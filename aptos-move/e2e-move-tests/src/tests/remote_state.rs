@@ -294,7 +294,10 @@ async fn test_option() {
             FeatureFlag::ENABLE_FUNCTION_VALUES,
             FeatureFlag::ENABLE_ENUM_TYPES,
         ],
-        vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION],
+        vec![
+            FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
+            FeatureFlag::ENABLE_ENUM_OPTION,
+        ],
     );
 
     let existing_account_addr = AccountAddress::from_hex_literal(TESTNET_ACCOUNT_ADDR).unwrap();
@@ -314,7 +317,7 @@ async fn test_option() {
     );
     assert_success!(status);
 
-    h.enable_features(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![]);
+    h.enable_features(vec![FeatureFlag::ENABLE_ENUM_OPTION], vec![]);
     let status = h.run_entry_function(
         &existing_account,
         str::parse(

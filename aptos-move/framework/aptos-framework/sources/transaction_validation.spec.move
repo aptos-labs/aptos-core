@@ -162,7 +162,7 @@ spec aptos_framework::transaction_validation {
             !account::spec_exists_at(secondary_signer_addresses[i]);
         aborts_if exists i in 0..num_secondary_signers:
             !can_skip(features::spec_simulation_enhancement_enabled(), is_simulation, secondary_signer_public_key_hashes[i]) &&
-                option::is_some(secondary_signer_public_key_hashes[i]) && option::spec_borrow(
+                option::is_some(secondary_signer_public_key_hashes[i]) && option::borrow(
                 secondary_signer_public_key_hashes[i]
             ) !=
                     account::spec_get_authentication_key(secondary_signer_addresses[i]);
@@ -170,7 +170,7 @@ spec aptos_framework::transaction_validation {
         ensures forall i in 0..num_secondary_signers:
             account::spec_exists_at(secondary_signer_addresses[i]);
         ensures forall i in 0..num_secondary_signers:
-            option::is_none(secondary_signer_public_key_hashes[i]) || option::spec_borrow(
+            option::is_none(secondary_signer_public_key_hashes[i]) || option::borrow(
                 secondary_signer_public_key_hashes[i]
             ) ==
                 account::spec_get_authentication_key(secondary_signer_addresses[i])
@@ -487,10 +487,10 @@ spec aptos_framework::transaction_validation {
         let apt_addr = type_info::type_of<AptosCoin>().account_address;
         let maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
         let total_supply_enabled = option::is_some(maybe_apt_supply);
-        let apt_supply = option::spec_borrow(maybe_apt_supply);
+        let apt_supply = option::borrow(maybe_apt_supply);
         let apt_supply_value = optional_aggregator::optional_aggregator_value(apt_supply);
         let post post_maybe_apt_supply = global<CoinInfo<AptosCoin>>(apt_addr).supply;
-        let post post_apt_supply = option::spec_borrow(post_maybe_apt_supply);
+        let post post_apt_supply = option::borrow(post_maybe_apt_supply);
         let post post_apt_supply_value = optional_aggregator::optional_aggregator_value(post_apt_supply);
 
         aborts_if amount_to_burn > 0 && !exists<AptosCoinCapabilities>(@aptos_framework);
