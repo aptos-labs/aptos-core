@@ -71,6 +71,7 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
 -  [Function `contains`](#0x1_big_ordered_map_contains)
 -  [Function `borrow`](#0x1_big_ordered_map_borrow)
 -  [Function `get`](#0x1_big_ordered_map_get)
+-  [Function `get_and_map`](#0x1_big_ordered_map_get_and_map)
 -  [Function `borrow_mut`](#0x1_big_ordered_map_borrow_mut)
 -  [Function `borrow_front`](#0x1_big_ordered_map_borrow_front)
 -  [Function `borrow_back`](#0x1_big_ordered_map_borrow_back)
@@ -1615,6 +1616,35 @@ Returns a reference to the element with its key, aborts if the key is not found.
 
 </details>
 
+<a id="0x1_big_ordered_map_get_and_map"></a>
+
+## Function `get_and_map`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_get_and_map">get_and_map</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store, R&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;R&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_get_and_map">get_and_map</a>&lt;K: drop + <b>copy</b> + store, V: <b>copy</b> + store, R&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): Option&lt;R&gt; {
+    <b>let</b> iter = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_find">internal_find</a>(key);
+    <b>if</b> (iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    } <b>else</b> {
+        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(f(iter.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow">iter_borrow</a>(self)))
+    }
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_big_ordered_map_borrow_mut"></a>
 
 ## Function `borrow_mut`
@@ -2203,7 +2233,7 @@ Note: Requires that the map is not changed after the input iterator is generated
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>&lt;K: drop, store, V: store, R&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |&<b>mut</b> V|R): R
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>&lt;K: drop, store, V: store, R&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">big_ordered_map::IteratorPtr</a>&lt;K&gt;, map: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;, f: |&<b>mut</b> V|R): R
 </code></pre>
 
 
@@ -2212,7 +2242,7 @@ Note: Requires that the map is not changed after the input iterator is generated
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>&lt;K: drop + store, V: store, R&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">IteratorPtr</a>&lt;K&gt;, map: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&<b>mut</b> V|R): R {
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_iter_modify">iter_modify</a>&lt;K: drop + store, V: store, R&gt;(self: <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">IteratorPtr</a>&lt;K&gt;, map: &<b>mut</b> <a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;, f: |&<b>mut</b> V|R): R {
     <b>assert</b>!(!self.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(map), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EITER_OUT_OF_BOUNDS">EITER_OUT_OF_BOUNDS</a>));
     <b>let</b> IteratorPtr::Some { node_index, child_iter, key } = self;
     <b>let</b> children = &<b>mut</b> map.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node_mut">borrow_node_mut</a>(node_index).children;
