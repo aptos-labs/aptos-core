@@ -3,10 +3,10 @@
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_language_e2e_tests::executor::{ExecutorMode, FakeExecutor};
-use aptos_types::{
-    on_chain_config::FeatureFlag,
-    transaction::{EntryFunction, ExecutionStatus, TransactionPayload, TransactionStatus},
+use aptos_types::transaction::{
+    EntryFunction, ExecutionStatus, TransactionPayload, TransactionStatus,
 };
+use aptos_vm_environment::prod_configs::set_layout_caches;
 use move_core_types::{
     account_address::AccountAddress, ident_str, language_storage::ModuleId, vm_status::StatusCode,
 };
@@ -14,17 +14,11 @@ use std::{collections::BTreeSet, str::FromStr};
 
 #[test]
 fn test_layout_cache_successful_reads() {
+    set_layout_caches(true);
+
     let executor =
         FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::BothComparison);
     let mut h = MoveHarness::new_with_executor(executor);
-    h.enable_features(
-        vec![
-            FeatureFlag::ENABLE_LAYOUT_CACHES,
-            FeatureFlag::ENABLE_LAZY_LOADING,
-        ],
-        vec![],
-    );
-
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
 
     assert_success!(

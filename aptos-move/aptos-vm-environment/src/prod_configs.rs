@@ -26,6 +26,10 @@ static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
+/// If enabled, types layouts are cached in a global long-living cache. Caches ensure the behavior
+/// is the same as without caches, and so, using node config suffices.
+static LAYOUT_CACHES: OnceCell<bool> = OnceCell::new();
+
 /// Set the paranoid type check flag.
 pub fn set_paranoid_type_checks(enable: bool) {
     PARANOID_TYPE_CHECKS.set(enable).ok();
@@ -54,6 +58,16 @@ pub fn set_timed_feature_override(profile: TimedFeatureOverride) {
 /// Returns the timed feature override, and [None] if not set.
 pub fn get_timed_feature_override() -> Option<TimedFeatureOverride> {
     TIMED_FEATURE_OVERRIDE.get().cloned()
+}
+
+/// Set the layout cache flag.
+pub fn set_layout_caches(enable: bool) {
+    LAYOUT_CACHES.set(enable).ok();
+}
+
+/// Returns the layout cache flag if already set, and false otherwise.
+pub fn get_layout_caches() -> bool {
+    LAYOUT_CACHES.get().cloned().unwrap_or(false)
 }
 
 /// Returns [TypeBuilder] used by the Aptos blockchain in production.
@@ -148,6 +162,7 @@ pub fn aptos_prod_vm_config(
 ) -> VMConfig {
     let paranoid_type_checks = get_paranoid_type_checks();
     let paranoid_ref_checks = get_paranoid_ref_checks();
+    let enable_layout_caches = get_layout_caches();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
@@ -194,7 +209,7 @@ pub fn aptos_prod_vm_config(
         paranoid_ref_checks,
         enable_capture_option,
         enable_enum_option,
-        enable_layout_caches: features.are_layout_caches_enabled(),
+        enable_layout_caches,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
