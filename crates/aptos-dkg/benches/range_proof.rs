@@ -98,30 +98,37 @@ use std::time::Instant;
 fn run_param_sweep<E: Pairing, B: BatchedRangeProof<E>>(curve_name: &str) {
     let ells = [4, 8, 16, 32];
     let ns = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
+    let num_runs = 10;
 
-    // store results in microseconds
+    // store results in microseconds (averaged)
     let mut prove_times = vec![vec![0u128; ns.len()]; ells.len()];
     let mut verify_times = vec![vec![0u128; ns.len()]; ells.len()];
 
     for (i, &ell) in ells.iter().enumerate() {
         for (j, &n) in ns.iter().enumerate() {
-            // println!("NOW DOING ELL {} N {}", ell, n);
-            let mut rng = thread_rng();
-            let (pk, vk, values, comm, r) =
-                test_utils::range_proof_random_instance::<_, B, _>(n, ell, &mut rng);
+            let mut prove_sum = 0u128;
+            let mut verify_sum = 0u128;
 
-            // --- Prove ---
-            let mut fs_t = merlin::Transcript::new(B::DST);
-            let start = Instant::now();
-            let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
-            prove_times[i][j] = (start.elapsed().as_secs_f64() * 1_000_000.0) as u128; // µs
+            for _ in 0..num_runs {
+                let mut rng = thread_rng();
+                let (pk, vk, values, comm, r) =
+                    test_utils::range_proof_random_instance::<_, B, _>(n, ell, &mut rng);
 
-            // --- Verify ---
-            let mut fs_t = merlin::Transcript::new(B::DST);
-            let start = Instant::now();
-            proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
-            verify_times[i][j] = (start.elapsed().as_secs_f64() * 1_000_000.0) as u128;
-            // µs
+                // --- Prove ---
+                let mut fs_t = merlin::Transcript::new(B::DST);
+                let start = Instant::now();
+                let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+                prove_sum += (start.elapsed().as_secs_f64() * 1_000_000.0) as u128; // µs
+
+                // --- Verify ---
+                let mut fs_t = merlin::Transcript::new(B::DST);
+                let start = Instant::now();
+                proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
+                verify_sum += (start.elapsed().as_secs_f64() * 1_000_000.0) as u128; // µs
+            }
+
+            prove_times[i][j] = prove_sum / num_runs as u128;
+            verify_times[i][j] = verify_sum / num_runs as u128;
         }
     }
 
