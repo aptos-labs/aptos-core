@@ -44,9 +44,13 @@ module 0xc0ffee::m {
         assert!(x > 10);
     }
 
-
     #[lint::skip(empty_if)]
     public fun skip_empty_if(x: u64) {
+        if (x > 35) {
+        } else { };
+    }
+
+    public fun dont_flag_abort_on_else(x: u64) {
         if (x > 0) {
         } else {
             abort(0)
