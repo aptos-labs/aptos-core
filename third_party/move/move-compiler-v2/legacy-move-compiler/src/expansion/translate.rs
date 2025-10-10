@@ -2673,6 +2673,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                         // { let t2 = e2; let t1 = e1; *t1 = *t1 + t2 }
                         Some(op) => {
                             // t2, let t2 = e2;
+                            let lhs_loc = el.loc;
                             let (tmp2, bind2) = let_symbol_eq_exp(er.loc, Symbol::from("$t2"), *er);
                             // t1, let t1 = e1;
                             let (tmp1, bind1) =
@@ -2681,7 +2682,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                                     _ => *el,
                                 });
                             // *t1
-                            let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
+                            let deref_tmp1 = sp(lhs_loc, EE::Dereference(Box::new(tmp1.clone())));
                             // *t1 + t2
                             let rhs_expanded =
                                 sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
@@ -2711,7 +2712,7 @@ fn exp_(context: &mut Context, sp!(loc, pe_): P::Exp) -> E::Exp {
                         // t1, let t1 = &mut e1.f;
                         let (tmp1, bind1) = let_symbol_eq_exp(lhs_loc, Symbol::from("$t1"), e_mut);
                         // *t1
-                        let deref_tmp1 = sp(loc, EE::Dereference(Box::new(tmp1.clone())));
+                        let deref_tmp1 = sp(lhs_loc, EE::Dereference(Box::new(tmp1.clone())));
                         // *t1 + t2
                         let rhs_expanded =
                             sp(loc, EE::BinopExp(Box::new(deref_tmp1), op, Box::new(tmp2)));
