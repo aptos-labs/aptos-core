@@ -323,8 +323,9 @@ class TaskStats:
         self.succeeded: bool = False
 
     def set_end_time(self) -> None:
-        self.end_time = time.time()
-        self.durations.append(self.end_time - self.start_time)
+        if self.end_time is None:
+            self.end_time = time.time()
+            self.durations.append(self.end_time - self.start_time)
 
     def increment_retry_count(self) -> None:
         self.retry_count += 1
