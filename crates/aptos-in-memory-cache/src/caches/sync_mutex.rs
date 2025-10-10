@@ -58,7 +58,7 @@ const DEFAULT_MAX_NUM_CACHE_ITEMS: usize = 1_000_000;
 /// +---+---+---+---+---+---+---+---+---+
 /// ```
 ///
-/// 6. Insert 10 → `10 % 9 = 1` → `cache[1] = 10`  
+/// 6. Insert 10 → `10 % 9 = 1` → `cache[1] = 10`
 ///    Evict 6 → `6 % 9 = 6` → `cache[6] = None`
 /// * Capacity at 5
 /// ```text
