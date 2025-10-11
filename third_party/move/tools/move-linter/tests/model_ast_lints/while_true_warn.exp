@@ -21,3 +21,19 @@ warning: [lint] Use the more explicit `loop` instead.
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(while_true)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#while_true.
+
+warning: [lint] This statement has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/while_true_warn.move:8:36
+   │
+ 8 │       public fun test_warn_2(x: u64) {
+   │ ╭────────────────────────────────────^
+ 9 │ │         let i = x;
+10 │ │         let __update_iter_flag = false;
+11 │ │         while (true) {
+12 │ │             if (__update_iter_flag) { i = i + 1; } else { __update_iter_flag = true; }
+13 │ │         }
+14 │ │     }
+   │ ╰─────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
