@@ -15,7 +15,9 @@ use aptos_types::{
 };
 use better_any::{Tid, TidAble};
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{
+    native_extensions::NativeExtensionSession, native_functions::NativeFunction,
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -50,6 +52,26 @@ pub struct NativeTransactionContext {
     user_transaction_context_opt: Option<UserTransactionContext>,
     /// A number to represent the sessions inside the execution of a transaction. Used for computing the `monotonically_increasing_counter` method.
     session_counter: u8,
+}
+
+impl NativeExtensionSession for NativeTransactionContext {
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn start(&mut self, txn_hash: &[u8; 32], script_hash: &[u8], session_counter: u8) {
+        self.txn_hash = txn_hash.to_vec();
+        self.auid_counter = 0;
+        self.local_counter = 0;
+        self.script_hash = script_hash.to_vec();
+        // Chain ID is persisted.
+        // User transaction context is persisted.
+        self.session_counter = session_counter;
+    }
 }
 
 impl NativeTransactionContext {
@@ -486,4 +508,35 @@ pub fn make_all(
     ];
 
     builder.make_named_natives(natives)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extension_update() {
+        let mut ctx = NativeTransactionContext::new(vec![2; 32], vec![1; 2], 2, None, 32);
+        ctx.auid_counter = 100;
+        ctx.local_counter = 23;
+        ctx.start(&[4; 32], &[2; 3], 44);
+
+        let NativeTransactionContext {
+            txn_hash,
+            auid_counter,
+            local_counter,
+            script_hash,
+            chain_id,
+            user_transaction_context_opt,
+            session_counter,
+        } = ctx;
+
+        assert_eq!(txn_hash, vec![4; 32]);
+        assert_eq!(auid_counter, 0);
+        assert_eq!(local_counter, 0);
+        assert_eq!(script_hash, vec![2; 3]);
+        assert_eq!(chain_id, 2);
+        assert!(user_transaction_context_opt.is_none());
+        assert_eq!(session_counter, 44);
+    }
 }

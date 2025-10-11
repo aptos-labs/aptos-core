@@ -113,7 +113,9 @@ static DUMMY_RESOLVER: Lazy<BlankStorage> = Lazy::new(|| BlankStorage);
 mod tests {
     use crate::extensions::{new_extensions, set_extension_hook};
     use better_any::{Tid, TidAble};
-    use move_vm_runtime::native_extensions::NativeContextExtensions;
+    use move_vm_runtime::native_extensions::{
+        NativeContextExtensions, UnreachableNativeExtensionSession,
+    };
 
     /// A test that extension hooks work as expected.
     #[test]
@@ -125,6 +127,8 @@ mod tests {
 
     #[derive(Tid)]
     struct TestExtension();
+
+    impl UnreachableNativeExtensionSession for TestExtension {}
 
     fn my_hook(ext: &mut NativeContextExtensions) {
         ext.add(TestExtension())
