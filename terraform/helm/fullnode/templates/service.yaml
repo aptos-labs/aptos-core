@@ -28,6 +28,10 @@ spec:
     port: 9102
     targetPort: 9102
   {{- end }}
+  {{- if $.Values.service.exposeGrpcPort }}
+  - name: grpc
+    port: 50051
+  {{- end }}
   - name: aptosnet
     port: 6182
   {{- with .Values.service }}
@@ -45,12 +49,24 @@ metadata:
   name: {{ include "aptos-fullnode.fullname" . }}
   labels:
     {{- include "aptos-fullnode.labels" . | nindent 4 }}
+  annotations:
+    {{- with $.Values.service.internal.annotations }}
+    {{- toYaml $.Values.service.internal.annotations | nindent 4 }}
+    {{- end }}
+    {{- if $.Values.service.internal.hostname }}
+    external-dns.alpha.kubernetes.io/hostname: {{ $.Values.service.internal.hostname }}
+    {{- end }}
 spec:
   selector:
     {{- include "aptos-fullnode.selectorLabels" . | nindent 4 }}
     app.kubernetes.io/name: fullnode
+  type: {{ $.Values.service.internal.type }}
   ports:
   - name: backup
     port: 6186
   - name: metrics
     port: 9101
+  {{- if $.Values.service.internal.exposeGrpcPort }}
+  - name: grpc
+    port: 50051
+  {{- end }}

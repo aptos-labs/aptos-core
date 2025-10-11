@@ -23,7 +23,7 @@
 | backup.enable | bool | `false` | Whether to enable backup |
 | backup.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for backup images |
 | backup.image.repo | string | `"aptoslabs/tools"` | Image repo to use for backup images |
-| backup.image.tag | string | `nil` | Image tag to use for backup images |
+| backup.image.tag | string | `nil` | Image tag to use for backup images. If set, overrides `imageTag` |
 | backup.nodeSelector | object | `{}` |  |
 | backup.resources.limits.cpu | int | `6` |  |
 | backup.resources.limits.memory | string | `"8Gi"` |  |
@@ -43,8 +43,8 @@
 | backup_verify.nodeSelector | object | `{}` |  |
 | backup_verify.resources.limits.cpu | int | `32` |  |
 | backup_verify.resources.limits.memory | string | `"60Gi"` |  |
-| backup_verify.resources.requests.cpu | int | `8` |  |
-| backup_verify.resources.requests.memory | string | `"8Gi"` |  |
+| backup_verify.resources.requests.cpu | int | `16` |  |
+| backup_verify.resources.requests.memory | string | `"30Gi"` |  |
 | backup_verify.schedule | string | `"@daily"` | The schedule for backup verification |
 | backup_verify.tolerations | list | `[]` |  |
 | chain.era | int | `1` | Bump this number to wipe the underlying storage |
@@ -85,7 +85,7 @@
 | restore.enabled | bool | `false` |  |
 | restore.image.pullPolicy | string | `"IfNotPresent"` | Image pull policy to use for restore images |
 | restore.image.repo | string | `"aptoslabs/tools"` | Image repo to use for restore images |
-| restore.image.tag | string | `nil` | Image tag to use for restore images |
+| restore.image.tag | string | `nil` | Image tag to use for restore images. If set, overrides `imageTag` |
 | restore.nodeSelector | object | `{}` |  |
 | restore.resources.limits.cpu | int | `16` |  |
 | restore.resources.limits.memory | string | `"120Gi"` |  |
@@ -96,8 +96,13 @@
 | service.annotations | object | `{}` |  |
 | service.exposeAdmin | bool | `false` | Whether to expose the admin port on fullnodes |
 | service.exposeApi | bool | `true` | Whether to expose the node REST API |
+| service.exposeGrpcPort | bool | `false` | Whether to expose the gRPC port on the external service |
 | service.exposeMetrics | bool | `false` | Whether to expose the metrics port on fullnodes |
 | service.externalTrafficPolicy | string | `nil` | The externalTrafficPolicy for the fullnode service |
+| service.internal.annotations | object | `{}` |  |
+| service.internal.exposeGrpcPort | bool | `false` | Whether to expose the gRPC port on the internal service |
+| service.internal.hostname | string | `nil` | If set, the hostname to use for the internal LB |
+| service.internal.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for the internal service. |
 | service.loadBalancerSourceRanges | list | `[]` | If set and if the ServiceType is LoadBalancer, allow traffic to fullnode from these CIDRs |
 | service.type | string | `"ClusterIP"` | The Kubernetes ServiceType to use for the fullnode. Change this to LoadBalancer expose the REST API, aptosnet endpoint externally |
 | serviceAccount.annotations | object | `{}` |  |
