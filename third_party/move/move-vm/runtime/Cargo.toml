@@ -46,7 +46,7 @@ smallbitvec = { workspace = true }
 test-case = { workspace = true }
 
 [features]
-default = []
+default = ["inline-interpreter-helpers"]
 fuzzing = ["move-vm-types/fuzzing"]
 failpoints = ["fail/failpoints"]
 # Enable tracing and debugging also for release builds. By default, it is only enabled for debug builds.
@@ -56,6 +56,7 @@ stacktrace = []
 # Enable this features for tests that check bytecode verification.
 disable_verifier_cache = []
 force-inline = []
+inline-interpreter-helpers = []
 
 [lints.rust]
 unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }
