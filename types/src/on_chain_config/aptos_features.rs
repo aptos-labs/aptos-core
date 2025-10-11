@@ -233,7 +233,7 @@ impl FeatureFlag {
             FeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES,
             FeatureFlag::COLLECTION_OWNER,
             FeatureFlag::PERMISSIONED_SIGNER,
-            FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
+            // FeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE,
             FeatureFlag::ACCOUNT_ABSTRACTION,
             FeatureFlag::BULLETPROOFS_BATCH_NATIVES,
             FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION,
