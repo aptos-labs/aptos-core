@@ -1016,8 +1016,8 @@ Returns <code><b>false</b></code> if either:
 <pre><code><b>aborts_if</b> <b>false</b>;
 <b>let</b> cond = len(bytes) % <a href="multi_ed25519.md#0x1_multi_ed25519_INDIVIDUAL_PUBLIC_KEY_NUM_BYTES">INDIVIDUAL_PUBLIC_KEY_NUM_BYTES</a> == <a href="multi_ed25519.md#0x1_multi_ed25519_THRESHOLD_SIZE_BYTES">THRESHOLD_SIZE_BYTES</a>
     && <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_internal">spec_public_key_validate_internal</a>(bytes);
-<b>ensures</b> cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>{bytes});
-<b>ensures</b> !cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>&lt;<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>&gt;();
+<b>ensures</b> cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>{bytes});
+<b>ensures</b> !cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>&gt;();
 </code></pre>
 
 
@@ -1034,8 +1034,8 @@ Returns <code><b>false</b></code> if either:
 
 
 <pre><code><b>let</b> cond = <a href="multi_ed25519.md#0x1_multi_ed25519_spec_public_key_validate_v2_internal">spec_public_key_validate_v2_internal</a>(bytes);
-<b>ensures</b> cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>{bytes});
-<b>ensures</b> !cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_spec_none">option::spec_none</a>&lt;<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>&gt;();
+<b>ensures</b> cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>{bytes});
+<b>ensures</b> !cond ==&gt; result == <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;<a href="multi_ed25519.md#0x1_multi_ed25519_ValidatedPublicKey">ValidatedPublicKey</a>&gt;();
 </code></pre>
 
 
@@ -1262,7 +1262,7 @@ Returns <code><b>false</b></code> if either:
        } <b>else</b> <b>if</b> (threshold_byte == 0 || threshold_byte &gt; (num_of_keys <b>as</b> u8)) {
            <a href="../../move-stdlib/doc/option.md#0x1_option_none">option::none</a>&lt;u8&gt;()
        } <b>else</b> {
-           <a href="../../move-stdlib/doc/option.md#0x1_option_spec_some">option::spec_some</a>(threshold_byte)
+           <a href="../../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(threshold_byte)
        }
    }
 }
