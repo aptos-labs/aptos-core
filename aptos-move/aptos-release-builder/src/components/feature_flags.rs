@@ -153,6 +153,7 @@ pub enum FeatureFlag {
     EnableCaptureOption,
     EnableTrustedCode,
     EnableEnumOption,
+    FakeFeatureForComparisonTesting,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -377,6 +378,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::DisallowInitModuleToPublishModules => {
                 AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES
             },
+            FeatureFlag::FakeFeatureForComparisonTesting => {
+                AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING
+            },
             FeatureFlag::EnableCallTreeAndInstructionVMCache => {
                 AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE
             },
@@ -555,6 +559,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::_ENABLE_LOADER_V2 => FeatureFlag::EnableLoaderV2,
             AptosFeatureFlag::_DISALLOW_INIT_MODULE_TO_PUBLISH_MODULES => {
                 FeatureFlag::DisallowInitModuleToPublishModules
+            },
+            AptosFeatureFlag::FAKE_FEATURE_FOR_COMPARISON_TESTING => {
+                FeatureFlag::FakeFeatureForComparisonTesting
             },
             AptosFeatureFlag::ENABLE_CALL_TREE_AND_INSTRUCTION_VM_CACHE => {
                 FeatureFlag::EnableCallTreeAndInstructionVMCache

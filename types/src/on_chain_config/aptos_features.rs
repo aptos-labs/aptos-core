@@ -148,6 +148,7 @@ pub enum FeatureFlag {
     /// Whether to allow trusted code optimizations.
     ENABLE_TRUSTED_CODE = 100,
     ENABLE_ENUM_OPTION = 101,
+    FAKE_FEATURE_FOR_COMPARISON_TESTING = 1000,
 }
 
 impl FeatureFlag {
