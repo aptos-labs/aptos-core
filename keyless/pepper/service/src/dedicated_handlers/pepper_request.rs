@@ -25,6 +25,7 @@ use aptos_types::{
     keyless::{Configuration, IdCommitment, KeylessPublicKey, OpenIdSig, Pepper},
     transaction::authenticator::{AnyPublicKey, AuthenticationKey, EphemeralPublicKey},
 };
+use ark_bls12_381::Fr;
 use jsonwebtoken::{Algorithm::RS256, DecodingKey, TokenData, Validation};
 use std::{
     sync::Arc,
@@ -94,8 +95,22 @@ pub async fn handle_pepper_request(
     )
     .await?;
 
+    // Derive the pepper base, pepper bytes and account address
+    let (pepper_base, derived_pepper_bytes, address) =
+        derive_pepper_and_account_address(vuf_private_key, derivation_path, &pepper_input)?;
+
+    // Return the pepper base, derived pepper and address
+    Ok((pepper_base, derived_pepper_bytes, address))
+}
+
+/// Derives the pepper base, pepper bytes and account address
+fn derive_pepper_and_account_address(
+    vuf_private_key: &Fr,
+    derivation_path: Option<String>,
+    pepper_input: &PepperInput,
+) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), PepperServiceError> {
     // Create the pepper base using the vuf private key and the pepper input
-    let pepper_base = create_pepper_base(vuf_private_key, &pepper_input)?;
+    let pepper_base = create_pepper_base(vuf_private_key, pepper_input)?;
 
     // Derive the pepper using the verified derivation path and the pepper base
     let verified_derivation_path = get_verified_derivation_path(derivation_path)?;
@@ -103,9 +118,8 @@ pub async fn handle_pepper_request(
     let derived_pepper_bytes = derived_pepper.to_bytes().to_vec();
 
     // Create the account address
-    let address = create_account_address(&pepper_input, &derived_pepper)?;
+    let address = create_account_address(pepper_input, &derived_pepper)?;
 
-    // Return the pepper base, derived pepper and address
     Ok((pepper_base, derived_pepper_bytes, address))
 }
 
@@ -676,16 +690,9 @@ mod tests {
         expected_derived_pepper_hex: &str,
         expected_account_address: &str,
     ) {
-        // Create the pepper base
-        let pepper_base = create_pepper_base(vuf_private_key, pepper_input).unwrap();
-
-        // Derive the pepper using the verified derivation path and the pepper base
-        let verified_derivation_path = get_verified_derivation_path(None).unwrap();
-        let derived_pepper = derive_pepper(&verified_derivation_path, &pepper_base).unwrap();
-        let derived_pepper_bytes = derived_pepper.to_bytes().to_vec();
-
-        // Create the account address
-        let address = create_account_address(pepper_input, &derived_pepper).unwrap();
+        // Derive the pepper base, pepper and account address
+        let (pepper_base, derived_pepper_bytes, address) =
+            derive_pepper_and_account_address(vuf_private_key, None, pepper_input).unwrap();
 
         // Verify the pepper base, derived pepper and account address
         assert_eq!(hex::encode(pepper_base), expected_pepper_base_hex);
