@@ -1,0 +1,73 @@
+
+Diagnostics:
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:10:42
+   │
+10 │     public fun error(r: ConstructorRef): ConstructorRef { r }
+   │                                          ^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
+
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:11:45
+   │
+11 │     public fun ret_ref(r: &ConstructorRef): &ConstructorRef { r }
+   │                                             ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
+
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:12:53
+   │
+12 │     public fun ret_mut_ref(r: &mut ConstructorRef): &mut ConstructorRef { r }
+   │                                                     ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
+
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:13:52
+   │
+13 │     public fun ret_vec(v: vector<ConstructorRef>): vector<ConstructorRef> { v }
+   │                                                    ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
+
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:14:54
+   │
+14 │     public fun ret_tuple(r: ConstructorRef, u: u64): (u64, ConstructorRef) { (u, r) }
+   │                                                      ^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
+
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:15:51
+   │
+15 │     public fun ret_wrapped(w: W<ConstructorRef>): W<ConstructorRef> { w }
+   │                                                   ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
+
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:16:63
+   │
+16 │     public fun ret_vecvec(v: vector<vector<ConstructorRef>>): vector<vector<ConstructorRef>> { v }
+   │                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
+
+warning: [lint] Returning an `object::ConstructorRef` leaks authority; avoid returning constructor refs.
+   ┌─ tests/stackless_bytecode_lints/return_constructor_ref.move:17:59
+   │
+17 │     public fun ret_tuple_ref(r: &ConstructorRef, u: u64): (u64, &ConstructorRef) { (u, r) }
+   │                                                           ^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(return_constructor_ref)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#return_constructor_ref.
