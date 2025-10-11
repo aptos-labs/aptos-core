@@ -20,6 +20,7 @@ move-compiler-v2 = { workspace = true }
 move-model = { workspace = true }
 move-stackless-bytecode = { workspace = true }
 num = { workspace = true }
+once_cell = { workspace = true }
 
 [dev-dependencies]
 datatest-stable = { workspace = true }

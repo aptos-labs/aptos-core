@@ -12554,6 +12554,7 @@ dependencies = [
  "move-prover-test-utils",
  "move-stackless-bytecode",
  "num 0.4.1",
+ "once_cell",
 ]
 
 [[package]]
