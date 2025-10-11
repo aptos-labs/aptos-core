@@ -11,6 +11,7 @@ use crate::{
     values::function_values_impl::{AbstractFunction, Closure, ClosureVisitor},
     views::{ValueView, ValueVisitor},
 };
+use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
     errors::*,
@@ -239,10 +240,17 @@ pub struct VectorRef(ContainerRef);
 /// A special "slot" in global storage that can hold a resource. It also keeps track of the status
 /// of the resource relative to the global state, which is necessary to compute the effects to emit
 /// at the end of transaction execution.
-#[derive(Debug)]
+#[derive(Derivative)]
+#[derivative(Debug)]
 enum GlobalValueImpl {
     /// No resource resides in this slot or in storage.
     None,
+    /// A resource has been fetched from storage but is not yet deserialized and not in the
+    /// cache.
+    Fetched {
+        #[derivative(Debug = "ignore")]
+        deserializer: Box<dyn FnOnce() -> PartialVMResult<Value>>,
+    },
     /// A resource has been published to this slot and it did not previously exist in storage.
     Fresh { fields: Rc<RefCell<Vec<ValueImpl>>> },
     /// A resource resides in this slot and also in storage. The status flag indicates whether
@@ -3365,6 +3373,14 @@ impl Struct {
  **************************************************************************************/
 #[allow(clippy::unnecessary_wraps)]
 impl GlobalValueImpl {
+    fn fetched(
+        deserializer: impl FnOnce() -> PartialVMResult<Value> + 'static,
+    ) -> PartialVMResult<Self> {
+        Ok(GlobalValueImpl::Fetched {
+            deserializer: Box::new(deserializer),
+        })
+    }
+
     fn cached(
         val: ValueImpl,
         status: GlobalDataStatus,
@@ -3393,7 +3409,22 @@ impl GlobalValueImpl {
         }
     }
 
+    fn ensure_cached(&mut self) -> PartialVMResult<()> {
+        if matches!(self, Self::Fetched { .. }) {
+            // For Rust semantics restrictions, need to replace data before we can consume.
+            let data = mem::replace(self, GlobalValueImpl::None);
+            let Self::Fetched { deserializer } = data else {
+                unreachable!()
+            };
+            *self = Self::cached(deserializer()?.0, GlobalDataStatus::Clean).map_err(|_| {
+                PartialVMError::new_invariant_violation("unexpected lazy deserialization error")
+            })?;
+        }
+        Ok(())
+    }
+
     fn move_from(&mut self) -> PartialVMResult<ValueImpl> {
+        self.ensure_cached()?;
         let fields = match self {
             Self::None | Self::Deleted => {
                 return Err(PartialVMError::new(StatusCode::MISSING_DATA))
@@ -3406,6 +3437,7 @@ impl GlobalValueImpl {
                 Self::Cached { fields, .. } => fields,
                 _ => unreachable!(),
             },
+            Self::Fetched { .. } => unreachable!(),
         };
         if Rc::strong_count(&fields) != 1 {
             return Err(
@@ -3419,7 +3451,7 @@ impl GlobalValueImpl {
 
     fn move_to(&mut self, val: ValueImpl) -> Result<(), (PartialVMError, ValueImpl)> {
         match self {
-            Self::Fresh { .. } | Self::Cached { .. } => {
+            Self::Fresh { .. } | Self::Cached { .. } | Self::Fetched { .. } => {
                 return Err((
                     PartialVMError::new(StatusCode::RESOURCE_ALREADY_EXISTS),
                     val,
@@ -3433,12 +3465,13 @@ impl GlobalValueImpl {
 
     fn exists(&self) -> PartialVMResult<bool> {
         match self {
-            Self::Fresh { .. } | Self::Cached { .. } => Ok(true),
+            Self::Fresh { .. } | Self::Cached { .. } | Self::Fetched { .. } => Ok(true),
             Self::None | Self::Deleted => Ok(false),
         }
     }
 
-    fn borrow_global(&self) -> PartialVMResult<ValueImpl> {
+    fn borrow_global(&mut self) -> PartialVMResult<ValueImpl> {
+        self.ensure_cached()?;
         match self {
             Self::None | Self::Deleted => Err(PartialVMError::new(StatusCode::MISSING_DATA)),
             Self::Fresh { fields } => Ok(ValueImpl::ContainerRef(ContainerRef::Local(
@@ -3448,6 +3481,7 @@ impl GlobalValueImpl {
                 container: Container::Struct(Rc::clone(fields)),
                 status: Rc::clone(status),
             })),
+            Self::Fetched { .. } => unreachable!(),
         }
     }
 
@@ -3464,6 +3498,7 @@ impl GlobalValueImpl {
                 },
                 GlobalDataStatus::Clean => None,
             },
+            Self::Fetched { .. } => None,
         }
     }
 
@@ -3476,6 +3511,7 @@ impl GlobalValueImpl {
                 GlobalDataStatus::Dirty => true,
                 GlobalDataStatus::Clean => false,
             },
+            Self::Fetched { .. } => false,
         }
     }
 }
@@ -3483,6 +3519,12 @@ impl GlobalValueImpl {
 impl GlobalValue {
     pub fn none() -> Self {
         Self(GlobalValueImpl::None)
+    }
+
+    pub fn fetched(
+        deserializer: impl FnOnce() -> PartialVMResult<Value> + 'static,
+    ) -> PartialVMResult<Self> {
+        Ok(Self(GlobalValueImpl::fetched(deserializer)?))
     }
 
     pub fn cached(val: Value) -> PartialVMResult<Self> {
@@ -3501,7 +3543,7 @@ impl GlobalValue {
             .map_err(|(err, val)| (err, Value(val)))
     }
 
-    pub fn borrow_global(&self) -> PartialVMResult<Value> {
+    pub fn borrow_global(&mut self) -> PartialVMResult<Value> {
         Ok(Value(self.0.borrow_global()?))
     }
 
@@ -4752,7 +4794,7 @@ impl GlobalValue {
         }
 
         match &self.0 {
-            G::None | G::Deleted => None,
+            G::None | G::Deleted | G::Fetched { .. } => None,
             G::Cached { fields, .. } | G::Fresh { fields } => Some(Wrapper(fields)),
         }
     }
