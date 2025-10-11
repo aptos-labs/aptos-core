@@ -1,7 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{algebra::polynomials, fiat_shamir, range_proofs::traits, utils};
+use crate::{
+    algebra::{homomorphism::Map, polynomials},
+    fiat_shamir,
+    pcs::univariate_kzg,
+    range_proofs::traits,
+    utils,
+};
 use anyhow::ensure;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -33,6 +39,7 @@ pub struct Proof<E: Pairing> {
     c_hat: Vec<E::G2Affine>, // of size \ell
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PowersOfTau<E: Pairing> {
     t1: Vec<E::G1>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^max_n}, where `max_n` is the maximum batch size
     t2: Vec<E::G2>,
@@ -57,11 +64,12 @@ where
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment<E: Pairing>(E::G1);
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
     max_n: usize,
     max_ell: usize,
-    taus: PowersOfTau<E>,      // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n},
-    lagr_g1: Vec<E::G1Affine>, // of size n + 1
+    taus: PowersOfTau<E>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n},
+    pub(crate) lagr_g1: Vec<E::G1Affine>, // of size n + 1
     lagr_g2: Vec<E::G2Affine>, // of size n + 1
     eval_dom: Radix2EvaluationDomain<E::ScalarField>,
     roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
@@ -76,7 +84,7 @@ pub struct PublicStatement<E: Pairing> {
     comm: Commitment<E>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     max_ell: usize,
     tau_1: E::G1,
@@ -195,17 +203,16 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     ) -> Commitment<E> {
         debug_assert!(
             pk.lagr_g1.len() > values.len(),
-            "pp.lagr_g1 must have at least z.len() + 1 elements"
+            "pk.lagr_g1 must have at least values.len() + 1 elements"
         );
 
-        let mut scalars = Vec::with_capacity(values.len() + 1);
-        scalars.push(*r);
-        scalars.extend_from_slice(values);
+        let kzg: univariate_kzg::Map<'_, E> = univariate_kzg::Map {
+            lagr_g1: &pk.lagr_g1,
+        };
 
-        Commitment(
-            E::G1::msm(&pk.lagr_g1[..scalars.len()], &scalars)
-                .expect("Failed to compute MSM in range proof commitment"),
-        )
+        let kzg_input = (*r, values.to_vec());
+
+        Commitment(kzg.apply(&kzg_input))
     }
 
     #[allow(non_snake_case)]
@@ -644,7 +651,7 @@ fn fiat_shamir_challenges<E: Pairing>(
         public_statement,
     );
 
-    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_bit_commitments(
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_commitments(
         fs_transcript,
         bit_commitments,
     );

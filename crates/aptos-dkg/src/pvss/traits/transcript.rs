@@ -108,6 +108,8 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
             <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
         >;
 
+    const DST: &[u8];
+
     /// Return a developer-friendly name of the PVSS scheme (e.g., "vanilla_scrape") that can be
     /// used in, say, criterion benchmark names.
     fn scheme_name() -> String;
