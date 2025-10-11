@@ -2813,7 +2813,7 @@ impl IntegerValue {
             let msg = if other.is_zero() {
                 "Division by zero".to_string()
             } else {
-                "Division overflow".to_string()
+                "Division overflow".to_string() // This happens when dividing the minimum negative value by -1
             };
             PartialVMError::new(StatusCode::ARITHMETIC_ERROR).with_message(msg)
         })
