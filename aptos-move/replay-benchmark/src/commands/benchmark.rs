@@ -9,7 +9,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail};
 use aptos_logger::Level;
-use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
+use aptos_vm_environment::prod_configs::{set_layout_caches, set_paranoid_type_checks};
 use clap::Parser;
 use std::path::PathBuf;
 use tokio::fs;
@@ -117,6 +117,7 @@ impl BenchmarkCommand {
             })
             .collect::<Vec<_>>();
 
+        set_layout_caches(true);
         set_paranoid_type_checks(!self.disable_paranoid_mode);
         BenchmarkRunner::new(
             self.concurrency_levels,
