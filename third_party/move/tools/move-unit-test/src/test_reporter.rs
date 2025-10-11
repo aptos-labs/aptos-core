@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{format_module_id, DEFAULT_EXECUTION_BOUND};
+use crate::format_module_id;
 use codespan_reporting::files::{Files, SimpleFiles};
 use colored::{control, Colorize};
 pub use legacy_move_compiler::unit_test::ExpectedMoveError as MoveError;
@@ -19,8 +19,7 @@ use move_core_types::{effects::ChangeSet, language_storage::ModuleId, vm_status:
 use move_ir_types::location::Loc;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::native_extensions::NativeContextExtensions;
-use move_vm_test_utils::gas_schedule::{zero_cost_schedule, CostTable, GasCost, GasStatus};
-use move_vm_types::gas::GasMeter;
+use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 use once_cell::sync::Lazy;
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -28,16 +27,6 @@ use std::{
     sync::Mutex,
     time::Duration,
 };
-
-/// A gas schedule where every instruction has a cost of "1". This is used to bound execution of a
-/// test to a certain number of ticks.
-fn unit_cost_table() -> CostTable {
-    let mut cost_schedule = zero_cost_schedule();
-    cost_schedule.instruction_table.iter_mut().for_each(|cost| {
-        *cost = GasCost::new(1, 1);
-    });
-    cost_schedule
-}
 
 pub trait UnitTestFactory {
     type GasMeter: GasMeter;
@@ -51,25 +40,25 @@ pub trait UnitTestFactory {
     ) -> TestRunInfo;
 }
 
-pub struct UnitTestFactoryWithCostTable {
-    cost_table: CostTable,
-    gas_limit: u64,
-}
+pub struct LegacyUnitTestFactory;
 
-impl UnitTestFactoryWithCostTable {
-    pub fn new(cost_table: Option<CostTable>, gas_limit: Option<u64>) -> Self {
-        Self {
-            cost_table: cost_table.unwrap_or_else(unit_cost_table),
-            gas_limit: gas_limit.unwrap_or(DEFAULT_EXECUTION_BOUND),
-        }
+impl LegacyUnitTestFactory {
+    pub fn new() -> Self {
+        Self
     }
 }
 
-impl UnitTestFactory for UnitTestFactoryWithCostTable {
-    type GasMeter = GasStatus;
+impl Default for LegacyUnitTestFactory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl UnitTestFactory for LegacyUnitTestFactory {
+    type GasMeter = UnmeteredGasMeter;
 
     fn new_gas_meter(&self) -> Self::GasMeter {
-        GasStatus::new(self.cost_table.clone(), self.gas_limit.into())
+        UnmeteredGasMeter
     }
 
     // @dev: the caller must fill the test_run_info.gas_used field in the returned TestRunInfo
@@ -77,11 +66,12 @@ impl UnitTestFactory for UnitTestFactoryWithCostTable {
         &self,
         _: &ChangeSet,
         _: &mut NativeContextExtensions,
-        gas_status: Self::GasMeter,
+        _gas_meter: Self::GasMeter,
         mut test_run_info: TestRunInfo,
     ) -> TestRunInfo {
-        let remaining_gas: u64 = gas_status.remaining_gas().into();
-        test_run_info.gas_used = self.gas_limit - remaining_gas;
+        // Note: The `gas_used` field is currently unused as we use the unmetered gas meter.
+        //       This could change in the future if we switch to a real gas meter.
+        test_run_info.gas_used = 0;
         test_run_info
     }
 }
