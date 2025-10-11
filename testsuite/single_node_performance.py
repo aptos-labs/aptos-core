@@ -3,6 +3,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import math
 import re
 import os
 import tempfile
@@ -895,6 +896,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         )
 
         if not HIDE_OUTPUT:
+            def get_tps_delta(r: RunGroupInstance) -> str:
+                tps = r.single_node_result.tps
+                if not math.isclose(r.expected_tps, 0):
+                    delta = (tps - r.expected_tps) / r.expected_tps * 100
+                    return f"{delta:+.2f}%"
+                else:
+                    return "N/A"
+
             print_table(
                 results,
                 by_levels=True,
@@ -902,6 +911,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     ("block_size", lambda r: r.block_size),
                     ("expected t/s", lambda r: r.expected_tps),
                     ("t/s", lambda r: int(round(r.single_node_result.tps))),
+                    ("delta", get_tps_delta),
                 ],
             )
             print_table(
