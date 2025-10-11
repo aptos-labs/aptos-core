@@ -63,13 +63,6 @@ pub(crate) struct FrameTypeCache {
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
-    /// Recursive frame cache for a function that is called from the
-    /// current frame. It is indexed by FunctionInstantiationIndex or
-    /// FunctionHandleIndex for non-generic functions. Note that
-    /// whenever a function with the same `index` is called, the
-    /// structures stored in that function's frame cache do not change.
-    pub(crate) generic_sub_frame_cache:
-        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
     /// small. The caches are indexed by the index of the given
@@ -81,6 +74,7 @@ pub(crate) struct FrameTypeCache {
     /// guaranteed that everything will be exactly the same as when we
     /// did the insertion.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
+    pub(crate) generic_sub_frame_cache: BTreeMap<FunctionInstantiationIndex, Rc<LoadedFunction>>,
 
     /// Cached instantiated local types for generic functions.
     pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
