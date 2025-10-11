@@ -9,6 +9,15 @@ warning: [lint] This boolean expression can be simplified using double negation 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:29:9
+   │
+29 │         if (!!a) ();
+   │         ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:36:13
    │
@@ -17,6 +26,15 @@ warning: [lint] This boolean expression can be simplified using double negation 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:36:9
+   │
+36 │         if (!!a) ();
+   │         ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:37:13
@@ -27,6 +45,15 @@ warning: [lint] This boolean expression can be simplified using double negation 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:37:9
+   │
+37 │         if (!(!b)) ();
+   │         ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:43:13
    │
@@ -35,6 +62,15 @@ warning: [lint] This boolean expression can be simplified using double negation 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:43:9
+   │
+43 │         if (!!flags.a) ();
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:44:13
@@ -45,6 +81,15 @@ warning: [lint] This boolean expression can be simplified using double negation 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:44:9
+   │
+44 │         if (!(!flags.b)) ();
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:53:13
    │
@@ -53,6 +98,15 @@ warning: [lint] This boolean expression can be simplified using double negation 
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:53:9
+   │
+53 │         if (!!nested.flags.a) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:54:13
@@ -63,6 +117,15 @@ warning: [lint] This boolean expression can be simplified using double negation 
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:54:9
+   │
+54 │         if (!(!nested.enabled)) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:62:13
    │
@@ -71,6 +134,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:62:9
+   │
+62 │         if (a && b || a) ();
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:63:13
@@ -81,6 +153,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:63:9
+   │
+63 │         if (a || a && b) ();
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:70:13
    │
@@ -90,6 +171,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:70:9
+   │
+70 │         if (x && y || x) ();
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:71:13
    │
@@ -98,6 +188,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:71:9
+   │
+71 │         if (x || x && y) ();
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:75:13
@@ -126,6 +225,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:75:9
+   │
+75 │         if (TRUE_CONST && FALSE_CONST || TRUE_CONST) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The left-hand side of `&&` evaluates to `false`. Recall that the expression `false && bexpr` is logically equivalent to `false`. Consider simplifying.
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:76:28
    │
@@ -153,6 +261,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:76:9
+   │
+76 │         if (FALSE_CONST || FALSE_CONST && TRUE_CONST) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:82:13
    │
@@ -161,6 +278,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:82:9
+   │
+82 │         if (flags.a && flags.b || flags.a) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:83:13
@@ -171,6 +297,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:83:9
+   │
+83 │         if (flags.a || flags.a && flags.b) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:92:13
    │
@@ -180,6 +315,15 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:92:9
+   │
+92 │         if (nested.flags.a && nested.enabled || nested.flags.a) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using absorption law (`a && b || a` is equivalent to `a`).
    ┌─ tests/model_ast_lints/simpler_bool_expression.move:93:13
    │
@@ -188,6 +332,33 @@ warning: [lint] This boolean expression can be simplified using absorption law (
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+   ┌─ tests/model_ast_lints/simpler_bool_expression.move:93:9
+   │
+93 │         if (nested.flags.a || nested.flags.a && nested.enabled) ();
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:101:9
+    │
+101 │         if ((helper_function()) && p > 10 || helper_function()) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:102:9
+    │
+102 │         if ((x == helper_function()) || x == helper_function() && p > 10) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using double negation law (`!!a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:110:13
@@ -207,6 +378,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:110:9
+    │
+110 │         if (!!a && !a) ();
+    │         ^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:111:13
     │
@@ -215,6 +395,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:111:9
+    │
+111 │         if (a && a) ();
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:112:13
@@ -225,6 +414,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:112:9
+    │
+112 │         if (a || a) ();
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:118:13
     │
@@ -233,6 +431,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:118:9
+    │
+118 │         if (flag && flag) ();
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:119:13
@@ -243,6 +450,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:119:9
+    │
+119 │         if (flag || flag) ();
+    │         ^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:124:13
     │
@@ -251,6 +467,15 @@ warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:124:9
+    │
+124 │         if (TRUE_CONST && TRUE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:125:13
@@ -261,6 +486,15 @@ warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:125:9
+    │
+125 │         if (FALSE_CONST || FALSE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:131:13
     │
@@ -269,6 +503,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:131:9
+    │
+131 │         if (flags.a && flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:132:13
@@ -279,6 +522,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:132:9
+    │
+132 │         if (flags.b || flags.b) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:141:13
     │
@@ -287,6 +539,15 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:141:9
+    │
+141 │         if (nested.flags.a && nested.flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using idempotence (`a && a` is equivalent to `a`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:142:13
@@ -297,6 +558,33 @@ warning: [lint] This boolean expression can be simplified using idempotence (`a 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:142:9
+    │
+142 │         if (nested.flags.b || nested.flags.b) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:149:9
+    │
+149 │         if ((x == helper_function()) && (x == helper_function())) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:150:9
+    │
+150 │         if ((x == helper_function()) || (x == helper_function())) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:160:13
     │
@@ -305,6 +593,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:160:9
+    │
+160 │         if (a && !a) ();
+    │         ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:161:13
@@ -315,6 +612,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:161:9
+    │
+161 │         if (!a && a) ();
+    │         ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:162:13
     │
@@ -323,6 +629,15 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:162:9
+    │
+162 │         if (a || !a) ();
+    │         ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:163:13
@@ -333,6 +648,15 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:163:9
+    │
+163 │         if (!a || a) ();
+    │         ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:169:13
     │
@@ -341,6 +665,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:169:9
+    │
+169 │         if (condition && !condition) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:170:13
@@ -351,6 +684,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:170:9
+    │
+170 │         if (!condition && condition) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:171:13
     │
@@ -360,6 +702,15 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:171:9
+    │
+171 │         if (condition || !condition) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:172:13
     │
@@ -368,6 +719,15 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:172:9
+    │
+172 │         if (!condition || condition) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:177:27
@@ -387,6 +747,15 @@ warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:177:9
+    │
+177 │         if (TRUE_CONST && !TRUE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This expression evaluates to `false`. Recall that the expression `!true` is logically equivalent to `false`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:178:13
     │
@@ -404,6 +773,15 @@ warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:178:9
+    │
+178 │         if (!TRUE_CONST && TRUE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This expression evaluates to `true`. Recall that the expression `!false` is logically equivalent to `true`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:179:28
@@ -423,6 +801,15 @@ warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:179:9
+    │
+179 │         if (FALSE_CONST || !FALSE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This expression evaluates to `true`. Recall that the expression `!false` is logically equivalent to `true`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:180:13
     │
@@ -441,6 +828,15 @@ warning: [lint] The right-hand side of `||` evaluates to `false`. Recall that th
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:180:9
+    │
+180 │         if (!FALSE_CONST || FALSE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:186:13
     │
@@ -449,6 +845,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:186:9
+    │
+186 │         if (flags.a && !flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:187:13
@@ -459,6 +864,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:187:9
+    │
+187 │         if (!flags.a && flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:188:13
     │
@@ -467,6 +881,15 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:188:9
+    │
+188 │         if (flags.a || !flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:189:13
@@ -477,6 +900,15 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:189:9
+    │
+189 │         if (!flags.a || flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:198:13
     │
@@ -485,6 +917,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:198:9
+    │
+198 │         if (nested.flags.a && !nested.flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using contradiction (`a && !a` is equivalent to `false`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:199:13
@@ -495,6 +936,15 @@ warning: [lint] This boolean expression can be simplified using contradiction (`
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:199:9
+    │
+199 │         if (!nested.flags.a && nested.flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:200:13
     │
@@ -503,6 +953,15 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:200:9
+    │
+200 │         if (nested.flags.a || !nested.flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using tautology (`a || !a` is equivalent to `true`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:201:13
@@ -513,6 +972,51 @@ warning: [lint] This boolean expression can be simplified using tautology (`a ||
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:201:9
+    │
+201 │         if (!nested.flags.a || nested.flags.a) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:208:9
+    │
+208 │         if ((x == helper_function()) && !(x == helper_function())) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:209:9
+    │
+209 │         if (!(x == helper_function()) && (x == helper_function())) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:210:9
+    │
+210 │         if ((x == helper_function()) || !(x == helper_function())) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:211:9
+    │
+211 │         if (!(x == helper_function()) || (x == helper_function())) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:219:13
     │
@@ -521,6 +1025,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:219:9
+    │
+219 │         if ((a && b) || (a && c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:220:13
@@ -531,6 +1044,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:220:9
+    │
+220 │         if ((a || b) && (a || c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:228:13
     │
@@ -540,6 +1062,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:228:9
+    │
+228 │         if ((a && b) || (a && c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:229:13
     │
@@ -548,6 +1079,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:229:9
+    │
+229 │         if ((a || b) && (a || c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:233:13
@@ -576,6 +1116,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:233:9
+    │
+233 │         if ((TRUE_CONST && FALSE_CONST) || (TRUE_CONST && TRUE_CONST)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:234:13
     │
@@ -603,6 +1152,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:234:9
+    │
+234 │         if ((FALSE_CONST || FALSE_CONST) && (FALSE_CONST || TRUE_CONST)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:241:13
     │
@@ -611,6 +1169,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:241:9
+    │
+241 │         if ((flags.a && other.a) || (flags.a && other.c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:242:13
@@ -621,6 +1188,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:242:9
+    │
+242 │         if ((flags.a || other.a) && (flags.a || other.c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:251:13
     │
@@ -629,6 +1205,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:251:9
+    │
+251 │         if ((nested.flags.a && nested.enabled) || (nested.flags.a && nested.flags.c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] This boolean expression can be simplified using distributive law (`(a && b) || (a && c)` is equivalent to `a && (b || c)`).
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:252:13
@@ -639,6 +1224,15 @@ warning: [lint] This boolean expression can be simplified using distributive law
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(simpler_bool_expression)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#simpler_bool_expression.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:252:9
+    │
+252 │         if ((nested.flags.a || nested.enabled) && (nested.flags.a || nested.flags.c)) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the expression `bexpr && true` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:259:13
     │
@@ -647,6 +1241,15 @@ warning: [lint] The right-hand side of `&&` evaluates to `true`. Recall that the
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:259:9
+    │
+259 │         if ((helper_function() && TRUE_CONST) || (helper_function() && (y > 10))) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
 
 warning: [lint] The right-hand side of `||` evaluates to `false`. Recall that the expression `bexpr || false` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:260:13
@@ -657,6 +1260,78 @@ warning: [lint] The right-hand side of `||` evaluates to `false`. Recall that th
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:260:9
+    │
+260 │         if ((helper_function() || FALSE_CONST) && (helper_function() || (y > 10))) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:271:9
+    │
+271 │         if (a && a) ();
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:272:9
+    │
+272 │         if (b || !b) ();
+    │         ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:273:9
+    │
+273 │         if (a && !a) ();
+    │         ^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:279:9
+    │
+279 │         if (a && b || c) ();
+    │         ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:280:9
+    │
+280 │         if (c || a && b) ();
+    │         ^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:287:9
+    │
+287 │         if (a && b) ();
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:288:9
+    │
+288 │         if (b || a) ();
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the expression `true && bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:292:13
     │
@@ -666,6 +1341,15 @@ warning: [lint] The left-hand side of `&&` evaluates to `true`. Recall that the 
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
 
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:292:9
+    │
+292 │         if (TRUE_CONST && FALSE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
 warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the expression `false || bexpr` is logically equivalent to `bexpr`. Consider simplifying.
     ┌─ tests/model_ast_lints/simpler_bool_expression.move:293:13
     │
@@ -674,3 +1358,120 @@ warning: [lint] The left-hand side of `||` evaluates to `false`. Recall that the
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(nonminimal_bool)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#nonminimal_bool.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:293:9
+    │
+293 │         if (FALSE_CONST || TRUE_CONST) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:299:9
+    │
+299 │         if (flags.a && flags.b) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:300:9
+    │
+300 │         if (flags.a || flags.c) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:301:9
+    │
+301 │         if (!flags.a && flags.b) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:302:9
+    │
+302 │         if (flags.b && !flags.c) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:311:9
+    │
+311 │         if (nested.flags.a && nested.enabled) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:312:9
+    │
+312 │         if (nested.flags.a || nested.enabled) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:313:9
+    │
+313 │         if (!nested.flags.a && nested.enabled) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:314:9
+    │
+314 │         if (nested.flags.a && !nested.enabled) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:321:9
+    │
+321 │         if (x && y) ();
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:322:9
+    │
+322 │         if (x || y) ();
+    │         ^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:331:9
+    │
+331 │         if (new_vec[0] && new_vec[0]) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
+
+warning: [lint] Empty `if` branch. Consider simplifying by removing or rewriting.
+    ┌─ tests/model_ast_lints/simpler_bool_expression.move:332:9
+    │
+332 │         if (new_vec[1] || new_vec[1]) ();
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(empty_if)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#empty_if.
