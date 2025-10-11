@@ -2,11 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{anyhow, ensure};
+use hyper::{Body, Request};
 use reqwest::Client;
 use std::time::Duration;
 
 // Timeout for client requests
-const CLIENT_REQUEST_TIMEOUT_SECS: u64 = 10;
+const CLIENT_REQUEST_TIMEOUT_SECS: u64 = 15;
+
+// Origin header constants
+const MISSING_ORIGIN_STRING: &str = ""; // Default to empty string if origin header is missing
+const ORIGIN_HEADER: &str = "origin";
 
 /// Creates and returns a reqwest HTTP client with a timeout
 pub fn create_request_client() -> Client {
@@ -14,6 +19,16 @@ pub fn create_request_client() -> Client {
         .timeout(Duration::from_secs(CLIENT_REQUEST_TIMEOUT_SECS))
         .build()
         .expect("Failed to build the request client!")
+}
+
+/// Extracts the origin header from the request
+pub fn get_request_origin(request: &Request<Body>) -> String {
+    request
+        .headers()
+        .get(ORIGIN_HEADER)
+        .and_then(|header_value| header_value.to_str().ok())
+        .unwrap_or(MISSING_ORIGIN_STRING)
+        .to_owned()
 }
 
 /// Converts a hex-encoded string (with "0x" prefix) to a byte vector

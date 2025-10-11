@@ -15,9 +15,9 @@ use aptos_keyless_pepper_service::{
     metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
     request_handler::DEFAULT_PEPPER_SERVICE_PORT,
-    vuf_pub_key,
+    utils, vuf_pub_key,
 };
-use aptos_logger::{info, warn};
+use aptos_logger::{error, info, warn};
 use clap::Parser;
 use hyper::{
     service::{make_service_fn, service_fn},
@@ -201,8 +201,11 @@ async fn start_pepper_service(
 
         async move {
             Ok::<_, Infallible>(service_fn(move |request| {
-                // Get the request start time, method and request path
+                // Start the request timer
                 let request_start_time = Instant::now();
+
+                // Get the request origin, method and request path
+                let request_origin = utils::get_request_origin(&request);
                 let request_method = request.method().clone();
                 let request_path = request.uri().path().to_owned();
 
@@ -226,14 +229,36 @@ async fn start_pepper_service(
                     )
                     .await;
 
-                    // Update the request handling metrics
-                    if let Ok(response) = &result {
-                        metrics::update_request_handling_metrics(
-                            &request_path,
-                            request_method,
-                            response.status(),
-                            request_start_time,
-                        );
+                    // Update the request handling metrics and logs
+                    match &result {
+                        Ok(response) => {
+                            // Update the request handling metrics
+                            metrics::update_request_handling_metrics(
+                                &request_path,
+                                request_method.clone(),
+                                response.status(),
+                                request_start_time,
+                            );
+
+                            // If the response was not successful, log the request details
+                            if !response.status().is_success() {
+                                warn!(
+                                    "Handled request with non-successful response! Request origin: {:?}, \
+                                    request path: {:?}, request method: {:?}, response status: {:?}",
+                                    request_origin,
+                                    request_path,
+                                    request_method,
+                                    response.status()
+                                );
+                            }
+                        },
+                        Err(error) => {
+                            error!(
+                                "Error occurred when handling request! Request origin: {:?}, \
+                                request path: {:?}, request method: {:?}, Error: {:?}",
+                                request_origin, request_path, request_method, error
+                            );
+                        },
                     }
 
                     result

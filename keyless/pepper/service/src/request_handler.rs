@@ -10,6 +10,7 @@ use crate::{
     },
     error::PepperServiceError,
     external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    utils,
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
@@ -56,10 +57,6 @@ pub const ALL_PATHS: [&str; 9] = [
 // Content type constants
 const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_TEXT: &str = "text/plain";
-
-// Origin header constants
-const MISSING_ORIGIN_STRING: &str = ""; // Default to empty string if origin header is missing
-const ORIGIN_HEADER: &str = "origin";
 
 // Useful message constants
 const METHOD_NOT_ALLOWED_MESSAGE: &str =
@@ -291,16 +288,6 @@ fn generate_options_response(origin: String) -> Result<Response<Body>, Infallibl
     Ok(response)
 }
 
-/// Extracts the origin header from the request
-fn get_request_origin(request: &Request<Body>) -> String {
-    request
-        .headers()
-        .get(ORIGIN_HEADER)
-        .and_then(|header_value| header_value.to_str().ok())
-        .unwrap_or(MISSING_ORIGIN_STRING)
-        .to_owned()
-}
-
 /// Generates a text response with the given status code and body string
 fn generate_text_response(
     origin: String,
@@ -324,7 +311,7 @@ pub async fn handle_request(
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
-    let origin = get_request_origin(&request);
+    let origin = utils::get_request_origin(&request);
 
     // Handle any OPTIONS requests
     let request_method = request.method();
