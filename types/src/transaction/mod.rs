@@ -1451,6 +1451,7 @@ impl From<KeptVMStatus> for ExecutionStatus {
                 function: func,
                 code_offset: offset,
                 message: _,
+                status_code: _,
             } => ExecutionStatus::ExecutionFailure {
                 location: loc,
                 function: func,
@@ -1539,7 +1540,10 @@ impl TransactionStatus {
     pub fn from_vm_status(vm_status: VMStatus, features: &Features) -> Self {
         let status_code = vm_status.status_code();
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard(features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES)) {
+        match vm_status.keep_or_discard(
+            features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES),
+            features.is_enabled(FeatureFlag::ENABLE_MEMORY_LIMIT_EXCEEDED),
+        ) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {

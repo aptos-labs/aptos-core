@@ -150,6 +150,7 @@ pub enum FeatureFlag {
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
     MonotonicallyIncreasingCounter,
+    EnableMemoryLimitExceeded,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -399,6 +400,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::MonotonicallyIncreasingCounter => {
                 AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER
             },
+            FeatureFlag::EnableMemoryLimitExceeded => {
+                AptosFeatureFlag::ENABLE_MEMORY_LIMIT_EXCEEDED
+            },
         }
     }
 }
@@ -574,6 +578,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
             AptosFeatureFlag::MONOTONICALLY_INCREASING_COUNTER => {
                 FeatureFlag::MonotonicallyIncreasingCounter
+            },
+            AptosFeatureFlag::ENABLE_MEMORY_LIMIT_EXCEEDED => {
+                FeatureFlag::EnableMemoryLimitExceeded
             },
         }
     }
