@@ -11,7 +11,6 @@ pub mod access;
 pub mod binary_views;
 pub mod check_bounds;
 pub mod compatibility;
-pub mod compatibility_legacy;
 #[macro_use]
 pub mod errors;
 pub mod builders;
@@ -23,7 +22,6 @@ pub mod file_format;
 pub mod file_format_common;
 pub mod internals;
 pub mod module_script_conversion;
-pub mod normalized;
 #[cfg(any(test, feature = "fuzzing"))]
 pub mod proptest_types;
 pub mod serializer;

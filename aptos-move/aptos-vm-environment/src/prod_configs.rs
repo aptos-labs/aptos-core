@@ -87,7 +87,6 @@ pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig
 
 /// Returns [VerifierConfig] used by the Aptos blockchain in production.
 pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features) -> VerifierConfig {
-    let use_signature_checker_v2 = features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2);
     let sig_checker_v2_fix_script_ty_param_count =
         features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
     let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
@@ -119,7 +118,6 @@ pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features)
         max_basic_blocks_in_script: None,
         max_per_fun_meter_units: Some(1000 * 80000),
         max_per_mod_meter_units: Some(1000 * 80000),
-        use_signature_checker_v2,
         sig_checker_v2_fix_script_ty_param_count,
         sig_checker_v2_fix_function_signatures,
         enable_enum_types,
