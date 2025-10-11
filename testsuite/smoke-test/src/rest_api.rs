@@ -15,12 +15,19 @@ use aptos_rest_client::{
     aptos_api_types::{MoveModuleId, TransactionData, ViewFunction, ViewRequest},
     Client,
 };
-use aptos_sdk::move_types::language_storage::StructTag;
+use aptos_sdk::{
+    move_types::language_storage::StructTag, transaction_builder::TransactionBuilder,
+    types::LocalAccount,
+};
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{AccountResource, CORE_CODE_ADDRESS},
+    chain_id::ChainId,
     on_chain_config::{ExecutionConfigV2, OnChainExecutionConfig, TransactionShufflerType},
-    transaction::{authenticator::AuthenticationKey, SignedTransaction, Transaction},
+    transaction::{
+        authenticator::{AccountAuthenticator, AuthenticationKey},
+        EntryFunction, SignedTransaction, Transaction, TransactionPayload,
+    },
 };
 use move_core_types::{
     ident_str,
@@ -598,4 +605,85 @@ async fn test_view_function() {
         .into_inner();
     assert_eq!(bcs_ret_values.len(), 1);
     assert!(bcs_ret_values[0]);
+}
+
+#[tokio::test]
+async fn test_simulation() {
+    let swarm = new_local_swarm_with_aptos(1).await;
+    let mut info = swarm.aptos_public_info();
+
+    let fee_payer = info
+        .create_and_fund_user_account(10_000_000_000)
+        .await
+        .unwrap();
+
+    let client: &Client = info.client();
+
+    // -- First test with a fee payer, and no fee payer specified -- //
+
+    // Create a local account, and not fund it
+    let mut rng = rand::thread_rng();
+    let sender = LocalAccount::generate(&mut rng);
+    let account_to_create = LocalAccount::generate(&mut rng);
+
+    // Create body to simulate
+    let txn_builder = TransactionBuilder::new(
+        TransactionPayload::EntryFunction(EntryFunction::new(
+            ModuleId::new(AccountAddress::ONE, ident_str!("aptos_account").into()),
+            ident_str!("create").into(),
+            vec![],
+            vec![account_to_create.address().to_vec()],
+        )),
+        30,
+        ChainId::test(),
+    );
+
+    // TODO: TransactionBuilder or RawTransaction signing functions aren't built to handle this properly
+    // So the raw txn and signed transaction have to be built manually
+    let raw_txn = txn_builder
+        .sender(sender.address())
+        .gas_unit_price(100)
+        .max_gas_amount(200000000)
+        .expiration_timestamp_secs(17429208930)
+        .sequence_number(0)
+        .build();
+
+    let signed_txn = SignedTransaction::new_fee_payer(
+        raw_txn.clone(),
+        AccountAuthenticator::NoAccountAuthenticator,
+        vec![],
+        vec![],
+        AccountAddress::ZERO,
+        AccountAuthenticator::NoAccountAuthenticator,
+    );
+
+    let bcs_simulate_response = client.simulate_bcs(&signed_txn).await;
+    assert!(bcs_simulate_response.is_ok());
+    let bcs_simulation = bcs_simulate_response.unwrap().into_inner();
+    assert!(bcs_simulation.info.status().is_success());
+
+    let json_simulate_response = client.simulate(&signed_txn).await;
+    assert!(json_simulate_response.is_ok());
+    let json_simulation = json_simulate_response.unwrap().into_inner();
+    assert!(json_simulation.first().unwrap().info.success);
+
+    // -- Now test with a fee payer, and a fee payer specified -- //
+    let signed_txn_2 = SignedTransaction::new_fee_payer(
+        raw_txn,
+        AccountAuthenticator::NoAccountAuthenticator,
+        vec![],
+        vec![],
+        fee_payer.address(),
+        AccountAuthenticator::NoAccountAuthenticator,
+    );
+
+    let bcs_simulate_response_2 = client.simulate_bcs(&signed_txn_2).await;
+    assert!(bcs_simulate_response_2.is_ok());
+    let bcs_simulation_2 = bcs_simulate_response_2.unwrap().into_inner();
+    assert!(bcs_simulation_2.info.status().is_success());
+
+    let json_simulate_response_2 = client.simulate(&signed_txn_2).await;
+    assert!(json_simulate_response_2.is_ok());
+    let json_simulation_2 = json_simulate_response_2.unwrap().into_inner();
+    assert!(json_simulation_2.first().unwrap().info.success);
 }
