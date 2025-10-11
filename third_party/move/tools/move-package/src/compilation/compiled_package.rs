@@ -39,7 +39,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use termcolor::{ColorChoice, StandardStream};
 
 #[derive(Debug, Clone)]
 pub enum CompilationCachingStatus {
@@ -675,6 +674,7 @@ impl CompiledPackage {
                         compile_test_code: flags.keep_testing_functions(),
                         experiments: config.experiments.clone(),
                         external_checks,
+                        print_errors: config.print_errors,
                         ..Default::default()
                     };
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
@@ -1126,8 +1126,8 @@ pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerD
 
 /// Runs the v2 compiler, exiting the process if any errors occurred.
 pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
-    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    let mut emitter = options.error_emitter(&mut stderr);
+    let mut writer = options.error_writer();
+    let mut emitter = options.error_emitter(&mut writer);
     match move_compiler_v2::run_move_compiler(emitter.as_mut(), options) {
         Ok((env, units)) => Ok((move_compiler_v2::make_files_source_text(&env), units, env)),
         Err(_) => {
@@ -1141,8 +1141,8 @@ pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> Compile
 pub fn build_and_report_no_exit_v2_driver(
     options: move_compiler_v2::Options,
 ) -> CompilerDriverResult {
-    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    let mut emitter = options.error_emitter(&mut stderr);
+    let mut writer = options.error_writer();
+    let mut emitter = options.error_emitter(&mut writer);
     let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
     Ok((move_compiler_v2::make_files_source_text(&env), units, env))
 }

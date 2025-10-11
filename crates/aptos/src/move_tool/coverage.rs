@@ -190,6 +190,7 @@ fn compile_coverage(
                 .language_version
                 .or_else(|| Some(LanguageVersion::latest_stable())),
             experiments: move_options.compute_experiments(),
+            print_errors: true,
         },
         ..Default::default()
     };
