@@ -5,7 +5,7 @@
 use move_command_line_common::testing::{
     add_update_baseline_fix, format_diff, get_compiler_exp_extension, read_env_update_baseline,
 };
-use move_unit_test::{self, test_reporter::UnitTestFactoryWithCostTable, UnitTestingConfig};
+use move_unit_test::{self, test_reporter::LegacyUnitTestFactory, UnitTestingConfig};
 use regex::RegexBuilder;
 use std::{
     fs,
@@ -54,7 +54,7 @@ fn run_test_with_modifiers(
                     None,
                     None,
                     buffer,
-                    UnitTestFactoryWithCostTable::new(None, None),
+                    LegacyUnitTestFactory,
                     false,
                 )?,
                 modified_exp_path,
@@ -75,7 +75,7 @@ fn run_test_with_modifiers(
             None,
             None,
             buffer,
-            UnitTestFactoryWithCostTable::new(None, None),
+            LegacyUnitTestFactory,
             false,
         )?,
         path.with_extension(exp_ext),

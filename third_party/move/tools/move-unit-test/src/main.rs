@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use clap::*;
-use move_unit_test::{test_reporter::UnitTestFactoryWithCostTable, UnitTestingConfig};
+use move_unit_test::{test_reporter::LegacyUnitTestFactory, UnitTestingConfig};
 
 pub fn main() {
     let args = UnitTestingConfig::parse();
@@ -15,7 +15,7 @@ pub fn main() {
             None,
             None,
             std::io::stdout(),
-            UnitTestFactoryWithCostTable::new(None, None),
+            LegacyUnitTestFactory,
             false,
         )
         .unwrap();

@@ -6,7 +6,7 @@ use crate::{
     framework::{run_test_impl, CompiledState, MoveTestAdapter},
     tasks::{EmptyCommand, InitCommand, SyntaxChoice, TaskInput},
 };
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use clap::Parser;
 use legacy_move_compiler::{
     compiled_unit::{AnnotatedCompiledModule, AnnotatedCompiledUnit},
@@ -46,11 +46,9 @@ use move_vm_runtime::{
     InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
     StagingModuleStorage,
 };
-use move_vm_test_utils::{
-    gas_schedule::{CostTable, Gas, GasStatus},
-    InMemoryStorage,
-};
+use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
+    gas::UnmeteredGasMeter,
     resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::Value,
@@ -423,14 +421,10 @@ impl SimpleVMTestAdapter<'_> {
         entry_point: EntryPoint,
         ty_args: &[TypeTag],
         args: Vec<Vec<u8>>,
-        gas_budget: Option<u64>,
+        _gas_budget: Option<u64>,
         code_storage: &impl CodeStorage,
     ) -> VMResult<SerializedReturnValues> {
-        let mut gas_meter = get_gas_status(
-            &move_vm_test_utils::gas_schedule::INITIAL_COST_SCHEDULE,
-            gas_budget,
-        )
-        .unwrap();
+        let mut gas_meter = UnmeteredGasMeter;
 
         let traversal_storage = TraversalStorage::new();
         let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -485,21 +479,6 @@ fn create_runtime_environment(vm_config: VMConfig) -> RuntimeEnvironment {
         ),
         vm_config,
     )
-}
-
-fn get_gas_status(cost_table: &CostTable, gas_budget: Option<u64>) -> Result<GasStatus> {
-    let gas_status = if let Some(gas_budget) = gas_budget {
-        // TODO(Gas): This should not be hardcoded.
-        let max_gas_budget = u64::MAX.checked_div(1000).unwrap();
-        if gas_budget >= max_gas_budget {
-            bail!("Gas budget set too high; maximum is {}", max_gas_budget)
-        }
-        GasStatus::new(cost_table.clone(), Gas::new(gas_budget))
-    } else {
-        // no budget specified. Disable gas metering
-        GasStatus::new_unmetered()
-    };
-    Ok(gas_status)
 }
 
 pub struct PrecompiledFilesModules(Vec<String>, Vec<AnnotatedCompiledUnit>);

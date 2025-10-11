@@ -19,11 +19,10 @@ use move_package::{
     BuildConfig,
 };
 use move_unit_test::{
-    test_reporter::{UnitTestFactory, UnitTestFactoryWithCostTable},
+    test_reporter::{LegacyUnitTestFactory, UnitTestFactory},
     UnitTestingConfig,
 };
 use move_vm_runtime::tracing::{LOGGING_FILE_WRITER, TRACING_ENABLED};
-use move_vm_test_utils::gas_schedule::CostTable;
 // if unix
 #[cfg(target_family = "unix")]
 use std::os::unix::prelude::ExitStatusExt;
@@ -90,7 +89,6 @@ impl Test {
         config: BuildConfig,
         natives: Vec<NativeFunctionRecord>,
         genesis: ChangeSet,
-        cost_table: Option<CostTable>,
     ) -> anyhow::Result<()> {
         let rerooted_path = reroot_path(path)?;
         let Self {
@@ -121,7 +119,6 @@ impl Test {
             natives,
             genesis,
             gas_limit,
-            cost_table,
             compute_coverage,
             &mut std::io::stdout(),
             false,
@@ -148,8 +145,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
     unit_test_config: UnitTestingConfig,
     natives: Vec<NativeFunctionRecord>,
     genesis: ChangeSet,
-    gas_limit: Option<u64>,
-    cost_table: Option<CostTable>,
+    _gas_limit: Option<u64>,
     compute_coverage: bool,
     writer: &mut W,
     enable_enum_option: bool,
@@ -162,7 +158,7 @@ pub fn run_move_unit_tests<W: Write + Send>(
         genesis,
         compute_coverage,
         writer,
-        UnitTestFactoryWithCostTable::new(cost_table, gas_limit),
+        LegacyUnitTestFactory,
         enable_enum_option,
     )
 }
