@@ -4629,6 +4629,7 @@ dependencies = [
  "once_cell",
  "parking_lot 0.12.1",
  "proptest",
+ "rand 0.7.3",
  "serde",
 ]
 
@@ -11431,6 +11432,8 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
+ "rand 0.7.3",
+ "rstest",
  "test-case",
 ]
 

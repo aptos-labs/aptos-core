@@ -418,7 +418,7 @@ pub async fn simulate_multistep_proposal(
     std::io::stdout().flush()?;
     let mut rng = aptos_keygen::KeyGen::from_seed([0; 32]);
     let balance = 100 * 1_0000_0000; // 100 APT
-    let account = AccountData::new_from_seed(&mut rng, balance, 0);
+    let account = AccountData::new_from_seed(&mut rng, balance, Some(0));
     state_view.apply_write_set(&account.to_writeset())?;
     // TODO: should update coin info (total supply)
     println!("done");
@@ -487,7 +487,6 @@ pub async fn simulate_multistep_proposal(
             .sequence_number(script_idx as u64)
             .gas_unit_price(gas_params.vm.txn.min_price_per_gas_unit.into())
             .max_gas_amount(100000)
-            .ttl(u64::MAX)
             .sign();
 
         let vm_output = if !profile_gas {

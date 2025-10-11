@@ -27,6 +27,8 @@ mod module_generator;
 
 const DEFAULT_BALANCE: u64 = 1_000_000_000;
 
+// TODO[Orderless]: Adapt this file to support orderless transactions
+
 #[derive(Debug)]
 pub struct Node {
     name: ModuleId,
@@ -165,7 +167,7 @@ impl DependencyGraph {
         Self {
             graph,
             base_directory,
-            sender_account: AccountData::new(DEFAULT_BALANCE, 0),
+            sender_account: AccountData::new(DEFAULT_BALANCE, Some(0)),
         }
     }
 
@@ -241,7 +243,7 @@ impl DependencyGraph {
             .sender_account
             .account()
             .transaction()
-            .sequence_number(self.sender_account.sequence_number())
+            .sequence_number(self.sender_account.sequence_number().unwrap_or(0))
             .entry_function(EntryFunction::new(
                 self.graph.node_weight(*node_idx).unwrap().name.clone(),
                 Identifier::new("foo_entry").unwrap(),
@@ -254,7 +256,7 @@ impl DependencyGraph {
             ))
             .sign();
 
-        self.sender_account.increment_sequence_number();
+        self.sender_account.increment_seq_num_or_assign_default();
         txn
     }
 
@@ -290,7 +292,7 @@ impl DependencyGraph {
             .account_data
             .account()
             .transaction()
-            .sequence_number(node.account_data.sequence_number())
+            .sequence_number(node.account_data.sequence_number().unwrap_or(0))
             .payload(aptos_stdlib::code_publish_package_txn(
                 bcs::to_bytes(&metadata).expect("PackageMetadata has BCS"),
                 code,
@@ -298,7 +300,7 @@ impl DependencyGraph {
             .sign();
 
         let node = self.graph.node_weight_mut(*node_idx).unwrap();
-        node.account_data.increment_sequence_number();
+        node.account_data.increment_seq_num_or_assign_default();
         node.self_size = self_size as u64;
         txn
     }

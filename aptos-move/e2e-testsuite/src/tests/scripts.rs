@@ -19,14 +19,27 @@ use move_core_types::{
     language_storage::{StructTag, TypeTag},
     vm_status::{StatusCode, StatusCode::LINKER_ERROR},
 };
+use rand::{rngs::StdRng, SeedableRng};
+use rstest::rstest;
 
-#[test]
-fn script_code_unverifiable() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn script_code_unverifiable(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
     let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
+    let golden_file_name = if use_orderless_transactions {
+        format!("{}_orderless", current_function_name!())
+    } else {
+        current_function_name!().to_string()
+    };
+    executor.set_golden_file(&golden_file_name);
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -34,16 +47,24 @@ fn script_code_unverifiable() {
     script.code.code = vec![Bytecode::LdU8(0), Bytecode::Add, Bytecode::Ret];
     let mut blob = vec![];
     script.serialize(&mut blob).expect("script must serialize");
+    let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
     let txn = sender
         .account()
         .transaction()
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .current_time(executor.get_block_time_seconds())
+        .upgrade_payload(
+            &mut rng,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        )
         .sign();
     // execute transaction
     let output = &executor.execute_transaction(txn);
     let status = output.status();
+    println!("status: {:?}", status);
     match status {
         TransactionStatus::Keep(_) => (),
         _ => panic!("TransactionStatus must be Keep"),
@@ -67,16 +88,34 @@ fn script_code_unverifiable() {
         .read_apt_fungible_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.balance());
-    assert_eq!(11, updated_sender.sequence_number());
+    if use_orderless_transactions {
+        assert_eq!(10, updated_sender.sequence_number());
+    } else {
+        assert_eq!(11, updated_sender.sequence_number());
+    }
 }
 
-#[test]
-fn script_none_existing_module_dep() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn script_none_existing_module_dep(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
+    let golden_file_name = if use_orderless_transactions {
+        format!("{}_orderless", current_function_name!())
+    } else {
+        current_function_name!().to_string()
+    };
+    executor.set_golden_file(&golden_file_name);
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -113,17 +152,25 @@ fn script_none_existing_module_dep() {
     ];
     let mut blob = vec![];
     script.serialize(&mut blob).expect("script must serialize");
+    let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
     let txn = sender
         .account()
         .transaction()
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .current_time(executor.get_block_time_seconds())
+        .upgrade_payload(
+            &mut rng,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        )
         .sign();
 
     // execute transaction
     let output = &executor.execute_transaction(txn);
     let status = output.status();
+    println!("status: {:?}", status);
     match status {
         TransactionStatus::Keep(_) => (),
         _ => panic!("TransactionStatus must be Keep"),
@@ -147,16 +194,34 @@ fn script_none_existing_module_dep() {
         .read_apt_fungible_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.balance());
-    assert_eq!(11, updated_sender.sequence_number());
+    if use_orderless_transactions {
+        assert_eq!(10, updated_sender.sequence_number());
+    } else {
+        assert_eq!(11, updated_sender.sequence_number());
+    }
 }
 
-#[test]
-fn script_non_existing_function_dep() {
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+fn script_non_existing_function_dep(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
     let mut executor = FakeExecutor::from_head_genesis();
-    executor.set_golden_file(current_function_name!());
+    let golden_file_name = if use_orderless_transactions {
+        format!("{}_orderless", current_function_name!())
+    } else {
+        current_function_name!().to_string()
+    };
+    executor.set_golden_file(&golden_file_name);
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -193,12 +258,19 @@ fn script_non_existing_function_dep() {
     ];
     let mut blob = vec![];
     script.serialize(&mut blob).expect("script must serialize");
+    let mut rng: StdRng = SeedableRng::from_seed([0; 32]);
     let txn = sender
         .account()
         .transaction()
         .script(Script::new(blob, vec![], vec![]))
         .sequence_number(10)
         .gas_unit_price(1)
+        .current_time(executor.get_block_time_seconds())
+        .upgrade_payload(
+            &mut rng,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
+        )
         .sign();
 
     // execute transaction
@@ -227,7 +299,11 @@ fn script_non_existing_function_dep() {
         .read_apt_fungible_store_resource(sender.account())
         .expect("sender balance must exist");
     assert_eq!(balance, updated_sender_balance.balance());
-    assert_eq!(11, updated_sender.sequence_number());
+    if use_orderless_transactions {
+        assert_eq!(10, updated_sender.sequence_number());
+    } else {
+        assert_eq!(11, updated_sender.sequence_number());
+    }
 }
 
 #[test]
@@ -236,7 +312,7 @@ fn script_bad_sig_function_dep() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -317,7 +393,7 @@ fn script_type_argument_module_does_not_exist() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -383,7 +459,7 @@ fn script_nested_type_argument_module_does_not_exist() {
     executor.set_golden_file(current_function_name!());
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create a bogus script
@@ -450,7 +526,7 @@ fn forbid_script_emitting_events() {
     let mut executor = FakeExecutor::from_head_genesis();
 
     // create and publish sender
-    let sender = executor.create_raw_account_data(1_000_000, 10);
+    let sender = executor.create_raw_account_data(1_000_000, Some(10));
     executor.add_account_data(&sender);
 
     // create an event-emitting script
