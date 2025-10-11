@@ -530,8 +530,12 @@ pub const VERSION_7: u32 = 7;
 /// + closure instructions
 pub const VERSION_8: u32 = 8;
 
+/// Version 9: changes compared to version 8
+/// + allow `$` in identifiers
+pub const VERSION_9: u32 = 9;
+
 /// Mark which version is the latest version.
-pub const VERSION_MAX: u32 = VERSION_8;
+pub const VERSION_MAX: u32 = VERSION_9;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
