@@ -399,6 +399,68 @@ module aptos_std::big_ordered_map {
         }
     }
 
+    /// Modifies the element in the map via calling f.
+    /// Aborts if element doesn't exist
+    public inline fun modify<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K, f: |&mut V|) {
+        self.modify_and_return(key, |v| { f(v); true});
+    }
+
+    /// Modifies the element in the map via calling f, and propagates the return value of the function.
+    /// Aborts if element doesn't exist
+    ///
+    /// This function cannot be inline, due to iter_modify requiring actual function value.
+    /// This also is why we return a value
+    public inline fun modify_and_return<K: drop + copy + store, V: store, R>(self: &mut BigOrderedMap<K, V>, key: &K, f: |&mut V|R): R {
+        let iter = self.internal_find(key);
+        assert!(!iter.iter_is_end(self), error::invalid_argument(EKEY_NOT_FOUND));
+        iter.iter_modify(self, |v| f(v))
+    }
+
+    /// Modifies element by calling modify_f if it exists, or calling add_f to add if it doesn't.
+    /// Returns true if element already existed.
+    public inline fun modify_or_add<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop, add_f: ||V has drop): bool {
+        let exists = self.modify_if_present_and_return(key, |v| { modify_f(v); true }).is_some();
+        if (!exists) {
+            self.add(*key, add_f());
+        };
+        exists
+    }
+
+    public inline fun modify_if_present<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop): bool {
+        self.modify_if_present_and_return(key, |v| { modify_f(v); true }).is_some()
+    }
+
+    /// Modifies the element in the map via calling modify_f, and propagates the return value of the function.
+    /// Returns None if not present.
+    ///
+    /// Function value cannot be inlined, due to iter_modify requiring actual function value.
+    /// This also is why we return a value
+    public inline fun modify_if_present_and_return<K: drop + copy + store, V: store, R>(self: &mut BigOrderedMap<K, V>, key: &K, modify_f: |&mut V|R has drop): Option<R> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(iter.iter_modify(self, |v| modify_f(v)))
+        }
+    }
+
+    // /// If value exists, calls modify_f on it, which returns tuple (to_keep, result).
+    // /// If to_keep is false, value is deleted from the map, and option::some(result) is returned.
+    // /// This function cannot be inline, due to iter_modify requiring actual function value.
+    // /// This also is why we return a value
+    // public fun modify_or_remove_if_present_and_return<K: drop + copy + store, V: store, R>(self: &mut BigOrderedMap<K, V>, key: &K, modify_f: |&mut V|(R, bool) has drop): Option<R> {
+    //     let iter = self.find(key);
+    //     if (iter.iter_is_end(self)) {
+    //         option::none()
+    //     } else {
+    //         let (result, keep) = iter.iter_modify(self, modify_f);
+    //         if (!keep) {
+    //             iter.iter_remove(self);
+    //         };
+    //         option::some(result)
+    //     }
+    // }
+
     /// Add multiple key/value pairs to the map. The keys must not already exist.
     /// Aborts with EKEY_ALREADY_EXISTS if key already exist, or duplicate keys are passed in.
     public fun add_all<K: drop + copy + store, V: store>(self: &mut BigOrderedMap<K, V>, keys: vector<K>, values: vector<V>) {
@@ -521,6 +583,15 @@ module aptos_std::big_ordered_map {
             option::none()
         } else {
             option::some(*iter.iter_borrow(self))
+        }
+    }
+
+    public fun get_and_map<K: drop + copy + store, V: copy + store, R>(self: &BigOrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(f(iter.iter_borrow(self)))
         }
     }
 
@@ -729,6 +800,24 @@ module aptos_std::big_ordered_map {
         let IteratorPtr::Some { node_index, child_iter, key: _ } = self;
         let children = &mut map.borrow_node_mut(node_index).children;
         &mut child_iter.iter_borrow_mut(children).value
+    }
+
+    public fun iter_modify<K: drop + store, V: store, R>(self: IteratorPtr<K>, map: &mut BigOrderedMap<K, V>, f: |&mut V|R): R {
+        assert!(!self.iter_is_end(map), error::invalid_argument(EITER_OUT_OF_BOUNDS));
+        let IteratorPtr::Some { node_index, child_iter, key } = self;
+        let children = &mut map.borrow_node_mut(node_index).children;
+        let value_mut = &mut child_iter.iter_borrow_mut(children).value;
+        let result = f(value_mut);
+
+        if (map.constant_kv_size) {
+            return result;
+        };
+
+        // validate that after modifications size invariants hold
+        let key_size = bcs::serialized_size(&key);
+        let value_size = bcs::serialized_size(value_mut);
+        map.validate_size_and_init_max_degrees(key_size, value_size);
+        result
     }
 
     /// Removes the entry from BigOrderedMap and returns the value which `key` maps to.
@@ -1825,6 +1914,30 @@ module aptos_std::big_ordered_map {
         map.remove(&5);
         assert!(map.internal_lower_bound(&3).key == 6, 5);
         assert!(map.internal_lower_bound(&4).key == 6, 6);
+
+        map.destroy(|_v| {});
+    }
+
+    #[test]
+    fun test_modify_and_get() {
+        let map = new_with_config(4, 3, false);
+        map.add_all(vector[1, 2, 3], vector[1, 2, 3]);
+        map.modify(&2, |v| *v += 10);
+        assert!(map.get(&2) == option::some(12));
+        assert!(map.get(&4) == option::none());
+
+        assert!(map.get_and_map(&2, |v| *v + 5) == option::some(17));
+        assert!(map.get_and_map(&4, |v| *v + 5) == option::none());
+
+        map.modify_or_add(&3, |v| *v += 10, || 20);
+        assert!(map.get(&3) == option::some(13));
+        map.modify_or_add(&4, |v| *v += 10, || 20);
+        assert!(map.get(&4) == option::some(20));
+
+        assert!(option::some(7) == map.modify_if_present_and_return(&4, |v| { *v += 10; 7}));
+        assert!(map.get(&4) == option::some(30));
+
+        assert!(option::none() == map.modify_if_present_and_return(&5, |v| { *v += 10; 7}));
 
         map.destroy(|_v| {});
     }

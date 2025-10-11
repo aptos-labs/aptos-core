@@ -45,6 +45,8 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
 -  [Function `upsert`](#0x1_ordered_map_upsert)
 -  [Function `remove`](#0x1_ordered_map_remove)
 -  [Function `remove_or_none`](#0x1_ordered_map_remove_or_none)
+-  [Function `modify_or_add`](#0x1_ordered_map_modify_or_add)
+-  [Function `modify_if_present`](#0x1_ordered_map_modify_if_present)
 -  [Function `contains`](#0x1_ordered_map_contains)
 -  [Function `borrow`](#0x1_ordered_map_borrow)
 -  [Function `borrow_mut`](#0x1_ordered_map_borrow_mut)
@@ -548,6 +550,68 @@ Returns none if <code>key</code> doesn't exist.
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(value)
     } <b>else</b> {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_modify_or_add"></a>
+
+## Function `modify_or_add`
+
+Modifies element by calling modify_f if it exists, or calling add_f to add if it doesn't.
+Returns true if element already existed.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_modify_or_add">modify_or_add</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop, add_f: ||V <b>has</b> drop): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_modify_or_add">modify_or_add</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop, add_f: ||V <b>has</b> drop): bool {
+    <b>let</b> <b>exists</b> = self.<a href="ordered_map.md#0x1_ordered_map_modify_if_present">modify_if_present</a>(key, |v| modify_f(v));
+    <b>if</b> (!<b>exists</b>) {
+        self.<a href="ordered_map.md#0x1_ordered_map_add">add</a>(*key, add_f());
+    };
+    <b>exists</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_ordered_map_modify_if_present"></a>
+
+## Function `modify_if_present`
+
+Modifies element by calling modify_f if it exists.
+Returns true if element already existed.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_modify_if_present">modify_if_present</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_modify_if_present">modify_if_present</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<b>mut</b> <a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K, modify_f: |&<b>mut</b> V| <b>has</b> drop): bool {
+    <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_internal_find">internal_find</a>(key);
+    <b>if</b> (iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
+        <b>false</b>
+    } <b>else</b> {
+        modify_f(iter.<a href="ordered_map.md#0x1_ordered_map_iter_borrow_mut">iter_borrow_mut</a>(self));
+        <b>true</b>
     }
 }
 </code></pre>

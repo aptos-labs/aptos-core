@@ -148,6 +148,28 @@ module aptos_std::ordered_map {
         }
     }
 
+    /// Modifies element by calling modify_f if it exists, or calling add_f to add if it doesn't.
+    /// Returns true if element already existed.
+    public inline fun modify_or_add<K: drop + copy + store, V: store>(self: &mut OrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop, add_f: ||V has drop): bool {
+        let exists = self.modify_if_present(key, |v| modify_f(v));
+        if (!exists) {
+            self.add(*key, add_f());
+        };
+        exists
+    }
+
+    /// Modifies element by calling modify_f if it exists.
+    /// Returns true if element already existed.
+    public inline fun modify_if_present<K: drop + copy + store, V: store>(self: &mut OrderedMap<K, V>, key: &K, modify_f: |&mut V| has drop): bool {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            false
+        } else {
+            modify_f(iter.iter_borrow_mut(self));
+            true
+        }
+    }
+
     /// Returns whether map contains a given key.
     public fun contains<K, V>(self: &OrderedMap<K, V>, key: &K): bool {
         !self.internal_find(key).iter_is_end(self)
@@ -159,6 +181,24 @@ module aptos_std::ordered_map {
 
     public fun borrow_mut<K, V>(self: &mut OrderedMap<K, V>, key: &K): &mut V {
         self.internal_find(key).iter_borrow_mut(self)
+    }
+
+    public fun get<K: drop + copy + store, V: copy + store>(self: &OrderedMap<K, V>, key: &K): Option<V> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(*iter.iter_borrow(self))
+        }
+    }
+
+    public fun get_and_map<K: drop + copy + store, V: copy + store, R>(self: &OrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
+        let iter = self.internal_find(key);
+        if (iter.iter_is_end(self)) {
+            option::none()
+        } else {
+            option::some(f(iter.iter_borrow(self)))
+        }
     }
 
     /// Changes the key, while keeping the same value attached to it
@@ -849,6 +889,23 @@ module aptos_std::ordered_map {
         map.add(3, 2);
 
         assert!(map.values() == vector[1, 2], 0);
+    }
+
+    #[test]
+    fun test_modify_and_get() {
+        let map = new<u64, u64>();
+        map.add_all(vector[1, 2, 3], vector[1, 2, 3]);
+        assert!(true == map.modify_if_present(&2, |v| *v += 10));
+        assert!(map.get(&2) == option::some(12));
+        assert!(map.get(&4) == option::none());
+
+        assert!(map.get_and_map(&2, |v| *v + 5) == option::some(17));
+        assert!(map.get_and_map(&4, |v| *v + 5) == option::none());
+
+        map.modify_or_add(&3, |v| {*v += 10}, || 20);
+        assert!(map.get(&3) == option::some(13));
+        map.modify_or_add(&4, |v| {*v += 10}, || 20);
+        assert!(map.get(&4) == option::some(20));
     }
 
     #[test]
