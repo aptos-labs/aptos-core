@@ -46,6 +46,9 @@ use std::{
 pub struct Module {
     id: ModuleId,
 
+    // Blake3 hash of the module id -- currently used for efficient reentrancy checks
+    pub(crate) id_hash: [u8; 32],
+
     // size in bytes
     #[allow(dead_code)]
     pub(crate) size: usize,
@@ -157,6 +160,8 @@ impl Module {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
         let id = module.self_id();
+        let id_hash = id.blake3_hash();
+
         let friends = module
             .immediate_friends_iter()
             .map(|(addr, name)| ModuleId::new(*addr, name.to_owned()))
@@ -190,7 +195,9 @@ impl Module {
                 module: module_id,
                 name: struct_name.to_owned(),
             };
-            struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
+            struct_idxs.push(
+                struct_name_index_map.struct_name_to_idx_with_module_hash(&struct_name, id_hash)?,
+            );
             struct_names.push(struct_name)
         }
 
@@ -365,6 +372,7 @@ impl Module {
 
         Ok(Self {
             id,
+            id_hash,
             size,
             module,
             structs,
@@ -401,8 +409,11 @@ impl Module {
         // Create necessary empty collections
         let module_arc = Arc::new(empty_module);
 
+        let id_hash = module_id.blake3_hash();
+
         Self {
             id: module_id,
+            id_hash,
             size: 0,
             module: module_arc,
             structs: vec![],
