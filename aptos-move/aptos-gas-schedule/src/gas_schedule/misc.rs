@@ -52,12 +52,14 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [per_u16_packed: AbstractValueSizePerArg, { 5.. => "per_u16_packed" }, 2],
         [per_u32_packed: AbstractValueSizePerArg, { 5.. => "per_u32_packed" }, 4],
         [per_u64_packed: AbstractValueSizePerArg, "per_u64_packed", 8],
-        [
-            per_u128_packed: AbstractValueSizePerArg,
-            "per_u128_packed",
-            16
-        ],
+        [per_u128_packed: AbstractValueSizePerArg, "per_u128_packed", 16],
         [per_u256_packed: AbstractValueSizePerArg, { 5.. => "per_u256_packed" }, 32],
+        [per_i8_packed: AbstractValueSizePerArg, { RELEASE_V1_38.. => "per_i8_packed" }, 1],
+        [per_i16_packed: AbstractValueSizePerArg, { RELEASE_V1_38.. => "per_i16_packed" }, 2],
+        [per_i32_packed: AbstractValueSizePerArg, { RELEASE_V1_38.. => "per_i32_packed" }, 4],
+        [per_i64_packed: AbstractValueSizePerArg, { RELEASE_V1_38.. => "per_i64_packed" }, 8],
+        [per_i128_packed: AbstractValueSizePerArg, { RELEASE_V1_38.. => "per_i128_packed" }, 16],
+        [per_i256_packed: AbstractValueSizePerArg, { RELEASE_V1_38.. => "per_i256_packed" }, 32],
         [
             per_bool_packed: AbstractValueSizePerArg,
             "per_bool_packed",
@@ -511,42 +513,42 @@ impl AbstractValueSizeGasParameters {
             #[inline]
             fn visit_i8(&mut self, depth: u64, _val: i8) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.u8);
+                self.res = Some(self.params.i8);
                 Ok(())
             }
 
             #[inline]
             fn visit_i16(&mut self, depth: u64, _val: i16) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.u16);
+                self.res = Some(self.params.i16);
                 Ok(())
             }
 
             #[inline]
             fn visit_i32(&mut self, depth: u64, _val: i32) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.u32);
+                self.res = Some(self.params.i32);
                 Ok(())
             }
 
             #[inline]
             fn visit_i64(&mut self, depth: u64, _val: i64) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.u64);
+                self.res = Some(self.params.i64);
                 Ok(())
             }
 
             #[inline]
             fn visit_i128(&mut self, depth: u64, _val: i128) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.u128);
+                self.res = Some(self.params.i128);
                 Ok(())
             }
 
             #[inline]
             fn visit_i256(&mut self, depth: u64, _val: I256) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.u256);
+                self.res = Some(self.params.i256);
                 Ok(())
             }
 
@@ -743,42 +745,42 @@ impl AbstractValueSizeGasParameters {
             #[inline]
             fn visit_i8(&mut self, depth: u64, _val: i8) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.per_u8_packed * NumArgs::from(1));
+                self.res = Some(self.params.per_i8_packed * NumArgs::from(1));
                 Ok(())
             }
 
             #[inline]
             fn visit_i16(&mut self, depth: u64, _val: i16) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.per_u16_packed * NumArgs::from(1));
+                self.res = Some(self.params.per_i16_packed * NumArgs::from(1));
                 Ok(())
             }
 
             #[inline]
             fn visit_i32(&mut self, depth: u64, _val: i32) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.per_u32_packed * NumArgs::from(1));
+                self.res = Some(self.params.per_i32_packed * NumArgs::from(1));
                 Ok(())
             }
 
             #[inline]
             fn visit_i64(&mut self, depth: u64, _val: i64) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.per_u64_packed * NumArgs::from(1));
+                self.res = Some(self.params.per_i64_packed * NumArgs::from(1));
                 Ok(())
             }
 
             #[inline]
             fn visit_i128(&mut self, depth: u64, _val: i128) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.per_u128_packed * NumArgs::from(1));
+                self.res = Some(self.params.per_i128_packed * NumArgs::from(1));
                 Ok(())
             }
 
             #[inline]
             fn visit_i256(&mut self, depth: u64, _val: I256) -> PartialVMResult<()> {
                 self.check_depth(depth)?;
-                self.res = Some(self.params.per_u256_packed * NumArgs::from(1));
+                self.res = Some(self.params.per_i256_packed * NumArgs::from(1));
                 Ok(())
             }
 
