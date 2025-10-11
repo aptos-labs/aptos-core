@@ -96,6 +96,7 @@ pub enum KeptVMStatus {
         function: u16,
         code_offset: u16,
         message: Option<String>,
+        status_code: Option<StatusCode>,
     },
     MiscellaneousError,
 }
@@ -195,6 +196,7 @@ impl VMStatus {
     pub fn keep_or_discard(
         self,
         function_values_enabled: bool,
+        memory_limit_exceeded_as_miscellaneous_error: bool,
     ) -> Result<KeptVMStatus, DiscardedVMStatus> {
         match self {
             VMStatus::Executed => Ok(KeptVMStatus::Executed),
@@ -218,7 +220,18 @@ impl VMStatus {
                 status_code: StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
                 ..
             } if function_values_enabled => Ok(KeptVMStatus::MiscellaneousError),
-
+            VMStatus::ExecutionFailure {
+                status_code: StatusCode::MEMORY_LIMIT_EXCEEDED,
+                ..
+            } if memory_limit_exceeded_as_miscellaneous_error => {
+                Ok(KeptVMStatus::MiscellaneousError)
+            },
+            VMStatus::Error {
+                status_code: StatusCode::MEMORY_LIMIT_EXCEEDED,
+                ..
+            } if memory_limit_exceeded_as_miscellaneous_error => {
+                Ok(KeptVMStatus::MiscellaneousError)
+            },
             VMStatus::ExecutionFailure {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
@@ -239,7 +252,7 @@ impl VMStatus {
             } => Ok(KeptVMStatus::MiscellaneousError),
 
             VMStatus::ExecutionFailure {
-                status_code: _status_code,
+                status_code,
                 location,
                 function,
                 code_offset,
@@ -250,6 +263,7 @@ impl VMStatus {
                 function,
                 code_offset,
                 message,
+                status_code: Some(status_code),
             }),
             VMStatus::Error {
                 status_code: code,
@@ -277,6 +291,7 @@ impl VMStatus {
                         function: 0,
                         code_offset: 0,
                         message,
+                        status_code: Some(code),
                     }),
                 }
             },
@@ -330,10 +345,11 @@ impl fmt::Display for KeptVMStatus {
                 function,
                 code_offset,
                 message,
+                status_code,
             } => write!(
                 f,
-                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {} with error message {:?}",
-                code_offset, function, location, message
+                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {} with error message {:?} and status code {:?}",
+                code_offset, function, location, message, status_code
             ),
         }
     }
@@ -393,12 +409,14 @@ impl fmt::Debug for KeptVMStatus {
                 function,
                 code_offset,
                 message,
+                status_code,
             } => f
                 .debug_struct("EXECUTION_FAILURE")
                 .field("location", location)
                 .field("function_definition", function)
                 .field("code_offset", code_offset)
                 .field("message", message)
+                .field("status_code", status_code)
                 .finish(),
             KeptVMStatus::MiscellaneousError => write!(f, "MISCELLANEOUS_ERROR"),
         }
