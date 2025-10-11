@@ -786,6 +786,30 @@ fn verify_instr(
             verifier.push(meter, ST::U256)?;
         },
 
+        Bytecode::LdI8(_) => {
+            verifier.push(meter, ST::I8)?;
+        },
+
+        Bytecode::LdI16(_) => {
+            verifier.push(meter, ST::I16)?;
+        },
+
+        Bytecode::LdI32(_) => {
+            verifier.push(meter, ST::I32)?;
+        },
+
+        Bytecode::LdI64(_) => {
+            verifier.push(meter, ST::I64)?;
+        },
+
+        Bytecode::LdI128(_) => {
+            verifier.push(meter, ST::I128)?;
+        },
+
+        Bytecode::LdI256(_) => {
+            verifier.push(meter, ST::I256)?;
+        },
+
         Bytecode::LdConst(idx) => {
             let signature = verifier.resolver.constant_at(*idx).type_.clone();
             verifier.push(meter, signature)?;
@@ -1007,14 +1031,7 @@ fn verify_instr(
             verifier.push(meter, ST::U128)?;
         },
 
-        Bytecode::Add
-        | Bytecode::Sub
-        | Bytecode::Mul
-        | Bytecode::Mod
-        | Bytecode::Div
-        | Bytecode::BitOr
-        | Bytecode::BitAnd
-        | Bytecode::Xor => {
+        Bytecode::Add | Bytecode::Sub | Bytecode::Mul | Bytecode::Mod | Bytecode::Div => {
             let operand1 = safe_unwrap!(verifier.stack.pop());
             let operand2 = safe_unwrap!(verifier.stack.pop());
             if operand1.is_integer() && operand1 == operand2 {
@@ -1024,10 +1041,29 @@ fn verify_instr(
             }
         },
 
+        Bytecode::BitOr | Bytecode::BitAnd | Bytecode::Xor => {
+            let operand1 = safe_unwrap!(verifier.stack.pop());
+            let operand2 = safe_unwrap!(verifier.stack.pop());
+            if operand1.is_unsigned_integer() && operand1 == operand2 {
+                verifier.push(meter, operand1)?;
+            } else {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+        },
+
+        Bytecode::Negate => {
+            let operand = safe_unwrap!(verifier.stack.pop());
+            if operand.is_signed_integer() {
+                verifier.push(meter, operand)?;
+            } else {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+        },
+
         Bytecode::Shl | Bytecode::Shr => {
             let operand1 = safe_unwrap!(verifier.stack.pop());
             let operand2 = safe_unwrap!(verifier.stack.pop());
-            if operand2.is_integer() && operand1 == ST::U8 {
+            if operand2.is_unsigned_integer() && operand1 == ST::U8 {
                 verifier.push(meter, operand2)?;
             } else {
                 return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
@@ -1242,6 +1278,49 @@ fn verify_instr(
             }
             verifier.push(meter, ST::U256)?;
         },
+
+        Bytecode::CastI8 => {
+            let operand = safe_unwrap!(verifier.stack.pop());
+            if !operand.is_integer() {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+            verifier.push(meter, ST::I8)?;
+        },
+        Bytecode::CastI16 => {
+            let operand = safe_unwrap!(verifier.stack.pop());
+            if !operand.is_integer() {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+            verifier.push(meter, ST::I16)?;
+        },
+        Bytecode::CastI32 => {
+            let operand = safe_unwrap!(verifier.stack.pop());
+            if !operand.is_integer() {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+            verifier.push(meter, ST::I32)?;
+        },
+        Bytecode::CastI64 => {
+            let operand = safe_unwrap!(verifier.stack.pop());
+            if !operand.is_integer() {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+            verifier.push(meter, ST::I64)?;
+        },
+        Bytecode::CastI128 => {
+            let operand = safe_unwrap!(verifier.stack.pop());
+            if !operand.is_integer() {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+            verifier.push(meter, ST::I128)?;
+        },
+        Bytecode::CastI256 => {
+            let operand = safe_unwrap!(verifier.stack.pop());
+            if !operand.is_integer() {
+                return Err(verifier.error(StatusCode::INTEGER_OP_TYPE_MISMATCH_ERROR, offset));
+            }
+            verifier.push(meter, ST::I256)?;
+        },
     };
     Ok(())
 }
@@ -1276,6 +1355,12 @@ fn instantiate(token: &SignatureToken, subst: &Signature) -> SignatureToken {
         U64 => U64,
         U128 => U128,
         U256 => U256,
+        I8 => I8,
+        I16 => I16,
+        I32 => I32,
+        I64 => I64,
+        I128 => I128,
+        I256 => I256,
         Address => Address,
         Signer => Signer,
         Vector(ty) => Vector(Box::new(instantiate(ty, subst))),

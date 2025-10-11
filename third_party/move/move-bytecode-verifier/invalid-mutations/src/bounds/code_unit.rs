@@ -480,9 +480,11 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     // bytecode gets added.
                     FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_)
                     | LdU128(_) | LdU256(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128
-                    | CastU256 | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod
-                    | Div | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq | Lt
-                    | Gt | Le | Ge | Abort | Nop => {
+                    | CastU256 | LdI8(_) | LdI16(_) | LdI32(_) | LdI64(_) | LdI128(_)
+                    | LdI256(_) | CastI8 | CastI16 | CastI32 | CastI64 | CastI128 | CastI256
+                    | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div
+                    | Negate | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq | Neq
+                    | Lt | Gt | Le | Ge | Abort | Nop => {
                         panic!("Bytecode has no internal index: {:?}", code[bytecode_idx])
                     },
                     PackVariant(_)
@@ -557,9 +559,11 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         // List out the other options explicitly so there's a compile error if a new
         // bytecode gets added.
         FreezeRef | Pop | Ret | LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_)
-        | LdU256(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdTrue
-        | LdFalse | ReadRef | WriteRef | Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor
-        | Shl | Shr | Or | And | Not | Eq | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
+        | LdU256(_) | CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | LdI8(_)
+        | LdI16(_) | LdI32(_) | LdI64(_) | LdI128(_) | LdI256(_) | CastI8 | CastI16 | CastI32
+        | CastI64 | CastI128 | CastI256 | LdTrue | LdFalse | ReadRef | WriteRef | Add | Sub
+        | Mul | Mod | Div | Negate | BitOr | BitAnd | Xor | Shl | Shr | Or | And | Not | Eq
+        | Neq | Lt | Gt | Le | Ge | Abort | Nop => false,
 
         PackClosure(..)
         | PackClosureGeneric(..)

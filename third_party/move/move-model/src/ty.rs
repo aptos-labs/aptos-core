@@ -21,8 +21,8 @@ use move_binary_format::{
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
+    int256::U256,
     language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
-    u256::U256,
 };
 use num::BigInt;
 use num_traits::identities::Zero;
@@ -873,7 +873,7 @@ impl PrimitiveType {
             PrimitiveType::U32 => Some(BigInt::from(u32::MAX)),
             PrimitiveType::U64 => Some(BigInt::from(u64::MAX)),
             PrimitiveType::U128 => Some(BigInt::from(u128::MAX)),
-            PrimitiveType::U256 => Some(BigInt::from(&U256::max_value())),
+            PrimitiveType::U256 => Some(BigInt::from(U256::MAX)),
             PrimitiveType::Num => None,
             _ => unreachable!("no num type"),
         }
@@ -1601,6 +1601,15 @@ impl Type {
                     *abilities,
                 )
             },
+            TypeTag::I8
+            | TypeTag::I16
+            | TypeTag::I32
+            | TypeTag::I64
+            | TypeTag::I128
+            | TypeTag::I256 => {
+                // TODO(#17645): implement conversion
+                unimplemented!("signed integer support")
+            },
         }
     }
 
@@ -1667,6 +1676,15 @@ impl Type {
                 Box::new(Type::Tuple(from_slice(result))),
                 *abilities,
             ),
+            SignatureToken::I8
+            | SignatureToken::I16
+            | SignatureToken::I32
+            | SignatureToken::I64
+            | SignatureToken::I128
+            | SignatureToken::I256 => {
+                // TODO(#17645): implement
+                unimplemented!("signed integer support")
+            },
         }
     }
 

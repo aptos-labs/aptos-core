@@ -544,8 +544,11 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 let temp_index = self.temp_count;
                 self.temp_stack.push(temp_index);
                 self.local_types.push(Type::Primitive(PrimitiveType::U256));
-                self.code
-                    .push(Bytecode::Load(attr_id, temp_index, Constant::from(number)));
+                self.code.push(Bytecode::Load(
+                    attr_id,
+                    temp_index,
+                    Constant::U256(number.repr()),
+                ));
                 self.temp_count += 1;
             },
 
@@ -1662,6 +1665,22 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     None,
                 ))
             },
+            MoveBytecode::LdI8(_)
+            | MoveBytecode::LdI16(_)
+            | MoveBytecode::LdI32(_)
+            | MoveBytecode::LdI64(_)
+            | MoveBytecode::LdI128(_)
+            | MoveBytecode::LdI256(_)
+            | MoveBytecode::CastI8
+            | MoveBytecode::CastI16
+            | MoveBytecode::CastI32
+            | MoveBytecode::CastI64
+            | MoveBytecode::CastI128
+            | MoveBytecode::CastI256
+            | MoveBytecode::Negate => {
+                // TODO(#17645): implement
+                unimplemented!("signed integers")
+            },
         }
     }
 
@@ -1803,7 +1822,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             (Type::Primitive(PrimitiveType::U32), MoveValue::U32(b)) => Constant::U32(*b),
             (Type::Primitive(PrimitiveType::U64), MoveValue::U64(b)) => Constant::U64(*b),
             (Type::Primitive(PrimitiveType::U128), MoveValue::U128(b)) => Constant::U128(*b),
-            (Type::Primitive(PrimitiveType::U256), MoveValue::U256(b)) => Constant::U256(b.into()),
+            (Type::Primitive(PrimitiveType::U256), MoveValue::U256(b)) => Constant::U256(b.repr()),
             (Type::Primitive(PrimitiveType::Address), MoveValue::Address(a)) => {
                 Constant::Address(Address::Numerical(*a))
             },

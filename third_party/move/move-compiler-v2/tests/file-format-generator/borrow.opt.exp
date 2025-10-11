@@ -14,7 +14,7 @@ warning: Unused value of parameter `param`. Consider removing the parameter, or 
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.borrow {
 struct S {
 	f: u64

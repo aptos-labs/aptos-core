@@ -745,7 +745,7 @@ public fun m::scalar_zero(): 0x42::m::Scalar {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.m {
 struct Scalar has copy, drop, store {
 	data: vector<u8>

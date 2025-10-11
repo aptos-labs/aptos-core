@@ -2863,7 +2863,7 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
             },
         },
         PV::Num(s) if s.ends_with("u256") => match parse_u256(&s[..s.len() - 4]) {
-            Ok((u, _format)) => EV::U256(u),
+            Ok(u) => EV::U256(u),
             Err(_) => {
                 context.env.add_diag(num_too_big_error(loc, "'u256'"));
                 return None;
@@ -2871,7 +2871,7 @@ fn value(context: &mut Context, sp!(loc, pvalue_): P::Value) -> Option<E::Value>
         },
 
         PV::Num(s) => match parse_u256(&s) {
-            Ok((u, _format)) => EV::InferredNum(u),
+            Ok(u) => EV::InferredNum(u),
             Err(_) => {
                 context.env.add_diag(num_too_big_error(
                     loc,

@@ -5,20 +5,47 @@
 
 use anyhow::anyhow;
 use move_binary_format::file_format::SignatureToken;
-use move_core_types::{account_address::AccountAddress, u256::U256, value::MoveValue};
+use move_core_types::{
+    account_address::AccountAddress,
+    int256::{I256, U256},
+    value::MoveValue,
+};
 use std::fmt;
 
 /// An untyped numeric value, or a vector of such values.
 #[derive(Debug)]
 pub enum AsmValue {
-    Number(U256),
+    Number(/*sign_positive*/ bool, U256),
     Vector(Vec<AsmValue>),
+}
+
+impl AsmValue {
+    pub fn unsigned(u256: U256) -> AsmValue {
+        Self::Number(true, u256)
+    }
+
+    pub fn signed(i256: I256) -> AsmValue {
+        if i256 < I256::ZERO {
+            if i256 == I256::MIN {
+                // can't negate this one
+                let m: U256 = I256::MAX.try_into().expect("into succeeds");
+                Self::Number(
+                    false,
+                    U256::checked_add(m, U256::ONE).expect("add succeeds"),
+                )
+            } else {
+                Self::Number(false, (-i256).try_into().expect("into succeeds"))
+            }
+        } else {
+            Self::Number(true, i256.try_into().expect("into succeeds"))
+        }
+    }
 }
 
 impl fmt::Display for AsmValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AsmValue::Number(v) => write!(f, "{}", v),
+            AsmValue::Number(s, v) => write!(f, "{}{}", if *s { "" } else { "-" }, v),
             AsmValue::Vector(vs) => {
                 write!(f, "[")?;
                 for (p, v) in vs.iter().enumerate() {
@@ -38,28 +65,56 @@ impl AsmValue {
     pub fn to_move_value(&self, ty: &SignatureToken) -> anyhow::Result<MoveValue> {
         match ty {
             SignatureToken::Bool => {
-                let num = self.check_number(U256::from(1u8))?;
-                Ok(MoveValue::Bool(num != U256::zero()))
+                let num = self.check_unsigned_number(U256::ONE)?;
+                Ok(MoveValue::Bool(num != U256::ZERO))
             },
             SignatureToken::U8 => Ok(MoveValue::U8(
-                self.check_number(U256::from(u8::MAX))?.unchecked_as_u8(),
+                self.check_unsigned_number(U256::from(u8::MAX))?
+                    .try_into()?,
             )),
             SignatureToken::U16 => Ok(MoveValue::U16(
-                self.check_number(U256::from(u16::MAX))?.unchecked_as_u16(),
+                self.check_unsigned_number(U256::from(u16::MAX))?
+                    .try_into()?,
             )),
             SignatureToken::U32 => Ok(MoveValue::U32(
-                self.check_number(U256::from(u32::MAX))?.unchecked_as_u32(),
+                self.check_unsigned_number(U256::from(u32::MAX))?
+                    .try_into()?,
             )),
             SignatureToken::U64 => Ok(MoveValue::U64(
-                self.check_number(U256::from(u64::MAX))?.unchecked_as_u64(),
+                self.check_unsigned_number(U256::from(u64::MAX))?
+                    .try_into()?,
             )),
             SignatureToken::U128 => Ok(MoveValue::U128(
-                self.check_number(U256::from(u128::MAX))?
-                    .unchecked_as_u128(),
+                self.check_unsigned_number(U256::from(u128::MAX))?
+                    .try_into()?,
             )),
-            SignatureToken::U256 => Ok(MoveValue::U256(self.check_number(U256::max_value())?)),
+            SignatureToken::U256 => Ok(MoveValue::U256(self.check_unsigned_number(U256::MAX)?)),
+            SignatureToken::I8 => Ok(MoveValue::I8(
+                self.check_signed_number(I256::from(i8::MIN), I256::from(i8::MAX))?
+                    .try_into()?,
+            )),
+            SignatureToken::I16 => Ok(MoveValue::I16(
+                self.check_signed_number(I256::from(i16::MIN), I256::from(i16::MAX))?
+                    .try_into()?,
+            )),
+            SignatureToken::I32 => Ok(MoveValue::I32(
+                self.check_signed_number(I256::from(i32::MIN), I256::from(i32::MAX))?
+                    .try_into()?,
+            )),
+            SignatureToken::I64 => Ok(MoveValue::I64(
+                self.check_signed_number(I256::from(i64::MIN), I256::from(i64::MAX))?
+                    .try_into()?,
+            )),
+            SignatureToken::I128 => Ok(MoveValue::I128(
+                self.check_signed_number(I256::from(i128::MIN), I256::from(i128::MAX))?
+                    .try_into()?,
+            )),
+            SignatureToken::I256 => Ok(MoveValue::I256(
+                self.check_signed_number(I256::MIN, I256::MAX)?,
+            )),
+
             SignatureToken::Address => Ok(MoveValue::Address(u256_to_address(
-                self.check_number(U256::max_value())?,
+                self.check_unsigned_number(U256::MAX)?,
             ))),
             SignatureToken::Vector(elem_type) => {
                 if let AsmValue::Vector(vals) = self {
@@ -82,28 +137,73 @@ impl AsmValue {
         }
     }
 
-    pub fn check_number(&self, max: U256) -> anyhow::Result<U256> {
-        if let AsmValue::Number(n) = self {
+    pub fn check_unsigned_number(&self, max: U256) -> anyhow::Result<U256> {
+        if let AsmValue::Number(true, n) = self {
             if *n <= max {
                 Ok(*n)
             } else {
                 Err(anyhow!("number {} out of range (max {})", n, max))
             }
         } else {
-            Err(anyhow!("expected a number but found a vector"))
+            Err(anyhow!("expected an unsigned number"))
+        }
+    }
+
+    pub fn check_signed_number(&self, min: I256, max: I256) -> anyhow::Result<I256> {
+        debug_assert!(min < I256::ZERO && max > I256::ZERO);
+        let abs = |i: I256| -> anyhow::Result<U256> {
+            if i == I256::MIN {
+                // This value cannot be negated, so simulate conversion to U256
+                let n: U256 = I256::MAX.try_into()?;
+                Ok(U256::checked_add(n, U256::ONE).expect("add defined"))
+            } else if i < I256::ZERO {
+                Ok((-i).try_into()?)
+            } else {
+                Ok(i.try_into()?)
+            }
+        };
+        if let AsmValue::Number(sign, n) = self {
+            if *sign {
+                if *n > max.try_into()? {
+                    Err(anyhow!("number {} out of range (max {})", n, max))
+                } else {
+                    Ok((*n).try_into()?)
+                }
+            } else if *n > abs(min)? {
+                Err(anyhow!("number -{} out of range (min {})", n, min))
+            } else if *n
+                == U256::checked_add(I256::MAX.try_into()?, 1u8.into()).expect("addition defined")
+            {
+                Ok(I256::MIN)
+            } else {
+                Ok(-(*n).try_into()?)
+            }
+        } else {
+            Err(anyhow!("expected an signed number"))
         }
     }
 
     pub fn from_move_value(value: &MoveValue) -> anyhow::Result<AsmValue> {
         match value {
-            MoveValue::Bool(v) => Ok(AsmValue::Number(U256::from(if *v { 1u8 } else { 0u8 }))),
-            MoveValue::U8(v) => Ok(AsmValue::Number(U256::from(*v))),
-            MoveValue::U16(v) => Ok(AsmValue::Number(U256::from(*v))),
-            MoveValue::U32(v) => Ok(AsmValue::Number(U256::from(*v))),
-            MoveValue::U64(v) => Ok(AsmValue::Number(U256::from(*v))),
-            MoveValue::U128(v) => Ok(AsmValue::Number(U256::from(*v))),
-            MoveValue::U256(v) => Ok(AsmValue::Number(*v)),
-            MoveValue::Address(v) => Ok(AsmValue::Number(address_to_u256(*v))),
+            MoveValue::Bool(v) => Ok(AsmValue::Number(
+                true,
+                U256::from(if *v { 1u8 } else { 0u8 }),
+            )),
+            MoveValue::U8(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U16(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U32(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U64(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U128(v) => Ok(AsmValue::unsigned(U256::from(*v))),
+            MoveValue::U256(v) => Ok(AsmValue::unsigned(*v)),
+
+            MoveValue::I8(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I16(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I32(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I64(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I128(v) => Ok(AsmValue::signed(I256::from(*v))),
+            MoveValue::I256(v) => Ok(AsmValue::signed(*v)),
+
+            MoveValue::Address(v) => Ok(AsmValue::Number(true, address_to_u256(*v))),
             MoveValue::Vector(vs) => Ok(AsmValue::Vector(
                 vs.iter()
                     .map(Self::from_move_value)
@@ -123,5 +223,5 @@ pub(crate) fn u256_to_address(num: U256) -> AccountAddress {
 pub(crate) fn address_to_u256(addr: AccountAddress) -> U256 {
     let mut bytes = addr.into_bytes();
     bytes.reverse();
-    U256::from_le_bytes(&bytes)
+    U256::from_le_bytes(bytes)
 }

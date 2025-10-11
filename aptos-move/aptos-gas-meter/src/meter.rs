@@ -137,6 +137,14 @@ where
             LdU64 => LD_U64,
             LdU128 => LD_U128,
             LdU256 => LD_U256,
+
+            LdI8 => LD_I8,
+            LdI16 => LD_I16,
+            LdI32 => LD_I32,
+            LdI64 => LD_I64,
+            LdI128 => LD_I128,
+            LdI256 => LD_I256,
+
             LdTrue => LD_TRUE,
             LdFalse => LD_FALSE,
 
@@ -162,11 +170,19 @@ where
             CastU128 => CAST_U128,
             CastU256 => CAST_U256,
 
+            CastI8 => CAST_I8,
+            CastI16 => CAST_I16,
+            CastI32 => CAST_I32,
+            CastI64 => CAST_I64,
+            CastI128 => CAST_I128,
+            CastI256 => CAST_I256,
+
             Add => ADD,
             Sub => SUB,
             Mul => MUL,
             Mod => MOD_,
             Div => DIV,
+            Negate => NEGATE,
 
             BitOr => BIT_OR,
             BitAnd => BIT_AND,

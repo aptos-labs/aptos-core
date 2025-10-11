@@ -143,7 +143,8 @@ impl<'a> InstantiationLoopChecker<'a> {
 
         fn rec(type_params: &mut HashSet<TypeParameterIndex>, ty: &SignatureToken) {
             match ty {
-                Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Signer | Struct(_) => (),
+                Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64
+                | I128 | I256 | Signer | Struct(_) => (),
                 TypeParameter(idx) => {
                     type_params.insert(*idx);
                 },
@@ -240,6 +241,12 @@ impl<'a> InstantiationLoopChecker<'a> {
                     | Bytecode::LdU64(_)
                     | Bytecode::LdU128(_)
                     | Bytecode::LdU256(_)
+                    | Bytecode::LdI8(_)
+                    | Bytecode::LdI16(_)
+                    | Bytecode::LdI32(_)
+                    | Bytecode::LdI64(_)
+                    | Bytecode::LdI128(_)
+                    | Bytecode::LdI256(_)
                     | Bytecode::LdConst(_)
                     | Bytecode::LdTrue
                     | Bytecode::LdFalse
@@ -264,11 +271,18 @@ impl<'a> InstantiationLoopChecker<'a> {
                     | Bytecode::CastU64
                     | Bytecode::CastU128
                     | Bytecode::CastU256
+                    | Bytecode::CastI8
+                    | Bytecode::CastI16
+                    | Bytecode::CastI32
+                    | Bytecode::CastI64
+                    | Bytecode::CastI128
+                    | Bytecode::CastI256
                     | Bytecode::Add
                     | Bytecode::Sub
                     | Bytecode::Mul
                     | Bytecode::Mod
                     | Bytecode::Div
+                    | Bytecode::Negate
                     | Bytecode::BitOr
                     | Bytecode::BitAnd
                     | Bytecode::Xor

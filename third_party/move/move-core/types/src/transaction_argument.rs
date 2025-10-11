@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{account_address::AccountAddress, u256, value::MoveValue};
+use crate::{account_address::AccountAddress, int256, value::MoveValue};
 use anyhow::{anyhow, Error, Result};
 use serde::{Deserialize, Serialize};
 use std::{convert::TryFrom, fmt};
@@ -18,9 +18,10 @@ pub enum TransactionArgument {
     // NOTE: Added in bytecode version v6, do not reorder!
     U16(u16),
     U32(u32),
-    U256(u256::U256),
+    U256(int256::U256),
     // Note: Gated by feature flag ALLOW_SERIALIZED_SCRIPT_ARGS
     Serialized(#[serde(with = "serde_bytes")] Vec<u8>),
+    // TODO(#17645): determine whether iNN types need support here
 }
 
 impl fmt::Debug for TransactionArgument {
@@ -88,6 +89,15 @@ impl TryFrom<MoveValue> for TransactionArgument {
             MoveValue::U16(i) => TransactionArgument::U16(i),
             MoveValue::U32(i) => TransactionArgument::U32(i),
             MoveValue::U256(i) => TransactionArgument::U256(i),
+            MoveValue::I8(_)
+            | MoveValue::I16(_)
+            | MoveValue::I32(_)
+            | MoveValue::I64(_)
+            | MoveValue::I128(_)
+            | MoveValue::I256(_) => {
+                // TODO(#17645): determine signed int support
+                return Err(anyhow!("invalid transaction argument: {:?}", val));
+            },
         })
     }
 }
@@ -132,7 +142,7 @@ impl VecBytes {
 #[cfg(test)]
 mod tests {
     use crate::{
-        account_address::AccountAddress, transaction_argument::TransactionArgument, u256::U256,
+        account_address::AccountAddress, int256::U256, transaction_argument::TransactionArgument,
         value::MoveValue,
     };
     use std::convert::{From, TryInto};
@@ -145,7 +155,7 @@ mod tests {
             TransactionArgument::U32(u32::MAX),
             TransactionArgument::U64(u64::MAX),
             TransactionArgument::U128(u128::MAX),
-            TransactionArgument::U256(U256::max_value()),
+            TransactionArgument::U256(U256::MAX),
             TransactionArgument::Bool(true),
             TransactionArgument::Address(AccountAddress::from_hex_literal("0x1").unwrap()),
             TransactionArgument::U8Vector(vec![1, 2, 3, 4]),

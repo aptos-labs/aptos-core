@@ -1016,9 +1016,8 @@ impl<'a> ModuleBuilder<'a> {
                 .collect::<Result<Vec<_>>>()
         };
         Ok(match tok {
-            Bool | U8 | U64 | U128 | U16 | U32 | U256 | Address | Signer | TypeParameter(_) => {
-                tok.clone()
-            },
+            Bool | U8 | U64 | U128 | U16 | U32 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer | TypeParameter(_) => tok.clone(),
             Vector(bt) => Vector(Box::new(self.map_sign_token(module, &bt.clone())?)),
             Struct(hdl) => {
                 let view = StructHandleView::new(module, module.struct_handle_at(*hdl));
