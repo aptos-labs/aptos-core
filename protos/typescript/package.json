@@ -12,12 +12,12 @@
     "build": "./scripts/build.sh"
   },
   "dependencies": {
-    "@grpc/grpc-js": "^1.9.2",
-    "long": "^5.2.3",
-    "protobufjs": "^7.2.5"
+    "@grpc/grpc-js": "^1.9.15",
+    "long": "^5.2.5",
+    "protobufjs": "^7.2.6"
   },
   "devDependencies": {
-    "typescript": "4.8.4"
+    "typescript": "5.8.3"
   },
   "type": "module",
   "main": "./dist/cjs/index.js",
