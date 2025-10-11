@@ -732,7 +732,7 @@ def get_image(image_tag: str | None = None) -> str:
             image_name=image_name,
         )[0]
         if image_tag is None
-        else image_tag
+        else "performance_" + image_tag
     )
     full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{default_latest_image}"
     return full_image

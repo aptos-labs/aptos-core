@@ -29,7 +29,7 @@ use aptos_types::{
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
 use clap::Parser;
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::{
     panic,
     path::PathBuf,
@@ -209,24 +209,22 @@ impl Verifier {
         }
 
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
-        let task_size = self.limit / self.concurrent_replay as u64;
-        let ranges: Vec<(u64, u64)> = (0..self.concurrent_replay)
-            .map(|i| {
-                let chunk_start = self.start + (i as u64) * task_size;
-                let chunk_limit = if i == self.concurrent_replay - 1 {
-                    self.start + self.limit - chunk_start
-                } else {
-                    task_size
-                };
-                (chunk_start, chunk_limit)
-            })
-            .collect();
-
-        // Process each range in parallel using `par_iter`
-        let res = ranges
-            .par_iter()
-            .map(|(start, limit)| self.verify(*start, *limit))
-            .collect::<Vec<_>>();
+        let thread_pool = rayon::ThreadPoolBuilder::new()
+            .num_threads(self.concurrent_replay)
+            .thread_name(|i| format!("replay-verify-{}", i))
+            .build()?;
+        let chunk_size = self.chunk_size as u64;
+        let total_chunks = self.limit.div_ceil(chunk_size);
+        let res: Vec<_> = thread_pool.install(|| {
+            (0..total_chunks)
+                .into_par_iter()
+                .map(|i| {
+                    let start = self.start + i * chunk_size;
+                    let end = std::cmp::min(start + chunk_size - 1, self.start + self.limit - 1);
+                    self.verify(start, end - start + 1)
+                })
+                .collect()
+        });
         let mut all_failed_txns = Vec::new();
         for iter in res.into_iter() {
             all_failed_txns.extend(iter?);
@@ -234,17 +232,17 @@ impl Verifier {
         Ok(all_failed_txns)
     }
 
-    // Execute the verify one valide range
+    // Execute the verify one valid range
     pub fn verify(&self, start: Version, limit: u64) -> Result<Vec<Error>> {
-        let mut total_failed_txns = Vec::new();
+        let mut total_failed_txns = Vec::with_capacity(limit as usize);
         let txn_iter = self
             .backup_handler
             .get_transaction_iter(start, limit as usize)?;
-        let mut cur_txns = Vec::new();
-        let mut cur_persisted_aux_info = Vec::new();
-        let mut expected_events = Vec::new();
-        let mut expected_writesets = Vec::new();
-        let mut expected_txn_infos = Vec::new();
+        let mut cur_txns = Vec::with_capacity(limit as usize);
+        let mut cur_persisted_aux_info = Vec::with_capacity(limit as usize);
+        let mut expected_events = Vec::with_capacity(limit as usize);
+        let mut expected_writesets = Vec::with_capacity(limit as usize);
+        let mut expected_txn_infos = Vec::with_capacity(limit as usize);
         let mut chunk_start_version = start;
         let executor = AptosVMBlockExecutor::new();
         for item in txn_iter {
