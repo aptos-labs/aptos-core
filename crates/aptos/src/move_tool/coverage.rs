@@ -31,9 +31,10 @@ pub struct SummaryCoverage {
     /// Output CSV data of coverage
     #[clap(long = "csv")]
     pub output_csv: bool,
-    /// A filter string to determine which unit tests to compute coverage on
-    #[clap(long, short)]
-    pub filter: Option<String>,
+
+    #[clap(flatten)]
+    pub filter_options: move_unit_test::FilterOptions,
+
     #[clap(flatten)]
     pub move_options: MovePackageOptions,
 }
@@ -43,19 +44,13 @@ impl SummaryCoverage {
         let (coverage_map, package) = compile_coverage(self.move_options)?;
         let modules: Vec<_> = package
             .root_modules()
-            .filter_map(|unit| {
-                let mut retain = true;
-                if let Some(filter_str) = &self.filter {
-                    if !&unit.unit.name().as_str().contains(filter_str.as_str()) {
-                        retain = false;
-                    }
-                }
-                match &unit.unit {
-                    CompiledUnit::Module(NamedCompiledModule { module, .. }) if retain => {
-                        Some(module.clone())
-                    },
-                    _ => None,
-                }
+            .filter_map(|unit| match &unit.unit {
+                CompiledUnit::Module(NamedCompiledModule { module, name, .. })
+                    if self.filter_options.matches(name.as_str()) =>
+                {
+                    Some(module.clone())
+                },
+                _ => None,
             })
             .collect();
         let coverage_map = coverage_map.to_unified_exec_map();
