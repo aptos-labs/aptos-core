@@ -76,7 +76,8 @@ impl JWKObserver {
             if r.is_err() {
                 error!(
                     "Failed to add issuer to relayer with uri={:?}, error={:?}",
-                    open_id_config_url, r.unwrap_err(),
+                    open_id_config_url,
+                    r.unwrap_err(),
                 );
                 return;
             }
@@ -116,15 +117,27 @@ impl JWKObserver {
 
 async fn fetch_jwks_with_relayer(issuer: &str) -> Result<Vec<JWK>> {
     let relayer = GLOBAL_RELAYER.get().unwrap();
-    let last_state = relayer.get_last_state(issuer).await.unwrap();
-    let jwks = last_state.into_iter().map(|jwk| JWK::Unsupported(UnsupportedJWK {
-        id: jwk.type_name.into_bytes(),
-        payload: jwk.data,
-    })).collect();
+    let last_state = relayer
+        .get_last_state(issuer)
+        .await
+        .map_err(|e| anyhow!("fetch_jwks failed with relayer request: {:?}", e))?;
+    let jwks = last_state
+        .into_iter()
+        .map(|jwk| {
+            JWK::Unsupported(UnsupportedJWK {
+                id: jwk.type_name.into_bytes(),
+                payload: jwk.data,
+            })
+        })
+        .collect();
     Ok(jwks)
 }
 
-async fn fetch_jwks(open_id_config_url: &str, my_addr: Option<AccountAddress>, issuer: &str) -> Result<Vec<JWK>> {
+async fn fetch_jwks(
+    open_id_config_url: &str,
+    my_addr: Option<AccountAddress>,
+    issuer: &str,
+) -> Result<Vec<JWK>> {
     if issuer.starts_with("gravity://") {
         return fetch_jwks_with_relayer(issuer).await;
     }
