@@ -37,6 +37,11 @@ struct Args {
     #[arg(long)]
     account_recovery_managers: Vec<AccountRecoveryManager>,
 
+    /// Disable asynchronous updates to the account recovery database.
+    /// By default, async updates are enabled to avoid blocking request handlers.
+    #[arg(long)]
+    disable_async_db_updates: bool, // Defaults to false if not provided
+
     /// The Firestore database ID (required to connect to Firestore).
     /// Only required if not running in local development mode.
     #[arg(
@@ -126,20 +131,26 @@ async fn main() {
     );
 
     // Create the account recovery database
-    let account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync> = if args
-        .local_development_mode
-    {
-        warn!("Running in local development mode! Using a test account recovery database!");
-        Arc::new(TestAccountRecoveryDB::new())
-    } else {
-        let google_project_id = args.google_project_id.expect(
-            "Google Project ID must be provided when not running in local development mode!",
-        );
-        let firestore_database_id = args.firestore_database_id.expect(
+    let account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync> =
+        if args.local_development_mode {
+            warn!("Running in local development mode! Using a test account recovery database!");
+            Arc::new(TestAccountRecoveryDB::new())
+        } else {
+            let google_project_id = args.google_project_id.expect(
+                "Google Project ID must be provided when not running in local development mode!",
+            );
+            let firestore_database_id = args.firestore_database_id.expect(
             "Firestore Database ID must be provided when not running in local development mode!",
         );
-        Arc::new(FirestoreAccountRecoveryDB::new(google_project_id, firestore_database_id).await)
-    };
+            Arc::new(
+                FirestoreAccountRecoveryDB::new(
+                    google_project_id,
+                    firestore_database_id,
+                    args.disable_async_db_updates,
+                )
+                .await,
+            )
+        };
 
     // Start the JWK fetchers
     let jwk_cache = jwk_fetcher::start_jwk_fetchers();

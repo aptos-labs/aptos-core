@@ -223,7 +223,7 @@ impl PepperV0VufPubKey {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct PepperInput {
     pub iss: String,
     pub aud: String,

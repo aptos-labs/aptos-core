@@ -1,12 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::error::PepperServiceError;
+use crate::{error::PepperServiceError, metrics};
 use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{account_recovery_db::AccountRecoveryDbEntry, PepperInput};
-use aptos_logger::info;
+use aptos_logger::{error, info};
 use firestore::{path, paths, FirestoreDb, FirestoreDbOptions};
-use std::io::Write;
+use std::{io::Write, time::Instant};
 use tempfile::NamedTempFile;
 
 // Firestore DB transaction constants
@@ -24,11 +24,19 @@ pub trait AccountRecoveryDBInterface {
 
 /// A GCP firestore that holds all account recovery data
 pub struct FirestoreAccountRecoveryDB {
+    /// Whether to disable async DB updates (e.g., for testing purposes)
+    disable_async_db_updates: bool,
+
+    /// The Firestore DB instance
     firestore_db: FirestoreDb,
 }
 
 impl FirestoreAccountRecoveryDB {
-    pub async fn new(google_project_id: String, firestore_database_id: String) -> Self {
+    pub async fn new(
+        google_project_id: String,
+        firestore_database_id: String,
+        disable_async_db_updates: bool,
+    ) -> Self {
         // Create the FirestoreDB options
         let firestore_db_options = FirestoreDbOptions {
             google_project_id,
@@ -39,7 +47,10 @@ impl FirestoreAccountRecoveryDB {
 
         // Create the FirestoreDB instance
         match FirestoreDb::with_options(firestore_db_options).await {
-            Ok(firestore_db) => Self { firestore_db },
+            Ok(firestore_db) => Self {
+                disable_async_db_updates,
+                firestore_db,
+            },
             Err(error) => {
                 panic!(
                     "Failed to create Firestore account recovery database! Error: {}",
@@ -56,89 +67,36 @@ impl AccountRecoveryDBInterface for FirestoreAccountRecoveryDB {
         &self,
         pepper_input: &PepperInput,
     ) -> Result<(), PepperServiceError> {
-        // Create the database entry and get the document ID
-        let entry = AccountRecoveryDbEntry {
-            iss: pepper_input.iss.clone(),
-            aud: pepper_input.aud.clone(),
-            uid_key: pepper_input.uid_key.clone(),
-            uid_val: pepper_input.uid_val.clone(),
-            first_request_unix_ms_minus_1q: None,
-            last_request_unix_ms: None,
-            num_requests: None,
-        };
-        let document_id = entry.document_id();
+        let firestore_db = self.firestore_db.clone();
+        let pepper_input = pepper_input.clone();
 
-        // Get the time now
-        let now_unix_ms = duration_since_epoch().as_millis() as i64;
+        // Create the DB update task
+        let db_update_task = async move {
+            // Start the db update timer
+            let db_update_timer = Instant::now();
 
-        // To update the DB, we use the following strategy:
-        // 1. If the document doesn't exist, create the document for the user identifier `(iss, aud, uid_key, uid_val)`,
-        //    but leave counter/time fields unspecified.
-        // 2. `num_requests += 1`, assuming the default value is 0.
-        // 3. `last_request_unix_ms = max(last_request_unix_ms, now)`, assuming the default value is 0.
-        // 4. `first_request_unix_ms = min(first_request_unix_ms, now)`, assuming the default value is +inf.
-        //
-        // This strategy is preferred because all the operations can be done on the server-side,
-        // which means the transaction should require only 1 RTT (this is better than using
-        // the read-compute-write pattern that requires 2 RTTs).
-        //
-        // Note: this strategy requires some modifications:
-        // - In firestore, the default value of a number field is 0, and we do not have a way to customize it for step 4.
-        // - The workaround here is to apply an offset so 0 becomes a legitimate default value.
-        // - So we work with `first_request_unix_ms_minus_1q` instead, which is defined as
-        //   `first_request_unix_ms - 1_000_000_000_000_000`, where 1_000_000_000_000_000 milliseconds is roughly 31710 years.
-
-        // Create the firestore DB transaction
-        let mut firestore_transaction =
-            self.firestore_db
-                .begin_transaction()
-                .await
-                .map_err(|error| {
-                    PepperServiceError::InternalError(format!(
-                        "Firestore DB begin_transaction() error: {}",
-                        error
-                    ))
-                })?;
-        self.firestore_db
-            .fluent()
-            .update()
-            .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val}))
-            .in_col(FIRESTORE_DB_COLLECTION_ID)
-            .document_id(&document_id)
-            .object(&entry) // Step 1
-            .transforms(|builder| {
-                builder.fields([
-                    builder
-                        .field(path!(AccountRecoveryDbEntry::num_requests))
-                        .increment(1), // Step 2
-                    builder
-                        .field(path!(AccountRecoveryDbEntry::last_request_unix_ms))
-                        .maximum(now_unix_ms), // Step 3
-                    builder
-                        .field(path!(
-                            AccountRecoveryDbEntry::first_request_unix_ms_minus_1q
-                        ))
-                        .minimum(now_unix_ms - 1_000_000_000_000_000), // Step 4
-                ])
-            })
-            .add_to_transaction(&mut firestore_transaction)
-            .map_err(|error| {
-                PepperServiceError::InternalError(format!(
-                    "Firestore DB add_to_transaction() error: {}",
-                    error
-                ))
-            })?;
-
-        // Commit the DB transaction
-        match firestore_transaction.commit().await {
-            Ok(_) => Ok(()),
-            Err(error) => {
-                let error_message = format!(
-                    "Failed to commit Firestore DB transaction for pepper input {:?}! Document ID {}, Error: {}",
-                    pepper_input, document_id, error
+            // Update the firestore DB
+            let update_result =
+                update_firestore_with_pepper_input(firestore_db, pepper_input.clone()).await;
+            if let Err(error) = &update_result {
+                error!(
+                    "Failed to update the firestore database for pepper input: {:?}! Error: {:?}",
+                    pepper_input, error
                 );
-                Err(PepperServiceError::InternalError(error_message))
-            },
+            }
+
+            // Update the write metrics
+            metrics::update_account_recovery_db_metrics(update_result.is_ok(), db_update_timer);
+
+            update_result
+        };
+
+        // Run the DB update task
+        if self.disable_async_db_updates {
+            db_update_task.await // Run the task and wait for the result
+        } else {
+            tokio::spawn(db_update_task); // Run the task asynchronously
+            Ok(())
         }
     }
 }
@@ -198,5 +156,92 @@ impl AccountRecoveryDBInterface for TestAccountRecoveryDB {
 impl Default for TestAccountRecoveryDB {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Updates the firestore DB with the given pepper input
+async fn update_firestore_with_pepper_input(
+    firestore_db: FirestoreDb,
+    pepper_input: PepperInput,
+) -> Result<(), PepperServiceError> {
+    // Create the database entry and get the document ID
+    let entry = AccountRecoveryDbEntry {
+        iss: pepper_input.iss.clone(),
+        aud: pepper_input.aud.clone(),
+        uid_key: pepper_input.uid_key.clone(),
+        uid_val: pepper_input.uid_val.clone(),
+        first_request_unix_ms_minus_1q: None,
+        last_request_unix_ms: None,
+        num_requests: None,
+    };
+    let document_id = entry.document_id();
+
+    // Get the time now
+    let now_unix_ms = duration_since_epoch().as_millis() as i64;
+
+    // To update the DB, we use the following strategy:
+    // 1. If the document doesn't exist, create the document for the user identifier `(iss, aud, uid_key, uid_val)`,
+    //    but leave counter/time fields unspecified.
+    // 2. `num_requests += 1`, assuming the default value is 0.
+    // 3. `last_request_unix_ms = max(last_request_unix_ms, now)`, assuming the default value is 0.
+    // 4. `first_request_unix_ms = min(first_request_unix_ms, now)`, assuming the default value is +inf.
+    //
+    // This strategy is preferred because all the operations can be done on the server-side,
+    // which means the transaction should require only 1 RTT (this is better than using
+    // the read-compute-write pattern that requires 2 RTTs).
+    //
+    // Note: this strategy requires some modifications:
+    // - In firestore, the default value of a number field is 0, and we do not have a way to customize it for step 4.
+    // - The workaround here is to apply an offset so 0 becomes a legitimate default value.
+    // - So we work with `first_request_unix_ms_minus_1q` instead, which is defined as
+    //   `first_request_unix_ms - 1_000_000_000_000_000`, where 1_000_000_000_000_000 milliseconds is roughly 31710 years.
+
+    // Create the firestore DB transaction
+    let mut firestore_transaction = firestore_db.begin_transaction().await.map_err(|error| {
+        PepperServiceError::InternalError(format!(
+            "Firestore DB begin_transaction() error: {}",
+            error
+        ))
+    })?;
+    firestore_db
+        .fluent()
+        .update()
+        .fields(paths!(AccountRecoveryDbEntry::{iss, aud, uid_key, uid_val}))
+        .in_col(FIRESTORE_DB_COLLECTION_ID)
+        .document_id(&document_id)
+        .object(&entry) // Step 1
+        .transforms(|builder| {
+            builder.fields([
+                builder
+                    .field(path!(AccountRecoveryDbEntry::num_requests))
+                    .increment(1), // Step 2
+                builder
+                    .field(path!(AccountRecoveryDbEntry::last_request_unix_ms))
+                    .maximum(now_unix_ms), // Step 3
+                builder
+                    .field(path!(
+                        AccountRecoveryDbEntry::first_request_unix_ms_minus_1q
+                    ))
+                    .minimum(now_unix_ms - 1_000_000_000_000_000), // Step 4
+            ])
+        })
+        .add_to_transaction(&mut firestore_transaction)
+        .map_err(|error| {
+            PepperServiceError::InternalError(format!(
+                "Firestore DB add_to_transaction() error: {}",
+                error
+            ))
+        })?;
+
+    // Commit the DB transaction
+    match firestore_transaction.commit().await {
+        Ok(_) => Ok(()),
+        Err(error) => {
+            let error_message = format!(
+                "Failed to commit Firestore DB transaction for pepper input {:?}! Document ID {}, Error: {}",
+                pepper_input, document_id, error
+            );
+            Err(PepperServiceError::InternalError(error_message))
+        },
     }
 }
