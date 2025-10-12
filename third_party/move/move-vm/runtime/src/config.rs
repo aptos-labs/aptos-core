@@ -45,6 +45,7 @@ pub struct VMConfig {
     pub paranoid_ref_checks: bool,
     pub enable_capture_option: bool,
     pub enable_enum_option: bool,
+    pub enable_framework_for_option: bool,
 }
 
 impl Default for VMConfig {
@@ -69,6 +70,7 @@ impl Default for VMConfig {
             paranoid_ref_checks: false,
             enable_capture_option: false,
             enable_enum_option: true,
+            enable_framework_for_option: true,
         }
     }
 }

@@ -398,7 +398,8 @@ impl RuntimeEnvironment {
         name: &IdentStr,
     ) -> Option<Bytes> {
         let enable_enum_option = self.vm_config().enable_enum_option;
-        if enable_enum_option {
+        let enable_framework_for_option = self.vm_config().enable_framework_for_option;
+        if !enable_framework_for_option && enable_enum_option {
             if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
                 return Some(self.get_option_module_bytes());
             }
