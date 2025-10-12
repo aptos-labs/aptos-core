@@ -27,7 +27,10 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
-use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
+use move_vm_runtime::{
+    LayoutCache, LayoutCacheEntry, Module, RuntimeEnvironment, Script, StructKey,
+    WithRuntimeEnvironment,
+};
 use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
     WithBytes,
@@ -245,5 +248,17 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
             ViewState::Sync(state) => state.versioned_map.module_cache(),
             ViewState::Unsync(state) => state.unsync_map.module_cache(),
         }
+    }
+}
+
+impl<T: Transaction, S: TStateView<Key = T::Key>> LayoutCache for LatestView<'_, T, S> {
+    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+        self.global_module_cache.get_struct_layout_entry(key)
+    }
+
+    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
+        self.global_module_cache
+            .store_struct_layout_entry(key, entry)?;
+        Ok(())
     }
 }

@@ -8,8 +8,8 @@ use crate::{
         LegacyLoaderConfig, Loader, ModuleMetadataLoader, NativeModuleLoader, ScriptLoader,
         StructDefinitionLoader,
     },
-    Function, LoadedFunction, Module, ModuleStorage, RuntimeEnvironment, Script,
-    WithRuntimeEnvironment,
+    Function, LayoutCacheEntry, LayoutWithDelayedFields, LoadedFunction, Module, ModuleStorage,
+    RuntimeEnvironment, Script, StructKey, WithRuntimeEnvironment,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -198,6 +198,34 @@ where
         self.metered_load_module(gas_meter, traversal_context, &struct_name.module)
             .and_then(|module| module.get_struct(&struct_name.name))
             .map_err(|err| err.to_partial())
+    }
+
+    fn load_layout_from_cache(
+        &self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        key: &StructKey,
+    ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
+        let entry = self.module_storage.get_struct_layout(key)?;
+        let (layout, modules) = entry.unpack();
+        for module_id in modules.iter() {
+            // Re-read all modules for this layout, so that transaction gets invalidated
+            // on module publish. Also, we re-read them in exactly the same way as they
+            // were traversed during layout construction, so gas charging should be exactly
+            // the same as on the cache miss.
+            if let Err(err) = self.charge_module(gas_meter, traversal_context, module_id) {
+                return Some(Err(err));
+            }
+        }
+        Some(Ok(layout))
+    }
+
+    fn store_layout_to_cache(
+        &self,
+        key: &StructKey,
+        entry: LayoutCacheEntry,
+    ) -> PartialVMResult<()> {
+        self.module_storage.store_struct_layout(key, entry)
     }
 }
 
