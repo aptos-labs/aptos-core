@@ -39,7 +39,7 @@ pub async fn advance_time_secs(time_service: TimeService, seconds: u64) {
 }
 
 /// Generates a random VUF public and private keypair for testing purposes
-pub fn create_vuf_public_private_keypair() -> Arc<(String, ark_bls12_381::Fr)> {
+pub fn create_vuf_public_private_keypair() -> (String, Arc<ark_bls12_381::Fr>) {
     // Generate a random VUF seed
     let private_key_seed = rand::random::<[u8; 32]>();
 
@@ -63,7 +63,7 @@ pub fn create_vuf_public_private_keypair() -> Arc<(String, ark_bls12_381::Fr)> {
     // Transform the public key object to a pretty JSON string
     let vuf_public_key_string = serde_json::to_string_pretty(&pepper_vuf_public_key).unwrap();
 
-    Arc::new((vuf_public_key_string, vuf_private_key))
+    (vuf_public_key_string, Arc::new(vuf_private_key))
 }
 
 /// Returns an empty account managers and overrides instance

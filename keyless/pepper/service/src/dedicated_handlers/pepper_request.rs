@@ -7,6 +7,7 @@ use crate::{
     },
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    metrics,
 };
 use aptos_keyless_pepper_common::{
     jwt::Claims,
@@ -25,11 +26,11 @@ use aptos_types::{
     keyless::{Configuration, IdCommitment, KeylessPublicKey, OpenIdSig, Pepper},
     transaction::authenticator::{AnyPublicKey, AuthenticationKey, EphemeralPublicKey},
 };
-use ark_bls12_381::Fr;
 use jsonwebtoken::{Algorithm::RS256, DecodingKey, TokenData, Validation};
 use std::{
+    ops::Deref,
     sync::Arc,
-    time::{SystemTime, UNIX_EPOCH},
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 // The default derivation path (if none is provided)
@@ -46,7 +47,7 @@ const EMAIL_UID_KEY: &str = "email";
 
 /// Handles the given pepper request, returning the pepper base, pepper and account address
 pub async fn handle_pepper_request(
-    vuf_private_key: &ark_bls12_381::Fr,
+    vuf_private_key: Arc<ark_bls12_381::Fr>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     jwt: String,
@@ -95,31 +96,24 @@ pub async fn handle_pepper_request(
     )
     .await?;
 
-    // Derive the pepper base, pepper bytes and account address
-    let (pepper_base, derived_pepper_bytes, address) =
-        derive_pepper_and_account_address(vuf_private_key, derivation_path, &pepper_input)?;
+    // Derive the pepper base, pepper bytes and account address.
+    // Note: we do this using spawn_blocking() to avoid blocking the async runtime.
+    let (pepper_base, derived_pepper_bytes, address) = tokio::task::spawn_blocking(move || {
+        // Start the derivation timer
+        let derivation_start_time = Instant::now();
+
+        // Derive the pepper and account address
+        let derivation_result =
+            derive_pepper_and_account_address(vuf_private_key, derivation_path, &pepper_input);
+
+        // Update the derivation metrics
+        metrics::update_pepper_derivation_metrics(derivation_result.is_ok(), derivation_start_time);
+
+        derivation_result
+    })
+    .await??;
 
     // Return the pepper base, derived pepper and address
-    Ok((pepper_base, derived_pepper_bytes, address))
-}
-
-/// Derives the pepper base, pepper bytes and account address
-fn derive_pepper_and_account_address(
-    vuf_private_key: &Fr,
-    derivation_path: Option<String>,
-    pepper_input: &PepperInput,
-) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), PepperServiceError> {
-    // Create the pepper base using the vuf private key and the pepper input
-    let pepper_base = create_pepper_base(vuf_private_key, pepper_input)?;
-
-    // Derive the pepper using the verified derivation path and the pepper base
-    let verified_derivation_path = get_verified_derivation_path(derivation_path)?;
-    let derived_pepper = derive_pepper(&verified_derivation_path, &pepper_base)?;
-    let derived_pepper_bytes = derived_pepper.to_bytes().to_vec();
-
-    // Create the account address
-    let address = create_account_address(pepper_input, &derived_pepper)?;
-
     Ok((pepper_base, derived_pepper_bytes, address))
 }
 
@@ -148,7 +142,7 @@ fn create_account_address(
 
 /// Creates the pepper base using the VUF private key and the pepper input
 fn create_pepper_base(
-    vuf_private_key: &ark_bls12_381::Fr,
+    vuf_private_key: Arc<ark_bls12_381::Fr>,
     pepper_input: &PepperInput,
 ) -> Result<Vec<u8>, PepperServiceError> {
     // Serialize the pepper input using BCS
@@ -161,7 +155,7 @@ fn create_pepper_base(
 
     // Generate the pepper base and proof using the VUF
     let (pepper_base, vuf_proof) =
-        vuf::bls12381_g1_bls::Bls12381G1Bls::eval(vuf_private_key, &input_bytes).map_err(
+        vuf::bls12381_g1_bls::Bls12381G1Bls::eval(vuf_private_key.deref(), &input_bytes).map_err(
             |error| {
                 PepperServiceError::InternalError(format!(
                     "Failed to evaluate bls12381_g1_bls VUF: {}",
@@ -246,6 +240,26 @@ fn derive_pepper(
         .get_pepper();
 
     Ok(derived_pepper)
+}
+
+/// Derives the pepper base, pepper bytes and account address
+fn derive_pepper_and_account_address(
+    vuf_private_key: Arc<ark_bls12_381::Fr>,
+    derivation_path: Option<String>,
+    pepper_input: &PepperInput,
+) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), PepperServiceError> {
+    // Create the pepper base using the vuf private key and the pepper input
+    let pepper_base = create_pepper_base(vuf_private_key, pepper_input)?;
+
+    // Derive the pepper using the verified derivation path and the pepper base
+    let verified_derivation_path = get_verified_derivation_path(derivation_path)?;
+    let derived_pepper = derive_pepper(&verified_derivation_path, &pepper_base)?;
+    let derived_pepper_bytes = derived_pepper.to_bytes().to_vec();
+
+    // Create the account address
+    let address = create_account_address(pepper_input, &derived_pepper)?;
+
+    Ok((pepper_base, derived_pepper_bytes, address))
 }
 
 /// Returns the on-chain keyless configuration from the cached resources
@@ -538,7 +552,7 @@ mod tests {
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            &vuf_private_key,
+            vuf_private_key,
             &pepper_input,
             TEST_SUB_PEPPER_BASE_HEX,
             TEST_SUB_DERIVED_PEPPER_HEX,
@@ -574,7 +588,7 @@ mod tests {
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            &vuf_private_key,
+            vuf_private_key,
             &pepper_input,
             TEST_EMAIL_PEPPER_BASE_HEX,
             TEST_EMAIL_DERIVED_PEPPER_HEX,
@@ -609,7 +623,7 @@ mod tests {
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            &vuf_private_key,
+            vuf_private_key,
             &pepper_input,
             TEST_SUB_PEPPER_BASE_HEX,
             TEST_SUB_DERIVED_PEPPER_HEX,
@@ -649,7 +663,7 @@ mod tests {
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            &vuf_private_key,
+            vuf_private_key,
             &pepper_input,
             TEST_SUB_OVERRIDE_PEPPER_BASE_HEX,
             TEST_SUB_OVERRIDE_DERIVED_PEPPER_HEX,
@@ -675,16 +689,18 @@ mod tests {
     }
 
     /// Returns the test VUF private key from the given seed
-    fn get_test_vuf_private_key(seed: [u8; 32]) -> ark_bls12_381::Fr {
+    fn get_test_vuf_private_key(seed: [u8; 32]) -> Arc<ark_bls12_381::Fr> {
         // Derive the VUF private key from the seed
         let mut sha3_hasher = sha3::Sha3_512::new();
         sha3_hasher.update(seed);
-        ark_bls12_381::Fr::from_be_bytes_mod_order(sha3_hasher.finalize().as_slice())
+        let vuf_private_key =
+            ark_bls12_381::Fr::from_be_bytes_mod_order(sha3_hasher.finalize().as_slice());
+        Arc::new(vuf_private_key)
     }
 
     /// Verifies the generated pepper base, derived pepper and account address against the expected values
     fn verify_base_pepper_and_address_generation(
-        vuf_private_key: &ark_bls12_381::Fr,
+        vuf_private_key: Arc<ark_bls12_381::Fr>,
         pepper_input: &PepperInput,
         expected_pepper_base_hex: &str,
         expected_derived_pepper_hex: &str,

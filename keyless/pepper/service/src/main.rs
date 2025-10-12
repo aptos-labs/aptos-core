@@ -145,7 +145,7 @@ async fn main() {
     let jwk_cache = jwk_fetcher::start_jwk_fetchers();
 
     // Start the pepper service
-    let vuf_keypair = Arc::new((vuf_public_key, vuf_private_key));
+    let vuf_keypair = Arc::new((vuf_public_key, Arc::new(vuf_private_key)));
     start_pepper_service(
         args.pepper_service_port,
         vuf_keypair,
@@ -179,7 +179,7 @@ fn start_metrics_server() {
 // Starts the pepper service
 async fn start_pepper_service(
     pepper_service_port: u16,
-    vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    vuf_keypair: Arc<(String, Arc<ark_bls12_381::Fr>)>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,

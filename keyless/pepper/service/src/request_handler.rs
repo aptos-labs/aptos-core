@@ -67,7 +67,7 @@ const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
-    vuf_private_key: &ark_bls12_381::Fr,
+    vuf_private_key: Arc<ark_bls12_381::Fr>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
@@ -304,7 +304,7 @@ fn generate_text_response(
 /// Handles the given request and returns a response
 pub async fn handle_request(
     request: Request<Body>,
-    vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    vuf_keypair: Arc<(String, Arc<ark_bls12_381::Fr>)>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
@@ -361,7 +361,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_priv_key.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0DelegatedFetchHandler,
@@ -374,7 +374,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_priv_key.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0FetchHandler,
@@ -387,7 +387,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_priv_key.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0SignatureHandler,
@@ -400,7 +400,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_priv_key.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0VerifyHandler,

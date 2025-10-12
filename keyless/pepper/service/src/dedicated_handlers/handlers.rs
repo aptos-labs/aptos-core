@@ -40,7 +40,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     // TODO: is there a way we can remove the vuf_private_key param here?
     async fn handle_request(
         &self,
-        vuf_private_key: &ark_bls12_381::Fr,
+        vuf_private_key: Arc<ark_bls12_381::Fr>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: TRequest,
@@ -56,7 +56,7 @@ pub struct V0DelegatedFetchHandler;
 impl HandlerTrait<PepperRequestV2, PepperResponse> for V0DelegatedFetchHandler {
     async fn handle_request(
         &self,
-        vuf_private_key: &ark_bls12_381::Fr,
+        vuf_private_key: Arc<ark_bls12_381::Fr>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequestV2,
@@ -109,7 +109,7 @@ pub struct V0FetchHandler;
 impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
     async fn handle_request(
         &self,
-        vuf_private_key: &ark_bls12_381::Fr,
+        vuf_private_key: Arc<ark_bls12_381::Fr>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
@@ -158,7 +158,7 @@ pub struct V0SignatureHandler;
 impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
     async fn handle_request(
         &self,
-        vuf_private_key: &ark_bls12_381::Fr,
+        vuf_private_key: Arc<ark_bls12_381::Fr>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
@@ -207,7 +207,7 @@ pub struct V0VerifyHandler;
 impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
     async fn handle_request(
         &self,
-        _: &ark_bls12_381::Fr,
+        _: Arc<ark_bls12_381::Fr>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: VerifyRequest,
