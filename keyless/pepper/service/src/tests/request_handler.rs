@@ -305,8 +305,8 @@ async fn test_get_vuf_pub_key_request() {
     let response_vuf_public_key = get_public_key_from_json(&body_string);
 
     // Get the expected public key from the keypair
-    let (vuf_public_key_json, _) = vuf_keypair.deref();
-    let vuf_public_key = get_public_key_from_json(vuf_public_key_json);
+    let (vuf_public_key_json, _) = vuf_keypair;
+    let vuf_public_key = get_public_key_from_json(&vuf_public_key_json);
 
     // Verify the public key is correct
     assert_eq!(response_vuf_public_key, vuf_public_key);
@@ -508,7 +508,7 @@ async fn send_request_to_path(
     method: Method,
     endpoint: &str,
     body: Body,
-    vuf_keypair: Option<Arc<(String, ark_bls12_381::Fr)>>,
+    vuf_keypair: Option<(String, Arc<ark_bls12_381::Fr>)>,
     jwk_cache: Option<JWKCache>,
     cached_resources: Option<CachedResources>,
 ) -> Response<Body> {
@@ -526,7 +526,8 @@ async fn send_request_to_path(
         .unwrap();
 
     // Get or create a VUF public private keypair
-    let vuf_keypair = vuf_keypair.unwrap_or_else(utils::create_vuf_public_private_keypair);
+    let vuf_keypair =
+        Arc::new(vuf_keypair.unwrap_or_else(utils::create_vuf_public_private_keypair));
 
     // Get or create a JWK cache
     let jwk_cache = jwk_cache.unwrap_or_else(|| Arc::new(Mutex::new(HashMap::new())));

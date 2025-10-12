@@ -47,6 +47,17 @@ static JWK_FETCH_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     .unwrap()
 });
 
+// Histogram for tracking time taken to derive peppers
+static PEPPER_DERIVATION_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
+    register_histogram_vec!(
+        "keyless_pepper_service_pepper_derivation_seconds",
+        "Time taken to derive peppers",
+        &["succeeded"],
+        LATENCY_BUCKETS.clone()
+    )
+    .unwrap()
+});
+
 // Histogram for tracking time taken to handle pepper service requests
 static REQUEST_HANDLING_SECONDS: Lazy<HistogramVec> = Lazy::new(|| {
     register_histogram_vec!(
@@ -95,6 +106,17 @@ pub fn update_external_resource_fetch_metrics(
 pub fn update_jwk_fetch_metrics(issuer: &str, succeeded: bool, elapsed: Duration) {
     JWK_FETCH_SECONDS
         .with_label_values(&[issuer, &succeeded.to_string()])
+        .observe(elapsed.as_secs_f64());
+}
+
+/// Updates the pepper derivation metrics with the given data
+pub fn update_pepper_derivation_metrics(succeeded: bool, derivation_start_time: Instant) {
+    // Calculate the elapsed time
+    let elapsed = derivation_start_time.elapsed();
+
+    // Update the metrics
+    PEPPER_DERIVATION_SECONDS
+        .with_label_values(&[&succeeded.to_string()])
         .observe(elapsed.as_secs_f64());
 }
 
