@@ -4,7 +4,7 @@
 
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
-    network::{BroadcastPeerPriority, MempoolSyncMsg},
+    network::{BroadcastPeerPriority, MempoolSyncMsg}, shared_mempool::types::{CoreMempoolTrait, GravityCoreMempool},
 };
 use anyhow::{format_err, Result};
 use aptos_compression::client::CompressionClient;
@@ -22,10 +22,10 @@ use rand::{rngs::StdRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-pub(crate) fn setup_mempool() -> (CoreMempool, ConsensusMock) {
+pub(crate) fn setup_mempool() -> (Box<dyn CoreMempoolTrait>, ConsensusMock) {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.broadcast_buckets = vec![0];
-    (CoreMempool::new(&config), ConsensusMock::new())
+    (Box::new(GravityCoreMempool::from(CoreMempool::new(&config))) as Box<dyn CoreMempoolTrait>, ConsensusMock::new())
 }
 
 pub(crate) fn setup_mempool_with_broadcast_buckets(
@@ -199,7 +199,7 @@ pub(crate) fn txn_bytes_len(transaction: TestTransaction) -> u64 {
 }
 
 pub(crate) fn add_txn(
-    pool: &mut CoreMempool,
+    pool: &mut Box<dyn CoreMempoolTrait>,
     transaction: TestTransaction,
 ) -> Result<SignedTransaction> {
     let txn = transaction.make_signed_transaction();
@@ -207,7 +207,7 @@ pub(crate) fn add_txn(
     Ok(txn)
 }
 
-pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransaction) -> Result<()> {
+pub(crate) fn add_signed_txn(pool: &mut Box<dyn CoreMempoolTrait>, transaction: SignedTransaction) -> Result<()> {
     match pool
         .add_txn(
             transaction.clone(),
@@ -226,7 +226,7 @@ pub(crate) fn add_signed_txn(pool: &mut CoreMempool, transaction: SignedTransact
 }
 
 pub(crate) fn batch_add_signed_txn(
-    pool: &mut CoreMempool,
+    pool: &mut Box<dyn CoreMempoolTrait>,
     transactions: Vec<SignedTransaction>,
 ) -> Result<()> {
     for txn in transactions.into_iter() {

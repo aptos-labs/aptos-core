@@ -11,8 +11,7 @@ use crate::{
     network::{BroadcastError, BroadcastPeerPriority, MempoolSyncMsg},
     shared_mempool::{
         types::{
-            notify_subscribers, ScheduledBroadcast, SharedMempool, SharedMempoolNotification,
-            SubmissionStatusBundle,
+            notify_subscribers, CoreMempoolTrait, ScheduledBroadcast, SharedMempool, SharedMempoolNotification, SubmissionStatusBundle
         },
         use_case_history::UseCaseHistory,
     },
@@ -614,7 +613,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
 
 /// Remove transactions that are committed (or rejected) so that we can stop broadcasting them.
 pub(crate) fn process_committed_transactions(
-    mempool: &Mutex<CoreMempool>,
+    mempool: &Mutex<Box<dyn CoreMempoolTrait>>,
     use_case_history: &Mutex<UseCaseHistory>,
     transactions: Vec<CommittedTransaction>,
     block_timestamp_usecs: u64,
@@ -646,7 +645,7 @@ pub(crate) fn process_committed_transactions(
 }
 
 pub(crate) fn process_rejected_transactions(
-    mempool: &Mutex<CoreMempool>,
+    mempool: &Mutex<Box<dyn CoreMempoolTrait>>,
     transactions: Vec<RejectedTransactionSummary>,
 ) {
     let mut pool = mempool.lock();

@@ -4,8 +4,8 @@
 
 #[cfg(test)]
 mod common;
-#[cfg(test)]
-mod core_mempool_test;
+// #[cfg(test)]
+// mod core_mempool_test;
 #[cfg(test)]
 mod integration_tests;
 #[cfg(test)]

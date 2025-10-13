@@ -5,7 +5,7 @@
 use crate::{
     core_mempool::{CoreMempool, TimelineState},
     network::{BroadcastPeerPriority, MempoolSyncMsg},
-    shared_mempool::{start_shared_mempool, types::SharedMempoolNotification},
+    shared_mempool::{start_shared_mempool, types::{CoreMempoolTrait, GravityCoreMempool, SharedMempoolNotification}},
     tests::common::TestTransaction,
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
@@ -314,7 +314,7 @@ pub struct Node {
     /// The identifying Node
     node_info: NodeInfo,
     /// `CoreMempool` for this node
-    mempool: Arc<Mutex<CoreMempool>>,
+    mempool: Arc<Mutex<Box<dyn CoreMempoolTrait>>>,
     /// Network interfaces for a node
     network_interfaces: HashMap<NetworkId, NodeNetworkInterface>,
     /// Tokio runtime
@@ -367,7 +367,7 @@ impl Node {
     }
 
     /// Retrieves a `CoreMempool`
-    pub fn mempool(&self) -> MutexGuard<CoreMempool> {
+    pub fn mempool(&self) -> MutexGuard<Box<dyn CoreMempoolTrait>> {
         self.mempool.lock()
     }
 
@@ -563,11 +563,11 @@ fn start_node_mempool(
     network_service_events: NetworkServiceEvents<MempoolSyncMsg>,
     peers_and_metadata: Arc<PeersAndMetadata>,
 ) -> (
-    Arc<Mutex<CoreMempool>>,
+    Arc<Mutex<Box<dyn CoreMempoolTrait>>>,
     Runtime,
     UnboundedReceiver<SharedMempoolNotification>,
 ) {
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let mempool = Arc::new(Mutex::new(Box::new(GravityCoreMempool::from(CoreMempool::new(&config))) as Box<dyn CoreMempoolTrait>));
     let (sender, subscriber) = unbounded();
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);

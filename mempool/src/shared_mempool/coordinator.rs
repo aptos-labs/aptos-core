@@ -12,8 +12,7 @@ use crate::{
     shared_mempool::{
         tasks::{self, process_committed_transactions},
         types::{
-            notify_subscribers, MempoolMessageId, ScheduledBroadcast, SharedMempool,
-            SharedMempoolNotification,
+            notify_subscribers, CoreMempoolTrait, MempoolMessageId, ScheduledBroadcast, SharedMempool, SharedMempoolNotification
         },
         use_case_history::UseCaseHistory,
     },
@@ -228,7 +227,7 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
 /// Handle removing committed transactions from local mempool immediately.  This should be done
 /// immediately to ensure broadcasts of committed transactions stop as soon as possible.
 fn handle_commit_notification<TransactionValidator>(
-    mempool: &Arc<Mutex<CoreMempool>>,
+    mempool: &Arc<Mutex<Box<dyn CoreMempoolTrait>>>,
     mempool_validator: &Arc<RwLock<TransactionValidator>>,
     use_case_history: &Arc<Mutex<UseCaseHistory>>,
     msg: MempoolCommitNotification,
@@ -443,7 +442,7 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
 }
 
 /// Garbage collect all expired transactions by SystemTTL.
-pub(crate) async fn gc_coordinator(mempool: Arc<Mutex<CoreMempool>>, gc_interval_ms: u64) {
+pub(crate) async fn gc_coordinator(mempool: Arc<Mutex<Box<dyn CoreMempoolTrait>>>, gc_interval_ms: u64) {
     debug!(LogSchema::event_log(LogEntry::GCRuntime, LogEvent::Start));
     let mut interval = IntervalStream::new(interval(Duration::from_millis(gc_interval_ms)));
     while let Some(_interval) = interval.next().await {
@@ -463,7 +462,7 @@ pub(crate) async fn gc_coordinator(mempool: Arc<Mutex<CoreMempool>>, gc_interval
 /// Periodically logs a snapshot of transactions in core mempool.
 /// In the future we may want an interactive way to directly query mempool's internal state.
 /// For now, we will rely on this periodic snapshot to observe the internal state.
-pub(crate) async fn snapshot_job(mempool: Arc<Mutex<CoreMempool>>, snapshot_interval_secs: u64) {
+pub(crate) async fn snapshot_job(mempool: Arc<Mutex<Box<dyn CoreMempoolTrait>>>, snapshot_interval_secs: u64) {
     let mut interval = IntervalStream::new(interval(Duration::from_secs(snapshot_interval_secs)));
     while let Some(_interval) = interval.next().await {
         let snapshot = mempool.lock().gen_snapshot();

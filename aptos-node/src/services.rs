@@ -20,7 +20,7 @@ use aptos_indexer_grpc_table_info::runtime::{
 };
 use aptos_logger::{debug, telemetry_log_writer::TelemetryLog, LoggerFilterUpdater};
 use aptos_mempool::{
-    network::MempoolSyncMsg, MempoolClientRequest, MempoolClientSender, QuorumStoreRequest,
+    network::MempoolSyncMsg, shared_mempool::types::{CoreMempoolTrait, GravityCoreMempool}, MempoolClientRequest, MempoolClientSender, QuorumStoreRequest
 };
 use aptos_mempool_notifications::MempoolNotificationListener;
 use aptos_network::application::{interface::NetworkClientInterface, storage::PeersAndMetadata};
@@ -187,6 +187,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
 
     // Bootstrap and start mempool
     let instant = Instant::now();
+    let mempool = Box::new(GravityCoreMempool::from_config(node_config)) as Box<dyn CoreMempoolTrait>;
     let mempool = aptos_mempool::bootstrap(
         node_config,
         Arc::clone(&db_rw.reader),
@@ -197,6 +198,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         mempool_listener,
         mempool_reconfig_subscription,
         peers_and_metadata,
+        mempool,
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 

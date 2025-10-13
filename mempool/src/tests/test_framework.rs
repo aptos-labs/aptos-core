@@ -6,7 +6,7 @@ use crate::{
     core_mempool::CoreMempool,
     shared_mempool::{
         start_shared_mempool,
-        types::{MempoolMessageId, MempoolSenderBucket},
+        types::{CoreMempoolTrait, GravityCoreMempool, MempoolMessageId, MempoolSenderBucket},
     },
     tests::common::{self, TestTransaction},
     MempoolClientRequest, MempoolClientSender, MempoolSyncMsg, QuorumStoreRequest,
@@ -64,7 +64,7 @@ use tokio_stream::StreamExt;
 /// TODO: Add ability to reject transactions via Consensus
 pub struct MempoolNode {
     /// The [`CoreMempool`] storage of the node
-    pub mempool: Arc<Mutex<CoreMempool>>,
+    pub mempool: Arc<Mutex<Box<dyn CoreMempoolTrait>>>,
     /// A generator for [`MempoolSyncMsg`] request ids.
     pub request_id_generator: U32IdGenerator,
 
@@ -622,7 +622,7 @@ fn setup_mempool(
     MempoolClientSender,
     futures::channel::mpsc::Sender<QuorumStoreRequest>,
     MempoolNotifier,
-    Arc<Mutex<CoreMempool>>,
+    Arc<Mutex<Box<dyn CoreMempoolTrait>>>,
 ) {
     let (sender, _subscriber) = futures::channel::mpsc::unbounded();
     let (ac_endpoint_sender, ac_endpoint_receiver) = mpsc_channel();
@@ -630,7 +630,7 @@ fn setup_mempool(
     let (mempool_notifier, mempool_listener) =
         aptos_mempool_notifications::new_mempool_notifier_listener_pair(100);
 
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let mempool = Arc::new(Mutex::new(Box::new(GravityCoreMempool::from(CoreMempool::new(&config))) as Box<dyn CoreMempoolTrait>));
     let vm_validator = Arc::new(RwLock::new(MockVMValidator));
     let db_ro = Arc::new(MockDbReaderWriter);
 

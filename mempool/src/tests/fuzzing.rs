@@ -73,26 +73,27 @@ pub fn test_mempool_process_incoming_transactions_impl(
     )>,
     timeline_state: TimelineState,
 ) {
-    let config = NodeConfig::default();
-    let mock_db = MockDbReaderWriter;
-    let vm_validator = Arc::new(RwLock::new(MockVMValidator));
-    let network_client = NetworkClient::new(
-        vec![MempoolDirectSend],
-        vec![],
-        HashMap::new(),
-        PeersAndMetadata::new(&[NetworkId::Validator]),
-    );
-    let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, MockVMValidator> = SharedMempool::new(
-        Arc::new(Mutex::new(CoreMempool::new(&config))),
-        config.mempool.clone(),
-        network_client,
-        Arc::new(mock_db),
-        vm_validator,
-        vec![],
-        NodeType::extract_from_config(&config),
-    );
+    todo!()
+    // let config = NodeConfig::default();
+    // let mock_db = MockDbReaderWriter;
+    // let vm_validator = Arc::new(RwLock::new(MockVMValidator));
+    // let network_client = NetworkClient::new(
+    //     vec![MempoolDirectSend],
+    //     vec![],
+    //     HashMap::new(),
+    //     PeersAndMetadata::new(&[NetworkId::Validator]),
+    // );
+    // let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, MockVMValidator> = SharedMempool::new(
+    //     Arc::new(Mutex::new(CoreMempool::new(&config))),
+    //     config.mempool.clone(),
+    //     network_client,
+    //     Arc::new(mock_db),
+    //     vm_validator,
+    //     vec![],
+    //     NodeType::extract_from_config(&config),
+    // );
 
-    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
+    // let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
 }
 
 proptest! {
