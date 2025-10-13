@@ -9,6 +9,7 @@ use crate::{
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
     metadata::LanguageVersion,
     model::{Parameter, TypeParameter, TypeParameterKind},
+    options::ModelBuilderOptions,
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
 };
 use legacy_move_compiler::parser::ast as PA;
@@ -35,6 +36,11 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         )
     };
 
+    let options = trans
+        .env
+        .get_extension::<ModelBuilderOptions>()
+        .unwrap_or_default();
+
     let param_t = &Type::TypeParameter(0);
     let param_t_decl = TypeParameter::new_named(&trans.env.symbol_pool().make("T"), &loc);
 
@@ -44,6 +50,21 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         value: Value::Number(value),
         visibility,
     };
+
+    let mk_bool_const = |value: bool, visibility: EntryVisibility| ConstEntry {
+        loc: loc.clone(),
+        ty: bool_t.clone(),
+        value: Value::Bool(value),
+        visibility,
+    };
+
+    {
+        // Compiler builtin constants.
+        trans.define_const(
+            trans.builtin_qualified_symbol("__COMPILE_FOR_TESTING__"),
+            mk_bool_const(options.compile_for_testing, EntryVisibility::Impl),
+        );
+    }
 
     {
         // Builtin Constants (for specifications)

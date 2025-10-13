@@ -3065,6 +3065,14 @@ impl ModuleName {
         ModuleName(addr, name)
     }
 
+    /// Returns builtin module name.
+    pub fn builtin_module(env: &GlobalEnv) -> Self {
+        Self::new(
+            Address::Numerical(AccountAddress::ZERO),
+            env.symbol_pool().make("$$"),
+        )
+    }
+
     pub fn from_address_bytes_and_name(
         addr: legacy_move_compiler::shared::NumericalAddress,
         name: Symbol,

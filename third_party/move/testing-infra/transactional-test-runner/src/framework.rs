@@ -32,6 +32,7 @@ use move_command_line_common::{
     types::ParsedType,
     values::{ParsableValue, ParsedValue},
 };
+use move_compiler_v2::Experiment;
 use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
@@ -945,6 +946,9 @@ fn compile_source_unit_v2(
     };
     for (exp, value) in experiments {
         options = options.set_experiment(exp, value)
+    }
+    if options.experiment_on(Experiment::COMPILE_FOR_TESTING) {
+        options.compile_test_code = true
     }
     let mut error_writer = termcolor::Buffer::no_color();
     let result = {
