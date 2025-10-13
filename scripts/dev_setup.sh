@@ -1071,7 +1071,7 @@ if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
   fi
 
   # For now best effort install, will need to improve later
-  if command -v pre-commit; then
+  if command -v pre-commit &>/dev/null; then
     pre-commit install
   else
     ~/.local/bin/pre-commit install
