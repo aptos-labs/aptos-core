@@ -8,7 +8,7 @@ pub mod external_resources;
 pub mod metrics;
 pub mod request_handler;
 pub mod utils;
-pub mod vuf_pub_key;
+pub mod vuf_keypair;
 
 #[cfg(test)]
 mod tests;
