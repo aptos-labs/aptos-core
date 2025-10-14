@@ -9,12 +9,13 @@ use crate::{
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
     metadata::LanguageVersion,
     model::{Parameter, TypeParameter, TypeParameterKind},
+    options::ModelBuilderOptions,
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
 };
 use legacy_move_compiler::parser::ast as PA;
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    int256::U256,
+    int256::{I256, U256},
 };
 use num::BigInt;
 use std::collections::BTreeMap;
@@ -22,6 +23,7 @@ use std::collections::BTreeMap;
 /// Adds builtin functions.
 pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     let loc = trans.env.internal_loc();
+    let prim_ty = |p| Type::new_prim(p);
     let bool_t = &Type::new_prim(PrimitiveType::Bool);
     let num_t = &Type::new_prim(PrimitiveType::Num);
     let range_t = &Type::new_prim(PrimitiveType::Range);
@@ -35,43 +37,199 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         )
     };
 
+    let options = trans
+        .env
+        .get_extension::<ModelBuilderOptions>()
+        .unwrap_or_default();
+
     let param_t = &Type::TypeParameter(0);
     let param_t_decl = TypeParameter::new_named(&trans.env.symbol_pool().make("T"), &loc);
 
-    let mk_num_const = |value: BigInt, visibility: EntryVisibility| ConstEntry {
+    let mk_int_const = |value: BigInt, ty: &Type, visibility: EntryVisibility| ConstEntry {
         loc: loc.clone(),
-        ty: num_t.clone(),
+        ty: ty.clone(),
         value: Value::Number(value),
         visibility,
     };
 
+    let mk_num_const =
+        |value: BigInt, visibility: EntryVisibility| mk_int_const(value, num_t, visibility);
+
+    let mk_bool_const = |value: bool, visibility: EntryVisibility| ConstEntry {
+        loc: loc.clone(),
+        ty: bool_t.clone(),
+        value: Value::Bool(value),
+        visibility,
+    };
+
     {
+        if options.language_version.is_at_least(LanguageVersion::V2_3) {
+            use EntryVisibility::SpecAndImpl;
+            // Compiler builtin constants.
+            trans.define_const(
+                trans.builtin_qualified_symbol("__COMPILE_FOR_TESTING__"),
+                mk_bool_const(options.compile_for_testing, SpecAndImpl),
+            );
+        }
+    }
+
+    {
+        use EntryVisibility::{Spec, SpecAndImpl};
+
+        let range_visibility = if options.language_version.is_at_least(LanguageVersion::V2_3) {
+            SpecAndImpl
+        } else {
+            Spec
+        };
+
         // Builtin Constants (for specifications)
-        use EntryVisibility::Spec;
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U8"),
-            mk_num_const(BigInt::from(u8::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u8::MAX),
+                &prim_ty(PrimitiveType::U8),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U16"),
-            mk_num_const(BigInt::from(u16::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u16::MAX),
+                &prim_ty(PrimitiveType::U16),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U32"),
-            mk_num_const(BigInt::from(u32::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u32::MAX),
+                &prim_ty(PrimitiveType::U32),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U64"),
-            mk_num_const(BigInt::from(u64::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u64::MAX),
+                &prim_ty(PrimitiveType::U64),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U128"),
-            mk_num_const(BigInt::from(u128::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u128::MAX),
+                &prim_ty(PrimitiveType::U128),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U256"),
-            mk_num_const(BigInt::from(U256::MAX), Spec),
+            mk_int_const(
+                BigInt::from(U256::MAX),
+                &prim_ty(PrimitiveType::U256),
+                range_visibility,
+            ),
         );
+
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I8"),
+            mk_int_const(
+                BigInt::from(i8::MAX),
+                &prim_ty(PrimitiveType::I8),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I16"),
+            mk_int_const(
+                BigInt::from(i16::MAX),
+                &prim_ty(PrimitiveType::I16),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I32"),
+            mk_int_const(
+                BigInt::from(i32::MAX),
+                &prim_ty(PrimitiveType::I32),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I64"),
+            mk_int_const(
+                BigInt::from(i64::MAX),
+                &prim_ty(PrimitiveType::I64),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I128"),
+            mk_int_const(
+                BigInt::from(i128::MAX),
+                &prim_ty(PrimitiveType::I128),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I256"),
+            mk_int_const(
+                BigInt::from(I256::MAX),
+                &prim_ty(PrimitiveType::I256),
+                range_visibility,
+            ),
+        );
+
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I8"),
+            mk_int_const(
+                BigInt::from(i8::MIN),
+                &prim_ty(PrimitiveType::I8),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I16"),
+            mk_int_const(
+                BigInt::from(i16::MIN),
+                &prim_ty(PrimitiveType::I16),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I32"),
+            mk_int_const(
+                BigInt::from(i32::MIN),
+                &prim_ty(PrimitiveType::I32),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I64"),
+            mk_int_const(
+                BigInt::from(i64::MIN),
+                &prim_ty(PrimitiveType::I64),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I128"),
+            mk_int_const(
+                BigInt::from(i128::MIN),
+                &prim_ty(PrimitiveType::I128),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I256"),
+            mk_int_const(
+                BigInt::from(I256::MIN),
+                &prim_ty(PrimitiveType::I256),
+                range_visibility,
+            ),
+        );
+
         trans.define_const(
             trans.builtin_qualified_symbol("EXECUTION_FAILURE"),
             mk_num_const(BigInt::from(-1), Spec),

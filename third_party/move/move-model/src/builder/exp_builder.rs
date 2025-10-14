@@ -3881,8 +3881,11 @@ impl ExpTranslator<'_, '_, '_> {
         context: &ErrorMessageContext,
         sym: &QualifiedSymbol,
     ) -> ExpData {
-        // Constants are always visible in specs.
-        if self.mode != ExpTranslationMode::Spec && sym.module_name != self.parent.module_name {
+        // Constants are always visible in specs. Builtin constants are visible everywhere.
+        if self.mode != ExpTranslationMode::Spec
+            && sym.module_name != self.parent.module_name
+            && sym.module_name != ModuleName::builtin_module(self.env())
+        {
             self.error(
                 loc,
                 &format!(
