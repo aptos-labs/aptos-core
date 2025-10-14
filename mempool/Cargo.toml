@@ -47,6 +47,7 @@ serde = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true }
 tokio-stream = { workspace = true }
+async-trait = {workspace = true}
 
 [dev-dependencies]
 aptos-compression = { workspace = true }

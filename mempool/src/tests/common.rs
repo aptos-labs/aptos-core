@@ -198,16 +198,16 @@ pub(crate) fn txn_bytes_len(transaction: TestTransaction) -> u64 {
     txn.txn_bytes_len() as u64
 }
 
-pub(crate) fn add_txn(
+pub(crate) async fn add_txn(
     pool: &mut Box<dyn CoreMempoolTrait>,
     transaction: TestTransaction,
 ) -> Result<SignedTransaction> {
     let txn = transaction.make_signed_transaction();
-    add_signed_txn(pool, txn.clone())?;
+    add_signed_txn(pool, txn.clone()).await?;
     Ok(txn)
 }
 
-pub(crate) fn add_signed_txn(pool: &mut Box<dyn CoreMempoolTrait>, transaction: SignedTransaction) -> Result<()> {
+pub(crate) async fn add_signed_txn(pool: &mut Box<dyn CoreMempoolTrait>, transaction: SignedTransaction) -> Result<()> {
     match pool
         .add_txn(
             transaction.clone(),
@@ -218,6 +218,7 @@ pub(crate) fn add_signed_txn(pool: &mut Box<dyn CoreMempoolTrait>, transaction: 
             None,
             Some(BroadcastPeerPriority::Primary),
         )
+        .await
         .code
     {
         MempoolStatusCode::Accepted => Ok(()),
@@ -225,12 +226,12 @@ pub(crate) fn add_signed_txn(pool: &mut Box<dyn CoreMempoolTrait>, transaction: 
     }
 }
 
-pub(crate) fn batch_add_signed_txn(
+pub(crate) async fn batch_add_signed_txn(
     pool: &mut Box<dyn CoreMempoolTrait>,
     transactions: Vec<SignedTransaction>,
 ) -> Result<()> {
     for txn in transactions.into_iter() {
-        add_signed_txn(pool, txn)?
+        add_signed_txn(pool, txn).await?
     }
     Ok(())
 }

@@ -174,7 +174,7 @@ impl MockSharedMempool {
         (ac_client, mempool, quorum_store_sender, mempool_notifier)
     }
 
-    pub fn add_txns(&self, txns: Vec<SignedTransaction>) -> Result<()> {
+    pub async fn add_txns(&self, txns: Vec<SignedTransaction>) -> Result<()> {
         {
             let mut pool = self.mempool.lock();
             for txn in txns {
@@ -188,6 +188,7 @@ impl MockSharedMempool {
                         None,
                         Some(BroadcastPeerPriority::Primary),
                     )
+                    .await
                     .code
                     != MempoolStatusCode::Accepted
                 {

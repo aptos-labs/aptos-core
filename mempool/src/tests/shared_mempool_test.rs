@@ -39,7 +39,7 @@ async fn test_consensus_events_rejected_txns() {
     // Add txns to mempool
     {
         let mut pool = smp.mempool.lock();
-        assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
+        assert!(batch_add_signed_txn(&mut pool, txns).await.is_ok());
     }
 
     let transactions = vec![RejectedTransactionSummary {
@@ -115,7 +115,7 @@ async fn test_mempool_notify_committed_txns() {
     // Add txns to mempool
     {
         let mut pool = smp.mempool.lock();
-        assert!(batch_add_signed_txn(&mut pool, txns).is_ok());
+        assert!(batch_add_signed_txn(&mut pool, txns).await.is_ok());
     }
 
     // Notify mempool of the new commit
