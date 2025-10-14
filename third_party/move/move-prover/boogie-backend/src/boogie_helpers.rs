@@ -34,7 +34,7 @@ pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
-pub const BITWISE_NOT_ENABLED_ERROR: &str = "bitwise operations not enabled for this type";
+const BV_TYPE_NOT_ENABLED_ERROR: &str = "signed integer cannot be turned into bit vector";
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
@@ -387,14 +387,16 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
             U64 => "bv64".to_string(),
             U128 => "bv128".to_string(),
             U256 => "bv256".to_string(),
-            I8 | I16 | I32 | I64 | I128 | I256 => unreachable!("{}", BITWISE_NOT_ENABLED_ERROR),
+            I8 | I16 | I32 | I64 | I128 | I256 => {
+                unimplemented!("{}", BV_TYPE_NOT_ENABLED_ERROR)
+            },
             Address => "int".to_string(),
             Signer => "$signer".to_string(),
             Bool => "bool".to_string(),
             Range | EventStore => panic!("unexpected type"),
             Num => {
                 //TODO(tengzhang): add error message with accurate location info
-                "<<num is not unsupported here>>".to_string()
+                "<<num is not supported here>>".to_string()
             },
         },
         Vector(et) => format!("Vec ({})", boogie_bv_type(env, et)),
@@ -425,11 +427,12 @@ pub fn boogie_num_type_base_bv(env: &GlobalEnv, loc: Option<Loc>, ty: &Type) -> 
         | Type::Primitive(PrimitiveType::I64)
         | Type::Primitive(PrimitiveType::I128)
         | Type::Primitive(PrimitiveType::I256) => {
-            unreachable!("{}", BITWISE_NOT_ENABLED_ERROR);
+            env.error(&loc.unwrap_or_default(), BV_TYPE_NOT_ENABLED_ERROR);
+            "<<signed integer is not supported here>>"
         },
         Type::Primitive(PrimitiveType::Num) => {
             env.error(&loc.unwrap_or_default(), NUM_TYPE_BASE_ERROR);
-            "<<num is not unsupported here>>"
+            "<<num is not supported here>>"
         },
         _ => unreachable!(),
     };
@@ -479,11 +482,12 @@ pub fn boogie_num_type_base(env: &GlobalEnv, loc: Option<Loc>, ty: &Type) -> Str
             U128 => "128".to_string(),
             U256 => "256".to_string(),
             I8 | I16 | I32 | I64 | I128 | I256 => {
-                unreachable!("{}", BITWISE_NOT_ENABLED_ERROR);
+                env.error(&loc.unwrap_or_default(), BV_TYPE_NOT_ENABLED_ERROR);
+                "<<signed integer is not supported here>>".to_string()
             },
             Num => {
                 env.error(&loc.unwrap_or_default(), NUM_TYPE_BASE_ERROR);
-                "<<num is not unsupported here>>".to_string()
+                "<<num is not supported here>>".to_string()
             },
             _ => format!("<<unsupported {:?}>>", ty),
         },
@@ -513,7 +517,7 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
             Num => {
                 if bv_flag {
                     //TODO(tengzhang): add error message with accurate location info
-                    "<<num is not unsupported here>>".to_string()
+                    "<<num is not supported here>>".to_string()
                 } else {
                     "num".to_string()
                 }
