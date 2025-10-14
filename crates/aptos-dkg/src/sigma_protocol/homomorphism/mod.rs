@@ -141,7 +141,7 @@ impl<
 ///
 /// Given a value of this type, you can apply a function to each "entry" independently,
 /// producing a new value of the same shape but possibly with a different inner type.
-pub trait EntrywiseMap<T>: Sized {
+pub trait EntrywiseMap<T> {
     /// The resulting type after mapping the inner elements to type `U`.
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>;
 
