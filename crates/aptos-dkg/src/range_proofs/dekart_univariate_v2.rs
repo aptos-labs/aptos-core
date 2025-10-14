@@ -1047,7 +1047,6 @@ pub mod two_term_msm {
 
     impl<E: Pairing> sigma_protocol::Trait<E> for TwoTermMsm<E> {
         type Statement = CodomainShape<E::G1>;
-        type Witness = Witness<E>;
 
         const DST: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL";
         const DST_VERIFIER: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER";

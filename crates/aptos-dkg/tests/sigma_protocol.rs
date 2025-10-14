@@ -17,7 +17,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::thread_rng;
 
 #[cfg(test)]
-pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Witness)
+pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Domain)
 where
     E: Pairing,
     P: sigma_protocol::Trait<E>,
@@ -55,7 +55,6 @@ mod schnorr {
 
     impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
         type Statement = CodomainShape<E::G1>;
-        type Witness = Scalar<E>;
 
         const DST: &[u8] = b"Schnorr";
         const DST_VERIFIER: &[u8] = b"Schnorr-verifier";

@@ -72,7 +72,7 @@ use ark_std::{
 
 pub trait Trait<E: Pairing>:
     FixedBaseMsms<
-        Domain = Self::Witness,
+        Domain: Witness<E>,
         Codomain = Self::Statement,
         Scalar = E::ScalarField,
         Base = E::G1Affine,
@@ -81,14 +81,13 @@ pub trait Trait<E: Pairing>:
     > + Sized
 {
     type Statement: Statement;
-    type Witness: Witness<E>;
 
     const DST: &[u8];
     const DST_VERIFIER: &[u8];
 
     fn prove<R: RngCore + CryptoRng>(
         &self,
-        witness: &Self::Witness,
+        witness: &Self::Domain,
         transcript: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Proof<E, Self> {
