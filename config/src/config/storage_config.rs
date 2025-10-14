@@ -208,7 +208,7 @@ impl Default for RocksdbConfigs {
             },
             enable_storage_sharding: true,
             high_priority_background_threads: 4,
-            low_priority_background_threads: 4,
+            low_priority_background_threads: 2,
         }
     }
 }
