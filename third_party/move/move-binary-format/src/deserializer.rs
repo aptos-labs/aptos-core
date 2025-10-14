@@ -981,11 +981,21 @@ fn load_identifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Identifie
     let mut buffer: Vec<u8> = vec![0u8; size];
     if !cursor.read(&mut buffer).map(|count| count == size).unwrap() {
         Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("Bad Identifier pool size".to_string()))?
+            .with_message("Bad Identifier pool size".to_string()))?;
     }
-    Identifier::from_utf8(buffer).map_err(|_| {
+    let ident = Identifier::from_utf8(buffer).map_err(|_| {
         PartialVMError::new(StatusCode::MALFORMED).with_message("Invalid Identifier".to_string())
-    })
+    })?;
+    if cursor.version() < VERSION_9 && ident.as_str().contains('$') {
+        Err(
+            PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                "`$` in identifiers not supported in bytecode version {}",
+                cursor.version()
+            )),
+        )
+    } else {
+        Ok(ident)
+    }
 }
 
 fn load_address_identifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AccountAddress> {

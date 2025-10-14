@@ -549,6 +549,7 @@ pub const VERSION_8: u32 = 8;
 
 /// Version 9: changes compared to version 8
 /// + signed integers
+/// + allow `$` in identifiers
 pub const VERSION_9: u32 = 9;
 
 /// Mark which version is the latest version.
