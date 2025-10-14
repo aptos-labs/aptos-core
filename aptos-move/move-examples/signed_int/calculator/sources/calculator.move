@@ -59,9 +59,44 @@ module account::calculator {
     }
 
     #[view]
-    fun view(a: address): i64 acquires State {
+    fun view_i8(a: address): i8 acquires State {
+        match (&State[a]) {
+            Value(x) => *x as i8,
+        }
+    }
+
+    #[view]
+    fun view_i16(a: address): i16 acquires State {
+        match (&State[a]) {
+            Value(x) => *x as i16,
+        }
+    }
+
+    #[view]
+    fun view_i32(a: address): i32 acquires State {
+        match (&State[a]) {
+            Value(x) => *x as i32,
+        }
+    }
+
+    #[view]
+    fun view_i64(a: address): i64 acquires State {
         match (&State[a]) {
             Value(x) => *x,
+        }
+    }
+
+    #[view]
+    fun view_i128(a: address): i128 acquires State {
+        match (&State[a]) {
+            Value(x) => *x as i128,
+        }
+    }
+
+    #[view]
+    fun view_i256(a: address): i256 acquires State {
+        match (&State[a]) {
+            Value(x) => *x as i256,
         }
     }
 }

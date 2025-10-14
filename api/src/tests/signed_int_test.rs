@@ -131,4 +131,76 @@ async fn test_signed_ints(use_txn_payload_v2_format: bool, use_orderless_transac
         .await
         .unwrap()["data"];
     assert_eq!(state, &json!({"__variant__": "Value", "_0": "1"}));
+
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": &format!("0x{}::calculator::view_i8", account_addr.to_hex()),
+                "arguments": vec![account_addr.to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    assert_eq!(resp, json!([1]));
+
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": &format!("0x{}::calculator::view_i16", account_addr.to_hex()),
+                "arguments": vec![account_addr.to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    assert_eq!(resp, json!([1]));
+
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": &format!("0x{}::calculator::view_i32", account_addr.to_hex()),
+                "arguments": vec![account_addr.to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    assert_eq!(resp, json!([1]));
+
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": &format!("0x{}::calculator::view_i64", account_addr.to_hex()),
+                "arguments": vec![account_addr.to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    assert_eq!(resp, json!(["1"]));
+
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": &format!("0x{}::calculator::view_i128", account_addr.to_hex()),
+                "arguments": vec![account_addr.to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    assert_eq!(resp, json!(["1"]));
+
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": &format!("0x{}::calculator::view_i256", account_addr.to_hex()),
+                "arguments": vec![account_addr.to_string()],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    assert_eq!(resp, json!(["1"]));
 }
