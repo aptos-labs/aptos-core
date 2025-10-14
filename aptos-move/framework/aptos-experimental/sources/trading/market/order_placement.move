@@ -71,7 +71,7 @@ module aptos_experimental::order_placement {
         Self,
         MarketClearinghouseCallbacks,
         Market, CallbackResult, new_callback_result_not_available,
-        is_validation_result_valid,
+        is_validation_result_valid, get_place_maker_order_actions,
     };
 
     // Error codes
@@ -292,7 +292,7 @@ module aptos_experimental::order_placement {
             );
         };
 
-        callbacks.place_maker_order(
+        let result = callbacks.place_maker_order(
             new_clearinghouse_order_info(
                 user_addr,
                 order_id,
@@ -304,6 +304,10 @@ module aptos_experimental::order_placement {
             ),
             remaining_size,
         );
+        let actions = result.get_place_maker_order_actions();
+        if (actions.is_some()) {
+            callback_results.push_back(actions.destroy_some());
+        };
         market.get_order_book_mut().place_maker_order(
             new_single_order_request(
                 user_addr,
@@ -756,7 +760,7 @@ module aptos_experimental::order_placement {
             is_taker_order, // is_taker
             remaining_size,
         );
-        if (!is_validation_result_valid(&validation_result)) {
+        if (!validation_result.is_validation_result_valid()) {
             return cancel_single_order_internal(
                 market,
                 user_addr,
@@ -776,11 +780,6 @@ module aptos_experimental::order_placement {
                 callbacks,
                 vector[],
             );
-        };
-
-        let validation_actions = validation_result.get_validation_actions();
-        if (validation_actions.is_some()) {
-            callback_results.push_back(validation_actions.destroy_some());
         };
 
         if (client_order_id.is_some()) {
