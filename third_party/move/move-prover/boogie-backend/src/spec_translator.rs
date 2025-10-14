@@ -2113,6 +2113,21 @@ impl SpecTranslator<'_> {
                 oper_right_base
             );
         } else {
+            let ty = self.get_node_type(args[0].node_id());
+            if matches!(
+                ty,
+                Type::Primitive(PrimitiveType::I8)
+                    | Type::Primitive(PrimitiveType::I16)
+                    | Type::Primitive(PrimitiveType::I32)
+                    | Type::Primitive(PrimitiveType::I64)
+                    | Type::Primitive(PrimitiveType::I128)
+                    | Type::Primitive(PrimitiveType::I256)
+            ) {
+                self.error(
+                    &self.env.get_node_loc(args[0].node_id()),
+                    &format!("signed integer types not supported in operation {}", fun),
+                );
+            }
             emit!(self.writer, "{}(", fun);
         }
         self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
