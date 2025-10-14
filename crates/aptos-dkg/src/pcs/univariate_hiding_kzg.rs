@@ -317,21 +317,21 @@ impl<'a, E: Pairing> homomorphism::FixedBaseMsms for Homomorphism<'a, E> {
     }
 }
 
-// pub struct Sigma<'a, E: Pairing> {
-//     pub lagr_g1: &'a [E::G1Affine],
-//     pub xi_1: E::G1Affine,
-// }
+pub struct Sigma<'a, E: Pairing> {
+    pub lagr_g1: &'a [E::G1Affine],
+    pub xi_1: E::G1Affine,
+}
 
-// use crate::sigma_protocol;
+use crate::sigma_protocol;
 
-// use crate::Scalar;
-// use aptos_crypto_derive::Witness;
+use crate::Scalar;
+use aptos_crypto_derive::SigmaProtocolWitness;
 
-// #[derive(Witness, CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
-// pub struct Witness<E: Pairing> {
-//     pub randomness: Scalar<E>,
-//     pub values: Vec<Scalar<E>>,
-// }
+#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct Witness<E: Pairing> {
+    pub randomness: Scalar<E>,
+    pub values: Vec<Scalar<E>>,
+}
 
 // impl<'a, E: Pairing> sigma_protocol::Trait<E> for Sigma<'a, E> {
 //     type Statement = CodomainShape<E::G1>;

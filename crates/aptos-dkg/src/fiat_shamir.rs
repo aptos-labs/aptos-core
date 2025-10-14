@@ -153,12 +153,6 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>:
     fn challenge_for_sigma_protocol(&mut self) -> E::ScalarField;
 }
 
-pub trait KzgFSProtocol<E: Pairing> {
-    fn append_stuff<A: CanonicalSerialize>(&mut self, stuff: &A);
-
-    fn challenge_scalars(&mut self, num_scalars: usize) -> Vec<Scalar<E>>;
-}
-
 #[allow(non_snake_case)]
 impl<T: Transcript> PVSS<T> for merlin::Transcript {
     fn pvss_domain_sep(&mut self, sc: &ThresholdConfig) {
@@ -384,25 +378,6 @@ where
             b"challenge_sigma_protocol",
         )
         .0
-    }
-}
-
-#[allow(non_snake_case)]
-impl<E: Pairing> KzgFSProtocol<E> for merlin::Transcript {
-    fn append_stuff<A: CanonicalSerialize>(&mut self, stuff: &A) {
-        let mut stuff_bytes = Vec::new();
-        stuff
-            .serialize_compressed(&mut stuff_bytes)
-            .expect("stuff serialization should succeed");
-        self.append_message(b"vk", stuff_bytes.as_slice());
-    }
-
-    fn challenge_scalars(&mut self, num_scalars: usize) -> Vec<Scalar<E>> {
-        <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_scalars(
-            self,
-            b"challenge_linear_combination",
-            num_scalars,
-        )
     }
 }
 

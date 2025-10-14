@@ -946,7 +946,7 @@ mod fiat_shamir {
 pub mod two_term_msm {
     use super::*;
     use crate::sigma_protocol::homomorphism::FixedBaseMsms;
-    use aptos_crypto_derive::Witness; // TODO: rename to SigmaProtocolWitness
+    use aptos_crypto_derive::SigmaProtocolWitness; // TODO: rename to SigmaProtocolWitness
 
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
     pub struct SigmaProtocol<E: Pairing> {
@@ -955,7 +955,7 @@ pub mod two_term_msm {
     }
 
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-    pub struct TwoTermMsm<E: Pairing> {
+    pub struct TwoTermMsm<E: Pairing> { // This is rather similar to a Pederson commitment!
         pub base_1: E::G1Affine,
         pub base_2: E::G1Affine,
     }
@@ -968,7 +968,7 @@ pub mod two_term_msm {
         }
     }
 
-    #[derive(Witness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+    #[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
     pub struct Witness<E: Pairing> {
         pub kzg_randomness: Scalar<E>,
         pub hiding_kzg_randomness: Scalar<E>,

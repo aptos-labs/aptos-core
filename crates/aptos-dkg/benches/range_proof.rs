@@ -23,12 +23,12 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
     let ell = std::env::var("L")
         .unwrap_or(std::env::var("ELL").unwrap_or_default())
         .parse::<usize>()
-        .unwrap_or(48); // 48
+        .unwrap_or(16); // 48
 
     let n = std::env::var("N")
         .unwrap_or_default()
         .parse::<usize>()
-        .unwrap_or(2048 - 1); // 2048 - 1
+        .unwrap_or(1023); // 2048 - 1
 
     group.bench_function(format!("prove/ell={ell}/n={n}").as_str(), move |b| {
         b.iter_with_setup(
@@ -72,14 +72,14 @@ fn bench_groups(c: &mut Criterion) {
     //    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254");
     //    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381");
 
-    // bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
-    //    bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");
+     bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
+        bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");
 
     // bench_verify_components::<Bn254>(c, "BN254");
     // bench_verify_components::<Bls12_381>(c, "BLS12-381");
 
-    run_param_sweep::<Bn254, UnivariateDeKARTv2<Bn254>>("BN254");
-    run_param_sweep::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>("BLS12-381");
+    //run_param_sweep::<Bn254, UnivariateDeKARTv2<Bn254>>("BN254");
+    //run_param_sweep::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>("BLS12-381");
 
     // Sweep parameters for BLS12-381, DeKART v2
     //    run_param_sweep::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>("BLS12-381-v2");

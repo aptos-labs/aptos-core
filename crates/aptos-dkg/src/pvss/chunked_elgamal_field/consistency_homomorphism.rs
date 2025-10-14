@@ -8,12 +8,12 @@ use crate::{
     sigma_protocol::homomorphism::{LiftHomomorphism, TupleHomomorphism},
     Scalar,
 };
-use aptos_crypto_derive::Witness;
+use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 
-#[derive(Witness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct KzgElgamalWitness<E: Pairing> {
     pub kzg_randomness: Scalar<E>,
     pub chunked_plaintexts: Vec<Vec<Scalar<E>>>,

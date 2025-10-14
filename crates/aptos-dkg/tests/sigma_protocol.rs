@@ -11,6 +11,8 @@ use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{thread_rng, CryptoRng, RngCore};
+use aptos_crypto_derive::SigmaProtocolWitness;
+use aptos_dkg::Scalar;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Witness)
@@ -35,6 +37,7 @@ where
 mod schnorr {
     use super::*;
 
+    #[derive(Clone, Debug, PartialEq, Eq)]
     pub(crate) struct Schnorr<E: Pairing> {
         pub g: E::G1Affine,
     }
@@ -47,59 +50,35 @@ mod schnorr {
         }
     }
 
-    #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)] // TODO add SigmaProtocolWitness here
-    pub(crate) struct Domain<E: Pairing>(pub(crate) E::ScalarField);
-    impl<E: Pairing> sigma_protocol::Witness<E> for Domain<E> {
-        type Scalar = E::ScalarField;
-
-        fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
-            Domain(self.0 + c * other.0)
-        }
-
-        fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
-            Domain(E::ScalarField::rand(rng))
-        }
-    }
-
     impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
-        type Hom = ExponentiateBase<E>;
+        type Hom = Self; // TODO: potential for simplification here
         type Statement = CodomainShape<E::G1>;
-        type Witness = Domain<E>;
+        type Witness = Scalar<E>;
 
         const DST: &[u8] = b"Schnorr";
         const DST_VERIFIER: &[u8] = b"Schnorr-verifier";
 
         fn homomorphism(&self) -> Self::Hom {
-            ExponentiateBase { g: self.g }
+            self.clone() // since Schnorr implements Hom
         }
     }
 
-    #[derive(Clone, Debug, PartialEq, Eq)]
-    pub(crate) struct ExponentiateBase<E: Pairing> {
-        pub g: E::G1Affine,
-    }
-
-    impl<E: Pairing> homomorphism::Trait for ExponentiateBase<E> {
+    impl<E: Pairing> homomorphism::Trait for Schnorr<E> {
         type Codomain = CodomainShape<E::G1>;
-        type Domain = Domain<E>;
+        type Domain = Scalar<E>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             self.apply_msm(self.msm_terms(input))
         }
-
-        // fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        //     self.g * input.0
-        // }
     }
 
     use ark_ec::VariableBaseMSM;
     use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
-    impl<E: Pairing> homomorphism::FixedBaseMsms for ExponentiateBase<E> {
+    impl<E: Pairing> homomorphism::FixedBaseMsms for Schnorr<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
-        // ehhh?
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
         type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
@@ -107,14 +86,6 @@ mod schnorr {
         type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-            // let mut scalars = Vec::with_capacity(2);
-            // scalars.push(input.kzg_randomness.0);
-            // scalars.push(input.hiding_kzg_randomness.0);
-
-            // let mut bases = Vec::with_capacity(2);
-            // bases.push(self.base_1);
-            // bases.push(self.base_2);
-
             CodomainShape(homomorphism::MsmInput {
                 bases: vec![self.g],
                 scalars: vec![input.0],
@@ -122,16 +93,8 @@ mod schnorr {
         }
 
         fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-            E::G1::msm(bases, scalars).expect("MSM failed in TwoTermMSM")
+            E::G1::msm(bases, scalars).expect("MSM failed in Schnorr")
         }
-
-        // fn msm_rows(&self, input: &Self::Domain) -> Vec<(Vec<Self::Base>, Vec<Self::Scalar>)> {
-        //     vec![(vec![self.g], vec![input.0])]
-        // }
-
-        // fn flatten_codomain(&self, output: &Self::Codomain) -> Vec<Self::Base> {
-        //     vec![output.into_affine()]
-        // }
     }
 }
 
@@ -176,11 +139,11 @@ fn test_schnorr() {
     let mut rng = thread_rng();
 
     // ---- Bn254 ----
-    let witness_bn = Domain(<Bn254 as Pairing>::ScalarField::rand(&mut rng));
+    let witness_bn = Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng));
     test_sigma_protocol::<Bn254, _>(Schnorr::default(), witness_bn);
 
     // ---- Bls12_381 ----
-    let witness_bls = Domain(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
+    let witness_bls = Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
     test_sigma_protocol::<Bls12_381, _>(Schnorr::default(), witness_bls);
 }
 

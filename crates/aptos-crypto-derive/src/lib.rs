@@ -464,18 +464,18 @@ pub fn bcs_crypto_hash_dispatch(input: TokenStream) -> TokenStream {
     out.into()
 }
 
-#[proc_macro_derive(Witness)]
-pub fn derive_witness(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(SigmaProtocolWitness)]
+pub fn derive_sigma_protocol_witness(input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
     let name = &input.ident;
 
     let fields = if let syn::Data::Struct(data) = &input.data {
         match &data.fields {
             syn::Fields::Named(fields_named) => &fields_named.named,
-            _ => panic!("Witness derive only supports named fields"),
+            _ => panic!("SigmaProtocolWitness derive only supports named fields"),
         }
     } else {
-        panic!("Witness derive only supports structs");
+        panic!("SigmaProtocolWitness derive only supports structs");
     };
 
     let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
