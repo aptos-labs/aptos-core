@@ -64,6 +64,19 @@ use std::{
     hash::{DefaultHasher, Hash, Hasher},
 };
 
+macro_rules! bv_op_not_enabled_error {
+    ($bytecode:expr, $fun_target:expr, $env:expr, $loc:expr) => {
+        unimplemented!(
+            "bit vector not supported in operation: `{}` {}",
+            $bytecode
+                .display($fun_target, &::std::collections::BTreeMap::default())
+                .to_string()
+                .replace('\n', "\n// "),
+            $loc.display($env)
+        )
+    };
+}
+
 pub struct BoogieTranslator<'env> {
     env: &'env GlobalEnv,
     options: &'env BoogieOptions,
@@ -2456,10 +2469,7 @@ impl FunctionTranslator<'_> {
                         emitln!(writer, "assume false;");
                         emitln!(writer, "return;");
                     },
-                    CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | CastI8
-                    | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 => {
-                        let src = srcs[0];
-                        let dest = dests[0];
+                    CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => {
                         let make_cast = |target_kind: &str,
                                          target_base: &str,
                                          src: TempIndex,
@@ -2494,6 +2504,9 @@ impl FunctionTranslator<'_> {
                                 );
                             }
                         };
+
+                        let src = srcs[0];
+                        let dest = dests[0];
                         let (target_kind, target_base) = match oper {
                             CastU8 => ("U", "8"),
                             CastU16 => ("U", "16"),
@@ -2501,6 +2514,20 @@ impl FunctionTranslator<'_> {
                             CastU64 => ("U", "64"),
                             CastU128 => ("U", "128"),
                             CastU256 => ("U", "256"),
+                            _ => unreachable!(),
+                        };
+                        make_cast(target_kind, target_base, src, dest);
+                    },
+                    CastI8 | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 => {
+                        let src = srcs[0];
+                        let dest = dests[0];
+                        let num_oper = global_state
+                            .get_temp_index_oper(mid, fid, src, baseline_flag)
+                            .unwrap();
+                        if self.bv_flag(num_oper) {
+                            bv_op_not_enabled_error!(bytecode, fun_target, env, loc);
+                        }
+                        let (target_kind, target_base) = match oper {
                             CastI8 => ("I", "8"),
                             CastI16 => ("I", "16"),
                             CastI32 => ("I", "32"),
@@ -2509,7 +2536,14 @@ impl FunctionTranslator<'_> {
                             CastI256 => ("I", "256"),
                             _ => unreachable!(),
                         };
-                        make_cast(target_kind, target_base, src, dest);
+                        emitln!(
+                            writer,
+                            "call {} := $Cast{}{}({});",
+                            str_local(dest),
+                            target_kind,
+                            target_base,
+                            str_local(src)
+                        );
                     },
                     Not => {
                         let src = srcs[0];
@@ -2835,8 +2869,9 @@ impl FunctionTranslator<'_> {
                         let num_oper = global_state
                             .get_temp_index_oper(mid, fid, dest, baseline_flag)
                             .unwrap();
-                        assert!(!self.bv_flag(num_oper), "Negate not enabled on bitvectors");
-
+                        if self.bv_flag(num_oper) {
+                            bv_op_not_enabled_error!(bytecode, fun_target, env, loc);
+                        }
                         let neg_type = match &self.get_local_type(dest) {
                             Type::Primitive(PrimitiveType::I8) => "I8",
                             Type::Primitive(PrimitiveType::I16) => "I16",

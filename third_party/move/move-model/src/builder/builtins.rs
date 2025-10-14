@@ -137,51 +137,100 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         // Signed integers
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I8"),
-            mk_num_const(BigInt::from(i8::MAX), Spec),
-        );
-        trans.define_const(
-            trans.builtin_qualified_symbol("MIN_I8"),
-            mk_num_const(BigInt::from(i8::MIN), Spec),
+            mk_int_const(
+                BigInt::from(i8::MAX),
+                &prim_ty(PrimitiveType::I8),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I16"),
-            mk_num_const(BigInt::from(i16::MAX), Spec),
-        );
-        trans.define_const(
-            trans.builtin_qualified_symbol("MIN_I16"),
-            mk_num_const(BigInt::from(i16::MIN), Spec),
+            mk_int_const(
+                BigInt::from(i16::MAX),
+                &prim_ty(PrimitiveType::I16),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I32"),
-            mk_num_const(BigInt::from(i32::MAX), Spec),
-        );
-        trans.define_const(
-            trans.builtin_qualified_symbol("MIN_I32"),
-            mk_num_const(BigInt::from(i32::MIN), Spec),
+            mk_int_const(
+                BigInt::from(i32::MAX),
+                &prim_ty(PrimitiveType::I32),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I64"),
-            mk_num_const(BigInt::from(i64::MAX), Spec),
-        );
-        trans.define_const(
-            trans.builtin_qualified_symbol("MIN_I64"),
-            mk_num_const(BigInt::from(i64::MIN), Spec),
+            mk_int_const(
+                BigInt::from(i64::MAX),
+                &prim_ty(PrimitiveType::I64),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I128"),
-            mk_num_const(BigInt::from(i128::MAX), Spec),
-        );
-        trans.define_const(
-            trans.builtin_qualified_symbol("MIN_I128"),
-            mk_num_const(BigInt::from(i128::MIN), Spec),
+            mk_int_const(
+                BigInt::from(i128::MAX),
+                &prim_ty(PrimitiveType::I128),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I256"),
-            mk_num_const(BigInt::from(I256::MAX), Spec),
+            mk_int_const(
+                BigInt::from(I256::MAX),
+                &prim_ty(PrimitiveType::I256),
+                range_visibility,
+            ),
+        );
+
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I8"),
+            mk_int_const(
+                BigInt::from(i8::MIN),
+                &prim_ty(PrimitiveType::I8),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I16"),
+            mk_int_const(
+                BigInt::from(i16::MIN),
+                &prim_ty(PrimitiveType::I16),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I32"),
+            mk_int_const(
+                BigInt::from(i32::MIN),
+                &prim_ty(PrimitiveType::I32),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I64"),
+            mk_int_const(
+                BigInt::from(i64::MIN),
+                &prim_ty(PrimitiveType::I64),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I128"),
+            mk_int_const(
+                BigInt::from(i128::MIN),
+                &prim_ty(PrimitiveType::I128),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MIN_I256"),
-            mk_num_const(BigInt::from(I256::MIN), Spec),
+            mk_int_const(
+                BigInt::from(I256::MIN),
+                &prim_ty(PrimitiveType::I256),
+                range_visibility,
+            ),
         );
 
         trans.define_const(
