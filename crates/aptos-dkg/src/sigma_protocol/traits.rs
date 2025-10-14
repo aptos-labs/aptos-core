@@ -5,70 +5,14 @@ use crate::{fiat_shamir, sigma_protocol::homomorphism::FixedBaseMsms, utils, Sca
 use anyhow::ensure;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_ff::AdditiveGroup;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Valid};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid,
+};
 use ark_std::{
     rand::{CryptoRng, RngCore},
     UniformRand,
 };
-
-// pub trait Trait<E: Pairing> {
-//     type Statement: Statement;
-//     type Witness: Witness<E>;
-//     type Hom: FixedBaseMsms<
-//         Domain = Self::Witness,
-//         Codomain = Self::Statement,
-//         Scalar = E::ScalarField,
-//         Base = E::G1Affine,
-//         MsmOutput = E::G1,
-//     >;
-
-//     const DST: &[u8];
-//     const DST_VERIFIER: &[u8];
-
-//     fn homomorphism(&self) -> Self::Hom;
-
-//     fn prove<R: RngCore + CryptoRng>(
-//         &self,
-//         witness: &Self::Witness,
-//         transcript: &mut merlin::Transcript,
-//         rng: &mut R,
-//     ) -> Proof<E, Self::Hom> {
-//         prove_homomorphism(
-//             self.homomorphism(),
-//             witness,
-//             transcript,
-//             true,
-//             rng,
-//             Self::DST,
-//         )
-//     }
-
-//     #[allow(non_snake_case)]
-//     fn verify(
-//         &self,
-//         statement: &Self::Statement,
-//         proof: &Proof<E, Self::Hom>,
-//         transcript: &mut merlin::Transcript,
-//     ) -> anyhow::Result<()>
-//     where
-//         Self::Hom: Homomorphism<Codomain = <Self::Hom as FixedBaseMsms>::CodomainShape<<Self::Hom as FixedBaseMsms>::MsmOutput>>,
-//     {
-//         verify_msm_hom(
-//             self.homomorphism(),
-//             statement,
-//             match &proof.first_proof_item {
-//                 FirstProofItem::Commitment(A) => A,
-//                 FirstProofItem::Challenge(_) => {
-//                     anyhow::bail!("Missing implementation - expected commitment, not challenge")
-//                 },
-//             },
-//             &proof.z,
-//             transcript,
-//             Self::DST,
-//             Self::DST_VERIFIER,
-//         )
-//     }
-// }
+use std::io::Write;
 
 pub trait Trait<E: Pairing>:
     FixedBaseMsms<
@@ -242,9 +186,6 @@ where
     Commitment(H::Codomain),
     Challenge(E::ScalarField),
 }
-
-use ark_serialize::{Compress, SerializationError};
-use std::io::Write;
 
 impl<E: Pairing, H: homomorphism::Trait> Valid for FirstProofItem<E, H>
 where

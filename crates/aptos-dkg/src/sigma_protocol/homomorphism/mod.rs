@@ -143,12 +143,12 @@ impl<
 /// producing a new value of the same shape but possibly with a different inner type.
 pub trait EntrywiseMap<T>: Sized {
     /// The resulting type after mapping the inner elements to type `U`.
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>;
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
 }
 
 /// A `FixedBaseMsms` instance represents a homomorphism whose outputs can be expressed
@@ -181,11 +181,10 @@ pub trait FixedBaseMsms: Trait {
         + CanonicalDeserialize
         + Clone
         + IsMsmInput<Self::Base, Self::Scalar>
-        + PartialEq
         + Eq;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, which can't be enforced directly with the current version of Rust
-    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
 
     /// The "shape" of the homomorphism's output, parameterized by an inner type `T`.
     // TODO: type CodomainShape<T>: for<'a> IntoIterator<Item = &'a T> + 'static;
@@ -193,10 +192,9 @@ pub trait FixedBaseMsms: Trait {
         + IntoIterator<Item = T>
         + CanonicalSerialize
         + Clone
-        + PartialEq
         + Eq
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
 
     /// Returns the MSM terms corresponding to a given homomorphism input.
     ///
@@ -230,7 +228,7 @@ where
     type CodomainShape<T>
         = H::CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
     type MsmInput = H::MsmInput;
     type MsmOutput = H::MsmOutput;
     type Scalar = H::Scalar;
@@ -291,13 +289,13 @@ where
     A: EntrywiseMap<T>,
     B: EntrywiseMap<T>,
 {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq,
     {
         TupleCodomainShape(self.0.map(&f), self.1.map(f))
     }
@@ -325,7 +323,7 @@ where
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;
@@ -345,29 +343,24 @@ where
 // Codomain example
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
-pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>(
-    pub T,
-); // TODO: this is a copy-paste...
+pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>(pub T); // TODO: this is a copy-paste...
 
 // Implement EntrywiseMap for the wrapper
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> EntrywiseMap<T>
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> EntrywiseMap<T>
     for TrivialShape<T>
 {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
-        TrivialShape<U>;
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> = TrivialShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq,
     {
         TrivialShape(f(self.0))
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> IntoIterator
-    for TrivialShape<T>
-{
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> IntoIterator for TrivialShape<T> {
     type IntoIter = std::iter::Once<T>;
     type Item = T;
 
