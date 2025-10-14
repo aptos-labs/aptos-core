@@ -69,7 +69,8 @@ pub(crate) fn quotient_evaluations_batch<F: Field>(
 ///
 /// # Returns
 /// * `f(z)` in `F`
-pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F], z: F) -> F { // TODO: Add n_inv precomputed, change z to x
+pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F], z: F) -> F {
+    // TODO: Add n_inv precomputed, change z to x
     let n = evals.len();
     assert_eq!(n, roots_of_unity_in_eval_dom.len());
 

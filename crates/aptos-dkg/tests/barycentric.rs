@@ -1,9 +1,7 @@
-use ark_bls12_381::Fr;
-use num_traits::identities::One;
 use aptos_dkg::algebra::polynomials::barycentric_eval;
-use num_traits::Zero;
-use ark_ff::FftField;
-use ark_ff::Field;
+use ark_bls12_381::Fr;
+use ark_ff::{FftField, Field};
+use num_traits::{identities::One, Zero};
 
 #[test]
 fn test_barycentric_eval_linear() {
@@ -29,9 +27,18 @@ fn test_barycentric_eval_third_degree() {
     let n = 4;
 
     let omega = Fr::get_root_of_unity(n).unwrap();
-    let roots = [omega.pow([0u64]), omega.pow([1u64]), omega.pow([2u64]), omega.pow([3u64])].to_vec();
+    let roots = [
+        omega.pow([0u64]),
+        omega.pow([1u64]),
+        omega.pow([2u64]),
+        omega.pow([3u64]),
+    ]
+    .to_vec();
 
-    let evals: Vec<Fr> = roots.iter().map(|&x| x * x * x + x * x + Fr::one()).collect();
+    let evals: Vec<Fr> = roots
+        .iter()
+        .map(|&x| x * x * x + x * x + Fr::one())
+        .collect();
 
     // Test at roots
     for (r, &f_r) in roots.iter().zip(evals.iter()) {

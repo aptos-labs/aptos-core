@@ -113,8 +113,8 @@ impl<'a, E: Pairing> FixedBaseMsms for Homomorphism<'a, E> {
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        let scalars: Vec<E::ScalarField> = Scalar::<E>::vec_into_inner(scalars.to_vec());
+        //let scalars: Vec<E::ScalarField> = Scalar::<E>::vec_into_inner(scalars.to_vec());
 
-        E::G1::msm(bases, &scalars).expect("MSM failed in ChunkedElGamal")
+        E::G1::msm(bases, Scalar::slice_as_inner(scalars)).expect("MSM failed in ChunkedElGamal")
     }
 }

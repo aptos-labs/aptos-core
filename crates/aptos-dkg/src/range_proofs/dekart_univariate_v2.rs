@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{polynomials, polynomials as OURpolynomials, GroupData},
+    algebra::{polynomials, polynomials as OURpolynomials, GroupGenerators},
     pcs::{univariate_hiding_kzg, univariate_kzg_commitment},
     range_proofs::traits,
-    sigma_protocol::{self, homomorphism, homomorphism::{Trait as HomomorphismTrait}, Trait},
+    sigma_protocol::{self, homomorphism, homomorphism::Trait as HomomorphismTrait, Trait},
     utils, Scalar,
 };
 use anyhow::ensure;
@@ -69,7 +69,7 @@ pub struct VerificationKey<E: Pairing> {
     zeroth_lagr: E::G1Affine,
     xi_2: E::G2Affine,
     tau_2: E::G2Affine,
-    group_data: GroupData<E>,
+    group_data: GroupGenerators<E>,
     roots_of_unity: Vec<E::ScalarField>,
 }
 
@@ -94,8 +94,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         _max_ell: usize, // TODO: remove from trait?
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
-        let group = GroupData::new(rng);
-        let GroupData { g1, g2 } = group; // TODO: make this part of setup(...) in trait?
+        let group = GroupGenerators::new(rng);
+        let GroupGenerators { g1, g2 } = group; // TODO: make this part of setup(...) in trait?
 
         let max_n = (max_n + 1).next_power_of_two() - 1;
         let num_omegas = max_n + 1;
@@ -104,8 +104,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let xi = E::ScalarField::rand(rng);
         let tau = E::ScalarField::rand(rng);
         let xi_1_proj: E::G1 = g1 * xi;
-//        let xi = E::ScalarField::ONE;
-//        let tau = E::ScalarField::ONE;
+        //        let xi = E::ScalarField::ONE;
+        //        let tau = E::ScalarField::ONE;
 
         let (
             univariate_hiding_kzg::VerificationKey {
@@ -233,17 +233,17 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let r = E::ScalarField::rand(rng);
         let delta_rho = E::ScalarField::rand(rng);
         let hatC = *xi_1 * delta_rho + lagr_g1[0] * r + comm.0; // TODO change into MSMs?
-//        let r = E::ScalarField::ZERO;
-//        let r = E::ScalarField::ONE;
-        //        let delta_rho = E::ScalarField::ZERO;
+                                                                //        let r = E::ScalarField::ZERO;
+                                                                //        let r = E::ScalarField::ONE;
+                                                                //        let delta_rho = E::ScalarField::ZERO;
 
         // Step 2b
         fiat_shamir::append_hat_f_commitment::<E>(fs_transcript, &hatC);
 
         // Step 3a
-        let sigma_protocol = two_term_msm::SigmaProtocol {
-            zeroth_lagr: lagr_g1[0],
-            xi_1: *xi_1,
+        let sigma_protocol = two_term_msm::TwoTermMsm {
+            base_1: lagr_g1[0],
+            base_2: *xi_1,
         };
         // let mut prover_transcript = merlin::Transcript::new(b"Sigma-Protocol-DeKART");
         let pi_PoK = sigma_protocol.prove(
@@ -276,7 +276,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                     .collect::<Vec<_>>()
             })
             .collect(); // bits[i][j] = z_ij, i.e. the j-bit of z_i (little-endian)
-        // add debug_assert for z_0, so sum.... = z_0
+                        // add debug_assert for z_0, so sum.... = z_0
 
         let f_j_evals_without_r: Vec<Vec<E::ScalarField>> = (0..ell)
             .map(|j| {
@@ -285,7 +285,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                     .collect()
             })
             .collect(); // This is just transposing the bits matrix, also moving them into E::ScalarField
-        // f_j_evals_without_r[j][i] = z_ij
+                        // f_j_evals_without_r[j][i] = z_ij
 
         let rs: Vec<E::ScalarField> = std::iter::repeat_with(|| E::ScalarField::rand(rng))
             .take(ell)
@@ -304,7 +304,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| E::ScalarField::rand(rng))
             .take(ell)
             .collect();
-//        let rhos = vec![E::ScalarField::ZERO; ell];
+        //        let rhos = vec![E::ScalarField::ZERO; ell];
 
         let Cj: Vec<_> = f_js_evals
             .iter()
@@ -321,8 +321,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 6
         let (beta, betas) = fiat_shamir::get_beta_and_betas::<E>(fs_transcript, ell);
-//        let beta = E::ScalarField::ONE;
-//        let betas = vec![E::ScalarField::ONE; n];
+        //        let beta = E::ScalarField::ONE;
+        //        let betas = vec![E::ScalarField::ONE; n];
 
         let mut hat_f_evals = Vec::with_capacity(1 + values.len());
         hat_f_evals.push(r);
@@ -366,10 +366,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
 
         let mut denom = Vec::with_capacity(num_omegas);
-        let val = E::ScalarField::from((n * (n+1) / 2) as u64);
+        let val = E::ScalarField::from((n * (n + 1) / 2) as u64);
         denom.push(val);
 
-        let omega_stuff: Vec<E::ScalarField> = ck_S.roots_of_unity_in_eval_dom
+        let omega_stuff: Vec<E::ScalarField> = ck_S
+            .roots_of_unity_in_eval_dom
             .iter()
             .skip(1) // skip the first root omega^0
             .take(n) // take the next n roots, can remove this
@@ -388,7 +389,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 diff_f_j
                     .iter()
                     .zip(f_j.iter())
-                    .map(|(&diff_f_j_i, &f_j_i)| diff_f_j_i * (E::ScalarField::from(2u64) * f_j_i - E::ScalarField::ONE))
+                    .map(|(&diff_f_j_i, &f_j_i)| {
+                        diff_f_j_i * (E::ScalarField::from(2u64) * f_j_i - E::ScalarField::ONE)
+                    })
                     .collect()
             })
             .collect();
@@ -501,7 +504,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // // dbg!(first_h_eval);
         h_evals.insert(0, first_h_eval);
 
-
         let n_plus_1_inv = E::ScalarField::from((num_omegas) as u64).inverse().unwrap();
         // let mut omega_in_pows: Vec<E::ScalarField> = (1..=n + 1)
         //     .map(|i| ck_S.roots_of_unity_in_eval_dom[(i * n) % (n + 1)]) // safe modulo access
@@ -590,7 +592,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 9
         let gamma =
             fiat_shamir::get_gamma_challenge::<E>(fs_transcript, &ck_S.roots_of_unity_in_eval_dom);
-//        let gamma = E::ScalarField::ZERO;
+        //        let gamma = E::ScalarField::ZERO;
 
         let a: E::ScalarField = {
             let poly = ark_poly::univariate::DensePolynomial {
@@ -644,7 +646,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let rhs = beta * (a - two_pow_a_sum) + betas_sum;
 
         let gamma_pow_n_plus_1 = gamma.pow([(n + 1) as u64]); // gamma^(n+1)
-        let denomz = (gamma_pow_n_plus_1 - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap();
+        let denomz = (gamma_pow_n_plus_1 - E::ScalarField::ONE)
+            * (gamma - E::ScalarField::ONE).inverse().unwrap();
 
         let result = rhs * denomz.inverse().unwrap();
 
@@ -693,7 +696,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         comm: &Self::Commitment,
         fs_transcript: &mut merlin::Transcript,
     ) -> anyhow::Result<()> {
-
         // assert!(
         //     ell <= vk.max_ell,
         //     "ell (got {}) must be ≤ max_ell (which is {})",
@@ -728,17 +730,20 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 2b
         fiat_shamir::append_hat_f_commitment::<E>(fs_transcript, &hatC);
-    
+
         // Step 2c
-        let sigma_protocol = two_term_msm::SigmaProtocol {
-            zeroth_lagr: *zeroth_lagr,
-            xi_1: *xi_1,
+        let sigma_protocol = two_term_msm::TwoTermMsm {
+            base_1: *zeroth_lagr,
+            base_2: *xi_1,
         };
         // let mut prover_transcript = merlin::Transcript::new(b"Sigma-Protocol-DeKART");
-        assert!(sigma_protocol.verify(&two_term_msm::CodomainShape(*hatC - comm.0),
-     pi_PoK,
-            fs_transcript,
-        ).is_ok()); // TODO: propagate error
+        assert!(sigma_protocol
+            .verify(
+                &two_term_msm::CodomainShape(*hatC - comm.0),
+                pi_PoK,
+                fs_transcript,
+            )
+            .is_ok()); // TODO: propagate error
 
         fiat_shamir::append_sigma_proof(fs_transcript, &pi_PoK);
 
@@ -776,7 +781,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 7
         let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_transcript, &roots_of_unity);
-//        dbg!(gamma);
+        //        dbg!(gamma);
 
         // Step 8
         let a_u = *a * mu
@@ -790,12 +795,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             univariate_hiding_kzg::VerificationKey {
                 xi_2: *xi_2,
                 tau_2: *tau_2,
-                group_data: group_data.clone()
+                group_data: group_data.clone(),
             },
             univariate_hiding_kzg::Commitment(U),
             gamma,
             a_u,
-            pi_gamma.clone()
+            pi_gamma.clone(),
         )?;
 
         // assert!(univariate_hiding_kzg::Homomorphism::verify(
@@ -812,13 +817,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 9
         let gamma_pow = gamma.pow(&[(n + 1) as u64]); // gamma^(n+1) // TODO: change to some max_n ?
-        let V_eval_gamma = (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap();
+        let V_eval_gamma =
+            (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap();
 
         let powers_of_two: Vec<E::ScalarField> = (0..ell)
             .map(|j| E::ScalarField::from(1i64 << (j as u32)))
             .collect();
 
-//        let LHS = *a_h * V_eval_gamma;
+        //        let LHS = *a_h * V_eval_gamma;
         let LHS = *a_h;
 
         let sum1: E::ScalarField = powers_of_two
@@ -833,7 +839,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .map(|(b, a)| *b * *a * (*a - E::ScalarField::ONE))
             .sum();
 
-//        let RHS = beta * (*a - sum1) + sum2;
+        //        let RHS = beta * (*a - sum1) + sum2;
         let RHS = (beta * (*a - sum1) + sum2) / V_eval_gamma;
 
         assert_eq!(LHS, RHS); // TODO!!!!!
@@ -949,26 +955,23 @@ pub mod two_term_msm {
     use aptos_crypto_derive::SigmaProtocolWitness; // TODO: rename to SigmaProtocolWitness
 
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-    pub struct SigmaProtocol<E: Pairing> {
-        pub zeroth_lagr: E::G1Affine,
-        pub xi_1: E::G1Affine,
-    }
-
-    #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-    pub struct TwoTermMsm<E: Pairing> { // This is rather similar to a Pederson commitment!
+    pub struct TwoTermMsm<E: Pairing> {
+        // This is rather similar to a Pederson commitment!
         pub base_1: E::G1Affine,
         pub base_2: E::G1Affine,
     }
 
-    impl<E: Pairing> Default for SigmaProtocol<E> {
+    impl<E: Pairing> Default for TwoTermMsm<E> {
         fn default() -> Self {
-                let zeroth_lagr = E::G1::generator().into_affine();
-                let zeta = (zeroth_lagr * E::ScalarField::from(123456789u64)).into_affine();
-                Self { zeroth_lagr, xi_1: zeta }
+            let base_1 = E::G1::generator().into_affine();
+            let base_2 = (base_1 * E::ScalarField::from(123456789u64)).into_affine();
+            Self { base_1, base_2 }
         }
     }
 
-    #[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+    #[derive(
+        SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
+    )]
     pub struct Witness<E: Pairing> {
         pub kzg_randomness: Scalar<E>,
         pub hiding_kzg_randomness: Scalar<E>,
@@ -981,11 +984,6 @@ pub mod two_term_msm {
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             self.apply_msm(self.msm_terms(input))
         }
-
-        // fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        //     let (bases, scalars) = &homomorphism::FixedBaseMSMs::msm_rows(self, input)[0];
-        //     E::G1::msm(bases, scalars).expect("Could not compute MSM for univariate hiding KZG")
-        // }
     }
 
     #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
@@ -1047,19 +1045,11 @@ pub mod two_term_msm {
         }
     }
 
-    impl<E: Pairing> sigma_protocol::Trait<E> for SigmaProtocol<E> {
-        type Hom = TwoTermMsm<E>;
+    impl<E: Pairing> sigma_protocol::Trait<E> for TwoTermMsm<E> {
         type Statement = CodomainShape<E::G1>;
         type Witness = Witness<E>;
 
         const DST: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL";
         const DST_VERIFIER: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER";
-
-        fn homomorphism(&self) -> Self::Hom {
-            TwoTermMsm {
-                base_1: self.zeroth_lagr,
-                base_2: self.xi_1,
-            }
-        }
     }
 }

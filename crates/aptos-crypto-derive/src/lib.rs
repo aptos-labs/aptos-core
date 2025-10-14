@@ -482,7 +482,7 @@ pub fn derive_sigma_protocol_witness(input: TokenStream) -> TokenStream {
 
     let expanded = quote! {
         impl<E: Pairing> sigma_protocol::Witness<E> for #name<E> {
-            type Scalar = E::ScalarField;
+            type Scalar = Scalar<E>;
 
             fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
                 Self {

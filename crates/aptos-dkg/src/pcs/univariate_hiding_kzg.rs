@@ -1,10 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sigma_protocol::homomorphism::Trait;
 use crate::{
-    algebra::{polynomials, GroupData},
-    sigma_protocol::homomorphism,
+    algebra::{polynomials, GroupGenerators},
+    sigma_protocol::{homomorphism, homomorphism::Trait},
 };
 use anyhow::ensure;
 use ark_ec::{
@@ -13,15 +12,14 @@ use ark_ec::{
 };
 use ark_ff::Field;
 use ark_poly::EvaluationDomain;
-use ark_serialize::CanonicalSerialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
-use ark_serialize::CanonicalDeserialize;
 
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     pub(crate) xi_2: E::G2Affine,
     pub(crate) tau_2: E::G2Affine,
-    pub(crate) group_data: GroupData<E>,
+    pub(crate) group_data: GroupGenerators<E>,
 }
 
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
@@ -50,12 +48,12 @@ pub fn lagrange_basis<E: Pairing>(
 
 pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
     m: usize,
-    group_data: GroupData<E>,
+    group_data: GroupGenerators<E>,
     xi: E::ScalarField,
     tau: E::ScalarField,
     _rng: &mut R,
 ) -> (VerificationKey<E>, CommitmentKey<E>) {
-    let GroupData {
+    let GroupGenerators {
         g1: one_1,
         g2: one_2,
     } = group_data;
@@ -190,7 +188,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             xi_2,
             tau_2,
             group_data:
-                GroupData {
+                GroupGenerators {
                     g1: one_1,
                     g2: one_2,
                 },
@@ -243,13 +241,11 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         // TODO: use msm_eval here, like this:
-    //         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-    //     self.apply_msm(self.msm_terms(input))
-    // }
+        //         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        //     self.apply_msm(self.msm_terms(input))
+        // }
         let homomorphism::MsmInput { bases, scalars } = &Self::msm_terms(self, input).0;
         E::G1::msm(bases, scalars).expect("Could not compute MSM for univariate hiding KZG")
-
-
     }
 }
 
@@ -322,12 +318,12 @@ pub struct Sigma<'a, E: Pairing> {
     pub xi_1: E::G1Affine,
 }
 
-use crate::sigma_protocol;
-
-use crate::Scalar;
+use crate::{sigma_protocol, Scalar};
 use aptos_crypto_derive::SigmaProtocolWitness;
 
-#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(
+    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
+)]
 pub struct Witness<E: Pairing> {
     pub randomness: Scalar<E>,
     pub values: Vec<Scalar<E>>,
@@ -350,15 +346,13 @@ pub struct Witness<E: Pairing> {
 mod tests {
     use super::*;
     use ark_bls12_381::{Bls12_381, Fr, G1Projective, G2Projective};
-    use ark_std::rand::thread_rng;
-    use ark_std::test_rng;
+    use ark_ec::{AffineRepr, PrimeGroup};
     use ark_poly::EvaluationDomain;
-    use ark_serialize::{CanonicalSerialize, CanonicalDeserialize};
-    use ark_ec::PrimeGroup;
-    use ark_ec::AffineRepr;
+    use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+    use ark_std::{rand::thread_rng, test_rng};
 
-    fn sample_group_data() -> GroupData<Bls12_381> {
-        GroupData {
+    fn sample_group_data() -> GroupGenerators<Bls12_381> {
+        GroupGenerators {
             g1: G1Projective::generator().into_affine(),
             g2: G2Projective::generator().into_affine(),
         }
@@ -374,7 +368,8 @@ mod tests {
         let (vk, ck) = setup::<Bls12_381, _>(8, group_data, xi, tau, &mut rng);
 
         // Polynomial values at the roots of unity
-        let f_evals: Vec<Fr> = ck.roots_of_unity_in_eval_dom
+        let f_evals: Vec<Fr> = ck
+            .roots_of_unity_in_eval_dom
             .iter()
             .enumerate()
             .map(|(i, _)| Fr::from((i as u64) + 1))
@@ -394,6 +389,9 @@ mod tests {
         // Verify proof
         let result = Homomorphism::<Bls12_381>::verify(vk, C, x, y, proof);
 
-        assert!(result.is_ok(), "Verification should succeed for correct proof");
+        assert!(
+            result.is_ok(),
+            "Verification should succeed for correct proof"
+        );
     }
 }

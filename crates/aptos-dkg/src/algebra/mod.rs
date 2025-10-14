@@ -10,22 +10,19 @@ use ark_ec::pairing::Pairing;
 use ark_ff::UniformRand;
 use ark_serialize::CanonicalSerialize;
 use ark_std::rand::{CryptoRng, RngCore};
-use ark_ec::AffineRepr;
 
 #[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
-pub struct GroupData<E: Pairing> {
-    pub g1: E::G1Affine, // TODO: could also name these one_1 and one_2?
+pub struct GroupGenerators<E: Pairing> {
+    pub g1: E::G1Affine,
     pub g2: E::G2Affine,
 }
 
-impl<E: Pairing> GroupData<E> {
+impl<E: Pairing> GroupGenerators<E> {
     /// Create a new GroupData with random G1 and G2 elements
     pub fn new<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         Self {
             g1: E::G1Affine::rand(rng),
             g2: E::G2Affine::rand(rng),
-            // g1: E::G1Affine::generator(),
-            // g2: E::G2Affine::generator(),
         }
     }
 }

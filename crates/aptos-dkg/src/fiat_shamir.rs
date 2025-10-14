@@ -135,9 +135,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 }
 
 #[allow(private_bounds)]
-pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>:
-    ScalarProtocol<Scalar<E>>
-{
+pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scalar<E>> {
     fn append_sigma_protocol_sep(&mut self, dst: &[u8]);
 
     /// Append the claim of a sigma protocol.

@@ -54,18 +54,12 @@ pub mod weighted_vuf;
 pub struct Scalar<E: Pairing>(pub E::ScalarField);
 
 impl<E: Pairing> Scalar<E> {
-    /// Converts a `Vec<Scalar<E>>` into a `Vec<E::ScalarField>` without copying.
+    /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]` without copying.
     ///
     /// # Safety
     /// This function is safe because `Scalar<E>` is `#[repr(transparent)]`
     /// over `E::ScalarField`, so the memory layouts are guaranteed to match.
-    pub fn vec_into_inner(vec: Vec<Self>) -> Vec<E::ScalarField> {
-        let len = vec.len();
-        let capacity = vec.capacity();
-        let ptr = vec.as_ptr() as *mut E::ScalarField;
-
-        std::mem::forget(vec);
-
-        unsafe { Vec::from_raw_parts(ptr, len, capacity) }
+    pub fn slice_as_inner(slice: &[Self]) -> &[E::ScalarField] {
+        unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const E::ScalarField, slice.len()) }
     }
 }

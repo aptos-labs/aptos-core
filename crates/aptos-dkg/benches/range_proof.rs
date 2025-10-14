@@ -72,8 +72,8 @@ fn bench_groups(c: &mut Criterion) {
     //    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254");
     //    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381");
 
-     bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
-        bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");
+    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
+    bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");
 
     // bench_verify_components::<Bn254>(c, "BN254");
     // bench_verify_components::<Bls12_381>(c, "BLS12-381");
@@ -124,7 +124,8 @@ fn run_param_sweep<E: Pairing, B: BatchedRangeProof<E>>(curve_name: &str) {
                 let mut fs_t = merlin::Transcript::new(B::DST);
                 let start = Instant::now();
                 proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
-                verify_sum += (start.elapsed().as_secs_f64() * 1_000_000.0) as u128; // µs
+                verify_sum += (start.elapsed().as_secs_f64() * 1_000_000.0) as u128;
+                // µs
             }
 
             prove_times[i][j] = prove_sum / num_runs as u128;

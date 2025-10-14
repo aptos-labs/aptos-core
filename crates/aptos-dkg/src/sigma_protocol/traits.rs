@@ -1,14 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    fiat_shamir,
-    sigma_protocol::homomorphism::{FixedBaseMsms},
-    utils, Scalar,
-};
+use crate::{fiat_shamir, sigma_protocol::homomorphism::FixedBaseMsms, utils, Scalar};
 use anyhow::ensure;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
-use ark_ff::{AdditiveGroup, Field};
+use ark_ff::AdditiveGroup;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Valid};
 use ark_std::{
     rand::{CryptoRng, RngCore},
@@ -74,45 +70,36 @@ use ark_std::{
 //     }
 // }
 
-pub trait Trait<E: Pairing> {
-    // TODO: maybe make this 'pub trait Trait<E: Pairing>: FixedBaseMsms' for simplicity
-    type Statement: Statement;
-    type Witness: Witness<E>;
-    type Hom: FixedBaseMsms<
+pub trait Trait<E: Pairing>:
+    FixedBaseMsms<
         Domain = Self::Witness,
         Codomain = Self::Statement,
-        Scalar = E::ScalarField, // Hmm nee Scalar<E> denk ik
+        Scalar = E::ScalarField,
         Base = E::G1Affine,
         MsmOutput = E::G1,
-        CodomainShape<E::G1> = Self::Statement, //
-    >;
+        CodomainShape<E::G1> = Self::Statement,
+    > + Sized
+{
+    type Statement: Statement;
+    type Witness: Witness<E>;
 
     const DST: &[u8];
     const DST_VERIFIER: &[u8];
-
-    fn homomorphism(&self) -> Self::Hom;
 
     fn prove<R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Witness,
         transcript: &mut merlin::Transcript,
         rng: &mut R,
-    ) -> Proof<E, Self::Hom> {
-        prove_homomorphism(
-            self.homomorphism(),
-            witness,
-            transcript,
-            true,
-            rng,
-            Self::DST,
-        )
+    ) -> Proof<E, Self> {
+        prove_homomorphism(self, witness, transcript, true, rng, Self::DST)
     }
 
     #[allow(non_snake_case)]
     fn verify(
         &self,
         public_statement: &Self::Statement,
-        proof: &Proof<E, Self::Hom>,
+        proof: &Proof<E, Self>,
         transcript: &mut merlin::Transcript,
     ) -> anyhow::Result<()>
 //where 
@@ -182,8 +169,8 @@ pub trait Trait<E: Pairing> {
 
         // }
 
-        verify_msm_hom::<E, Self::Hom>(
-            self.homomorphism(),
+        verify_msm_hom::<E, Self>(
+            self,
             public_statement,
             match &proof.first_proof_item {
                 FirstProofItem::Commitment(A) => A,
@@ -393,7 +380,7 @@ where
 
 #[allow(non_snake_case)]
 pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait, R>(
-    homomorphism: H,
+    homomorphism: &H,
     witness: &H::Domain,
     fiat_shamir_transcript: &mut merlin::Transcript,
     store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
@@ -513,7 +500,7 @@ use ark_ec::CurveGroup;
 
 #[allow(non_snake_case)]
 pub fn verify_msm_hom<E: Pairing, H>(
-    homomorphism: H,
+    homomorphism: &H,
     public_statement: &H::Codomain,
     prover_first_message: &H::Codomain,
     prover_last_message: &H::Domain,
@@ -531,7 +518,7 @@ where
     let c =
         fiat_shamir_challenge_for_sigma_protocol::<E, H>(fs_transcript, &prover_first_message, dst);
 
-        // Step 2: Compute verifier-specific challenge (used for weighted MSM)
+    // Step 2: Compute verifier-specific challenge (used for weighted MSM)
     // let beta = fiat_shamir_challenge_for_msm_verifier::<E, H>(
     //     fs_transcript,
     //     public_statement,

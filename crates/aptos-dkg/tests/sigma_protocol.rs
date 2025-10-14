@@ -1,18 +1,20 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_dkg::sigma_protocol::{
-    self, homomorphism,
-    homomorphism::{FixedBaseMsms, Trait, TupleHomomorphism},
+use aptos_crypto_derive::SigmaProtocolWitness;
+use aptos_dkg::{
+    sigma_protocol::{
+        self, homomorphism,
+        homomorphism::{FixedBaseMsms, Trait, TupleHomomorphism},
+    },
+    Scalar,
 };
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::{thread_rng, CryptoRng, RngCore};
-use aptos_crypto_derive::SigmaProtocolWitness;
-use aptos_dkg::Scalar;
+use ark_std::rand::thread_rng;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Witness)
@@ -22,8 +24,7 @@ where
 {
     let mut rng = thread_rng();
 
-    let hom = instance.homomorphism();
-    let statement = hom.apply(&witness);
+    let statement = instance.apply(&witness);
 
     let mut prover_transcript = merlin::Transcript::new(b"sigma-protocol-test");
     let proof = instance.prove(&witness, &mut prover_transcript, &mut rng);
@@ -36,6 +37,8 @@ where
 
 mod schnorr {
     use super::*;
+    use ark_ec::VariableBaseMSM;
+    use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub(crate) struct Schnorr<E: Pairing> {
@@ -51,16 +54,11 @@ mod schnorr {
     }
 
     impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
-        type Hom = Self; // TODO: potential for simplification here
         type Statement = CodomainShape<E::G1>;
         type Witness = Scalar<E>;
 
         const DST: &[u8] = b"Schnorr";
         const DST_VERIFIER: &[u8] = b"Schnorr-verifier";
-
-        fn homomorphism(&self) -> Self::Hom {
-            self.clone() // since Schnorr implements Hom
-        }
     }
 
     impl<E: Pairing> homomorphism::Trait for Schnorr<E> {
@@ -71,9 +69,6 @@ mod schnorr {
             self.apply_msm(self.msm_terms(input))
         }
     }
-
-    use ark_ec::VariableBaseMSM;
-    use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
     impl<E: Pairing> homomorphism::FixedBaseMsms for Schnorr<E> {
         type Base = E::G1Affine;
@@ -165,16 +160,14 @@ fn test_schnorr() {
 
 #[test]
 fn test_dekart_sigma() {
-    use aptos_dkg::range_proofs::dekart_univariate_v2::two_term_msm::*;
-    use aptos_dkg::Scalar;
+    use aptos_dkg::{range_proofs::dekart_univariate_v2::two_term_msm::*, Scalar};
 
     let mut rng = thread_rng();
 
     // ---- Bn254 ----
-    let witness_bn = Witness{kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)), hiding_kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng))};
-    test_sigma_protocol::<Bn254, _>(SigmaProtocol::default(), witness_bn);
-
-    // // ---- Bls12_381 ----
-    // let witness_bls = Domain(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
-    // test_sigma_protocol::<Bls12_381, _>(Schnorr::default(), witness_bls);
+    let witness_bn = Witness {
+        kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
+        hiding_kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
+    };
+    test_sigma_protocol::<Bn254, _>(TwoTermMsm::default(), witness_bn);
 }

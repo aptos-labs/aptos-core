@@ -25,6 +25,10 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
         })
         .collect();
 
-    let (comm, r) = B::commit(&B::commitment_key_from_prover_key(&pk), &ell_bit_values, rng);
+    let (comm, r) = B::commit(
+        &B::commitment_key_from_prover_key(&pk),
+        &ell_bit_values,
+        rng,
+    );
     (pk, vk, ell_bit_values, comm, r)
 }
