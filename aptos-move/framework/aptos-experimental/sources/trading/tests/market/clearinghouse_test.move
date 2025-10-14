@@ -66,7 +66,7 @@ module aptos_experimental::clearinghouse_test {
         );
     }
 
-    public(package) fun validate_order_placement(order_id: OrderIdType): ValidationResult<u64> acquires GlobalState {
+    public(package) fun validate_order_placement(order_id: OrderIdType): ValidationResult acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             !open_orders.contains(order_id),

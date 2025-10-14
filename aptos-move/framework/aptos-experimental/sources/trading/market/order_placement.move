@@ -71,7 +71,6 @@ module aptos_experimental::order_placement {
         Self,
         MarketClearinghouseCallbacks,
         Market, CallbackResult, new_callback_result_not_available,
-        is_validation_result_valid, get_place_maker_order_actions,
     };
 
     // Error codes

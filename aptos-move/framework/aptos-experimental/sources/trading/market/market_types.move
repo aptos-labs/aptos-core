@@ -112,7 +112,7 @@ module aptos_experimental::market_types {
             /// settle_trade_f arguments: market, taker, maker, fill_id, settled_price, settled_size,
             settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
             /// validate_settlement_update_f arguments: order_info, is_taker, size
-            validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult<R> has drop + copy,
+            validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
             validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
             /// place_maker_order_f arguments: order_info, size
@@ -142,9 +142,9 @@ module aptos_experimental::market_types {
         }
     }
 
-    public fun new_validation_result<R: store + copy + drop>(
+    public fun new_validation_result(
         cancellation_reason: Option<String>,
-    ): ValidationResult<R> {
+    ): ValidationResult {
         ValidationResult::V1 {
             cancellation_reason,
         }
@@ -160,7 +160,7 @@ module aptos_experimental::market_types {
 
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
         settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
-        validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult<R> has drop + copy,
+        validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult has drop + copy,
         validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
         cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
@@ -196,11 +196,11 @@ module aptos_experimental::market_types {
         &self.callback_result
     }
 
-    public fun is_validation_result_valid<R: store + copy + drop>(self: &ValidationResult<R>): bool {
+    public fun is_validation_result_valid(self: &ValidationResult): bool {
         self.cancellation_reason.is_none()
     }
 
-    public fun get_validation_cancellation_reason<R: store + copy + drop>(self: &ValidationResult<R>): Option<String> {
+    public fun get_validation_cancellation_reason(self: &ValidationResult): Option<String> {
         self.cancellation_reason
     }
 
@@ -252,7 +252,7 @@ module aptos_experimental::market_types {
         self: &MarketClearinghouseCallbacks<M, R>,
         order_info: MarketClearinghouseOrderInfo<M>,
         is_taker: bool,
-        size: u64): ValidationResult<R> {
+        size: u64): ValidationResult {
         (self.validate_order_placement_f)(order_info, is_taker, size)
     }
 
