@@ -18,7 +18,8 @@ use aptos_keyless_pepper_service::{
     metrics::DEFAULT_METRICS_SERVER_PORT,
     request_handler,
     request_handler::DEFAULT_PEPPER_SERVICE_PORT,
-    utils, vuf_pub_key,
+    utils, vuf_keypair,
+    vuf_keypair::VUFKeypair,
 };
 use aptos_logger::{error, info, warn};
 use clap::Parser;
@@ -125,11 +126,14 @@ async fn main() {
 
     // Fetch the VUF public and private keypair (this will load the private key into memory)
     info!("Fetching the VUF public and private keypair for the pepper service...");
-    let (vuf_public_key, vuf_private_key) = vuf_pub_key::get_pepper_service_vuf_keypair(
+    let vuf_keypair = vuf_keypair::get_pepper_service_vuf_keypair(
         args.vuf_private_key_hex,
         args.vuf_private_key_seed_hex,
     );
-    info!("Retrieved the VUF public key: {:?}", vuf_public_key);
+    info!(
+        "Retrieved the VUF public key: {:?}",
+        vuf_keypair.vuf_public_key_json()
+    );
 
     // Collect the account recovery managers
     info!("Collecting the account recovery managers...");
@@ -168,7 +172,7 @@ async fn main() {
     let jwk_cache = jwk_fetcher::start_jwk_fetchers(args.jwk_issuers_override.clone());
 
     // Start the pepper service
-    let vuf_keypair = Arc::new((vuf_public_key, Arc::new(vuf_private_key)));
+    let vuf_keypair = Arc::new(vuf_keypair);
     start_pepper_service(
         args.pepper_service_port,
         vuf_keypair,
@@ -202,7 +206,7 @@ fn start_metrics_server() {
 // Starts the pepper service
 async fn start_pepper_service(
     pepper_service_port: u16,
-    vuf_keypair: Arc<(String, Arc<ark_bls12_381::Fr>)>,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
