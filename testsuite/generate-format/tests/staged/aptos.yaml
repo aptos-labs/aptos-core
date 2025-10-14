@@ -628,6 +628,27 @@ TransactionArgument:
     9:
       Serialized:
         NEWTYPE: BYTES
+    10:
+      I8:
+        NEWTYPE: I8
+    11:
+      I16:
+        NEWTYPE: I16
+    12:
+      I32:
+        NEWTYPE: I32
+    13:
+      I64:
+        NEWTYPE: I64
+    14:
+      I128:
+        NEWTYPE: I128
+    15:
+      I256:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 32
 TransactionAuthenticator:
   ENUM:
     0:
