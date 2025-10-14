@@ -1019,7 +1019,7 @@ impl SpecTranslator<'_> {
             Operation::BitOr => self.translate_bit_op("$Or", args),
             Operation::BitAnd => self.translate_bit_op("$And", args),
             Operation::Xor => self.translate_bit_op("$Xor", args),
-            Operation::Shl => self.translate_primitive_call_shl("$shl", args),
+            Operation::Shl => self.translate_primitive_call_shl("$shl", args, &loc),
             Operation::Shr => self.translate_primitive_call_shr("$shr", args),
             Operation::Implies => self.translate_logical_op("==>", args),
             Operation::Iff => self.translate_logical_op("<==>", args),
@@ -2119,7 +2119,7 @@ impl SpecTranslator<'_> {
         emit!(self.writer, ")");
     }
 
-    fn translate_primitive_call_shl(&self, fun: &str, args: &[Exp]) {
+    fn translate_primitive_call_shl(&self, fun: &str, args: &[Exp], loc: &Loc) {
         let global_state = &self
             .env
             .get_extension::<GlobalNumberOperationState>()
@@ -2152,6 +2152,18 @@ impl SpecTranslator<'_> {
                 Type::Primitive(PrimitiveType::U64) => "U64",
                 Type::Primitive(PrimitiveType::U128) => "U128",
                 Type::Primitive(PrimitiveType::U256) => "U256",
+                Type::Primitive(PrimitiveType::I8)
+                | Type::Primitive(PrimitiveType::I16)
+                | Type::Primitive(PrimitiveType::I32)
+                | Type::Primitive(PrimitiveType::I64)
+                | Type::Primitive(PrimitiveType::I128)
+                | Type::Primitive(PrimitiveType::I256) => {
+                    self.error(
+                        loc,
+                        &format!("signed integer types not supported in operation {}", fun),
+                    );
+                    "<<signed integer is not supported here>>"
+                },
                 Type::Primitive(PrimitiveType::Num) => "",
                 _ => unreachable!(),
             };
