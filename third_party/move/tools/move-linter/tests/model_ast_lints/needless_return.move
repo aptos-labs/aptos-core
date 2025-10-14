@@ -53,38 +53,43 @@ module 0xc0ffee::m {
         (1, 2) // Should not warn here.
     }
 
-    fun explicit_return_if(x: u64, b: bool): u64 {  
-        if (b) {  
+    fun explicit_return_if(x: u64, b: bool): u64 {
+        if (b) {
             return x + 1 // Should warn here.
-        } else {  
-            x - 1  
-        }  
-    }  
+        } else {
+            x - 1
+        }
+    }
 
 
-    fun explicit_return_if_else(x: u64, b: bool): u64 {  
-        if (b) {  
+    fun explicit_return_if_else(x: u64, b: bool): u64 {
+        if (b) {
             return x + 1 // Should warn here.
-        } else {  
+        } else {
             return x - 1 // Should warn here.
-        }  
-    }  
+        }
+    }
 
-    fun explicit_return_if_else_void_semicolon(b: bool) {  
-        if (b) {  
+    fun explicit_return_if_else_void_semicolon(b: bool) {
+        if (b) {
             return; // Should warn here.
-        } else {  
+        } else {
             return; // Should warn here.
         }
-    }  
+    }
 
-    fun ok_function(b: bool): u64 {  
-        if (b) {  
+    fun ok_function(b: bool): u64 {
+        if (b) {
             1
-        } else {  
+        } else {
             2
         }
-    }  
+    }
+
+    public fun with_return_void_and_tuple(_x : bool) {
+        return;  // Should warn here.
+        ()
+    }
 
     #[lint::skip(needless_return)]
     fun test_skip(): bool {
