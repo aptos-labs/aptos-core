@@ -22,6 +22,7 @@ pub struct DbStateView {
     db: Arc<dyn DbReader>,
     version: Option<Version>,
     /// DB doesn't support returning proofs for buffered state, so only optionally verify proof.
+    /// dummy change
     /// TODO: support returning state proof for buffered state.
     maybe_verify_against_state_root_hash: Option<HashValue>,
     memorized: ShardedStateCache,
