@@ -57,6 +57,8 @@ pub struct PrebuiltPackageConfig {
     pub latest_language: bool,
     /// If true, will use the local Aptos framework.
     pub use_local_std: bool,
+    /// Experiments for compiler optimization
+    pub experiments: Vec<String>,
 }
 
 impl PrebuiltPackageConfig {
@@ -69,6 +71,9 @@ impl PrebuiltPackageConfig {
         }
         if self.use_local_std {
             build_options.override_std = Some(StdVersion::Local(get_local_framework_path()));
+        }
+        for exp in &self.experiments {
+            build_options = build_options.with_experiment(exp);
         }
         build_options
     }
