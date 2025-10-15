@@ -322,6 +322,33 @@ where
     )
 }
 
+/// Performs a **batch verification** of multiple Sigma protocol MSM (Multi-Scalar Multiplication) relations.
+///
+/// ### Overview
+/// Suppose we need to verify a family of equations of the form:
+///
+/// \[
+/// \sum_i g_{i,j} \cdot x_{i,j} = A_j + P_j \cdot c
+/// \]
+///
+/// for each index \( j \).  
+///
+/// Instead of checking each equation individually, we batch them using a random challenge \(\beta\).
+/// The verifier checks that:
+///
+/// \[
+/// \sum_j \beta^j \cdot \left( \sum_i g_{i,j} \cdot x_{i,j} - A_j - P_j \cdot c \right) = 0
+/// \]
+///
+/// This reduces the verification of multiple MSM-based equations to a single MSM check,
+/// significantly improving efficiency.
+///
+/// ### Generalization
+/// This batching technique can be extended to simultaneously verify multiple protocols
+/// that involve MSM relations.
+///
+/// ### Notes
+/// - The random challenge \(\beta\) is currently sampled locally by the verifier, for composability with larger protocols. But this could be derived via Fiat–Shamir as well. (TODO: Pending discussion)
 #[allow(non_snake_case)]
 pub fn verify_msm_hom<E: Pairing, H>(
     homomorphism: &H,
