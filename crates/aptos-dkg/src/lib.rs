@@ -62,4 +62,8 @@ impl<E: Pairing> Scalar<E> {
     pub fn slice_as_inner(slice: &[Self]) -> &[E::ScalarField] {
         unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const E::ScalarField, slice.len()) }
     }
+
+    pub fn vec_into_inner(v: Vec<Self>) -> Vec<E::ScalarField> {
+        unsafe { Vec::from_raw_parts(v.as_ptr() as *mut E::ScalarField, v.len(), v.capacity()) }
+    }
 }

@@ -925,7 +925,7 @@ mod fiat_shamir {
     ) -> (E::ScalarField, E::ScalarField, Vec<E::ScalarField>) {
         let mut mus = <Transcript as RangeProof<E, Proof<E>>>::challenges_for_linear_combination(
             fs_transcript,
-            ell,
+            ell + 2,
         );
 
         let mu = mus.pop().expect("mus must have at least one element");

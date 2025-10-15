@@ -649,20 +649,20 @@ pub fn fiat_shamir_challenges<E: Pairing>(
         public_statement,
     );
 
-    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_commitments(
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_f_j_commitments(
         fs_transcript,
         bit_commitments,
     );
 
     // Generate the Fiat–Shamir challenges from the updated transcript
     let beta_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenges_for_linear_combination(
             fs_transcript,
             num_scalars,
         );
 
     let alpha_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenges_for_linear_combination(
             fs_transcript,
             num_scalars,
         );

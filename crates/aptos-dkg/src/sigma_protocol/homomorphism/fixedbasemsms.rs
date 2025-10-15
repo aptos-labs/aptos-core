@@ -58,10 +58,10 @@ pub trait FixedBaseMsms:
     homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>>
 {
     /// The scalar type used in the MSMs.
-    type Scalar;
+    type Scalar: Clone;
 
     /// The group/base type used in the MSMs.
-    type Base;
+    type Base: Clone;
 
     /// Type representing a single MSM input (a set of bases and scalars).
     /// Normally, this would default to `MsmInput<Self::Base, Self::Scalar>`,
@@ -75,12 +75,16 @@ pub trait FixedBaseMsms:
     type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone;
 
     /// The "shape" of the homomorphism's output, parameterized by an inner type `T`.
-    // TODO: type CodomainShape<T>: for<'a> IntoIterator<Item = &'a T> + 'static;
     type CodomainShape<T>: EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
-        + IntoIterator<Item = T>
+        + IntoIterator<Item = T> // TODO: leads to cloning - is this ideal?
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
+    : EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
+    + IntoIterator<Item = T>     // TODO: leads to cloning - is this ideal?
+    + CanonicalSerialize
+    + CanonicalDeserialize
+    + Clone
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone;
 

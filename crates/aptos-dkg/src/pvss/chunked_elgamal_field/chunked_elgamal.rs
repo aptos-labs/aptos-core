@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    sigma_protocol::homomorphism::{self, fixedbasemsms::FixedBaseMsms, EntrywiseMap},
+    sigma_protocol::homomorphism::{
+        self, fixedbasemsms, fixedbasemsms::FixedBaseMsms, EntrywiseMap,
+    },
     Scalar,
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
@@ -73,7 +75,7 @@ impl<'a, E: Pairing> FixedBaseMsms for Homomorphism<'a, E> {
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone;
-    type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = Scalar<E>;
 
@@ -85,7 +87,7 @@ impl<'a, E: Pairing> FixedBaseMsms for Homomorphism<'a, E> {
             .map(|(i, row)| {
                 row.iter()
                     .zip(input.1.iter())
-                    .map(|(&z_ij, &r_j)| homomorphism::fixedbasemsms::MsmInput {
+                    .map(|(&z_ij, &r_j)| fixedbasemsms::MsmInput {
                         bases: vec![*self.g_1, self.ek[i]],
                         scalars: vec![z_ij, r_j],
                     })
@@ -96,7 +98,7 @@ impl<'a, E: Pairing> FixedBaseMsms for Homomorphism<'a, E> {
         let Rs = input
             .1
             .iter()
-            .map(|&r_j| homomorphism::fixedbasemsms::MsmInput {
+            .map(|&r_j| fixedbasemsms::MsmInput {
                 bases: vec![*self.h_1],
                 scalars: vec![r_j],
             })

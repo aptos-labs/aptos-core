@@ -243,13 +243,9 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     type Codomain = CodomainShape<E::G1>;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
-    // fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-    // TODO: use msm_eval here, like this:
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
     }
-    // let homomorphism::MsmInput { bases, scalars } = &Self::msm_terms(self, input).0;
-    // E::G1::msm(bases, scalars).expect("Could not compute MSM for univariate hiding KZG")
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
@@ -323,19 +319,6 @@ pub struct Witness<E: Pairing> {
     pub randomness: Scalar<E>,
     pub values: Vec<Scalar<E>>,
 }
-
-// impl<'a, E: Pairing> sigma_protocol::Trait<E> for Sigma<'a, E> {
-//     type Statement = CodomainShape<E::G1>;
-//     type Witness = Witness<E>;
-//     type Hom = Homomorphism<'a, E>;
-
-//     const DST: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL";
-//     const DST_VERIFIER: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER";
-
-//     fn homomorphism(&self) -> Self::Hom {
-//         Homomorphism { lagr_g1: self.lagr_g1, xi_1: self.xi_1 }
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

@@ -69,8 +69,8 @@ fn bench_groups(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
     use ark_bn254::Bn254;
 
-    //    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254");
-    //    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381");
+    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254");
+    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381");
 
     bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
     bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");

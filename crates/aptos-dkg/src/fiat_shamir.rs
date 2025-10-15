@@ -17,7 +17,7 @@ use crate::{
 };
 use aptos_crypto::ValidCryptoMaterial;
 use ark_ec::pairing::Pairing;
-use ark_ff::{Field, PrimeField};
+use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use serde::Serialize;
 
@@ -38,6 +38,8 @@ trait ScalarProtocol<S: FromUniformBytes> {
     fn challenge_scalar(&mut self, label: &[u8]) -> S {
         self.challenge_scalars(label, 1)[0]
     }
+
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<S>;
 }
 
 trait FromUniformBytes: Copy {
@@ -74,6 +76,21 @@ impl<S: FromUniformBytes> ScalarProtocol<S> for merlin::Transcript {
 
         debug_assert_eq!(result.len(), num_scalars);
         result
+    }
+
+    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<S> {
+        // Allocate 16 bytes (128 bits) per scalar
+        let mut buf = vec![0u8; num_scalars * 16];
+        self.challenge_bytes(b"challenge_linear_combination", &mut buf);
+
+        let mut scalars = Vec::with_capacity(num_scalars);
+
+        for chunk in buf.chunks(16) {
+            scalars.push(S::from_uniform_bytes(chunk));
+        }
+
+        debug_assert_eq!(scalars.len(), num_scalars);
+        scalars
     }
 }
 
@@ -123,15 +140,11 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
-    fn append_commitments<A: CanonicalSerialize>(&mut self, commitments: &A); // TODO: REMOVE
-
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
     fn challenges_for_linear_combination(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
     fn challenge_from_verifier(&mut self) -> E::ScalarField;
-
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField>; // TODO: REMOVE
 }
 
 #[allow(private_bounds)]
@@ -271,32 +284,23 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         self.append_message(b"h_commitment", commitment_bytes.as_slice());
     }
 
-    fn append_commitments<A: CanonicalSerialize>(&mut self, commitments: &A) {
-        let mut commitments_bytes = Vec::new();
-        commitments
-            .serialize_compressed(&mut commitments_bytes)
-            .expect("commitments serialization should succeed");
-        self.append_message(b"commitments", commitments_bytes.as_slice());
-    }
-
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField> {
-        // let challenges = <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_scalars( // TODO: fix this
-        //     self,
-        //     b"challenge_for_quotient_polynomials",
-        //     ell + 1,
-        // );
-        // Scalar::<E>::vec_into_inner(challenges)
-        <merlin::Transcript as RangeProof<E, B>>::challenge_linear_combination_128bit(self, ell + 1)
+        let challenges =
+            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_linear_combination_128bit(
+                self,
+                ell + 1,
+            );
+
+        Scalar::<E>::vec_into_inner(challenges)
     }
 
-    fn challenges_for_linear_combination(&mut self, ell: usize) -> Vec<E::ScalarField> {
-        // let challenges = <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_scalars( // TODO: fix this
-        //     self,
-        //     b"challenge_for_linear_combination",
-        //     ell + 2,
-        // );
-        // Scalar::<E>::vec_into_inner(challenges)
-        <merlin::Transcript as RangeProof<E, B>>::challenge_linear_combination_128bit(self, ell + 2)
+    fn challenges_for_linear_combination(&mut self, num: usize) -> Vec<E::ScalarField> {
+        let challenges =
+            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_linear_combination_128bit(
+                self, num,
+            );
+
+        Scalar::<E>::vec_into_inner(challenges)
     }
 
     fn challenge_from_verifier(&mut self) -> E::ScalarField {
@@ -305,29 +309,6 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
             b"challenge_for_linear_combination",
         )
         .0
-    }
-
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<E::ScalarField> {
-        let mut buf = vec![0u8; num_scalars * 16];
-        self.challenge_bytes(b"challenge_linear_combination", &mut buf);
-
-        let mut v = Vec::with_capacity(num_scalars);
-
-        for chunk in buf.chunks(16) {
-            match chunk.try_into() {
-                Ok(chunk) => {
-                    v.push(
-                        E::ScalarField::from_random_bytes(chunk)
-                            .expect("Error sampling field elements from bytes"),
-                    );
-                },
-                Err(_) => panic!("Expected a 16-byte slice, but got a different size"),
-            }
-        }
-
-        assert_eq!(v.len(), num_scalars);
-
-        v
     }
 }
 
