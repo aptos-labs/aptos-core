@@ -108,7 +108,8 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
             <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
         >;
 
-    const DST: &[u8];
+    /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
+    fn dst() -> Vec<u8>;
 
     /// Return a developer-friendly name of the PVSS scheme (e.g., "vanilla_scrape") that can be
     /// used in, say, criterion benchmark names.
