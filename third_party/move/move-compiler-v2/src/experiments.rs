@@ -311,6 +311,8 @@ impl Experiment {
     pub const ACCESS_CHECK: &'static str = "access-use-function-check";
     pub const ACQUIRES_CHECK: &'static str = "acquires-check";
     pub const ACROSS_PACKAGE_INLINING: &'static str = "across-package-inlining";
+    pub const ALLOW_INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS: &'static str =
+        "allow-inlining-optimization-to-non-primary-targets";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";
