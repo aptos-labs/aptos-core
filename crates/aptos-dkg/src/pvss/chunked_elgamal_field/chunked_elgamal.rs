@@ -1,92 +1,114 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::homomorphism::{self, FixedBaseMSM};
-use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
+use crate::{
+    sigma_protocol::homomorphism::{
+        self, fixedbasemsms, fixedbasemsms::FixedBaseMsms, EntrywiseMap,
+    },
+    Scalar,
+};
+use ark_ec::{pairing::Pairing, VariableBaseMSM};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+
+type Base<E> = <E as Pairing>::G1Affine;
 
 #[allow(non_snake_case)]
-pub struct Map<'a, E: Pairing> {
-    pub g_1: &'a E::G1Affine,
-    pub h_1: &'a E::G1Affine,
-    pub ek: &'a [E::G1Affine],
+pub struct Homomorphism<'a, E: Pairing> {
+    pub g_1: &'a Base<E>,
+    pub h_1: &'a Base<E>,
+    pub ek: &'a [Base<E>],
 }
 
-type MatrixVectorPair<T> = (Vec<Vec<T>>, Vec<T>);
-type MSMInputVec<'a, E> = MatrixVectorPair<(
-    Vec<<Map<'a, E> as FixedBaseMSM>::Base>,
-    Vec<<Map<'a, E> as FixedBaseMSM>::Scalar>,
-)>;
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
+    pub chunks: Vec<Vec<T>>, // Depending on T, these can be chunked plaintexts, chunked ciphertexts, their MSM representations, etc
+    pub randomness: Vec<T>,
+}
+type MatrixVectorPair<T> = (Vec<Vec<T>>, Vec<T>); // Domain shape happens to be similar to Codomain shape
 
-impl<'a, E: Pairing> Map<'a, E> {
-    pub fn prep_msms(&self, input: &<Self as homomorphism::Map>::Domain) -> MSMInputVec<'a, E> {
-        let first_elgamal_comp = input
+impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
+    type Codomain = CodomainShape<E::G1>;
+    type Domain = MatrixVectorPair<Scalar<E>>;
+
+    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+        self.apply_msm(self.msm_terms(input))
+    }
+}
+
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> EntrywiseMap<T> for CodomainShape<T> {
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = CodomainShape<U>;
+
+    fn map<U, F>(self, f: F) -> Self::Output<U>
+    where
+        F: Fn(T) -> U,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone,
+    {
+        let chunks = self
+            .chunks
+            .into_iter()
+            .map(|row| row.into_iter().map(&f).collect())
+            .collect();
+
+        let randomness = self.randomness.into_iter().map(f).collect();
+
+        CodomainShape { chunks, randomness }
+    }
+}
+
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
+    type IntoIter = std::vec::IntoIter<T>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let mut combined: Vec<T> = self.chunks.into_iter().flatten().collect(); // Temporary Vec can probably be avoided, but might require unstable Rust or a lot of lines
+        combined.extend(self.randomness);
+        combined.into_iter()
+    }
+}
+
+#[allow(non_snake_case)]
+impl<'a, E: Pairing> FixedBaseMsms for Homomorphism<'a, E> {
+    type Base = Base<E>;
+    type CodomainShape<T>
+        = CodomainShape<T>
+    where
+        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+    type MsmInput = fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmOutput = E::G1;
+    type Scalar = Scalar<E>;
+
+    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+        let Cs = input
             .0
             .iter()
             .enumerate()
             .map(|(i, row)| {
                 row.iter()
                     .zip(input.1.iter())
-                    .map(|(&z_ij, &r_j)| (vec![*self.g_1, self.ek[i]], vec![z_ij, r_j]))
+                    .map(|(&z_ij, &r_j)| fixedbasemsms::MsmInput {
+                        bases: vec![*self.g_1, self.ek[i]],
+                        scalars: vec![z_ij, r_j],
+                    })
                     .collect()
             })
             .collect();
 
-        let second_elgamal_comp = input
+        let Rs = input
             .1
             .iter()
-            .map(|&r_j| (vec![*self.h_1], vec![r_j]))
+            .map(|&r_j| fixedbasemsms::MsmInput {
+                bases: vec![*self.h_1],
+                scalars: vec![r_j],
+            })
             .collect();
 
-        (first_elgamal_comp, second_elgamal_comp)
+        CodomainShape {
+            chunks: Cs,
+            randomness: Rs,
+        }
     }
 
-    fn msm_eval(
-        bases: &[<Self as FixedBaseMSM>::Base],
-        scalars: &[<Self as FixedBaseMSM>::Scalar],
-    ) -> E::G1 {
-        E::G1::msm(bases, scalars).expect("MSM failed in ChunkedElGamal")
-    }
-}
-
-impl<'a, E: Pairing> homomorphism::Map for Map<'a, E> {
-    type Codomain = MatrixVectorPair<E::G1>;
-    type Domain = MatrixVectorPair<E::ScalarField>;
-
-    fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        let (first_elgamal_comp, second_elgamal_comp) = self.prep_msms(input);
-
-        (
-            first_elgamal_comp
-                .into_iter()
-                .map(|row| {
-                    row.into_iter()
-                        .map(|(b, s)| Self::msm_eval(&b, &s))
-                        .collect()
-                })
-                .collect(),
-            second_elgamal_comp
-                .into_iter()
-                .map(|(b, s)| Self::msm_eval(&b, &s))
-                .collect(),
-        )
-    }
-}
-
-fn flatten<T>(input: MatrixVectorPair<T>) -> Vec<T> {
-    let (mat, vec) = input;
-    mat.into_iter().flatten().chain(vec).collect()
-}
-
-impl<'a, E: Pairing> FixedBaseMSM for Map<'a, E> {
-    type Base = E::G1Affine;
-    type Scalar = E::ScalarField;
-
-    fn msm_rows(&self, input: &Self::Domain) -> Vec<(Vec<Self::Base>, Vec<Self::Scalar>)> {
-        let res = Map::<'a, E>::prep_msms(self, input);
-        flatten(res)
-    }
-
-    fn flatten_codomain(&self, output: &Self::Codomain) -> Vec<Self::Base> {
-        E::G1::normalize_batch(&flatten(output.clone()))
+    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
+        E::G1::msm(bases, Scalar::slice_as_inner(scalars)).expect("MSM failed in ChunkedElGamal")
     }
 }

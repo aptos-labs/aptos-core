@@ -19,8 +19,7 @@
 
 use crate::constants::SCALAR_FIELD_ORDER;
 use ark_ec::pairing::Pairing;
-use ark_serialize::CanonicalDeserialize;
-use ark_serialize::CanonicalSerialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 pub use constants::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 pub use utils::random::DST_RAND_CORE_HELL;
 
