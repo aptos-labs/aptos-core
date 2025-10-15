@@ -791,7 +791,7 @@ static_assertions = "1.1.0"
 status-line = "0.2.0"
 strum = "0.27.1"
 strum_macros = "0.27.1"
-sugars = "3.0.1"
+sugars = "3.0.2"
 syn = { version = "1.0.92", features = ["derive", "extra-traits"] }
 sysinfo = "0.28.4"
 tar = "0.4.40"
