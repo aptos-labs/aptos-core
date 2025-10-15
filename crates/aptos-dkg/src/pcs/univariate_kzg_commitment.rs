@@ -23,35 +23,36 @@ pub struct Homomorphism<'a, E: Pairing> {
 }
 
 impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
-    type Codomain = E::G1;
+    type Codomain = CodomainShape<E::G1>;
     /// Input domain: (blinding factor, remaining values)
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        self.apply_msm(self.msm_terms(input)).0
+        self.apply_msm(self.msm_terms(input))
     }
 }
 
 use ark_serialize::CanonicalSerialize;
 
-#[derive(CanonicalSerialize, Clone, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + Clone + PartialEq + Eq>(T);
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>(pub T);
 
 // Implement EntrywiseMap for the wrapper
-impl<T: CanonicalSerialize + Clone + PartialEq + Eq> EntrywiseMap<T> for CodomainShape<T> {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
-        CodomainShape<U>;
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> EntrywiseMap<T>
+    for CodomainShape<T>
+{
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> = CodomainShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq,
     {
         CodomainShape(f(self.0))
     }
 }
 
-impl<T: CanonicalSerialize + Clone + PartialEq + Eq> IntoIterator for CodomainShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> IntoIterator for CodomainShape<T> {
     type IntoIter = std::iter::Once<T>;
     type Item = T;
 
@@ -65,7 +66,7 @@ impl<'a, E: Pairing> homomorphism::FixedBaseMsms for Homomorphism<'a, E> {
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
     type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;

@@ -6,6 +6,7 @@ use crate::{
     Scalar,
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 type Base<E> = <E as Pairing>::G1Affine;
 
@@ -16,10 +17,8 @@ pub struct Homomorphism<'a, E: Pairing> {
     pub ek: &'a [Base<E>],
 }
 
-use ark_serialize::CanonicalSerialize;
-
-#[derive(CanonicalSerialize, Clone, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + Clone + PartialEq + Eq> {
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> {
     pub chunks: Vec<Vec<T>>, // Depending on T, these can be chunked plaintexts, chunked ciphertexts, their MSM representations, etc
     pub randomness: Vec<T>,
 }
@@ -36,9 +35,9 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     }
 }
 
-use ark_serialize::CanonicalDeserialize;
-
-impl<T: CanonicalSerialize + Clone + PartialEq + Eq> EntrywiseMap<T> for CodomainShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> EntrywiseMap<T>
+    for CodomainShape<T>
+{
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
         CodomainShape<U>;
 
@@ -59,7 +58,9 @@ impl<T: CanonicalSerialize + Clone + PartialEq + Eq> EntrywiseMap<T> for Codomai
     }
 }
 
-impl<T: CanonicalSerialize + Clone + PartialEq + Eq> IntoIterator for CodomainShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> IntoIterator
+    for CodomainShape<T>
+{
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 

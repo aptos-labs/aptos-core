@@ -174,7 +174,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let hiding_kzg_input = (*rho, values_shifted);
 
-        Commitment(hiding_kzg_hom.apply(&hiding_kzg_input))
+        Commitment(hiding_kzg_hom.apply(&hiding_kzg_input).0)
     }
 
     #[allow(non_snake_case)]
@@ -312,7 +312,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .zip(rhos.iter())
             .map(|(f_j, rho)| {
                 let hkzg_commit_input = (*rho, f_j.clone());
-                hkzg_commit.apply(&hkzg_commit_input)
+                hkzg_commit.apply(&hkzg_commit_input).0
             })
             .collect();
 
@@ -569,7 +569,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // }
 
         let rho_h = E::ScalarField::rand(rng);
-        let D = hkzg_commit.apply(&(rho_h, h_evals.clone()));
+        let D = hkzg_commit.apply(&(rho_h, h_evals.clone())).0;
 
         // Step 7b
         fiat_shamir::append_h_commitment::<E>(fs_transcript, &D);
@@ -1046,8 +1046,6 @@ pub mod two_term_msm {
     }
 
     impl<E: Pairing> sigma_protocol::Trait<E> for TwoTermMsm<E> {
-        type Statement = CodomainShape<E::G1>;
-
         const DST: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL";
         const DST_VERIFIER: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER";
     }

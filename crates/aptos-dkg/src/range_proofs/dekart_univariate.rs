@@ -210,7 +210,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let input = (*r, values.to_vec());
 
-        Commitment(kzg_commit_hom.apply(&input))
+        Commitment(kzg_commit_hom.apply(&input).0)
     }
 
     #[allow(non_snake_case)]

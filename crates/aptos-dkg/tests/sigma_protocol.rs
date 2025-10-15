@@ -54,8 +54,6 @@ mod schnorr {
     }
 
     impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
-        type Statement = CodomainShape<E::G1>;
-
         const DST: &[u8] = b"Schnorr";
         const DST_VERIFIER: &[u8] = b"Schnorr-verifier";
     }
@@ -74,7 +72,7 @@ mod schnorr {
         type CodomainShape<T>
             = CodomainShape<T>
         where
-            T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+            T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
         type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;

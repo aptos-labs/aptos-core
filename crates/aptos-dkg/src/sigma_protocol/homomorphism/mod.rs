@@ -167,7 +167,7 @@ pub trait EntrywiseMap<T> {
 /// - Methods for computing the MSM representations of a homomorphism input.
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
-pub trait FixedBaseMsms: Trait {
+pub trait FixedBaseMsms: Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
     /// The scalar type used in the MSMs.
     type Scalar;
 
@@ -183,7 +183,7 @@ pub trait FixedBaseMsms: Trait {
         + IsMsmInput<Self::Base, Self::Scalar>
         + Eq;
 
-    /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, which can't be enforced directly with the current version of Rust
+    /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`
     type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
 
     /// The "shape" of the homomorphism's output, parameterized by an inner type `T`.
@@ -191,6 +191,7 @@ pub trait FixedBaseMsms: Trait {
     type CodomainShape<T>: EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
         + IntoIterator<Item = T>
         + CanonicalSerialize
+        + CanonicalDeserialize
         + Clone
         + Eq
     where
@@ -308,40 +309,39 @@ where
 /// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future. Similarly, we **implicitly** that the two msm_eval methods are identical.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
-impl<H1, H2> FixedBaseMsms for TupleHomomorphism<H1, H2>
-where
-    H1: FixedBaseMsms,
-    H2: FixedBaseMsms<
-        Domain = H1::Domain,
-        Scalar = H1::Scalar,
-        Base = H1::Base,
-        MsmInput = H1::MsmInput,
-        MsmOutput = H1::MsmOutput,
-    >,
-{
-    type Base = H1::Base;
-    type CodomainShape<T>
-        = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
-    where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
-    type MsmInput = H1::MsmInput;
-    type MsmOutput = H1::MsmOutput;
-    type Scalar = H1::Scalar;
+// impl<H1, H2> FixedBaseMsms for TupleHomomorphism<H1, H2>
+// where
+//     H1: FixedBaseMsms,
+//     H2: FixedBaseMsms<
+//         Domain = H1::Domain,
+//         Scalar = H1::Scalar,
+//         Base = H1::Base,
+//         MsmInput = H1::MsmInput,
+//         MsmOutput = H1::MsmOutput,
+//     >,
+// {
+//     type Base = H1::Base;
+//     type CodomainShape<T>
+//         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
+//     where
+//         T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+//     type MsmInput = H1::MsmInput;
+//     type MsmOutput = H1::MsmOutput;
+//     type Scalar = H1::Scalar;
 
-    /// Returns the MSM terms for each homomorphism, combined into a tuple.
-    fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-        let terms1 = self.hom1.msm_terms(input);
-        let terms2 = self.hom2.msm_terms(input);
-        TupleCodomainShape(terms1, terms2)
-    }
+//     /// Returns the MSM terms for each homomorphism, combined into a tuple.
+//     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
+//         let terms1 = self.hom1.msm_terms(input);
+//         let terms2 = self.hom2.msm_terms(input);
+//         TupleCodomainShape(terms1, terms2)
+//     }
 
-    fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        H1::msm_eval(bases, scalars)
-    }
-}
+//     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
+//         H1::msm_eval(bases, scalars)
+//     }
+// }
 
 // Codomain example
-
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
 pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>(pub T); // TODO: this is a copy-paste...
 

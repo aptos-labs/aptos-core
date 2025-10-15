@@ -17,14 +17,14 @@ use std::io::Write;
 pub trait Trait<E: Pairing>:
     FixedBaseMsms<
         Domain: Witness<E>,
-        Codomain = Self::Statement,
+//        Codomain = Self::Statement,
         Scalar = E::ScalarField,
         Base = E::G1Affine,
         MsmOutput = E::G1,
-        CodomainShape<E::G1> = Self::Statement,
+//        CodomainShape<E::G1> = Self::Statement,
     > + Sized
 {
-    type Statement: Statement;
+//    type Statement: Statement;
 
     const DST: &[u8];
     const DST_VERIFIER: &[u8];
@@ -41,7 +41,7 @@ pub trait Trait<E: Pairing>:
     #[allow(non_snake_case)]
     fn verify(
         &self,
-        public_statement: &Self::Statement,
+        public_statement: &Self::Codomain,
         proof: &Proof<E, Self>,
         transcript: &mut merlin::Transcript,
     ) -> anyhow::Result<()>

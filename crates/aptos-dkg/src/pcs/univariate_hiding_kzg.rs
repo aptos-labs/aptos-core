@@ -3,9 +3,12 @@
 
 use crate::{
     algebra::{polynomials, GroupGenerators},
+    sigma_protocol,
     sigma_protocol::{homomorphism, homomorphism::Trait},
+    Scalar,
 };
 use anyhow::ensure;
+use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
@@ -98,7 +101,7 @@ fn commit_with_randomness<E: Pairing>(
 
     let input = (r.0, values.to_vec());
 
-    Commitment(commitment_hom.apply(&input))
+    Commitment(commitment_hom.apply(&input).0)
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
@@ -236,21 +239,22 @@ pub struct Homomorphism<'a, E: Pairing> {
 }
 
 impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
-    type Codomain = E::G1;
+    type Codomain = CodomainShape<E::G1>;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
+    // fn apply(&self, input: &Self::Domain) -> Self::Codomain {
+    // TODO: use msm_eval here, like this:
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        // TODO: use msm_eval here, like this:
-        //         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-        //     self.apply_msm(self.msm_terms(input))
-        // }
-        let homomorphism::MsmInput { bases, scalars } = &Self::msm_terms(self, input).0;
-        E::G1::msm(bases, scalars).expect("Could not compute MSM for univariate hiding KZG")
+        self.apply_msm(self.msm_terms(input))
     }
+    // let homomorphism::MsmInput { bases, scalars } = &Self::msm_terms(self, input).0;
+    // E::G1::msm(bases, scalars).expect("Could not compute MSM for univariate hiding KZG")
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>(T); // TODO: this is a copy-paste...
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>(
+    pub T,
+); // TODO: this is a copy-paste...
 
 // Implement EntrywiseMap for the wrapper
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>
@@ -317,9 +321,6 @@ pub struct Sigma<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
 }
-
-use crate::{sigma_protocol, Scalar};
-use aptos_crypto_derive::SigmaProtocolWitness;
 
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
