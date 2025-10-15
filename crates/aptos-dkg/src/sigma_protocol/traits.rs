@@ -5,7 +5,7 @@ use crate::{
     fiat_shamir,
     sigma_protocol::{
         homomorphism,
-        homomorphism::fixedbasemsms::{FixedBaseMsms, IsMsmInput},
+        homomorphism::fixedbasemsms::{IsMsmInput, Trait as FixedBaseMsmsTrait},
     },
     utils, Scalar,
 };
@@ -23,7 +23,7 @@ use ark_std::{
 use std::io::Write;
 
 pub trait Trait<E: Pairing>:
-    FixedBaseMsms<
+    FixedBaseMsmsTrait<
         Domain: Witness<E>,
         Scalar = E::ScalarField,
         Base = E::G1Affine,
@@ -333,7 +333,7 @@ pub fn verify_msm_hom<E: Pairing, H>(
     _dst_verifier: &[u8],
 ) -> anyhow::Result<()>
 where
-    H: FixedBaseMsms<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>,
+    H: FixedBaseMsmsTrait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>,
     H::Domain: Witness<E>,
 {
     // Step 1: Reproduce the prover's Fiat-Shamir challenge

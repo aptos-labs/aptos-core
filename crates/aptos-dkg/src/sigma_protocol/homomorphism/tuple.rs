@@ -3,7 +3,7 @@
 
 use crate::sigma_protocol::{
     homomorphism,
-    homomorphism::{fixedbasemsms::FixedBaseMsms, EntrywiseMap},
+    homomorphism::{fixedbasemsms::Trait, EntrywiseMap},
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
 pub use ark_std::io::Write;
@@ -146,10 +146,10 @@ where
 /// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future. Similarly, we **implicitly** that the two msm_eval methods are identical.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
-impl<H1, H2> FixedBaseMsms for TupleHomomorphism<H1, H2>
+impl<H1, H2> Trait for TupleHomomorphism<H1, H2>
 where
-    H1: FixedBaseMsms,
-    H2: FixedBaseMsms<
+    H1: Trait,
+    H2: Trait<
         Domain = H1::Domain,
         Scalar = H1::Scalar,
         Base = H1::Base,
@@ -183,8 +183,8 @@ use ark_ec::pairing::Pairing;
 
 impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
 where
-    H1: FixedBaseMsms<MsmOutput = E::G1, Base = E::G1Affine, Scalar = E::ScalarField>,
-    H2: FixedBaseMsms<
+    H1: Trait<MsmOutput = E::G1, Base = E::G1Affine, Scalar = E::ScalarField>,
+    H2: Trait<
         Domain = H1::Domain,
         Scalar = H1::Scalar,
         Base = H1::Base,

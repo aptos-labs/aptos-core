@@ -54,9 +54,7 @@ impl<
 /// - Methods for computing the MSM representations of a homomorphism input.
 /// - A uniform “shape” abstraction for collecting and flattening MSM outputs
 ///   for batch verification in Σ-protocols.
-pub trait FixedBaseMsms:
-    homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>>
-{
+pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOutput>> {
     /// The scalar type used in the MSMs.
     type Scalar: Clone;
 
@@ -110,9 +108,9 @@ pub trait FixedBaseMsms:
 // Implements FixedBaseMsms for the LiftHomomorphism wrapper.
 // This allows us to perform multi-scalar multiplications (MSM) on a "lifted" homomorphism
 // by delegating the actual MSM computation to the underlying homomorphism type `H`.
-impl<H, LargerDomain> FixedBaseMsms for homomorphism::LiftHomomorphism<H, LargerDomain>
+impl<H, LargerDomain> Trait for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
-    H: FixedBaseMsms,
+    H: Trait,
 {
     type Base = H::Base;
     type CodomainShape<T>

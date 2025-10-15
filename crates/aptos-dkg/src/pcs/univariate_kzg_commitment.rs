@@ -3,7 +3,7 @@
 
 use crate::sigma_protocol::{
     homomorphism,
-    homomorphism::{fixedbasemsms, fixedbasemsms::FixedBaseMsms, TrivialShape as CodomainShape},
+    homomorphism::{fixedbasemsms, fixedbasemsms::Trait, TrivialShape as CodomainShape},
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -32,7 +32,7 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> fixedbasemsms::FixedBaseMsms for Homomorphism<'a, E> {
+impl<'a, E: Pairing> fixedbasemsms::Trait for Homomorphism<'a, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
