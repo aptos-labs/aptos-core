@@ -9,8 +9,8 @@ use crate::{
     },
     dkg::DKGStartEvent,
     event::EventKey,
-    jwks::{jwk::JWKMoveStruct, AllProvidersJWKs, ObservedJWKsUpdated, ProviderJWKs},
-    move_any::Any,
+    jwks::{jwk::JWKMoveStruct, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, ObservedJWKsUpdated, ProviderJWKs},
+    move_any::{Any, AsMoveAny},
     transaction::Version,
 };
 use anyhow::{bail, Error, Result};
@@ -453,11 +453,28 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                                 jwks: jwk
                                     .jwks
                                     .iter()
-                                    .map(|jwk| JWKMoveStruct {
-                                        variant: Any {
-                                            type_name: "0x1::jwks::JWK".to_string(),
-                                            data: jwk.data.clone(),
-                                        },
+                                    .map(|jwk| {
+                                        match jwk.type_name.as_str() {
+                                            // TODO(Gravity_byteyue): Support RSA later
+                                            RSA_JWK::MOVE_TYPE_NAME => {
+                                                JWKMoveStruct {
+                                                    variant: Any {
+                                                        type_name: RSA_JWK::MOVE_TYPE_NAME.to_string(),
+                                                        data: jwk.data.clone(),
+                                                    },
+                                                }
+                                            },
+                                            UnsupportedJWK::MOVE_TYPE_NAME => {
+                                                let unsupported_jwk = UnsupportedJWK {
+                                                    id: UnsupportedJWK::MOVE_TYPE_NAME.as_bytes().to_vec(),
+                                                    payload: jwk.data.clone(),
+                                                };
+                                                JWKMoveStruct {
+                                                    variant: unsupported_jwk.as_move_any(),
+                                                }
+                                            },
+                                            _ => panic!("unknown jwk type: {}", jwk.type_name),
+                                        }
                                     })
                                     .collect(),
                             })

@@ -3,7 +3,7 @@
 
 use crate::counters::OBSERVATION_SECONDS;
 use anyhow::{anyhow, Result};
-use api_types::relayer::GLOBAL_RELAYER;
+use api_types::{on_chain_config::jwks, relayer::{PollResult, GLOBAL_RELAYER}};
 use aptos_channels::aptos_channel;
 use aptos_jwk_utils::{fetch_jwks_from_jwks_uri, fetch_jwks_uri_from_openid_config};
 use aptos_logger::{debug, error, info};
@@ -117,11 +117,13 @@ impl JWKObserver {
 
 async fn fetch_jwks_with_relayer(issuer: &str) -> Result<Vec<JWK>> {
     let relayer = GLOBAL_RELAYER.get().unwrap();
-    let last_state = relayer
+    let poll_result = relayer
         .get_last_state(issuer)
         .await
         .map_err(|e| anyhow!("fetch_jwks failed with relayer request: {:?}", e))?;
-    let jwks = last_state
+    let PollResult { jwk_structs, max_block_number, updated } = poll_result;
+    debug!(issuer = issuer, max_block_number = max_block_number, updated = updated, "fetch_jwks_with_relayer");
+    let jwks = jwk_structs
         .into_iter()
         .map(|jwk| {
             JWK::Unsupported(UnsupportedJWK {
