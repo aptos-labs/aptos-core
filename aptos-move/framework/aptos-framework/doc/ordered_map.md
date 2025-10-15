@@ -104,7 +104,6 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
     -  [Function `borrow`](#@Specification_1_borrow)
     -  [Function `borrow_mut`](#@Specification_1_borrow_mut)
     -  [Function `get`](#@Specification_1_get)
-    -  [Function `get_and_map`](#@Specification_1_get_and_map)
     -  [Function `replace_key_inplace`](#@Specification_1_replace_key_inplace)
     -  [Function `add_all`](#@Specification_1_add_all)
     -  [Function `upsert_all`](#@Specification_1_upsert_all)
@@ -741,7 +740,7 @@ Returns whether map contains a given key.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_get_and_map">get_and_map</a>&lt;K: drop + <b>copy</b> + store, V: <b>copy</b> + store, R&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): Option&lt;R&gt; {
+<pre><code><b>public</b> inline <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_get_and_map">get_and_map</a>&lt;K: drop + <b>copy</b> + store, V: <b>copy</b> + store, R&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">OrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): Option&lt;R&gt; {
     <b>let</b> iter = self.<a href="ordered_map.md#0x1_ordered_map_internal_find">internal_find</a>(key);
     <b>if</b> (iter.<a href="ordered_map.md#0x1_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
@@ -2321,23 +2320,6 @@ Apply the function to a mutable reference of each key-value pair in the map.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_get">get</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;V&gt;
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> opaque;
-<b>pragma</b> verify = <b>false</b>;
-</code></pre>
-
-
-
-<a id="@Specification_1_get_and_map"></a>
-
-### Function `get_and_map`
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="ordered_map.md#0x1_ordered_map_get_and_map">get_and_map</a>&lt;K: <b>copy</b>, drop, store, V: <b>copy</b>, store, R&gt;(self: &<a href="ordered_map.md#0x1_ordered_map_OrderedMap">ordered_map::OrderedMap</a>&lt;K, V&gt;, key: &K, f: |&V|R <b>has</b> drop): <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;R&gt;
 </code></pre>
 
 

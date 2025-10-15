@@ -252,11 +252,6 @@ spec aptos_std::big_ordered_map {
         ensures [abstract] result == spec_len(self);
     }
 
-    spec get_and_map {
-        pragma opaque;
-        pragma verify = false;
-    }
-
     spec iter_modify {
         pragma opaque;
         pragma verify = false;
