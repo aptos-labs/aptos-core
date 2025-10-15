@@ -2470,41 +2470,6 @@ impl FunctionTranslator<'_> {
                         emitln!(writer, "return;");
                     },
                     CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => {
-                        let make_cast = |target_kind: &str,
-                                         target_base: &str,
-                                         src: TempIndex,
-                                         dest: TempIndex| {
-                            let num_oper = global_state
-                                .get_temp_index_oper(mid, fid, src, baseline_flag)
-                                .unwrap();
-                            let bv_flag = self.bv_flag(num_oper);
-                            if bv_flag {
-                                let src_type = self.get_local_type(src);
-                                let base = boogie_num_type_base(
-                                    self.parent.env,
-                                    Some(self.fun_target.get_bytecode_loc(attr_id)),
-                                    &src_type,
-                                );
-                                emitln!(
-                                    writer,
-                                    "call {} := $CastBv{}to{}({});",
-                                    str_local(dest),
-                                    base,
-                                    target_base,
-                                    str_local(src)
-                                );
-                            } else {
-                                emitln!(
-                                    writer,
-                                    "call {} := $Cast{}{}({});",
-                                    str_local(dest),
-                                    target_kind,
-                                    target_base,
-                                    str_local(src)
-                                );
-                            }
-                        };
-
                         let src = srcs[0];
                         let dest = dests[0];
                         let (target_kind, target_base) = match oper {
@@ -2516,17 +2481,40 @@ impl FunctionTranslator<'_> {
                             CastU256 => ("U", "256"),
                             _ => unreachable!(),
                         };
-                        make_cast(target_kind, target_base, src, dest);
+
+                        let num_oper = global_state
+                            .get_temp_index_oper(mid, fid, src, baseline_flag)
+                            .unwrap();
+
+                        if self.bv_flag(num_oper) {
+                            let src_type = self.get_local_type(src);
+                            let src_base = boogie_num_type_base(
+                                self.parent.env,
+                                Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                &src_type,
+                            );
+                            emitln!(
+                                writer,
+                                "call {} := $CastBv{}to{}({});",
+                                str_local(dest),
+                                src_base,
+                                target_base,
+                                str_local(src)
+                            );
+                        } else {
+                            emitln!(
+                                writer,
+                                "call {} := $Cast{}{}({});",
+                                str_local(dest),
+                                target_kind,
+                                target_base,
+                                str_local(src)
+                            );
+                        }
                     },
                     CastI8 | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 => {
                         let src = srcs[0];
                         let dest = dests[0];
-                        let num_oper = global_state
-                            .get_temp_index_oper(mid, fid, src, baseline_flag)
-                            .unwrap();
-                        if self.bv_flag(num_oper) {
-                            bv_op_not_enabled_error!(bytecode, fun_target, env, loc);
-                        }
                         let (target_kind, target_base) = match oper {
                             CastI8 => ("I", "8"),
                             CastI16 => ("I", "16"),
@@ -2536,14 +2524,36 @@ impl FunctionTranslator<'_> {
                             CastI256 => ("I", "256"),
                             _ => unreachable!(),
                         };
-                        emitln!(
-                            writer,
-                            "call {} := $Cast{}{}({});",
-                            str_local(dest),
-                            target_kind,
-                            target_base,
-                            str_local(src)
-                        );
+                        let num_oper = global_state
+                            .get_temp_index_oper(mid, fid, src, baseline_flag)
+                            .unwrap();
+                        if self.bv_flag(num_oper) {
+                            // src is a bitvector: convert it to int and then do cast
+                            let src_type = self.get_local_type(src);
+                            let src_base = boogie_num_type_base(
+                                self.parent.env,
+                                Some(self.fun_target.get_bytecode_loc(attr_id)),
+                                &src_type,
+                            );
+                            emitln!(
+                                writer,
+                                "call {} := $Cast{}{}($bv2int.{}({}));",
+                                str_local(dest),
+                                target_kind,
+                                target_base,
+                                src_base,
+                                str_local(src)
+                            );
+                        } else {
+                            emitln!(
+                                writer,
+                                "call {} := $Cast{}{}({});",
+                                str_local(dest),
+                                target_kind,
+                                target_base,
+                                str_local(src)
+                            );
+                        }
                     },
                     Not => {
                         let src = srcs[0];
