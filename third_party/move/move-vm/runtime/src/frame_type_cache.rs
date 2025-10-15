@@ -5,7 +5,7 @@ use crate::{frame::Frame, LoadedFunction};
 use move_binary_format::{
     errors::*,
     file_format::{
-        FieldInstantiationIndex, FunctionInstantiationIndex, SignatureIndex,
+        FieldInstantiationIndex, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex,
         StructDefInstantiationIndex, StructVariantInstantiationIndex,
         VariantFieldInstantiationIndex,
     },
@@ -74,7 +74,11 @@ pub(crate) struct FrameTypeCache {
     /// guaranteed that everything will be exactly the same as when we
     /// did the insertion.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
-    pub(crate) generic_sub_frame_cache: BTreeMap<FunctionInstantiationIndex, Rc<LoadedFunction>>,
+
+    pub(crate) function_cache:
+        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+    pub(crate) generic_function_cache:
+        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
 
     /// Cached instantiated local types for generic functions.
     pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
