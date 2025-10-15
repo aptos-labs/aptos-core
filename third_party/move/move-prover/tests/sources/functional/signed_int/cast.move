@@ -117,4 +117,11 @@ module 0x42::TestCast {
         aborts_if x > 170141183460469231731687303715884105727 || x < -170141183460469231731687303715884105728;
     }
 
+    fun cast_bv_to_sint(x: u64): i64 {
+       (x & 0x1u64) as i64
+    }
+
+    spec cast_bv_to_sint {
+        aborts_if false;
+    }
 }
