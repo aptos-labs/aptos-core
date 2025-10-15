@@ -76,17 +76,6 @@ module aptos_experimental::order_placement {
 
     // Error codes
     const EINVALID_ORDER: u64 = 1;
-    const EORDER_BOOK_FULL: u64 = 2;
-    const EMARKET_NOT_FOUND: u64 = 3;
-    const ENOT_ADMIN: u64 = 4;
-    const EINVALID_FEE_TIER: u64 = 5;
-    const EORDER_DOES_NOT_EXIST: u64 = 6;
-    const EINVALID_MATCHING_FOR_MAKER_REINSERT: u64 = 9;
-    const EINVALID_TAKER_POSITION_UPDATE: u64 = 10;
-    const EINVALID_LIQUIDATION: u64 = 11;
-    const ENOT_ORDER_CREATOR: u64 = 12;
-
-    const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
     const U64_MAX: u64 = 0xffffffffffffffff;
 
     enum OrderCancellationReason has drop, copy {
@@ -696,12 +685,9 @@ module aptos_experimental::order_placement {
         (option::none(), *settle_result.get_callback_result())
     }
 
-    /// Similar to `place_order` API but allows few extra parameters as follows
-    /// - order_id: The order id for the order - this is needed because for orders with trigger conditions, the order
-    /// id is generated when the order is placed and when they are triggered, the same order id is used to match the order.
-    /// - emit_taker_order_open: bool: Whether to emit an order open event for the taker order - this is used when
-    /// the caller do not wants to emit an open order event for a taker in case the taker order was intterrupted because
-    /// of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
+    /// Core function to place an order with a given order id. If the order id is not provided, a new order id is generated.
+    /// The function itself doesn't do any validation of the user_address, it is up to the caller to ensure that signer validation
+    /// is done before calling this function if needed.
     public fun place_order_with_order_id<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user_addr: address,

@@ -20,7 +20,6 @@ module aptos_experimental::order_operations {
     use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
 
     // Error codes
-    const ENOT_ORDER_CREATOR: u64 = 12;
     const EORDER_DOES_NOT_EXIST: u64 = 6;
 
     /// Cancels an order using the client order ID.
@@ -30,6 +29,8 @@ module aptos_experimental::order_operations {
     ///
     /// Parameters:
     /// - market: The market instance
+    /// - account: address of the account that owns the order - please note that no signer validation is done here.
+    ///   It it the caller's responsibility to ensure that the account is authorized to cancel the order.
     /// - user: The signer of the user whose order should be cancelled
     /// - client_order_id: The client order ID of the order to cancel
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -59,6 +60,8 @@ module aptos_experimental::order_operations {
     ///
     /// Parameters:
     /// - market: The market instance
+    /// - account: address of the account that owns the order - please note that no signer validation is done here.
+    ///   It it the caller's responsibility to ensure that the account is authorized to cancel the order.
     /// - user: The signer of the user whose order should be cancelled
     /// - order_id: The order ID of the order to cancel
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -70,7 +73,6 @@ module aptos_experimental::order_operations {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): SingleOrder<M> {
         let order = market.get_order_book_mut().cancel_order(account, order_id);
-        assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
         cancel_single_order_helper(market, order, emit_event, callbacks);
         order
     }
@@ -88,7 +90,6 @@ module aptos_experimental::order_operations {
         let maybe_order = market.get_order_book_mut().try_cancel_order(account, order_id);
         if (maybe_order.is_some()) {
             let order = maybe_order.destroy_some();
-            assert!(account == order.get_account(), ENOT_ORDER_CREATOR);
             cancel_single_order_helper(market, order, emit_event, callbacks);
             option::some(order)
         } else {
@@ -102,7 +103,8 @@ module aptos_experimental::order_operations {
     ///
     /// Parameters:
     /// - market: The market instance
-    /// - user: The signer of the user whose order size should be reduced
+    /// - account: address of the account that owns the order - please note that no signer validation is done here.
+    /// It it the caller's responsibility to ensure that the account is authorized to modify the order.
     /// - order_id: The order ID of the order to reduce
     /// - size_delta: The amount by which to reduce the order size
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -118,7 +120,6 @@ module aptos_experimental::order_operations {
         let maybe_order = order_book.get_order(order_id);
         assert!(maybe_order.is_some(), EORDER_DOES_NOT_EXIST);
         let (order, _) = maybe_order.destroy_some().destroy_order_from_state();
-        assert!(order.get_account() == account, ENOT_ORDER_CREATOR);
         let (
             user,
             order_id,

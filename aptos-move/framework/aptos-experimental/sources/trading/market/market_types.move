@@ -322,7 +322,7 @@ module aptos_experimental::market_types {
             allow_self_trade: bool,
             /// Whether to allow sending all events for the markett
             allow_events_emission: bool,
-            /// Pre cancellation window in microseconds
+            /// Pre cancellation window in seconds
             pre_cancellation_window_secs: u64
         }
     }

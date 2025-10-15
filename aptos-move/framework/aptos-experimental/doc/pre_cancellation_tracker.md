@@ -235,7 +235,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
         // If the mapping <b>exists</b>, then we remove the order ID <b>with</b> its expiration time.
         tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
     };
-    <b>let</b> current_time = aptos_std::timestamp::now_microseconds();
+    <b>let</b> current_time = aptos_std::timestamp::now_seconds();
     <b>let</b> expiration_time = current_time + tracker.pre_cancellation_window_secs;
     <b>let</b> order_id_with_expiration = <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_ExpirationAndOrderId">ExpirationAndOrderId</a> {
         expiration_time,

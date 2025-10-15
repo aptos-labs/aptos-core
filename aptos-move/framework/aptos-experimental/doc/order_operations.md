@@ -43,15 +43,6 @@ and reducing the size of existing orders.
 
 
 
-<a id="0x7_order_operations_ENOT_ORDER_CREATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>: u64 = 12;
-</code></pre>
-
-
-
 <a id="0x7_order_operations_cancel_order_with_client_id"></a>
 
 ## Function `cancel_order_with_client_id`
@@ -63,6 +54,8 @@ so it can be cancelled when it's eventually placed.
 
 Parameters:
 - market: The market instance
+- account: address of the account that owns the order - please note that no signer validation is done here.
+It it the caller's responsibility to ensure that the account is authorized to cancel the order.
 - user: The signer of the user whose order should be cancelled
 - client_order_id: The client order ID of the order to cancel
 - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -112,6 +105,8 @@ This will cancel the order and emit an event for the order cancellation.
 
 Parameters:
 - market: The market instance
+- account: address of the account that owns the order - please note that no signer validation is done here.
+It it the caller's responsibility to ensure that the account is authorized to cancel the order.
 - user: The signer of the user whose order should be cancelled
 - order_id: The order ID of the order to cancel
 - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -134,7 +129,6 @@ Parameters:
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): SingleOrder&lt;M&gt; {
     <b>let</b> order = market.get_order_book_mut().<a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
-    <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == order.get_account(), <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
     <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, callbacks);
     order
 }
@@ -172,7 +166,6 @@ if it was successfully cancelled, or None if the order does not exist.
     <b>let</b> maybe_order = market.get_order_book_mut().<a href="order_operations.md#0x7_order_operations_try_cancel_order">try_cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
     <b>if</b> (maybe_order.is_some()) {
         <b>let</b> order = maybe_order.destroy_some();
-        <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == order.get_account(), <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
         <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, callbacks);
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order)
     } <b>else</b> {
@@ -195,7 +188,8 @@ an event for the size reduction.
 
 Parameters:
 - market: The market instance
-- user: The signer of the user whose order size should be reduced
+- account: address of the account that owns the order - please note that no signer validation is done here.
+It it the caller's responsibility to ensure that the account is authorized to modify the order.
 - order_id: The order ID of the order to reduce
 - size_delta: The amount by which to reduce the order size
 - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -222,7 +216,6 @@ Parameters:
     <b>let</b> maybe_order = <a href="order_book.md#0x7_order_book">order_book</a>.get_order(order_id);
     <b>assert</b>!(maybe_order.is_some(), <a href="order_operations.md#0x7_order_operations_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
     <b>let</b> (order, _) = maybe_order.destroy_some().destroy_order_from_state();
-    <b>assert</b>!(order.get_account() == <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
     <b>let</b> (
         user,
         order_id,
