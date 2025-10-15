@@ -192,7 +192,7 @@ module aptos_std::ordered_map {
         }
     }
 
-    public fun get_and_map<K: drop + copy + store, V: copy + store, R>(self: &OrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
+    public inline fun get_and_map<K: drop + copy + store, V: copy + store, R>(self: &OrderedMap<K, V>, key: &K, f: |&V|R has drop): Option<R> {
         let iter = self.internal_find(key);
         if (iter.iter_is_end(self)) {
             option::none()
