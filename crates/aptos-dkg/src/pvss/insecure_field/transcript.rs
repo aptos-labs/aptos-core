@@ -69,8 +69,6 @@ impl traits::Transcript for Transcript {
 
     const DST: &[u8] = b"APTOS_INSECURE_FIELD_PVSS_FIAT_SHAMIR_DST";
 
-    // Not used
-
     fn scheme_name() -> String {
         "insecure_field_pvss".to_string()
     }
