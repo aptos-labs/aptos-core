@@ -346,7 +346,8 @@ where
     //     public_statement,
     //     prover_last_message,
     //     dst_verifier,
-    // ); // TODO? Need to put this into the prover code, just as in the ZK range proof, it's not composable otherwise. For the moment:
+    // );
+    // ); // TODO? Need to put this into the prover code, just as in the ZK range proof, it's not composable otherwise. Make that optional, in case composability is not needed?? For the moment:
     let mut rng = ark_std::rand::thread_rng();
     let beta = E::ScalarField::rand(&mut rng);
 
@@ -366,7 +367,6 @@ where
         .zip(powers_of_beta)
     {
         // Destructure term and create a new MsmInput
-        //let homomorphism::MsmInput { bases: term_bases, scalars: term_scalars } = term;
         let mut bases = term.bases().to_vec();
         let mut scalars = term.scalars().to_vec();
 
@@ -375,9 +375,6 @@ where
         }
 
         // Append bases/scalars from prover and statement
-        // Assuming MsmResult can be cloned to Base/Scalar type
-        // You may need a conversion function if MsmResult is not exactly Base/Scalar
-        // Here we just append placeholders (e.g., 1)
         bases.push(A.clone().into_affine()); // TODO: do a batch into affine
         bases.push(P.clone().into_affine()); // TODO: do a batch into affine
 

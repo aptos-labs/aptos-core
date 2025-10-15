@@ -62,6 +62,7 @@ impl<E: Pairing> Scalar<E> {
     }
 
     pub fn vec_into_inner(v: Vec<Self>) -> Vec<E::ScalarField> {
+        let v = std::mem::ManuallyDrop::new(v);
         unsafe { Vec::from_raw_parts(v.as_ptr() as *mut E::ScalarField, v.len(), v.capacity()) }
     }
 }

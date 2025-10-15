@@ -19,6 +19,7 @@ use aptos_crypto::ValidCryptoMaterial;
 use ark_ec::pairing::Pairing;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
+use ff::PrimeField as FfPrimeField;
 use serde::Serialize;
 
 pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name needs work, but check backwards-compatibility
@@ -32,7 +33,7 @@ pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name need
 /// ⚠️ This trait is intentionally private: `challenge_scalars`
 /// should **only** be used internally to ensure properly
 /// labelled scalar generation across protocols.
-trait ScalarProtocol<S: FromUniformBytes> {
+trait ScalarProtocol<S: FromBytes> {
     fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
 
     fn challenge_scalar(&mut self, label: &[u8]) -> S {
@@ -42,29 +43,43 @@ trait ScalarProtocol<S: FromUniformBytes> {
     fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<S>;
 }
 
-trait FromUniformBytes: Copy {
+/// Trait for types that can be constructed from uniform bytes or 128-bit random bytes
+trait FromBytes: Copy {
     const BYTE_SIZE: usize;
+
+    /// Construct from a uniform byte slice (usually larger than 16 bytes)
     fn from_uniform_bytes(bytes: &[u8]) -> Self;
+
+    /// Construct from exactly 16 bytes (128-bit randomness)
+    fn from_random_bytes(bytes: &[u8; 16]) -> Self;
 }
 
-impl<E: Pairing> FromUniformBytes for Scalar<E> {
+impl<E: Pairing> FromBytes for Scalar<E> {
     const BYTE_SIZE: usize = (E::ScalarField::MODULUS_BIT_SIZE as usize) / 8;
 
     fn from_uniform_bytes(bytes: &[u8]) -> Self {
         assert_eq!(bytes.len(), 2 * Self::BYTE_SIZE);
         Self(E::ScalarField::from_le_bytes_mod_order(bytes))
     }
+
+    fn from_random_bytes(bytes: &[u8; 16]) -> Self {
+        Self(E::ScalarField::from_le_bytes_mod_order(bytes))
+    }
 }
 
-impl FromUniformBytes for blstrs::Scalar {
+impl FromBytes for blstrs::Scalar {
     const BYTE_SIZE: usize = crate::SCALAR_NUM_BYTES;
 
     fn from_uniform_bytes(bytes: &[u8]) -> Self {
         random_scalar_from_uniform_bytes(bytes.try_into().expect("Wrong byte length"))
     }
+
+    fn from_random_bytes(bytes: &[u8; 16]) -> Self {
+        blstrs::Scalar::from_u128(u128::from_le_bytes(*bytes))
+    }
 }
 
-impl<S: FromUniformBytes> ScalarProtocol<S> for merlin::Transcript {
+impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
     fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
         let mut buf = vec![0u8; 2 * num_scalars * S::BYTE_SIZE];
         self.challenge_bytes(label, &mut buf);
@@ -86,7 +101,7 @@ impl<S: FromUniformBytes> ScalarProtocol<S> for merlin::Transcript {
         let mut scalars = Vec::with_capacity(num_scalars);
 
         for chunk in buf.chunks(16) {
-            scalars.push(S::from_uniform_bytes(chunk));
+            scalars.push(S::from_random_bytes(chunk.try_into().unwrap()));
         }
 
         debug_assert_eq!(scalars.len(), num_scalars);

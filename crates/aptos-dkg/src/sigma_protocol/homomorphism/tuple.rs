@@ -1,10 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sigma_protocol::{
-    homomorphism,
-    homomorphism::{fixedbasemsms::Trait, EntrywiseMap},
+use crate::{
+    sigma_protocol,
+    sigma_protocol::{
+        homomorphism,
+        homomorphism::{fixedbasemsms::Trait, EntrywiseMap},
+        Witness,
+    },
 };
+use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
 pub use ark_std::io::Write;
 
@@ -177,9 +182,6 @@ where
         H1::msm_eval(bases, scalars)
     }
 }
-
-use crate::{sigma_protocol, sigma_protocol::Witness};
-use ark_ec::pairing::Pairing;
 
 impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
 where

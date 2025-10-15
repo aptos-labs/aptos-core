@@ -31,9 +31,9 @@ pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V1_RANGE_PROOF_DST";
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Proof<E: Pairing> {
-    pub d: E::G1,                // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
-    pub c: Vec<E::G1Affine>,     // of size \ell
-    pub c_hat: Vec<E::G2Affine>, // of size \ell
+    d: E::G1,                // commitment to h(X) = \sum_{j=0}^{\ell-1} beta_j h_j(X)
+    c: Vec<E::G1Affine>,     // of size \ell
+    c_hat: Vec<E::G2Affine>, // of size \ell
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,14 +59,14 @@ where
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(pub E::G1);
+pub struct Commitment<E: Pairing>(E::G1);
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
     max_n: usize,
     max_ell: usize,
-    taus: PowersOfTau<E>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n},
-    pub(crate) lagr_g1: Vec<E::G1Affine>, // of size n + 1
+    taus: PowersOfTau<E>,      // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^n},
+    lagr_g1: Vec<E::G1Affine>, // of size n + 1
     lagr_g2: Vec<E::G2Affine>, // of size n + 1
     eval_dom: Radix2EvaluationDomain<E::ScalarField>,
     roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
@@ -76,18 +76,18 @@ pub struct ProverKey<E: Pairing> {
 
 #[derive(CanonicalSerialize)]
 pub struct PublicStatement<E: Pairing> {
-    pub n: usize,
-    pub ell: usize,
-    pub comm: Commitment<E>,
+    n: usize,
+    ell: usize,
+    comm: Commitment<E>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     max_ell: usize,
-    pub tau_1: E::G1,
-    pub tau_2: E::G2,
-    pub vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
-    pub powers_of_two: Vec<E::ScalarField>, // [1, 2, 4, ..., 2^{max_ell - 1}]
+    tau_1: E::G1,
+    tau_2: E::G2,
+    vanishing_com: E::G2, // commitment to deg-n vanishing polynomial (X^{n+1} - 1) / (X - 1) used to test h(X)
+    powers_of_two: Vec<E::ScalarField>, // [1, 2, 4, ..., 2^{max_ell - 1}]
 }
 
 impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
@@ -633,7 +633,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 }
 
 /// Compute alpha, beta.
-pub fn fiat_shamir_challenges<E: Pairing>(
+fn fiat_shamir_challenges<E: Pairing>(
     vk: &VerificationKey<E>,
     public_statement: PublicStatement<E>,
     bit_commitments: &(&[E::G1Affine], &[E::G2Affine]), // TODO: make this generic over B?
