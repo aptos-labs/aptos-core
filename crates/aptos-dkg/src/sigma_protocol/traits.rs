@@ -328,10 +328,8 @@ where
 /// Suppose we need to verify a family of equations of the form:
 ///
 /// \[
-/// \sum_i g_{i,j} \cdot x_{i,j} = A_j + P_j \cdot c
+/// \sum_i g_{i,j} \cdot x_{i,j} = A_j + P_j \cdot c                         for each index \( j \).
 /// \]
-///
-/// for each index \( j \).  
 ///
 /// Instead of checking each equation individually, we batch them using a random challenge \(\beta\).
 /// The verifier checks that:
