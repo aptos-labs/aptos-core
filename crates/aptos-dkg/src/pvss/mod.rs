@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-pub mod chunked_elgamal_field;
+// pub mod chunked_elgamal_field;
 mod contribution;
 pub mod das;
 pub(crate) mod dealt_pub_key;

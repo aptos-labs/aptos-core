@@ -4,7 +4,7 @@
 use crate::sigma_protocol::{homomorphism, homomorphism::EntrywiseMap};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
-/// Workaround because stable Rust does not yet support associated type defaults.
+/// Workaround (see trait FixedBaseMsms below) because stable Rust does not yet support associated type defaults.
 pub trait IsMsmInput<B, S> {
     /// Returns a reference to the slice of base elements in this MSM input.
     fn bases(&self) -> &[B];
@@ -74,17 +74,12 @@ pub trait FixedBaseMsms:
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`
     type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone;
 
-    /// The "shape" of the homomorphism's output, parameterized by an inner type `T`.
+    /// The "shape" of the homomorphism's output, parameterized by an inner type `T`. // TODO: IntoIterator leads to cloning - is this ideal?
     type CodomainShape<T>: EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
-        + IntoIterator<Item = T> // TODO: leads to cloning - is this ideal?
+        + IntoIterator<Item = T>
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-    : EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
-    + IntoIterator<Item = T> // TODO: leads to cloning - is this ideal?
-    + CanonicalSerialize
-    + CanonicalDeserialize
-    + Clone
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone;
 

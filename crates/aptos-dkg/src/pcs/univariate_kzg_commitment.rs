@@ -3,10 +3,10 @@
 
 use crate::sigma_protocol::{
     homomorphism,
-    homomorphism::{fixedbasemsms::FixedBaseMsms, EntrywiseMap},
+    homomorphism::{fixedbasemsms::FixedBaseMsms, TrivialShape as CodomainShape},
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
-use ark_serialize::CanonicalDeserialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
 /// Homomorphism for univariate KZG commitments using a Lagrange basis.
 ///
@@ -29,33 +29,6 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
-    }
-}
-
-use ark_serialize::CanonicalSerialize;
-
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub T);
-
-// Implement EntrywiseMap for the wrapper
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> EntrywiseMap<T> for CodomainShape<T> {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = CodomainShape<U>;
-
-    fn map<U, F>(self, f: F) -> Self::Output<U>
-    where
-        F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone,
-    {
-        CodomainShape(f(self.0))
-    }
-}
-
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
-    type IntoIter = std::iter::Once<T>;
-    type Item = T;
-
-    fn into_iter(self) -> Self::IntoIter {
-        std::iter::once(self.0)
     }
 }
 
@@ -88,6 +61,6 @@ impl<'a, E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Homomorphism
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, &scalars).expect("MSM failed in univariate KZG") // TODO: Use vec_into_inner here??? Maybe after testing...
+        E::G1::msm(bases, &scalars).expect("MSM failed in univariate KZG")
     }
 }
