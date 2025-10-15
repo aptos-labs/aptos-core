@@ -4989,7 +4989,6 @@ dependencies = [
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",
- "bcs 0.1.4",
  "clap 4.5.21",
  "glob",
  "move-binary-format",
