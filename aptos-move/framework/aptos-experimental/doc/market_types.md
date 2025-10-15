@@ -579,7 +579,7 @@
 <code>pre_cancellation_window_secs: u64</code>
 </dt>
 <dd>
- Pre cancellation window in microseconds
+ Pre cancellation window in seconds
 </dd>
 </dl>
 

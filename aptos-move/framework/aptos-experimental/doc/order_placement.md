@@ -303,15 +303,6 @@ TimeBased(time): The order is triggered when the current time is greater than or
 ## Constants
 
 
-<a id="0x7_order_placement_ENOT_ADMIN"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_ENOT_ADMIN">ENOT_ADMIN</a>: u64 = 4;
-</code></pre>
-
-
-
 <a id="0x7_order_placement_U64_MAX"></a>
 
 
@@ -321,92 +312,11 @@ TimeBased(time): The order is triggered when the current time is greater than or
 
 
 
-<a id="0x7_order_placement_EORDER_DOES_NOT_EXIST"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>: u64 = 6;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_PRE_CANCELLATION_TRACKER_KEY"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_PRE_CANCELLATION_TRACKER_KEY">PRE_CANCELLATION_TRACKER_KEY</a>: u8 = 0;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_EINVALID_FEE_TIER"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EINVALID_FEE_TIER">EINVALID_FEE_TIER</a>: u64 = 5;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_EINVALID_LIQUIDATION"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EINVALID_LIQUIDATION">EINVALID_LIQUIDATION</a>: u64 = 11;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_EINVALID_MATCHING_FOR_MAKER_REINSERT"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EINVALID_MATCHING_FOR_MAKER_REINSERT">EINVALID_MATCHING_FOR_MAKER_REINSERT</a>: u64 = 9;
-</code></pre>
-
-
-
 <a id="0x7_order_placement_EINVALID_ORDER"></a>
 
 
 
 <pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>: u64 = 1;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_EINVALID_TAKER_POSITION_UPDATE"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EINVALID_TAKER_POSITION_UPDATE">EINVALID_TAKER_POSITION_UPDATE</a>: u64 = 10;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_EMARKET_NOT_FOUND"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EMARKET_NOT_FOUND">EMARKET_NOT_FOUND</a>: u64 = 3;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_ENOT_ORDER_CREATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>: u64 = 12;
-</code></pre>
-
-
-
-<a id="0x7_order_placement_EORDER_BOOK_FULL"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_placement.md#0x7_order_placement_EORDER_BOOK_FULL">EORDER_BOOK_FULL</a>: u64 = 2;
 </code></pre>
 
 
@@ -1342,12 +1252,9 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 ## Function `place_order_with_order_id`
 
-Similar to <code>place_order</code> API but allows few extra parameters as follows
-- order_id: The order id for the order - this is needed because for orders with trigger conditions, the order
-id is generated when the order is placed and when they are triggered, the same order id is used to match the order.
-- emit_taker_order_open: bool: Whether to emit an order open event for the taker order - this is used when
-the caller do not wants to emit an open order event for a taker in case the taker order was intterrupted because
-of fill limit violation  in the previous transaction and the order is just a continuation of the previous order.
+Core function to place an order with a given order id. If the order id is not provided, a new order id is generated.
+The function itself doesn't do any validation of the user_address, it is up to the caller to ensure that signer validation
+is done before calling this function if needed.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_placement.md#0x7_order_placement_place_order_with_order_id">place_order_with_order_id</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, max_match_limit: u32, cancel_on_match_limit: bool, emit_taker_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;

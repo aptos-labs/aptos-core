@@ -76,7 +76,7 @@ module aptos_experimental::pre_cancellation_tracker {
             // If the mapping exists, then we remove the order ID with its expiration time.
             tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
         };
-        let current_time = aptos_std::timestamp::now_microseconds();
+        let current_time = aptos_std::timestamp::now_seconds();
         let expiration_time = current_time + tracker.pre_cancellation_window_secs;
         let order_id_with_expiration = ExpirationAndOrderId {
             expiration_time,
