@@ -48,8 +48,6 @@ use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 pub use move_binary_format::file_format::Visibility;
-#[allow(deprecated)]
-use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -2412,36 +2410,6 @@ impl GlobalEnv {
             return n.to_usize();
         }
         None
-    }
-
-    /// Attempt to compute a struct tag for (`mid`, `sid`, `ts`). Returns `Some` if all types in
-    /// `ts` are closed, `None` otherwise
-    pub fn get_struct_tag(
-        &self,
-        mid: ModuleId,
-        sid: StructId,
-        ts: &[Type],
-    ) -> Option<language_storage::StructTag> {
-        self.get_struct_type(mid, sid, ts)?.into_struct_tag()
-    }
-
-    /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
-    #[allow(deprecated)]
-    pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> Option<MType> {
-        let menv = self.get_module(mid);
-        Some(MType::Struct {
-            address: (if let Address::Numerical(addr) = *menv.self_address() {
-                Some(addr)
-            } else {
-                None
-            })?,
-            module: menv.get_identifier()?,
-            name: menv.get_struct(sid).get_identifier()?,
-            type_arguments: ts
-                .iter()
-                .map(|t| t.clone().into_normalized_type(self).unwrap())
-                .collect(),
-        })
     }
 
     /// Gets the location of the given node.

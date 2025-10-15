@@ -266,7 +266,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::PERIODICAL_REWARD_RATE_DECREASE
             },
             FeatureFlag::PartialGovernanceVoting => AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING,
-            FeatureFlag::SignatureCheckerV2 => AptosFeatureFlag::SIGNATURE_CHECKER_V2,
+            FeatureFlag::SignatureCheckerV2 => AptosFeatureFlag::_SIGNATURE_CHECKER_V2,
             FeatureFlag::StorageSlotMetadata => AptosFeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::ChargeInvariantViolation => AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION,
             FeatureFlag::DelegationPoolPartialGovernanceVoting => {
@@ -446,7 +446,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::PeriodicalRewardRateReduction
             },
             AptosFeatureFlag::PARTIAL_GOVERNANCE_VOTING => FeatureFlag::PartialGovernanceVoting,
-            AptosFeatureFlag::SIGNATURE_CHECKER_V2 => FeatureFlag::SignatureCheckerV2,
+            AptosFeatureFlag::_SIGNATURE_CHECKER_V2 => FeatureFlag::SignatureCheckerV2,
             AptosFeatureFlag::STORAGE_SLOT_METADATA => FeatureFlag::StorageSlotMetadata,
             AptosFeatureFlag::CHARGE_INVARIANT_VIOLATION => FeatureFlag::ChargeInvariantViolation,
             AptosFeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING => {

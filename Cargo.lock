@@ -12687,7 +12687,6 @@ dependencies = [
 name = "move-prover-bytecode-pipeline"
 version = "0.1.0"
 dependencies = [
- "abstract-domain-derive",
  "anyhow",
  "codespan-reporting",
  "datatest-stable",

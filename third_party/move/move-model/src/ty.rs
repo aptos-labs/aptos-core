@@ -14,15 +14,13 @@ use crate::{
     symbol::Symbol,
 };
 use itertools::Itertools;
-#[allow(deprecated)]
-use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess, file_format::SignatureToken, views::StructHandleView, CompiledModule,
 };
 use move_core_types::{
     ability::{Ability, AbilitySet},
     int256::{I256, U256},
-    language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
+    language_storage::{FunctionParamOrReturnTag, FunctionTag, TypeTag},
 };
 use num::BigInt;
 use num_traits::identities::Zero;
@@ -834,30 +832,6 @@ impl PrimitiveType {
         }
     }
 
-    /// Attempt to convert this type into a normalized::Type
-    #[allow(deprecated)]
-    pub fn into_normalized_type(self) -> Option<MType> {
-        use PrimitiveType::*;
-        Some(match self {
-            Bool => MType::Bool,
-            U8 => MType::U8,
-            U16 => MType::U16,
-            U32 => MType::U32,
-            U64 => MType::U64,
-            U128 => MType::U128,
-            U256 => MType::U256,
-            Address => MType::Address,
-            Signer => MType::Signer,
-            I8 => MType::I8,
-            I16 => MType::I16,
-            I32 => MType::I32,
-            I64 => MType::I64,
-            I128 => MType::I128,
-            I256 => MType::I256,
-            Num | Range | EventStore => return None,
-        })
-    }
-
     /// Infer a type from a value. Returns the set of int types which can fit the
     /// value.
     pub fn possible_int_types(value: BigInt) -> Vec<PrimitiveType> {
@@ -1574,53 +1548,6 @@ impl Type {
             TypeDomain(bt) => bt.module_usage(usage),
             _ => {},
         }
-    }
-
-    /// Attempt to convert this type into a normalized::Type
-    #[allow(deprecated)]
-    pub fn into_struct_type(self, env: &GlobalEnv) -> Option<MType> {
-        use Type::*;
-        match self {
-            Struct(mid, sid, ts) => env.get_struct_type(mid, sid, &ts),
-            _ => None,
-        }
-    }
-
-    /// Attempt to convert this type into a normalized::Type
-    #[allow(deprecated)]
-    pub fn into_normalized_type(self, env: &GlobalEnv) -> Option<MType> {
-        use Type::*;
-        match self {
-            Primitive(p) => Some(p.into_normalized_type().expect("Invariant violation: unexpected spec primitive")),
-            Struct(mid, sid, ts) =>
-                env.get_struct_type(mid, sid, &ts),
-            Vector(et) => Some(MType::Vector(
-                Box::new(et.into_normalized_type(env)
-                    .expect("Invariant violation: vector type argument contains incomplete, tuple, or spec type"))
-            )),
-            Reference(r, t) =>
-                match r {
-                    ReferenceKind::Mutable => {
-                        Some(MType::MutableReference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                    }
-                    ReferenceKind::Immutable => {
-                        Some(MType::Reference(Box::new(t.into_normalized_type(env).expect("Invariant violation: reference type contains incomplete, tuple, or spec type"))))
-                    }
-                },
-            TypeParameter(idx) => Some(MType::TypeParameter(idx)),
-            Tuple(..) | Error | Fun(..) | TypeDomain(..) | ResourceDomain(..) | Var(..) =>
-                None
-        }
-    }
-
-    /// Attempt to convert this type into a language_storage::StructTag
-    pub fn into_struct_tag(self, env: &GlobalEnv) -> Option<StructTag> {
-        self.into_struct_type(env)?.into_struct_tag()
-    }
-
-    /// Attempt to convert this type into a language_storage::TypeTag
-    pub fn into_type_tag(self, env: &GlobalEnv) -> Option<TypeTag> {
-        self.into_normalized_type(env)?.into_type_tag()
     }
 
     /// Create a `Type` from `t`
