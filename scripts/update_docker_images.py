@@ -21,42 +21,46 @@ def update() -> int:
     )
 
     update_exists = False
+    with open(dockerfile_path, "r", encoding="utf-8") as f:
+        dockerfile_content = f.read()
 
     for base_image, image_name in IMAGES.items():
-        manifest = None
         digest = None
         current_digest = None
-        regex = f'{base_image} = "docker-image://{image_name}.*"'
+        regex = rf'{re.escape(base_image)} = "docker-image://{re.escape(image_name)}@([^"]+)"'
 
         print(f"Update {image_name}")
         # Note space before {{ in --format is important.
-        digest = subprocess.check_output(
-            [
-                "docker",
-                "buildx",
-                "imagetools",
-                "inspect",
-                image_name,
-                "--format",
-                "{{json .Manifest.Digest}}",
-            ]
-        )
-        digest = digest.decode("utf-8").strip(' "')
+        try:
+            result = subprocess.run(
+                [
+                    "docker",
+                    "buildx",
+                    "imagetools",
+                    "inspect",
+                    image_name,
+                    "--format",
+                    "{{json .Manifest.Digest}}",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            digest = result.stdout.strip().strip('"')
+        except subprocess.CalledProcessError:
+            print(f"Unable to find digest for {image_name}")
+            continue
 
-        if digest == None:
+        if not digest:
             print(f"Unable to find digest for {image_name}")
             continue
 
         print(f"Found digest for {image_name}: {digest}")
-        with open(dockerfile_path, "r") as f:
-            dockerfile_content = f.read()
+        match = re.search(regex, dockerfile_content)
+        if match:
+            current_digest = match.group(1)
 
-        for line in dockerfile_content.splitlines():
-            if re.search(regex, line):
-                current_digest = line.split("@")[1].split('"')[0]
-                break
-
-        if current_digest == None:
+        if current_digest is None:
             print(f"Unable to find current_digest for {image_name}")
             continue
 
@@ -70,11 +74,11 @@ def update() -> int:
             f'{base_image} = "docker-image://{image_name}@{digest}"',
             dockerfile_content,
         )
-
-        with open(dockerfile_path, "w") as f:
-            f.write(dockerfile_content)
-
         update_exists = True
+
+    if update_exists:
+        with open(dockerfile_path, "w", encoding="utf-8") as f:
+            f.write(dockerfile_content)
 
     return update_exists
 
@@ -82,7 +86,7 @@ def update() -> int:
 def write_github_output(key, value) -> None:
     print(f"GITHUB_OUTPUT: {key}={value}")
     try:
-        with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+        with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as f:
             f.write(f"{key}={value}\n")
     except KeyError:
         print("GITHUB_OUTPUT environment variable not set")
