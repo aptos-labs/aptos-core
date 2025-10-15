@@ -69,11 +69,10 @@ pub trait FixedBaseMsms:
     type MsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Self::Base, Self::Scalar>
-        + Eq;
+        + IsMsmInput<Self::Base, Self::Scalar>;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`
-    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone;
 
     /// The "shape" of the homomorphism's output, parameterized by an inner type `T`.
     // TODO: type CodomainShape<T>: for<'a> IntoIterator<Item = &'a T> + 'static;
@@ -82,9 +81,8 @@ pub trait FixedBaseMsms:
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + Eq
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone;
 
     /// Returns the MSM terms corresponding to a given homomorphism input.
     ///
@@ -118,7 +116,7 @@ where
     type CodomainShape<T>
         = H::CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone;
     type MsmInput = H::MsmInput;
     type MsmOutput = H::MsmOutput;
     type Scalar = H::Scalar;

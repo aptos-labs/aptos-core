@@ -21,14 +21,14 @@ use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 
-#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, Debug, Clone)]
 pub struct VerificationKey<E: Pairing> {
     pub(crate) xi_2: E::G2Affine,
     pub(crate) tau_2: E::G2Affine,
     pub(crate) group_data: GroupGenerators<E>,
 }
 
-#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, Debug, Clone)]
 pub struct CommitmentKey<E: Pairing> {
     pub(crate) xi_1: E::G1Affine,
     pub(crate) tau_1: E::G1Affine,
@@ -107,13 +107,13 @@ fn commit_with_randomness<E: Pairing>(
     Commitment(commitment_hom.apply(&input).0)
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct Commitment<E: Pairing>(pub E::G1);
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct Proof<E: Pairing> {
     pi_1: Commitment<E>,
     pi_2: E::G1,
@@ -252,30 +252,25 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     // E::G1::msm(bases, scalars).expect("Could not compute MSM for univariate hiding KZG")
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>(
-    pub T,
-); // TODO: this is a copy-paste...
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub T); // TODO: this is a copy-paste...
 
 // Implement EntrywiseMap for the wrapper
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>
-    homomorphism::EntrywiseMap<T> for CodomainShape<T>
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> homomorphism::EntrywiseMap<T>
+    for CodomainShape<T>
 {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
-        CodomainShape<U>;
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = CodomainShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone,
     {
         CodomainShape(f(self.0))
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> IntoIterator
-    for CodomainShape<T>
-{
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
     type IntoIter = std::iter::Once<T>;
     type Item = T;
 
@@ -289,7 +284,7 @@ impl<'a, E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Homomorphism
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone;
     type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
@@ -323,9 +318,7 @@ pub struct Sigma<'a, E: Pairing> {
     pub xi_1: E::G1Affine,
 }
 
-#[derive(
-    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
-)]
+#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct Witness<E: Pairing> {
     pub randomness: Scalar<E>,
     pub values: Vec<Scalar<E>>,

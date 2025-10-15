@@ -29,7 +29,7 @@ use std::{
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
 
 #[allow(non_snake_case)]
-#[derive(CanonicalSerialize, Clone, PartialEq, Eq, CanonicalDeserialize)] // TODO: add Debug here, CanonicalDeserialize
+#[derive(CanonicalSerialize, Clone, CanonicalDeserialize)] // TODO: add Debug here?
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
@@ -45,7 +45,7 @@ pub struct Proof<E: Pairing> {
 pub struct Commitment<E: Pairing>(E::G1);
 
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub struct ProverKey<E: Pairing> {
     vk: VerificationKey<E>,
     ck_S: univariate_hiding_kzg::CommitmentKey<E>,
@@ -986,30 +986,25 @@ pub mod two_term_msm {
         }
     }
 
-    #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
-    pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>(
-        pub T,
-    ); // TODO: this is a copy-paste... plus the two impl's below
+    #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+    pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub T); // TODO: this is a copy-paste... plus the two impl's below
 
     // Implement EntrywiseMap for the wrapper
-    impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq>
-        homomorphism::EntrywiseMap<T> for CodomainShape<T>
+    impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> homomorphism::EntrywiseMap<T>
+        for CodomainShape<T>
     {
-        type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
-            CodomainShape<U>;
+        type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = CodomainShape<U>;
 
         fn map<U, F>(self, f: F) -> Self::Output<U>
         where
             F: Fn(T) -> U,
-            U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq,
+            U: CanonicalSerialize + CanonicalDeserialize + Clone,
         {
             CodomainShape(f(self.0))
         }
     }
 
-    impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> IntoIterator
-        for CodomainShape<T>
-    {
+    impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
         type IntoIter = std::iter::Once<T>;
         type Item = T;
 
@@ -1023,7 +1018,7 @@ pub mod two_term_msm {
         type CodomainShape<T>
             = CodomainShape<T>
         where
-            T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+            T: CanonicalSerialize + CanonicalDeserialize + Clone;
         type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;

@@ -5,7 +5,7 @@ use aptos_crypto_derive::SigmaProtocolWitness;
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{fixedbasemsms::Trait, tuple::TupleHomomorphism, Trait},
+        homomorphism::{fixedbasemsms::FixedBaseMsms, tuple::TupleHomomorphism, Trait},
     },
     Scalar,
 };
@@ -40,7 +40,7 @@ mod schnorr {
     use ark_ec::VariableBaseMSM;
     use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
-    #[derive(Clone, Debug, PartialEq, Eq)]
+    #[derive(Clone, Debug)]
     pub(crate) struct Schnorr<E: Pairing> {
         pub g: E::G1Affine,
     }
@@ -67,12 +67,12 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> homomorphism::fixedbasemsms::Trait for Schnorr<E> {
+    impl<E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Schnorr<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
-            T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+            T: CanonicalSerialize + CanonicalDeserialize + Clone;
         type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;

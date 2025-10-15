@@ -126,13 +126,13 @@ where
     A: EntrywiseMap<T>,
     B: EntrywiseMap<T>,
 {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> =
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone,
     {
         TupleCodomainShape(self.0.map(&f), self.1.map(f))
     }
@@ -160,7 +160,7 @@ where
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;

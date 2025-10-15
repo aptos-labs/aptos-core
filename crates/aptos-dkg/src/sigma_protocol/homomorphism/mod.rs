@@ -71,35 +71,33 @@ where
 /// producing a new value of the same shape but possibly with a different inner type.
 pub trait EntrywiseMap<T> {
     /// The resulting type after mapping the inner elements to type `U`.
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>;
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+        U: CanonicalSerialize + CanonicalDeserialize + Clone;
 }
 
 /// A trivial wrapper type for a single value. Typically used when the Codomain would've been E::G1
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
-pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>(pub T);
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub T);
 
 /// Implements `EntrywiseMap` for `TrivialShape`, mapping the inner value.
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> EntrywiseMap<T>
-    for TrivialShape<T>
-{
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> = TrivialShape<U>;
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> EntrywiseMap<T> for TrivialShape<T> {
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = TrivialShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone,
     {
         TrivialShape(f(self.0))
     }
 }
 
 /// Implements `IntoIterator` for `TrivialShape`, producing a single-element iterator.
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> IntoIterator for TrivialShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for TrivialShape<T> {
     type IntoIter = std::iter::Once<T>;
     type Item = T;
 

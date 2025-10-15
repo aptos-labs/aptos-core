@@ -17,8 +17,8 @@ pub struct Homomorphism<'a, E: Pairing> {
     pub ek: &'a [Base<E>],
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> {
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
     pub chunks: Vec<Vec<T>>, // Depending on T, these can be chunked plaintexts, chunked ciphertexts, their MSM representations, etc
     pub randomness: Vec<T>,
 }
@@ -35,16 +35,13 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> EntrywiseMap<T>
-    for CodomainShape<T>
-{
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> =
-        CodomainShape<U>;
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> EntrywiseMap<T> for CodomainShape<T> {
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = CodomainShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone,
     {
         let chunks = self
             .chunks
@@ -58,9 +55,7 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> Entr
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> IntoIterator
-    for CodomainShape<T>
-{
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 
@@ -77,7 +72,7 @@ impl<'a, E: Pairing> FixedBaseMsms for Homomorphism<'a, E> {
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone;
     type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = Scalar<E>;

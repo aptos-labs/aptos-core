@@ -34,25 +34,23 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
 
 use ark_serialize::CanonicalSerialize;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>(pub T);
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub T);
 
 // Implement EntrywiseMap for the wrapper
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> EntrywiseMap<T>
-    for CodomainShape<T>
-{
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> = CodomainShape<U>;
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> EntrywiseMap<T> for CodomainShape<T> {
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = CodomainShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone,
     {
         CodomainShape(f(self.0))
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> IntoIterator for CodomainShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
     type IntoIter = std::iter::Once<T>;
     type Item = T;
 
@@ -66,7 +64,7 @@ impl<'a, E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Homomorphism
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone;
     type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;

@@ -8,16 +8,14 @@ use anyhow::ensure;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_ff::AdditiveGroup;
 use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid,
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid, Validate,
 };
 use ark_std::{
+    io::Read,
     rand::{CryptoRng, RngCore},
     UniformRand,
 };
 use std::io::Write;
-use ark_serialize::Validate;
-use ark_std::io::Read;
-
 
 pub trait Trait<E: Pairing>:
     FixedBaseMsms<
@@ -135,10 +133,10 @@ pub trait Trait<E: Pairing>:
 }
 
 pub trait Witness<E: Pairing>:
-    CanonicalSerialize + CanonicalDeserialize + Clone + std::fmt::Debug + PartialEq + Eq
+    CanonicalSerialize + CanonicalDeserialize + Clone + std::fmt::Debug
 {
     /// The scalar type associated with the domain.
-    type Scalar: CanonicalSerialize + CanonicalDeserialize + Copy + std::fmt::Debug + PartialEq + Eq;
+    type Scalar: CanonicalSerialize + CanonicalDeserialize + Copy + std::fmt::Debug;
 
     /// Computes a scaled addition: `self + c * other`. Can take ownership because the randomness is discarded by the prover afterwards
     fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self;
@@ -175,13 +173,13 @@ impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
 }
 
 // Standard workaround because type aliases are experimental in Rust
-pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq {}
-impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq {}
+pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone {}
+impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone {}
 
 /// The “first item” recorded in a Σ-proof, which is one of:
 /// - The first message of the protocol, which is the commitment from the prover
 /// - The second message of the protocol, which is the challenge from the verifier
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum FirstProofItem<E: Pairing, H: homomorphism::Trait>
 where
     H::Domain: Witness<E>,
@@ -271,7 +269,7 @@ where
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct Proof<E: Pairing, H: homomorphism::Trait>
 where
     H::Domain: Witness<E>,
