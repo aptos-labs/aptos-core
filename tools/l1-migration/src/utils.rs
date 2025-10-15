@@ -2,8 +2,8 @@ use anyhow::Result;
 use aptos_config::config::{RocksdbConfigs, StorageDirPaths, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
 use aptos_storage_interface::DbReader;
-use aptos_types::{transaction::Transaction, waypoint::Waypoint};
-use std::{fs, path::Path};
+use aptos_types::{network_address::NetworkAddress, transaction::Transaction, waypoint::Waypoint};
+use std::{fs, path::Path, str::FromStr};
 
 /// Extract genesis transaction and waypoint from an Aptos database
 pub fn extract_genesis_and_waypoint(db_path: &str, output_dir: &str) -> Result<()> {
@@ -153,5 +153,61 @@ fn print_genesis_transaction_info(genesis_transaction: &Transaction) {
         Transaction::ValidatorTransaction(_) => {
             println!("⚠ Transaction 0 is ValidatorTransaction (unexpected for genesis)");
         },
+    }
+}
+
+/// Encode a network address from multiaddr string to BCS hex format
+pub fn encode_network_address(multiaddr_input: &str) -> Result<()> {
+    let mut addresses = Vec::new();
+
+    // Split by comma and parse each address
+    for addr_str in multiaddr_input.split(',') {
+        let addr_str = addr_str.trim();
+        if !addr_str.is_empty() {
+            let network_address = NetworkAddress::from_str(addr_str)
+                .map_err(|e| anyhow::anyhow!("Invalid multiaddr string '{}': {}. Please provide a valid multiaddr string (e.g., /dns/example.com/tcp/6180/noise-ik/.../handshake/1)", addr_str, e))?;
+            addresses.push(network_address);
+        }
+    }
+
+    if addresses.is_empty() {
+        return Err(anyhow::anyhow!(
+            "No valid network addresses found. Please provide at least one valid multiaddr string"
+        ));
+    }
+
+    let encoded_bytes = bcs::to_bytes(&addresses)?;
+    let hex_output = format!("0x{}", hex::encode(&encoded_bytes));
+
+    println!("{}", hex_output);
+
+    Ok(())
+}
+
+/// Decode a network address from BCS hex format to multiaddr string
+pub fn decode_network_address(bcs_hex: &str) -> Result<()> {
+    let hex_str = bcs_hex.strip_prefix("0x").unwrap_or(bcs_hex);
+    let bcs_bytes = hex::decode(hex_str).map_err(|e| {
+        anyhow::anyhow!(
+            "Invalid hex string: {}. Please provide a valid hex string (with or without 0x prefix)",
+            e
+        )
+    })?;
+
+    // Try to decode as Vec<NetworkAddress> first (most common case)
+    if let Ok(addresses) = bcs::from_bytes::<Vec<NetworkAddress>>(&bcs_bytes) {
+        let addr_strings: Vec<String> = addresses.iter().map(|addr| addr.to_string()).collect();
+        let multiaddr_output = addr_strings.join(", ");
+
+        println!("{}", multiaddr_output);
+
+        Ok(())
+    } else if let Ok(network_address) = bcs::from_bytes::<NetworkAddress>(&bcs_bytes) {
+        // Try to decode as single NetworkAddress
+        println!("{}", network_address);
+
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Failed to decode network address from BCS hex. Please ensure the input is a valid BCS-encoded NetworkAddress or Vec<NetworkAddress>"))
     }
 }
