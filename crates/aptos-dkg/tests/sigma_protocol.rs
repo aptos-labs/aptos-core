@@ -5,7 +5,7 @@ use aptos_crypto_derive::SigmaProtocolWitness;
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{fixedbasemsms::FixedBaseMsms, tuple::TupleHomomorphism, Trait},
+        homomorphism::{fixedbasemsms::Trait, tuple::TupleHomomorphism, Trait},
     },
     Scalar,
 };
@@ -67,7 +67,7 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Schnorr<E> {
+    impl<E: Pairing> homomorphism::fixedbasemsms::Trait for Schnorr<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>

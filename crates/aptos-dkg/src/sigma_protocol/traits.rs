@@ -15,6 +15,9 @@ use ark_std::{
     UniformRand,
 };
 use std::io::Write;
+use ark_serialize::Validate;
+use ark_std::io::Read;
+
 
 pub trait Trait<E: Pairing>:
     FixedBaseMsms<
@@ -139,11 +142,9 @@ pub trait Witness<E: Pairing>:
 
     /// Computes a scaled addition: `self + c * other`. Can take ownership because the randomness is discarded by the prover afterwards
     fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self;
-    // TODO: Maybe implement this directly / obtain it automatically by using Mul, Add, etc?? Seems impractical with arkworks
 
     /// Samples a random element in the domain.
     fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self;
-    // TODO: Do this via UniformRand instead?
 }
 
 impl<E: Pairing> Witness<E> for Scalar<E> {
@@ -173,6 +174,7 @@ impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
     }
 }
 
+// Standard workaround because type aliases are experimental in Rust
 pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq {}
 impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq {}
 
@@ -233,9 +235,6 @@ where
         }
     }
 }
-
-use ark_serialize::Validate;
-pub use ark_std::io::Read;
 
 impl<E: Pairing, H: homomorphism::Trait> CanonicalDeserialize for FirstProofItem<E, H>
 where

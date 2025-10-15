@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-pub use ark_std::io::Write;
 
 pub mod fixedbasemsms;
 pub mod tuple;
@@ -80,11 +79,11 @@ pub trait EntrywiseMap<T> {
         U: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
 }
 
-// Codomain example
+/// A trivial wrapper type for a single value. Typically used when the Codomain would've been E::G1
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq)]
 pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq>(pub T);
 
-// Implement EntrywiseMap for the wrapper
+/// Implements `EntrywiseMap` for `TrivialShape`, mapping the inner value.
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> EntrywiseMap<T>
     for TrivialShape<T>
 {
@@ -99,6 +98,7 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> EntrywiseMap<T>
     }
 }
 
+/// Implements `IntoIterator` for `TrivialShape`, producing a single-element iterator.
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> IntoIterator for TrivialShape<T> {
     type IntoIter = std::iter::Once<T>;
     type Item = T;
