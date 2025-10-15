@@ -44,7 +44,6 @@ where
     H1::Codomain: CanonicalSerialize + CanonicalDeserialize,
     H2::Codomain: CanonicalSerialize + CanonicalDeserialize,
 {
-    //    type Codomain = (H1::Codomain, H2::Codomain);
     type Codomain = TupleCodomainShape<H1::Codomain, H2::Codomain>;
     type Domain = H1::Domain;
 

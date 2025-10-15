@@ -4,7 +4,7 @@
 use crate::sigma_protocol::{homomorphism, homomorphism::EntrywiseMap};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
-/// Temporary workaround because stable Rust does not yet support associated type defaults.
+/// Workaround because stable Rust does not yet support associated type defaults.
 pub trait IsMsmInput<B, S> {
     /// Returns a reference to the slice of base elements in this MSM input.
     fn bases(&self) -> &[B];
@@ -13,9 +13,9 @@ pub trait IsMsmInput<B, S> {
     fn scalars(&self) -> &[S];
 }
 
-/// Represents the input to a multi-scalar multiplication (MSM):
+/// Represents the input to a (not necessarily fixed-base) multi-scalar multiplication (MSM):
 /// a collection of bases and corresponding scalars.
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct MsmInput<
     B: CanonicalSerialize + CanonicalDeserialize,
     S: CanonicalSerialize + CanonicalDeserialize,
@@ -80,6 +80,11 @@ pub trait FixedBaseMsms:
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
+    : EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
+    + IntoIterator<Item = T> // TODO: leads to cloning - is this ideal?
+    + CanonicalSerialize
+    + CanonicalDeserialize
+    + Clone
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone;
 
