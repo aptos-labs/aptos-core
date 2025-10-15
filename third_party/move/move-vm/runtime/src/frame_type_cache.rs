@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{frame::Frame, LoadedFunction};
+use crate::{
+    frame::Frame,
+    instruction_caches::{InstructionCache, PerInstructionCache},
+    LoadedFunction,
+};
 use move_binary_format::{
     errors::*,
     file_format::{
@@ -33,19 +37,6 @@ impl RuntimeCacheTraits for AllRuntimeCaches {
     }
 }
 
-/// Variants for each individual instruction cache. Should make sure
-/// that the memory footprint of each variant is small. This is an
-/// enum that is expected to grow in the future.
-#[derive(Clone)]
-pub(crate) enum PerInstructionCache {
-    Nothing,
-    Pack(u16),
-    PackGeneric(u16),
-    Call(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
-    CallGeneric(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
-}
-
-#[derive(Default)]
 pub(crate) struct FrameTypeCache {
     struct_field_type_instantiation:
         BTreeMap<StructDefInstantiationIndex, Vec<(Type, NumTypeNodes)>>,
@@ -73,7 +64,7 @@ pub(crate) struct FrameTypeCache {
     /// the argument of the bytecode instructions, for which it is
     /// guaranteed that everything will be exactly the same as when we
     /// did the insertion.
-    pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
+    pub(crate) per_instruction_cache: InstructionCache,
 
     pub(crate) function_cache:
         BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
@@ -87,6 +78,23 @@ pub(crate) struct FrameTypeCache {
 }
 
 impl FrameTypeCache {
+    fn new(function: &LoadedFunction) -> Self {
+        Self {
+            struct_field_type_instantiation: BTreeMap::new(),
+            struct_variant_field_type_instantiation: BTreeMap::new(),
+            struct_def_instantiation_type: BTreeMap::new(),
+            struct_variant_instantiation_type: BTreeMap::new(),
+            field_instantiation: BTreeMap::new(),
+            variant_field_instantiation: BTreeMap::new(),
+            single_sig_token_type: BTreeMap::new(),
+            per_instruction_cache: InstructionCache::new_for_execution(function),
+            function_cache: BTreeMap::new(),
+            generic_function_cache: BTreeMap::new(),
+            instantiated_local_tys: None,
+            instantiated_local_ty_counts: None,
+        }
+    }
+
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn get_or<K: Copy + Ord + Eq, V, F>(
         map: &mut BTreeMap<K, V>,
@@ -234,17 +242,26 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
-    pub(crate) fn make_rc() -> Rc<RefCell<Self>> {
-        Rc::new(RefCell::<Self>::new(Default::default()))
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub(crate) fn get_signature_index_type_at_pc(
+        &mut self,
+        pc: u16,
+        idx: SignatureIndex,
+        frame: &Frame,
+    ) -> PartialVMResult<(&Type, NumTypeNodes)> {
+        if let PerInstructionCache::TypeInfo(ty, ty_count) = self.per_instruction_cache.get(pc) {
+            Ok((ty, *ty_count))
+        } else {
+            let (ty, ty_count) = Self::get_or(&mut self.single_sig_token_type, idx, |idx| {
+                let ty = frame.instantiate_single_type(idx)?;
+                let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+                Ok((ty, ty_count))
+            })?;
+            Ok((ty, *ty_count))
+        }
     }
 
     pub(crate) fn make_rc_for_function(function: &LoadedFunction) -> Rc<RefCell<Self>> {
-        let frame_cache = Rc::new(RefCell::<Self>::new(Default::default()));
-
-        frame_cache
-            .borrow_mut()
-            .per_instruction_cache
-            .resize(function.code_size(), PerInstructionCache::Nothing);
-        frame_cache
+        Rc::new(RefCell::new(Self::new(function)))
     }
 }

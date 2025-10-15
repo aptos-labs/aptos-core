@@ -7,9 +7,8 @@ use crate::{
     config::VMConfig,
     data_cache::{DataCacheEntry, TransactionDataCache},
     frame::Frame,
-    frame_type_cache::{
-        AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, PerInstructionCache, RuntimeCacheTraits,
-    },
+    frame_type_cache::{AllRuntimeCaches, FrameTypeCache, NoRuntimeCaches, RuntimeCacheTraits},
+    instruction_caches::PerInstructionCache,
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
     module_traversal::TraversalContext,
@@ -431,7 +430,7 @@ where
         RTRCheck::init_entry(&function, &mut self.ref_state)
             .map_err(|err| self.set_location(err))?;
 
-        let frame_cache = function_caches.get_or_create_frame_cache::<RTCaches>(&function);
+        let frame_cache = function_caches.get_or_create_frame_cache(&function);
         let mut current_frame = Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             CallType::Regular,
@@ -537,8 +536,10 @@ where
                     let (function, frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::Call(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        if let PerInstructionCache::Call(function, frame_cache) =
+                            current_frame_cache
+                                .per_instruction_cache
+                                .get(current_frame.pc)
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
@@ -560,11 +561,13 @@ where
                                     },
                                     Entry::Occupied(e) => e.into_mut().clone(),
                                 };
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
+                            current_frame_cache.per_instruction_cache.set(
+                                current_frame.pc,
                                 PerInstructionCache::Call(
                                     Rc::clone(&function),
                                     Rc::clone(&frame_cache),
-                                );
+                                ),
+                            );
                             (function, frame_cache)
                         }
                     } else {
@@ -574,7 +577,7 @@ where
                             &current_frame,
                             fh_idx,
                         )?);
-                        let frame_cache = FrameTypeCache::make_rc();
+                        let frame_cache = FrameTypeCache::make_rc_for_function(&function);
                         (function, frame_cache)
                     };
 
@@ -627,8 +630,10 @@ where
                     let (function, frame_cache) = if RTCaches::caches_enabled() {
                         let current_frame_cache = &mut *current_frame.frame_cache.borrow_mut();
 
-                        if let PerInstructionCache::CallGeneric(ref function, ref frame_cache) =
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize]
+                        if let PerInstructionCache::Call(function, frame_cache) =
+                            current_frame_cache
+                                .per_instruction_cache
+                                .get(current_frame.pc)
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
@@ -650,11 +655,13 @@ where
                                     },
                                     Entry::Occupied(e) => e.into_mut().clone(),
                                 };
-                            current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
-                                PerInstructionCache::CallGeneric(
+                            current_frame_cache.per_instruction_cache.set(
+                                current_frame.pc,
+                                PerInstructionCache::Call(
                                     Rc::clone(&function),
                                     Rc::clone(&frame_cache),
-                                );
+                                ),
+                            );
                             (function, frame_cache)
                         }
                     } else {
@@ -664,7 +671,7 @@ where
                             &current_frame,
                             idx,
                         )?);
-                        let frame_cache = FrameTypeCache::make_rc();
+                        let frame_cache = FrameTypeCache::make_rc_for_function(&function);
                         (function, frame_cache)
                     };
 
@@ -796,8 +803,7 @@ where
                             captured_vec,
                         )?
                     } else {
-                        let frame_cache =
-                            function_caches.get_or_create_frame_cache::<RTCaches>(&callee);
+                        let frame_cache = function_caches.get_or_create_frame_cache(&callee);
                         self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
                             &mut current_frame,
                             gas_meter,
@@ -1206,8 +1212,7 @@ where
                     }
                 }
 
-                let frame_cache =
-                    function_caches.get_or_create_frame_cache::<RTCaches>(&target_func);
+                let frame_cache = function_caches.get_or_create_frame_cache(&target_func);
                 self.set_new_call_frame::<RTTCheck, RTRCheck, RTCaches>(
                     current_frame,
                     gas_meter,
@@ -2315,13 +2320,14 @@ impl Frame {
 
                         let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
-                                &frame_cache.per_instruction_cache[self.pc as usize];
+                                &frame_cache.per_instruction_cache.get(self.pc);
                             if let PerInstructionCache::Pack(field_count) = cached_field_count {
                                 *field_count
                             } else {
                                 let field_count = get_field_count_charge_gas_and_check_depth()?;
-                                frame_cache.per_instruction_cache[self.pc as usize] =
-                                    PerInstructionCache::Pack(field_count);
+                                frame_cache
+                                    .per_instruction_cache
+                                    .set(self.pc, PerInstructionCache::Pack(field_count));
                                 field_count
                             }
                         } else {
@@ -2384,7 +2390,7 @@ impl Frame {
 
                         let field_count = if RTCaches::caches_enabled() {
                             let cached_field_count =
-                                &frame_cache.per_instruction_cache[self.pc as usize];
+                                &frame_cache.per_instruction_cache.get(self.pc);
 
                             if let PerInstructionCache::PackGeneric(field_count) =
                                 cached_field_count
@@ -2393,8 +2399,9 @@ impl Frame {
                             } else {
                                 let field_count =
                                     get_field_count_charge_gas_and_check_depth(frame_cache)?;
-                                frame_cache.per_instruction_cache[self.pc as usize] =
-                                    PerInstructionCache::PackGeneric(field_count);
+                                frame_cache
+                                    .per_instruction_cache
+                                    .set(self.pc, PerInstructionCache::PackGeneric(field_count));
                                 field_count
                             }
                         } else {
@@ -2962,7 +2969,8 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Nop)?;
                     },
                     Bytecode::VecPack(si, num) => {
-                        let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (ty, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
@@ -2977,7 +2985,8 @@ impl Frame {
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_len()?;
                         let value = vec_ref.len()?;
@@ -2986,7 +2995,8 @@ impl Frame {
                     Bytecode::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(false)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -2995,7 +3005,8 @@ impl Frame {
                     Bytecode::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(true)?;
                         let elem = vec_ref.borrow_elem(idx)?;
@@ -3004,14 +3015,16 @@ impl Frame {
                     Bytecode::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(&elem)?;
                         vec_ref.push_back(elem)?;
                     },
                     Bytecode::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.pop();
                         gas_meter.charge_vec_pop_back(res.as_ref().ok())?;
@@ -3019,7 +3032,8 @@ impl Frame {
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_unpack(NumArgs::new(*num), vec_val.elem_views())?;
                         let elements = vec_val.unpack(*num)?;
@@ -3031,7 +3045,8 @@ impl Frame {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
-                        let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
+                        let (_, ty_count) =
+                            frame_cache.get_signature_index_type_at_pc(self.pc, *si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;

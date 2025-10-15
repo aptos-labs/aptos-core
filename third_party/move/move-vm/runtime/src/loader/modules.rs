@@ -257,12 +257,19 @@ impl Module {
 
         for (idx, _) in module.function_defs().iter().enumerate() {
             let findex = FunctionDefinitionIndex(idx as TableIndex);
-            let function = Function::new(
+            let mut function = Function::new(
                 natives,
                 findex,
                 &module,
                 signature_table.as_slice(),
                 &struct_names,
+            )?;
+
+            // TODO: feature-gate
+            function.instruction_cache.warmup(
+                &function.code,
+                signature_table.as_slice(),
+                is_fully_instantiated_signature.as_slice(),
             )?;
 
             function_map.insert(function.name.to_owned(), idx);

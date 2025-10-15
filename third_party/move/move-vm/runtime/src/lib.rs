@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
 #![deny(deprecated)]
 
 //! The core Move VM logic.
@@ -27,6 +26,7 @@ mod debug;
 mod access_control;
 mod frame;
 mod frame_type_cache;
+mod instruction_caches;
 mod reentrancy_checker;
 mod runtime_ref_checks;
 mod runtime_type_checks;

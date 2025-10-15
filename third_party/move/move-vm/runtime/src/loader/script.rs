@@ -5,7 +5,7 @@ use super::{
     convert_tok_to_type, single_signature_loader::load_single_signatures_for_script, Function,
     FunctionHandle, FunctionInstantiation,
 };
-use crate::loader::type_loader::convert_toks_to_types;
+use crate::{instruction_caches::InstructionCache, loader::type_loader::convert_toks_to_types};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -112,10 +112,12 @@ impl Script {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();
 
-        let main: Arc<Function> = Arc::new(Function {
+        let code_size = code.len();
+        let main = Arc::new(Function {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
             code,
+            instruction_cache: InstructionCache::new_empty(code_size),
             ty_param_abilities,
             native: None,
             is_native: false,
@@ -132,6 +134,7 @@ impl Script {
             has_module_reentrancy_lock: false,
             is_trusted: false,
         });
+        main.instruction_cache.validate_cache_safety()?;
 
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;
 

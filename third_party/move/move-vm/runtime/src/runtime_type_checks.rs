@@ -873,7 +873,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::VecPack(si, num) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _) = ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 let elem_tys = operand_stack.popn_tys(*num as u16)?;
                 for elem_ty in elem_tys.iter() {
                     // For vector element types, use assignability
@@ -884,7 +884,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(vec_ty)?;
             },
             Bytecode::VecLen(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _) = ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 operand_stack
                     .pop_ty()?
                     .paranoid_check_is_vec_ref_ty::<false>(ty)?;
@@ -893,7 +893,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(u64_ty)?;
             },
             Bytecode::VecImmBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _) = ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
@@ -902,7 +902,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecMutBorrow(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _) = ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
                     .pop_ty()?
@@ -910,7 +910,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecPushBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _) = ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 // For pushing an element to a vector, use assignability
                 operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
                 operand_stack
@@ -918,14 +918,15 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
             Bytecode::VecPopBack(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _) = ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 let elem_ty = operand_stack
                     .pop_ty()?
                     .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
                 operand_stack.push_ty(elem_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
-                let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (expected_elem_ty, _) =
+                    ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 let vec_ty = operand_stack.pop_ty()?;
                 vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
                 for _ in 0..*num {
@@ -933,7 +934,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 }
             },
             Bytecode::VecSwap(si) => {
-                let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
+                let (ty, _) = ty_cache.get_signature_index_type_at_pc(frame.pc, *si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack

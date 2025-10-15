@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    instruction_caches::InstructionCache,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -51,6 +52,8 @@ pub struct Function {
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
     pub(crate) code: Vec<Bytecode>,
+    /// Cache per each instruction pre-populated at load-time for faster execution.
+    pub(crate) instruction_cache: InstructionCache,
     pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
@@ -617,10 +620,12 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
+        let code_size = code.len();
         Ok(Self {
             file_format_version: module.version(),
             index,
             code,
+            instruction_cache: InstructionCache::new_empty(code_size),
             ty_param_abilities,
             native,
             is_native,
