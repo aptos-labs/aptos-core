@@ -1,0 +1,88 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i2u16.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i8 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i16 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i32 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i64 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i128 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -1i256 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 65536i32 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 65536i64 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 65536i128 as u16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 65536i256 as u16;
+    }
+}

@@ -7,7 +7,7 @@ use crate::{
     spec_language_ast::{Condition, Invariant, SyntheticDefinition},
 };
 use move_core_types::{
-    account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
+    account_address::AccountAddress, identifier::Identifier, int256, language_storage::ModuleId,
     value::MoveValue,
 };
 use move_symbol_pool::Symbol;
@@ -17,7 +17,6 @@ use std::{
     collections::{BTreeSet, HashSet, VecDeque},
     fmt,
 };
-
 //**************************************************************************************************
 // Program
 //**************************************************************************************************
@@ -535,7 +534,7 @@ pub enum CopyableVal_ {
     /// An unsigned 128-bit integer
     U128(u128),
     /// An unsigned 256-bit integer
-    U256(move_core_types::u256::U256),
+    U256(int256::U256),
     /// true or false
     Bool(bool),
     /// `b"<bytes>"`
@@ -671,7 +670,7 @@ pub enum Bytecode_ {
     LdU32(u32),
     LdU64(u64),
     LdU128(u128),
-    LdU256(move_core_types::u256::U256),
+    LdU256(int256::U256),
     CastU8,
     CastU16,
     CastU32,
@@ -1810,5 +1809,11 @@ fn format_move_value(v: &MoveValue) -> String {
         MoveValue::U16(u) => format!("{}u16", u),
         MoveValue::U32(u) => format!("{}u32", u),
         MoveValue::U256(u) => format!("{}u256", u),
+        MoveValue::I8(u) => format!("{}i8", u),
+        MoveValue::I16(u) => format!("{}i16", u),
+        MoveValue::I32(u) => format!("{}i32", u),
+        MoveValue::I64(u) => format!("{}i64", u),
+        MoveValue::I128(u) => format!("{}i128", u),
+        MoveValue::I256(u) => format!("{}i256", u),
     }
 }

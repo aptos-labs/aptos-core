@@ -344,6 +344,12 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | LdU64(_)
             | LdU128(_)
             | LdU256(_)
+            | LdI8(_)
+            | LdI16(_)
+            | LdI32(_)
+            | LdI64(_)
+            | LdI128(_)
+            | LdI256(_)
             | LdTrue
             | LdFalse
             | LdConst(_)
@@ -368,11 +374,18 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | CastU64
             | CastU128
             | CastU256
+            | CastI8
+            | CastI16
+            | CastI32
+            | CastI64
+            | CastI128
+            | CastI256
             | Add
             | Sub
             | Mul
             | Mod
             | Div
+            | Negate
             | BitOr
             | BitAnd
             | Xor
@@ -440,12 +453,14 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             Ret | BrTrue(_) | BrFalse(_) | Branch(_) => {
                 // not reachable here, transition is handled in `pre_execution_transition`
             },
-            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | Not | Nop | Exists(_)
+            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | CastI8 | CastI16
+            | CastI32 | CastI64 | CastI128 | CastI256 | Not | Nop | Exists(_)
             | ExistsGeneric(_) => {
                 // no-op
             },
-            LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_)
-            | LdTrue | LdFalse => {
+            LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdI8(_)
+            | LdI16(_) | LdI32(_) | LdI64(_) | LdI128(_) | LdI256(_) | LdConst(_) | LdTrue
+            | LdFalse => {
                 ref_state.push_non_refs_to_shadow_stack(1);
             },
             CopyLoc(index) => {
@@ -581,6 +596,9 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | Shl | Shr => {
                 // pop two non-ref values from the shadow stack, push a new non-ref value
                 let _ = ref_state.pop_from_shadow_stack()?;
+            },
+            Negate => {
+                // leaves shadow stack at same value
             },
             Eq | Neq => {
                 // pop two values from the shadow stack (which can be ref or non-ref values)
@@ -1238,7 +1256,7 @@ impl RefCheckState {
     /// Push `num` non-reference values onto the shadow stack.
     fn push_non_refs_to_shadow_stack(&mut self, num: usize) {
         self.shadow_stack
-            .extend(std::iter::repeat(Value::NonRef).take(num));
+            .extend(std::iter::repeat_n(Value::NonRef, num));
     }
 
     /// Push the given `ref_id` onto the shadow stack as a reference value.

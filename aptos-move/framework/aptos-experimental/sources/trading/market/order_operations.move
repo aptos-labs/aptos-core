@@ -17,6 +17,7 @@ module aptos_experimental::order_operations {
         pre_cancel_order_for_tracker
     };
     use aptos_experimental::order_placement::cleanup_order_internal;
+    use aptos_experimental::market_clearinghouse_order_info::new_clearinghouse_order_info;
 
     // Error codes
     const ENOT_ORDER_CREATOR: u64 = 12;
@@ -132,7 +133,16 @@ module aptos_experimental::order_operations {
             metadata
         ) = order.destroy_single_order();
         callbacks.decrease_order_size(
-            user, order_id, is_bid, price, remaining_size
+            new_clearinghouse_order_info(
+                user,
+                order_id,
+                client_order_id,
+                is_bid,
+                price,
+                time_in_force,
+                metadata
+            ),
+            remaining_size
         );
 
         market.emit_event_for_order(
@@ -154,13 +164,14 @@ module aptos_experimental::order_operations {
         );
     }
 
-    /// Internal helper function to cancel a single order.
-    /// This function handles the cleanup and event emission for order cancellation.
-    ///
-    /// Parameters:
-    /// - market: The market instance
-    /// - order: The order to cancel
-    /// - callbacks: The market clearinghouse callbacks for cleanup operations
+    #[lint::skip(needless_mutable_reference)]
+    // Internal helper function to cancel a single order.
+    // This function handles the cleanup and event emission for order cancellation.
+    //
+    // Parameters:
+    // - market: The market instance
+    // - order: The order to cancel
+    // - callbacks: The market clearinghouse callbacks for cleanup operations
     fun cancel_single_order_helper<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         order: SingleOrder<M>,
@@ -181,7 +192,7 @@ module aptos_experimental::order_operations {
             metadata
         ) = order.destroy_single_order();
         cleanup_order_internal(
-            account, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
+            account, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, price, metadata, callbacks
         );
         if (emit_event) {
             market.emit_event_for_order(

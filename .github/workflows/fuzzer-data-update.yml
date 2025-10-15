@@ -11,6 +11,7 @@ on:
 permissions:
   contents: read
   id-token: write # Required for GCP Workload Identity federation
+  actions: write
 
 jobs:
   update-fuzzer-data:

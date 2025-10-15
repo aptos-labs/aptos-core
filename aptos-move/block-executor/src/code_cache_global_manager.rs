@@ -4,7 +4,8 @@
 use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
-        GLOBAL_MODULE_CACHE_NUM_MODULES, GLOBAL_MODULE_CACHE_SIZE_IN_BYTES,
+        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
+        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_TYPES, NUM_INTERNED_TYPE_VECS,
         STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
@@ -107,7 +108,7 @@ where
         let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
             if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
-                let flush_verifier_cache = self.environment.as_ref().map_or(true, |e| {
+                let flush_verifier_cache = self.environment.as_ref().is_none_or(|e| {
                     e.verifier_config_bytes() != storage_environment.verifier_config_bytes()
                 });
                 if flush_verifier_cache {
@@ -133,7 +134,19 @@ where
         // If the environment caches too many struct names, flush type caches. Also flush module
         // caches because they contain indices for struct names.
         if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
-            runtime_environment.flush_struct_name_and_tag_caches();
+            runtime_environment.flush_all_caches();
+            self.module_cache.flush();
+        }
+
+        let num_interned_tys = runtime_environment.ty_pool().num_interned_tys();
+        NUM_INTERNED_TYPES.set(num_interned_tys as i64);
+        let num_interned_ty_vecs = runtime_environment.ty_pool().num_interned_ty_vecs();
+        NUM_INTERNED_TYPE_VECS.set(num_interned_ty_vecs as i64);
+
+        if num_interned_tys > config.max_interned_tys
+            || num_interned_ty_vecs > config.max_interned_ty_vecs
+        {
+            runtime_environment.ty_pool().flush();
             self.module_cache.flush();
         }
 
@@ -144,6 +157,12 @@ where
         // If module cache stores too many modules, flush it as well.
         if module_cache_size_in_bytes > config.max_module_cache_size_in_bytes {
             self.module_cache.flush();
+        }
+
+        let num_non_generic_layout_entries = self.module_cache.num_cached_layouts();
+        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES.set(num_non_generic_layout_entries as i64);
+        if num_non_generic_layout_entries > config.max_layout_cache_size {
+            self.module_cache.flush_layout_cache();
         }
 
         Ok(())
@@ -438,6 +457,9 @@ mod test {
             prefetch_framework_code: false,
             max_module_cache_size_in_bytes: 32,
             max_struct_name_index_map_num_entries: 2,
+            max_interned_tys: 100,
+            max_interned_ty_vecs: 100,
+            max_layout_cache_size: 10,
         };
 
         // Populate the cache for testing.

@@ -132,7 +132,7 @@ const KNOWN_FALSE_POSITIVES_VMSTATUS: &[&str] = &["moving container with danglin
 
 // panic to catch invariant violations
 pub(crate) fn check_for_invariant_violation(e: VMStatus) {
-    let is_known_false_positive = e.message().map_or(false, |msg| {
+    let is_known_false_positive = e.message().is_some_and(|msg| {
         KNOWN_FALSE_POSITIVES_VMSTATUS
             .iter()
             .any(|known| msg.starts_with(known))

@@ -1,0 +1,128 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i16.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768u16 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768u32 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768u128 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768u256 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768i32 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768i64 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768i128 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 32768i256 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -32769i32 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -32769i64 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -32769i128 as i16;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -32769i256 as i16;
+    }
+}

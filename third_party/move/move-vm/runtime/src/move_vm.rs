@@ -66,7 +66,6 @@ impl MoveVM {
         resource_resolver: &impl ResourceResolver,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = loader.runtime_environment().vm_config();
-        let check_invariant_in_swap_loc = vm_config.check_invariant_in_swap_loc;
 
         let function_value_extension = FunctionValueExtensionAdapter {
             module_storage: loader.unmetered_module_storage(),
@@ -90,7 +89,6 @@ impl MoveVM {
             traversal_context,
             &param_tys,
             serialized_args,
-            check_invariant_in_swap_loc,
         )
         .map_err(|err| err.finish(Location::Undefined))?;
 
@@ -132,7 +130,7 @@ impl MoveVM {
             })
             .map(|(idx, ty)| {
                 // serialize return values first in the case that a value points into this local
-                let local_val = dummy_locals.move_loc(idx, check_invariant_in_swap_loc)?;
+                let local_val = dummy_locals.move_loc(idx)?;
                 let (bytes, layout) = serialize_return_value(
                     &function_value_extension,
                     &layout_converter,
@@ -202,7 +200,6 @@ fn deserialize_args(
     traversal_context: &mut TraversalContext,
     param_tys: &[Type],
     serialized_args: Vec<impl Borrow<[u8]>>,
-    check_invariant_in_swap_loc: bool,
 ) -> PartialVMResult<(Locals, Vec<Value>)> {
     if param_tys.len() != serialized_args.len() {
         return Err(
@@ -235,7 +232,6 @@ fn deserialize_args(
                         inner_ty,
                         arg_bytes,
                     )?,
-                    check_invariant_in_swap_loc,
                 )?;
                 dummy_locals.borrow_loc(idx)
             },
@@ -297,7 +293,8 @@ fn serialize_return_value(
         .with_func_args_deserialization(function_value_extension)
         .serialize(&value, &layout)?
         .ok_or_else(serialization_error)?;
-    Ok((bytes, layout))
+    // TODO(layouts): consider not cloning returned layouts?
+    Ok((bytes, layout.as_ref().clone()))
 }
 
 fn serialize_return_values(

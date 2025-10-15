@@ -240,8 +240,9 @@ module aptos_experimental::bulk_order_book {
     ) {
         assert!(reinsert_order.validate_reinsertion_request(original_order), E_REINSERT_ORDER_MISMATCH);
         let account = reinsert_order.get_account_from_match_details();
-        assert!(self.orders.contains(&account), EORDER_NOT_FOUND);
-        let order = self.orders.remove(&account);
+        let order_option = self.orders.remove_or_none(&account);
+        assert!(order_option.is_some(), EORDER_NOT_FOUND);
+        let order = order_option.destroy_some();
         cancel_active_orders(price_time_idx, &order);
         order.reinsert_order(&reinsert_order);
         activate_first_price_levels(price_time_idx, &order, reinsert_order.get_order_id_from_match_details());
@@ -265,33 +266,38 @@ module aptos_experimental::bulk_order_book {
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         account: address
-    ): (OrderIdType, u64, u64) {
-        if (!self.orders.contains(&account)) {
-            abort EORDER_NOT_FOUND;
-        };
+    ): BulkOrder<M> {
         // For cancellation, instead of removing the order, we will just cancel the active orders and set the sizes to 0.
         // This allows us to reuse the order id for the same account in the future without creating a new order.
-        let order = self.orders.remove(&account);
-        let order_id = order.get_order_id();
-        let remaining_bid_size = order.get_total_remaining_size(true);
-        let remaining_ask_size = order.get_total_remaining_size(false);
+        let order_opt = self.orders.remove_or_none(&account);
+        assert!(order_opt.is_some(), EORDER_NOT_FOUND);
+        let order = order_opt.destroy_some();
+        let order_copy = order;
         cancel_active_orders(price_time_idx, &order);
         order.set_empty();
         self.orders.add(account, order);
-        (order_id, remaining_bid_size, remaining_ask_size)
+        order_copy
     }
 
+    public fun get_bulk_order<M: store + copy + drop>(
+        self: &BulkOrderBook<M>,
+        account: address
+    ): BulkOrder<M> {
+        if (!self.orders.contains(&account)) {
+            abort EORDER_NOT_FOUND;
+        };
+
+        self.orders.get(&account).destroy_some()
+    }
 
     public fun get_remaining_size<M: store + copy + drop>(
         self: &BulkOrderBook<M>,
         account: address,
         is_bid: bool
     ): u64 {
-        if (!self.orders.contains(&account)) {
-            abort EORDER_NOT_FOUND;
-        };
-
-        self.orders.get(&account).destroy_some().get_total_remaining_size(is_bid)
+        let result_option = self.orders.get_and_map(&account, |order| order.get_total_remaining_size(is_bid));
+        assert!(result_option.is_some(), EORDER_NOT_FOUND);
+        result_option.destroy_some()
     }
 
     public fun get_prices<M: store + copy + drop>(
@@ -299,11 +305,9 @@ module aptos_experimental::bulk_order_book {
         account: address,
         is_bid: bool
     ): vector<u64> {
-        if (!self.orders.contains(&account)) {
-            abort EORDER_NOT_FOUND;
-        };
-
-        self.orders.get(&account).destroy_some().get_all_prices(is_bid)
+        let result_option = self.orders.get_and_map(&account, |order| order.get_all_prices(is_bid));
+        assert!(result_option.is_some(), EORDER_NOT_FOUND);
+        result_option.destroy_some()
     }
 
     public fun get_sizes<M: store + copy + drop>(
@@ -311,11 +315,9 @@ module aptos_experimental::bulk_order_book {
         account: address,
         is_bid: bool
     ): vector<u64> {
-        if (!self.orders.contains(&account)) {
-            abort EORDER_NOT_FOUND;
-        };
-
-        self.orders.get(&account).destroy_some().get_all_sizes(is_bid)
+        let result_option = self.orders.get_and_map(&account, |order| order.get_all_sizes(is_bid));
+        assert!(result_option.is_some(), EORDER_NOT_FOUND);
+        result_option.destroy_some()
     }
 
     /// Places a new maker order in the bulk order book.
@@ -339,9 +341,9 @@ module aptos_experimental::bulk_order_book {
     ) : BulkOrder<M> {
         let account = get_account_from_order_request(&order_req);
         let new_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_order_request(&order_req);
-        let existing_order = self.orders.contains(&account);
-        let order_id = if (existing_order) {
-            let old_order = self.orders.remove(&account);
+        let order_option = self.orders.remove_or_none(&account);
+        let order_id = if (order_option.is_some()) {
+            let old_order = order_option.destroy_some();
             let existing_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_bulk_order(&old_order);
             assert!(new_sequence_number > existing_sequence_number, E_INVALID_SEQUENCE_NUMBER);
             cancel_active_orders(price_time_idx, &old_order);

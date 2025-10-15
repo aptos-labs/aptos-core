@@ -37,6 +37,12 @@ pub(crate) fn import_type_tag(
         TypeTag::U64 => SignatureToken::U64,
         TypeTag::U128 => SignatureToken::U128,
         TypeTag::U256 => SignatureToken::U256,
+        TypeTag::I8 => SignatureToken::I8,
+        TypeTag::I16 => SignatureToken::I16,
+        TypeTag::I32 => SignatureToken::I32,
+        TypeTag::I64 => SignatureToken::I64,
+        TypeTag::I128 => SignatureToken::I128,
+        TypeTag::I256 => SignatureToken::I256,
         TypeTag::Bool => SignatureToken::Bool,
         TypeTag::Signer => SignatureToken::Signer,
         TypeTag::Vector(t) => SignatureToken::Vector(Box::new(import_type_tag(

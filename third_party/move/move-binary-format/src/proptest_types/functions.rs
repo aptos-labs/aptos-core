@@ -21,7 +21,7 @@ use crate::{
         TableSize,
     },
 };
-use move_core_types::{ability::AbilitySet, u256::U256};
+use move_core_types::{ability::AbilitySet, int256::U256};
 use proptest::{
     collection::{vec, SizeRange},
     option::of,
@@ -1063,8 +1063,8 @@ impl BytecodeGen {
     fn check_signature_token(token: &SignatureToken) -> bool {
         use SignatureToken::*;
         match token {
-            U8 | U16 | U32 | U64 | U128 | U256 | Bool | Address | Signer | Struct(_)
-            | TypeParameter(_) => true,
+            U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256 | Bool
+            | Address | Signer | Struct(_) | TypeParameter(_) => true,
             Vector(element_token) => BytecodeGen::check_signature_token(element_token),
             StructInstantiation(_, type_arguments) => type_arguments
                 .iter()

@@ -14,4 +14,3 @@ anyhow = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 petgraph = { workspace = true }
-serde-reflection = { workspace = true }

@@ -5,4 +5,4 @@ mod jwk_fetcher;
 mod pepper_request;
 mod request_handler;
 mod resource_fetcher;
-mod utils;
+pub mod utils;

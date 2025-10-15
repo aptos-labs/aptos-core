@@ -223,9 +223,15 @@ module aptos_experimental::order_book {
         )
     }
 
+    public fun get_bulk_order<M: store + copy + drop>(
+        self: &OrderBook<M>, order_creator: address
+    ): BulkOrder<M> {
+        self.bulk_order_book.get_bulk_order(order_creator)
+    }
+
     public fun cancel_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address
-    ): (OrderIdType, u64, u64) {
+    ): BulkOrder<M> {
         self.bulk_order_book.cancel_bulk_order(&mut self.price_time_idx, order_creator)
     }
 

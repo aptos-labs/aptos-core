@@ -62,6 +62,19 @@ spec aptos_std::ordered_map {
         ensures [abstract] forall k: K where k != key: spec_contains_key(old(self), k) == spec_contains_key(self, k);
     }
 
+    spec remove_or_none {
+        pragma opaque;
+        pragma verify = false;
+        aborts_if [abstract] false;
+        ensures [abstract] spec_contains_key(old(self), key) ==> result == option::spec_some(spec_get(old(self), key));
+        ensures [abstract] !spec_contains_key(old(self), key) ==> result == option::spec_none();
+        ensures [abstract] !spec_contains_key(self, key);
+        ensures [abstract] option::spec_is_none(result) ==> self == old(self);
+        ensures [abstract] option::spec_is_some(result) ==> spec_len(old(self)) == spec_len(self) + 1;
+        ensures [abstract] forall k: K where k != key: spec_contains_key(self, k) ==> spec_get(self, k) == spec_get(old(self), k);
+        ensures [abstract] forall k: K where k != key: spec_contains_key(old(self), k) == spec_contains_key(self, k);
+    }
+
     spec is_empty {
         pragma intrinsic;
     }
@@ -119,7 +132,7 @@ spec aptos_std::ordered_map {
     }
 
 
-    spec lower_bound {
+    spec internal_lower_bound {
         pragma opaque;
         pragma verify = false;
     }
@@ -257,17 +270,17 @@ spec aptos_std::ordered_map {
     }
 
 
-    spec find {
+    spec internal_find {
         pragma opaque;
         pragma verify = false;
     }
 
-    spec new_begin_iter {
+    spec internal_new_begin_iter {
         pragma opaque;
         pragma verify = false;
     }
 
-    spec new_end_iter {
+    spec internal_new_end_iter {
         pragma opaque;
         pragma verify = false;
     }
@@ -282,5 +295,8 @@ spec aptos_std::ordered_map {
         pragma verify = false;
     }
 
-
+    spec get {
+        pragma opaque;
+        pragma verify = false;
+    }
 }

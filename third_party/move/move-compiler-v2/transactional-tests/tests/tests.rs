@@ -39,6 +39,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/no-recursive-check/",
     "/no-access-check/",
     "/no-recursive-type-check/",
+    "/testing-constant/",
 ];
 
 /// Note that any config which has different output for a test directory
@@ -139,6 +140,24 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: &[],
         cross_compile: false,
     },
+    TestConfig {
+        name: "testing-constant-true",
+        runner: |p| run(p, get_config_by_name("testing-constant-true")),
+        experiments: &[(Experiment::COMPILE_FOR_TESTING, true)],
+        language_version: LanguageVersion::latest(),
+        include: &["/testing-constant/"],
+        exclude: &[],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "testing-constant-false",
+        runner: |p| run(p, get_config_by_name("testing-constant-false")),
+        experiments: &[(Experiment::COMPILE_FOR_TESTING, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/testing-constant/"],
+        exclude: &[],
+        cross_compile: false,
+    },
 ];
 
 /// Test files which must use separate baselines because their result
@@ -176,6 +195,10 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/fv_as_keys.move",
     // needed until bug #17615 is fixed
     "misc/bug_14817_extended.move",
+    // run in verbose mode to unveil the exact error messages
+    "/signed-int/",
+    // different expected result
+    "/testing-constant/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

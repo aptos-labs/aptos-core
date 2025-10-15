@@ -42,13 +42,20 @@ pub enum ValueToken {
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub enum ParsedValue<Extra: ParsableValue = ()> {
     Address(ParsedAddress),
-    InferredNum(move_core_types::u256::U256),
+    InferredNum(move_core_types::int256::U256),
+    InferredNegNum(move_core_types::int256::I256),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
     U128(u128),
-    U256(move_core_types::u256::U256),
+    U256(move_core_types::int256::U256),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    I256(move_core_types::int256::I256),
     Bool(bool),
     Vector(Vec<ParsedValue<Extra>>),
     Struct(
@@ -314,12 +321,20 @@ impl<Extra: ParsableValue> ParsedValue<Extra> {
             ParsedValue::U16(u) => Extra::move_value_into_concrete(MoveValue::U16(u)),
             ParsedValue::U32(u) => Extra::move_value_into_concrete(MoveValue::U32(u)),
             ParsedValue::U64(u) => Extra::move_value_into_concrete(MoveValue::U64(u)),
-            ParsedValue::InferredNum(u) if u <= (u64::MAX.into()) => {
+            ParsedValue::InferredNum(u) if u <= u64::MAX.into() => {
                 Extra::move_value_into_concrete(MoveValue::U64(u.try_into()?))
             },
             ParsedValue::U128(u) => Extra::move_value_into_concrete(MoveValue::U128(u)),
             ParsedValue::InferredNum(u) | ParsedValue::U256(u) => {
                 Extra::move_value_into_concrete(MoveValue::U256(u))
+            },
+            ParsedValue::I8(i) => Extra::move_value_into_concrete(MoveValue::I8(i)),
+            ParsedValue::I16(i) => Extra::move_value_into_concrete(MoveValue::I16(i)),
+            ParsedValue::I32(i) => Extra::move_value_into_concrete(MoveValue::I32(i)),
+            ParsedValue::I64(i) => Extra::move_value_into_concrete(MoveValue::I64(i)),
+            ParsedValue::I128(i) => Extra::move_value_into_concrete(MoveValue::I128(i)),
+            ParsedValue::InferredNegNum(i) | ParsedValue::I256(i) => {
+                Extra::move_value_into_concrete(MoveValue::I256(i))
             },
             ParsedValue::Bool(b) => Extra::move_value_into_concrete(MoveValue::Bool(b)),
             ParsedValue::Vector(values) => Extra::concrete_vector(

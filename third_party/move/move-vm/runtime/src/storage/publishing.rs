@@ -4,8 +4,9 @@
 #![allow(clippy::duplicated_attributes)]
 
 use crate::{
-    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
-    Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
+    storage::layout_cache::NoOpLayoutCache, AsUnsyncModuleStorage, Module, ModuleStorage,
+    RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -87,6 +88,10 @@ impl<M: ModuleStorage> ModuleBytesStorage for StagingModuleBytesStorage<'_, M> {
 pub struct StagingModuleStorage<'a, M> {
     storage: UnsyncModuleStorage<'a, StagingModuleBytesStorage<'a, M>>,
 }
+
+// Very important: no caching for staging module storage so that any speculative updates are not
+// accidentally cached.
+impl<M> NoOpLayoutCache for StagingModuleStorage<'_, M> {}
 
 impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
     /// Returns new module storage with staged modules, running full compatability checks for them.

@@ -33,14 +33,13 @@ fn generate_virtual_dag(
     let num_strong_links = num_nodes * 2 / 3 + 1;
     assert!(num_holes <= num_nodes - num_strong_links);
     // This only has length of num_nodes - num_holes which ignores holes
-    let strong_links: Vec<bool> = std::iter::repeat(false)
-        .take(num_nodes - num_holes - num_strong_links)
-        .chain(std::iter::repeat(true).take(num_strong_links))
-        .collect();
+    let strong_links: Vec<bool> =
+        std::iter::repeat_n(false, num_nodes - num_holes - num_strong_links)
+            .chain(std::iter::repeat_n(true, num_strong_links))
+            .collect();
     // This has length of num_nodes
-    let nodes: Vec<bool> = std::iter::repeat(false)
-        .take(num_holes)
-        .chain(std::iter::repeat(true).take(num_nodes - num_holes))
+    let nodes: Vec<bool> = std::iter::repeat_n(false, num_holes)
+        .chain(std::iter::repeat_n(true, num_nodes - num_holes))
         .collect();
     // For every round, we shuffle the nodes bitmask to generate holes
     // For every node, we shuffle the compressed strong links if the node is not a hole

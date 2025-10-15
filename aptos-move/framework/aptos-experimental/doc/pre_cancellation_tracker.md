@@ -222,10 +222,14 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 ) {
     <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_garbage_collect">garbage_collect</a>(tracker);
     <b>let</b> account_order_id = new_account_client_order_id(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id);
-    <b>if</b> (tracker.account_order_ids.contains(&account_order_id)) {
+
+    // If the account_order_id already <b>exists</b> <b>with</b> a previously set expiration time,
+    // we <b>update</b> the expiration time.
+    <b>let</b> prev_expiration_time = tracker.account_order_ids.remove_or_none(&account_order_id);
+    <b>if</b> (prev_expiration_time.is_some()) {
         // If the account_order_id already <b>exists</b> <b>with</b> a previously set expiration time,
         // we <b>update</b> the expiration time.
-        <b>let</b> expiration_time = tracker.account_order_ids.remove(&account_order_id);
+        <b>let</b> expiration_time = prev_expiration_time.destroy_some();
         <b>let</b> order_id_with_expiration =
             <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_ExpirationAndOrderId">ExpirationAndOrderId</a> { expiration_time, account_order_id };
         // If the mapping <b>exists</b>, then we remove the order ID <b>with</b> its expiration time.

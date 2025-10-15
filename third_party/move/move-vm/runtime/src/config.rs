@@ -20,7 +20,8 @@ pub struct VMConfig {
     /// are more than type checks, for example, stack balancing, visibility, but the name
     /// is kept for historical reasons.
     pub paranoid_type_checks: bool,
-    pub check_invariant_in_swap_loc: bool,
+    /// Always set to false, no longer used, kept for compatibility.
+    pub legacy_check_invariant_in_swap_loc: bool,
     /// Maximum value nest depth for structs.
     pub max_value_nest_depth: Option<u64>,
     /// Maximum allowed number of nodes in a type layout. This includes the types of fields for
@@ -44,6 +45,9 @@ pub struct VMConfig {
     pub paranoid_ref_checks: bool,
     pub enable_capture_option: bool,
     pub enable_enum_option: bool,
+    /// If true, Move VM will try to fetch layout from remote cache.
+    pub enable_layout_caches: bool,
+    pub propagate_dependency_limit_error: bool,
 }
 
 impl Default for VMConfig {
@@ -52,7 +56,7 @@ impl Default for VMConfig {
             verifier_config: VerifierConfig::default(),
             deserializer_config: DeserializerConfig::default(),
             paranoid_type_checks: false,
-            check_invariant_in_swap_loc: true,
+            legacy_check_invariant_in_swap_loc: false,
             max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
             layout_max_size: 512,
             layout_max_depth: 128,
@@ -68,6 +72,8 @@ impl Default for VMConfig {
             paranoid_ref_checks: false,
             enable_capture_option: false,
             enable_enum_option: true,
+            enable_layout_caches: true,
+            propagate_dependency_limit_error: true,
         }
     }
 }

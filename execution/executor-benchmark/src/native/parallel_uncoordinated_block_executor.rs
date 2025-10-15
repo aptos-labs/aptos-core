@@ -429,6 +429,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                 }
             },
             NativeTransaction::BlockEpilogue => return output.into_success_output(0),
+            NativeTransaction::BlockMetadata => return output.into_success_output(0),
         };
 
         self.reduce_apt_supply(fa_migration_complete, gas, state_view, &mut output)?;
@@ -1241,6 +1242,7 @@ impl RawTransactionExecutor for NativeNoStorageRawTransactionExecutor {
                 (sender, sequence_number)
             },
             NativeTransaction::BlockEpilogue => return output.into_success_output(0),
+            NativeTransaction::BlockMetadata => return output.into_success_output(0),
         };
 
         self.seq_nums.insert(sender, sequence_number);

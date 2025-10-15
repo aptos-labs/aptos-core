@@ -32,12 +32,14 @@ use move_vm_types::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
     },
+    ty_interner::TypeVecId,
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{
     cell::RefCell,
     cmp::Ordering,
     fmt::{Debug, Formatter},
+    hash::{Hash, Hasher},
     mem,
     rc::Rc,
     sync::Arc,
@@ -57,6 +59,10 @@ pub struct Function {
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
     pub(crate) return_tys: Vec<Type>,
+    // For non-native functions: parameter types first and then local types, if any.
+    // For native functions, an empty vector (there are no locals). This is very important because
+    // gas is charged based on number of locals which should be 0 for native calls (to be backwards
+    // compatible).
     pub(crate) local_tys: Vec<Type>,
     pub(crate) param_tys: Vec<Type>,
     pub(crate) access_specifier: AccessSpecifier,
@@ -95,6 +101,8 @@ pub struct LoadedFunction {
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
     pub ty_args: Vec<Type>,
+    // Unique identifier for type arguments.
+    pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
     pub function: Arc<Function>,
 }
@@ -121,6 +129,7 @@ impl LoadedFunction {
 
     /// Returns a reference to parent [Module] owning the function. Returns an invariant violation
     /// error if the function comes from a script.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn owner_as_module(&self) -> VMResult<&Module> {
         match &self.owner {
             LoadedFunctionOwner::Module(module) => Ok(module.as_ref()),
@@ -132,6 +141,37 @@ impl LoadedFunction {
                 Err(err)
             },
         }
+    }
+}
+
+/// Stable pointer identity for a non-generic [Function] within a single interpreter invocation.
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+pub(crate) struct FunctionPtr(*const Function);
+
+impl FunctionPtr {
+    pub(crate) fn from_loaded_function(function: &LoadedFunction) -> Self {
+        // Pointer identity can be used since the loader guarantees that any loaded function has
+        // exactly one `Arc<Function>`.
+        Self(Arc::as_ptr(&function.function))
+    }
+}
+
+impl Hash for FunctionPtr {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        state.write_usize(self.0 as usize);
+    }
+}
+
+/// Stable pointer identity for a generic [Function] within a single interpreter invocation.
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+pub(crate) struct GenericFunctionPtr(FunctionPtr, TypeVecId);
+
+impl GenericFunctionPtr {
+    pub(crate) fn from_loaded_function(function: &LoadedFunction) -> Self {
+        Self(
+            FunctionPtr::from_loaded_function(function),
+            function.ty_args_id,
+        )
     }
 }
 
@@ -259,7 +299,10 @@ impl LazyLoadedFunction {
                 };
 
                 // Do not allow delayed fields to be serialized.
-                Ok(layout.into_layout_when_has_no_delayed_fields())
+                // TODO(layouts): consider not cloning layouts for captured arguments.
+                Ok(layout
+                    .into_layout_when_has_no_delayed_fields()
+                    .map(|l| l.as_ref().clone()))
             })
             .collect::<PartialVMResult<Option<Vec<_>>>>()
     }
@@ -406,6 +449,7 @@ impl LoadedFunction {
     }
 
     /// Returns the module id or, if it is a script, the pseudo module id for scripts.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn module_or_script_id(&self) -> &ModuleId {
         match &self.owner {
             LoadedFunctionOwner::Module(m) => Module::self_id(m),
@@ -481,6 +525,7 @@ impl LoadedFunction {
         self.function.is_native()
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn get_native(&self) -> PartialVMResult<&UnboxedNativeFunction> {
         self.function.get_native()
     }
@@ -554,10 +599,11 @@ impl Function {
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();
+
         let return_tys = signature_table[handle.return_.0 as usize].clone();
         let local_tys = if let Some(code) = &def.code {
             let mut local_tys = signature_table[handle.parameters.0 as usize].clone();
-            local_tys.append(&mut signature_table[code.locals.0 as usize].clone());
+            local_tys.extend(signature_table[code.locals.0 as usize].clone());
             local_tys
         } else {
             vec![]
@@ -617,6 +663,7 @@ impl Function {
         self.ty_param_abilities.len()
     }
 
+    /// Returns local types, including parameters and local variables.
     pub(crate) fn local_tys(&self) -> &[Type] {
         &self.local_tys
     }
@@ -668,9 +715,11 @@ impl Function {
 // A function instantiation.
 #[derive(Clone, Debug)]
 pub(crate) struct FunctionInstantiation {
-    // index to `ModuleCache::functions` global table
     pub(crate) handle: FunctionHandle,
     pub(crate) instantiation: Vec<Type>,
+    // Unique ID for type arg instantiation. If type arguments are non-generic, is set. For generic
+    // type arguments kept not set.
+    pub(crate) ty_args_id: Option<TypeVecId>,
 }
 
 #[derive(Clone, Debug)]

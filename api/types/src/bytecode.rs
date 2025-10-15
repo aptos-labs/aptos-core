@@ -54,6 +54,13 @@ pub trait Bytecode {
         }
     }
 
+    fn struct_is_enum(&self, def: &StructDefinition) -> bool {
+        matches!(
+            def.field_information,
+            StructFieldInformation::DeclaredVariants(_)
+        )
+    }
+
     fn new_move_struct_field(&self, def: &FieldDefinition) -> MoveStructField {
         MoveStructField {
             name: self.identifier_at(def.name).to_owned().into(),
@@ -85,6 +92,12 @@ pub trait Bytecode {
             SignatureToken::U64 => MoveType::U64,
             SignatureToken::U128 => MoveType::U128,
             SignatureToken::U256 => MoveType::U256,
+            SignatureToken::I8 => MoveType::I8,
+            SignatureToken::I16 => MoveType::I16,
+            SignatureToken::I32 => MoveType::I32,
+            SignatureToken::I64 => MoveType::I64,
+            SignatureToken::I128 => MoveType::I128,
+            SignatureToken::I256 => MoveType::I256,
             SignatureToken::Address => MoveType::Address,
             SignatureToken::Signer => MoveType::Signer,
             SignatureToken::Vector(t) => MoveType::Vector {
@@ -136,6 +149,7 @@ pub trait Bytecode {
         };
         let name = self.identifier_at(handle.name).to_owned();
         let is_event = self.struct_is_event(&name);
+        let is_enum = self.struct_is_enum(def);
         let abilities = handle
             .abilities
             .into_iter()
@@ -150,6 +164,7 @@ pub trait Bytecode {
             name: name.into(),
             is_native,
             is_event,
+            is_enum,
             abilities,
             generic_type_params,
             fields,

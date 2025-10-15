@@ -8,7 +8,9 @@ mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
 mod cyclomatic_complexity;
+mod empty_if;
 mod equal_operands_in_bin_op;
+mod find_unnecessary_casts;
 mod known_to_abort;
 mod needless_bool;
 mod needless_deref_ref;
@@ -33,7 +35,9 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<empty_if::EmptyIf>::default(),
         Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
+        Box::<find_unnecessary_casts::FindUnnecessaryCasts>::default(),
         Box::<known_to_abort::KnownToAbort>::default(),
         Box::<needless_bool::NeedlessBool>::default(),
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
@@ -41,8 +45,8 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
         Box::<nonminimal_bool::NonminimalBool>::default(),
         Box::<self_assignment::SelfAssignment>::default(),
-        Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
         Box::<simpler_bool_expression::SimplerBoolExpression>::default(),
+        Box::<simpler_numeric_expression::SimplerNumericExpression>::default(),
         Box::<unnecessary_boolean_identity_comparison::UnnecessaryBooleanIdentityComparison>::default(),
         Box::<unnecessary_numerical_extreme_comparison::UnnecessaryNumericalExtremeComparison>::default(),
         Box::<while_true::WhileTrue>::default(),

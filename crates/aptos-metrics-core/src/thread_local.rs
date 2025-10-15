@@ -108,7 +108,7 @@ impl<'a> ThreadLocalHistogramTimer<'a> {
     }
 }
 
-impl<'a> Drop for ThreadLocalHistogramTimer<'a> {
+impl Drop for ThreadLocalHistogramTimer<'_> {
     fn drop(&mut self) {
         self.parent
             .observe_with(self.labels, self.start.elapsed().as_secs_f64());

@@ -149,7 +149,7 @@ impl<'a> ValueSerDeContext<'a> {
     pub(crate) fn check_depth(&self, depth: u64) -> PartialVMResult<()> {
         if self
             .max_value_nested_depth
-            .map_or(false, |max_depth| depth > max_depth)
+            .is_some_and(|max_depth| depth > max_depth)
         {
             return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
         }
@@ -193,7 +193,7 @@ impl<'a> ValueSerDeContext<'a> {
         let value = SerializationReadyValue {
             ctx: &self,
             layout,
-            value: &value.0,
+            value,
             depth: 1,
         };
 
@@ -223,7 +223,7 @@ impl<'a> ValueSerDeContext<'a> {
         let value = SerializationReadyValue {
             ctx: &self,
             layout,
-            value: &value.0,
+            value,
             depth: 1,
         };
         bcs::serialized_size(&value).map_err(|e| {

@@ -23,18 +23,34 @@ use move_model::{
     ty::Type,
     well_known,
 };
+use once_cell::sync::Lazy;
 use petgraph::{algo::kosaraju_scc, prelude::DiGraphMap};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, env};
 
 /// [TODO]: tune the heuristic limits below
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a caller function can grow to due to inlining.
-const MAX_CALLER_CODE_SIZE: usize = 1024;
+pub static MAX_CALLER_CODE_SIZE: Lazy<usize> = Lazy::new(|| {
+    env::var("MAX_CALLER_CODE_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1024)
+});
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a callee function can be for it to be considered for inlining.
-const MAX_CALLEE_CODE_SIZE: usize = 128;
+pub static MAX_CALLEE_CODE_SIZE: Lazy<usize> = Lazy::new(|| {
+    env::var("MAX_CALLEE_CODE_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(128)
+});
 /// Number of times we want to apply "unrolling" of functions with inlining.
-const UNROLL_DEPTH: usize = 10;
+pub static UNROLL_DEPTH: Lazy<usize> = Lazy::new(|| {
+    env::var("UNROLL_DEPTH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10)
+});
 
 /// Optimize functions in target modules by applying inlining transformations.
 /// With inlining, a call site of the form:
@@ -84,7 +100,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
     });
     let mut todo: Vec<_> = targets.keys().collect();
     // Each time you unroll, a call site may be substituted with the original body of the callee.
-    for _ in 0..UNROLL_DEPTH {
+    for _ in 0..*UNROLL_DEPTH {
         if todo.is_empty() {
             break;
         }
@@ -224,7 +240,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
             let callee_size = get_function_size_estimate(env, &callee);
             if callee_env.is_inline()
                 || callee_env.is_native()
-                || callee_size.code_size > MAX_CALLEE_CODE_SIZE
+                || callee_size.code_size > *MAX_CALLEE_CODE_SIZE
                 || has_explicit_return(&callee_env)
                 || has_privileged_operations(caller_mid, &callee_env)
                 || has_invisible_calls(caller_module, &callee_env, across_package)

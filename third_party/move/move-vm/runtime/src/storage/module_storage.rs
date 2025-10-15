@@ -4,7 +4,7 @@
 use crate::{
     loader::{LazyLoadedFunction, LazyLoadedFunctionState, Module},
     logging::expect_no_verification_errors,
-    WithRuntimeEnvironment,
+    LayoutCache, WithRuntimeEnvironment,
 };
 use ambassador::delegatable_trait;
 use bytes::Bytes;
@@ -31,7 +31,7 @@ use std::sync::Arc;
 /// Represents module storage backend, abstracting away any caching behaviour. The clients can
 /// implement their own module storage to pass to the VM to resolve code.
 #[delegatable_trait]
-pub trait ModuleStorage: WithRuntimeEnvironment {
+pub trait ModuleStorage: WithRuntimeEnvironment + LayoutCache {
     /// Returns true if the module exists, and false otherwise. An error is returned if there is a
     /// storage error.
     ///
@@ -195,6 +195,7 @@ pub trait ModuleStorage: WithRuntimeEnvironment {
 impl<T, E, V> ModuleStorage for T
 where
     T: WithRuntimeEnvironment
+        + LayoutCache
         + ModuleCache<
             Key = ModuleId,
             Deserialized = CompiledModule,

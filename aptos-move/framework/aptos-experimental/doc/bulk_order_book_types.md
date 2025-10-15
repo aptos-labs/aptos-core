@@ -102,34 +102,32 @@ ask_sizes
     -  [Aborts:](#@Aborts:_22)
 -  [Function `discard_price_crossing_levels`](#0x7_bulk_order_book_types_discard_price_crossing_levels)
 -  [Function `new_bulk_order_match`](#0x7_bulk_order_book_types_new_bulk_order_match)
-    -  [Arguments:](#@Arguments:_23)
-    -  [Returns:](#@Returns:_24)
 -  [Function `get_total_remaining_size`](#0x7_bulk_order_book_types_get_total_remaining_size)
 -  [Function `get_unique_priority_idx`](#0x7_bulk_order_book_types_get_unique_priority_idx)
+    -  [Arguments:](#@Arguments:_23)
+    -  [Returns:](#@Returns:_24)
+-  [Function `get_order_id`](#0x7_bulk_order_book_types_get_order_id)
     -  [Arguments:](#@Arguments:_25)
     -  [Returns:](#@Returns:_26)
--  [Function `get_order_id`](#0x7_bulk_order_book_types_get_order_id)
+-  [Function `get_account`](#0x7_bulk_order_book_types_get_account)
     -  [Arguments:](#@Arguments:_27)
     -  [Returns:](#@Returns:_28)
--  [Function `get_account`](#0x7_bulk_order_book_types_get_account)
+-  [Function `get_active_price`](#0x7_bulk_order_book_types_get_active_price)
     -  [Arguments:](#@Arguments:_29)
     -  [Returns:](#@Returns:_30)
--  [Function `get_active_price`](#0x7_bulk_order_book_types_get_active_price)
-    -  [Arguments:](#@Arguments:_31)
-    -  [Returns:](#@Returns:_32)
 -  [Function `get_all_prices`](#0x7_bulk_order_book_types_get_all_prices)
 -  [Function `get_all_sizes`](#0x7_bulk_order_book_types_get_all_sizes)
 -  [Function `get_active_size`](#0x7_bulk_order_book_types_get_active_size)
-    -  [Arguments:](#@Arguments:_33)
-    -  [Returns:](#@Returns:_34)
+    -  [Arguments:](#@Arguments:_31)
+    -  [Returns:](#@Returns:_32)
 -  [Function `reinsert_order`](#0x7_bulk_order_book_types_reinsert_order)
-    -  [Arguments:](#@Arguments:_35)
+    -  [Arguments:](#@Arguments:_33)
 -  [Function `match_order_and_get_next`](#0x7_bulk_order_book_types_match_order_and_get_next)
-    -  [Arguments:](#@Arguments:_36)
-    -  [Returns:](#@Returns:_37)
-    -  [Aborts:](#@Aborts:_38)
+    -  [Arguments:](#@Arguments:_34)
+    -  [Returns:](#@Returns:_35)
+    -  [Aborts:](#@Aborts:_36)
 -  [Function `set_empty`](#0x7_bulk_order_book_types_set_empty)
-    -  [Arguments:](#@Arguments:_39)
+    -  [Arguments:](#@Arguments:_37)
 -  [Function `destroy_bulk_order`](#0x7_bulk_order_book_types_destroy_bulk_order)
 
 
@@ -312,30 +310,6 @@ both original and remaining sizes for tracking purposes.
 
 </dd>
 <dt>
-<code>orig_bid_size: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>orig_ask_size: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>total_remaining_bid_size: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>total_remaining_ask_size: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
 <code>bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
 </dt>
 <dd>
@@ -481,18 +455,11 @@ A new <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrde
     } <b>else</b> {
         (ask_prices, ask_sizes)
     };
-    // Original bid and ask sizes are the sum of the sizes at each price level
-    <b>let</b> orig_bid_size = bid_sizes.fold(0, |acc, size| acc + size);
-    <b>let</b> orig_ask_size = ask_sizes.fold(0, |acc, size| acc + size);
     BulkOrder::V1 {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         unique_priority_idx,
         order_sequence_number,
-        orig_bid_size,
-        orig_ask_size,
-        total_remaining_bid_size: orig_bid_size, // Initially, the remaining size is the original size
-        total_remaining_ask_size: orig_ask_size, // Initially, the remaining size is the original size
         bid_prices: post_only_bid_prices,
         bid_sizes: post_only_bid_sizes,
         ask_prices: post_only_ask_prices,
@@ -903,26 +870,10 @@ Validates a bulk order request for correctness.
 
 ## Function `new_bulk_order_match`
 
-Creates a new single bulk order match result.
 
 
-<a id="@Arguments:_23"></a>
-
-### Arguments:
-
-- <code>order</code>: Reference to the bulk order being matched
-- <code>is_bid</code>: True if matching against bid side, false for ask side
-- <code>matched_size</code>: Size that was matched in this operation
-
-
-<a id="@Returns:_24"></a>
-
-### Returns:
-
-A <code>SingleBulkOrderMatch</code> containing the match details.
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
+<pre><code>#[lint::skip(#[needless_mutable_reference])]
+<b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_match">new_bulk_order_match</a>&lt;M: <b>copy</b>, drop, store&gt;(order: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, is_bid: bool, matched_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
 </code></pre>
 
 
@@ -936,10 +887,10 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
     is_bid: bool,
     matched_size: u64
 ): OrderMatch&lt;M&gt; {
-    <b>let</b> price = <b>if</b> (is_bid) {
-        order.bid_prices[0]
+    <b>let</b> (price, remaining_size) = <b>if</b> (is_bid) {
+        (order.bid_prices[0], order.bid_sizes[0]  - matched_size)
     } <b>else</b> {
-        order.ask_prices[0]
+        (order.ask_prices[0], order.ask_sizes[0] - matched_size)
     };
     new_order_match&lt;M&gt;(
         new_order_match_details&lt;M&gt;(
@@ -948,8 +899,8 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             order.<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_unique_priority_idx">get_unique_priority_idx</a>(),
             price,
-            order.orig_bid_size + order.orig_ask_size,
-            order.total_remaining_bid_size + order.total_remaining_ask_size - matched_size,
+            0, // Original size is not applicable for bulk orders
+            remaining_size,
             is_bid,
             good_till_cancelled(),
             order.metadata,
@@ -984,9 +935,9 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
     is_bid: bool,
 ): u64 {
     <b>if</b> (is_bid) {
-        self.total_remaining_bid_size
+        self.bid_sizes.fold(0, |acc, size| acc + size)
     } <b>else</b> {
-        self.total_remaining_ask_size
+        self.ask_sizes.fold(0, |acc, size| acc + size)
     }
 }
 </code></pre>
@@ -1002,14 +953,14 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
 Gets the unique priority index of a bulk order.
 
 
-<a id="@Arguments:_25"></a>
+<a id="@Arguments:_23"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_26"></a>
+<a id="@Returns:_24"></a>
 
 ### Returns:
 
@@ -1043,14 +994,14 @@ The unique priority index for time-based ordering.
 Gets the order ID of a bulk order.
 
 
-<a id="@Arguments:_27"></a>
+<a id="@Arguments:_25"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_28"></a>
+<a id="@Returns:_26"></a>
 
 ### Returns:
 
@@ -1084,14 +1035,14 @@ The unique order identifier.
 Gets the account of a bulk order.
 
 
-<a id="@Arguments:_29"></a>
+<a id="@Arguments:_27"></a>
 
 ### Arguments:
 
 - <code>self</code>: Reference to the bulk order
 
 
-<a id="@Returns:_30"></a>
+<a id="@Returns:_28"></a>
 
 ### Returns:
 
@@ -1125,7 +1076,7 @@ The account that placed the order.
 Gets the active price for a specific side of a bulk order.
 
 
-<a id="@Arguments:_31"></a>
+<a id="@Arguments:_29"></a>
 
 ### Arguments:
 
@@ -1133,7 +1084,7 @@ Gets the active price for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid price, false for ask price
 
 
-<a id="@Returns:_32"></a>
+<a id="@Returns:_30"></a>
 
 ### Returns:
 
@@ -1235,7 +1186,7 @@ An option containing the active price if available, none otherwise.
 Gets the active size for a specific side of a bulk order.
 
 
-<a id="@Arguments:_33"></a>
+<a id="@Arguments:_31"></a>
 
 ### Arguments:
 
@@ -1243,7 +1194,7 @@ Gets the active size for a specific side of a bulk order.
 - <code>is_bid</code>: True to get bid size, false for ask size
 
 
-<a id="@Returns:_34"></a>
+<a id="@Returns:_32"></a>
 
 ### Returns:
 
@@ -1293,7 +1244,7 @@ of the bulk order. If the price already exists at the first level, it increases
 the size; otherwise, it inserts the new price level at the front.
 
 
-<a id="@Arguments:_35"></a>
+<a id="@Arguments:_33"></a>
 
 ### Arguments:
 
@@ -1315,21 +1266,19 @@ the size; otherwise, it inserts the new price level at the front.
     other: &OrderMatchDetails&lt;M&gt;,
 ) {
     // Reinsert the order into the bulk order
-    <b>let</b> (prices, sizes, total_remaining) = <b>if</b> (other.is_bid_from_match_details()) {
-        (&<b>mut</b> self.bid_prices, &<b>mut</b> self.bid_sizes, &<b>mut</b> self.total_remaining_bid_size)
+    <b>let</b> (prices, sizes) = <b>if</b> (other.is_bid_from_match_details()) {
+        (&<b>mut</b> self.bid_prices, &<b>mut</b> self.bid_sizes)
     } <b>else</b> {
-        (&<b>mut</b> self.ask_prices, &<b>mut</b> self.ask_sizes, &<b>mut</b> self.total_remaining_ask_size)
+        (&<b>mut</b> self.ask_prices, &<b>mut</b> self.ask_sizes)
     };
     // Reinsert the price and size at the front of the respective vectors - <b>if</b> the price already <b>exists</b>, we ensure that
     // it is same <b>as</b> the reinsertion price and we just increase the size
     // If the price does not exist, we insert it at the front.
     <b>if</b> (prices.length() &gt; 0 && prices[0] == other.get_price_from_match_details()) {
         sizes[0] += other.get_remaining_size_from_match_details(); // Increase the size at the first price level
-        *total_remaining += other.get_remaining_size_from_match_details(); // Increase the total remaining size
     } <b>else</b> {
         prices.insert(0, other.get_price_from_match_details()); // Insert the new price at the front
         sizes.insert(0, other.get_remaining_size_from_match_details()); // Insert the new size at the front
-        *total_remaining += other.get_remaining_size_from_match_details(); // Set the total remaining size <b>to</b> the new size
     }
 }
 </code></pre>
@@ -1348,7 +1297,7 @@ This function reduces the size at the first price level by the matched size.
 If the first level becomes empty, it is removed and the next level becomes active.
 
 
-<a id="@Arguments:_36"></a>
+<a id="@Arguments:_34"></a>
 
 ### Arguments:
 
@@ -1357,14 +1306,14 @@ If the first level becomes empty, it is removed and the next level becomes activ
 - <code>matched_size</code>: Size that was matched in this operation
 
 
-<a id="@Returns:_37"></a>
+<a id="@Returns:_35"></a>
 
 ### Returns:
 
 A tuple containing the next active price and size as options.
 
 
-<a id="@Aborts:_38"></a>
+<a id="@Aborts:_36"></a>
 
 ### Aborts:
 
@@ -1385,14 +1334,13 @@ A tuple containing the next active price and size as options.
     is_bid: bool,
     matched_size: u64,
 ): (Option&lt;u64&gt;, Option&lt;u64&gt;) {
-    <b>let</b> (prices, sizes, total_remaining) = <b>if</b> (is_bid) {
-        (&<b>mut</b> self.bid_prices, &<b>mut</b> self.bid_sizes, &<b>mut</b> self.total_remaining_bid_size)
+    <b>let</b> (prices, sizes) = <b>if</b> (is_bid) {
+        (&<b>mut</b> self.bid_prices, &<b>mut</b> self.bid_sizes)
     } <b>else</b> {
-        (&<b>mut</b> self.ask_prices, &<b>mut</b> self.ask_sizes, &<b>mut</b> self.total_remaining_ask_size)
+        (&<b>mut</b> self.ask_prices, &<b>mut</b> self.ask_sizes)
     };
     <b>assert</b>!(matched_size &lt;= sizes[0], <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EUNEXPECTED_MATCH_SIZE">EUNEXPECTED_MATCH_SIZE</a>); // Ensure the remaining size is not more than the size at the first price level
     sizes[0] -= matched_size; // Decrease the size at the first price level by the matched size
-    *total_remaining -= matched_size; // Decrease the total remaining size
     <b>if</b> (sizes[0] == 0) {
         // If the size at the first price level is now 0, remove this price level
         prices.remove(0);
@@ -1417,7 +1365,7 @@ A tuple containing the next active price and size as options.
 Sets the bulk order to empty state by clearing all sizes.
 
 
-<a id="@Arguments:_39"></a>
+<a id="@Arguments:_37"></a>
 
 ### Arguments:
 
@@ -1436,8 +1384,6 @@ Sets the bulk order to empty state by clearing all sizes.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_set_empty">set_empty</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;
 ) {
-    self.total_remaining_bid_size = 0;
-    self.total_remaining_ask_size = 0;
     self.bid_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     self.ask_sizes = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
     self.bid_prices = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
@@ -1455,7 +1401,7 @@ Sets the bulk order to empty state by clearing all sizes.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, u64, u64, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, M)
+<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order">destroy_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, M)
 </code></pre>
 
 
@@ -1471,10 +1417,6 @@ Sets the bulk order to empty state by clearing all sizes.
     <b>address</b>,
     UniqueIdxType,
     u64,
-    u64,
-    u64,
-    u64,
-    u64,
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -1486,10 +1428,6 @@ Sets the bulk order to empty state by clearing all sizes.
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         unique_priority_idx,
         order_sequence_number,
-        orig_bid_size,
-        orig_ask_size,
-        total_remaining_bid_size,
-        total_remaining_ask_size,
         bid_prices,
         bid_sizes,
         ask_prices,
@@ -1501,10 +1439,6 @@ Sets the bulk order to empty state by clearing all sizes.
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         unique_priority_idx,
         order_sequence_number,
-        orig_bid_size,
-        orig_ask_size,
-        total_remaining_bid_size,
-        total_remaining_ask_size,
         bid_prices,
         bid_sizes,
         ask_prices,

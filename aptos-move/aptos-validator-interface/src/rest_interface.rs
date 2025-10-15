@@ -370,9 +370,17 @@ impl AptosValidatorInterface for RestDebuggerInterface {
         start: Version,
         limit: u64,
     ) -> Result<Vec<PersistedAuxiliaryInfo>> {
-        self.0
-            .get_persisted_auxiliary_infos(start, limit)
-            .await
-            .map_err(|e| anyhow!(e))
+        // TODO: Once testnet and mainnet are upgraded to v1.37, return error when the REST API fails.
+        // self.0
+        //  .get_persisted_auxiliary_infos(start, limit)
+        //  .await
+        //  .map_err(|e| anyhow!(e))
+        match self.0.get_persisted_auxiliary_infos(start, limit).await {
+            Ok(auxiliary_infos) => Ok(auxiliary_infos),
+            Err(_) => {
+                // Fallback to empty auxiliary info when REST API fails
+                Ok(vec![PersistedAuxiliaryInfo::None; limit as usize])
+            },
+        }
     }
 }

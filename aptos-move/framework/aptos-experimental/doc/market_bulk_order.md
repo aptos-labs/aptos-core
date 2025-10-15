@@ -85,7 +85,7 @@ Returns:
         ask_sizes,
         metadata,
     ));
-    <b>let</b> (order_id, _, _, _, _, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = bulk_order.destroy_bulk_order(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
+    <b>let</b> (order_id, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = bulk_order.destroy_bulk_order(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
     // Emit an <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for the placed bulk order
     market.emit_event_for_bulk_order_placed(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bid_sizes, bid_prices, ask_sizes, ask_prices);
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
@@ -153,9 +153,17 @@ Parameters:
     user: <b>address</b>,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
-    <b>let</b> (order_id, remaining_bid_size, remaining_ask_size) = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>(user);
-    <b>if</b> (remaining_bid_size &gt; 0 || remaining_ask_size &gt; 0) {
-        callbacks.cleanup_bulk_orders(user, order_id);
+    <b>let</b> cancelled_bulk_order = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>(user);
+    <b>let</b> (order_id, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = cancelled_bulk_order.destroy_bulk_order();
+    <b>let</b> i = 0;
+    <b>while</b> (i &lt; bid_sizes.length()) {
+        callbacks.cleanup_bulk_order_at_price(user, order_id, <b>true</b>, bid_prices[i], bid_sizes[i]);
+        i += 1;
+    };
+    <b>let</b> j = 0;
+    <b>while</b> (j &lt; ask_sizes.length()) {
+        callbacks.cleanup_bulk_order_at_price(user, order_id, <b>false</b>, ask_prices[j], ask_sizes[j]);
+        j += 1;
     };
     market.emit_event_for_bulk_order_cancelled(order_id, user);
 }

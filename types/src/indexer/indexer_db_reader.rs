@@ -66,7 +66,7 @@ pub trait IndexerReader: Send + Sync {
     fn wait_for_internal_indexer(&self, version: Version) -> Result<()> {
         while self
             .get_latest_internal_indexer_ledger_version()?
-            .map_or(true, |v| v < version)
+            .is_none_or(|v| v < version)
         {
             std::thread::sleep(std::time::Duration::from_millis(200));
         }

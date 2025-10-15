@@ -21,7 +21,7 @@
 use crate::{
     move_types::{MoveAbility, MoveStructValue},
     Address, AssetType, EntryFunctionId, HashValue, HexEncodedBytes, IdentifierWrapper,
-    MoveModuleId, MoveStructTag, MoveType, StateKeyWrapper, U128, U256, U64,
+    MoveModuleId, MoveStructTag, MoveType, StateKeyWrapper, I128, I256, I64, U128, U256, U64,
 };
 use aptos_openapi::{impl_poem_parameter, impl_poem_type};
 use indoc::indoc;
@@ -177,9 +177,9 @@ impl_poem_type!(
 
             Move `bool` type value is serialized into `boolean`.
 
-            Move `u8`, `u16` and `u32` type value is serialized into `integer`.
+            Move `u8`, `u16`, `u32`, `i8`, `i16`, and `i32` type value is serialized into `integer`.
 
-            Move `u64`, `u128` and `u256` type value is serialized into `string`.
+            Move `u64`, `u128`, `u256`, `i64`, `i128`, and `i256` type value is serialized into `string`.
 
             Move `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.
             For example:
@@ -217,7 +217,7 @@ impl_poem_type!(
     "string",
     (
         pattern =
-            Some("^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$".to_string()),
+            Some("^(bool|u8|u16|u32|u64|u128|u256|i8|i16|i32|i64|i128|i256|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$".to_string()),
         description = Some(indoc! {"
             String representation of an on-chain Move type tag that is exposed in transaction payload.
                 Values:
@@ -228,6 +228,12 @@ impl_poem_type!(
                   - u64
                   - u128
                   - u256
+                  - i8
+                  - i16
+                  - i32
+                  - i64
+                  - i128
+                  - i256
                   - address
                   - signer
                   - vector: `vector<{non-reference MoveTypeId}>`
@@ -309,6 +315,51 @@ impl_poem_type!(
     )
 );
 
+impl_poem_type!(
+    I64,
+    "string",
+    (
+        example = Some(serde_json::Value::String("-32425224034".to_string())),
+        format = Some("int64"),
+        description = Some(indoc! {"
+        A string containing a 64-bit signed integer.
+
+        We represent i64 values as a string to ensure compatibility with languages such
+        as JavaScript that do not parse i64s in JSON natively.
+    "})
+    )
+);
+
+impl_poem_type!(
+    I128,
+    "string",
+    (
+        example = Some(serde_json::Value::String("-32425224034".to_string())),
+        format = Some("int128"),
+        description = Some(indoc! {"
+        A string containing a 128-bit signed integer.
+
+        We represent i128 values as a string to ensure compatibility with languages such
+        as JavaScript that do not parse i128s in JSON natively.
+  "})
+    )
+);
+
+impl_poem_type!(
+    I256,
+    "string",
+    (
+        example = Some(serde_json::Value::String("-32425224034".to_string())),
+        format = Some("int256"),
+        description = Some(indoc! {"
+        A string containing a 256-bit signed integer.
+
+        We represent i256 values as a string to ensure compatibility with languages such
+        as JavaScript that do not parse i256s in JSON natively.
+    "})
+    )
+);
+
 impl_poem_parameter!(
     Address,
     AssetType,
@@ -318,5 +369,7 @@ impl_poem_parameter!(
     MoveStructTag,
     StateKeyWrapper,
     U64,
-    U128
+    U128,
+    I64,
+    I128
 );

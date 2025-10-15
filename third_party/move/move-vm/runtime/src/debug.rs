@@ -12,6 +12,7 @@ use std::{
 };
 
 #[derive(Debug)]
+#[allow(unused)]
 enum DebugCommand {
     PrintStack,
     Step(usize),
@@ -109,12 +110,14 @@ impl FromStr for DebugCommand {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub(crate) struct DebugContext {
     breakpoints: BTreeSet<String>,
     input_checker: InputChecker,
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 enum InputChecker {
     StepRemaining(usize),
     StepOverRemaining {
@@ -128,6 +131,7 @@ enum InputChecker {
 }
 
 impl DebugContext {
+    #[allow(unused)]
     pub(crate) fn new() -> Self {
         Self {
             breakpoints: BTreeSet::new(),
@@ -135,6 +139,7 @@ impl DebugContext {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn debug_loop(
         &mut self,
         function: &LoadedFunction,
@@ -275,7 +280,7 @@ impl DebugContext {
                                 println!("        Locals:");
                                 if !function.local_tys().is_empty() {
                                     let mut s = String::new();
-                                    values::debug::print_locals(&mut s, locals).unwrap();
+                                    values::debug::print_locals(&mut s, locals, false).unwrap();
                                     println!("{}", s);
                                 } else {
                                     println!("            (none)");

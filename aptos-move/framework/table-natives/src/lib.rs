@@ -81,7 +81,7 @@ struct LayoutInfo {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
+    key_layout: TriompheArc<MoveTypeLayout>,
     value_layout_info: LayoutInfo,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
@@ -215,7 +215,7 @@ impl LayoutInfo {
             .type_to_type_layout_with_delayed_fields(value_ty)?
             .unpack();
         Ok(Self {
-            layout: TriompheArc::new(layout),
+            layout,
             contains_delayed_fields,
         })
     }

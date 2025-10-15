@@ -6,7 +6,10 @@
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
-    storage::environment::{RuntimeEnvironment, WithRuntimeEnvironment},
+    storage::{
+        environment::{RuntimeEnvironment, WithRuntimeEnvironment},
+        layout_cache::NoOpLayoutCache,
+    },
     ModuleStorage,
 };
 use ambassador::Delegate;
@@ -116,6 +119,7 @@ impl<Ctx> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'_, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
 {
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.ctx.runtime_environment()
     }
@@ -157,6 +161,8 @@ where
     }
 }
 
+impl<Ctx> NoOpLayoutCache for UnsyncModuleStorageImpl<'_, Ctx> {}
+
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
 #[derive(Delegate)]
 #[delegate(
@@ -168,6 +174,8 @@ where
     where = "Ctx: ModuleBytesStorage + WithRuntimeEnvironment"
 )]
 pub struct UnsyncModuleStorage<'ctx, Ctx>(UnsyncModuleStorageImpl<'ctx, Ctx>);
+
+impl<Ctx> NoOpLayoutCache for UnsyncModuleStorage<'_, Ctx> {}
 
 impl<'ctx, Ctx> UnsyncModuleStorage<'ctx, Ctx>
 where

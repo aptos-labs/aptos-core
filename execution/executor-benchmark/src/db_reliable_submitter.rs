@@ -2,7 +2,7 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::db_access::DbAccessUtil;
+use crate::{db_access::DbAccessUtil, transaction_generator::create_block_metadata_transaction};
 use anyhow::Result;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReaderWriter,
@@ -50,11 +50,15 @@ impl ReliableTransactionSubmitter for DbReliableTransactionSubmitter {
         txns: &[SignedTransaction],
         _state: &CounterState,
     ) -> Result<()> {
-        self.block_sender.send(
+        let mut block = Vec::new();
+        block.push(create_block_metadata_transaction(1, &self.db));
+        block.extend(
             txns.iter()
                 .map(|t| Transaction::UserTransaction(t.clone()))
-                .collect(),
-        )?;
+                .collect::<Vec<_>>(),
+        );
+
+        self.block_sender.send(block)?;
 
         let start = Instant::now();
         for txn in txns {
