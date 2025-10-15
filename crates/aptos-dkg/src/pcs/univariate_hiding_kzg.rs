@@ -353,6 +353,7 @@ mod tests {
         }
     }
 
+    #[allow(non_snake_case)]
     #[test]
     fn test_open_and_verify_roundtrip() {
         let mut rng = thread_rng(); // not used

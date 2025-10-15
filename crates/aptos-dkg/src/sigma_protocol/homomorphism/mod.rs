@@ -79,7 +79,7 @@ pub trait EntrywiseMap<T> {
         U: CanonicalSerialize + CanonicalDeserialize + Clone;
 }
 
-/// A trivial wrapper type for a single value. Typically used when the Codomain would've been E::G1
+/// A trivial wrapper type for a single value. Should be used when the Codomain would've been something like E::G1
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub T);
 

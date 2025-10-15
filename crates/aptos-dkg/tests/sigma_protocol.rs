@@ -1,11 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto_derive::SigmaProtocolWitness;
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{fixedbasemsms::FixedBaseMsms, tuple::TupleHomomorphism, Trait},
+        homomorphism::{fixedbasemsms::FixedBaseMsms, tuple::TupleHomomorphism},
     },
     Scalar,
 };
@@ -54,8 +53,13 @@ mod schnorr {
     }
 
     impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
-        const DST: &[u8] = b"Schnorr";
-        const DST_VERIFIER: &[u8] = b"Schnorr-verifier";
+        fn dst(&self) -> Vec<u8> {
+            b"Schnorr".to_vec()
+        }
+
+        fn dst_verifier(&self) -> Vec<u8> {
+            b"Schnorr-verifier".to_vec()
+        }
     }
 
     impl<E: Pairing> homomorphism::Trait for Schnorr<E> {
@@ -90,39 +94,26 @@ mod schnorr {
     }
 }
 
-// mod chaum_pedersen {
-//     use super::{schnorr::*, *};
-//     use sigma_protocol::{homomorphism::TrivialShape as CodomainShape};
-//     use crate::homomorphism::TupleCodomainShape;
+mod chaum_pedersen {
+    use super::{schnorr::*, *};
 
-//     pub(crate) struct ChaumPedersen<E: Pairing> {
-//         pub g1: E::G1Affine,
-//         pub g2: E::G1Affine,
-//     }
+    pub type ChaumPedersen<E> = TupleHomomorphism<Schnorr<E>, Schnorr<E>>;
 
-//     impl<E: Pairing> Default for ChaumPedersen<E> {
-//         fn default() -> Self {
-//             let g1 = E::G1::generator().into_affine();
-//             let g2 = (g1 * E::ScalarField::from(123456789u64)).into_affine();
-//             Self { g1, g2 }
-//         }
-//     }
+    pub fn make_chaum_pedersen<E: Pairing>() -> ChaumPedersen<E> {
+        let g1 = E::G1::generator().into_affine();
+        let g2 = (g1 * E::ScalarField::from(123456789u64)).into_affine();
 
-//     impl<E: Pairing> sigma_protocol::Trait<E> for ChaumPedersen<E> {
-//         type Hom = TupleHomomorphism<ExponentiateBase<E>, ExponentiateBase<E>>;
-//         type Statement = TupleCodomainShape<CodomainShape<E::G1>, CodomainShape<E::G1>>;
-//         type Witness = Domain<E>;
+        let s1 = Schnorr { g: g1 };
+        let s2 = Schnorr { g: g2 };
 
-//         const DST: &[u8] = b"Chaum-Pedersen";
-//         const DST_VERIFIER: &[u8] = b"Chaum-Pedersen-verifier";
-
-//         fn homomorphism(&self) -> Self::Hom {
-//             let hom1 = ExponentiateBase { g: self.g1 };
-//             let hom2 = ExponentiateBase { g: self.g2 };
-//             TupleHomomorphism { hom1, hom2 }
-//         }
-//     }
-// }
+        TupleHomomorphism {
+            hom1: s1,
+            hom2: s2,
+            dst: b"Chaum-Pedersen DST".to_vec(),
+            dst_verifier: b"Chaum-Pedersen verifier DST".to_vec(),
+        }
+    }
+}
 
 #[test]
 fn test_schnorr() {
@@ -139,21 +130,20 @@ fn test_schnorr() {
     test_sigma_protocol::<Bls12_381, _>(Schnorr::default(), witness_bls);
 }
 
-// #[test]
-// fn test_chaum_pedersen() {
-//     use chaum_pedersen::*;
-//     use schnorr::*;
+#[test]
+fn test_chaum_pedersen() {
+    use chaum_pedersen::*;
 
-//     let mut rng = thread_rng();
+    let mut rng = thread_rng();
 
-//     // ---- Bn254 ----
-//     let witness_bn = Domain(<Bn254 as Pairing>::ScalarField::rand(&mut rng));
-//     test_sigma_protocol::<Bn254, _>(ChaumPedersen::default(), witness_bn);
+    // ---- Bn254 ----
+    let witness_bn = Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng));
+    test_sigma_protocol::<Bn254, _>(make_chaum_pedersen(), witness_bn);
 
-//     // ---- Bls12_381 ----
-//     let witness_bls = Domain(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
-//     test_sigma_protocol::<Bls12_381, _>(ChaumPedersen::default(), witness_bls);
-// }
+    // ---- Bls12_381 ----
+    let witness_bls = Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
+    test_sigma_protocol::<Bls12_381, _>(make_chaum_pedersen(), witness_bls);
+}
 
 #[test]
 fn test_dekart_sigma() {

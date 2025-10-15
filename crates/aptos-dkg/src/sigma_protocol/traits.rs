@@ -29,8 +29,8 @@ pub trait Trait<E: Pairing>:
 {
 //    type Statement: Statement;
 
-    const DST: &[u8];
-    const DST_VERIFIER: &[u8];
+    fn dst(&self) -> Vec<u8>;
+    fn dst_verifier(&self) -> Vec<u8>;
 
     fn prove<R: RngCore + CryptoRng>(
         &self,
@@ -38,7 +38,7 @@ pub trait Trait<E: Pairing>:
         transcript: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Proof<E, Self> {
-        prove_homomorphism(self, witness, transcript, true, rng, Self::DST)
+        prove_homomorphism(self, witness, transcript, true, rng, &self.dst())
     }
 
     #[allow(non_snake_case)]
@@ -126,8 +126,8 @@ pub trait Trait<E: Pairing>:
             },
             &proof.z,
             transcript,
-            Self::DST,
-            Self::DST_VERIFIER,
+            &self.dst(),
+            &self.dst_verifier(),
         )
     }
 }
@@ -445,7 +445,7 @@ pub fn verify_msm_hom<E: Pairing, H>(
     prover_last_message: &H::Domain,
     fs_transcript: &mut merlin::Transcript,
     dst: &[u8],
-    dst_verifier: &[u8],
+    _dst_verifier: &[u8],
 ) -> anyhow::Result<()>
 where
     H: FixedBaseMsms<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>, // TODO: Scalar should probably be Scalar<E>

@@ -27,6 +27,8 @@ where
 {
     pub hom1: H1,
     pub hom2: H2,
+    pub dst: Vec<u8>,
+    pub dst_verifier: Vec<u8>,
 }
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
@@ -174,5 +176,29 @@ where
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
         H1::msm_eval(bases, scalars)
+    }
+}
+
+use crate::{sigma_protocol, sigma_protocol::Witness};
+use ark_ec::pairing::Pairing;
+
+impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
+where
+    H1: FixedBaseMsms<MsmOutput = E::G1, Base = E::G1Affine, Scalar = E::ScalarField>,
+    H2: FixedBaseMsms<
+        Domain = H1::Domain,
+        Scalar = H1::Scalar,
+        Base = H1::Base,
+        MsmInput = H1::MsmInput,
+        MsmOutput = H1::MsmOutput,
+    >,
+    H1::Domain: Witness<E>,
+{
+    fn dst(&self) -> Vec<u8> {
+        self.dst.clone()
+    }
+
+    fn dst_verifier(&self) -> Vec<u8> {
+        self.dst_verifier.clone()
     }
 }

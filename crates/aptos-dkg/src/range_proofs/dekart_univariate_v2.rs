@@ -1041,7 +1041,12 @@ pub mod two_term_msm {
     }
 
     impl<E: Pairing> sigma_protocol::Trait<E> for Homomorphism<E> {
-        const DST: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL";
-        const DST_VERIFIER: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER";
+        fn dst(&self) -> Vec<u8> {
+            b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
+        }
+
+        fn dst_verifier(&self) -> Vec<u8> {
+            b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER".to_vec()
+        }
     }
 }
