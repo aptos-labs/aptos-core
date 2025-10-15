@@ -476,21 +476,20 @@ impl FatLoopBuilder {
             if cfg.successors(*block_id).len() == 1 && !block[block.len() - 1].is_branching() {
                 let successor_id = cfg.successors(*block_id).first().unwrap();
                 let successor_label_opt = id_label_map.get(successor_id).copied();
-                if let Some(successor_label) = successor_label_opt
-                    && i != blocks.len() - 1
-                    && !blocks.get(i + 1).unwrap().1.is_empty()
-                {
-                    if let Some(lbl) = blocks.get(i + 1).unwrap().1[0].get_label_inner_opt() {
-                        if lbl != successor_label {
-                            let mut new_block = block.clone();
-                            // Inserted bc is used for jumping to its successor so
-                            // we just use the attr_id of its previous bc
-                            new_block.push(Bytecode::Jump(
-                                block[block.len() - 1].get_attr_id(),
-                                Label::new(successor_label as usize),
-                            ));
-                            results.push(new_block);
-                            continue;
+                if let Some(successor_label) = successor_label_opt {
+                    if i != blocks.len() - 1 && !blocks.get(i + 1).unwrap().1.is_empty() {
+                        if let Some(lbl) = blocks.get(i + 1).unwrap().1[0].get_label_inner_opt() {
+                            if lbl != successor_label {
+                                let mut new_block = block.clone();
+                                // Inserted bc is used for jumping to its successor so
+                                // we just use the attr_id of its previous bc
+                                new_block.push(Bytecode::Jump(
+                                    block[block.len() - 1].get_attr_id(),
+                                    Label::new(successor_label as usize),
+                                ));
+                                results.push(new_block);
+                                continue;
+                            }
                         }
                     }
                 }

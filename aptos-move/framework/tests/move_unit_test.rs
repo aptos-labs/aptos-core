@@ -30,6 +30,9 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
     let pkg_path = path_in_crate(path_to_pkg);
     let compiler_config = CompilerConfig {
         known_attributes: extended_checks::get_all_attribute_names().clone(),
+        // Enable compile-for-testing experiment to make __COMPILE_FOR_TESTING__ available in tests
+        // Note: __COMPILE_FOR_TESTING__ requires language version >= 2.3
+        experiments: vec!["compile-for-testing".to_string()],
         ..Default::default()
     };
     let mut build_config = move_package::BuildConfig {
@@ -39,7 +42,13 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
         full_model_generation: true, // Run extended checks also on test code
         ..Default::default()
     };
-    if use_latest_language {
+
+    // Use latest language version when requested via environment variable or use_latest_language parameter
+    // Note: __COMPILE_FOR_TESTING__ requires language version >= 2.3
+    let enable_latest_language =
+        use_latest_language || std::env::var("USE_LATEST_LANGUAGE").is_ok_and(|v| v == "1");
+
+    if enable_latest_language {
         let latest_build_options = BuildOptions::default().set_latest_language();
         build_config.compiler_config.bytecode_version = latest_build_options.bytecode_version;
         build_config.compiler_config.language_version = latest_build_options.language_version;
