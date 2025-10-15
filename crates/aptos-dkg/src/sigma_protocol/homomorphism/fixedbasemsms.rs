@@ -4,7 +4,7 @@
 use crate::sigma_protocol::{homomorphism, homomorphism::EntrywiseMap};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
-/// Workaround (see trait FixedBaseMsms below) because stable Rust does not yet support associated type defaults.
+/// Workaround (see the main trait below) because stable Rust does not yet support associated type defaults.
 pub trait IsMsmInput<B, S> {
     /// Returns a reference to the slice of base elements in this MSM input.
     fn bases(&self) -> &[B];
