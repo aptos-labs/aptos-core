@@ -8083,7 +8083,7 @@ dependencies = [
  "chrono",
  "diesel_derives",
  "itoa",
- "num-bigint 0.4.4",
+ "num-bigint 0.2.6",
  "num-integer",
  "num-traits",
  "pq-sys",

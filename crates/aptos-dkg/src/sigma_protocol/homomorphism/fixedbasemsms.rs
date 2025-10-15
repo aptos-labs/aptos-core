@@ -80,11 +80,6 @@ pub trait FixedBaseMsms:
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-    : EntrywiseMap<T, Output<T> = Self::CodomainShape<T>>
-    + IntoIterator<Item = T>     // TODO: leads to cloning - is this ideal?
-    + CanonicalSerialize
-    + CanonicalDeserialize
-    + Clone
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone;
 
@@ -112,7 +107,10 @@ pub trait FixedBaseMsms:
     }
 }
 
-impl<H, LargerDomain: Sync> FixedBaseMsms for homomorphism::LiftHomomorphism<H, LargerDomain>
+// Implements FixedBaseMsms for the LiftHomomorphism wrapper.
+// This allows us to perform multi-scalar multiplications (MSM) on a "lifted" homomorphism
+// by delegating the actual MSM computation to the underlying homomorphism type `H`.
+impl<H, LargerDomain> FixedBaseMsms for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
     H: FixedBaseMsms,
 {
