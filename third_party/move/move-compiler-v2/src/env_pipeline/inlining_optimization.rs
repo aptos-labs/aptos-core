@@ -70,7 +70,9 @@ pub static UNROLL_DEPTH: Lazy<usize> = Lazy::new(|| {
 /// With across-package inlining, calls to functions in other packages may be inlined,
 /// which means that if the other package is upgraded, one would get the behavior
 /// at the inline-time rather than the latest upgrade.
-pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
+/// With `allow_non_primary_targets`, inlining optimization is performed to functions
+/// that do not belong to the primary target.
+pub fn optimize(env: &mut GlobalEnv, across_package: bool, allow_non_primary_targets: bool) {
     let mut targets = RewriteTargets::create(env, RewritingScope::CompilationTarget);
     let skip_functions = find_cycles_in_call_graph(env, &targets);
     targets.filter(|target, _| {
@@ -78,7 +80,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             let function = env.get_function(*function_id);
             // We will consider inlining the callees in a function only if it satisfies all of:
             // - is not a part of a cycle in the call graph
-            // - is in a primary target module
+            // - is in a primary target module (if `allow_non_primary_targets` is false)
             // - is not in a script module
             // - is not a test only function
             // - is not a verify only function
@@ -86,7 +88,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             // - is not an inline function
             // - does not have the `#[module_lock]` attribute
             !skip_functions.contains(function_id)
-                && function.module_env.is_primary_target()
+                && (allow_non_primary_targets || function.module_env.is_primary_target())
                 && !function.module_env.is_script_module()
                 && !function.is_test_only()
                 && !function.is_verify_only()

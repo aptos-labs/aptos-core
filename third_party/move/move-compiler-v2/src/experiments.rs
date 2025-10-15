@@ -117,6 +117,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS.to_string(),
+            description: "Turns on or off restricting inlining optimization to primary target modules".to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::SPEC_CHECK.to_string(),
             description: "Turns on or off specification checks".to_string(),
             default: Inherited(Experiment::CHECKS.to_string()),
@@ -319,6 +324,8 @@ impl Experiment {
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
     pub const INLINING: &'static str = "inlining";
     pub const INLINING_OPTIMIZATION: &'static str = "inlining-optimization";
+    pub const INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS: &'static str =
+        "inlining-optimization-to-non-primary-targets";
     pub const KEEP_INLINE_FUNS: &'static str = "keep-inline-funs";
     pub const KEEP_UNINIT_ANNOTATIONS: &'static str = "keep-uninit-annotations";
     pub const LAMBDA_LIFTING_INLINE: &'static str = "lambda-lifting-inline";
