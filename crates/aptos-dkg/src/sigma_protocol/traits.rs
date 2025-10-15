@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{fiat_shamir, sigma_protocol::homomorphism::FixedBaseMsms, utils, Scalar};
+use crate::{
+    fiat_shamir, sigma_protocol::homomorphism::fixedbasemsms::FixedBaseMsms, utils, Scalar,
+};
 use anyhow::ensure;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_ff::AdditiveGroup;
@@ -435,7 +437,7 @@ where
 //     ans
 // }
 
-use crate::sigma_protocol::{homomorphism, homomorphism::IsMsmInput};
+use crate::sigma_protocol::{homomorphism, homomorphism::fixedbasemsms::IsMsmInput};
 use ark_ec::CurveGroup;
 
 #[allow(non_snake_case)]

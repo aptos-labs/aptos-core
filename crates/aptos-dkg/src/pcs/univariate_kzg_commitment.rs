@@ -3,7 +3,7 @@
 
 use crate::sigma_protocol::{
     homomorphism,
-    homomorphism::{EntrywiseMap, FixedBaseMsms},
+    homomorphism::{fixedbasemsms::FixedBaseMsms, EntrywiseMap},
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::CanonicalDeserialize;
@@ -61,13 +61,13 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq> IntoIterator for
     }
 }
 
-impl<'a, E: Pairing> homomorphism::FixedBaseMsms for Homomorphism<'a, E> {
+impl<'a, E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Homomorphism<'a, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
-    type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -83,7 +83,7 @@ impl<'a, E: Pairing> homomorphism::FixedBaseMsms for Homomorphism<'a, E> {
         scalars.push(input.0);
         scalars.extend_from_slice(&input.1);
 
-        CodomainShape(homomorphism::MsmInput {
+        CodomainShape(homomorphism::fixedbasemsms::MsmInput {
             bases: self.lagr_g1[..1 + input.1.len()].to_vec(),
             scalars,
         })

@@ -4,7 +4,10 @@
 use crate::{
     algebra::{polynomials, GroupGenerators},
     sigma_protocol,
-    sigma_protocol::{homomorphism, homomorphism::Trait},
+    sigma_protocol::{
+        homomorphism,
+        homomorphism::{fixedbasemsms::FixedBaseMsms, Trait},
+    },
     Scalar,
 };
 use anyhow::ensure;
@@ -231,8 +234,6 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     // }
 }
 
-use crate::sigma_protocol::homomorphism::FixedBaseMsms;
-
 pub struct Homomorphism<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
@@ -283,13 +284,13 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq> Into
     }
 }
 
-impl<'a, E: Pairing> homomorphism::FixedBaseMsms for Homomorphism<'a, E> {
+impl<'a, E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Homomorphism<'a, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
-    type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -309,7 +310,7 @@ impl<'a, E: Pairing> homomorphism::FixedBaseMsms for Homomorphism<'a, E> {
         bases.push(self.xi_1);
         bases.extend(&self.lagr_g1[..input.1.len()]);
 
-        CodomainShape(homomorphism::MsmInput { bases, scalars })
+        CodomainShape(homomorphism::fixedbasemsms::MsmInput { bases, scalars })
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {

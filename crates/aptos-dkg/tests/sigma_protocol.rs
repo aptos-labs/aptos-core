@@ -5,7 +5,7 @@ use aptos_crypto_derive::SigmaProtocolWitness;
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{FixedBaseMsms, Trait, TupleHomomorphism},
+        homomorphism::{fixedbasemsms::FixedBaseMsms, tuple::TupleHomomorphism, Trait},
     },
     Scalar,
 };
@@ -67,18 +67,18 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> homomorphism::FixedBaseMsms for Schnorr<E> {
+    impl<E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Schnorr<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq;
-        type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-            CodomainShape(homomorphism::MsmInput {
+            CodomainShape(homomorphism::fixedbasemsms::MsmInput {
                 bases: vec![self.g],
                 scalars: vec![input.0],
             })
@@ -166,5 +166,5 @@ fn test_dekart_sigma() {
         kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
         hiding_kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
     };
-    test_sigma_protocol::<Bn254, _>(TwoTermMsm::default(), witness_bn);
+    test_sigma_protocol::<Bn254, _>(Homomorphism::default(), witness_bn);
 }

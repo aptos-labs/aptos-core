@@ -5,7 +5,7 @@ use crate::{
     pcs::univariate_kzg_commitment,
     pvss::chunked_elgamal_field::chunked_elgamal,
     sigma_protocol,
-    sigma_protocol::homomorphism::{LiftHomomorphism, TupleHomomorphism},
+    sigma_protocol::homomorphism::{tuple::TupleHomomorphism, LiftHomomorphism},
     Scalar,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;

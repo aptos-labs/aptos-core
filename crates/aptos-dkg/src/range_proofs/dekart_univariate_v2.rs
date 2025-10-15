@@ -32,7 +32,7 @@ pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
 #[derive(CanonicalSerialize, Clone, PartialEq, Eq, CanonicalDeserialize)] // TODO: add Debug here, CanonicalDeserialize
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
-    pi_PoK: sigma_protocol::Proof<E, two_term_msm::TwoTermMsm<E>>,
+    pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
     Cj: Vec<E::G1>,
     D: E::G1,
     a: E::ScalarField,
@@ -241,7 +241,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_hat_f_commitment::<E>(fs_transcript, &hatC);
 
         // Step 3a
-        let sigma_protocol = two_term_msm::TwoTermMsm {
+        let sigma_protocol = two_term_msm::Homomorphism {
             base_1: lagr_g1[0],
             base_2: *xi_1,
         };
@@ -732,7 +732,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_hat_f_commitment::<E>(fs_transcript, &hatC);
 
         // Step 2c
-        let sigma_protocol = two_term_msm::TwoTermMsm {
+        let sigma_protocol = two_term_msm::Homomorphism {
             base_1: *zeroth_lagr,
             base_2: *xi_1,
         };
@@ -888,7 +888,7 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
         fs_transcript: &mut Transcript,
-        pi_PoK: &sigma_protocol::Proof<E, two_term_msm::TwoTermMsm<E>>,
+        pi_PoK: &sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sigma_proof(fs_transcript, pi_PoK);
     }
@@ -951,17 +951,17 @@ mod fiat_shamir {
 
 pub mod two_term_msm {
     use super::*;
-    use crate::sigma_protocol::homomorphism::FixedBaseMsms;
+    use crate::sigma_protocol::homomorphism::fixedbasemsms::FixedBaseMsms;
     use aptos_crypto_derive::SigmaProtocolWitness; // TODO: rename to SigmaProtocolWitness
 
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-    pub struct TwoTermMsm<E: Pairing> {
+    pub struct Homomorphism<E: Pairing> {
         // This is rather similar to a Pederson commitment!
         pub base_1: E::G1Affine,
         pub base_2: E::G1Affine,
     }
 
-    impl<E: Pairing> Default for TwoTermMsm<E> {
+    impl<E: Pairing> Default for Homomorphism<E> {
         fn default() -> Self {
             let base_1 = E::G1::generator().into_affine();
             let base_2 = (base_1 * E::ScalarField::from(123456789u64)).into_affine();
@@ -977,7 +977,7 @@ pub mod two_term_msm {
         pub hiding_kzg_randomness: Scalar<E>,
     }
 
-    impl<'a, E: Pairing> homomorphism::Trait for TwoTermMsm<E> {
+    impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<E> {
         type Codomain = CodomainShape<E::G1>;
         type Domain = Witness<E>;
 
@@ -1018,13 +1018,13 @@ pub mod two_term_msm {
         }
     }
 
-    impl<'a, E: Pairing> homomorphism::FixedBaseMsms for TwoTermMsm<E> {
+    impl<'a, E: Pairing> homomorphism::fixedbasemsms::FixedBaseMsms for Homomorphism<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + PartialEq + Eq;
-        type MsmInput = homomorphism::MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
 
@@ -1037,7 +1037,7 @@ pub mod two_term_msm {
             bases.push(self.base_1);
             bases.push(self.base_2);
 
-            CodomainShape(homomorphism::MsmInput { bases, scalars })
+            CodomainShape(homomorphism::fixedbasemsms::MsmInput { bases, scalars })
         }
 
         fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
@@ -1045,7 +1045,7 @@ pub mod two_term_msm {
         }
     }
 
-    impl<E: Pairing> sigma_protocol::Trait<E> for TwoTermMsm<E> {
+    impl<E: Pairing> sigma_protocol::Trait<E> for Homomorphism<E> {
         const DST: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL";
         const DST_VERIFIER: &'static [u8] = b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER";
     }
