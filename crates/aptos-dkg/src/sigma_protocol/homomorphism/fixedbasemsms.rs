@@ -43,8 +43,7 @@ impl<
 ///
 /// When such homomorphisms are used in a Σ-protocol, the resulting
 /// verification equations can be batched efficiently via a
-/// Schwartz–Zippel–style random linear combination.  
-/// This requires uniformly iterating over all MSMs involved in the proof
+/// Schwartz–Zippel–style random linear combination. This requires uniformly iterating over all MSMs involved in the proof
 /// and public statement.
 ///
 /// Typically, MSM bases are fixed early in the protocol (e.g., as powers of τ or other public parameters),

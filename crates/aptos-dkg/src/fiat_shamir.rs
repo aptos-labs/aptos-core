@@ -30,7 +30,7 @@ pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name need
 /// (like appending PVSS information), but most do require scalar
 /// derivation. This basic trait provides that functionality.
 ///
-/// ⚠️ This trait is intentionally private: `challenge_scalars`
+/// ⚠️ This trait is intentionally private: functions like `challenge_scalars`
 /// should **only** be used internally to ensure properly
 /// labelled scalar generation across protocols.
 trait ScalarProtocol<S: FromBytes> {
@@ -40,7 +40,7 @@ trait ScalarProtocol<S: FromBytes> {
         self.challenge_scalars(label, 1)[0]
     }
 
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<S>;
+    fn challenge_from_128bit_chunks(&mut self, num_scalars: usize) -> Vec<S>;
 }
 
 /// Trait for types that can be constructed from uniform bytes or 128-bit random bytes
@@ -93,7 +93,7 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
         result
     }
 
-    fn challenge_linear_combination_128bit(&mut self, num_scalars: usize) -> Vec<S> {
+    fn challenge_from_128bit_chunks(&mut self, num_scalars: usize) -> Vec<S> {
         // Allocate 16 bytes (128 bits) per scalar
         let mut buf = vec![0u8; num_scalars * 16];
         self.challenge_bytes(b"challenge_linear_combination", &mut buf);
@@ -301,7 +301,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField> {
         let challenges =
-            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_linear_combination_128bit(
+            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_from_128bit_chunks(
                 self,
                 ell + 1,
             );
@@ -311,7 +311,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
 
     fn challenges_for_linear_combination(&mut self, num: usize) -> Vec<E::ScalarField> {
         let challenges =
-            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_linear_combination_128bit(
+            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_from_128bit_chunks(
                 self, num,
             );
 

@@ -4,7 +4,7 @@
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{fixedbasemsms::Trait, tuple::TupleHomomorphism},
+        homomorphism::{fixedbasemsms, fixedbasemsms::Trait, tuple::TupleHomomorphism},
     },
     Scalar,
 };
@@ -52,16 +52,6 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
-        fn dst(&self) -> Vec<u8> {
-            b"Schnorr".to_vec()
-        }
-
-        fn dst_verifier(&self) -> Vec<u8> {
-            b"Schnorr-verifier".to_vec()
-        }
-    }
-
     impl<E: Pairing> homomorphism::Trait for Schnorr<E> {
         type Codomain = CodomainShape<E::G1>;
         type Domain = Scalar<E>;
@@ -71,18 +61,18 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> homomorphism::fixedbasemsms::Trait for Schnorr<E> {
+    impl<E: Pairing> fixedbasemsms::Trait for Schnorr<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone;
-        type MsmInput = homomorphism::fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-            CodomainShape(homomorphism::fixedbasemsms::MsmInput {
+            CodomainShape(fixedbasemsms::MsmInput {
                 bases: vec![self.g],
                 scalars: vec![input.0],
             })
@@ -90,6 +80,16 @@ mod schnorr {
 
         fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
             E::G1::msm(bases, scalars).expect("MSM failed in Schnorr")
+        }
+    }
+
+    impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
+        fn dst(&self) -> Vec<u8> {
+            b"Schnorr".to_vec()
+        }
+
+        fn dst_verifier(&self) -> Vec<u8> {
+            b"Schnorr-verifier".to_vec()
         }
     }
 }
