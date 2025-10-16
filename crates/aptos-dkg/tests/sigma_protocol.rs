@@ -99,16 +99,17 @@ mod chaum_pedersen {
 
     pub type ChaumPedersen<E> = TupleHomomorphism<Schnorr<E>, Schnorr<E>>;
 
-    pub fn make_chaum_pedersen<E: Pairing>() -> ChaumPedersen<E> {
+    // Implementing e.g. Default here would require a wrapper, but then sigma_protocol::Trait would have to get re-implemented...
+    pub fn make_chaum_pedersen_instance<E: Pairing>() -> ChaumPedersen<E> {
         let g1 = E::G1::generator().into_affine();
         let g2 = (g1 * E::ScalarField::from(123456789u64)).into_affine();
 
-        let s1 = Schnorr { g: g1 };
-        let s2 = Schnorr { g: g2 };
+        let schnorr1 = Schnorr { g: g1 };
+        let schnorr2 = Schnorr { g: g2 };
 
         TupleHomomorphism {
-            hom1: s1,
-            hom2: s2,
+            hom1: schnorr1,
+            hom2: schnorr2,
             dst: b"Chaum-Pedersen DST".to_vec(),
             dst_verifier: b"Chaum-Pedersen verifier DST".to_vec(),
         }
@@ -138,9 +139,9 @@ fn test_chaum_pedersen() {
 
     // ---- Bn254 ----
     let witness_bn = Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng));
-    test_sigma_protocol::<Bn254, _>(make_chaum_pedersen(), witness_bn);
+    test_sigma_protocol::<Bn254, _>(make_chaum_pedersen_instance(), witness_bn);
 
     // ---- Bls12_381 ----
     let witness_bls = Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
-    test_sigma_protocol::<Bls12_381, _>(make_chaum_pedersen(), witness_bls);
+    test_sigma_protocol::<Bls12_381, _>(make_chaum_pedersen_instance(), witness_bls);
 }

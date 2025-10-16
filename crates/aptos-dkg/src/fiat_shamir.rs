@@ -40,7 +40,7 @@ trait ScalarProtocol<S: FromBytes> {
         self.challenge_scalars(label, 1)[0]
     }
 
-    fn challenge_from_128bit_chunks(&mut self, num_scalars: usize) -> Vec<S>;
+    fn challenge_from_128bit_chunks(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
 }
 
 /// Trait for types that can be constructed from uniform bytes or 128-bit random bytes
@@ -82,7 +82,7 @@ impl FromBytes for blstrs::Scalar {
 impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
     fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
         let mut buf = vec![0u8; 2 * num_scalars * S::BYTE_SIZE];
-        self.challenge_bytes(label, &mut buf);
+        self.challenge_bytes(label, &mut buf); // Label is also appended here
 
         let result = buf
             .chunks(2 * S::BYTE_SIZE)
@@ -93,10 +93,10 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
         result
     }
 
-    fn challenge_from_128bit_chunks(&mut self, num_scalars: usize) -> Vec<S> {
+    fn challenge_from_128bit_chunks(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
         // Allocate 16 bytes (128 bits) per scalar
         let mut buf = vec![0u8; num_scalars * 16];
-        self.challenge_bytes(b"challenge_linear_combination", &mut buf);
+        self.challenge_bytes(label, &mut buf);
 
         let mut scalars = Vec::with_capacity(num_scalars);
 
@@ -147,18 +147,23 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
+    #[allow(dead_code)]
     fn append_hat_f_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
+    #[allow(dead_code)]
     fn append_sigma_proof<A: CanonicalSerialize>(&mut self, sigma_proof: &A);
 
     fn append_f_j_commitments<A: CanonicalSerialize>(&mut self, f_j_commitments: &A);
 
+    #[allow(dead_code)]
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
+    #[allow(dead_code)]
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
     fn challenges_for_linear_combination(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
+    #[allow(dead_code)]
     fn challenge_from_verifier(&mut self) -> E::ScalarField;
 }
 
@@ -303,6 +308,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
         let challenges =
             <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_from_128bit_chunks(
                 self,
+                b"challenge_for_quotient_polynomials",
                 ell + 1,
             );
 
@@ -312,7 +318,9 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     fn challenges_for_linear_combination(&mut self, num: usize) -> Vec<E::ScalarField> {
         let challenges =
             <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_from_128bit_chunks(
-                self, num,
+                self,
+                b"challenge_for_linear_combination",
+                num,
             );
 
         Scalar::<E>::vec_into_inner(challenges)
@@ -321,7 +329,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     fn challenge_from_verifier(&mut self) -> E::ScalarField {
         <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_scalar(
             self,
-            b"challenge_for_linear_combination",
+            b"verifier_challenge_for_linear_combination",
         )
         .0
     }

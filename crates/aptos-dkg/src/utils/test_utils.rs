@@ -16,7 +16,7 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
     B::Commitment,
     B::CommitmentRandomness,
 ) {
-    let (pk, vk) = B::setup(n + 0, ell + 0, rng); // TODO: change these values?
+    let (pk, vk) = B::setup(n, ell, rng); // TODO: potentially change these values back to n + 10 and ell + 10?
 
     let ell_bit_values: Vec<B::Input> = (0..n)
         .map(|_| {
