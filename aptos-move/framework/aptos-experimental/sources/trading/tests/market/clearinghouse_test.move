@@ -13,7 +13,8 @@ module aptos_experimental::clearinghouse_test {
         MarketClearinghouseCallbacks,
         new_market_clearinghouse_callbacks,
         new_callback_result_continue_matching,
-        new_callback_result_stop_matching, ValidationResult, new_validation_result
+        new_callback_result_stop_matching, ValidationResult, new_validation_result, PlaceMakerOrderResult,
+        new_place_maker_order_result
     };
 
     const EINVALID_ADDRESS: u64 = 1;
@@ -65,14 +66,14 @@ module aptos_experimental::clearinghouse_test {
         );
     }
 
-    public(package) fun validate_order_placement(order_id: OrderIdType): ValidationResult<u64> acquires GlobalState {
+    public(package) fun validate_order_placement(order_id: OrderIdType): ValidationResult acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             !open_orders.contains(order_id),
             error::invalid_argument(E_DUPLICATE_ORDER)
         );
         open_orders.add(order_id, true);
-        return new_validation_result(option::none(), option::none())
+        return new_validation_result(option::none())
     }
 
     public(package) fun validate_bulk_order_placement(account: address): bool acquires GlobalState {
@@ -130,7 +131,7 @@ module aptos_experimental::clearinghouse_test {
         new_settle_trade_result(size, option::none(), option::none(), new_callback_result_continue_matching(size))
     }
 
-    public(package) fun place_maker_order(order_id: OrderIdType) acquires GlobalState {
+    public(package) fun place_maker_order(order_id: OrderIdType): PlaceMakerOrderResult<u64> acquires GlobalState {
         let maker_order_calls =
             &mut borrow_global_mut<GlobalState>(@0x1).maker_order_calls;
         assert!(
@@ -138,6 +139,7 @@ module aptos_experimental::clearinghouse_test {
             error::invalid_argument(E_DUPLICATE_ORDER)
         );
         maker_order_calls.add(order_id, true);
+        new_place_maker_order_result(option::none())
     }
 
     public(package) fun is_maker_order_called(order_id: OrderIdType): bool acquires GlobalState {
@@ -203,7 +205,7 @@ module aptos_experimental::clearinghouse_test {
                 validate_bulk_order_placement(account)
             },
             |order_info, _size| {
-                place_maker_order(order_info.get_order_id());
+                place_maker_order(order_info.get_order_id())
             },
             |order_info, _remaining_size| {
                 cleanup_order(order_info.get_order_id());
@@ -233,6 +235,7 @@ module aptos_experimental::clearinghouse_test {
                 validate_bulk_order_placement(account)
             },
             |_order_info, _size| {
+                new_place_maker_order_result(option::none())
                 // place_maker_order is not used in this test
             },
             |order_info, _remaining_size| {
