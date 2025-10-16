@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::constant_time;
 use aptos_keyless_pepper_service::{
     accounts::{
         account_managers::{AccountRecoveryManager, AccountRecoveryManagers},
@@ -23,10 +24,13 @@ use aptos_keyless_pepper_service::{
 };
 use aptos_logger::{error, info, warn};
 use clap::Parser;
+use dudect_bencher::{ctbench, ctbench::BenchName};
 use hyper::{
     service::{make_service_fn, service_fn},
     Server,
 };
+use more_asserts::assert_le;
+use num_traits::ToPrimitive;
 use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Instant};
 
 #[derive(Parser, Debug)]
@@ -112,10 +116,45 @@ struct Args {
     jwk_issuers_override: Vec<JWKIssuer>,
 }
 
+/// The DudeCT statistical test must output a `max_t` value whose absolute value is <= to this.
+///
+/// Docs here: https://docs.rs/dudect-bencher/latest/dudect_bencher/
+/// Original paper here: https://eprint.iacr.org/2016/1123.pdf
+const ABS_MAX_T: i64 = 5;
+
 #[tokio::main]
 async fn main() {
     // Fetch the command line arguments
     let args = Args::parse();
+
+    // Ensure a timing side channel does not exist
+    let abs_max_t = ctbench::run_bench(
+        &BenchName("blstrs_scalar_mul/random_bases"),
+        constant_time::blstrs_scalar_mul::run_bench_with_random_bases,
+        None,
+    )
+    .1
+    .max_t
+    .abs()
+    .ceil()
+    .to_i64()
+    .expect("Floating point arithmetic went awry.");
+
+    assert_le!(abs_max_t, ABS_MAX_T);
+
+    let abs_max_t = ctbench::run_bench(
+        &BenchName("blstrs_scalar_mul/fixed_bases"),
+        constant_time::blstrs_scalar_mul::run_bench_with_fixed_bases,
+        None,
+    )
+    .1
+    .max_t
+    .abs()
+    .ceil()
+    .to_i64()
+    .expect("Floating point arithmetic went awry.");
+
+    assert_le!(abs_max_t, ABS_MAX_T);
 
     // Start the logger
     aptos_logger::Logger::new().init();

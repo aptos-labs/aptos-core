@@ -1095,7 +1095,9 @@ dependencies = [
  "bitvec",
  "blake2",
  "blake2-rfc",
+ "bls12_381",
  "blst",
+ "blstrs",
  "bulletproofs",
  "byteorder",
  "bytes",
@@ -1103,8 +1105,10 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "curve25519-dalek-ng",
  "digest 0.9.0",
+ "dudect-bencher",
  "ed25519-dalek 1.0.1",
  "ff",
+ "group",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
@@ -1113,8 +1117,10 @@ dependencies = [
  "neptune",
  "num-bigint 0.3.3",
  "num-integer",
+ "num-traits",
  "once_cell",
  "p256",
+ "pairing",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -1376,7 +1382,6 @@ dependencies = [
  "num-integer",
  "num-traits",
  "num_cpus",
- "once_cell",
  "pairing",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -2789,17 +2794,12 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
- "aptos-dkg",
  "aptos-types",
- "ark-bls12-381 0.5.0",
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
  "bcs 0.1.4",
  "blstrs",
  "derivation-path",
  "ed25519-dalek 1.0.1",
+ "group",
  "hex",
  "hmac 0.12.1",
  "jsonwebtoken 8.3.0",
@@ -2819,9 +2819,8 @@ dependencies = [
  "aptos-infallible",
  "aptos-keyless-pepper-common",
  "aptos-types",
- "ark-bls12-381 0.5.0",
- "ark-serialize 0.5.0",
  "bcs 0.1.4",
+ "blstrs",
  "clap 4.5.21",
  "firestore",
  "hex",
@@ -2846,20 +2845,21 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-time-service",
  "aptos-types",
- "ark-bls12-381 0.5.0",
  "ark-bn254",
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
  "ark-groth16",
  "ark-serialize 0.5.0",
  "async-trait",
  "bcs 0.1.4",
+ "blstrs",
  "clap 4.5.21",
+ "dudect-bencher",
  "firestore",
  "hex",
  "hyper 0.14.28",
  "jsonwebtoken 8.3.0",
  "jwt",
+ "more-asserts",
+ "num-traits",
  "once_cell",
  "rand 0.7.3",
  "regex",
@@ -6327,6 +6327,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "bls12_381"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7bc6d6292be3a19e6379786dac800f551e5865a5bb51ebbe3064ab80433f403"
+dependencies = [
+ "ff",
+ "group",
+ "pairing",
+ "rand_core 0.6.4",
+ "subtle",
+]
+
+[[package]]
 name = "blst"
 version = "0.3.15"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8294,6 +8307,17 @@ name = "dtoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6add3b8cff394282be81f3fc1a0605db594ed69890078ca6e2cab1c408bcf04"
+
+[[package]]
+name = "dudect-bencher"
+version = "0.6.0"
+source = "git+https://github.com/aptos-labs/dudect-bencher?rev=9515677c83c58884c1a8c764251753269d46fc0e#9515677c83c58884c1a8c764251753269d46fc0e"
+dependencies = [
+ "clap 2.34.0",
+ "ctrlc",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+]
 
 [[package]]
 name = "dunce"

@@ -11,15 +11,18 @@ use crate::{
         LowDegreeTest, Player, ThresholdConfig,
     },
     utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing,
+        g1_multi_exp, g2_multi_exp,
         random::{
             insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_g2_point,
-            random_scalar,
         },
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381,
+    blstrs::{multi_pairing, random_scalar},
+    CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;

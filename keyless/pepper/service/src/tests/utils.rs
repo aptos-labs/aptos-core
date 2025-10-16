@@ -8,9 +8,9 @@ use crate::{
     error::PepperServiceError,
     vuf_keypair::{get_pepper_service_vuf_public_key_and_json, VUFKeypair},
 };
+use aptos_crypto::blstrs::scalar_from_uniform_be_bytes;
 use aptos_keyless_pepper_common::{vuf::slip_10::ed25519_dalek::Digest, PepperInput};
 use aptos_time_service::TimeService;
-use ark_ff::PrimeField;
 use std::{sync::Arc, time::Duration};
 
 /// A mock implementation of the account recovery DB that does nothing
@@ -42,8 +42,7 @@ pub fn create_vuf_keypair(private_key_seed: Option<[u8; 32]>) -> Arc<VUFKeypair>
     // Derive the VUF private key from the seed
     let mut sha3_hasher = sha3::Sha3_512::new();
     sha3_hasher.update(private_key_seed);
-    let vuf_private_key =
-        ark_bls12_381::Fr::from_be_bytes_mod_order(sha3_hasher.finalize().as_slice());
+    let vuf_private_key = scalar_from_uniform_be_bytes(sha3_hasher.finalize().as_slice());
 
     // Get the VUF public key and its JSON representation
     let (vuf_public_key, vuf_public_key_json) =

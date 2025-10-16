@@ -761,7 +761,7 @@ Decompresses a CompressedRistretto from storage into a RistrettoPoint which can 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ristretto255.md#0x1_ristretto255_point_decompress">point_decompress</a>(point: &<a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a>): <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> {
     // NOTE: Our <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> <b>invariant</b> assures us that every <a href="ristretto255.md#0x1_ristretto255_CompressedRistretto">CompressedRistretto</a> in storage is a valid
-    // <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a>
+    // point
     <b>let</b> (handle, _) = <a href="ristretto255.md#0x1_ristretto255_point_decompress_internal">point_decompress_internal</a>(point.data);
     <a href="ristretto255.md#0x1_ristretto255_RistrettoPoint">RistrettoPoint</a> { handle }
 }
