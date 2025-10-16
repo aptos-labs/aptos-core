@@ -303,20 +303,20 @@ types of pending orders are supported.
 ## Constants
 
 
-<a id="0x7_single_order_book_EORDER_ALREADY_EXISTS"></a>
-
-
-
-<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x7_single_order_book_E_REINSERT_ORDER_MISMATCH"></a>
 
 
 
 <pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x7_single_order_book_EORDER_ALREADY_EXISTS"></a>
+
+
+
+<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
 </code></pre>
 
 
@@ -546,9 +546,8 @@ types of pending orders are supported.
         remaining_size,
         is_bid,
         time_in_force,
-        metadata,
-        _single_order_book_type
-    ) = order_match_details.destroy_order_match_details();
+        metadata
+    ) = order_match_details.destroy_single_order_match_details();
     SingleOrderRequest::V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_id,
@@ -916,7 +915,7 @@ it is added to the order book, if it exists, it's size is updated.
     reinsert_order: OrderMatchDetails&lt;M&gt;,
     original_order: &OrderMatchDetails&lt;M&gt;,
 ) {
-    <b>assert</b>!(reinsert_order.validate_reinsertion_request(original_order), <a href="single_order_book.md#0x7_single_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+    <b>assert</b>!(reinsert_order.validate_single_order_reinsertion_request(original_order), <a href="single_order_book.md#0x7_single_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
     <b>let</b> order_id = reinsert_order.get_order_id_from_match_details();
     <b>let</b> unique_idx = reinsert_order.get_unique_priority_idx_from_match_details();
 
@@ -1050,7 +1049,7 @@ API to ensure that the order is a taker order before calling this API, otherwise
         metadata
     ) = order.destroy_single_order();
     <b>assert</b>!(is_active, <a href="single_order_book.md#0x7_single_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>);
-    new_order_match(new_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata, single_order_book_type()), matched_size)
+    new_order_match(new_single_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata), matched_size)
 }
 </code></pre>
 

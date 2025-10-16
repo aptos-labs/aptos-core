@@ -1,8 +1,6 @@
 #[test_only]
 module aptos_experimental::bulk_order_book_tests {
-    use aptos_experimental::order_book_types::{OrderMatch, new_ascending_id_generator, AscendingIdGenerator,
-        bulk_order_book_type
-    };
+    use aptos_experimental::order_book_types::{OrderMatch, new_ascending_id_generator, AscendingIdGenerator};
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use std::vector;
     use aptos_experimental::bulk_order_book_types::{BulkOrderRequest, new_bulk_order_request};
@@ -64,7 +62,7 @@ module aptos_experimental::bulk_order_book_tests {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>
     ): BulkOrderRequest<TestMetadata> {
-        new_bulk_order_request(
+        let response = new_bulk_order_request(
             account,
             1, // sequence number for tests
             bid_prices,
@@ -72,7 +70,14 @@ module aptos_experimental::bulk_order_book_tests {
             ask_prices,
             ask_sizes,
             new_test_metadata(1)
-        )
+        );
+        let (request_option, _rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        if (request_option.is_some()) {
+            request_option.destroy_some()
+        } else {
+            // This should not happen for valid test data, but handle gracefully
+            abort 999
+        }
     }
 
     fun create_test_order_request_with_sequence(
@@ -83,7 +88,7 @@ module aptos_experimental::bulk_order_book_tests {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>
     ): BulkOrderRequest<TestMetadata> {
-        new_bulk_order_request(
+        let response = new_bulk_order_request(
             account,
             sequence_number,
             bid_prices,
@@ -91,7 +96,14 @@ module aptos_experimental::bulk_order_book_tests {
             ask_prices,
             ask_sizes,
             new_test_metadata(1)
-        )
+        );
+        let (request_option, _rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        if (request_option.is_some()) {
+            request_option.destroy_some()
+        } else {
+            // This should not happen for valid test data, but handle gracefully
+            abort 999
+        }
     }
 
     fun place_taker_order_and_get_matches(
@@ -133,15 +145,15 @@ module aptos_experimental::bulk_order_book_tests {
         expected_remaining_size: u64
     ) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _client_order_id, _unique_priority_idx, price, _orig_size, remaining_size, is_bid, _, _metadata, order_book_type) =
-            matched_order.destroy_order_match_details();
+        let (_order_id, account, _unique_priority_idx, price, _orig_size, remaining_size, is_bid, _sequence_number, _metadata) =
+            matched_order.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
         assert!(price == expected_price);
         assert!(matched_size == expected_matched_size);
         assert!(is_bid == expected_is_bid);
         assert!(remaining_size == expected_remaining_size);
-        assert!(order_book_type == bulk_order_book_type()); // Ensure it's a bulk order book match
+        // This is a bulk order match by construction
     }
 
     /// Verifies a single match result with basic properties (account, price, matched_size, is_bid)
@@ -153,14 +165,14 @@ module aptos_experimental::bulk_order_book_tests {
         expected_is_bid: bool
     ) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _client_order_id, _unique_priority_idx, price, _orig_size, _remaining_size, is_bid, _, _metadata, order_book_type) =
-            matched_order.destroy_order_match_details();
+        let (_order_id, account, _unique_priority_idx, price, _orig_size, _remaining_size, is_bid, _sequence_number, _metadata) =
+            matched_order.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
         assert!(price == expected_price);
         assert!(matched_size == expected_matched_size);
         assert!(is_bid == expected_is_bid);
-        assert!(order_book_type == bulk_order_book_type()); // Ensure it's a bulk order book match
+        // This is a bulk order match by construction
     }
 
     /// Verifies total matched size across all matches
@@ -183,8 +195,8 @@ module aptos_experimental::bulk_order_book_tests {
         match_result: OrderMatch<TestMetadata>
     ): (address, u64, u64, u64, u64, bool) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _client_order_id, _unique_priority_idx, price, orig_size, remaining_size, is_bid, _,  _metadata, _) =
-            matched_order.destroy_order_match_details();
+        let (_order_id, account, _unique_priority_idx, price, orig_size, remaining_size, is_bid, _sequence_number, _metadata) =
+            matched_order.destroy_bulk_order_match_details();
         (account, price, orig_size, matched_size, remaining_size, is_bid)
     }
 
@@ -292,7 +304,7 @@ module aptos_experimental::bulk_order_book_tests {
         expected_is_bid: bool
     ) {
         let (matched_order_result, matched_size) = match_result.destroy_order_match();
-        let (_, account, _, _, price, _, _, is_bid, _, _, _) = matched_order_result.destroy_order_match_details();
+        let (_, account, _, price, _, _, is_bid, _, _) = matched_order_result.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
         assert!(price == expected_price);
@@ -900,192 +912,186 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_invalid_bid_prices_not_descending() {
-        // Test placing an order with bid prices not in descending order
-        let (order_book, price_time_index, id_gen) = setup_test();
-
+        // Test placing an order with bid prices not in descending order - should return rejection
         // Bid prices in ascending order (invalid - should be descending)
         let bid_prices = vector[BID_PRICE_2, BID_PRICE_1]; // 99, 100 (ascending)
         let bid_sizes = vector[SIZE_1, SIZE_2];
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to invalid bid price ordering
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Bid order invalid" for non-descending prices
+        assert!(std::string::utf8(b"Bid order invalid") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_invalid_ask_prices_not_ascending() {
-        // Test placing an order with ask prices not in ascending order
-        let (order_book, price_time_index, id_gen) = setup_test();
-
-
+        // Test placing an order with ask prices not in ascending order - should return rejection
         // Ask prices in descending order (invalid - should be ascending)
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
         let bid_sizes = vector[SIZE_1, SIZE_2];
         let ask_prices = vector[ASK_PRICE_2, ASK_PRICE_1]; // 102, 101 (descending)
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to invalid ask price ordering
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Ask order invalid" for non-ascending prices
+        assert!(std::string::utf8(b"Ask order invalid") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_zero_bid_size() {
-        // Test placing an order with zero bid size
-        let (order_book, price_time_index, id_gen) = setup_test();
-
+        // Test placing an order with zero bid size - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
         let bid_sizes = vector[0, SIZE_2]; // Zero size in first bid level
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to zero bid size
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Zero bid size" for zero bid size
+        assert!(std::string::utf8(b"Zero bid size") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_zero_ask_size() {
-        // Test placing an order with zero ask size
-        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test placing an order with zero ask size - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
         let bid_sizes = vector[SIZE_1, SIZE_2];
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, 0]; // Zero size in second ask level
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to zero ask size
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Zero ask size" for zero ask size
+        assert!(std::string::utf8(b"Zero ask size") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_all_zero_sizes() {
-        // Test placing an order with all zero sizes
-        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test placing an order with all zero sizes - should return rejection
+        let (order_book, price_time_index, _id_gen) = setup_test();
 
         let bid_prices = vector[BID_PRICE_1];
         let bid_sizes = vector[0]; // All zero bid sizes
         let ask_prices = vector[ASK_PRICE_1];
         let ask_sizes = vector[0]; // All zero ask sizes
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let _rejection_reason = rejection_reason_option.destroy_some();
 
-        // This should abort due to all zero sizes
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_mismatched_bid_prices_and_sizes() {
-        // Test placing an order with mismatched bid prices and sizes lengths
-        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test placing an order with mismatched bid prices and sizes lengths - should return rejection
+        let (order_book, price_time_index, _id_gen) = setup_test();
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2]; // 2 prices
         let bid_sizes = vector[SIZE_1]; // Only 1 size
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let _rejection_reason = rejection_reason_option.destroy_some();
 
-        // This should abort due to mismatched lengths
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_mismatched_ask_prices_and_sizes() {
-        // Test placing an order with mismatched ask prices and sizes lengths
-        let (order_book, price_time_index, id_gen) = setup_test();
-
+        // Test placing an order with mismatched ask prices and sizes lengths - should return rejection
+        let (order_book, price_time_index, _id_gen) = setup_test();
 
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
         let bid_sizes = vector[SIZE_1, SIZE_2];
         let ask_prices = vector[ASK_PRICE_1]; // Only 1 price
         let ask_sizes = vector[SIZE_1, SIZE_2]; // 2 sizes
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let _rejection_reason = rejection_reason_option.destroy_some();
 
-        // This should abort due to mismatched lengths
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
@@ -1117,65 +1123,59 @@ module aptos_experimental::bulk_order_book_tests {
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_duplicate_bid_prices() {
-        // Test placing an order with duplicate bid prices (not strictly descending)
-        let (order_book, price_time_index, id_gen) = setup_test();
-
+        // Test placing an order with duplicate bid prices (not strictly descending) - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_1]; // Duplicate prices
         let bid_sizes = vector[SIZE_1, SIZE_2];
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_2];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to duplicate bid prices
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Bid order invalid" for duplicate prices
+        assert!(std::string::utf8(b"Bid order invalid") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EINVLID_MM_ORDER_REQUEST)]
     fun test_duplicate_ask_prices() {
-        // Test placing an order with duplicate ask prices (not strictly ascending)
-        let (order_book, price_time_index, id_gen) = setup_test();
-
+        // Test placing an order with duplicate ask prices (not strictly ascending) - should return rejection
         let bid_prices = vector[BID_PRICE_1, BID_PRICE_2];
         let bid_sizes = vector[SIZE_1, SIZE_2];
         let ask_prices = vector[ASK_PRICE_1, ASK_PRICE_1]; // Duplicate prices
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to duplicate ask prices
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Ask order invalid" for duplicate prices
+        assert!(std::string::utf8(b"Ask order invalid") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EPRICE_CROSSING)]
     fun test_price_crossing() {
-        // Test placing an order where bid and ask prices cross
+        // Test placing an order where bid and ask prices cross - should return rejection
         // This should be prevented to avoid self-matching within a single order
-        let (order_book, price_time_index, id_gen) = setup_test();
 
         // Bid price 100, Ask price 99 - this crosses (bid > ask)
         let bid_prices = vector[100]; // Highest bid price
@@ -1183,55 +1183,52 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[99]; // Lowest ask price
         let ask_sizes = vector[SIZE_1];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to price crossing
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Price crossing" for crossing prices
+        assert!(std::string::utf8(b"Price crossing") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EPRICE_CROSSING)]
     fun test_price_crossing_equal_prices() {
-        // Test placing an order where bid and ask prices are equal (also crossing)
-        let (order_book, price_time_index, id_gen) = setup_test();
+        // Test placing an order where bid and ask prices are equal (also crossing) - should return rejection
         // Bid price 100, Ask price 100 - this also crosses (bid == ask)
         let bid_prices = vector[100]; // Highest bid price
         let bid_sizes = vector[SIZE_1];
         let ask_prices = vector[100]; // Lowest ask price (same as bid)
         let ask_sizes = vector[SIZE_1];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-
-        // This should abort due to price crossing (equal prices)
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        // This line should never be reached
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Price crossing" for equal prices
+        assert!(std::string::utf8(b"Price crossing") == rejection_reason);
     }
 
     #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book_types::EPRICE_CROSSING)]
     fun test_price_crossing_multiple_levels() {
-        // Test placing an order with multiple price levels where the highest bid crosses the lowest ask
-        let (order_book, price_time_index, id_gen) = setup_test();
-
+        // Test placing an order with multiple price levels where the highest bid crosses the lowest ask - should return rejection
         // Bid prices: 100, 99 (descending)
         // Ask prices: 98, 99 (ascending)
         // The highest bid (100) crosses the lowest ask (98)
@@ -1240,17 +1237,21 @@ module aptos_experimental::bulk_order_book_tests {
         let ask_prices = vector[98, 99];
         let ask_sizes = vector[SIZE_1, SIZE_2];
 
-        let order_request = create_test_order_request(
+        let response = new_bulk_order_request(
             TEST_ACCOUNT_1,
+            1,
             bid_prices,
             bid_sizes,
             ask_prices,
-            ask_sizes
+            ask_sizes,
+            new_test_metadata(1)
         );
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request);
-
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
+        let (request_option, rejection_reason_option) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_request_response(response);
+        assert!(request_option.is_none());
+        assert!(rejection_reason_option.is_some());
+        let rejection_reason = rejection_reason_option.destroy_some();
+        // Should be "Price crossing" for crossing prices
+        assert!(std::string::utf8(b"Price crossing") == rejection_reason);
     }
 
     #[test]
@@ -1288,7 +1289,29 @@ module aptos_experimental::bulk_order_book_tests {
             ask_prices_2,
             ask_sizes_2
         );
-        order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request_2);
+        let response2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_request_2);
+
+        // Validate that the order was placed successfully
+        assert!(aptos_experimental::bulk_order_book_types::is_success(&response2));
+
+        // Extract the cancelled levels from the success response
+        let (order_option2, rejection_reason_option2, cancelled_bid_prices2, cancelled_bid_sizes2, cancelled_ask_prices2, cancelled_ask_sizes2) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_place_response(response2);
+
+        // Validate that we got a successful response
+        assert!(order_option2.is_some());
+        assert!(rejection_reason_option2.is_none());
+
+        // Validate cancelled bid levels (106 and 105 should be cancelled as they cross 105)
+        assert!(cancelled_bid_prices2.length() == 2);
+        assert!(cancelled_bid_prices2[0] == 106);
+        assert!(cancelled_bid_prices2[1] == 105);
+        assert!(cancelled_bid_sizes2.length() == 2);
+        assert!(cancelled_bid_sizes2[0] == SIZE_1); // 10
+        assert!(cancelled_bid_sizes2[1] == SIZE_2); // 20
+
+        // No cancelled ask levels (107, 108 don't cross 100)
+        assert!(cancelled_ask_prices2.length() == 0);
+        assert!(cancelled_ask_sizes2.length() == 0);
 
         let bid_prices = order_book.get_prices(TEST_ACCOUNT_2, true);
         let ask_prices = order_book.get_prices(TEST_ACCOUNT_2, false);
@@ -1584,40 +1607,39 @@ module aptos_experimental::bulk_order_book_tests {
     #[test]
     fun test_sequence_number_validation() {
         let (order_book, price_time_index, id_gen) = setup_test();
+
         // Test that we can place an order with higher sequence number (replacing the one from setup_test)
         let order_req1 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
         );
-        let _order_id1 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req1);
+        let response1 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req1);
+        let (order_option1, rejection_reason_option1, _cancelled_bid_prices1, _cancelled_bid_sizes1, _cancelled_ask_prices1, _cancelled_ask_sizes1) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_place_response(response1);
+        assert!(order_option1.is_some());
+        assert!(rejection_reason_option1.is_none());
+        let _order1 = order_option1.destroy_some();
+
         // Test that we can place an order with even higher sequence number
         let order_req2 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
         );
-        let _order_id2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req2);
+        let response2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req2);
+        let (order_option2, rejection_reason_option2, _cancelled_bid_prices2, _cancelled_bid_sizes2, _cancelled_ask_prices2, _cancelled_ask_sizes2) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_place_response(response2);
+        assert!(order_option2.is_some());
+        assert!(rejection_reason_option2.is_none());
+        let _order2 = order_option2.destroy_some();
+
+        // Test that we cannot place an order with lower sequence number (should return rejection)
+        let order_req3 = create_test_order_request_with_sequence(
+            TEST_ACCOUNT_1, 12, vector[100], vector[10], vector[200], vector[10]
+        );
+        let response3 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req3);
+        let (order_option3, rejection_reason_option3, _cancelled_bid_prices3, _cancelled_bid_sizes3, _cancelled_ask_prices3, _cancelled_ask_sizes3) = aptos_experimental::bulk_order_book_types::destroy_bulk_order_place_response(response3);
+        assert!(order_option3.is_none());
+        assert!(rejection_reason_option3.is_some());
+        let _rejection_reason = rejection_reason_option3.destroy_some();
+
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
 
-    #[test]
-    #[expected_failure(abort_code = aptos_experimental::bulk_order_book::E_INVALID_SEQUENCE_NUMBER)]
-    fun test_sequence_number_validation_failure() {
-        let (order_book, price_time_index, id_gen) = setup_test();
-        // Test that we can place an order with higher sequence number (replacing the one from setup_test)
-        let order_req1 = create_test_order_request_with_sequence(
-            TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
-        );
-        let _order_id1 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req1);
-        // Test that we can place an order with even higher sequence number
-        let order_req2 = create_test_order_request_with_sequence(
-            TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
-        );
-        let _order_id2 = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req2);
-        // Test that we cannot place an order with lower sequence number (should abort)
-        let order_req3 = create_test_order_request_with_sequence(
-            TEST_ACCOUNT_1, 12, vector[100], vector[10], vector[200], vector[10]
-        );
-        let _ = order_book.place_bulk_order(&mut price_time_index, &mut id_gen, order_req3);
-        price_time_index.destroy_price_time_idx();
-        order_book.destroy_bulk_order_book();
-    }
 }
