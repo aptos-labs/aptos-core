@@ -53,14 +53,14 @@ where
     // Another thread is possibly modifying the cell, explicit synchronization is needed through,
     // e.g. atomic::fence
     pub unsafe fn unsafe_expect(&self, index: usize) -> &T {
-        &*self.expect_raw(index)
+        unsafe { &*self.expect_raw(index) }
     }
 
     // The caller must guarantee the cell pointed by the index is not accessed while
     // it's mutated.
     #[allow(clippy::mut_from_ref)]
     pub unsafe fn unsafe_expect_mut(&self, index: usize) -> &mut T {
-        &mut *self.expect_raw(index)
+        unsafe { &mut *self.expect_raw(index) }
     }
 }
 
@@ -114,7 +114,7 @@ impl HexyBase {
 
         let level = self.expect_level(position);
         if position.index_in_level < level.len() as u32 {
-            Ok(*level.unsafe_expect(position.index_in_level as usize))
+            Ok(unsafe { *level.unsafe_expect(position.index_in_level as usize) })
         } else {
             let parent_position = position.parent();
             ensure!(
@@ -153,7 +153,7 @@ impl HexyBase {
             position,
         );
 
-        Ok(level.unsafe_expect_mut(position.index_in_level as usize))
+        Ok(unsafe { level.unsafe_expect_mut(position.index_in_level as usize) })
     }
 
     fn expect_level(&self, position: NodePosition) -> &BigVector<HashValue> {
@@ -161,7 +161,7 @@ impl HexyBase {
     }
 
     pub(crate) unsafe fn unsafe_expect_hash(&self, position: NodePosition) -> HashValue {
-        self.unsafe_get_hash(position).expect("Failed to get hash.")
+        unsafe { self.unsafe_get_hash(position).expect("Failed to get hash.") }
     }
 
     pub fn root_position(&self) -> NodePosition {

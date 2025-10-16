@@ -1,11 +1,11 @@
 //# publish
-module 0x2.a {
-    // Empty module for 0x2::b to link against when declaring as a friend.
+module 0x22.a {
+    // Empty module for 0x22.:b to link against when declaring as a friend.
 }
 
 //# publish
-module 0x2.b {
-    friend 0x2.a;
+module 0x22.b {
+    friend 0x22.a;
 
     private_function<T>() {
     label b0:
@@ -24,8 +24,8 @@ module 0x2.b {
 }
 
 //# publish
-module 0x2.a {
-    import 0x2.b;
+module 0x22.a {
+    import 0x22.b;
 
     public call_private_function() {
     label b0:
@@ -47,8 +47,8 @@ module 0x2.a {
 }
 
 //# publish
-module 0x2.c {
-    import 0x2.b;
+module 0x22.c {
+    import 0x22.b;
 
     public call_private_function() {
     label b0:
@@ -69,20 +69,20 @@ module 0x2.c {
     }
 }
 
-//# run 0x2::a::call_private_function
+//# run 0x22::a::call_private_function
 
-//# run 0x2::a::call_friend_function
+//# run 0x22::a::call_friend_function
 
-//# run 0x2::a::call_public_function
+//# run 0x22::a::call_public_function
 
-//# run 0x2::c::call_private_function
+//# run 0x22::c::call_private_function
 
-//# run 0x2::c::call_friend_function
+//# run 0x22::c::call_friend_function
 
-//# run 0x2::c::call_public_function
+//# run 0x22::c::call_public_function
 
 //# run --signers 0x1
-import 0x2.b;
+import 0x22.b;
 main(account: signer) {
 label b0:
     b.private_function<u8>();
@@ -90,7 +90,7 @@ label b0:
 }
 
 //# run --signers 0x1
-import 0x2.b;
+import 0x22.b;
 main(account: signer) {
 label b0:
     b.friend_function<u64>();
@@ -98,7 +98,7 @@ label b0:
 }
 
 //# run --signers 0x1
-import 0x2.b;
+import 0x22.b;
 main(account: signer) {
 label b0:
     b.public_function<u128>();

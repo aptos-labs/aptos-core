@@ -38,7 +38,7 @@ module 0xABCD::order_book_example {
     }
 
 
-    inline fun borrow_order_book_mut(market_id: u32): &mut OrderBook<Empty> acquires Dex {
+    inline fun borrow_order_book_mut(market_id: u32): &mut OrderBook<Empty> {
         assert!(exists<Dex>(@publisher_address), error::invalid_argument(EDEX_RESOURCE_NOT_PRESENT));
         let dex = borrow_global_mut<Dex>(@publisher_address);
 

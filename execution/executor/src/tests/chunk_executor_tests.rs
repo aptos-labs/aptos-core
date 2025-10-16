@@ -236,7 +236,7 @@ fn test_executor_execute_and_commit_chunk_local_result_mismatch() {
 
         let mut rng = rand::thread_rng();
         let txns = (0..5)
-            .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
+            .map(|_| encode_mint_transaction(tests::gen_address(rng.r#gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(
@@ -289,7 +289,7 @@ fn test_executor_execute_and_commit_chunk_without_verify() {
 
         let mut rng = rand::thread_rng();
         let txns = (0..5)
-            .map(|_| encode_mint_transaction(tests::gen_address(rng.gen::<u64>()), 100))
+            .map(|_| encode_mint_transaction(tests::gen_address(rng.r#gen::<u64>()), 100))
             .collect::<Vec<_>>();
         let output = executor
             .execute_block(

@@ -1,0 +1,72 @@
+processed 8 tasks
+task 0 lines 1-26:  run --verbose [script {]
+task 1 lines 28-34:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i8(-1) to u128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 2 lines 36-42:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i16(-1) to u128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 3 lines 44-50:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i32(-1) to u128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 4 lines 52-58:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i64(-1) to u128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 60-66:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i128(-1) to u128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 68-78:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(-1) to u128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 7 lines 80-86:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(340282366920938463463374607431768211456) to u128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

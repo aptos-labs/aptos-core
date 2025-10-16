@@ -3,14 +3,14 @@
 //# run --gas-budget 700
 script {
     fun main() {
-        let _t0 = 0;
-        let _t1 = false;
+        let _v0 = 0;
+        let _v1 = false;
         loop {
-            if (_t1) _t0 = _t0 + 1 else _t1 = true;
-            if (!(_t0 < 10)) break;
-            _t0 = 0;
-            let _t2 = 0;
-            if (false) _t2 = _t2 + 1;
+            if (_v1) _v0 = _v0 + 1 else _v1 = true;
+            if (!(_v0 < 10)) break;
+            _v0 = 0;
+            let _v2 = 0;
+            if (false) _v2 = _v2 + 1;
             continue
         };
         abort 42

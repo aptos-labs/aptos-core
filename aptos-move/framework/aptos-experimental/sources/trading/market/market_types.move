@@ -6,6 +6,7 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
 
     use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
@@ -74,171 +75,223 @@ module aptos_experimental::market_types {
         OrderStatus::ACKNOWLEDGED
     }
 
-    enum SettleTradeResult has drop {
+    enum CallbackResult<R: store + copy + drop> has copy, drop {
+        NOT_AVAILABLE,
+        CONTINUE_MATCHING {
+            result: R
+        }
+        STOP_MATCHING {
+            result: R,
+        }
+    }
+
+    enum SettleTradeResult<R : store + copy + drop> has drop {
         V1 {
             settled_size: u64,
             maker_cancellation_reason: Option<String>,
             taker_cancellation_reason: Option<String>,
+            callback_result: CallbackResult<R>
         }
     }
 
-    enum MarketClearinghouseCallbacks<M: store + copy + drop> has drop {
+    enum ValidationResult<R: store + copy + drop> has drop, copy {
         V1 {
-            /// settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
-            settle_trade_f:  |&mut Market<M>, address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
-            /// validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
-            validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
+            // If valid this is none, else contains the reason for invalidity
+            cancellation_reason: Option<String>,
+            validation_actions: Option<R>
+        }
+    }
+
+    enum MarketClearinghouseCallbacks<M: store + copy + drop, R: store + copy + drop> has drop {
+        V1 {
+            /// settle_trade_f arguments: market, taker, maker, fill_id, settled_price, settled_size,
+            settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
+            /// validate_settlement_update_f arguments: order_info, is_taker, size
+            validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult<R> has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
             validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
-            /// place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
-            place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
-            /// cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
-            cleanup_order_f: |address, OrderIdType, bool, u64, M| has drop + copy,
+            /// place_maker_order_f arguments: order_info, size
+            place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
+            /// cleanup_order_f arguments: order_info, cleanup_size,
+            cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
             /// cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
-            cleanup_bulk_orders_f: |address, bool, u64| has drop + copy,
-            /// decrease_order_size_f arguments: account, order_id, is_bid, price, size
-            decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
+            cleanup_bulk_order_at_price_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
+            /// decrease_order_size_f arguments: order_info, size
+            decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
             /// get a string representation of order metadata to be used in events
             get_order_metadata_bytes: |M| vector<u8> has drop + copy
         }
     }
 
-    public fun new_settle_trade_result(
+    public fun new_settle_trade_result<R: store + copy + drop>(
         settled_size: u64,
         maker_cancellation_reason: Option<String>,
-        taker_cancellation_reason: Option<String>
-    ): SettleTradeResult {
+        taker_cancellation_reason: Option<String>,
+        callback_result: CallbackResult<R>
+    ): SettleTradeResult<R> {
         SettleTradeResult::V1 {
             settled_size,
             maker_cancellation_reason,
-            taker_cancellation_reason
+            taker_cancellation_reason,
+            callback_result
         }
     }
 
-    public fun new_market_clearinghouse_callbacks<M: store + copy + drop>(
-        // settle_trade_f arguments: taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size
-        settle_trade_f: |&mut Market<M>, address, OrderIdType, address, OrderIdType, u64, bool, u64, u64, M, M| SettleTradeResult has drop + copy,
-        // validate_settlement_update_f arguments: account, order_id, is_taker, is_long, price, size
-        validate_order_placement_f: |address, OrderIdType, bool, bool, u64,  TimeInForce, u64, M| bool has drop + copy,
-        // Validate the bulk order placement
+    public fun new_validation_result<R: store + copy + drop>(
+        cancellation_reason: Option<String>,
+        validation_actions: Option<R>
+    ): ValidationResult<R> {
+        ValidationResult::V1 {
+            cancellation_reason,
+            validation_actions
+        }
+    }
+
+    public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
+        settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
+        validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, bool, u64| ValidationResult<R> has drop + copy,
         validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
-        // place_maker_order_f arguments: account, order_id, is_bid, price, size, order_metadata
-        place_maker_order_f: |address, OrderIdType, bool, u64, u64, M| has drop + copy,
-        // cleanup_order_f arguments: account, order_id, is_bid, remaining_size, order_metadata
-        cleanup_order_f: |address, OrderIdType, bool, u64, M| has drop + copy,
-        // cleanup_bulk_orders_f arguments: account, is_bid, remaining_sizes
-        cleanup_bulk_orders_f: |address, bool, u64| has drop + copy,
-        // decrease_order_size_f arguments: account, order_id, is_bid, price, size
-        decrease_order_size_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
-        // get a string representation of order metadata to be used in events
+        place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
+        cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
+        cleanup_bulk_order_at_price_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
+        decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
         get_order_metadata_bytes: |M| vector<u8> has drop + copy
-    ): MarketClearinghouseCallbacks<M> {
+    ): MarketClearinghouseCallbacks<M, R> {
         MarketClearinghouseCallbacks::V1 {
             settle_trade_f,
             validate_order_placement_f,
             validate_bulk_order_placement_f,
             place_maker_order_f,
             cleanup_order_f,
-            cleanup_bulk_orders_f,
+            cleanup_bulk_order_at_price_f,
             decrease_order_size_f,
             get_order_metadata_bytes
         }
     }
 
-    public fun get_settled_size(self: &SettleTradeResult): u64 {
+    public fun get_settled_size<R: store + copy + drop>(self: &SettleTradeResult<R>): u64 {
         self.settled_size
     }
 
-    public fun get_maker_cancellation_reason(self: &SettleTradeResult): Option<String> {
+    public fun get_maker_cancellation_reason<R: store + copy + drop>(self: &SettleTradeResult<R>): Option<String> {
         self.maker_cancellation_reason
     }
 
-    public fun get_taker_cancellation_reason(self: &SettleTradeResult): Option<String> {
+    public fun get_taker_cancellation_reason<R: store + copy + drop>(self: &SettleTradeResult<R>): Option<String> {
         self.taker_cancellation_reason
     }
 
-    public fun settle_trade<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
+    public fun get_callback_result<R: store + copy + drop>(self: &SettleTradeResult<R>): &CallbackResult<R> {
+        &self.callback_result
+    }
+
+    public fun is_validation_result_valid<R: store + copy + drop>(self: &ValidationResult<R>): bool {
+        self.cancellation_reason.is_none()
+    }
+
+    public fun get_validation_cancellation_reason<R: store + copy + drop>(self: &ValidationResult<R>): Option<String> {
+        self.cancellation_reason
+    }
+
+    public fun get_validation_actions<R: store + copy + drop>(self: &ValidationResult<R>): Option<R> {
+        self.validation_actions
+    }
+
+    public fun extract_results<R: store + copy + drop>(self: CallbackResult<R>): Option<R> {
+        match (self) {
+            CallbackResult::NOT_AVAILABLE => option::none(),
+            CallbackResult::CONTINUE_MATCHING { result } => option::some(result),
+            CallbackResult::STOP_MATCHING { result } => option::some(result),
+        }
+    }
+
+    public fun should_stop_matching<R: store + copy + drop>(self: &CallbackResult<R>): bool {
+        match (self) {
+            CallbackResult::CONTINUE_MATCHING { result: _ } => false,
+            CallbackResult::STOP_MATCHING { result: _ } => true,
+            CallbackResult::NOT_AVAILABLE => false,
+        }
+    }
+
+    public fun new_callback_result_continue_matching<R: store + copy + drop>(result: R): CallbackResult<R> {
+        CallbackResult::CONTINUE_MATCHING { result }
+    }
+
+    public fun new_callback_result_stop_matching<R: store + copy + drop>(result: R): CallbackResult<R> {
+        CallbackResult::STOP_MATCHING { result }
+    }
+
+    public fun new_callback_result_not_available<R: store + copy + drop>(): CallbackResult<R> {
+        CallbackResult::NOT_AVAILABLE
+    }
+
+    #[lint::skip(needless_mutable_reference)]
+    public fun settle_trade<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
         market: &mut Market<M>,
-        taker: address,
-        taker_order_id: OrderIdType,
-        maker: address,
-        maker_order_id: OrderIdType,
+        taker: MarketClearinghouseOrderInfo<M>,
+        maker: MarketClearinghouseOrderInfo<M>,
         fill_id: u64,
-        is_taker_long: bool,
-        price: u64,
-        size: u64,
-        taker_metadata: M,
-        maker_metadata: M): SettleTradeResult {
-        (self.settle_trade_f)(market, taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size, taker_metadata, maker_metadata)
+        settled_price: u64,
+        settled_size: u64): SettleTradeResult<R> {
+        (self.settle_trade_f)(market, taker, maker, fill_id, settled_price, settled_size)
     }
 
-    public fun validate_order_placement<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
-        account: address,
-        order_id: OrderIdType,
+    public fun validate_order_placement<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
+        order_info: MarketClearinghouseOrderInfo<M>,
         is_taker: bool,
-        is_bid: bool,
-        price: u64,
-        time_in_force: TimeInForce,
-        size: u64,
-        order_metadata: M): bool {
-        (self.validate_order_placement_f)(account, order_id, is_taker, is_bid, price, time_in_force, size, order_metadata)
+        size: u64): ValidationResult<R> {
+        (self.validate_order_placement_f)(order_info, is_taker, size)
     }
 
-    public fun validate_bulk_order_placement<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
+    public fun validate_bulk_order_placement<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
         account: address,
         bids_prices: vector<u64>,
         bids_sizes: vector<u64>,
         asks_prices: vector<u64>,
         asks_sizes: vector<u64>,
-        order_metadata: M,
+        order_metadata: M
     ): bool {
         (self.validate_bulk_order_placement_f)(account, bids_prices, bids_sizes, asks_prices, asks_sizes, order_metadata)
     }
 
-    public fun place_maker_order<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
-        account: address,
-        order_id: OrderIdType,
-        is_bid: bool,
-        price: u64,
-        size: u64,
-        order_metadata: M) {
-        (self.place_maker_order_f)(account, order_id, is_bid, price, size, order_metadata)
-    }
-
-    public fun cleanup_order<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
-        account: address,
-        order_id: OrderIdType,
-        is_bid: bool,
-        remaining_size: u64,
-        order_metadata: M) {
-        (self.cleanup_order_f)(account, order_id, is_bid, remaining_size, order_metadata)
-    }
-
-    public fun cleanup_bulk_orders<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
-        account: address,
-        is_bid: bool,
-        remaining_sizes: u64) {
-        (self.cleanup_bulk_orders_f)(account, is_bid, remaining_sizes)
-    }
-
-    public fun decrease_order_size<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
-        account: address,
-        order_id: OrderIdType,
-        is_bid: bool,
-        price: u64,
+    public fun place_maker_order<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
+        order_info: MarketClearinghouseOrderInfo<M>,
         size: u64) {
-        (self.decrease_order_size_f)(account, order_id, is_bid, price, size)
+        (self.place_maker_order_f)(order_info, size)
     }
 
-    public fun get_order_metadata_bytes<M: store + copy + drop>(
-        self: &MarketClearinghouseCallbacks<M>,
+    public fun cleanup_order<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
+        order_info: MarketClearinghouseOrderInfo<M>,
+        cleanup_size: u64,
+    ) {
+        (self.cleanup_order_f)(order_info, cleanup_size)
+    }
+
+    public fun cleanup_bulk_order_at_price<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
+        account: address,
+        order_id: OrderIdType,
+        is_bid: bool,
+        price: u64,
+        cleanup_size: u64,
+    ) {
+        (self.cleanup_bulk_order_at_price_f)(account, order_id, is_bid, price, cleanup_size)
+    }
+
+    public fun decrease_order_size<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
+        order_info: MarketClearinghouseOrderInfo<M>,
+        size: u64) {
+        (self.decrease_order_size_f)(order_info, size)
+    }
+
+    public fun get_order_metadata_bytes<M: store + copy + drop, R: store + copy + drop>(
+        self: &MarketClearinghouseCallbacks<M, R>,
         order_metadata: M): vector<u8> {
         (self.get_order_metadata_bytes)(order_metadata)
     }
@@ -269,7 +322,7 @@ module aptos_experimental::market_types {
             allow_self_trade: bool,
             /// Whether to allow sending all events for the markett
             allow_events_emission: bool,
-            /// Pre cancellation window in microseconds
+            /// Pre cancellation window in seconds
             pre_cancellation_window_secs: u64
         }
     }
@@ -279,7 +332,7 @@ module aptos_experimental::market_types {
         parent: address,
         market: address,
         order_id: u128,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         user: address,
         /// Original size of the order
         orig_size: u64,
@@ -303,6 +356,50 @@ module aptos_experimental::market_types {
         trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
     }
 
+    #[event]
+    struct BulkOrderPlacedEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    }
+
+    #[event]
+    struct BulkOrderCancelledEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        user: address,
+    }
+
+    #[event]
+    struct BulkOrderFilledEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        user: address,
+        filled_size: u64,
+        price: u64,
+        is_bid: bool,
+    }
+
+    #[event]
+    // This event is emitted when a bulk order is modified - especially when some levels of the bulk orders
+    // are cancalled.
+    struct BulkOrderModifiedEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    }
 
     public fun new_market_config(
         allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64
@@ -313,7 +410,6 @@ module aptos_experimental::market_types {
             pre_cancellation_window_secs,
         }
     }
-
 
     public fun new_market<M: store + copy + drop>(
         parent: &signer, market: &signer, config: MarketConfig
@@ -417,7 +513,7 @@ module aptos_experimental::market_types {
     }
 
     public fun get_order_metadata_by_client_id<M: store + copy + drop>(
-        self: &Market<M>, user: address, client_order_id: u64
+        self: &Market<M>, user: address, client_order_id: String
     ): Option<M> {
         let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
         if (order_id.is_none()) {
@@ -429,7 +525,7 @@ module aptos_experimental::market_types {
     /// Sets the order metadata for an order by client id. It is up to the caller to perform necessary permissions checks
     /// around ownership of the order.
     public fun set_order_metadata_by_client_id<M: store + copy + drop>(
-        self: &mut Market<M>, user: address, client_order_id: u64, metadata: M
+        self: &mut Market<M>, user: address, client_order_id: String, metadata: M
     ) {
         let order_id = self.order_book.get_order_id_by_client_id(user, client_order_id);
         assert!(order_id.is_some(), EORDER_DOES_NOT_EXIST);
@@ -452,10 +548,10 @@ module aptos_experimental::market_types {
         self.order_book.take_ready_time_based_orders(order_limit)
     }
 
-    public fun emit_event_for_order<M: store + copy + drop>(
+    public fun emit_event_for_order<M: store + copy + drop, R: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         user: address,
         orig_size: u64,
         remaining_size: u64,
@@ -468,7 +564,7 @@ module aptos_experimental::market_types {
         metadata: M,
         trigger_condition: Option<TriggerCondition>,
         time_in_force: TimeInForce,
-        callbacks: &MarketClearinghouseCallbacks<M>
+        callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -492,6 +588,100 @@ module aptos_experimental::market_types {
                     metadata_bytes,
                     time_in_force,
                     trigger_condition
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_placed<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: OrderIdType,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderPlacedEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                    bid_sizes,
+                    bid_prices,
+                    ask_sizes,
+                    ask_prices,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_cancelled<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: OrderIdType,
+        user: address,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderCancelledEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_filled<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: OrderIdType,
+        user: address,
+        filled_size: u64,
+        price: u64,
+        is_bid: bool,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderFilledEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                    filled_size,
+                    price,
+                    is_bid,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_modified<M: store + copy + drop>(
+        self: &Market<M>,
+        order_id: OrderIdType,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkOrderModifiedEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                    bid_sizes,
+                    bid_prices,
+                    ask_sizes,
+                    ask_prices,
                 }
             );
         };
@@ -521,7 +711,7 @@ module aptos_experimental::market_types {
     }
 
     #[test_only]
-    public fun get_client_order_id_from_event(self: OrderEvent): Option<u64> {
+    public fun get_client_order_id_from_event(self: OrderEvent): Option<String> {
         self.client_order_id
     }
 
@@ -529,7 +719,7 @@ module aptos_experimental::market_types {
     public fun verify_order_event(
         self: OrderEvent,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         market: address,
         user: address,
         orig_size: u64,
@@ -553,4 +743,53 @@ module aptos_experimental::market_types {
         assert!(self.status == status);
     }
 
+    #[test_only]
+    public fun verify_bulk_order_placed_event(
+        self: BulkOrderPlacedEvent,
+        order_id: OrderIdType,
+        market: address,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    ) {
+        assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.market == market);
+        assert!(self.user == user);
+        assert!(self.bid_sizes == bid_sizes);
+        assert!(self.bid_prices == bid_prices);
+        assert!(self.ask_sizes == ask_sizes);
+        assert!(self.ask_prices == ask_prices);
+    }
+
+    #[test_only]
+    public fun verify_bulk_order_cancelled_event(
+        self: BulkOrderCancelledEvent,
+        order_id: OrderIdType,
+        market: address,
+        user: address,
+    ) {
+        assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.market == market);
+        assert!(self.user == user);
+    }
+
+    #[test_only]
+    public fun verify_bulk_order_filled_event(
+        self: BulkOrderFilledEvent,
+        order_id: OrderIdType,
+        market: address,
+        user: address,
+        filled_size: u64,
+        price: u64,
+        is_bid: bool,
+    ) {
+        assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.market == market);
+        assert!(self.user == user);
+        assert!(self.filled_size == filled_size);
+        assert!(self.price == price);
+        assert!(self.is_bid == is_bid);
+    }
 }

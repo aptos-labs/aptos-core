@@ -51,12 +51,12 @@ const PROCESSOR_NAMES: &[ProcessorName] = {
 /// The function returns two futures:
 /// - One that resolves when the processor is up.
 /// - One that resolves when the processor stops (which it should not under normal operation).
-fn start_processor(
-    fut_prerequisites: &(impl Future<Output = Result<(u16, u16), ArcError>> + Clone + Send + 'static),
+fn start_processor<T: Future<Output = Result<(u16, u16), ArcError>> + Clone + Send + 'static>(
+    fut_prerequisites: &T,
     processor_name: &ProcessorName,
 ) -> (
-    impl Future<Output = Result<()>>,
-    impl Future<Output = Result<()>>,
+    impl Future<Output = Result<()>> + use<T>,
+    impl Future<Output = Result<()>> + use<T>,
 ) {
     let fut_prerequisites_ = fut_prerequisites.clone();
     let processor_name_ = processor_name.to_owned();

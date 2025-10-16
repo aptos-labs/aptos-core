@@ -8,28 +8,28 @@ module 0x1::vector {
     public native fun destroy_empty<Element>(self: vector<Element>);
     public native fun swap<Element>(self: &mut vector<Element>, i: u64, j: u64);
     public fun contains<Element>(self: &vector<Element>, e: &Element): bool {
-        let _t2 = 0;
-        let _t3 = length<Element>(self);
+        let _v0 = 0;
+        let _v1 = length<Element>(self);
         'l0: loop {
             loop {
-                if (!(_t2 < _t3)) break 'l0;
-                if (borrow<Element>(self, _t2) == e) break;
-                _t2 = _t2 + 1
+                if (!(_v0 < _v1)) break 'l0;
+                if (borrow<Element>(self, _v0) == e) break;
+                _v0 = _v0 + 1
             };
             return true
         };
         false
     }
     public fun index_of<Element>(self: &vector<Element>, e: &Element): (bool, u64) {
-        let _t2 = 0;
-        let _t3 = length<Element>(self);
+        let _v0 = 0;
+        let _v1 = length<Element>(self);
         'l0: loop {
             loop {
-                if (!(_t2 < _t3)) break 'l0;
-                if (borrow<Element>(self, _t2) == e) break;
-                _t2 = _t2 + 1
+                if (!(_v0 < _v1)) break 'l0;
+                if (borrow<Element>(self, _v0) == e) break;
+                _v0 = _v0 + 1
             };
-            return (true, _t2)
+            return (true, _v0)
         };
         (false, 0)
     }
@@ -37,38 +37,38 @@ module 0x1::vector {
         range_with_step(start, end, 1)
     }
     public fun range_with_step(start: u64, end: u64, step: u64): vector<u64> {
-        if (!(step > 0)) abort 131075;
-        let _t3 = empty<u64>();
+        assert!(step > 0, 131075);
+        let _v0 = empty<u64>();
         while (start < end) {
-            push_back<u64>(&mut _t3, start);
+            push_back<u64>(&mut _v0, start);
             start = start + step
         };
-        _t3
+        _v0
     }
     public fun append<Element>(self: &mut vector<Element>, other: vector<Element>) {
         reverse<Element>(&mut other);
         reverse_append<Element>(self, other);
     }
     public fun reverse<Element>(self: &mut vector<Element>) {
-        let _t1 = length<Element>(freeze(self));
-        reverse_slice<Element>(self, 0, _t1);
+        let _v0 = length<Element>(freeze(self));
+        reverse_slice<Element>(self, 0, _v0);
     }
     public fun reverse_append<Element>(self: &mut vector<Element>, other: vector<Element>) {
-        let _t2 = length<Element>(&other);
-        while (_t2 > 0) {
-            let _t10 = pop_back<Element>(&mut other);
-            push_back<Element>(self, _t10);
-            _t2 = _t2 - 1;
+        let _v0 = length<Element>(&other);
+        while (_v0 > 0) {
+            let _v1 = pop_back<Element>(&mut other);
+            push_back<Element>(self, _v1);
+            _v0 = _v0 - 1;
             continue
         };
         destroy_empty<Element>(other);
     }
     public fun insert<Element>(self: &mut vector<Element>, i: u64, e: Element) {
-        let _t3 = length<Element>(freeze(self));
-        if (!(i <= _t3)) abort 131072;
+        let _v0 = length<Element>(freeze(self));
+        assert!(i <= _v0, 131072);
         push_back<Element>(self, e);
-        while (i < _t3) {
-            swap<Element>(self, i, _t3);
+        while (i < _v0) {
+            swap<Element>(self, i, _v0);
             i = i + 1
         };
     }
@@ -76,33 +76,33 @@ module 0x1::vector {
         length<Element>(self) == 0
     }
     public fun remove<Element>(self: &mut vector<Element>, i: u64): Element {
-        let _t2 = length<Element>(freeze(self));
-        if (i >= _t2) abort 131072;
-        _t2 = _t2 - 1;
-        while (i < _t2) {
-            let _t18 = i;
+        let _v0 = length<Element>(freeze(self));
+        if (i >= _v0) abort 131072;
+        _v0 = _v0 - 1;
+        while (i < _v0) {
+            let _v1 = i;
             i = i + 1;
-            swap<Element>(self, _t18, i);
+            swap<Element>(self, _v1, i);
             continue
         };
         pop_back<Element>(self)
     }
     public fun remove_value<Element>(self: &mut vector<Element>, val: &Element): vector<Element> {
-        let _t3;
-        let (_t7,_t8) = index_of<Element>(freeze(self), val);
-        if (_t7) {
-            let _t11 = remove<Element>(self, _t8);
-            let _t12 = empty<Element>();
-            push_back<Element>(&mut _t12, _t11);
-            _t3 = _t12
-        } else _t3 = empty<Element>();
-        _t3
+        let _v0;
+        let (_v1,_v2) = index_of<Element>(freeze(self), val);
+        if (_v1) {
+            let _v3 = remove<Element>(self, _v2);
+            let _v4 = empty<Element>();
+            push_back<Element>(&mut _v4, _v3);
+            _v0 = _v4
+        } else _v0 = empty<Element>();
+        _v0
     }
     public fun reverse_slice<Element>(self: &mut vector<Element>, left: u64, right: u64) {
-        if (!(left <= right)) abort 131073;
-        let _t8 = left == right;
+        assert!(left <= right, 131073);
+        let _v0 = left == right;
         'l0: loop {
-            if (!_t8) {
+            if (!_v0) {
                 right = right - 1;
                 loop {
                     if (!(left < right)) break 'l0;
@@ -115,61 +115,61 @@ module 0x1::vector {
         };
     }
     public fun rotate<Element>(self: &mut vector<Element>, rot: u64): u64 {
-        let _t2 = length<Element>(freeze(self));
-        rotate_slice<Element>(self, 0, rot, _t2)
+        let _v0 = length<Element>(freeze(self));
+        rotate_slice<Element>(self, 0, rot, _v0)
     }
     public fun rotate_slice<Element>(self: &mut vector<Element>, left: u64, rot: u64, right: u64): u64 {
         reverse_slice<Element>(self, left, rot);
         reverse_slice<Element>(self, rot, right);
         reverse_slice<Element>(self, left, right);
-        let _t16 = right - rot;
-        left + _t16
+        let _v0 = right - rot;
+        left + _v0
     }
     public fun singleton<Element>(e: Element): vector<Element> {
-        let _t1 = empty<Element>();
-        push_back<Element>(&mut _t1, e);
-        _t1
+        let _v0 = empty<Element>();
+        push_back<Element>(&mut _v0, e);
+        _v0
     }
     public fun slice<Element: copy>(self: &vector<Element>, start: u64, end: u64): vector<Element> {
-        let _t3;
+        let _v0;
         if (start <= end) {
-            let _t10 = length<Element>(self);
-            _t3 = end <= _t10
-        } else _t3 = false;
-        if (!_t3) abort 131076;
-        let _t4 = empty<Element>();
+            let _v1 = length<Element>(self);
+            _v0 = end <= _v1
+        } else _v0 = false;
+        assert!(_v0, 131076);
+        let _v2 = empty<Element>();
         while (start < end) {
-            let _t17 = &mut _t4;
-            let _t21 = *borrow<Element>(self, start);
-            push_back<Element>(_t17, _t21);
+            let _v3 = &mut _v2;
+            let _v4 = *borrow<Element>(self, start);
+            push_back<Element>(_v3, _v4);
             start = start + 1;
             continue
         };
-        _t4
+        _v2
     }
     public fun swap_remove<Element>(self: &mut vector<Element>, i: u64): Element {
         if (is_empty<Element>(freeze(self))) abort 131072;
-        let _t2 = length<Element>(freeze(self)) - 1;
-        swap<Element>(self, i, _t2);
+        let _v0 = length<Element>(freeze(self)) - 1;
+        swap<Element>(self, i, _v0);
         pop_back<Element>(self)
     }
     public fun trim<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let _t2 = trim_reverse<Element>(self, new_len);
-        reverse<Element>(&mut _t2);
-        _t2
+        let _v0 = trim_reverse<Element>(self, new_len);
+        reverse<Element>(&mut _v0);
+        _v0
     }
     public fun trim_reverse<Element>(self: &mut vector<Element>, new_len: u64): vector<Element> {
-        let _t2 = length<Element>(freeze(self));
-        if (!(new_len <= _t2)) abort 131072;
-        let _t3 = empty<Element>();
-        while (new_len < _t2) {
-            let _t14 = &mut _t3;
-            let _t16 = pop_back<Element>(self);
-            push_back<Element>(_t14, _t16);
-            _t2 = _t2 - 1;
+        let _v0 = length<Element>(freeze(self));
+        assert!(new_len <= _v0, 131072);
+        let _v1 = empty<Element>();
+        while (new_len < _v0) {
+            let _v2 = &mut _v1;
+            let _v3 = pop_back<Element>(self);
+            push_back<Element>(_v2, _v3);
+            _v0 = _v0 - 1;
             continue
         };
-        _t3
+        _v1
     }
 }
 

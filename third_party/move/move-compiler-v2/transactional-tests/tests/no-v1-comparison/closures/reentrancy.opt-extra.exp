@@ -1,0 +1,16 @@
+processed 5 tasks
+task 0 lines 1-6:  publish [module 0x42::callee {]
+task 1 lines 8-40:  publish [module 0x42::caller {]
+task 2 lines 43-43:  run 0x42::caller::init --signers 0x42
+task 3 lines 45-45:  run 0x42::caller::callback_ok
+return values: true
+task 4 lines 47-47:  run 0x42::caller::callback_fails --verbose
+Error: Function execution failed with VMError: {
+    message: Resource `0x42::caller::R` cannot be accessed because of active reentrancy of defining module.,
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::caller,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(4), 3)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000042, name: Identifier("caller") }), FunctionDefinitionIndex(1), 5)] }),
+}

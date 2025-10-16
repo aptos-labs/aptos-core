@@ -8,35 +8,40 @@ xclippy = [
   "-Wunexpected_cfgs",
   "-Dwarnings",
   "-Wclippy::all", # TODO: at some point we need to clean up all the exceptions listed below
-  "-Aclippy::upper_case_acronyms",
-  "-Aclippy::enum-variant-names",
-  "-Aclippy::result-large-err",
-  "-Aclippy::mutable-key-type",
-  "-Aclippy::doc_lazy_continuation",
+  "-Aclippy::collapsible_if",
   "-Aclippy::collapsible_match",
-  "-Aclippy::needless_borrows_for_generic_args",
-  "-Anon_local_definitions",
-  "-Aclippy::needless_lifetimes",
-  "-Aclippy::empty_line_after_doc_comments",
-  "-Aclippy::manual-ok-err",
+  "-Aclippy::doc_lazy_continuation",
   "-Aclippy::doc-overindented-list-items",
-  "-Aclippy::manual_div_ceil",
-  "-Aclippy::manual-repeat-n",
-  "-Aclippy::sliced-string-as-bytes",
-  "-Aclippy::obfuscated-if-else",
-  "-Aclippy::unnecessary-map-or",
-  "-Aclippy::nonminimal-bool",
-  "-Aclippy::unnecessary-unwrap",
+  "-Aclippy::empty_line_after_doc_comments",
+  "-Aclippy::enum-variant-names",
   "-Aclippy::large-enum-variant",
+  "-Aclippy::mutable-key-type",
+  "-Aclippy::result-large-err",
+  "-Aclippy::sliced-string-as-bytes",
+  "-Aclippy::upper_case_acronyms",
 ]
 x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 
 [build]
 rustflags = ["--cfg", "tokio_unstable", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes"]
 
-# TODO(grao): Figure out whether we should enable othaer cpu features, and whether we should use a different way to configure them rather than list every single one here.
 [target.x86_64-unknown-linux-gnu]
-rustflags = ["--cfg", "tokio_unstable", "-C", "link-arg=-fuse-ld=lld", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes", "-C", "target-feature=+sse4.2"]
+rustflags = [
+  "--cfg",
+  "tokio_unstable",
+  "-C",
+  "link-arg=-fuse-ld=lld",
+  "-C",
+  "force-frame-pointers=yes",
+  "-C",
+  "force-unwind-tables=yes",
+  "-C",
+  "target-cpu=x86-64-v3",
+]
+
+# Need this for RocksDB to build until its build script is fixed.
+[env]
+CXXFLAGS_x86_64_unknown_linux_gnu = "-mpclmul"
 
 # 64 bit MSVC
 [target.x86_64-pc-windows-msvc]

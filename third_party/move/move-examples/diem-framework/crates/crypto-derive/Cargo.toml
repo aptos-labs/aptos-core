@@ -3,7 +3,7 @@ name = "diem-crypto-derive"
 version = "0.0.3"
 authors = ["Diem Association <opensource@diem.com>"]
 publish = false
-edition = "2021"
+edition = { workspace = true }
 license = "Apache-2.0"
 
 [lib]

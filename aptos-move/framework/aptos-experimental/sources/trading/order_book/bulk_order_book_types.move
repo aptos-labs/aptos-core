@@ -77,6 +77,7 @@ module aptos_experimental::bulk_order_book_types {
     enum BulkOrderRequest<M: store + copy + drop> has copy, drop {
         V1 {
             account: address,
+            order_sequence_number: u64, // sequence number for order validation
             bid_prices: vector<u64>, // prices for each levels of the order
             bid_sizes: vector<u64>, // sizes for each levels of the order
             ask_prices: vector<u64>, // prices for each levels of the order
@@ -108,10 +109,7 @@ module aptos_experimental::bulk_order_book_types {
             order_id: OrderIdType,
             account: address,
             unique_priority_idx: UniqueIdxType,
-            orig_bid_size: u64, // original size of the bid order
-            orig_ask_size: u64, // original size of the ask order
-            total_remaining_bid_size: u64, // remaining size of the bid order
-            total_remaining_ask_size: u64, // remaining size of the ask order
+            order_sequence_number: u64, // sequence number for order validation
             bid_prices: vector<u64>, // prices for each levels of the order
             bid_sizes: vector<u64>, // sizes for each levels of the order
             ask_prices: vector<u64>, // prices for each levels of the order
@@ -139,7 +137,7 @@ module aptos_experimental::bulk_order_book_types {
         unique_priority_idx: UniqueIdxType,
         order_req: BulkOrderRequest<M>, best_bid_price: Option<u64>, best_ask_price: Option<u64>,
     ): BulkOrder<M> {
-        let BulkOrderRequest::V1 { account, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata } = order_req;
+        let BulkOrderRequest::V1 { account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata } = order_req;
         let bid_price_crossing_idx = discard_price_crossing_levels(&bid_prices, best_ask_price, true);
         let ask_price_crossing_idx = discard_price_crossing_levels(&ask_prices, best_bid_price, false);
         let (post_only_bid_prices, post_only_bid_sizes) = if (bid_price_crossing_idx > 0) {
@@ -154,17 +152,11 @@ module aptos_experimental::bulk_order_book_types {
         } else {
             (ask_prices, ask_sizes)
         };
-        // Original bid and ask sizes are the sum of the sizes at each price level
-        let orig_bid_size = bid_sizes.fold(0, |acc, size| acc + size);
-        let orig_ask_size = ask_sizes.fold(0, |acc, size| acc + size);
         BulkOrder::V1 {
             order_id,
             account,
             unique_priority_idx,
-            orig_bid_size,
-            orig_ask_size,
-            total_remaining_bid_size: orig_bid_size, // Initially, the remaining size is the original size
-            total_remaining_ask_size: orig_ask_size, // Initially, the remaining size is the original size
+            order_sequence_number,
             bid_prices: post_only_bid_prices,
             bid_sizes: post_only_bid_sizes,
             ask_prices: post_only_ask_prices,
@@ -191,6 +183,7 @@ module aptos_experimental::bulk_order_book_types {
     /// - If ask_prices and ask_sizes have different lengths
     public fun new_bulk_order_request<M: store + copy + drop>(
         account: address,
+        sequence_number: u64,
         bid_prices: vector<u64>,
         bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
@@ -201,6 +194,7 @@ module aptos_experimental::bulk_order_book_types {
         assert!(ask_prices.length() == ask_sizes.length(), EINVLID_MM_ORDER_REQUEST);
         let req = BulkOrderRequest::V1 {
             account,
+            order_sequence_number: sequence_number,
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -216,6 +210,20 @@ module aptos_experimental::bulk_order_book_types {
     ): address {
         let BulkOrderRequest::V1 { account, .. } = order_req;
         *account
+    }
+
+    public fun get_sequence_number_from_order_request<M: store + copy + drop>(
+        order_req: &BulkOrderRequest<M>
+    ): u64 {
+        let BulkOrderRequest::V1 { order_sequence_number: sequence_number, .. } = order_req;
+        *sequence_number
+    }
+
+    public fun get_sequence_number_from_bulk_order<M: store + copy + drop>(
+        order: &BulkOrder<M>
+    ): u64 {
+        let BulkOrder::V1 { order_sequence_number: sequence_number, .. } = order;
+        *sequence_number
     }
 
     /// Validates that all sizes in the vector are greater than 0.
@@ -326,26 +334,25 @@ module aptos_experimental::bulk_order_book_types {
         i // Return the index of the first non-crossing level
     }
 
-
-    /// Creates a new single bulk order match result.
-    ///
-    /// # Arguments:
-    /// - `order`: Reference to the bulk order being matched
-    /// - `is_bid`: True if matching against bid side, false for ask side
-    /// - `matched_size`: Size that was matched in this operation
-    ///
-    /// # Returns:
-    /// A `SingleBulkOrderMatch` containing the match details.
+    #[lint::skip(needless_mutable_reference)]
+    // Creates a new single bulk order match result.
+    //
+    // Arguments:
+    // - order: Reference to the bulk order being matched
+    // - is_bid: True if matching against bid side, false for ask side
+    // - matched_size: Size that was matched in this operation
+    //
+    // Returns:
+    // A `SingleBulkOrderMatch` containing the match details.
     public(friend) fun new_bulk_order_match<M: store + copy + drop>(
         order: &mut BulkOrder<M>,
         is_bid: bool,
         matched_size: u64
     ): OrderMatch<M> {
-        // print( &order.total_remaining_bid_size);
-        let (price, orig_size, remaining_size) = if (is_bid) {
-            (order.bid_prices[0], order.orig_bid_size, order.total_remaining_bid_size - matched_size)
+        let (price, remaining_size) = if (is_bid) {
+            (order.bid_prices[0], order.bid_sizes[0]  - matched_size)
         } else {
-            (order.ask_prices[0], order.orig_ask_size, order.total_remaining_ask_size - matched_size)
+            (order.ask_prices[0], order.ask_sizes[0] - matched_size)
         };
         new_order_match<M>(
             new_order_match_details<M>(
@@ -354,7 +361,7 @@ module aptos_experimental::bulk_order_book_types {
                 option::none(),
                 order.get_unique_priority_idx(),
                 price,
-                orig_size,
+                0, // Original size is not applicable for bulk orders
                 remaining_size,
                 is_bid,
                 good_till_cancelled(),
@@ -370,9 +377,9 @@ module aptos_experimental::bulk_order_book_types {
         is_bid: bool,
     ): u64 {
         if (is_bid) {
-            self.total_remaining_bid_size
+            self.bid_sizes.fold(0, |acc, size| acc + size)
         } else {
-            self.total_remaining_ask_size
+            self.ask_sizes.fold(0, |acc, size| acc + size)
         }
     }
 
@@ -501,21 +508,19 @@ module aptos_experimental::bulk_order_book_types {
         other: &OrderMatchDetails<M>,
     ) {
         // Reinsert the order into the bulk order
-        let (prices, sizes, total_remaining) = if (other.is_bid_from_match_details()) {
-            (&mut self.bid_prices, &mut self.bid_sizes, &mut self.total_remaining_bid_size)
+        let (prices, sizes) = if (other.is_bid_from_match_details()) {
+            (&mut self.bid_prices, &mut self.bid_sizes)
         } else {
-            (&mut self.ask_prices, &mut self.ask_sizes, &mut self.total_remaining_ask_size)
+            (&mut self.ask_prices, &mut self.ask_sizes)
         };
         // Reinsert the price and size at the front of the respective vectors - if the price already exists, we ensure that
         // it is same as the reinsertion price and we just increase the size
         // If the price does not exist, we insert it at the front.
         if (prices.length() > 0 && prices[0] == other.get_price_from_match_details()) {
             sizes[0] += other.get_remaining_size_from_match_details(); // Increase the size at the first price level
-            *total_remaining += other.get_remaining_size_from_match_details(); // Increase the total remaining size
         } else {
             prices.insert(0, other.get_price_from_match_details()); // Insert the new price at the front
             sizes.insert(0, other.get_remaining_size_from_match_details()); // Insert the new size at the front
-            *total_remaining += other.get_remaining_size_from_match_details(); // Set the total remaining size to the new size
         }
     }
 
@@ -539,14 +544,13 @@ module aptos_experimental::bulk_order_book_types {
         is_bid: bool,
         matched_size: u64,
     ): (Option<u64>, Option<u64>) {
-        let (prices, sizes, total_remaining) = if (is_bid) {
-            (&mut self.bid_prices, &mut self.bid_sizes, &mut self.total_remaining_bid_size)
+        let (prices, sizes) = if (is_bid) {
+            (&mut self.bid_prices, &mut self.bid_sizes)
         } else {
-            (&mut self.ask_prices, &mut self.ask_sizes, &mut self.total_remaining_ask_size)
+            (&mut self.ask_prices, &mut self.ask_sizes)
         };
         assert!(matched_size <= sizes[0], EUNEXPECTED_MATCH_SIZE); // Ensure the remaining size is not more than the size at the first price level
         sizes[0] -= matched_size; // Decrease the size at the first price level by the matched size
-        *total_remaining -= matched_size; // Decrease the total remaining size
         if (sizes[0] == 0) {
             // If the size at the first price level is now 0, remove this price level
             prices.remove(0);
@@ -566,11 +570,46 @@ module aptos_experimental::bulk_order_book_types {
     public(friend) fun set_empty<M: store + copy + drop>(
         self: &mut BulkOrder<M>
     ) {
-        self.total_remaining_bid_size = 0;
-        self.total_remaining_ask_size = 0;
         self.bid_sizes = vector::empty();
         self.ask_sizes = vector::empty();
         self.bid_prices = vector::empty();
         self.ask_prices = vector::empty();
+    }
+
+    public fun destroy_bulk_order<M: store + copy + drop>(
+        self: BulkOrder<M>
+    ): (
+        OrderIdType,
+        address,
+        UniqueIdxType,
+        u64,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        vector<u64>,
+        M
+    ) {
+        let BulkOrder::V1 {
+            order_id,
+            account,
+            unique_priority_idx,
+            order_sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata
+        } = self;
+        (
+            order_id,
+            account,
+            unique_priority_idx,
+            order_sequence_number,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            metadata
+        )
     }
 }

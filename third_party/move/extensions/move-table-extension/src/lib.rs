@@ -37,6 +37,7 @@ use std::{
     fmt::{Debug, Display},
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 // ===========================================================================================
 // Public Data Structures and Constants
@@ -137,8 +138,8 @@ struct TableData {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
-    value_layout: MoveTypeLayout,
+    key_layout: TriompheArc<MoveTypeLayout>,
+    value_layout: TriompheArc<MoveTypeLayout>,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 

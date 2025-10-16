@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-31:  publish [module 0xc0ffee::borrow]
+task 1 lines 33-33:  run 0xc0ffee::borrow::equality_poc --signers 0x1 --verbose
+return values: true

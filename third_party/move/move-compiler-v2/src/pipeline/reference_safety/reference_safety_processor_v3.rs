@@ -334,7 +334,9 @@ impl LifetimeState {
     }
 
     /// Returns all currently active global borrow edges.
-    fn global_borrow_edges(&self) -> impl Iterator<Item = (AttrId, QualifiedId<StructId>, RefID)> {
+    fn global_borrow_edges(
+        &self,
+    ) -> impl Iterator<Item = (AttrId, QualifiedId<StructId>, RefID)> + use<> {
         self.borrow_graph
             .out_edges(self.frame_root())
             .into_iter()

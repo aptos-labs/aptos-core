@@ -6,12 +6,11 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 default-run = "main"
 
 [dependencies]
 anyhow = { workspace = true }
-bcs = { workspace = true }
 clap = { workspace = true }
 glob = { workspace = true }
 once_cell = { workspace = true }

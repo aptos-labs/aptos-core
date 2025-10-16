@@ -1,8 +1,8 @@
 processed 2 tasks
-task 0 lines 3-9:  publish --print-bytecode [// Bytecode version v7]
+task 0 lines 3-9:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test1
 // Function definition at index 0
 public fun f(l0: u64): u64
@@ -11,10 +11,10 @@ public fun f(l0: u64): u64
 
 
 == END Bytecode ==
-task 1 lines 13-21:  publish --print-bytecode [// Bytecode version v7]
+task 1 lines 13-21:  publish --print-bytecode [// Bytecode version v8]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test2
 use 0x66::test1
 // Function definition at index 0

@@ -28,7 +28,7 @@ module 0x42::A {
         t_c: C::T,
     }
     public fun foo(): T {
-        let _t0 = C::foo();
-        T{t_b: B::foo(), t_c: _t0}
+        let _v0 = C::foo();
+        T{t_b: B::foo(), t_c: _v0}
     }
 }

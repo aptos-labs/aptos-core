@@ -1,0 +1,55 @@
+// -- Model dump before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    struct FunctionStore {
+        f: ||u64 has copy + drop + store,
+    }
+    private entry fun entry_func() {
+        {
+          let v: |0x1::option::Option<u64>|u64 has copy + drop + store = closure#0m::id2();
+          {
+            let _f: ||u64 has copy + drop + store = closure#1m::id(v);
+            Tuple()
+          }
+        }
+    }
+    public fun id(f: |0x1::option::Option<u64>|u64 has copy + drop + store): u64 {
+        (f)(option::some<u64>(3))
+    }
+    public fun id2(_v: 0x1::option::Option<u64>): u64 {
+        3
+    }
+    private fun init_module(account: &signer) {
+        {
+          let v: |0x1::option::Option<u64>|u64 has copy + drop + store = closure#0m::id2();
+          {
+            let f: ||u64 has copy + drop + store = closure#1m::id(v);
+            MoveTo<FunctionStore>(account, pack m::FunctionStore(f));
+            Tuple()
+          }
+        }
+    }
+} // end 0x99::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0x99::m {
+    use std::option;
+    struct FunctionStore has key {
+        f: ||u64 has copy + drop + store,
+    }
+    entry fun entry_func() {
+        let v: |0x1::option::Option<u64>|u64 has copy + drop + store = |arg0| id2(arg0);
+        let _f: ||u64 has copy + drop + store = || id(v);
+    }
+    public fun id(f: |0x1::option::Option<u64>|u64 has copy + drop + store): u64 {
+        f(0x1::option::some<u64>(3))
+    }
+    public fun id2(_v: 0x1::option::Option<u64>): u64 {
+        3
+    }
+    fun init_module(account: &signer) {
+        let v: |0x1::option::Option<u64>|u64 has copy + drop + store = |arg0| id2(arg0);
+        let f: ||u64 has copy + drop + store = || id(v);
+        move_to<FunctionStore>(FunctionStore{f: f}, account);
+    }
+}

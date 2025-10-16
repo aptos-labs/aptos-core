@@ -78,7 +78,7 @@ module aptos_std::pool_u64_unbound {
             shares,
             scaling_factor: _,
         } = self;
-        shares.destroy_empty::<address, u128>();
+        shares.destroy_empty<address, u128>();
     }
 
     /// Return `self`'s total balance of coins.

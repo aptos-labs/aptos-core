@@ -63,6 +63,7 @@ where
             self.num_blocks_processed, block_id
         );
         let num_input_txns = executable_block.transactions.num_transactions();
+        assert!(num_input_txns > 0);
         {
             let _timer = TIMER.timer_with(&["execute"]);
             self.executor

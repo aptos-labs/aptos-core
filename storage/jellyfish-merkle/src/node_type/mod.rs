@@ -119,10 +119,10 @@ impl NodeKey {
             "Invalid number of nibbles: {}",
             num_nibbles,
         );
-        let mut nibble_bytes = Vec::with_capacity((num_nibbles + 1) / 2);
+        let mut nibble_bytes = Vec::with_capacity(num_nibbles.div_ceil(2));
         reader.read_to_end(&mut nibble_bytes)?;
         ensure!(
-            (num_nibbles + 1) / 2 == nibble_bytes.len(),
+            num_nibbles.div_ceil(2) == nibble_bytes.len(),
             "encoded num_nibbles {} mismatches nibble path bytes {:?}",
             num_nibbles,
             nibble_bytes

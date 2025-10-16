@@ -1,0 +1,33 @@
+//# publish
+module 0xc0ffee::borrow
+
+struct Data has key+drop
+    value: u64
+
+fun equality_poc(s: &signer): bool acquires Data
+    local d: Data
+    local r2: &Data
+    local borrow_data: &mut Data
+
+    ld_u64 1
+    pack Data
+    st_loc d
+    move_loc s
+    move_loc d
+    move_to Data
+
+    ld_const<address> 0x1
+    borrow_global Data
+    ld_const<address> 0x1
+    borrow_global Data
+    eq
+    ld_const<address> 0x1
+    mut_borrow_global Data
+    st_loc borrow_data
+    ld_u64 2
+    move_loc borrow_data
+    mut_borrow_field Data, value
+    write_ref
+    ret
+
+//# run 0xc0ffee::borrow::equality_poc --signers 0x1 --verbose

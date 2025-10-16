@@ -4,8 +4,9 @@
 #![allow(clippy::duplicated_attributes)]
 
 use crate::{
-    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncModuleStorage,
-    Module, ModuleStorage, RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
+    ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
+    storage::layout_cache::NoOpLayoutCache, AsUnsyncModuleStorage, Module, ModuleStorage,
+    RuntimeEnvironment, UnsyncModuleStorage, WithRuntimeEnvironment,
 };
 use ambassador::Delegate;
 use bytes::Bytes;
@@ -88,6 +89,10 @@ pub struct StagingModuleStorage<'a, M> {
     storage: UnsyncModuleStorage<'a, StagingModuleBytesStorage<'a, M>>,
 }
 
+// Very important: no caching for staging module storage so that any speculative updates are not
+// accidentally cached.
+impl<M> NoOpLayoutCache for StagingModuleStorage<'_, M> {}
+
 impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
     /// Returns new module storage with staged modules, running full compatability checks for them.
     pub fn create(
@@ -126,6 +131,7 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             .runtime_environment()
             .vm_config()
             .enable_lazy_loading;
+        let is_enum_option_enabled = staged_runtime_environment.vm_config().enable_enum_option;
         let deserializer_config = &staged_runtime_environment.vm_config().deserializer_config;
 
         // For every module in bundle, run compatibility checks and construct a new bytes storage
@@ -170,6 +176,12 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                 if let Some(old_module_ref) =
                     existing_module_storage.unmetered_get_deserialized_module(addr, name)?
                 {
+                    if is_enum_option_enabled
+                        && old_module_ref.self_id().is_option()
+                        && old_module_ref.self_id() == compiled_module.self_id()
+                    {
+                        continue;
+                    }
                     let old_module = old_module_ref.as_ref();
                     compatibility
                         .check(old_module, &compiled_module)

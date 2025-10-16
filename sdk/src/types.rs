@@ -272,9 +272,9 @@ impl LocalAccount {
             // Simulation of OIDC provider processing.
             let iss = keyless::test_utils::get_sample_iss();
             let jwk = keyless::test_utils::get_sample_jwk();
-            let aud = format!("aud_{}", hex::encode(rng.gen::<[u8; 4]>()));
+            let aud = format!("aud_{}", hex::encode(rng.r#gen::<[u8; 4]>()));
             let uid_key = "sub".to_string();
-            let uid_val = format!("uid_{}", hex::encode(rng.gen::<[u8; 4]>()));
+            let uid_val = format!("uid_{}", hex::encode(rng.r#gen::<[u8; 4]>()));
             let jwt_header = keyless::test_utils::get_sample_jwt_header_json();
             let jwt_header_b64 = keyless::base64url_encode_str(&jwt_header);
             let jwt_payload = keyless::circuit_testcases::render_jwt_payload_json(

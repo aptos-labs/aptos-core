@@ -89,17 +89,6 @@ impl ObserverBlockData {
         self.block_payload_store.all_payloads_exist(blocks)
     }
 
-    /// Returns true iff the root epoch and round match the given values
-    pub fn check_root_epoch_and_round(&self, epoch: u64, round: Round) -> bool {
-        // Get the expected epoch and round
-        let root = self.root();
-        let expected_epoch = root.commit_info().epoch();
-        let expected_round = root.commit_info().round();
-
-        // Check if the expected epoch and round match the given values
-        expected_epoch == epoch && expected_round == round
-    }
-
     /// Clears all block data and returns the root ledger info
     pub fn clear_block_data(&mut self) -> LedgerInfoWithSignatures {
         // Clear the payload store
@@ -401,33 +390,6 @@ mod test {
 
         // Verify that the inserted payload exists
         assert!(observer_block_data.all_payloads_exist(&[pipelined_block]));
-    }
-
-    #[test]
-    fn test_check_root_epoch_and_round() {
-        // Create a root ledger info
-        let epoch = 10;
-        let round = 5;
-        let root = create_ledger_info(epoch, round);
-
-        // Create the observer block data
-        let mut observer_block_data =
-            ObserverBlockData::new_with_root(ConsensusObserverConfig::default(), root);
-
-        // Check the root epoch and round
-        assert!(observer_block_data.check_root_epoch_and_round(epoch, round));
-        assert!(!observer_block_data.check_root_epoch_and_round(epoch, round + 1));
-        assert!(!observer_block_data.check_root_epoch_and_round(epoch + 1, round));
-
-        // Update the root ledger info
-        let new_epoch = epoch + 10;
-        let new_round = round + 100;
-        let new_root = create_ledger_info(new_epoch, new_round);
-        observer_block_data.update_root(new_root.clone());
-
-        // Check the updated root epoch and round
-        assert!(!observer_block_data.check_root_epoch_and_round(epoch, round));
-        assert!(observer_block_data.check_root_epoch_and_round(new_epoch, new_round));
     }
 
     #[test]

@@ -3,9 +3,9 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(): bool {
-        let _t0 = 1 << 1u8;
-        let _t7 = _t0 << 1u8;
-        _t0 < _t7
+        let _v0 = 1 << 1u8;
+        let _v1 = _v0 << 1u8;
+        _v0 < _v1
     }
 }
 

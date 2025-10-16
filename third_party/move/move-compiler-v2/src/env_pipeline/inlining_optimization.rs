@@ -13,7 +13,7 @@ use crate::{
 use codespan_reporting::diagnostic::Severity;
 use move_binary_format::file_format::Visibility;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, TempIndex},
+    ast::{AccessSpecifierKind, Exp, ExpData, Operation, Pattern, TempIndex},
     exp_rewriter::ExpRewriterFunctions,
     metadata::LanguageVersion,
     model::{
@@ -21,19 +21,36 @@ use move_model::{
         QualifiedId,
     },
     ty::Type,
+    well_known,
 };
+use once_cell::sync::Lazy;
 use petgraph::{algo::kosaraju_scc, prelude::DiGraphMap};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, env};
 
 /// [TODO]: tune the heuristic limits below
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a caller function can grow to due to inlining.
-const MAX_CALLER_CODE_SIZE: usize = 1024;
+pub static MAX_CALLER_CODE_SIZE: Lazy<usize> = Lazy::new(|| {
+    env::var("MAX_CALLER_CODE_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1024)
+});
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a callee function can be for it to be considered for inlining.
-const MAX_CALLEE_CODE_SIZE: usize = 128;
+pub static MAX_CALLEE_CODE_SIZE: Lazy<usize> = Lazy::new(|| {
+    env::var("MAX_CALLEE_CODE_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(128)
+});
 /// Number of times we want to apply "unrolling" of functions with inlining.
-const UNROLL_DEPTH: usize = 10;
+pub static UNROLL_DEPTH: Lazy<usize> = Lazy::new(|| {
+    env::var("UNROLL_DEPTH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10)
+});
 
 /// Optimize functions in target modules by applying inlining transformations.
 /// With inlining, a call site of the form:
@@ -67,6 +84,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             // - is not a verify only function
             // - is not a native function
             // - is not an inline function
+            // - does not have the `#[module_lock]` attribute
             !skip_functions.contains(function_id)
                 && function.module_env.is_primary_target()
                 && !function.module_env.is_script_module()
@@ -74,6 +92,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
                 && !function.is_verify_only()
                 && !function.is_native()
                 && !function.is_inline()
+                && !has_module_lock_attribute(&function)
         } else {
             // only move functions are considered for inlining optimization
             false
@@ -81,7 +100,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
     });
     let mut todo: Vec<_> = targets.keys().collect();
     // Each time you unroll, a call site may be substituted with the original body of the callee.
-    for _ in 0..UNROLL_DEPTH {
+    for _ in 0..*UNROLL_DEPTH {
         if todo.is_empty() {
             break;
         }
@@ -221,10 +240,12 @@ fn compute_call_sites_to_inline_and_new_function_size(
             let callee_size = get_function_size_estimate(env, &callee);
             if callee_env.is_inline()
                 || callee_env.is_native()
-                || callee_size.code_size > MAX_CALLEE_CODE_SIZE
+                || callee_size.code_size > *MAX_CALLEE_CODE_SIZE
                 || has_explicit_return(&callee_env)
                 || has_privileged_operations(caller_mid, &callee_env)
                 || has_invisible_calls(caller_module, &callee_env, across_package)
+                || has_module_lock_attribute(&callee_env)
+                || has_access_controls(&callee_env)
             {
                 // won't inline if:
                 // - callee is inline (should have been inlined already)
@@ -235,6 +256,8 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 // - callee has privileged operations on structs/enums that the caller cannot
                 //   perform directly
                 // - callee has calls to functions that are not visible from the caller module
+                // - callee has the `#[module_lock]` attribute
+                // - callee has runtime access control checks
                 None
             } else {
                 let function_size = get_function_size_estimate(env, &callee);
@@ -502,6 +525,32 @@ fn has_explicit_return(function: &FunctionEnv) -> bool {
         !found
     });
     found
+}
+
+/// Does `function` have any runtime access control checks?
+/// If so, by inlining, such checks would not be performed.
+fn has_access_controls(function: &FunctionEnv) -> bool {
+    if let Some(access_specifiers) = function.get_access_specifiers() {
+        if access_specifiers.is_empty() {
+            // empty access specifiers means no access is allowed, the strictest form
+            // of access control
+            return true;
+        }
+        // any reads or writes specification is considered an access control
+        access_specifiers
+            .iter()
+            .any(|spec| spec.kind != AccessSpecifierKind::LegacyAcquires)
+    } else {
+        false
+    }
+}
+
+/// Does `function` have the `#[module_lock]` attribute?
+fn has_module_lock_attribute(function: &FunctionEnv) -> bool {
+    let env = function.env();
+    function.has_attribute(|attr| {
+        env.symbol_pool().string(attr.name()).as_str() == well_known::MODULE_LOCK_ATTRIBUTE
+    })
 }
 
 /// Rewriter for a caller function to inline the call sites in it.

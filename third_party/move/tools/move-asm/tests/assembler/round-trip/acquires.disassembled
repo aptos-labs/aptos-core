@@ -3,7 +3,7 @@
 //# init --addresses A=0x42
 
 //# publish --verbose
-// Bytecode version v7
+// Bytecode version v8
 module 0x42::N
 use 0x1::signer
 struct R<T0: store> has key

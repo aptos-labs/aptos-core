@@ -63,7 +63,7 @@ use colored::Colorize;
 use itertools::Itertools;
 use move_cli::{self, base::test::UnitTestResult};
 use move_command_line_common::{address::NumericalAddress, env::MOVE_HOME};
-use move_core_types::{identifier::Identifier, language_storage::ModuleId, u256::U256};
+use move_core_types::{identifier::Identifier, int256::U256, language_storage::ModuleId};
 use move_model::metadata::{CompilerVersion, LanguageVersion};
 use move_package::{source_package::layout::SourcePackageLayout, BuildConfig, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
@@ -626,6 +626,7 @@ impl CliCommand<&'static str> for TestPackage {
             None,
             self.compute_coverage,
             &mut std::io::stdout(),
+            true,
         )
         .map_err(|err| CliError::UnexpectedError(format!("Failed to run tests: {:#}", err)))?;
 
@@ -2333,7 +2334,7 @@ impl CliCommand<TransactionSummary> for Replay {
         let debugger = AptosDebugger::rest_client(client)?;
 
         // Fetch the transaction to replay.
-        let (txn, txn_info) = debugger
+        let (txn, txn_info, aux_info) = debugger
             .get_committed_transaction_at_version(self.txn_id)
             .await?;
 
@@ -2357,6 +2358,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 self.txn_id,
                 txn.clone(),
                 hash,
+                aux_info,
             )?
         } else if self.benchmark {
             println!("Benchmarking transaction...");
@@ -2365,6 +2367,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 self.txn_id,
                 txn.clone(),
                 hash,
+                aux_info,
             )?
         } else {
             println!("Replaying transaction...");
@@ -2373,6 +2376,7 @@ impl CliCommand<TransactionSummary> for Replay {
                 self.txn_id,
                 txn.clone(),
                 hash,
+                aux_info,
             )?
         };
 

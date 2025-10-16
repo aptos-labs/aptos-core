@@ -3,6 +3,7 @@ module aptos_experimental::market_single_order_tests {
     use std::option;
     use std::option::Option;
     use std::signer;
+    use std::string::String;
     use std::vector;
     use aptos_framework::timestamp;
     use aptos_experimental::order_placement::place_market_order;
@@ -20,7 +21,7 @@ module aptos_experimental::market_single_order_tests {
         verify_cancel_event,
     };
     use aptos_experimental::event_utils;
-    use aptos_experimental::market_types::{order_status_open, get_order_id_from_event};
+    use aptos_experimental::market_types::{order_status_open};
     use aptos_experimental::market_types::{OrderEvent};
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::{good_till_cancelled};
@@ -200,7 +201,7 @@ module aptos_experimental::market_single_order_tests {
 
         let events = latest_emitted_events<OrderEvent>(&mut event_store, option::some(1));
         let order_place_event = events[0];
-        let order_id = get_order_id_from_event(order_place_event);
+        let order_id = order_place_event.get_order_id_from_event();
         order_place_event.verify_order_event(
             order_id,
             option::none(),
@@ -225,7 +226,8 @@ module aptos_experimental::market_single_order_tests {
             0, // filled size
             1000000, // remaining size
             false, // Order is cancelled
-            &mut event_store
+            &mut event_store,
+            false,
         );
         market.destroy_market()
     }
@@ -274,6 +276,7 @@ module aptos_experimental::market_single_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
 
@@ -313,7 +316,7 @@ module aptos_experimental::market_single_order_tests {
         let expected_fill_sizes = vector::empty<u64>();
         let fill_prices = vector::empty<u64>();
         let maker_orig_sizes = vector::empty<u64>();
-        let maker_client_order_ids = vector::empty<Option<u64>>();
+        let maker_client_order_ids = vector::empty<Option<String>>();
         while (i < 6) {
             let maker_order_id = place_maker_order(
                 &mut market,
@@ -353,6 +356,7 @@ module aptos_experimental::market_single_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
         verify_positions(maker_addr, taker_addr, total_fill_size, total_fill_size);
@@ -466,7 +470,8 @@ module aptos_experimental::market_single_order_tests {
             0,
             2000000,
             true,
-            &mut event_store
+            &mut event_store,
+            false,
         );
 
         verify_positions(maker1_addr, maker2_addr, 0, 0);
@@ -495,7 +500,7 @@ module aptos_experimental::market_single_order_tests {
             false,
             false,
             new_test_order_metadata(1),
-            option::some(111),
+            option::some(std::string::utf8(b"111")),
             &test_market_callbacks()
         );
 
@@ -510,7 +515,7 @@ module aptos_experimental::market_single_order_tests {
             false,
             true, // This should fail due to duplicate client order ID
             new_test_order_metadata(1),
-            option::some(111), // Duplicate client order ID
+            option::some(std::string::utf8(b"111")), // Duplicate client order ID
             &test_market_callbacks()
         );
         market.destroy_market()
@@ -538,11 +543,11 @@ module aptos_experimental::market_single_order_tests {
             false,
             false,
             new_test_order_metadata(1),
-            option::some(111),
+            option::some(std::string::utf8(b"111")),
             &test_market_callbacks()
         );
 
-        let metadata = market.get_order_metadata_by_client_id(signer::address_of(maker1), 111);
+        let metadata = market.get_order_metadata_by_client_id(signer::address_of(maker1), std::string::utf8(b"111"));
         assert!(metadata.destroy_some() == new_test_order_metadata(1));
 
         // Test getting the metadata by order ID
@@ -552,12 +557,12 @@ module aptos_experimental::market_single_order_tests {
         // Update metadata
         market.set_order_metadata_by_client_id(
             signer::address_of(maker1),
-            111,
+            std::string::utf8(b"111"),
             new_test_order_metadata(2)
         );
 
         // Verify updated metadata
-        let updated_metadata = market.get_order_metadata_by_client_id(signer::address_of(maker1), 111);
+        let updated_metadata = market.get_order_metadata_by_client_id(signer::address_of(maker1), std::string::utf8(b"111"));
         assert!(updated_metadata.destroy_some() == new_test_order_metadata(2));
 
         // Update metadata by order ID

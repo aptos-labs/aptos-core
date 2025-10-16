@@ -7,8 +7,8 @@ module 0x42::foo {
         f: |T0|(vector<T0>) has drop + store,
     }
     public fun make_foo<T0: store>(p0: &signer) {
-        let _t5 = Foo<T0>{f: |arg0| vector::singleton<T0>(arg0)};
-        move_to<Foo<T0>>(p0, _t5);
+        let _v0 = Foo<T0>{f: |arg0| vector::singleton<T0>(arg0)};
+        move_to<Foo<T0>>(p0, _v0);
     }
 }
 
@@ -17,7 +17,7 @@ module 0x42::foo {
 module 0x42::test {
     use 0x42::foo;
     fun run<T0: store>(p0: &signer) {
-        let _t1 = |arg0| foo::make_foo<T0>(arg0);
-        _t1(p0);
+        let _v0 = |arg0| foo::make_foo<T0>(arg0);
+        _v0(p0);
     }
 }

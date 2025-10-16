@@ -6,7 +6,10 @@
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
     loader::Module,
-    storage::environment::{RuntimeEnvironment, WithRuntimeEnvironment},
+    storage::{
+        environment::{RuntimeEnvironment, WithRuntimeEnvironment},
+        layout_cache::NoOpLayoutCache,
+    },
     ModuleStorage,
 };
 use ambassador::Delegate;
@@ -116,6 +119,7 @@ impl<Ctx> WithRuntimeEnvironment for UnsyncModuleStorageImpl<'_, Ctx>
 where
     Ctx: ModuleBytesStorage + WithRuntimeEnvironment,
 {
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn runtime_environment(&self) -> &RuntimeEnvironment {
         self.ctx.runtime_environment()
     }
@@ -134,10 +138,18 @@ where
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let bytes = match self.ctx.fetch_module_bytes(key.address(), key.name())? {
+        let mut bytes = match self.ctx.fetch_module_bytes(key.address(), key.name())? {
             Some(bytes) => bytes,
             None => return Ok(None),
         };
+        // TODO: remove this once framework on mainnet is using the new option module
+        if let Some(replaced_bytes) = self
+            .ctx
+            .runtime_environment()
+            .get_module_bytes_override(key.address(), key.name())
+        {
+            bytes = replaced_bytes;
+        }
         let compiled_module = self
             .ctx
             .runtime_environment()
@@ -148,6 +160,8 @@ where
         Ok(Some(module))
     }
 }
+
+impl<Ctx> NoOpLayoutCache for UnsyncModuleStorageImpl<'_, Ctx> {}
 
 /// Implementation of (not thread-safe) module storage used for Move unit tests, and externally.
 #[derive(Delegate)]
@@ -160,6 +174,8 @@ where
     where = "Ctx: ModuleBytesStorage + WithRuntimeEnvironment"
 )]
 pub struct UnsyncModuleStorage<'ctx, Ctx>(UnsyncModuleStorageImpl<'ctx, Ctx>);
+
+impl<Ctx> NoOpLayoutCache for UnsyncModuleStorage<'_, Ctx> {}
 
 impl<'ctx, Ctx> UnsyncModuleStorage<'ctx, Ctx>
 where
@@ -175,7 +191,7 @@ where
         self,
     ) -> (
         BorrowedOrOwned<'ctx, Ctx>,
-        impl Iterator<Item = (ModuleId, Arc<Module>)>,
+        impl Iterator<Item = (ModuleId, Arc<Module>)> + use<Ctx>,
     ) {
         let verified_modules_iter =
             self.0

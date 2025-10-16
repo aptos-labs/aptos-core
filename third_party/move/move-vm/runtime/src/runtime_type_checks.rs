@@ -3,7 +3,7 @@
 
 use crate::{
     frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack,
-    reentrancy_checker::CallType, LoadedFunction,
+    reentrancy_checker::CallType, Function, LoadedFunction,
 };
 use move_binary_format::{errors::*, file_format::Bytecode};
 use move_core_types::{
@@ -31,13 +31,21 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 
     /// Paranoid check that operand and type stacks have the same size
-    fn check_operand_stack_balance(operand_stack: &Stack) -> PartialVMResult<()>;
+    fn check_operand_stack_balance(
+        for_fun: &Function,
+        operand_stack: &Stack,
+    ) -> PartialVMResult<()>;
 
     /// For any other checks are performed externally
-    fn should_perform_checks() -> bool;
+    fn should_perform_checks(for_fun: &Function) -> bool;
+
+    /// Whether this is a partial checker, in which some parts of the code are checked and
+    /// others not. This is needed for certain info only valid in full checking.
+    fn is_partial_checker() -> bool;
 
     /// Performs a runtime check of the caller is allowed to call the callee for any type of call,
     /// including native dynamic dispatch or calling a closure.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,
@@ -100,6 +108,7 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 }
 
+#[cfg_attr(feature = "force-inline", inline(always))]
 fn verify_pack<'a>(
     operand_stack: &mut Stack,
     field_count: u16,
@@ -212,8 +221,10 @@ fn with_owned_instantiation<R>(
 
 pub(crate) struct NoRuntimeTypeCheck;
 pub(crate) struct FullRuntimeTypeCheck;
+pub(crate) struct UntrustedOnlyRuntimeTypeCheck;
 
 impl RuntimeTypeCheck for NoRuntimeTypeCheck {
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pre_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
@@ -223,6 +234,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn post_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
@@ -232,15 +244,25 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         Ok(())
     }
 
-    fn check_operand_stack_balance(_operand_stack: &Stack) -> PartialVMResult<()> {
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn check_operand_stack_balance(
+        _for_fun: &Function,
+        _operand_stack: &Stack,
+    ) -> PartialVMResult<()> {
         Ok(())
     }
 
-    #[inline(always)]
-    fn should_perform_checks() -> bool {
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn should_perform_checks(_for_fun: &Function) -> bool {
         false
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn is_partial_checker() -> bool {
+        false
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_cross_module_regular_call_visibility(
         _caller: &LoadedFunction,
         _callee: &LoadedFunction,
@@ -252,6 +274,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
 impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// Note that most of the checks should happen after instruction execution, because gas charging will happen during
     /// instruction execution and we want to avoid running code without charging proper gas as much as possible.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -298,6 +321,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::LdU64(_)
             | Bytecode::LdU128(_)
             | Bytecode::LdU256(_)
+            | Bytecode::LdI8(_)
+            | Bytecode::LdI16(_)
+            | Bytecode::LdI32(_)
+            | Bytecode::LdI64(_)
+            | Bytecode::LdI128(_)
+            | Bytecode::LdI256(_)
             | Bytecode::LdTrue
             | Bytecode::LdFalse
             | Bytecode::LdConst(_)
@@ -323,11 +352,18 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::CastU64
             | Bytecode::CastU128
             | Bytecode::CastU256
+            | Bytecode::CastI8
+            | Bytecode::CastI16
+            | Bytecode::CastI32
+            | Bytecode::CastI64
+            | Bytecode::CastI128
+            | Bytecode::CastI256
             | Bytecode::Add
             | Bytecode::Sub
             | Bytecode::Mul
             | Bytecode::Mod
             | Bytecode::Div
+            | Bytecode::Negate
             | Bytecode::BitOr
             | Bytecode::BitAnd
             | Bytecode::Xor
@@ -383,6 +419,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// This function and `pre_execution_type_stack_transition` should
     /// constitute the full type stack transition for the paranoid
     /// mode.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -390,7 +427,6 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         let ty_builder = frame.ty_builder();
-
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
             Bytecode::Branch(_)
@@ -431,6 +467,30 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::LdU256(_) => {
                 let u256_ty = ty_builder.create_u256_ty();
                 operand_stack.push_ty(u256_ty)?
+            },
+            Bytecode::LdI8(_) => {
+                let i8_ty = ty_builder.create_i8_ty();
+                operand_stack.push_ty(i8_ty)?
+            },
+            Bytecode::LdI16(_) => {
+                let i16_ty = ty_builder.create_i16_ty();
+                operand_stack.push_ty(i16_ty)?
+            },
+            Bytecode::LdI32(_) => {
+                let i32_ty = ty_builder.create_i32_ty();
+                operand_stack.push_ty(i32_ty)?
+            },
+            Bytecode::LdI64(_) => {
+                let i64_ty = ty_builder.create_i64_ty();
+                operand_stack.push_ty(i64_ty)?
+            },
+            Bytecode::LdI128(_) => {
+                let i128_ty = ty_builder.create_i128_ty();
+                operand_stack.push_ty(i128_ty)?
+            },
+            Bytecode::LdI256(_) => {
+                let i256_ty = ty_builder.create_i256_ty();
+                operand_stack.push_ty(i256_ty)?
             },
             Bytecode::LdTrue | Bytecode::LdFalse => {
                 let bool_ty = ty_builder.create_bool_ty();
@@ -665,6 +725,36 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let u256_ty = ty_builder.create_u256_ty();
                 operand_stack.push_ty(u256_ty)?;
             },
+            Bytecode::CastI8 => {
+                operand_stack.pop_ty()?;
+                let i8_ty = ty_builder.create_i8_ty();
+                operand_stack.push_ty(i8_ty)?;
+            },
+            Bytecode::CastI16 => {
+                operand_stack.pop_ty()?;
+                let i16_ty = ty_builder.create_i16_ty();
+                operand_stack.push_ty(i16_ty)?;
+            },
+            Bytecode::CastI32 => {
+                operand_stack.pop_ty()?;
+                let i32_ty = ty_builder.create_i32_ty();
+                operand_stack.push_ty(i32_ty)?;
+            },
+            Bytecode::CastI64 => {
+                operand_stack.pop_ty()?;
+                let i64_ty = ty_builder.create_i64_ty();
+                operand_stack.push_ty(i64_ty)?;
+            },
+            Bytecode::CastI128 => {
+                operand_stack.pop_ty()?;
+                let i128_ty = ty_builder.create_i128_ty();
+                operand_stack.push_ty(i128_ty)?;
+            },
+            Bytecode::CastI256 => {
+                operand_stack.pop_ty()?;
+                let i256_ty = ty_builder.create_i256_ty();
+                operand_stack.push_ty(i256_ty)?;
+            },
             Bytecode::Add
             | Bytecode::Sub
             | Bytecode::Mul
@@ -680,6 +770,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // NO-OP, same as the two lines below when the types are indeed the same:
                 // let lhs_ty = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(rhs_ty)?;
+            },
+            Bytecode::Negate => {
+                operand_stack.top_ty()?.paranoid_check_is_sint_ty()?;
+                // NO-OP, leave stack as is
             },
             Bytecode::Shl | Bytecode::Shr => {
                 let _rhs = operand_stack.pop_ty()?;
@@ -850,15 +944,25 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         Ok(())
     }
 
-    fn check_operand_stack_balance(operand_stack: &Stack) -> PartialVMResult<()> {
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn check_operand_stack_balance(
+        _for_fun: &Function,
+        operand_stack: &Stack,
+    ) -> PartialVMResult<()> {
         operand_stack.check_balance()
     }
 
-    #[inline(always)]
-    fn should_perform_checks() -> bool {
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn should_perform_checks(_for_fun: &Function) -> bool {
         true
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn is_partial_checker() -> bool {
+        false
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_cross_module_regular_call_visibility(
         caller: &LoadedFunction,
         callee: &LoadedFunction,
@@ -895,5 +999,76 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         }
 
         Ok(())
+    }
+}
+
+impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn pre_execution_type_stack_transition(
+        frame: &Frame,
+        operand_stack: &mut Stack,
+        instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
+    ) -> PartialVMResult<()> {
+        if frame.untrusted_code() {
+            FullRuntimeTypeCheck::pre_execution_type_stack_transition(
+                frame,
+                operand_stack,
+                instruction,
+                ty_cache,
+            )
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn post_execution_type_stack_transition(
+        frame: &Frame,
+        operand_stack: &mut Stack,
+        instruction: &Bytecode,
+        ty_cache: &mut FrameTypeCache,
+    ) -> PartialVMResult<()> {
+        if frame.untrusted_code() {
+            FullRuntimeTypeCheck::post_execution_type_stack_transition(
+                frame,
+                operand_stack,
+                instruction,
+                ty_cache,
+            )
+        } else {
+            Ok(())
+        }
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn check_operand_stack_balance(
+        _for_fun: &Function,
+        _operand_stack: &Stack,
+    ) -> PartialVMResult<()> {
+        // We cannot have a global stack balancing without traversing the frame stack,
+        // so skip in this mode.
+        Ok(())
+    }
+
+    fn should_perform_checks(for_fun: &Function) -> bool {
+        !for_fun.is_trusted
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn is_partial_checker() -> bool {
+        true
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    fn check_cross_module_regular_call_visibility(
+        caller: &LoadedFunction,
+        callee: &LoadedFunction,
+    ) -> PartialVMResult<()> {
+        if !caller.function.is_trusted {
+            FullRuntimeTypeCheck::check_cross_module_regular_call_visibility(caller, callee)
+        } else {
+            Ok(())
+        }
     }
 }

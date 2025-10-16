@@ -1804,6 +1804,15 @@ impl FunctionTranslator<'_> {
                     Constant::Vector(val) => boogie_constant_blob(env, options, val),
                     Constant::U16(num) => boogie_num_literal(&num.to_string(), 16, bv_flag),
                     Constant::U32(num) => boogie_num_literal(&num.to_string(), 32, bv_flag),
+                    Constant::I8(_)
+                    | Constant::I16(_)
+                    | Constant::I32(_)
+                    | Constant::I64(_)
+                    | Constant::I128(_)
+                    | Constant::I256(_) => {
+                        // TODO(#17645): add support
+                        unimplemented!("Signed integer types not supported")
+                    },
                 };
                 let dest_str = str_local(*dest);
                 emitln!(writer, "{} := {};", dest_str, value);
@@ -3044,6 +3053,10 @@ impl FunctionTranslator<'_> {
                         self.track_global_mem(mem, node_id);
                     },
                     Vector => unimplemented!("vector"),
+                    CastI8 | CastI16 | CastI32 | CastI64 | CastI128 | CastI256 | Negate => {
+                        // TODO(#17645): add support
+                        panic!("signed integer operations not supported")
+                    },
                 }
                 if let Some(AbortAction(target, code)) = aa {
                     emitln!(writer, "if ($abort_flag) {");

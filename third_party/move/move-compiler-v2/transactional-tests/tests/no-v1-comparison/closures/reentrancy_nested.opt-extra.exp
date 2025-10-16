@@ -1,0 +1,31 @@
+processed 8 tasks
+task 0 lines 1-17:  publish [module 0x42::worker1 {]
+task 1 lines 19-36:  publish [module 0x42::worker2 {]
+task 2 lines 38-69:  publish [module 0x42::tests {]
+task 3 lines 71-73:  run 0x42::tests::init --signers 0x42 [// task 4]
+task 4 lines 74-76:  run 0x42::tests::direct_failure [// task 5]
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::tests,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(5), 1)],
+}
+task 5 lines 77-79:  run 0x42::tests::worker1_failure [// task 6]
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::worker1,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+}
+task 6 lines 80-82:  run 0x42::tests::worker2_failure [// task 7]
+Error: Function execution failed with VMError: {
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::worker2,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 1)],
+}
+task 7 lines 83-83:  run 0x42::tests::worker2_ok
+return values: true

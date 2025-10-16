@@ -295,7 +295,7 @@ impl TransactionGasParameters {
     pub fn calculate_intrinsic_gas(
         &self,
         transaction_size: NumBytes,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         let excess = transaction_size
             .checked_sub(self.large_transaction_cutoff)
             .unwrap_or_else(|| 0.into());

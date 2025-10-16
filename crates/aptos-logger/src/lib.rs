@@ -132,7 +132,7 @@
 //! Logger::builder().level(Level::Info).build();
 //! ```
 
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 
 pub mod prelude {
     pub use crate::{

@@ -594,6 +594,7 @@ impl TestRunConfig {
             vm_config: VMConfig {
                 verifier_config: VerifierConfig::production(),
                 paranoid_type_checks: true,
+                enable_enum_option: false,
                 ..VMConfig::default()
             },
             use_masm: true,
@@ -638,6 +639,13 @@ impl TestRunConfig {
 
     pub(crate) fn verifier_disabled(&self) -> bool {
         self.vm_config.verifier_config.verify_nothing()
+    }
+
+    pub fn with_runtime_ref_checks(self) -> Self {
+        Self {
+            vm_config: self.vm_config.set_paranoid_ref_checks(true),
+            ..self
+        }
     }
 }
 

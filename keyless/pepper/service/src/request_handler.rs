@@ -2,11 +2,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    accounts::{
+        account_managers::AccountRecoveryManagers, account_recovery_db::AccountRecoveryDBInterface,
+    },
     dedicated_handlers::handlers::{
-        HandlerTrait, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+        HandlerTrait, V0DelegatedFetchHandler, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
     },
     error::PepperServiceError,
     external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    utils,
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
@@ -28,6 +32,7 @@ pub const DEFAULT_PEPPER_SERVICE_PORT: u16 = 8000;
 // The list of endpoints/paths offered by the Pepper Service.
 // Note: if you update these paths, please also update the "ALL_PATHS" array below.
 pub const ABOUT_PATH: &str = "/about";
+pub const DELEGATED_FETCH_PATH: &str = "/v0/delegated-fetch";
 pub const FETCH_PATH: &str = "/v0/fetch";
 pub const GROTH16_VK_PATH: &str = "/cached/groth16-vk";
 pub const JWK_PATH: &str = "/cached/jwk";
@@ -37,12 +42,13 @@ pub const VERIFY_PATH: &str = "/v0/verify";
 pub const VUF_PUB_KEY_PATH: &str = "/v0/vuf-pub-key";
 
 // An array of all known endpoints/paths
-pub const ALL_PATHS: [&str; 8] = [
+pub const ALL_PATHS: [&str; 9] = [
     ABOUT_PATH,
+    DELEGATED_FETCH_PATH,
+    FETCH_PATH,
     GROTH16_VK_PATH,
     JWK_PATH,
     KEYLESS_CONFIG_PATH,
-    FETCH_PATH,
     SIGNATURE_PATH,
     VERIFY_PATH,
     VUF_PUB_KEY_PATH,
@@ -51,10 +57,6 @@ pub const ALL_PATHS: [&str; 8] = [
 // Content type constants
 const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_TEXT: &str = "text/plain";
-
-// Origin header constants
-const MISSING_ORIGIN_STRING: &str = ""; // Default to empty string if origin header is missing
-const ORIGIN_HEADER: &str = "origin";
 
 // Useful message constants
 const METHOD_NOT_ALLOWED_MESSAGE: &str =
@@ -65,10 +67,12 @@ const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
-    vuf_private_key: &ark_bls12_381::Fr,
+    vuf_private_key: Arc<ark_bls12_381::Fr>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
+    account_recovery_managers: Arc<AccountRecoveryManagers>,
+    account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<Response<Body>, Infallible>
 where
     TRequest: Debug + Serialize + DeserializeOwned,
@@ -97,7 +101,14 @@ where
 
     // Invoke the handler and generate the response
     match request_handler
-        .handle_request(vuf_private_key, jwk_cache, cached_resources, pepper_request)
+        .handle_request(
+            vuf_private_key,
+            jwk_cache,
+            cached_resources,
+            pepper_request,
+            account_recovery_managers,
+            account_recovery_db,
+        )
         .await
     {
         Ok(pepper_response) => {
@@ -277,16 +288,6 @@ fn generate_options_response(origin: String) -> Result<Response<Body>, Infallibl
     Ok(response)
 }
 
-/// Extracts the origin header from the request
-fn get_request_origin(request: &Request<Body>) -> String {
-    request
-        .headers()
-        .get(ORIGIN_HEADER)
-        .and_then(|header_value| header_value.to_str().ok())
-        .unwrap_or(MISSING_ORIGIN_STRING)
-        .to_owned()
-}
-
 /// Generates a text response with the given status code and body string
 fn generate_text_response(
     origin: String,
@@ -303,12 +304,14 @@ fn generate_text_response(
 /// Handles the given request and returns a response
 pub async fn handle_request(
     request: Request<Body>,
-    vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    vuf_keypair: Arc<(String, Arc<ark_bls12_381::Fr>)>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
+    account_recovery_managers: Arc<AccountRecoveryManagers>,
+    account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
-    let origin = get_request_origin(&request);
+    let origin = utils::get_request_origin(&request);
 
     // Handle any OPTIONS requests
     let request_method = request.method();
@@ -354,14 +357,29 @@ pub async fn handle_request(
     let (_, vuf_priv_key) = vuf_keypair.deref();
     if request_method == Method::POST {
         match request_path {
+            DELEGATED_FETCH_PATH => {
+                return call_dedicated_request_handler(
+                    origin,
+                    request,
+                    vuf_priv_key.clone(),
+                    jwk_cache,
+                    cached_resources,
+                    &V0DelegatedFetchHandler,
+                    account_recovery_managers,
+                    account_recovery_db,
+                )
+                .await
+            },
             FETCH_PATH => {
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_priv_key.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0FetchHandler,
+                    account_recovery_managers,
+                    account_recovery_db,
                 )
                 .await
             },
@@ -369,10 +387,12 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_priv_key.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0SignatureHandler,
+                    account_recovery_managers,
+                    account_recovery_db,
                 )
                 .await
             },
@@ -380,10 +400,12 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_priv_key.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0VerifyHandler,
+                    account_recovery_managers,
+                    account_recovery_db,
                 )
                 .await
             },

@@ -3,7 +3,7 @@
 
 use crate::{
     delayed_values::error::code_invariant_error,
-    values::{Closure, Container, Value, ValueImpl},
+    values::{Closure, Container, Value},
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::vm_status::StatusCode;
@@ -16,24 +16,30 @@ pub fn find_identifiers_in_value(
     value: &Value,
     identifiers: &mut HashSet<u64>,
 ) -> PartialVMResult<()> {
-    find_identifiers_in_value_impl(&value.0, identifiers)
+    find_identifiers_in_value_impl(value, identifiers)
 }
 
 fn find_identifiers_in_value_impl(
-    value: &ValueImpl,
+    value: &Value,
     identifiers: &mut HashSet<u64>,
 ) -> PartialVMResult<()> {
     match value {
-        ValueImpl::U8(_)
-        | ValueImpl::U16(_)
-        | ValueImpl::U32(_)
-        | ValueImpl::U64(_)
-        | ValueImpl::U128(_)
-        | ValueImpl::U256(_)
-        | ValueImpl::Bool(_)
-        | ValueImpl::Address(_) => {},
+        Value::U8(_)
+        | Value::U16(_)
+        | Value::U32(_)
+        | Value::U64(_)
+        | Value::U128(_)
+        | Value::U256(_)
+        | Value::I8(_)
+        | Value::I16(_)
+        | Value::I32(_)
+        | Value::I64(_)
+        | Value::I128(_)
+        | Value::I256(_)
+        | Value::Bool(_)
+        | Value::Address(_) => {},
 
-        ValueImpl::Container(c) => match c {
+        Value::Container(c) => match c {
             Container::Locals(_) => {
                 return Err(PartialVMError::new(
                     StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
@@ -47,7 +53,13 @@ fn find_identifiers_in_value_impl(
             | Container::VecAddress(_)
             | Container::VecU16(_)
             | Container::VecU32(_)
-            | Container::VecU256(_) => {},
+            | Container::VecU256(_)
+            | Container::VecI8(_)
+            | Container::VecI16(_)
+            | Container::VecI32(_)
+            | Container::VecI64(_)
+            | Container::VecI128(_)
+            | Container::VecI256(_) => {},
 
             Container::Vec(v) | Container::Struct(v) => {
                 for val in v.borrow().iter() {
@@ -56,19 +68,19 @@ fn find_identifiers_in_value_impl(
             },
         },
 
-        ValueImpl::ClosureValue(Closure(_, captured)) => {
+        Value::ClosureValue(Closure(_, captured)) => {
             for val in captured.iter() {
                 find_identifiers_in_value_impl(val, identifiers)?;
             }
         },
 
-        ValueImpl::Invalid | ValueImpl::ContainerRef(_) | ValueImpl::IndexedRef(_) => {
+        Value::Invalid | Value::ContainerRef(_) | Value::IndexedRef(_) => {
             return Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             ))
         },
 
-        ValueImpl::DelayedFieldID { id } => {
+        Value::DelayedFieldID { id } => {
             if !identifiers.insert(id.as_u64()) {
                 return Err(code_invariant_error(
                     "Duplicated identifiers for Move value".to_string(),
@@ -114,7 +126,7 @@ mod test {
         let x = Value::delayed_value(DelayedFieldID::from(1));
         let y = Value::delayed_value(DelayedFieldID::from(2));
         let z = Value::delayed_value(DelayedFieldID::from(3));
-        let d = Value::vector_for_testing_only(vec![x, y, z]);
+        let d = Value::vector_unchecked(vec![x, y, z]).unwrap();
 
         let e = Value::struct_(Struct::pack(vec![c, d]));
 

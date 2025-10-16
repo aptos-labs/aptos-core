@@ -1,0 +1,102 @@
+processed 11 tasks
+task 0 lines 1-32:  run --verbose [script {]
+task 1 lines 34-40:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i8(-1) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 2 lines 42-48:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i16(-1) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 3 lines 50-56:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i32(-1) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 4 lines 58-64:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i64(-1) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 66-72:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i128(-1) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 74-84:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(-1) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 7 lines 86-92:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i32(65536) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 8 lines 94-100:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i64(65536) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 9 lines 102-108:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast i128(65536) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 10 lines 110-116:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(65536) to u16,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

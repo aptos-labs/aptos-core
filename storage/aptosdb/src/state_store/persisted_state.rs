@@ -42,6 +42,11 @@ impl PersistedState {
         self.summary.lock().clone()
     }
 
+    #[cfg(test)]
+    pub fn get_hot_state(&self) -> Arc<HotState> {
+        Arc::clone(&self.hot_state)
+    }
+
     pub fn get_state(&self) -> (Arc<dyn HotStateView>, State) {
         self.hot_state.get_committed()
     }

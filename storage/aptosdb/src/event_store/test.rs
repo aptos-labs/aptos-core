@@ -84,7 +84,7 @@ proptest! {
             .into_iter()
             .map(|gens| {
                 gens.into_iter()
-                    .map(|(index, gen)| gen.materialize(*index, &mut universe))
+                    .map(|(index, r#gen)| r#gen.materialize(*index, &mut universe))
                     .collect()
             })
             .collect();
@@ -270,7 +270,7 @@ fn test_get_last_version_before_timestamp_impl(new_block_events: Vec<(Version, C
         }
         assert_eq!(
             store
-                .get_last_version_before_timestamp((last_block_ts + ts + 1) / 2, ledger_version)
+                .get_last_version_before_timestamp((last_block_ts + ts).div_ceil(2), ledger_version)
                 .unwrap(),
             version - 1,
         );

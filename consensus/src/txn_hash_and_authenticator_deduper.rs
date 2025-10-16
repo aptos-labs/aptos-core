@@ -333,9 +333,7 @@ mod tests {
             .sign(&sender.privkey, sender.pubkey)
             .unwrap()
             .into_inner();
-        let txns: Vec<_> = std::iter::repeat(txn.clone())
-            .take(PERF_TXN_PER_BLOCK)
-            .collect();
+        let txns: Vec<_> = std::iter::repeat_n(txn.clone(), PERF_TXN_PER_BLOCK).collect();
         let expected = block(vec![&txn]);
         let deduped_txns = deduper.dedup(txns.clone());
         assert_eq!(expected.len(), deduped_txns.len());
@@ -375,9 +373,7 @@ mod tests {
             .sign(&sender.privkey, sender.pubkey)
             .unwrap()
             .into_inner();
-        let txns: Vec<_> = std::iter::repeat(txn.clone())
-            .take(PERF_TXN_PER_BLOCK)
-            .collect();
+        let txns: Vec<_> = std::iter::repeat_n(txn.clone(), PERF_TXN_PER_BLOCK).collect();
         let expected = block(vec![&txn]);
         let deduped_txns = deduper.dedup(txns.clone());
         assert_eq!(expected.len(), deduped_txns.len());

@@ -3,7 +3,7 @@
 //# publish
 module 0x42::Test {
     public fun test_shadowing() {
-        if (!(3 == 3)) abort 0;
+        assert!(3 == 3, 0);
     }
 }
 

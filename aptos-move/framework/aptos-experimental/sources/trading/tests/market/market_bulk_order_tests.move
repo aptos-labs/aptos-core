@@ -25,7 +25,7 @@ module aptos_experimental::market_bulk_order_tests {
         test_gtc_taker_partially_filled_helper,
         test_post_only_success_helper,
         test_post_only_failure_helper,
-        test_taker_partial_cancelled_maker_reinserted_helper, test_self_matching_not_allowed_helper,
+        test_taker_partial_cancelled_maker_reinserted_helper,
         test_self_matching_allowed_helper,
     };
 
@@ -100,6 +100,7 @@ module aptos_experimental::market_bulk_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            true,
             &test_market_callbacks()
         );
 
@@ -150,18 +151,6 @@ module aptos_experimental::market_bulk_order_tests {
         taker: &signer
     ) {
         test_post_only_failure_helper(admin, market_signer, maker, taker, true);
-    }
-
-    #[test(
-        admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
-    )]
-    public fun test_self_matching_not_allowed(
-        admin: &signer,
-        market_signer: &signer,
-        maker1: &signer,
-        maker2: &signer
-    ) {
-        test_self_matching_not_allowed_helper(admin, market_signer, maker1, maker2, true);
     }
 
     #[test(

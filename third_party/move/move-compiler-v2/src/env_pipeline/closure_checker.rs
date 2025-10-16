@@ -17,6 +17,7 @@ use move_core_types::ability::Ability;
 use move_model::{
     ast::{ExpData, Operation},
     model::GlobalEnv,
+    ty::Type,
     well_known,
 };
 
@@ -90,6 +91,12 @@ pub fn check_closures(env: &GlobalEnv) {
                         };
                         for captured in args {
                             let captured_ty = env.get_node_type(captured.node_id());
+                            // when capturing a value that contains option, we need to generate a warning
+                            // After refactoring option type to use enum, we can lift this limitation
+                            // TODO: remove it after option type is refactored to use enum
+                            if contains_option_type(env, &captured_ty) {
+                                env.warning(&env.get_node_loc(captured.node_id()), "capturing option values is currently not supported");
+                            }
                             if captured_ty.is_reference() {
                                 env.error(
                                     &env.get_node_loc(captured.node_id()),
@@ -133,5 +140,51 @@ pub fn check_closures(env: &GlobalEnv) {
                 });
             }
         }
+    }
+}
+
+/// Check if the type contains an option type
+/// Note that this function does not find contained options within reference types/function types
+/// because it is used for checking captured values only
+fn contains_option_type(env: &GlobalEnv, ty: &Type) -> bool {
+    match ty {
+        Type::Vector(ty) => contains_option_type(env, ty),
+        Type::Struct(mid, sid, tys) => {
+            let struct_env = env.get_module(*mid).into_struct(*sid);
+            if struct_env.is_option_type() {
+                return true;
+            }
+            if struct_env.has_variants() {
+                for variant in struct_env.get_variants() {
+                    for field in struct_env.get_fields_of_variant(variant) {
+                        if contains_option_type(env, &field.get_type()) {
+                            return true;
+                        }
+                    }
+                }
+            } else {
+                for field in struct_env.get_fields() {
+                    if contains_option_type(env, &field.get_type()) {
+                        return true;
+                    }
+                }
+            }
+            tys.iter()
+                .zip(struct_env.get_type_parameters().iter())
+                .filter(|(_, param)| !param.1.is_phantom)
+                .any(|(t, _)| contains_option_type(env, t))
+        },
+        // since fun params and result does not appear in layout, we can safely return false,
+        Type::Fun(..) => false,
+        Type::Primitive(..) => false,
+        // compiler error will be generated separately
+        // we are looking at option values that are captured, and because references cannot be captured,
+        // we do not have to recurse here.
+        Type::Reference(..) => false,
+        Type::TypeParameter(..) => false,
+        _ => unreachable!(
+            "ICE: argument with type `{}` should not appear in this context",
+            ty.display(&env.get_type_display_ctx())
+        ),
     }
 }

@@ -6,12 +6,12 @@ module 0xc0ffee::prime {
         'l0: loop {
             'l1: loop {
                 if (!(p0 < 2)) {
-                    let _t1 = 2;
+                    let _v0 = 2;
                     loop {
-                        let _t10 = p0 / 2;
-                        if (!(_t1 <= _t10)) break 'l0;
-                        if (p0 % _t1 == 0) break 'l1;
-                        _t1 = _t1 + 1;
+                        let _v1 = p0 / 2;
+                        if (!(_v0 <= _v1)) break 'l0;
+                        if (p0 % _v0 == 0) break 'l1;
+                        _v0 = _v0 + 1;
                         continue
                     }
                 };
@@ -24,18 +24,18 @@ module 0xc0ffee::prime {
     public fun test_is_prime() {
         if (is_prime(0)) abort 0;
         if (is_prime(1)) abort 1;
-        if (!is_prime(2)) abort 2;
-        if (!is_prime(3)) abort 3;
+        assert!(is_prime(2), 2);
+        assert!(is_prime(3), 3);
         if (is_prime(4)) abort 4;
-        if (!is_prime(5)) abort 5;
+        assert!(is_prime(5), 5);
         if (is_prime(6)) abort 6;
-        if (!is_prime(7)) abort 7;
+        assert!(is_prime(7), 7);
         if (is_prime(8)) abort 8;
         if (is_prime(9)) abort 9;
         if (is_prime(10)) abort 10;
-        if (!is_prime(11)) abort 11;
+        assert!(is_prime(11), 11);
         if (is_prime(12)) abort 12;
-        if (!is_prime(13)) abort 13;
+        assert!(is_prime(13), 13);
     }
 }
 

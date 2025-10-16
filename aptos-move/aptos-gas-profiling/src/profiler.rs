@@ -334,45 +334,39 @@ where
         [VEC_PACK]
         fn charge_vec_pack<'a>(
             &mut self,
-            ty: impl TypeView + 'a,
             args: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         ) -> PartialVMResult<()>;
 
         [VEC_LEN]
-        fn charge_vec_len(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+        fn charge_vec_len(&mut self) -> PartialVMResult<()>;
 
         [VEC_IMM_BORROW]
         fn charge_vec_borrow(
             &mut self,
             is_mut: bool,
-            ty: impl TypeView,
-            is_success: bool,
         ) -> PartialVMResult<()>;
 
         [VEC_PUSH_BACK]
         fn charge_vec_push_back(
             &mut self,
-            ty: impl TypeView,
             val: impl ValueView,
         ) -> PartialVMResult<()>;
 
         [VEC_POP_BACK]
         fn charge_vec_pop_back(
             &mut self,
-            ty: impl TypeView,
             val: Option<impl ValueView>,
         ) -> PartialVMResult<()>;
 
         [VEC_UNPACK]
         fn charge_vec_unpack(
             &mut self,
-            ty: impl TypeView,
             expect_num_elements: NumArgs,
             elems: impl ExactSizeIterator<Item = impl ValueView> + Clone,
         ) -> PartialVMResult<()>;
 
         [VEC_SWAP]
-        fn charge_vec_swap(&mut self, ty: impl TypeView) -> PartialVMResult<()>;
+        fn charge_vec_swap(&mut self) -> PartialVMResult<()>;
     }
 
     fn balance_internal(&self) -> InternalGas {
@@ -405,7 +399,7 @@ where
                 name,
                 ty_args,
             } => (module_id, name, ty_args),
-            FrameName::Script => unreachable!(),
+            FrameName::Script | FrameName::TransactionBatch => unreachable!(),
         };
 
         // The following line of code is needed for correctness.
@@ -750,6 +744,10 @@ where
         });
         storage.assert_consistency();
 
-        TransactionGasLog { exec_io, storage }
+        TransactionGasLog {
+            exec_io,
+            storage,
+            num_txns: 1,
+        }
     }
 }

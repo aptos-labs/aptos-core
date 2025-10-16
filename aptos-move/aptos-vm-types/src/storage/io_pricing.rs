@@ -167,7 +167,7 @@ impl IoPricingV3 {
     fn calculate_read_gas(
         &self,
         loaded: NumBytes,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         STORAGE_IO_PER_STATE_SLOT_READ * NumArgs::from(1) + STORAGE_IO_PER_STATE_BYTE_READ * loaded
     }
 
@@ -184,7 +184,7 @@ impl IoPricingV3 {
         &self,
         key: &StateKey,
         op_size: &WriteOpSize,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         op_size.write_len().map_or_else(
             || Either::Right(InternalGas::zero()),
             |write_len| {
@@ -204,7 +204,7 @@ impl IoPricingV4 {
     fn calculate_read_gas(
         &self,
         loaded: NumBytes,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         // Round up bytes to whole pages
         // TODO(gas): make PAGE_SIZE configurable
         const PAGE_SIZE: u64 = 4096;
@@ -221,7 +221,7 @@ impl IoPricingV4 {
         &self,
         key: &StateKey,
         op_size: &WriteOpSize,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         let key_size = NumBytes::new(key.size() as u64);
         let value_size = NumBytes::new(op_size.write_len().unwrap_or(0));
         let size = key_size + value_size;
@@ -269,7 +269,7 @@ impl IoPricing {
         &self,
         resource_exists: bool,
         bytes_loaded: NumBytes,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         use IoPricing::*;
 
         match self {
@@ -289,14 +289,14 @@ impl IoPricing {
     pub fn io_gas_per_transaction(
         &self,
         txn_size: NumBytes,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         STORAGE_IO_PER_TRANSACTION_BYTE_WRITE * txn_size
     }
 
     pub fn io_gas_per_event(
         &self,
         event: &ContractEvent,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         STORAGE_IO_PER_EVENT_BYTE_WRITE * NumBytes::new(event.size() as u64)
     }
 
@@ -306,7 +306,7 @@ impl IoPricing {
         &self,
         key: &StateKey,
         op_size: &WriteOpSize,
-    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> {
+    ) -> impl GasExpression<VMGasParameters, Unit = InternalGasUnit> + use<> {
         use IoPricing::*;
 
         match self {

@@ -21,19 +21,21 @@ types of pending orders are supported.
 -  [Enum `OrderType`](#0x7_single_order_book_OrderType)
 -  [Struct `TestMetadata`](#0x7_single_order_book_TestMetadata)
 -  [Constants](#@Constants_0)
+-  [Function `__lambda__1__get_single_match_for_taker`](#0x7_single_order_book___lambda__1__get_single_match_for_taker)
+-  [Function `__lambda__1__reinsert_order`](#0x7_single_order_book___lambda__1__reinsert_order)
+-  [Function `__lambda__1__set_order_metadata`](#0x7_single_order_book___lambda__1__set_order_metadata)
+-  [Function `__lambda__1__decrease_order_size`](#0x7_single_order_book___lambda__1__decrease_order_size)
 -  [Function `new_single_order_request`](#0x7_single_order_book_new_single_order_request)
 -  [Function `new_order_request_from_match_details`](#0x7_single_order_book_new_order_request_from_match_details)
 -  [Function `new_single_order_book`](#0x7_single_order_book_new_single_order_book)
 -  [Function `new_price_time_index`](#0x7_single_order_book_new_price_time_index)
 -  [Function `cancel_order`](#0x7_single_order_book_cancel_order)
 -  [Function `try_cancel_order_with_client_order_id`](#0x7_single_order_book_try_cancel_order_with_client_order_id)
+-  [Function `try_cancel_order`](#0x7_single_order_book_try_cancel_order)
 -  [Function `client_order_id_exists`](#0x7_single_order_book_client_order_id_exists)
 -  [Function `place_maker_order`](#0x7_single_order_book_place_maker_order)
 -  [Function `place_ready_maker_order_with_unique_idx`](#0x7_single_order_book_place_ready_maker_order_with_unique_idx)
 -  [Function `reinsert_order`](#0x7_single_order_book_reinsert_order)
--  [Function `modify_order`](#0x7_single_order_book_modify_order)
--  [Function `modify_and_copy_order`](#0x7_single_order_book_modify_and_copy_order)
--  [Function `modify_or_remove_order`](#0x7_single_order_book_modify_or_remove_order)
 -  [Function `place_pending_maker_order`](#0x7_single_order_book_place_pending_maker_order)
 -  [Function `get_single_match_for_taker`](#0x7_single_order_book_get_single_match_for_taker)
 -  [Function `decrease_order_size`](#0x7_single_order_book_decrease_order_size)
@@ -50,6 +52,7 @@ types of pending orders are supported.
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 <b>use</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index">0x7::pending_order_book_index</a>;
@@ -96,7 +99,7 @@ types of pending orders are supported.
 
 </dd>
 <dt>
-<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;</code>
+<code>client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
 </dt>
 <dd>
 
@@ -381,13 +384,101 @@ types of pending orders are supported.
 
 
 
+<a id="0x7_single_order_book___lambda__1__get_single_match_for_taker"></a>
+
+## Function `__lambda__1__get_single_match_for_taker`
+
+
+
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book___lambda__1__get_single_match_for_taker">__lambda__1__get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(remaining_size: u64, v: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>|v| f(v)
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_single_order_book___lambda__1__reinsert_order"></a>
+
+## Function `__lambda__1__reinsert_order`
+
+
+
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book___lambda__1__reinsert_order">__lambda__1__reinsert_order</a>&lt;M: <b>copy</b>, drop, store&gt;(reinsert_remaining_size: u64, v: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>|v| modify_f(v)
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_single_order_book___lambda__1__set_order_metadata"></a>
+
+## Function `__lambda__1__set_order_metadata`
+
+
+
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book___lambda__1__set_order_metadata">__lambda__1__set_order_metadata</a>&lt;M: <b>copy</b>, drop, store&gt;(metadata: M, v: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>|v| modify_f(v)
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_single_order_book___lambda__1__decrease_order_size"></a>
+
+## Function `__lambda__1__decrease_order_size`
+
+
+
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book___lambda__1__decrease_order_size">__lambda__1__decrease_order_size</a>&lt;M: <b>copy</b>, drop, store&gt;(order_creator: <b>address</b>, size_delta: u64, v: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code>|v| modify_f(v)
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_single_order_book_new_single_order_request"></a>
 
 ## Function `new_single_order_request`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_new_single_order_request">new_single_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_new_single_order_request">new_single_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;
 </code></pre>
 
 
@@ -399,7 +490,7 @@ types of pending orders are supported.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_new_single_order_request">new_single_order_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     order_id: OrderIdType,
-    client_order_id: Option&lt;u64&gt;,
+    client_order_id: Option&lt;String&gt;,
     price: u64,
     orig_size: u64,
     remaining_size: u64,
@@ -552,8 +643,9 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_cancel_order">cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, order_creator: <b>address</b>, order_id: OrderIdType
 ): SingleOrder&lt;M&gt; {
-    <b>assert</b>!(self.orders.contains(&order_id), <a href="single_order_book.md#0x7_single_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
-    <b>let</b> order_with_state = self.orders.remove(&order_id);
+    <b>let</b> order_with_state_option = self.orders.remove_or_none(&order_id);
+    <b>assert</b>!(order_with_state_option.is_some(), <a href="single_order_book.md#0x7_single_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order_with_state = order_with_state_option.destroy_some();
     <b>let</b> (order, is_active) = order_with_state.destroy_order_from_state();
     <b>assert</b>!(order_creator == order.get_account(), <a href="single_order_book.md#0x7_single_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>);
     <b>if</b> (is_active) {
@@ -615,7 +707,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order_with_client_order_id">try_cancel_order_with_client_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_creator: <b>address</b>, client_order_id: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order_with_client_order_id">try_cancel_order_with_client_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_creator: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;&gt;
 </code></pre>
 
 
@@ -625,15 +717,50 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order_with_client_order_id">try_cancel_order_with_client_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, order_creator: <b>address</b>, client_order_id: u64
+    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, order_creator: <b>address</b>, client_order_id: String
 ): Option&lt;SingleOrder&lt;M&gt;&gt; {
     <b>let</b> account_client_order_id =
         new_account_client_order_id(order_creator, client_order_id);
-    <b>if</b> (!self.client_order_ids.contains(&account_client_order_id)) {
+    <b>let</b> order_id = self.client_order_ids.get(&account_client_order_id);
+    <b>if</b> (order_id.is_none()) {
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
-    <b>let</b> order_id = self.client_order_ids.borrow(&account_client_order_id);
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(self.<a href="single_order_book.md#0x7_single_order_book_cancel_order">cancel_order</a>(price_time_idx, order_creator, *order_id))
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(self.<a href="single_order_book.md#0x7_single_order_book_cancel_order">cancel_order</a>(price_time_idx, order_creator, order_id.destroy_some()))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_single_order_book_try_cancel_order"></a>
+
+## Function `try_cancel_order`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order">try_cancel_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_creator: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_try_cancel_order">try_cancel_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, order_creator: <b>address</b>, order_id: OrderIdType
+): Option&lt;SingleOrder&lt;M&gt;&gt; {
+    <b>let</b> is_creator = self.orders.get_and_map(
+        &order_id,
+        |order| order.get_order_from_state().get_account() == order_creator
+    );
+
+    <b>if</b> (is_creator.is_none() || !is_creator.destroy_some()) {
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(self.<a href="single_order_book.md#0x7_single_order_book_cancel_order">cancel_order</a>(price_time_idx, order_creator, order_id))
 }
 </code></pre>
 
@@ -647,7 +774,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: u64): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): bool
 </code></pre>
 
 
@@ -657,7 +784,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_client_order_id_exists">client_order_id_exists</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: u64
+    self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: String
 ): bool {
     <b>let</b> account_client_order_id =
         new_account_client_order_id(order_creator, client_order_id);
@@ -724,11 +851,6 @@ else it is added to the active order book. The API aborts if its not a maker ord
     order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;,
     ascending_idx: UniqueIdxType
 ) {
-    <b>assert</b>!(
-        !self.orders.contains(&order_req.order_id),
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>)
-    );
-
     <b>let</b> order =
         new_single_order(
             order_req.order_id,
@@ -743,7 +865,10 @@ else it is added to the active order book. The API aborts if its not a maker ord
             order_req.time_in_force,
             order_req.metadata
         );
-    self.orders.add(order_req.order_id, new_order_with_state(order, <b>true</b>));
+    <b>assert</b>!(
+        self.orders.upsert(order_req.order_id, new_order_with_state(order, <b>true</b>)).is_none(),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>)
+    );
     <b>if</b> (order_req.client_order_id.is_some()) {
         self.client_order_ids.add(
             new_account_client_order_id(
@@ -794,107 +919,21 @@ it is added to the order book, if it exists, it's size is updated.
     <b>assert</b>!(reinsert_order.validate_reinsertion_request(original_order), <a href="single_order_book.md#0x7_single_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
     <b>let</b> order_id = reinsert_order.get_order_id_from_match_details();
     <b>let</b> unique_idx = reinsert_order.get_unique_priority_idx_from_match_details();
-    <b>if</b> (!self.orders.contains(&order_id)) {
+
+    <b>let</b> reinsert_remaining_size = reinsert_order.get_remaining_size_from_match_details();
+    <b>let</b> present = self.orders.modify_if_present(&order_id, |order_with_state| {
+        order_with_state.increase_remaining_size(reinsert_remaining_size);
+    });
+    <b>if</b> (!present) {
         <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_ready_maker_order_with_unique_idx">place_ready_maker_order_with_unique_idx</a>(price_time_idx, <a href="single_order_book.md#0x7_single_order_book_new_order_request_from_match_details">new_order_request_from_match_details</a>(reinsert_order), unique_idx);
     };
 
-    <a href="single_order_book.md#0x7_single_order_book_modify_order">modify_order</a>(&<b>mut</b> self.orders, &order_id, |order_with_state| {
-        order_with_state.increase_remaining_size(reinsert_order.get_remaining_size_from_match_details());
-    });
     price_time_idx.increase_order_size(
         reinsert_order.get_price_from_match_details(),
         unique_idx,
         reinsert_order.get_remaining_size_from_match_details(),
         reinsert_order.is_bid_from_match_details(),
     );
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_single_order_book_modify_order"></a>
-
-## Function `modify_order`
-
-
-
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_modify_order">modify_order</a>&lt;M: <b>copy</b>, drop, store&gt;(orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;&gt;, order_id: &<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, modify_fn: |&<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;|)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_modify_order">modify_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    orders: &<b>mut</b> BigOrderedMap&lt;OrderIdType, OrderWithState&lt;M&gt;&gt;, order_id: &OrderIdType, modify_fn: |&<b>mut</b>  OrderWithState&lt;M&gt;|
-) {
-    <b>let</b> order = *orders.borrow(order_id);
-    modify_fn(&<b>mut</b> order);
-    orders.upsert(*order_id, order);
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_single_order_book_modify_and_copy_order"></a>
-
-## Function `modify_and_copy_order`
-
-
-
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_modify_and_copy_order">modify_and_copy_order</a>&lt;M: <b>copy</b>, drop, store&gt;(orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;&gt;, order_id: &<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, modify_fn: |&<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;|): <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_modify_and_copy_order">modify_and_copy_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    orders: &<b>mut</b> BigOrderedMap&lt;OrderIdType, OrderWithState&lt;M&gt;&gt;, order_id: &OrderIdType, modify_fn: |&<b>mut</b>  OrderWithState&lt;M&gt;|
-): OrderWithState&lt;M&gt; {
-    <b>let</b> order = *orders.borrow(order_id);
-    modify_fn(&<b>mut</b> order);
-    orders.upsert(*order_id, order);
-    order
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_single_order_book_modify_or_remove_order"></a>
-
-## Function `modify_or_remove_order`
-
-
-
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_modify_or_remove_order">modify_or_remove_order</a>&lt;M: <b>copy</b>, drop, store&gt;(orders: &<b>mut</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;&gt;, order_id: &<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, modify_fn: |&<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;|bool): <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code>inline <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_modify_or_remove_order">modify_or_remove_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    orders: &<b>mut</b> BigOrderedMap&lt;OrderIdType, OrderWithState&lt;M&gt;&gt;, order_id: &OrderIdType, modify_fn: |&<b>mut</b>  OrderWithState&lt;M&gt;| bool
-): OrderWithState&lt;M&gt; {
-    <b>let</b> order = orders.remove(order_id);
-    <b>let</b> keep = modify_fn(&<b>mut</b> order);
-    <b>if</b> (keep) {
-        orders.add(*order_id, order);
-    };
-    order
 }
 </code></pre>
 
@@ -977,10 +1016,17 @@ API to ensure that the order is a taker order before calling this API, otherwise
         active_matched_order.destroy_active_matched_order();
     <b>assert</b>!(order_book_type == single_order_book_type(), <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>);
 
-    <b>let</b> order_with_state = <a href="single_order_book.md#0x7_single_order_book_modify_or_remove_order">modify_or_remove_order</a>(&<b>mut</b> self.orders, &order_id, |order_with_state| {
-        order_with_state.set_remaining_size(remaining_size);
-        remaining_size &gt; 0
-    });
+    <b>let</b> order_with_state = <b>if</b> (remaining_size == 0) {
+        <b>let</b> order = self.orders.remove(&order_id);
+        order.set_remaining_size(0);
+        order
+    } <b>else</b> {
+        self.orders.modify_and_return(&order_id, |order_with_state| {
+            aptos_experimental::single_order_types::set_remaining_size(order_with_state, remaining_size);
+            // order_with_state.set_remaining_size(remaining_size);
+            *order_with_state
+        })
+    };
 
     <b>let</b> (order, is_active) = order_with_state.destroy_order_from_state();
     <b>if</b> (remaining_size == 0 && order.get_client_order_id().is_some()) {
@@ -1040,17 +1086,22 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
     order_id: OrderIdType,
     size_delta: u64
 ) {
-    <b>assert</b>!(self.orders.contains(&order_id), <a href="single_order_book.md#0x7_single_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order_opt = self.orders.modify_if_present_and_return(
+        &order_id,
+        |order_with_state| {
+            <b>assert</b>!(
+                order_creator == order_with_state.get_order_from_state().get_account(),
+                <a href="single_order_book.md#0x7_single_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>
+            );
+            // TODO should we be asserting that remaining size is greater than 0?
+            aptos_experimental::single_order_types::decrease_remaining_size(order_with_state, size_delta);
+            // order_with_state.decrease_remaining_size(size_delta);
+            *order_with_state
+        }
+    );
 
-    <b>let</b> order_with_state = <a href="single_order_book.md#0x7_single_order_book_modify_and_copy_order">modify_and_copy_order</a>(&<b>mut</b> self.orders, &order_id, |order_with_state| {
-        <b>assert</b>!(
-            order_creator == order_with_state.get_order_from_state().get_account(),
-            <a href="single_order_book.md#0x7_single_order_book_EORDER_CREATOR_MISMATCH">EORDER_CREATOR_MISMATCH</a>
-        );
-        order_with_state.decrease_remaining_size(size_delta);
-
-        // TODO should we be asserting that remaining size is greater than 0?
-    });
+    <b>assert</b>!(order_opt.is_some(), <a href="single_order_book.md#0x7_single_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order_with_state = order_opt.destroy_some();
 
     <b>if</b> (order_with_state.<a href="single_order_book.md#0x7_single_order_book_is_active_order">is_active_order</a>()) {
         <b>let</b> order = order_with_state.get_order_from_state();
@@ -1075,7 +1126,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: u64): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>&gt;
 </code></pre>
 
 
@@ -1085,14 +1136,11 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_id_by_client_id">get_order_id_by_client_id</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: u64
+    self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_creator: <b>address</b>, client_order_id: String
 ): Option&lt;OrderIdType&gt; {
     <b>let</b> account_client_order_id =
         new_account_client_order_id(order_creator, client_order_id);
-    <b>if</b> (!self.client_order_ids.contains(&account_client_order_id)) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
-    };
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*self.client_order_ids.borrow(&account_client_order_id))
+    self.client_order_ids.get(&account_client_order_id)
 }
 </code></pre>
 
@@ -1118,10 +1166,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order_metadata">get_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderIdType
 ): Option&lt;M&gt; {
-    <b>if</b> (!self.orders.contains(&order_id)) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
-    };
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(self.orders.borrow(&order_id).get_metadata_from_state())
+    self.orders.get_and_map(&order_id, |order| order.get_metadata_from_state())
 }
 </code></pre>
 
@@ -1147,11 +1192,10 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_set_order_metadata">set_order_metadata</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderIdType, metadata: M
 ) {
-    <b>assert</b>!(self.orders.contains(&order_id), <a href="single_order_book.md#0x7_single_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
-
-    <a href="single_order_book.md#0x7_single_order_book_modify_order">modify_order</a>(&<b>mut</b> self.orders, &order_id, |order_with_state| {
+    <b>let</b> present = self.orders.modify_if_present(&order_id, |order_with_state| {
         order_with_state.set_metadata_in_state(metadata);
     });
+    <b>assert</b>!(present, <a href="single_order_book.md#0x7_single_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
 }
 </code></pre>
 
@@ -1177,10 +1221,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_is_active_order">is_active_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderIdType
 ): bool {
-    <b>if</b> (!self.orders.contains(&order_id)) {
-        <b>return</b> <b>false</b>;
-    };
-    self.orders.borrow(&order_id).<a href="single_order_book.md#0x7_single_order_book_is_active_order">is_active_order</a>()
+    self.orders.get_and_map(&order_id, |order| order.<a href="single_order_book.md#0x7_single_order_book_is_active_order">is_active_order</a>()).destroy_with_default(<b>false</b>)
 }
 </code></pre>
 
@@ -1206,10 +1247,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_order">get_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderIdType
 ): Option&lt;OrderWithState&lt;M&gt;&gt; {
-    <b>if</b> (!self.orders.contains(&order_id)) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
-    };
-    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*self.orders.borrow(&order_id))
+    self.orders.get(&order_id)
 }
 </code></pre>
 
@@ -1235,10 +1273,7 @@ cancellation of the order. Please use the <code>cancel_order</code> API to cance
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_id: OrderIdType
 ): u64 {
-    <b>if</b> (!self.orders.contains(&order_id)) {
-        <b>return</b> 0;
-    };
-    self.orders.borrow(&order_id).get_remaining_size_from_state()
+    self.orders.get_and_map(&order_id, |order| order.get_remaining_size_from_state()).destroy_with_default(0)
 }
 </code></pre>
 

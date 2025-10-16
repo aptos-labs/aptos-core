@@ -8,7 +8,7 @@ module 0x42::phantoms {
         addr: address,
     }
     public fun test_phantoms() {
-        let _t1 = S<T>{addr: @0x12};
+        let _v0 = S<T>{addr: @0x12};
     }
 }
 

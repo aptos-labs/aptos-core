@@ -2,6 +2,7 @@
 module aptos_experimental::order_book_types {
     use std::option;
     use std::option::Option;
+    use std::string::String;
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
 
     friend aptos_experimental::price_time_index;
@@ -30,7 +31,7 @@ module aptos_experimental::order_book_types {
 
     struct AccountClientOrderId has store, copy, drop {
         account: address,
-        client_order_id: u64
+        client_order_id: String
     }
 
     // Internal type representing order in which trades are placed. Unique per instance of AscendingIdGenerator.
@@ -73,7 +74,7 @@ module aptos_experimental::order_book_types {
     }
 
     public fun new_account_client_order_id(
-        account: address, client_order_id: u64
+        account: address, client_order_id: String
     ): AccountClientOrderId {
         AccountClientOrderId { account, client_order_id }
     }
@@ -196,7 +197,7 @@ module aptos_experimental::order_book_types {
         V1 {
             order_id: OrderIdType,
             account: address,
-            client_order_id: Option<u64>, // for client to track orders
+            client_order_id: Option<String>, // for client to track orders
             unique_priority_idx: UniqueIdxType,
             price: u64,
             orig_size: u64,
@@ -232,7 +233,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun destroy_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, Option<u64>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, M, OrderBookType) {
+    ): (OrderIdType, address, Option<String>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, M, OrderBookType) {
         let OrderMatchDetails::V1 {
             order_id,
             account,
@@ -257,8 +258,6 @@ module aptos_experimental::order_book_types {
 
     /// Validates that a reinsertion request is valid for the given original order.
     ///
-
-
     public(friend) fun get_account_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
     ): address {
@@ -309,7 +308,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_client_order_id_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): Option<u64> {
+    ): Option<String> {
         self.client_order_id
     }
 
@@ -329,7 +328,7 @@ module aptos_experimental::order_book_types {
     public(friend) fun new_order_match_details<M: store + copy + drop>(
         order_id: OrderIdType,
         account: address,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         unique_priority_idx: UniqueIdxType,
         price: u64,
         orig_size: u64,

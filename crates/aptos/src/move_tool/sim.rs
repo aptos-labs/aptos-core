@@ -9,7 +9,7 @@ use aptos_rest_client::Client;
 use aptos_transaction_simulation_session::Session;
 use async_trait::async_trait;
 use clap::{Parser, Subcommand};
-use move_core_types::account_address::AccountAddress;
+use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use std::path::PathBuf;
 
 /// Initializes a new simulation session
@@ -99,6 +99,71 @@ impl CliCommand<()> for Fund {
     }
 }
 
+/// View a resource
+#[derive(Debug, Parser)]
+pub struct ViewResource {
+    /// Path to a stored session
+    #[clap(long)]
+    session: PathBuf,
+
+    /// Account under which the resource is stored
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    account: AccountAddress,
+
+    /// Resource to view
+    #[clap(long)]
+    resource: StructTag,
+}
+
+#[async_trait]
+impl CliCommand<Option<serde_json::Value>> for ViewResource {
+    fn command_name(&self) -> &'static str {
+        "view-resource"
+    }
+
+    async fn execute(self) -> CliTypedResult<Option<serde_json::Value>> {
+        let mut session = Session::load(&self.session)?;
+
+        Ok(session.view_resource(self.account, &self.resource)?)
+    }
+}
+
+/// View a resource group
+#[derive(Debug, Parser)]
+pub struct ViewResourceGroup {
+    /// Path to a stored session
+    #[clap(long)]
+    session: PathBuf,
+
+    /// Account under which the resource group is stored
+    #[clap(long, value_parser = crate::common::types::load_account_arg)]
+    account: AccountAddress,
+
+    /// Resource group to view
+    #[clap(long)]
+    resource_group: StructTag,
+
+    /// If specified, derives an object address from the source address and an object
+    #[clap(long)]
+    derived_object_address: Option<AccountAddress>,
+}
+
+#[async_trait]
+impl CliCommand<Option<serde_json::Value>> for ViewResourceGroup {
+    fn command_name(&self) -> &'static str {
+        "view-resource-group"
+    }
+
+    async fn execute(self) -> CliTypedResult<Option<serde_json::Value>> {
+        let mut session = Session::load(&self.session)?;
+        Ok(session.view_resource_group(
+            self.account,
+            &self.resource_group,
+            self.derived_object_address,
+        )?)
+    }
+}
+
 /// BETA: Commands for interacting with a local simulation session
 ///
 /// BETA: Subject to change
@@ -106,6 +171,8 @@ impl CliCommand<()> for Fund {
 pub enum Sim {
     Init(Init),
     Fund(Fund),
+    ViewResource(ViewResource),
+    ViewResourceGroup(ViewResourceGroup),
 }
 
 impl Sim {
@@ -113,6 +180,10 @@ impl Sim {
         match self {
             Sim::Init(init) => init.execute_serialized_success().await,
             Sim::Fund(fund) => fund.execute_serialized_success().await,
+            Sim::ViewResource(view_resource) => view_resource.execute_serialized().await,
+            Sim::ViewResourceGroup(view_resource_group) => {
+                view_resource_group.execute_serialized().await
+            },
         }
     }
 }

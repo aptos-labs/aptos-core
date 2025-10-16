@@ -6,7 +6,7 @@ use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
         single_signature_loader::load_single_signatures_for_module,
-        type_loader::intern_type,
+        type_loader::{convert_tok_to_type, convert_toks_to_types},
     },
     native_functions::NativeFunctions,
 };
@@ -27,9 +27,12 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::{
-    runtime_types::{StructIdentifier, StructLayout, StructType, Type},
-    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+use move_vm_types::{
+    loaded_data::{
+        runtime_types::{StructIdentifier, StructLayout, StructType, Type},
+        struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+    },
+    ty_interner::{InternedTypePool, TypeVecId},
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -153,6 +156,7 @@ impl Module {
         size: usize,
         module: Arc<CompiledModule>,
         struct_name_index_map: &StructNameIndexMap,
+        ty_pool: &InternedTypePool,
     ) -> PartialVMResult<Self> {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
@@ -176,6 +180,7 @@ impl Module {
         let mut function_map = HashMap::new();
         let mut struct_map = HashMap::new();
         let mut signature_table = vec![];
+        let mut is_fully_instantiated_signature = vec![];
 
         let mut struct_idxs = vec![];
         let mut struct_names = vec![];
@@ -196,13 +201,13 @@ impl Module {
 
         // Build signature table
         for signatures in module.signatures() {
-            signature_table.push(
-                signatures
-                    .0
-                    .iter()
-                    .map(|sig| intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs))
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            )
+            let (tys, is_fully_instantiated) = convert_toks_to_types(
+                BinaryIndexedView::Module(&module),
+                &signatures.0,
+                &struct_idxs,
+            )?;
+            signature_table.push(tys);
+            is_fully_instantiated_signature.push(is_fully_instantiated);
         }
 
         for (idx, struct_def) in module.struct_defs().iter().enumerate() {
@@ -289,9 +294,17 @@ impl Module {
 
         for func_inst in module.function_instantiations() {
             let handle = function_refs[func_inst.handle.0 as usize].clone();
+            let idx = func_inst.type_parameters.0 as usize;
+            let instantiation = signature_table[idx].clone();
+            let ty_args_id = if is_fully_instantiated_signature[idx] {
+                Some(ty_pool.intern_ty_args(&instantiation))
+            } else {
+                None
+            };
             function_instantiations.push(FunctionInstantiation {
                 handle,
-                instantiation: signature_table[func_inst.type_parameters.0 as usize].clone(),
+                instantiation,
+                ty_args_id,
             });
         }
 
@@ -475,7 +488,7 @@ impl Module {
         field: &FieldDefinition,
         struct_name_table: &[StructNameIndex],
     ) -> PartialVMResult<(Identifier, Type)> {
-        let ty = intern_type(
+        let ty = convert_tok_to_type(
             BinaryIndexedView::Module(module),
             &field.signature.0,
             struct_name_table,
@@ -487,18 +500,22 @@ impl Module {
         &self.id
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn struct_at(&self, idx: StructDefinitionIndex) -> &Arc<StructType> {
         &self.structs[idx.0 as usize].definition_struct_type
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn struct_instantiation_at(&self, idx: u16) -> &StructInstantiation {
         &self.struct_instantiations[idx as usize]
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn struct_variant_at(&self, idx: StructVariantHandleIndex) -> &StructVariantInfo {
         &self.struct_variant_infos[idx.0 as usize]
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn struct_variant_instantiation_at(
         &self,
         idx: StructVariantInstantiationIndex,
@@ -506,38 +523,48 @@ impl Module {
         &self.struct_variant_instantiation_infos[idx.0 as usize]
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn function_at(&self, idx: u16) -> &FunctionHandle {
         &self.function_refs[idx as usize]
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
-        &self.function_instantiations[idx as usize].instantiation
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> (&[Type], Option<TypeVecId>) {
+        let instantiation = &self.function_instantiations[idx as usize];
+        (&instantiation.instantiation, instantiation.ty_args_id)
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn function_instantiation_handle_at(&self, idx: u16) -> &FunctionHandle {
         &self.function_instantiations[idx as usize].handle
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_count(&self, idx: u16) -> u16 {
         self.structs[idx as usize].field_count
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_count(&self, idx: u16) -> u16 {
         self.struct_instantiations[idx as usize].field_count
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_offset(&self, idx: FieldHandleIndex) -> usize {
         self.field_handles[idx.0 as usize].offset
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn field_instantiation_offset(&self, idx: FieldInstantiationIndex) -> usize {
         self.field_instantiations[idx.0 as usize].offset
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo {
         &self.variant_field_infos[idx.0 as usize]
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn variant_field_instantiation_info_at(
         &self,
         idx: VariantFieldInstantiationIndex,
@@ -545,6 +572,7 @@ impl Module {
         &self.variant_field_instantiation_infos[idx.0 as usize]
     }
 
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {
         self.single_signature_token_map.get(&idx).unwrap()
     }

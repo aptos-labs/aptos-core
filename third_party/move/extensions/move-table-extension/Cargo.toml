@@ -5,7 +5,7 @@ authors = ["Diem Association <opensource@diem.com>"]
 description = "Wrapper for the Move VM which coordinates multiple extensions"
 repository = "https://github.com/diem/move"
 license = "Apache-2.0"
-edition = "2021"
+edition = { workspace = true }
 publish = false
 
 [dependencies]
@@ -17,6 +17,7 @@ move-vm-runtime = { workspace = true }
 move-vm-types = { workspace = true }
 sha3 = { workspace = true }
 smallvec = { workspace = true }
+triomphe = { workspace = true }
 
 [dev-dependencies]
 move-cli = { workspace = true }

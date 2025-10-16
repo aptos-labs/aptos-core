@@ -30,7 +30,7 @@ impl ObservedOrderedBlock {
     /// Creates a new observed ordered block for testing.
     /// Note: the observed type is determined randomly.
     pub fn new_for_testing(ordered_block: OrderedBlock) -> Self {
-        if OsRng.gen::<u8>() % 2 == 0 {
+        if OsRng.r#gen::<u8>() % 2 == 0 {
             ObservedOrderedBlock::new(ordered_block.clone())
         } else {
             let ordered_block_with_window = OrderedBlockWithWindow::new(

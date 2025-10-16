@@ -3,18 +3,18 @@
 //# run
 script {
     fun main() {
-        let _t0 = 0;
-        let _t1 = 0;
-        let _t2 = false;
+        let _v0 = 0;
+        let _v1 = 0;
+        let _v2 = false;
         loop {
-            if (_t2) _t1 = _t1 + 1 else _t2 = true;
-            if (!(_t1 < 10)) break;
-            _t0 = _t0 + 1;
-            if (_t0 >= 15) break;
-            _t0 = _t0 + 2;
-            if (_t1 % 2 == 0) continue;
-            _t0 = _t0 * 2
+            if (_v2) _v1 = _v1 + 1 else _v2 = true;
+            if (!(_v1 < 10)) break;
+            _v0 = _v0 + 1;
+            if (_v0 >= 15) break;
+            _v0 = _v0 + 2;
+            if (_v1 % 2 == 0) continue;
+            _v0 = _v0 * 2
         };
-        if (!(_t0 == 16)) abort _t0;
+        assert!(_v0 == 16, _v0);
     }
 }

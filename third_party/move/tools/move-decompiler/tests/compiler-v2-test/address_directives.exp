@@ -15,9 +15,9 @@ module 0x4::M {
         X{}
     }
     public fun both(): (X, M::X) {
-        let _t1 = X{};
-        let _t2 = M::x();
-        (_t1, _t2)
+        let _v0 = X{};
+        let _v1 = M::x();
+        (_v0, _v1)
     }
 }
 module 0x2::M2 {
@@ -26,10 +26,10 @@ module 0x2::M2 {
     struct X {
     }
     public fun x(): (M::X, X, M_1::X) {
-        let _t0 = M::x();
-        let _t2 = X{};
-        let _t3 = M_1::x();
-        (_t0, _t2, _t3)
+        let _v0 = M::x();
+        let _v1 = X{};
+        let _v2 = M_1::x();
+        (_v0, _v1, _v2)
     }
 }
 

@@ -29,21 +29,21 @@ module 0x42::m {
         3
     }
     fun t1_check_scoping(): u64 {
-        let _t2;
-        let _t0 = Outer::One{i: Inner::Inner1{x: 43}};
-        let _t1 = &_t0;
-        if (_t1 is None) {
-            let Outer::None{} = _t0;
-            _t2 = 0
-        } else if (_t1 is One) {
-            let Outer::One{i: _t18} = _t0;
-            let _t3 = _t18;
-            _t2 = check_scoping(&_t3)
-        } else if (_t1 is Two) {
-            let Outer::Two{i: _t24, b: _t25} = _t0;
-            _t2 = 3
+        let _v0;
+        let _v1 = Outer::One{i: Inner::Inner1{x: 43}};
+        let _v2 = &_v1;
+        if (_v2 is None) {
+            let Outer::None{} = _v1;
+            _v0 = 0
+        } else if (_v2 is One) {
+            let Outer::One{i: _v3} = _v1;
+            let _v4 = _v3;
+            _v0 = check_scoping(&_v4)
+        } else if (_v2 is Two) {
+            let Outer::Two{i: _v5, b: _v6} = _v1;
+            _v0 = 3
         } else abort 14566554180833181697;
-        _t2
+        _v0
     }
 }
 

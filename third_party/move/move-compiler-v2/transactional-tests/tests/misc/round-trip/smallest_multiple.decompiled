@@ -3,27 +3,27 @@
 //# publish
 module 0xc0ffee::smallest_multiple {
     public fun smallest_multiple(p0: u64): u64 {
-        let _t1 = 1;
-        let _t2 = 1;
-        while (_t2 <= p0) {
-            _t1 = lcm(_t1, _t2);
-            _t2 = _t2 + 1
+        let _v0 = 1;
+        let _v1 = 1;
+        while (_v1 <= p0) {
+            _v0 = lcm(_v0, _v1);
+            _v1 = _v1 + 1
         };
-        _t1
+        _v0
     }
     public fun lcm(p0: u64, p1: u64): u64 {
-        let _t4 = p0 * p1;
-        let _t7 = gcd(p0, p1);
-        _t4 / _t7
+        let _v0 = p0 * p1;
+        let _v1 = gcd(p0, p1);
+        _v0 / _v1
     }
     public fun gcd(p0: u64, p1: u64): u64 {
         if (p1 == 0) return p0;
-        let _t9 = p0 % p1;
-        gcd(p1, _t9)
+        let _v0 = p0 % p1;
+        gcd(p1, _v0)
     }
     public fun test_smallest_multiple() {
-        if (!(smallest_multiple(10) == 2520)) abort 0;
-        if (!(smallest_multiple(20) == 232792560)) abort 1;
+        assert!(smallest_multiple(10) == 2520, 0);
+        assert!(smallest_multiple(20) == 232792560, 1);
     }
 }
 

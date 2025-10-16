@@ -105,7 +105,14 @@ impl<K: Copy + Clone + Debug + Eq> VersionedValue<K> {
                 let bypass = match o.get().as_ref().deref() {
                     Value(_, maybe_apply) => maybe_apply.clone().map_or(NoBypass, Bypass),
                     Apply(apply) => Bypass(apply.clone()),
-                    Estimate(_) => unreachable!("Entry already marked estimate"),
+                    Estimate(_) => {
+                        // No longer asserting here as preparing for block epilogue execution
+                        // can rarely re-mark an entry as estimate (if the block was cut due to
+                        // block gas limit and the txn at the index was aborted before block
+                        // execution was halted). Return value does not matter as the entries
+                        // will be removed before block epilogue execution.
+                        NoBypass
+                    },
                 };
 
                 o.insert(Box::new(CachePadded::new(Estimate(bypass))));
@@ -947,26 +954,6 @@ mod test {
             v.insert_speculative_value(3, entry).unwrap();
         }
         v.mark_estimate(5);
-    }
-
-    #[should_panic]
-    #[test]
-    fn mark_estimate_wrong_entry() {
-        let mut v = VersionedValue::new(None);
-        v.insert_speculative_value(3, aggregator_entry(VALUE_AGGREGATOR).unwrap())
-            .unwrap();
-        v.mark_estimate(3);
-
-        // Marking an Estimate (first we confirm) as estimate is not allowed.
-        assert_matches!(
-            v.versioned_map
-                .get(&3)
-                .expect("Expecting an Estimate entry")
-                .as_ref()
-                .deref(),
-            VersionEntry::Estimate(EstimatedEntry::NoBypass)
-        );
-        v.mark_estimate(3);
     }
 
     #[should_panic]

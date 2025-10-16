@@ -28,9 +28,9 @@ module 0xc0ffee::m {
         consume_(p0);
     }
     public fun test5() {
-        let _t0 = W{x: 42};
-        test3(_t0);
-        test4(_t0);
+        let _v0 = W{x: 42};
+        test3(_v0);
+        test4(_v0);
     }
 }
 

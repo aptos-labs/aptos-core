@@ -6,11 +6,11 @@ module 0xc0ffee::m {
         *p0 = p1 + p2;
     }
     fun test(): u64 {
-        let _t0 = 0;
-        let _t1 = &mut _t0;
-        update(_t1, 3, 4);
-        update(_t1, 5, 6);
-        _t0
+        let _v0 = 0;
+        let _v1 = &mut _v0;
+        update(_v1, 3, 4);
+        update(_v1, 5, 6);
+        _v0
     }
 }
 

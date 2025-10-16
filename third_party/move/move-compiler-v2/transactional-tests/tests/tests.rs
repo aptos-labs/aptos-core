@@ -39,6 +39,7 @@ const COMMON_EXCLUSIONS: &[&str] = &[
     "/no-recursive-check/",
     "/no-access-check/",
     "/no-recursive-type-check/",
+    "/testing-constant/",
 ];
 
 /// Note that any config which has different output for a test directory
@@ -73,6 +74,21 @@ const TEST_CONFIGS: &[TestConfig] = &[
         name: "no-optimize",
         runner: |p| run(p, get_config_by_name("no-optimize")),
         experiments: &[(Experiment::OPTIMIZE, false)],
+        language_version: LanguageVersion::latest(),
+        include: &[], // all tests except those excluded below
+        exclude: COMMON_EXCLUSIONS,
+        cross_compile: false,
+    },
+    // Test enabling inlining optimization, across package inlining, and extra optimizations.
+    TestConfig {
+        name: "opt-extra",
+        runner: |p| run(p, get_config_by_name("opt-extra")),
+        experiments: &[
+            (Experiment::INLINING_OPTIMIZATION, true),
+            (Experiment::ACROSS_PACKAGE_INLINING, true),
+            (Experiment::OPTIMIZE, true),
+            (Experiment::OPTIMIZE_EXTRA, true),
+        ],
         language_version: LanguageVersion::latest(),
         include: &[], // all tests except those excluded below
         exclude: COMMON_EXCLUSIONS,
@@ -124,6 +140,24 @@ const TEST_CONFIGS: &[TestConfig] = &[
         exclude: &[],
         cross_compile: false,
     },
+    TestConfig {
+        name: "testing-constant-true",
+        runner: |p| run(p, get_config_by_name("testing-constant-true")),
+        experiments: &[(Experiment::COMPILE_FOR_TESTING, true)],
+        language_version: LanguageVersion::latest(),
+        include: &["/testing-constant/"],
+        exclude: &[],
+        cross_compile: false,
+    },
+    TestConfig {
+        name: "testing-constant-false",
+        runner: |p| run(p, get_config_by_name("testing-constant-false")),
+        experiments: &[(Experiment::COMPILE_FOR_TESTING, false)],
+        language_version: LanguageVersion::latest(),
+        include: &["/testing-constant/"],
+        exclude: &[],
+        cross_compile: false,
+    },
 ];
 
 /// Test files which must use separate baselines because their result
@@ -159,6 +193,12 @@ const SEPARATE_BASELINE: &[&str] = &[
     "no-v1-comparison/enum/enum_scoping.move",
     // Different error messages depending on optimizations or not
     "no-v1-comparison/fv_as_keys.move",
+    // needed until bug #17615 is fixed
+    "misc/bug_14817_extended.move",
+    // run in verbose mode to unveil the exact error messages
+    "/signed-int/",
+    // different expected result
+    "/testing-constant/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
@@ -183,18 +223,20 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         .map(|(s, v)| (s.to_string(), *v))
         .collect_vec();
     let language_version = config.language_version;
-    // For cross compilation, we need to always append the config name as a part of the outcome file suffix, as optimizations affect the generated code!
-    let vm_test_config = if config.cross_compile {
-        TestRunConfig::new(language_version, experiments).cross_compile_into(
+    let mut vm_test_config =
+        TestRunConfig::new(language_version, experiments).with_runtime_ref_checks();
+    // For cross compilation, we need to always append the config name as a part of the
+    // outcome file suffix, as optimizations affect the generated code.
+    if config.cross_compile {
+        vm_test_config = vm_test_config.cross_compile_into(
             SyntaxChoice::Source,
             true,
             exp_suffix
                 .clone()
                 .or_else(|| Some(format!("{}.exp", config.name))),
-        )
-    } else {
-        TestRunConfig::new(language_version, experiments)
-    };
+        );
+    }
+
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
 }
 

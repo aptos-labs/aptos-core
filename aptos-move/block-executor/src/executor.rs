@@ -7,9 +7,9 @@ use crate::{
     code_cache_global::{add_module_write_to_module_cache, GlobalModuleCache},
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     counters::{
-        self, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK, PARALLEL_EXECUTION_SECONDS,
-        PARALLEL_FINALIZE_SECONDS, RAYON_EXECUTION_SECONDS, TASK_EXECUTE_SECONDS,
-        TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        self, BLOCKSTM_VERSION_NUMBER, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
+        PARALLEL_EXECUTION_SECONDS, PARALLEL_FINALIZE_SECONDS, RAYON_EXECUTION_SECONDS,
+        TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -46,7 +46,7 @@ use aptos_types::{
         config::BlockExecutorConfig, transaction_slice_metadata::TransactionSliceMetadata,
     },
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
-    on_chain_config::Features,
+    on_chain_config::{BlockGasLimitType, Features},
     state_store::{state_value::StateValue, TStateView},
     transaction::{
         block_epilogue::TBlockEndInfoExt, AuxiliaryInfoTrait, BlockExecutableTransaction,
@@ -77,6 +77,7 @@ use std::{
         Arc,
     },
 };
+use triomphe::Arc as TriompheArc;
 
 struct SharedSyncParams<'a, T, E, S>
 where
@@ -89,7 +90,7 @@ where
     versioned_cache: &'a MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
     global_module_cache:
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
-    last_input_output: &'a TxnLastInputOutput<T, E::Output, E::Error>,
+    last_input_output: &'a TxnLastInputOutput<T, E::Output>,
     start_shared_counter: u32,
     delayed_field_id_counter: &'a AtomicU32,
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
@@ -111,7 +112,7 @@ where
     T: BlockExecutableTransaction,
     E: ExecutorTask<Txn = T, AuxiliaryInfo = A>,
     S: TStateView<Key = T::Key> + Sync,
-    L: TransactionCommitHook<Output = E::Output>,
+    L: TransactionCommitHook,
     TP: TxnProvider<T, A> + Sync,
     A: AuxiliaryInfoTrait,
 {
@@ -166,20 +167,78 @@ where
         }
     }
 
+    fn process_resource_output_v2(
+        maybe_output: Option<&E::Output>,
+        idx_to_execute: TxnIndex,
+        incarnation: Incarnation,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
+        versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
+        abort_manager: &mut AbortManager,
+    ) -> Result<(), PanicError> {
+        // The order is reversed in BlockSTMv2 as opposed to V1, avoiding the necessity
+        // to clone the previous keys.
+
+        let mut resource_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
+            output
+                .before_materialization()
+                .map(|inner| inner.resource_write_set())
+        })?;
+
+        last_input_output.for_each_resource_key_no_aggregator_v1(
+            idx_to_execute,
+            |prev_key_ref| {
+                match resource_write_set.remove_entry(prev_key_ref) {
+                    Some((key, (value, maybe_layout))) => {
+                        abort_manager.invalidate_dependencies(
+                            versioned_cache.data().write_v2::<false>(
+                                key,
+                                idx_to_execute,
+                                incarnation,
+                                value,
+                                maybe_layout,
+                            )?,
+                        )?;
+                    },
+                    None => {
+                        // Clean up the write from previous incarnation.
+                        abort_manager.invalidate_dependencies(
+                            versioned_cache
+                                .data()
+                                .remove_v2::<_, false>(prev_key_ref, idx_to_execute)?,
+                        )?;
+                    },
+                }
+                Ok(())
+            },
+        )?;
+
+        // Handle remaining entries in resource_write_set (new writes)
+        for (key, (value, maybe_layout)) in resource_write_set {
+            abort_manager.invalidate_dependencies(versioned_cache.data().write_v2::<false>(
+                key,
+                idx_to_execute,
+                incarnation,
+                value,
+                maybe_layout,
+            )?)?;
+        }
+
+        Ok(())
+    }
+
     // V1 processing is embedded in the execute method, while execute_v2 method calls
     // this method to process speculative resource group outputs.
     fn process_resource_group_output_v2(
         maybe_output: Option<&E::Output>,
         idx_to_execute: TxnIndex,
         incarnation: Incarnation,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         abort_manager: &mut AbortManager,
     ) -> Result<(), PanicError> {
         // The order of applying new group writes versus clearing previous writes is reversed
         // in BlockSTMv2 as opposed to V1, which avoids the necessity to clone group keys and
         // previous tags.
-        // TODO(BlockSTMv2): consider similar flow for resources.
 
         let mut resource_group_write_set = maybe_output.map_or(Ok(HashMap::new()), |output| {
             output
@@ -201,7 +260,7 @@ where
                                 group_key.clone(),
                                 idx_to_execute,
                                 incarnation,
-                                Arc::new(group_metadata_op),
+                                TriompheArc::new(group_metadata_op),
                                 None,
                             )?,
                         )?;
@@ -246,7 +305,7 @@ where
                     group_key.clone(),
                     idx_to_execute,
                     incarnation,
-                    Arc::new(group_metadata_op),
+                    TriompheArc::new(group_metadata_op),
                     None,
                 )?,
             )?;
@@ -267,7 +326,7 @@ where
         maybe_output: Option<&E::Output>,
         idx_to_execute: TxnIndex,
         read_set: &mut CapturedReads<T, ModuleId, CompiledModule, Module, AptosModuleExtension>,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         is_v2: bool,
     ) -> Result<(), PanicError> {
@@ -333,7 +392,7 @@ where
         incarnation: Incarnation,
         txn: &T,
         auxiliary_info: &A,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
         base_view: &S,
@@ -346,6 +405,7 @@ where
         runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T>,
         scheduler: &SchedulerV2,
+        block_gas_limit_type: &BlockGasLimitType,
     ) -> Result<(), PanicError> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
 
@@ -380,6 +440,7 @@ where
             return Ok(());
         }
 
+        // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         Self::process_delayed_field_output(
             maybe_output,
             idx_to_execute,
@@ -396,30 +457,21 @@ where
             versioned_cache,
             &mut abort_manager,
         )?;
+        Self::process_resource_output_v2(
+            maybe_output,
+            idx_to_execute,
+            incarnation,
+            last_input_output,
+            versioned_cache,
+            &mut abort_manager,
+        )?;
 
-        let mut prev_modified_resource_keys = last_input_output
-            .modified_resource_keys_no_aggregator_v1(idx_to_execute)
-            .map_or_else(HashSet::new, |keys| keys.collect());
+        // Legacy aggregator v1 handling.
         let mut prev_modified_aggregator_v1_keys = last_input_output
             .modified_aggregator_v1_keys(idx_to_execute)
             .map_or_else(HashSet::new, |keys| keys.collect());
-
-        // TODO: BlockSTMv2: use estimates for delayed field reads? (see V1 update on abort).
         if let Some(output) = maybe_output {
             let output_before_guard = output.before_materialization()?;
-
-            for (key, value, maybe_layout) in output_before_guard.resource_write_set().into_iter() {
-                prev_modified_resource_keys.remove(&key);
-                abort_manager.invalidate_dependencies(
-                    versioned_cache.data().write_v2::<false>(
-                        key,
-                        idx_to_execute,
-                        incarnation,
-                        value,
-                        maybe_layout,
-                    )?,
-                )?;
-            }
 
             // Apply aggregator v1 writes and deltas, using versioned data's V1 (write/add_delta) APIs.
             // AggregatorV1 is not push-validated, but follows the same logic as delayed fields, i.e.
@@ -431,7 +483,7 @@ where
                     key,
                     idx_to_execute,
                     incarnation,
-                    Arc::new(value),
+                    TriompheArc::new(value),
                     None,
                 );
             }
@@ -440,21 +492,17 @@ where
                 versioned_cache.data().add_delta(key, idx_to_execute, delta);
             }
         }
-
-        // Remove entries from previous write/delta set that were not overwritten.
-        for key in prev_modified_resource_keys {
-            abort_manager.invalidate_dependencies(
-                versioned_cache
-                    .data()
-                    .remove_v2::<_, false>(&key, idx_to_execute)?,
-            )?;
-        }
-
         for key in prev_modified_aggregator_v1_keys {
             versioned_cache.data().remove(&key, idx_to_execute);
         }
 
-        last_input_output.record(idx_to_execute, read_set, execution_result);
+        last_input_output.record(
+            idx_to_execute,
+            read_set,
+            execution_result,
+            block_gas_limit_type,
+            txn.user_txn_bytes_len() as u64,
+        )?;
 
         // It is important to call finish_execution after recording the input/output.
         // CAUTION: once any update has been applied to the shared data structures, there should
@@ -489,7 +537,7 @@ where
         // Passed for BlockSTMv1 during speculative execution, and used to record when the
         // transaction starts processing the outputs, as well as when the execution is finished.
         maybe_scheduler: Option<&Scheduler>,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
         base_view: &S,
@@ -501,6 +549,7 @@ where
         >,
         runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T>,
+        block_gas_limit_type: &BlockGasLimitType,
     ) -> Result<SchedulerTask, PanicError> {
         let _timer = TASK_EXECUTE_SECONDS.start_timer();
 
@@ -555,10 +604,7 @@ where
         // set (vanilla Block-STM rule), or if resource group size or metadata changed from an estimate
         // (since those resource group validations rely on estimates).
         let mut needs_suffix_validation = false;
-        let mut apply_updates = |output: &E::Output| -> Result<
-            Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>, // Cached resource writes
-            PanicError,
-        > {
+        let mut apply_updates = |output: &E::Output| -> Result<(), PanicError> {
             let output_before_guard = output.before_materialization()?;
             for (group_key, (group_metadata_op, group_size, group_ops)) in
                 output_before_guard.resource_group_write_set().into_iter()
@@ -595,12 +641,16 @@ where
             let resource_write_set = output_before_guard.resource_write_set();
 
             // Then, process resource & aggregator_v1 writes.
-            for (k, v, maybe_layout) in resource_write_set.clone().into_iter().chain(
-                output_before_guard
-                    .aggregator_v1_write_set()
-                    .into_iter()
-                    .map(|(state_key, write_op)| (state_key, Arc::new(write_op), None)),
-            ) {
+            for (k, v, maybe_layout) in resource_write_set
+                .into_iter()
+                .map(|(k, (v, maybe_layout))| (k, v, maybe_layout))
+                .chain(
+                    output_before_guard
+                        .aggregator_v1_write_set()
+                        .into_iter()
+                        .map(|(state_key, write_op)| (state_key, TriompheArc::new(write_op), None)),
+                )
+            {
                 if !prev_modified_resource_keys.remove(&k) {
                     needs_suffix_validation = true;
                 }
@@ -617,7 +667,7 @@ where
                 versioned_cache.data().add_delta(k, idx_to_execute, d);
             }
 
-            Ok(resource_write_set)
+            Ok(())
         };
 
         if let Some(output) = processed_output {
@@ -648,7 +698,13 @@ where
                 .remove(&k, idx_to_execute, tags);
         }
 
-        last_input_output.record(idx_to_execute, read_set, execution_result);
+        last_input_output.record(
+            idx_to_execute,
+            read_set,
+            execution_result,
+            block_gas_limit_type,
+            txn.user_txn_bytes_len() as u64,
+        )?;
         if let Some(scheduler) = maybe_scheduler {
             scheduler.finish_execution(idx_to_execute, incarnation, needs_suffix_validation)
         } else {
@@ -663,7 +719,7 @@ where
         incarnation_to_validate: Incarnation,
         scheduler: &SchedulerV2,
         updated_module_keys: &BTreeSet<ModuleId>,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -718,7 +774,7 @@ where
 
     fn validate(
         idx_to_validate: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         global_module_cache: &GlobalModuleCache<
             ModuleId,
             CompiledModule,
@@ -764,7 +820,7 @@ where
         incarnation: Incarnation,
         valid: bool,
         validation_wave: Wave,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         scheduler: &Scheduler,
     ) -> Result<SchedulerTask, PanicError> {
@@ -790,7 +846,7 @@ where
     fn validate_and_commit_delayed_fields(
         txn_idx: TxnIndex,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         is_v2: bool,
     ) -> Result<bool, PanicError> {
         let (read_set, is_speculative_failure) = last_input_output
@@ -844,7 +900,7 @@ where
         incarnation: Incarnation,
         scheduler: SchedulerWrapper,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
@@ -856,6 +912,7 @@ where
             AptosModuleExtension,
         >,
         runtime_environment: &RuntimeEnvironment,
+        block_gas_limit_type: &BlockGasLimitType,
     ) -> Result<(), PanicError> {
         let parallel_state = ParallelState::new(
             versioned_cache,
@@ -882,6 +939,7 @@ where
                     global_module_cache,
                     runtime_environment,
                     parallel_state,
+                    block_gas_limit_type,
                 )?;
             },
             Some((scheduler, worker_id)) => {
@@ -899,6 +957,7 @@ where
                     runtime_environment,
                     parallel_state,
                     scheduler,
+                    block_gas_limit_type,
                 )?;
             },
         }
@@ -939,7 +998,7 @@ where
         runtime_environment: &RuntimeEnvironment,
         scheduler: SchedulerWrapper,
         shared_sync_params: &SharedSyncParams<T, E, S>,
-    ) -> Result<bool, PanicOr<ParallelBlockExecutionError>> {
+    ) -> Result<(), PanicOr<ParallelBlockExecutionError>> {
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
         let global_module_cache = shared_sync_params.global_module_cache;
@@ -977,6 +1036,7 @@ where
                 shared_sync_params.base_view,
                 global_module_cache,
                 runtime_environment,
+                &self.config.onchain.block_gas_limit_type,
             )?;
         }
 
@@ -1000,16 +1060,15 @@ where
             txn_idx,
             num_txns,
             num_workers,
-            block.get_txn(txn_idx).user_txn_bytes_len() as u64,
-            &self.config.onchain.block_gas_limit_type,
             block_limit_processor,
+            shared_sync_params.maybe_block_epilogue_txn_idx,
             &scheduler,
         )
     }
 
     fn materialize_aggregator_v1_delta_writes(
         txn_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         base_view: &S,
     ) -> Vec<(T::Key, WriteOp)> {
@@ -1047,7 +1106,7 @@ where
 
                         versioned_cache.data().set_base_value(
                             k.clone(),
-                            ValueWithLayout::RawFromStorage(Arc::new(w)),
+                            ValueWithLayout::RawFromStorage(TriompheArc::new(w)),
                         );
                         op.apply_to(value_u128)
                             .expect("Materializing delta w. base value set must succeed")
@@ -1188,35 +1247,12 @@ where
 
         let last_input_output = shared_sync_params.last_input_output;
         if let Some(txn_commit_listener) = &self.transaction_commit_hook {
-            match last_input_output.txn_output(txn_idx).unwrap().as_ref() {
-                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
-                    txn_commit_listener.on_transaction_committed(output_idx, output);
-                },
-                ExecutionStatus::Abort(_) => {
-                    txn_commit_listener.on_execution_aborted(output_idx);
-                },
-                ExecutionStatus::SpeculativeExecutionAbortError(msg)
-                | ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                    panic!("Cannot be materializing with {}", msg);
-                },
-            }
+            last_input_output.notify_listener(txn_idx, txn_commit_listener)?;
         }
 
         let mut final_results = shared_sync_params.final_results.acquire();
 
-        match last_input_output.take_output(txn_idx)? {
-            ExecutionStatus::Success(t) => {
-                final_results[output_idx as usize] = t;
-            },
-            ExecutionStatus::SkipRest(t) => {
-                final_results[output_idx as usize] = t;
-            },
-            ExecutionStatus::Abort(_) => (),
-            ExecutionStatus::SpeculativeExecutionAbortError(msg)
-            | ExecutionStatus::DelayedFieldsCodeInvariantError(msg) => {
-                panic!("Cannot be materializing with {}", msg);
-            },
-        };
+        final_results[output_idx as usize] = last_input_output.take_output(txn_idx)?;
         Ok(())
     }
 
@@ -1239,7 +1275,6 @@ where
         let last_input_output = shared_sync_params.last_input_output;
         let base_view = shared_sync_params.base_view;
         let global_module_cache = shared_sync_params.global_module_cache;
-        let maybe_block_epilogue_txn_idx = shared_sync_params.maybe_block_epilogue_txn_idx;
         let scheduler_wrapper = SchedulerWrapper::V1(scheduler, skip_module_reads_validation);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -1282,7 +1317,7 @@ where
                         )));
                     }
 
-                    if self.prepare_and_queue_commit_ready_txn(
+                    self.prepare_and_queue_commit_ready_txn(
                         txn_idx,
                         incarnation,
                         num_txns as u32,
@@ -1292,11 +1327,7 @@ where
                         runtime_environment,
                         scheduler_wrapper,
                         shared_sync_params,
-                    )? {
-                        // We set the variable here and process after commit lock is released.
-                        *maybe_block_epilogue_txn_idx.acquire().dereference_mut() =
-                            Some(txn_idx + 1);
-                    }
+                    )?;
                 }
                 scheduler.queueing_commits_mark_done();
             }
@@ -1345,6 +1376,7 @@ where
                         shared_sync_params.delayed_field_id_counter,
                         incarnation,
                     ),
+                    &self.config.onchain.block_gas_limit_type,
                 )?,
                 SchedulerTask::ExecutionTask(_, _, ExecutionTaskType::Wakeup(condvar)) => {
                     {
@@ -1395,7 +1427,7 @@ where
             while scheduler.commit_hooks_try_lock() {
                 // Perform sequential commit hooks.
                 while let Some((txn_idx, incarnation)) = scheduler.start_commit()? {
-                    if self.prepare_and_queue_commit_ready_txn(
+                    self.prepare_and_queue_commit_ready_txn(
                         txn_idx,
                         incarnation,
                         num_txns,
@@ -1405,13 +1437,7 @@ where
                         runtime_environment,
                         scheduler_wrapper,
                         shared_sync_params,
-                    )? {
-                        // We set the variable here and process after commit lock is released.
-                        *shared_sync_params
-                            .maybe_block_epilogue_txn_idx
-                            .acquire()
-                            .dereference_mut() = Some(txn_idx + 1);
-                    }
+                    )?;
                 }
 
                 scheduler.commit_hooks_unlock();
@@ -1447,6 +1473,7 @@ where
                             incarnation,
                         ),
                         scheduler,
+                        &self.config.onchain.block_gas_limit_type,
                     )?;
                 },
                 TaskKind::PostCommitProcessing(txn_idx) => {
@@ -1614,6 +1641,7 @@ where
                     base_view,
                     module_cache,
                     runtime_environment,
+                    &self.config.onchain.block_gas_limit_type,
                 )?;
                 self.materialize_txn_commit(
                     epilogue_txn_idx,
@@ -2018,9 +2046,12 @@ where
         >,
         unsync_map: &UnsyncMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         output_before_guard: &<E::Output as TransactionOutput>::BeforeMaterializationGuard<'_>,
-        resource_write_set: Vec<(T::Key, Arc<T::Value>, Option<Arc<MoveTypeLayout>>)>,
+        resource_write_set: HashMap<
+            T::Key,
+            (TriompheArc<T::Value>, Option<TriompheArc<MoveTypeLayout>>),
+        >,
     ) -> Result<(), SequentialBlockExecutionError<E::Error>> {
-        for (key, write_op, layout) in resource_write_set.into_iter() {
+        for (key, (write_op, layout)) in resource_write_set.into_iter() {
             unsync_map.write(key, write_op, layout);
         }
 
@@ -2028,13 +2059,14 @@ where
             output_before_guard.resource_group_write_set().into_iter()
         {
             unsync_map.insert_group_ops(&group_key, group_ops, group_size)?;
-            unsync_map.write(group_key, Arc::new(metadata_op), None);
+            unsync_map.write(group_key, TriompheArc::new(metadata_op), None);
         }
 
         for (key, write_op) in output_before_guard.aggregator_v1_write_set().into_iter() {
-            unsync_map.write(key, Arc::new(write_op), None);
+            unsync_map.write(key, TriompheArc::new(write_op), None);
         }
 
+        let mut modules_published = false;
         for write in output_before_guard.module_write_set().values() {
             add_module_write_to_module_cache::<T>(
                 write,
@@ -2043,6 +2075,11 @@ where
                 global_module_cache,
                 unsync_map.module_cache(),
             )?;
+            modules_published = true;
+        }
+        // For simplicity, flush layout cache on module publish.
+        if modules_published {
+            global_module_cache.flush_layout_cache();
         }
 
         let mut second_phase = Vec::new();
@@ -2180,7 +2217,7 @@ where
                         BlockExecutionError::FatalBlockExecutorError(code_invariant_error(msg)),
                     ));
                 },
-                ExecutionStatus::Success(output) | ExecutionStatus::SkipRest(output) => {
+                ExecutionStatus::Success(mut output) | ExecutionStatus::SkipRest(mut output) => {
                     let output_before_guard = output.before_materialization()?;
                     // Calculating the accumulated gas costs of the committed txns.
 
@@ -2398,7 +2435,8 @@ where
                     }
 
                     if let Some(commit_hook) = &self.transaction_commit_hook {
-                        commit_hook.on_transaction_committed(idx as TxnIndex, &output);
+                        commit_hook
+                            .on_transaction_committed(idx as TxnIndex, output.committed_output());
                     }
                     ret.push(output);
                 },
@@ -2462,6 +2500,7 @@ where
 
         if self.config.local.concurrency_level > 1 {
             let parallel_result = if self.config.local.blockstm_v2 {
+                BLOCKSTM_VERSION_NUMBER.set(2);
                 self.execute_transactions_parallel_v2(
                     signature_verified_block,
                     base_view,
@@ -2469,6 +2508,7 @@ where
                     module_cache_manager_guard,
                 )
             } else {
+                BLOCKSTM_VERSION_NUMBER.set(1);
                 self.execute_transactions_parallel(
                     signature_verified_block,
                     base_view,
@@ -2494,7 +2534,7 @@ where
             module_cache_manager_guard
                 .environment()
                 .runtime_environment()
-                .flush_struct_name_and_tag_caches();
+                .flush_all_caches();
             module_cache_manager_guard.module_cache_mut().flush();
 
             info!("parallel execution requiring fallback");

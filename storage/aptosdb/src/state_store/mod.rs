@@ -591,20 +591,18 @@ impl StateStore {
                 .ledger_db
                 .transaction_info_db()
                 .get_transaction_info_iter(snapshot_next_version, write_sets.len())?;
-            let last_checkpoint_index = txn_info_iter
+            let all_checkpoint_indices = txn_info_iter
                 .into_iter()
                 .collect::<Result<Vec<_>>>()?
                 .into_iter()
-                .enumerate()
-                .filter(|(_idx, txn_info)| txn_info.has_state_checkpoint_hash())
-                .next_back()
-                .map(|(idx, _)| idx);
+                .positions(|txn_info| txn_info.has_state_checkpoint_hash())
+                .collect();
 
             let state_update_refs = StateUpdateRefs::index_write_sets(
                 state.next_version(),
                 &write_sets,
                 write_sets.len(),
-                last_checkpoint_index,
+                all_checkpoint_indices,
             );
             let current_state = out_current_state.lock().clone();
             let (hot_state, state) = out_persisted_state.get_state();
@@ -1000,7 +998,7 @@ impl StateStore {
         self: &Arc<Self>,
         version: Version,
         start_idx: usize,
-    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
         let store = Arc::clone(self);
         Ok(JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
@@ -1032,7 +1030,7 @@ impl StateStore {
         version: Version,
         first_index: usize,
         chunk_size: usize,
-    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync> {
+    ) -> Result<impl Iterator<Item = Result<(StateKey, StateValue)>> + Send + Sync + use<>> {
         let store = Arc::clone(self);
         let value_chunk_iter = JellyfishMerkleIterator::new_by_index(
             Arc::clone(&self.state_merkle_db),
@@ -1358,7 +1356,7 @@ mod test_only {
                     .iter()
                     .map(|updates| updates.iter().map(|(k, op)| (k, op))),
                 num_versions,
-                Some(num_versions - 1),
+                vec![num_versions - 1],
             );
 
             let mut ledger_batch = SchemaBatch::new();

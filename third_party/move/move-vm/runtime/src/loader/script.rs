@@ -2,20 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{
-    intern_type, single_signature_loader::load_single_signatures_for_script, Function,
+    convert_tok_to_type, single_signature_loader::load_single_signatures_for_script, Function,
     FunctionHandle, FunctionInstantiation,
 };
+use crate::loader::type_loader::convert_toks_to_types;
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
     errors::PartialVMResult,
-    file_format::{CompiledScript, FunctionDefinitionIndex, Signature, SignatureIndex, Visibility},
+    file_format::{CompiledScript, FunctionDefinitionIndex, SignatureIndex, Visibility},
 };
 use move_core_types::{ident_str, language_storage::ModuleId};
-use move_vm_types::loaded_data::{
-    runtime_access_specifier::AccessSpecifier,
-    runtime_types::{StructIdentifier, Type},
-    struct_name_indexing::StructNameIndexMap,
+use move_vm_types::{
+    loaded_data::{
+        runtime_access_specifier::AccessSpecifier,
+        runtime_types::{StructIdentifier, Type},
+        struct_name_indexing::StructNameIndexMap,
+    },
+    ty_interner::{InternedTypePool, TypeVecId},
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 
@@ -44,6 +48,7 @@ impl Script {
     pub(crate) fn new(
         script: Arc<CompiledScript>,
         struct_name_index_map: &StructNameIndexMap,
+        ty_pool: &InternedTypePool,
     ) -> PartialVMResult<Self> {
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
@@ -74,17 +79,20 @@ impl Script {
         let mut function_instantiations = vec![];
         for func_inst in script.function_instantiations() {
             let handle = function_refs[func_inst.handle.0 as usize].clone();
-            let mut instantiation = vec![];
-            for ty in &script.signature_at(func_inst.type_parameters).0 {
-                instantiation.push(intern_type(
-                    BinaryIndexedView::Script(&script),
-                    ty,
-                    &struct_names,
-                )?);
-            }
+            let (instantiation, is_fully_instantiated) = convert_toks_to_types(
+                BinaryIndexedView::Script(&script),
+                &script.signature_at(func_inst.type_parameters).0,
+                &struct_names,
+            )?;
+            let ty_args_id = if is_fully_instantiated {
+                Some(ty_pool.intern_ty_args(&instantiation))
+            } else {
+                None
+            };
             function_instantiations.push(FunctionInstantiation {
                 handle,
                 instantiation,
+                ty_args_id,
             });
         }
 
@@ -94,20 +102,13 @@ impl Script {
         let param_tys = parameters
             .0
             .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .map(|tok| convert_tok_to_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()?;
-        let locals = Signature(
-            parameters
-                .0
-                .iter()
-                .chain(script.signature_at(script.code.locals).0.iter())
-                .cloned()
-                .collect(),
-        );
-        let local_tys = locals
+        let local_tys = parameters
             .0
             .iter()
-            .map(|tok| intern_type(BinaryIndexedView::Script(&script), tok, &struct_names))
+            .chain(script.signature_at(script.code.locals).0.iter())
+            .map(|tok| convert_tok_to_type(BinaryIndexedView::Script(&script), tok, &struct_names))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();
 
@@ -129,6 +130,7 @@ impl Script {
             access_specifier: AccessSpecifier::Any,
             is_persistent: false,
             has_module_reentrancy_lock: false,
+            is_trusted: false,
         });
 
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;
@@ -154,8 +156,9 @@ impl Script {
         &self.function_instantiations[idx as usize].handle
     }
 
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
-        &self.function_instantiations[idx as usize].instantiation
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> (&[Type], Option<TypeVecId>) {
+        let instantiation = &self.function_instantiations[idx as usize];
+        (&instantiation.instantiation, instantiation.ty_args_id)
     }
 
     pub(crate) fn single_type_at(&self, idx: SignatureIndex) -> &Type {

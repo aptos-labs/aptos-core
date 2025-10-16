@@ -9,12 +9,13 @@ use crate::{
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
     metadata::LanguageVersion,
     model::{Parameter, TypeParameter, TypeParameterKind},
+    options::ModelBuilderOptions,
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
 };
 use legacy_move_compiler::parser::ast as PA;
 use move_core_types::{
     ability::{Ability, AbilitySet},
-    u256::U256,
+    int256::{I256, U256},
 };
 use num::BigInt;
 use std::collections::BTreeMap;
@@ -22,6 +23,7 @@ use std::collections::BTreeMap;
 /// Adds builtin functions.
 pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     let loc = trans.env.internal_loc();
+    let prim_ty = |p| Type::new_prim(p);
     let bool_t = &Type::new_prim(PrimitiveType::Bool);
     let num_t = &Type::new_prim(PrimitiveType::Num);
     let range_t = &Type::new_prim(PrimitiveType::Range);
@@ -35,43 +37,199 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         )
     };
 
+    let options = trans
+        .env
+        .get_extension::<ModelBuilderOptions>()
+        .unwrap_or_default();
+
     let param_t = &Type::TypeParameter(0);
     let param_t_decl = TypeParameter::new_named(&trans.env.symbol_pool().make("T"), &loc);
 
-    let mk_num_const = |value: BigInt, visibility: EntryVisibility| ConstEntry {
+    let mk_int_const = |value: BigInt, ty: &Type, visibility: EntryVisibility| ConstEntry {
         loc: loc.clone(),
-        ty: num_t.clone(),
+        ty: ty.clone(),
         value: Value::Number(value),
         visibility,
     };
 
+    let mk_num_const =
+        |value: BigInt, visibility: EntryVisibility| mk_int_const(value, num_t, visibility);
+
+    let mk_bool_const = |value: bool, visibility: EntryVisibility| ConstEntry {
+        loc: loc.clone(),
+        ty: bool_t.clone(),
+        value: Value::Bool(value),
+        visibility,
+    };
+
     {
+        if options.language_version.is_at_least(LanguageVersion::V2_3) {
+            use EntryVisibility::SpecAndImpl;
+            // Compiler builtin constants.
+            trans.define_const(
+                trans.builtin_qualified_symbol("__COMPILE_FOR_TESTING__"),
+                mk_bool_const(options.compile_for_testing, SpecAndImpl),
+            );
+        }
+    }
+
+    {
+        use EntryVisibility::{Spec, SpecAndImpl};
+
+        let range_visibility = if options.language_version.is_at_least(LanguageVersion::V2_3) {
+            SpecAndImpl
+        } else {
+            Spec
+        };
+
         // Builtin Constants (for specifications)
-        use EntryVisibility::Spec;
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U8"),
-            mk_num_const(BigInt::from(u8::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u8::MAX),
+                &prim_ty(PrimitiveType::U8),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U16"),
-            mk_num_const(BigInt::from(u16::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u16::MAX),
+                &prim_ty(PrimitiveType::U16),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U32"),
-            mk_num_const(BigInt::from(u32::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u32::MAX),
+                &prim_ty(PrimitiveType::U32),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U64"),
-            mk_num_const(BigInt::from(u64::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u64::MAX),
+                &prim_ty(PrimitiveType::U64),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U128"),
-            mk_num_const(BigInt::from(u128::MAX), Spec),
+            mk_int_const(
+                BigInt::from(u128::MAX),
+                &prim_ty(PrimitiveType::U128),
+                range_visibility,
+            ),
         );
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U256"),
-            mk_num_const(BigInt::from(&U256::max_value()), Spec),
+            mk_int_const(
+                BigInt::from(U256::MAX),
+                &prim_ty(PrimitiveType::U256),
+                range_visibility,
+            ),
         );
+
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I8"),
+            mk_int_const(
+                BigInt::from(i8::MAX),
+                &prim_ty(PrimitiveType::I8),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I16"),
+            mk_int_const(
+                BigInt::from(i16::MAX),
+                &prim_ty(PrimitiveType::I16),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I32"),
+            mk_int_const(
+                BigInt::from(i32::MAX),
+                &prim_ty(PrimitiveType::I32),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I64"),
+            mk_int_const(
+                BigInt::from(i64::MAX),
+                &prim_ty(PrimitiveType::I64),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I128"),
+            mk_int_const(
+                BigInt::from(i128::MAX),
+                &prim_ty(PrimitiveType::I128),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MAX_I256"),
+            mk_int_const(
+                BigInt::from(I256::MAX),
+                &prim_ty(PrimitiveType::I256),
+                range_visibility,
+            ),
+        );
+
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I8"),
+            mk_int_const(
+                BigInt::from(i8::MIN),
+                &prim_ty(PrimitiveType::I8),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I16"),
+            mk_int_const(
+                BigInt::from(i16::MIN),
+                &prim_ty(PrimitiveType::I16),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I32"),
+            mk_int_const(
+                BigInt::from(i32::MIN),
+                &prim_ty(PrimitiveType::I32),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I64"),
+            mk_int_const(
+                BigInt::from(i64::MIN),
+                &prim_ty(PrimitiveType::I64),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I128"),
+            mk_int_const(
+                BigInt::from(i128::MIN),
+                &prim_ty(PrimitiveType::I128),
+                range_visibility,
+            ),
+        );
+        trans.define_const(
+            trans.builtin_qualified_symbol("MIN_I256"),
+            mk_int_const(
+                BigInt::from(I256::MIN),
+                &prim_ty(PrimitiveType::I256),
+                range_visibility,
+            ),
+        );
+
         trans.define_const(
             trans.builtin_qualified_symbol("EXECUTION_FAILURE"),
             mk_num_const(BigInt::from(-1), Spec),
@@ -125,13 +283,41 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             )
         };
 
-        let u8_ty = Type::Primitive(PrimitiveType::U8);
+        // Builtin function for arithmetic operations
+        // op_vec: operations to declare
+        // type_params: type parameters for the operations
+        // type_constraints: constraints on the type parameters
+        // ty1, ty2: types of the two parameters
+        // result_ty: result type
+        // visibility: impl or spec
         let declare_arithm_ops = |trans: &mut ModelBuilder,
+                                  op_vec: &[(PA::BinOp_, Operation)],
                                   type_params: &[TypeParameter],
                                   type_constraints: &BTreeMap<usize, Constraint>,
-                                  ty: Type,
+                                  ty1: Type,
+                                  ty2: Type,
+                                  result_ty: Type,
                                   visibility: EntryVisibility| {
-            for (op, oper) in [
+            for (op, oper) in op_vec {
+                declare_bin_gen(
+                    trans,
+                    *op,
+                    oper.clone(),
+                    type_params,
+                    type_constraints,
+                    &ty1,
+                    &ty2,
+                    &result_ty,
+                    visibility,
+                );
+            }
+        };
+
+        // Declare the SPEC arithm ops for `Add`, `Sub`, `Mul`, `Mod`, `Div`, `BitOr`, `BitAnd`, `Xor`
+        // Both operands and the result are of Num type.
+        declare_arithm_ops(
+            trans,
+            &[
                 (Add, Operation::Add),
                 (Sub, Operation::Sub),
                 (Mul, Operation::Mul),
@@ -140,46 +326,40 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 (BitOr, Operation::BitOr),
                 (BitAnd, Operation::BitAnd),
                 (Xor, Operation::Xor),
-            ] {
-                declare_bin_gen(
-                    trans,
-                    op,
-                    oper,
-                    type_params,
-                    type_constraints,
-                    &ty,
-                    &ty,
-                    &ty,
-                    visibility,
-                );
-            }
-            for (op, oper) in [(Shl, Operation::Shl), (Shr, Operation::Shr)] {
-                declare_bin_gen(
-                    trans,
-                    op,
-                    oper,
-                    type_params,
-                    type_constraints,
-                    &ty,
-                    &u8_ty,
-                    &ty,
-                    visibility,
-                );
-            }
-        };
-
-        // Declare the specification arithm ops, based on Num type.
-        declare_arithm_ops(
-            trans,
+            ],
             &[],
             &BTreeMap::new(),
             Type::new_prim(PrimitiveType::Num),
+            Type::new_prim(PrimitiveType::Num),
+            Type::new_prim(PrimitiveType::Num),
             Spec, // visible only in the spec language
         );
-        // For the implementation arithm ops, we use a generic function with a constraint,
-        // conceptually: `fun _+_<A>(x: A, y: A): A where A: u8|u16|..|u256`.
+
+        // Declare the SPEC arithm ops for `Shl`, `Shr`
+        // First operand and the result are of Num type, second operand is of u8 type.
         declare_arithm_ops(
             trans,
+            &[(Shl, Operation::Shl), (Shr, Operation::Shr)],
+            &[],
+            &BTreeMap::new(),
+            Type::new_prim(PrimitiveType::Num),
+            Type::Primitive(PrimitiveType::U8),
+            Type::new_prim(PrimitiveType::Num),
+            Spec, // visible only in the spec language
+        );
+
+        // Declare the IMPL arithm ops for `Add`, `Sub`, `Mul`, `Mod`, `Div`
+        // We use a generic function with a constraint accepting all integer types,
+        // conceptually: `fun _+_<A>(x: A, y: A): A where A: u8|u16|..|u256|i8|i16|..|i256`.
+        declare_arithm_ops(
+            trans,
+            &[
+                (Add, Operation::Add),
+                (Sub, Operation::Sub),
+                (Mul, Operation::Mul),
+                (Mod, Operation::Mod),
+                (Div, Operation::Div),
+            ],
             std::slice::from_ref(&param_t_decl),
             &[(
                 0,
@@ -188,7 +368,59 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             .into_iter()
             .collect(),
             param_t.clone(),
-            Impl, // visible only in the impl language
+            param_t.clone(),
+            param_t.clone(),
+            Impl,
+        );
+
+        // Declare the IMPL arithm ops for `BitOr`, `BitAnd`, `Xor`
+        // We use a generic function with a constraint accepting only unsigned int types,
+        // conceptually: `fun _^_<A>(x: A, y: A): A where A: u8|u16|..|u256`.
+        declare_arithm_ops(
+            trans,
+            &[
+                (BitOr, Operation::BitOr),
+                (BitAnd, Operation::BitAnd),
+                (Xor, Operation::Xor),
+            ],
+            std::slice::from_ref(&param_t_decl),
+            &[(
+                0,
+                Constraint::SomeNumber(
+                    PrimitiveType::all_unsigned_int_types()
+                        .into_iter()
+                        .collect(),
+                ),
+            )]
+            .into_iter()
+            .collect(),
+            param_t.clone(),
+            param_t.clone(),
+            param_t.clone(),
+            Impl,
+        );
+
+        // Declare the IMPL arithm ops for `Shl`, `Shr`
+        // We use a generic function with a constraint accepting only unsigned int types as first arg and `u8` as second arg,
+        // conceptually: `fun _>>_<A>(x: A, y: u8): A where A: u8|u16|..|u256`.
+        declare_arithm_ops(
+            trans,
+            &[(Shl, Operation::Shl), (Shr, Operation::Shr)],
+            std::slice::from_ref(&param_t_decl),
+            &[(
+                0,
+                Constraint::SomeNumber(
+                    PrimitiveType::all_unsigned_int_types()
+                        .into_iter()
+                        .collect(),
+                ),
+            )]
+            .into_iter()
+            .collect(),
+            param_t.clone(),
+            Type::Primitive(PrimitiveType::U8),
+            param_t.clone(),
+            Impl,
         );
 
         // Builtin function for comparison operations
@@ -344,6 +576,26 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 type_param_constraints: BTreeMap::default(),
                 params: vec![mk_param(trans, 1, bool_t.clone())],
                 result_type: bool_t.clone(),
+                visibility: SpecAndImpl,
+            },
+        );
+
+        trans.define_spec_or_builtin_fun(
+            trans.unary_op_symbol(&PA::UnaryOp_::Negate),
+            SpecOrBuiltinFunEntry {
+                loc: loc.clone(),
+                oper: Operation::Negate,
+                type_params: vec![param_t_decl.clone()],
+                type_param_constraints: [(
+                    0,
+                    Constraint::SomeNumber(
+                        PrimitiveType::all_signed_int_types().into_iter().collect(),
+                    ),
+                )]
+                .into_iter()
+                .collect(),
+                params: vec![mk_param(trans, 1, param_t.clone())],
+                result_type: param_t.clone(),
                 visibility: SpecAndImpl,
             },
         );

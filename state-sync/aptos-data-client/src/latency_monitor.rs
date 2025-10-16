@@ -29,8 +29,9 @@ pub struct LatencyMonitor {
     caught_up_to_latest: bool, // Whether the node has ever caught up to the latest blockchain version
     data_client: Arc<dyn AptosDataClientInterface + Send + Sync>, // The data client through which to see advertised data
     monitor_loop_interval: Duration, // The interval between latency monitor loop executions
-    storage: Arc<dyn DbReader>,      // The reader interface to storage
-    time_service: TimeService,       // The service to monitor elapsed time
+    progress_check_max_stall_duration: Duration, // The duration after which to panic if no progress has been made
+    storage: Arc<dyn DbReader>,                  // The reader interface to storage
+    time_service: TimeService,                   // The service to monitor elapsed time
 }
 
 impl LatencyMonitor {
@@ -42,12 +43,15 @@ impl LatencyMonitor {
     ) -> Self {
         let monitor_loop_interval =
             Duration::from_millis(data_client_config.latency_monitor_loop_interval_ms);
+        let progress_check_max_stall_duration =
+            Duration::from_secs(data_client_config.progress_check_max_stall_time_secs);
 
         Self {
             advertised_versions: BTreeMap::new(),
             caught_up_to_latest: false,
             data_client,
             monitor_loop_interval,
+            progress_check_max_stall_duration,
             storage,
             time_service,
         }
@@ -59,14 +63,23 @@ impl LatencyMonitor {
             (LogSchema::new(LogEntry::LatencyMonitor)
                 .message("Starting the Aptos data client latency monitor!"))
         );
+
+        // Create a ticker for the monitor loop
         let loop_ticker = self.time_service.interval(self.monitor_loop_interval);
         futures::pin_mut!(loop_ticker);
+
+        // Create a progress checker to track syncing progress
+        let mut progress_checker = ProgressChecker::new(
+            self.time_service.clone(),
+            self.progress_check_max_stall_duration,
+        );
 
         // Start the monitor
         loop {
             // Wait for the next round
             loop_ticker.next().await;
 
+            // Get the highest synced version from storage
             let highest_synced_version = match self.storage.ensure_synced_version() {
                 Ok(version) => version,
                 Err(error) => {
@@ -81,6 +94,9 @@ impl LatencyMonitor {
                     continue; // Continue to the next round
                 },
             };
+
+            // Check if we've made sufficient progress since the last loop iteration
+            progress_checker.check_syncing_progress(highest_synced_version);
 
             // Get the latest block timestamp from storage
             let latest_block_timestamp_usecs = match self
@@ -274,6 +290,49 @@ impl LatencyMonitor {
     }
 }
 
+/// A simple struct that tracks the progress of node synchronization
+/// and panics if no progress has been made for a long time.
+struct ProgressChecker {
+    last_sync_progress_time: Instant, // The time when we last made syncing progress
+    highest_synced_version: u64,      // The highest synced version we've seen
+    progress_check_max_stall_duration: Duration, // The duration after which to panic if no progress has been made
+    time_service: TimeService,                   // The time service to track elapsed time
+}
+
+impl ProgressChecker {
+    fn new(time_service: TimeService, progress_check_max_stall_duration: Duration) -> Self {
+        Self {
+            last_sync_progress_time: time_service.now(),
+            highest_synced_version: 0,
+            progress_check_max_stall_duration,
+            time_service,
+        }
+    }
+
+    /// Ensures we've made progress since the last check, and
+    /// panics if we haven't made any progress for too long.
+    fn check_syncing_progress(&mut self, highest_synced_version: u64) {
+        // Check if we've made progress since the last iteration
+        let time_now = self.time_service.now();
+        if highest_synced_version > self.highest_synced_version {
+            // We've made progress, so reset the progress state
+            self.last_sync_progress_time = time_now;
+            self.highest_synced_version = highest_synced_version;
+            return;
+        }
+
+        // Otherwise, check if we've stalled for too long
+        let elapsed_time = time_now.duration_since(self.last_sync_progress_time);
+        if elapsed_time >= self.progress_check_max_stall_duration {
+            panic!(
+                "No syncing progress has been made for {:?}! Highest synced version: {}. \
+                We recommend restarting the node and checking if the issue persists.",
+                elapsed_time, highest_synced_version
+            );
+        }
+    }
+}
+
 /// A simple struct that holds the metadata of an advertised version.
 ///
 /// Note: the struct stores both the seen time as an Instant, as well
@@ -398,7 +457,7 @@ mod tests {
         );
 
         // Elapse some time
-        elapse_time(time_service.clone(), 1000);
+        elapse_time_ms(time_service.clone(), 1000);
 
         // Verify the seen to synced duration is 0
         let duration_from_seen_to_synced = calculate_duration_from_seen_to_synced(
@@ -416,7 +475,7 @@ mod tests {
 
         // Elapse some time
         let elapsed_time_ms = 1000;
-        elapse_time(time_service.clone(), elapsed_time_ms);
+        elapse_time_ms(time_service.clone(), elapsed_time_ms);
 
         // Verify the seen to synced duration is correct
         let duration_from_seen_to_synced =
@@ -470,7 +529,7 @@ mod tests {
         });
 
         // Elapse the time
-        elapse_time(time_service.clone(), 1000);
+        elapse_time_ms(time_service.clone(), 1000);
 
         // Update the advertised version timestamps again
         highest_advertised_version += 100;
@@ -519,7 +578,7 @@ mod tests {
         let start_time_usecs = time_service.now_unix_time().as_micros() as u64;
         for advertised_version in 0..num_advertised_versions {
             // Elapse some time (1 ms)
-            elapse_time(time_service.clone(), 1);
+            elapse_time_ms(time_service.clone(), 1);
 
             // Update the advertised version timestamps
             latency_monitor.update_advertised_version_timestamps(0, advertised_version);
@@ -562,7 +621,7 @@ mod tests {
         });
 
         // Elapse some time
-        elapse_time(time_service.clone(), 1000);
+        elapse_time_ms(time_service.clone(), 1000);
 
         // Update the advertised version timestamps again. But, this time
         // the highest synced version is equal to the highest advertised version.
@@ -663,6 +722,72 @@ mod tests {
         verify_advertised_version_timestamps_length(&mut latency_monitor, 1);
     }
 
+    #[tokio::test]
+    async fn test_progress_check_healthy() {
+        // Create a progress checker
+        let time_service = TimeService::mock();
+        let progress_check_max_stall_duration = Duration::from_secs(1); // 1 second
+        let mut progress_checker = latency_monitor::ProgressChecker::new(
+            time_service.clone(),
+            progress_check_max_stall_duration,
+        );
+
+        // Check progress with increasing versions
+        let max_synced_version = 10;
+        for highest_synced_version in 1..=max_synced_version {
+            // Elapse some time (2 seconds)
+            elapse_time_ms(time_service.clone(), 2000);
+
+            // Check progress (this should be fine, as we've made progress)
+            progress_checker.check_syncing_progress(highest_synced_version);
+        }
+
+        // Elapse some time (0.5 seconds), and verify that we don't panic (even with no progress)
+        elapse_time_ms(time_service.clone(), 500);
+        progress_checker.check_syncing_progress(max_synced_version);
+
+        // Elapse more time (0.4 seconds), and verify that we don't panic (even with no progress)
+        elapse_time_ms(time_service.clone(), 400);
+        progress_checker.check_syncing_progress(max_synced_version);
+
+        // Elapse more time (0.09 seconds), and verify that we don't panic (even with no progress)
+        elapse_time_ms(time_service.clone(), 90);
+        progress_checker.check_syncing_progress(max_synced_version);
+
+        // Elapse more time (1 seconds), and verify that we don't panic if we make progress
+        elapse_time_ms(time_service.clone(), 1000);
+        progress_checker.check_syncing_progress(max_synced_version + 1);
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "No syncing progress has been made for 1.1s!")]
+    async fn test_progress_check_panic() {
+        // Create a progress checker
+        let time_service = TimeService::mock();
+        let progress_check_max_stall_duration = Duration::from_secs(1); // 1 second
+        let mut progress_checker = latency_monitor::ProgressChecker::new(
+            time_service.clone(),
+            progress_check_max_stall_duration,
+        );
+
+        // Elapse some time (0.5 seconds), and verify that we don't panic (progress was made)
+        let max_synced_version = 10;
+        elapse_time_ms(time_service.clone(), 500);
+        progress_checker.check_syncing_progress(max_synced_version);
+
+        // Elapse more time (0.5 seconds), and verify that we don't panic (even with no progress)
+        elapse_time_ms(time_service.clone(), 500);
+        progress_checker.check_syncing_progress(max_synced_version);
+
+        // Elapse more time (0.4 seconds), and verify that we don't panic (even with no progress)
+        elapse_time_ms(time_service.clone(), 400);
+        progress_checker.check_syncing_progress(max_synced_version);
+
+        // Elapse more time (0.2 seconds), and verify that we panic (we've stalled for too long)
+        elapse_time_ms(time_service.clone(), 200);
+        progress_checker.check_syncing_progress(max_synced_version);
+    }
+
     /// Creates a latency monitor for testing
     fn create_latency_monitor() -> (TimeService, LatencyMonitor) {
         let data_client_config = Arc::new(AptosDataClientConfig::default());
@@ -680,7 +805,7 @@ mod tests {
     }
 
     /// Elapses the given time (in milliseconds) on the specified time service
-    fn elapse_time(time_service: TimeService, time_ms: u64) {
+    fn elapse_time_ms(time_service: TimeService, time_ms: u64) {
         time_service.into_mock().advance_ms(time_ms);
     }
 

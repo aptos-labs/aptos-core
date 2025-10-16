@@ -6,7 +6,7 @@ module 0xc0ffee::m {
         1
     }
     public fun test(p0: u64): u64 {
-        let _t1 = one();
+        let _v0 = one();
         p0
     }
 }

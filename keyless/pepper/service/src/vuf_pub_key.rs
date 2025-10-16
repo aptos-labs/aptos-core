@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{error::PepperServiceError, utils};
+use crate::error::PepperServiceError;
 use aptos_keyless_pepper_common::{
     vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
     PepperV0VufPubKey,
@@ -11,10 +11,6 @@ use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use sha3::Digest;
-
-// VUF related environment variables
-pub const ENV_VUF_KEY_HEX: &str = "VUF_KEY_HEX";
-pub const ENV_VUF_KEY_SEED_HEX: &str = "VUF_KEY_SEED_HEX";
 
 /// Derive the VUF private key from the given hex-encoded seed
 fn derive_vuf_private_key_from_seed(
@@ -76,21 +72,12 @@ fn deserialize_vuf_private_key(
 }
 
 /// Fetches the VUF private key for the pepper service. Note: this function
-/// will panic if the private key cannot be found (e.g., from the environment variables).
-fn get_pepper_service_vuf_private_key() -> ark_bls12_381::Fr {
+/// will panic if no valid private key can be derived or deserialized.
+fn get_pepper_service_vuf_private_key(
+    vuf_private_key_hex: Option<String>,
+    vuf_private_key_seed_hex: Option<String>,
+) -> ark_bls12_381::Fr {
     info!("Loading the VUF private key for the pepper service...");
-
-    // Load the VUF private key seed from the environment variable
-    let vuf_private_key_seed_hex = match utils::read_environment_variable(ENV_VUF_KEY_SEED_HEX) {
-        Ok(vuf_private_key_seed_hex) => Some(vuf_private_key_seed_hex),
-        Err(error) => {
-            warn!(
-                "Failed to read the VUF private key seed from the environment variable ({})! Error: {}",
-                ENV_VUF_KEY_SEED_HEX, error
-            );
-            None
-        },
-    };
 
     // Attempt to derive the private key from the seed
     if let Some(vuf_private_key_seed_hex) = vuf_private_key_seed_hex {
@@ -110,18 +97,6 @@ fn get_pepper_service_vuf_private_key() -> ark_bls12_381::Fr {
 
     // Seed derivation failed, fall back to direct deserialization
     warn!("Falling back to direct VUF private key deserialization!");
-
-    // Load the VUF private key hex from the environment variable
-    let vuf_private_key_hex = match utils::read_environment_variable(ENV_VUF_KEY_HEX) {
-        Ok(vuf_private_key_hex) => Some(vuf_private_key_hex),
-        Err(error) => {
-            warn!(
-                "Failed to read the VUF private key from the environment variable ({})! Error: {}",
-                ENV_VUF_KEY_HEX, error
-            );
-            None
-        },
-    };
 
     // Attempt to deserialize the private key directly
     if let Some(vuf_private_key_hex) = vuf_private_key_hex {
@@ -175,9 +150,13 @@ fn get_pepper_service_vuf_public_key(vuf_private_key: &ark_bls12_381::Fr) -> Str
 
 /// Returns the VUF public and private keypair for the pepper service.
 /// Note: the public key is serialized and returned in JSON format.
-pub fn get_pepper_service_vuf_keypair() -> (String, ark_bls12_381::Fr) {
+pub fn get_pepper_service_vuf_keypair(
+    vuf_private_key_hex: Option<String>,
+    vuf_private_key_seed_hex: Option<String>,
+) -> (String, ark_bls12_381::Fr) {
     // Fetch the VUF private key, and derive the public key
-    let vuf_private_key = get_pepper_service_vuf_private_key();
+    let vuf_private_key =
+        get_pepper_service_vuf_private_key(vuf_private_key_hex, vuf_private_key_seed_hex);
     let vuf_public_key = get_pepper_service_vuf_public_key(&vuf_private_key);
 
     // Return the keypair
@@ -186,10 +165,7 @@ pub fn get_pepper_service_vuf_keypair() -> (String, ark_bls12_381::Fr) {
 
 #[cfg(test)]
 mod tests {
-    use crate::{
-        vuf_pub_key,
-        vuf_pub_key::{ENV_VUF_KEY_HEX, ENV_VUF_KEY_SEED_HEX},
-    };
+    use crate::vuf_pub_key;
 
     // Useful test constants
     const TEST_VUF_KEY_SEED: &str =
@@ -200,29 +176,24 @@ mod tests {
     #[test]
     #[should_panic(expected = "No valid VUF private key could be derived or deserialized!")]
     fn test_get_pepper_service_vuf_keypair() {
-        // Set the private key seed environment variable
-        std::env::set_var(ENV_VUF_KEY_SEED_HEX, TEST_VUF_KEY_SEED);
-
-        // Set the fallback private key environment variable
-        std::env::set_var(ENV_VUF_KEY_HEX, TEST_VUF_KEY_HEX);
-
-        // Get the pepper service VUF keypair
-        let (public_key, private_key) = vuf_pub_key::get_pepper_service_vuf_keypair();
+        // Get the pepper service VUF keypair given both seed and hex
+        let (public_key, private_key) = vuf_pub_key::get_pepper_service_vuf_keypair(
+            Some(TEST_VUF_KEY_HEX.into()),
+            Some(TEST_VUF_KEY_SEED.into()),
+        );
 
         // Verify the private key is derived from the seed
         let derived_private_key =
-            vuf_pub_key::derive_vuf_private_key_from_seed(TEST_VUF_KEY_SEED.to_string()).unwrap();
+            vuf_pub_key::derive_vuf_private_key_from_seed(TEST_VUF_KEY_SEED.into()).unwrap();
         assert_eq!(private_key, derived_private_key);
 
         // Verify the public key is correctly derived from the private key
         let expected_public_key = vuf_pub_key::get_pepper_service_vuf_public_key(&private_key);
         assert_eq!(public_key, expected_public_key);
 
-        // Remove the seed environment variable to force the fallback
-        std::env::remove_var(ENV_VUF_KEY_SEED_HEX);
-
-        // Get the pepper service VUF keypair again
-        let (public_key, private_key) = vuf_pub_key::get_pepper_service_vuf_keypair();
+        // Get the pepper service VUF keypair again (with only the hex)
+        let (public_key, private_key) =
+            vuf_pub_key::get_pepper_service_vuf_keypair(Some(TEST_VUF_KEY_HEX.into()), None);
 
         // Verify the private key is derived from the fallback hex
         let deserialized_private_key =
@@ -233,10 +204,7 @@ mod tests {
         let expected_public_key = vuf_pub_key::get_pepper_service_vuf_public_key(&private_key);
         assert_eq!(public_key, expected_public_key);
 
-        // Remove all environment variables
-        std::env::remove_var(ENV_VUF_KEY_HEX);
-
-        // Get the pepper service VUF keypair again, this should panic
-        let _ = vuf_pub_key::get_pepper_service_vuf_keypair();
+        // Get the pepper service VUF keypair again, with neither seed nor hex (this should panic)
+        let _ = vuf_pub_key::get_pepper_service_vuf_keypair(None, None);
     }
 }

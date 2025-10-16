@@ -7,7 +7,7 @@ repository = "https://github.com/diem/diem"
 homepage = "https://diem.com"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 
 [dependencies]
 ambassador = { workspace = true }
@@ -40,3 +40,4 @@ rand = { workspace = true }
 default = []
 testing = []
 fuzzing = ["proptest", "move-binary-format/fuzzing"]
+force-inline = []

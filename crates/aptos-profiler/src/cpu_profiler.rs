@@ -46,7 +46,7 @@ impl<'a> CpuProfiler<'a> {
     }
 }
 
-impl Profiler for CpuProfiler<'_> {
+impl Profiler for CpuProfiler<'static> {
     /// Perform CPU profiling for the given duration
     fn profile_for(&self, duration_secs: u64, _binary_path: &str) -> Result<()> {
         let guard = pprof::ProfilerGuard::new(self.frequency).unwrap();
@@ -90,7 +90,6 @@ impl Profiler for CpuProfiler<'_> {
 
     /// Expose the results as SVG
     fn expose_svg_results(&self) -> Result<String> {
-        let content = convert_svg_to_string(self.svg_result_path.as_path());
-        content
+        convert_svg_to_string(self.svg_result_path.as_path())
     }
 }

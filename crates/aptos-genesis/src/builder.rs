@@ -531,7 +531,7 @@ impl Builder {
         );
 
         // Generate root key
-        let mut keygen = KeyGen::from_seed(rng.gen());
+        let mut keygen = KeyGen::from_seed(rng.r#gen());
         let root_key = keygen.generate_ed25519_private_key();
 
         // Generate validator configs
@@ -581,7 +581,7 @@ impl Builder {
             0,
         )?;
 
-        validator.init_keys(Some(rng.gen()))?;
+        validator.init_keys(Some(rng.r#gen()))?;
 
         // By default, we don't start with VFNs, so ensure that the REST port is open
         let vfn_identity_path = validator.dir.join(VFN_IDENTITY);

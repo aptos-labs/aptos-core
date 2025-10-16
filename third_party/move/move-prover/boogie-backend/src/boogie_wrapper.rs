@@ -1342,11 +1342,7 @@ impl ModelValue {
 
     /// Extract a number from a literal.
     fn extract_number(&self) -> Option<usize> {
-        if let Ok(n) = self.extract_literal()?.parse::<usize>() {
-            Some(n)
-        } else {
-            None
-        }
+        self.extract_literal()?.parse::<usize>().ok()
     }
 
     /// Extract a i128 from a literal.
@@ -1359,10 +1355,8 @@ impl ModelValue {
             }
         }) {
             Some(value)
-        } else if let Ok(n) = self.extract_literal()?.parse::<i128>() {
-            Some(n)
         } else {
-            None
+            self.extract_literal()?.parse::<i128>().ok()
         }
     }
 

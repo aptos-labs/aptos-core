@@ -5,6 +5,7 @@
 use crate::{
     ability::AbilitySet,
     account_address::AccountAddress,
+    ident_str,
     identifier::{IdentStr, Identifier},
     language_storage::FunctionParamOrReturnTag::{MutableReference, Reference, Value},
     parser::{parse_module_id, parse_struct_tag, parse_type_tag},
@@ -28,6 +29,18 @@ pub const CORE_CODE_ADDRESS: AccountAddress = AccountAddress::ONE;
 pub const TOKEN_ADDRESS: AccountAddress = AccountAddress::THREE;
 pub const TOKEN_OBJECTS_ADDRESS: AccountAddress = AccountAddress::FOUR;
 pub const EXPERIMENTAL_CODE_ADDRESS: AccountAddress = AccountAddress::SEVEN;
+
+pub const OPTION_NONE_TAG: u16 = 0;
+pub const OPTION_SOME_TAG: u16 = 1;
+// field "vec" of the old representation of option
+pub const LEGACY_OPTION_VEC: &str = "vec";
+
+pub static OPTION_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
+pub static OPTION_STRUCT_NAME: Lazy<Identifier> =
+    Lazy::new(|| Identifier::from(ident_str!("Option")));
+pub static MEM_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("mem"))));
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
@@ -81,6 +94,20 @@ pub enum TypeTag {
         )]
         Box<FunctionTag>,
     ),
+
+    // NOTED: added in bytecode version v9
+    #[serde(rename = "i8", alias = "I8")]
+    I8,
+    #[serde(rename = "i16", alias = "I16")]
+    I16,
+    #[serde(rename = "i32", alias = "I32")]
+    I32,
+    #[serde(rename = "i64", alias = "I64")]
+    I64,
+    #[serde(rename = "i128", alias = "I128")]
+    I128,
+    #[serde(rename = "i256", alias = "I256")]
+    I256,
 }
 
 impl TypeTag {
@@ -98,6 +125,12 @@ impl TypeTag {
             U64 => "u64".to_owned(),
             U128 => "u128".to_owned(),
             U256 => "u256".to_owned(),
+            I8 => "i8".to_owned(),
+            I16 => "i16".to_owned(),
+            I32 => "i32".to_owned(),
+            I64 => "i64".to_owned(),
+            I128 => "i128".to_owned(),
+            I256 => "i256".to_owned(),
             Address => "address".to_owned(),
             Signer => "signer".to_owned(),
             Vector(t) => format!("vector<{}>", t.to_canonical_string()),
@@ -110,8 +143,8 @@ impl TypeTag {
         use TypeTag::*;
         match self {
             Struct(struct_tag) => Some(struct_tag.as_ref()),
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address | Signer | Vector(_)
-            | Function(_) => None,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer | Vector(_) | Function(_) => None,
         }
     }
 
@@ -133,7 +166,8 @@ impl<'a> Iterator for TypeTagPreorderTraversalIter<'a> {
         match self.stack.pop() {
             Some(ty) => {
                 match ty {
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 => (),
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16
+                    | I32 | I64 | I128 | I256 => (),
                     Vector(ty) => self.stack.push(ty),
                     Struct(struct_tag) => self.stack.extend(struct_tag.type_args.iter().rev()),
                     Function(fun_tag) => {
@@ -244,6 +278,12 @@ impl StructTag {
             self.name,
             generics
         )
+    }
+
+    /// Returns true if this is a `StructTag` for an `Option` struct defined in the
+    /// standard library at address `0x1`.
+    pub fn is_option(&self) -> bool {
+        self.is_std_option(OPTION_MODULE_ID.address())
     }
 }
 
@@ -401,6 +441,11 @@ impl ModuleId {
 
     pub fn as_refs(&self) -> (&AccountAddress, &IdentStr) {
         (&self.address, self.name.as_ident_str())
+    }
+
+    pub fn is_option(&self) -> bool {
+        self.address == *OPTION_MODULE_ID.address()
+            && self.name.as_ident_str() == OPTION_MODULE_ID.name()
     }
 }
 

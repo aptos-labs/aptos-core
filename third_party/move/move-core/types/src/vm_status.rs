@@ -855,12 +855,16 @@ pub enum StatusCode {
     VALUE_DESERIALIZATION_ERROR = 3023,
     CODE_DESERIALIZATION_ERROR = 3024,
     INVALID_FLAG_BITS = 3025,
+    // Returned when a function value is trying to capture an option. This is not allowed
+    // until the feature flag ENABLE_CAPTURE_OPTION is on.
+    UNABLE_TO_CAPTURE_OPTION_TYPE = 3026,
+
     // Reserved error code for future use
-    RESERVED_DESERIALIZAION_ERROR_1 = 3026,
-    RESERVED_DESERIALIZAION_ERROR_2 = 3027,
-    RESERVED_DESERIALIZAION_ERROR_3 = 3028,
-    RESERVED_DESERIALIZAION_ERROR_4 = 3029,
-    RESERVED_DESERIALIZAION_ERROR_5 = 3030,
+    RESERVED_DESERIALIZAION_ERROR_1 = 3027,
+    RESERVED_DESERIALIZAION_ERROR_2 = 3028,
+    RESERVED_DESERIALIZAION_ERROR_3 = 3029,
+    RESERVED_DESERIALIZAION_ERROR_4 = 3030,
+    RESERVED_DESERIALIZAION_ERROR_5 = 3031,
 
     // Errors that can arise at runtime
     // Runtime Errors: 4000-4999
@@ -1056,21 +1060,24 @@ fn test_status_codes() {
 }
 
 pub mod sub_status {
-    // Native Function Error sub-codes
+    /// Native Function Error sub-codes
     pub const NFE_VECTOR_ERROR_BASE: u64 = 0;
-    // Failure in BCS deserialization
+    /// Failure in BCS deserialization
     pub const NFE_BCS_SERIALIZATION_FAILURE: u64 = 0x1C5;
 
     pub mod unknown_invariant_violation {
-        // Paranoid Type checking returns an error
+        /// Paranoid Type checking returns an error
         pub const EPARANOID_FAILURE: u64 = 0x1;
 
-        // Reference safety checks failure
+        /// Reference counting checks failure
         pub const EREFERENCE_COUNTING_FAILURE: u64 = 0x2;
+
+        /// Dynamic reference safety checks failure
+        pub const EREFERENCE_SAFETY_FAILURE: u64 = 0x3;
     }
 
     pub mod type_resolution_failure {
-        // User provided typetag failed to load.
+        /// User provided typetag failed to load.
         pub const EUSER_TYPE_LOADING_FAILURE: u64 = 0x1;
     }
 }

@@ -4,6 +4,13 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.9.1]
+- Add mem as pre-compiled module to avoid compatibility issue when using aptos-framework
+
+## [7.9.0]
+- Set language version 2.2 and bytecode version v8 as default
+- Set Move disassembler v2 and decompiler v2 as default
+
 ## [7.8.1]
 - Transaction Simulatiom Session: fixed resource deserialization bug
 

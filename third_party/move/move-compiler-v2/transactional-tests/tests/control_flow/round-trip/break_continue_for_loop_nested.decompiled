@@ -3,39 +3,39 @@
 //# run
 script {
     fun main() {
-        let _t4;
-        let _t0 = 0;
-        let _t1 = 0;
-        let _t2 = 0;
-        let _t3 = false;
+        let _v0;
+        let _v1 = 0;
+        let _v2 = 0;
+        let _v3 = 0;
+        let _v4 = false;
         'l0: loop {
             loop {
-                if (_t3) _t2 = _t2 + 1 else _t3 = true;
-                if (!(_t2 < 10)) break 'l0;
-                _t1 = _t1 + 1;
-                if (_t1 >= 15) break 'l0;
-                _t1 = _t1 + 2;
-                _t4 = 0;
-                let _t5 = 0;
-                let _t6 = false;
+                if (_v4) _v3 = _v3 + 1 else _v4 = true;
+                if (!(_v3 < 10)) break 'l0;
+                _v2 = _v2 + 1;
+                if (_v2 >= 15) break 'l0;
+                _v2 = _v2 + 2;
+                _v0 = 0;
+                let _v5 = 0;
+                let _v6 = false;
                 loop {
-                    if (_t6) _t5 = _t5 + 1 else _t6 = true;
-                    if (!(_t5 < 10)) break;
-                    _t4 = _t4 + 1;
-                    if (_t4 >= 15) break;
-                    _t4 = _t4 + 2;
-                    if (_t5 % 2 == 0) continue;
-                    _t4 = _t4 * 2
+                    if (_v6) _v5 = _v5 + 1 else _v6 = true;
+                    if (!(_v5 < 10)) break;
+                    _v0 = _v0 + 1;
+                    if (_v0 >= 15) break;
+                    _v0 = _v0 + 2;
+                    if (_v5 % 2 == 0) continue;
+                    _v0 = _v0 * 2
                 };
-                if (!(_t4 == 16)) break;
-                _t0 = _t0 + _t4;
-                if (_t2 % 2 == 0) continue;
-                _t1 = _t1 * 2;
+                if (!(_v0 == 16)) break;
+                _v1 = _v1 + _v0;
+                if (_v3 % 2 == 0) continue;
+                _v2 = _v2 * 2;
                 continue
             };
-            abort _t4
+            abort _v0
         };
-        _t4 = 3 * _t0 + _t1;
-        if (!(_t4 == 160)) abort _t4;
+        _v0 = 3 * _v1 + _v2;
+        assert!(_v0 == 160, _v0);
     }
 }

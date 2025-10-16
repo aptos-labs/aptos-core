@@ -4,6 +4,11 @@ module abi::test {
         value: u64
     }
 
+    enum MyEnum has drop, store {
+        This,
+        That
+    }
+
     #[event]
     struct MyEvent has store {
         value: u64

@@ -1,0 +1,32 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i256.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 57896044618658097711785492504343953926634992332820282019728792003956564819968u256 as i256;
+    }
+}

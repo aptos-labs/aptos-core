@@ -222,13 +222,6 @@ impl AbilitySet {
 
         if declared_phantom_parameters.len() != type_arguments.len() {
             bail!("the length of `declared_phantom_parameters` doesn't match the length of `type_arguments`")
-            /*
-            return Err(
-                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
-                    "the length of `declared_phantom_parameters` doesn't match the length of `type_arguments`".to_string(),
-                ),
-            );
-             */
         }
 
         // Conceptually this is performing the following operation:

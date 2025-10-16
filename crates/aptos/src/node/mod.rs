@@ -155,7 +155,7 @@ impl ValidatorConsensusKeyArgs {
         let consensus_public_key = if let Some(ref consensus_public_key) = self.consensus_public_key
         {
             consensus_public_key
-        } else if let Some(ref operator_config) = operator_config {
+        } else if let Some(operator_config) = operator_config {
             &operator_config.consensus_public_key
         } else {
             return Err(CliError::CommandArgumentError(
@@ -171,7 +171,7 @@ impl ValidatorConsensusKeyArgs {
     ) -> CliTypedResult<&'a bls12381::ProofOfPossession> {
         let proof_of_possession = if let Some(ref proof_of_possession) = self.proof_of_possession {
             proof_of_possession
-        } else if let Some(ref operator_config) = operator_config {
+        } else if let Some(operator_config) = operator_config {
             &operator_config.consensus_proof_of_possession
         } else {
             return Err(CliError::CommandArgumentError(
@@ -218,7 +218,7 @@ impl ValidatorNetworkAddressesArgs {
         let validator_network_public_key =
             if let Some(public_key) = self.validator_network_public_key {
                 public_key
-            } else if let Some(ref operator_config) = operator_config {
+            } else if let Some(operator_config) = operator_config {
                 operator_config.validator_network_public_key
             } else {
                 return Err(CliError::CommandArgumentError(
@@ -230,7 +230,7 @@ impl ValidatorNetworkAddressesArgs {
         let full_node_network_public_key =
             if let Some(public_key) = self.full_node_network_public_key {
                 Some(public_key)
-            } else if let Some(ref operator_config) = operator_config {
+            } else if let Some(operator_config) = operator_config {
                 operator_config.full_node_network_public_key
             } else {
                 None
@@ -238,7 +238,7 @@ impl ValidatorNetworkAddressesArgs {
 
         let validator_host = if let Some(ref host) = self.validator_host {
             host
-        } else if let Some(ref operator_config) = operator_config {
+        } else if let Some(operator_config) = operator_config {
             &operator_config.validator_host
         } else {
             return Err(CliError::CommandArgumentError(
@@ -248,7 +248,7 @@ impl ValidatorNetworkAddressesArgs {
 
         let full_node_host = if let Some(ref host) = self.full_node_host {
             Some(host)
-        } else if let Some(ref operator_config) = operator_config {
+        } else if let Some(operator_config) = operator_config {
             operator_config.full_node_host.as_ref()
         } else {
             None

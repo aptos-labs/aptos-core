@@ -12,12 +12,12 @@ module 0xc0ffee::m {
         *p0
     }
     public fun test(): u64 {
-        let _t0 = 1;
-        let _t5 = _t0;
-        let _t7 = inc(&mut _t0);
-        let _t9 = inc(&mut _t0);
-        let S{x: _t11, y: _t12, z: _t13} = S{x: _t5, y: _t7, z: _t9};
-        _t11 + _t12 + _t13
+        let _v0 = 1;
+        let _v1 = _v0;
+        let _v2 = inc(&mut _v0);
+        let _v3 = inc(&mut _v0);
+        let S{x: _v4, y: _v5, z: _v6} = S{x: _v1, y: _v2, z: _v3};
+        _v4 + _v5 + _v6
     }
 }
 

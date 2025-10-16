@@ -1,6 +1,8 @@
 module aptos_experimental::order_book {
 
     use std::option::Option;
+    use std::string::String;
+    use aptos_experimental::bulk_order_book_types::BulkOrder;
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
     use aptos_experimental::order_book_types::{AscendingIdGenerator, OrderIdType, new_ascending_id_generator,
@@ -34,7 +36,7 @@ module aptos_experimental::order_book {
     public fun new_single_order_request<M: store + copy + drop>(
         account: address,
         order_id: OrderIdType,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
@@ -65,14 +67,20 @@ module aptos_experimental::order_book {
         self.single_order_book.cancel_order(&mut self.price_time_idx, order_creator, order_id)
     }
 
+    public fun try_cancel_order<M: store + copy + drop>(
+        self: &mut OrderBook<M>, order_creator: address, order_id: OrderIdType
+    ): Option<SingleOrder<M>> {
+        self.single_order_book.try_cancel_order(&mut self.price_time_idx, order_creator, order_id)
+    }
+
     public fun try_cancel_order_with_client_order_id<M: store + copy + drop>(
-        self: &mut OrderBook<M>, order_creator: address, client_order_id: u64
+        self: &mut OrderBook<M>, order_creator: address, client_order_id: String
     ): Option<SingleOrder<M>> {
         self.single_order_book.try_cancel_order_with_client_order_id(&mut self.price_time_idx, order_creator, client_order_id)
     }
 
     public fun client_order_id_exists<M: store + copy + drop>(
-        self: &OrderBook<M>, order_creator: address, client_order_id: u64
+        self: &OrderBook<M>, order_creator: address, client_order_id: String
     ): bool {
         self.single_order_book.client_order_id_exists(order_creator, client_order_id)
     }
@@ -94,7 +102,7 @@ module aptos_experimental::order_book {
     }
 
     public fun get_order_id_by_client_id<M: store + copy + drop>(
-        self: &OrderBook<M>, order_creator: address, client_order_id: u64
+        self: &OrderBook<M>, order_creator: address, client_order_id: String
     ): Option<OrderIdType> {
         self.single_order_book.get_order_id_by_client_id(order_creator, client_order_id)
     }
@@ -207,7 +215,7 @@ module aptos_experimental::order_book {
     // ============================= APIs relevant to bulk order only ====================================
     public fun place_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: aptos_experimental::bulk_order_book_types::BulkOrderRequest<M>
-    ) : OrderIdType {
+    ) : BulkOrder<M> {
         self.bulk_order_book.place_bulk_order(
             &mut self.price_time_idx,
             &mut self.ascending_id_generator,
@@ -215,9 +223,15 @@ module aptos_experimental::order_book {
         )
     }
 
+    public fun get_bulk_order<M: store + copy + drop>(
+        self: &OrderBook<M>, order_creator: address
+    ): BulkOrder<M> {
+        self.bulk_order_book.get_bulk_order(order_creator)
+    }
+
     public fun cancel_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address
-    ): (OrderIdType, u64, u64) {
+    ): BulkOrder<M> {
         self.bulk_order_book.cancel_bulk_order(&mut self.price_time_idx, order_creator)
     }
 

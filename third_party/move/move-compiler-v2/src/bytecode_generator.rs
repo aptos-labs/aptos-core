@@ -4,7 +4,7 @@
 
 use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
-use ethnum::U256;
+use ethnum::{I256, U256};
 use itertools::Itertools;
 use move_core_types::ability::Ability;
 use move_model::{
@@ -26,7 +26,7 @@ use move_stackless_bytecode::{
     },
     stackless_bytecode_generator::BytecodeGeneratorContext,
 };
-use num::ToPrimitive;
+use num::{BigInt, ToPrimitive, Zero};
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -38,7 +38,7 @@ use std::{
 /// This returns `FunctionData` suitable for the bytecode processing pipeline.
 pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionData {
     let func_env = env.get_function(fid);
-    let mut gen = Generator {
+    let mut r#gen = Generator {
         func_env,
         context: Default::default(),
         temps: Default::default(),
@@ -52,32 +52,32 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         local_names: BTreeMap::new(),
     };
     let mut scope = BTreeMap::new();
-    for Parameter(name, ty, _) in gen.func_env.get_parameters() {
-        let temp = gen.new_temp(ty);
+    for Parameter(name, ty, _) in r#gen.func_env.get_parameters() {
+        let temp = r#gen.new_temp(ty);
         scope.insert(name, temp);
-        gen.local_names.insert(temp, name);
+        r#gen.local_names.insert(temp, name);
     }
-    let tys = gen.func_env.get_result_type().flatten();
+    let tys = r#gen.func_env.get_result_type().flatten();
     let multiple = tys.len() > 1;
     for (p, ty) in tys.into_iter().enumerate() {
-        let temp = gen.new_temp(ty);
-        gen.results.push(temp);
-        let pool = gen.func_env.module_env.symbol_pool();
+        let temp = r#gen.new_temp(ty);
+        r#gen.results.push(temp);
+        let pool = r#gen.func_env.module_env.symbol_pool();
         let name = if multiple {
             pool.make(&format!("return[{}]", p))
         } else {
             pool.make("return")
         };
-        gen.local_names.insert(temp, name);
+        r#gen.local_names.insert(temp, name);
     }
-    gen.scopes.push(scope);
-    let optional_def = gen.func_env.get_def().cloned();
+    r#gen.scopes.push(scope);
+    let optional_def = r#gen.func_env.get_def().cloned();
     if let Some(def) = optional_def {
-        let results = gen.results.clone();
+        let results = r#gen.results.clone();
         // Need to clone expression if present because of sharing issues with `gen`. However, because
         // of interning, clone is cheap.
-        gen.gen(results.clone(), &def);
-        gen.emit_with(def.result_node_id(), |attr| Bytecode::Ret(attr, results))
+        r#gen.r#gen(results.clone(), &def);
+        r#gen.emit_with(def.result_node_id(), |attr| Bytecode::Ret(attr, results))
     }
     let Generator {
         func_env,
@@ -91,7 +91,7 @@ pub fn generate_bytecode(env: &GlobalEnv, fid: QualifiedId<FunId>) -> FunctionDa
         results: _,
         code,
         local_names,
-    } = gen;
+    } = r#gen;
     let BytecodeGeneratorContext {
         loop_unrolling,
         loop_invariants,
@@ -358,7 +358,7 @@ impl<'env> Generator<'env> {
 // Dispatcher
 
 impl Generator<'_> {
-    fn gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
+    fn r#gen(&mut self, targets: Vec<TempIndex>, exp: &Exp) {
         match exp.as_ref() {
             ExpData::Invalid(id) => self.internal_error(*id, "invalid expression"),
             ExpData::Temporary(id, temp) => self.gen_temporary(targets, *id, *temp),
@@ -389,11 +389,11 @@ impl Generator<'_> {
                         .into_iter()
                         .map(|ty| self.new_temp(ty))
                         .collect::<Vec<_>>();
-                    self.gen(step_targets.clone(), step);
+                    self.r#gen(step_targets.clone(), step);
                     self.release_temps(step_targets)
                 }
                 if let Some(final_step) = exps.last() {
-                    self.gen(targets, final_step)
+                    self.r#gen(targets, final_step)
                 } else {
                     self.release_temps(targets)
                 }
@@ -414,14 +414,14 @@ impl Generator<'_> {
                         // temporary for `binding` and directly pass the temp for `x` into
                         // translation.
                         let local = self.find_local_for_pattern(*var_id, *sym, Some(&scope));
-                        self.without_reference_mode(|s| s.gen(vec![local], binding))
+                        self.without_reference_mode(|s| s.r#gen(vec![local], binding))
                     } else {
                         self.gen_assign(pat.node_id(), pat, binding, Some(&scope));
                     }
                 }
                 // Compile the body
                 self.scopes.push(scope);
-                self.gen(targets, body);
+                self.r#gen(targets, body);
                 self.scopes.pop();
             },
             ExpData::Mutate(id, lhs, rhs) => {
@@ -452,7 +452,7 @@ impl Generator<'_> {
             ExpData::Assign(id, lhs, rhs) => self.gen_assign(*id, lhs, rhs, None),
             ExpData::Return(id, exp) => {
                 let results = self.results.clone();
-                self.gen(results.clone(), exp);
+                self.r#gen(results.clone(), exp);
                 self.emit_with(*id, |attr| Bytecode::Ret(attr, results))
             },
             ExpData::IfElse(id, cond, then_exp, else_exp) => {
@@ -465,11 +465,11 @@ impl Generator<'_> {
                 });
                 let then_id = then_exp.node_id();
                 self.emit_with(then_id, |attr| Bytecode::Label(attr, then_label));
-                self.gen(targets.clone(), then_exp);
+                self.r#gen(targets.clone(), then_exp);
                 self.emit_with(then_id, |attr| Bytecode::Jump(attr, end_label));
                 let else_id = else_exp.node_id();
                 self.emit_with(else_id, |attr| Bytecode::Label(attr, else_label));
-                self.gen(targets, else_exp);
+                self.r#gen(targets, else_exp);
                 self.emit_with(else_id, |attr| Bytecode::Label(attr, end_label));
             },
             ExpData::Match(id, exp, arms) => self.gen_match(targets, *id, exp, arms),
@@ -481,7 +481,7 @@ impl Generator<'_> {
                     break_label,
                 });
                 self.emit_with(*id, |attr| Bytecode::Label(attr, continue_label));
-                self.gen(vec![], body);
+                self.r#gen(vec![], body);
                 self.loops.pop();
                 self.emit_with(*id, |attr| Bytecode::Jump(attr, continue_label));
                 self.emit_with(*id, |attr| Bytecode::Label(attr, break_label));
@@ -555,8 +555,38 @@ impl Generator<'_> {
                 },
                 Type::Primitive(PrimitiveType::U256) => {
                     // No direct way to go from BigInt to ethnum::U256...
-                    let x = U256::from_str_radix(&x.to_str_radix(16), 16).unwrap();
-                    Constant::U256(x)
+                    // Detour: convert BitInt to little-endian bytes, then interpret as U256.
+                    let x = x.to_bytes_le();
+                    // Must fit into 32 bytes. This `assert!` should not be triggered as previous value translator has checked the value range of the BigInt.
+                    assert!(x.0 != num::bigint::Sign::Minus && x.1.len() <= 32);
+                    let mut bytes = [0u8; 32];
+                    bytes[..x.1.len()].copy_from_slice(&x.1);
+                    Constant::U256(U256::from_le_bytes(bytes))
+                },
+                Type::Primitive(PrimitiveType::I8) => Constant::I8(x.to_i8().unwrap_or_default()),
+                Type::Primitive(PrimitiveType::I16) => {
+                    Constant::I16(x.to_i16().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I32) => {
+                    Constant::I32(x.to_i32().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I64) => {
+                    Constant::I64(x.to_i64().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I128) => {
+                    Constant::I128(x.to_i128().unwrap_or_default())
+                },
+                Type::Primitive(PrimitiveType::I256) => {
+                    // No direct way to go from BigInt to ethnum::I256...
+                    // Detour: convert BitInt to signed little-endian bytes (i.e., 2's complement), then interpret as I256.
+                    let pad = if *x < BigInt::zero() { 0xFFu8 } else { 0x00u8 };
+                    let x = x.to_signed_bytes_le();
+                    // Must fit into 32 bytes. This `assert!` should not be triggered as previous value translator has checked the value range of the BigInt.
+                    assert!(x.len() <= 32);
+                    // `BigInt::to_signed_bytes_le` returns the shortest representation, so we need to sign-extend to 32 bytes.
+                    let mut bytes = [pad; 32];
+                    bytes[..x.len()].copy_from_slice(&x);
+                    Constant::I256(I256::from_le_bytes(bytes))
                 },
                 ty => {
                     self.internal_error(id, format!("inconsistent numeric constant: {:?}", ty));
@@ -703,7 +733,7 @@ impl Generator<'_> {
                     )
                 } else {
                     for (target, arg) in targets.into_iter().zip(args.iter()) {
-                        self.gen(vec![target], arg)
+                        self.r#gen(vec![target], arg)
                     }
                 }
             },
@@ -930,6 +960,7 @@ impl Generator<'_> {
             Operation::Le => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Le, args),
             Operation::Ge => self.gen_op_call_auto_freeze(targets, id, BytecodeOperation::Ge, args),
             Operation::Not => self.gen_op_call(targets, id, BytecodeOperation::Not, args),
+            Operation::Negate => self.gen_op_call(targets, id, BytecodeOperation::Negate, args),
 
             Operation::NoOp => {}, // do nothing
 
@@ -1018,6 +1049,12 @@ impl Generator<'_> {
             Type::Primitive(PrimitiveType::U64) => BytecodeOperation::CastU64,
             Type::Primitive(PrimitiveType::U128) => BytecodeOperation::CastU128,
             Type::Primitive(PrimitiveType::U256) => BytecodeOperation::CastU256,
+            Type::Primitive(PrimitiveType::I8) => BytecodeOperation::CastI8,
+            Type::Primitive(PrimitiveType::I16) => BytecodeOperation::CastI16,
+            Type::Primitive(PrimitiveType::I32) => BytecodeOperation::CastI32,
+            Type::Primitive(PrimitiveType::I64) => BytecodeOperation::CastI64,
+            Type::Primitive(PrimitiveType::I128) => BytecodeOperation::CastI128,
+            Type::Primitive(PrimitiveType::I256) => BytecodeOperation::CastI256,
             _ => {
                 self.internal_error(id, "inconsistent type");
                 return;
@@ -1067,7 +1104,7 @@ impl Generator<'_> {
         // in such expressions.
         match args[0].as_ref() {
             ExpData::Call(_, Operation::Borrow(_), borrow_args) => {
-                self.gen(targets, &borrow_args[0])
+                self.r#gen(targets, &borrow_args[0])
             },
             _ => self.gen_op_call(targets, id, BytecodeOperation::ReadRef, args),
         }
@@ -1090,7 +1127,7 @@ impl Generator<'_> {
         });
         self.emit_with(id, |attr| Bytecode::Label(attr, true_label));
         if is_and {
-            self.gen(vec![target], &args[1]);
+            self.r#gen(vec![target], &args[1]);
         } else {
             self.emit_with(id, |attr| {
                 Bytecode::Load(attr, target, Constant::Bool(true))
@@ -1103,7 +1140,7 @@ impl Generator<'_> {
                 Bytecode::Load(attr, target, Constant::Bool(false))
             })
         } else {
-            self.gen(vec![target], &args[1]);
+            self.r#gen(vec![target], &args[1]);
         }
         self.emit_with(id, |attr| Bytecode::Label(attr, done_label));
     }
@@ -1222,7 +1259,7 @@ impl Generator<'_> {
                 let ty =
                     Type::Reference(self.reference_mode_kind, Box::new(self.get_node_type(*id)));
                 let temp = self.new_temp(ty);
-                self.gen(vec![temp], exp);
+                self.r#gen(vec![temp], exp);
                 temp
             },
             _ => {
@@ -1235,7 +1272,7 @@ impl Generator<'_> {
                     self.get_node_type(id)
                 };
                 let temp = self.new_temp(ty);
-                self.gen(vec![temp], exp);
+                self.r#gen(vec![temp], exp);
                 temp
             },
         }
@@ -1260,7 +1297,7 @@ impl Generator<'_> {
                     .into_iter()
                     .map(|ty| self.new_temp(ty))
                     .collect::<Vec<_>>();
-                self.gen(temps.clone(), exp);
+                self.r#gen(temps.clone(), exp);
                 temps
             } else {
                 vec![self.gen_escape_auto_ref_arg(exp, with_forced_temp)]
@@ -1337,7 +1374,7 @@ impl Generator<'_> {
                 let arg_type = self.env().get_node_type(args[0].node_id());
                 if let Type::Reference(ref_kind, _) = arg_type {
                     if ref_kind == kind {
-                        return self.gen(vec![target], &args[0]);
+                        return self.r#gen(vec![target], &args[0]);
                     }
                 }
             },
@@ -1728,7 +1765,7 @@ impl Generator<'_> {
                 // assign the call results.
                 let match_mode = &MatchMode::Irrefutable;
                 let sub_matches = self.collect_sub_matches(true, pats, match_mode, next_scope);
-                self.gen(sub_matches.values().map(|(temp, _)| *temp).collect(), exp);
+                self.r#gen(sub_matches.values().map(|(temp, _)| *temp).collect(), exp);
                 for (_, (temp, cont_opt)) in sub_matches.into_iter() {
                     if let Some(cont_pat) = cont_opt {
                         self.gen_match_from_temp(
@@ -1802,11 +1839,11 @@ impl Generator<'_> {
             // If we have not yet executed the condition during probing, execute it now.
             self.scopes.push(scope);
             if let Some(cond) = arm.condition.as_ref().filter(|_| !needs_probing) {
-                self.gen(vec![bool_temp], cond);
+                self.r#gen(vec![bool_temp], cond);
                 self.branch_to_exit_if_false(cond.node_id(), bool_temp, exit_path)
             }
             // Translate the body
-            self.gen(targets.clone(), &arm.body);
+            self.r#gen(targets.clone(), &arm.body);
             self.scopes.pop().expect("scope stack balanced");
             // Exit match with success
             self.emit_with(id, |attr| Bytecode::Jump(attr, success_path));
@@ -1901,7 +1938,7 @@ impl Generator<'_> {
             })
             .rewrite_exp(exp.clone());
             self.scopes.push(probe_scope);
-            self.gen(vec![bool_temp], &rewritten_exp);
+            self.r#gen(vec![bool_temp], &rewritten_exp);
             self.branch_to_exit_if_false(id, bool_temp, exit_path);
             self.scopes.pop();
         }
@@ -2048,18 +2085,18 @@ impl Generator<'_> {
             .collect_vec();
         for (pos, (temp, _)) in sub_matches {
             let field_offset = fields[*pos];
-            self.with_reference_mode(|gen, entering| {
+            self.with_reference_mode(|r#gen, entering| {
                 if entering {
-                    gen.reference_mode_kind = ref_kind
+                    r#gen.reference_mode_kind = ref_kind
                 }
-                if !gen.temp_type(*temp).is_reference() {
-                    gen.env().diag(
+                if !r#gen.temp_type(*temp).is_reference() {
+                    r#gen.env().diag(
                         Severity::Bug,
-                        &gen.env().get_node_loc(*id),
+                        &r#gen.env().get_node_loc(*id),
                         "Unpacking a reference to a struct must return the references of fields",
                     );
                 }
-                gen.emit_call(
+                r#gen.emit_call(
                     *id,
                     vec![*temp],
                     if let Some(var) = variant {
@@ -2396,7 +2433,7 @@ impl ValueShape {
     fn possible_values_product(
         env: &GlobalEnv,
         shapes: &[ValueShape],
-    ) -> impl Iterator<Item = Vec<ValueShape>> {
+    ) -> impl Iterator<Item = Vec<ValueShape>> + use<> {
         shapes
             .iter()
             .map(|shape| shape.possible_values(env))

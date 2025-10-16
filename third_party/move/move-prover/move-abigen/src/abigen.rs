@@ -79,7 +79,7 @@ impl<'env> Abigen<'env> {
     }
 
     /// Generates ABIs for all script modules in the environment (excluding the dependency set).
-    pub fn gen(&mut self) {
+    pub fn r#gen(&mut self) {
         for module in self.env.get_modules() {
             if module.is_primary_target() {
                 let mut path = PathBuf::from(&self.options.output_directory);
@@ -279,6 +279,10 @@ impl<'env> Abigen<'env> {
                     Signer => TypeTag::Signer,
                     Num | Range | EventStore => {
                         bail!("Type {:?} is not allowed in scripts.", ty0)
+                    },
+                    I8 | I16 | I32 | I64 | I128 | I256 => {
+                        // TODO(#17645) add support
+                        unimplemented!("signed integer not supported");
                     },
                 }
             },

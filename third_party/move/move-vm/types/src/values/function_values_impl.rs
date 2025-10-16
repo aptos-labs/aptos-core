@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, Value, ValueImpl};
+use crate::values::{DeserializationSeed, SerializationReadyValue, VMValueCast, Value};
 use better_any::Tid;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
@@ -35,10 +35,7 @@ pub trait AbstractFunction: for<'a> Tid<'a> {
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
-pub struct Closure(
-    pub(crate) Box<dyn AbstractFunction>,
-    pub(crate) Vec<ValueImpl>,
-);
+pub struct Closure(pub(crate) Box<dyn AbstractFunction>, pub(crate) Vec<Value>);
 
 /// The representation of a function in storage.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -57,12 +54,12 @@ pub struct SerializedFunctionData {
 
 impl Closure {
     pub fn pack(fun: Box<dyn AbstractFunction>, captured: impl IntoIterator<Item = Value>) -> Self {
-        Self(fun, captured.into_iter().map(|v| v.0).collect())
+        Self(fun, captured.into_iter().collect())
     }
 
     pub fn unpack(self) -> (Box<dyn AbstractFunction>, impl Iterator<Item = Value>) {
         let Self(fun, captured) = self;
-        (fun, captured.into_iter().map(Value))
+        (fun, captured.into_iter())
     }
 
     pub fn into_call_data(
@@ -107,8 +104,8 @@ impl Display for Closure {
 
 impl VMValueCast<Closure> for Value {
     fn cast(self) -> PartialVMResult<Closure> {
-        match self.0 {
-            ValueImpl::ClosureValue(c) => Ok(c),
+        match self {
+            Value::ClosureValue(c) => Ok(c),
             v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                 .with_message(format!("cannot cast {:?} to closure", v))),
         }
@@ -185,7 +182,7 @@ impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
             })? {
                 Some(v) => {
                     captured_layouts.push(layout);
-                    captured.push(v.0)
+                    captured.push(v)
                 },
                 None => return Err(A::Error::invalid_length(captured.len(), &self)),
             }

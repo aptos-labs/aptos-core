@@ -48,8 +48,6 @@ use legacy_move_compiler::command_line as cli;
 #[allow(unused_imports)]
 use log::{debug, info, warn};
 pub use move_binary_format::file_format::Visibility;
-#[allow(deprecated)]
-use move_binary_format::normalized::Type as MType;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -1253,6 +1251,15 @@ impl GlobalEnv {
             .any(|(d, _)| d.severity >= Severity::Warning)
     }
 
+    pub fn has_diag_in_primary_targets(&self, min_severity: Severity) -> bool {
+        self.diags.borrow().iter().any(|(d, _)| {
+            d.severity >= min_severity
+                && d.labels
+                    .iter()
+                    .any(|label| self.file_id_is_primary_target.contains(&label.file_id))
+        })
+    }
+
     /// Writes accumulated diagnostics of given or higher severity.
     pub fn report_diag<W: WriteColor>(&self, writer: &mut W, severity: Severity) {
         self.report_diag_with_filter(
@@ -2403,36 +2410,6 @@ impl GlobalEnv {
             return n.to_usize();
         }
         None
-    }
-
-    /// Attempt to compute a struct tag for (`mid`, `sid`, `ts`). Returns `Some` if all types in
-    /// `ts` are closed, `None` otherwise
-    pub fn get_struct_tag(
-        &self,
-        mid: ModuleId,
-        sid: StructId,
-        ts: &[Type],
-    ) -> Option<language_storage::StructTag> {
-        self.get_struct_type(mid, sid, ts)?.into_struct_tag()
-    }
-
-    /// Attempt to compute a struct type for (`mid`, `sid`, `ts`).
-    #[allow(deprecated)]
-    pub fn get_struct_type(&self, mid: ModuleId, sid: StructId, ts: &[Type]) -> Option<MType> {
-        let menv = self.get_module(mid);
-        Some(MType::Struct {
-            address: (if let Address::Numerical(addr) = *menv.self_address() {
-                Some(addr)
-            } else {
-                None
-            })?,
-            module: menv.get_identifier()?,
-            name: menv.get_struct(sid).get_identifier()?,
-            type_arguments: ts
-                .iter()
-                .map(|t| t.clone().into_normalized_type(self).unwrap())
-                .collect(),
-        })
     }
 
     /// Gets the location of the given node.
@@ -3659,7 +3636,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn get_spec_funs_of_name(
         &self,
         name: Symbol,
-    ) -> impl Iterator<Item = (&'env SpecFunId, &'env SpecFunDecl)> {
+    ) -> impl Iterator<Item = (&'env SpecFunId, &'env SpecFunDecl)> + use<'env> {
         self.data
             .spec_funs
             .iter()
@@ -3670,7 +3647,7 @@ impl<'env> ModuleEnv<'env> {
     pub fn disassemble(&self) -> Option<String> {
         let module = self.get_verified_module()?;
         Some(
-            move_asm::disassembler::disassemble_module(String::new(), module)
+            move_asm::disassembler::disassemble_module(String::new(), module, false)
                 .expect("disassemble succeeds"),
         )
     }
@@ -3733,6 +3710,10 @@ impl<'env> ModuleEnv<'env> {
 
     pub fn is_cmp(&self) -> bool {
         self.is_module_in_std("cmp")
+    }
+
+    pub fn is_option(&self) -> bool {
+        self.is_module_in_std("option")
     }
 }
 
@@ -3962,7 +3943,7 @@ impl<'env> StructEnv<'env> {
 
     /// Returns an iteration of the variant names in the struct, in the order they
     /// are declared.
-    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env {
+    pub fn get_variants(&self) -> impl Iterator<Item = Symbol> + 'env + use<'env> {
         self.data
             .variants
             .as_ref()
@@ -4143,6 +4124,11 @@ impl<'env> StructEnv<'env> {
             }
         }
         None
+    }
+
+    /// Whether the current struct/enum is Option
+    pub fn is_option_type(&self) -> bool {
+        self.module_env.is_option() && self.get_full_name_str() == "option::Option"
     }
 }
 

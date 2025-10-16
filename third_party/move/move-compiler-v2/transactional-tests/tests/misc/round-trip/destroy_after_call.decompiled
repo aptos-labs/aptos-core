@@ -6,8 +6,8 @@ module 0x42::m {
         p0
     }
     fun g() {
-        let _t0 = 22;
-        let _t5 = f(&mut _t0);
-        let _t6 = &_t0;
+        let _v0 = 22;
+        let _v1 = f(&mut _v0);
+        let _v2 = &_v0;
     }
 }
