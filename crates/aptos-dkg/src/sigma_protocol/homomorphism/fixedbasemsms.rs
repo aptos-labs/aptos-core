@@ -42,7 +42,7 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     /// The codomain of a homomorphism is often a **nested structure** — for example, `Vec<Vec<E::G1>>`.
     /// In the case of a `FixedBaseMsms`, the homomorphism then factorizes as:
     ///
-    /// Domain ─▶ Vec<Vec<MsmInput>> ─▶ Vec<Vec<E::G1>>
+    /// Domain ─▶ Vec<Vec<MsmInput>> ─▶ Vec<Vec<E::G1>> = Codomain
     ///
     /// For **efficient batch verification**, it’s useful to collect all MSM terms together and
     /// combine them with the sigma proof’s *commitment* (the first prover message) and the public statement.

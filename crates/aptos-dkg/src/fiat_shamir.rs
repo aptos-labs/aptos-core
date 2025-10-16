@@ -34,24 +34,24 @@ pub const PVSS_DOM_SEP: &[u8; 21] = b"APTOS_SCRAPE_PVSS_DST"; // TODO: Name need
 /// should **only** be used internally to ensure properly
 /// labelled scalar generation across protocols.
 trait ScalarProtocol<S: FromBytes> {
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
+    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
 
-    fn challenge_scalar(&mut self, label: &[u8]) -> S {
-        self.challenge_scalars(label, 1)[0]
+    fn challenge_full_scalar(&mut self, label: &[u8]) -> S {
+        self.challenge_full_scalars(label, 1)[0]
     }
 
-    fn challenge_from_128bit_chunks(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
+    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
 }
 
 /// Trait for types that can be constructed from uniform bytes or 128-bit random bytes
 trait FromBytes: Copy {
     const BYTE_SIZE: usize;
 
-    /// Construct from a uniform byte slice (usually larger than 16 bytes)
+    /// Construct scalars, each from a uniform byte slice (usually larger than 16 bytes)
     fn from_uniform_bytes(bytes: &[u8]) -> Self;
 
-    /// Construct from exactly 16 bytes (128-bit randomness)
-    fn from_random_bytes(bytes: &[u8; 16]) -> Self;
+    /// Construct scalars, each from exactly 16 bytes (128-bit randomness)
+    fn from_16_random_bytes(bytes: &[u8; 16]) -> Self;
 }
 
 impl<E: Pairing> FromBytes for Scalar<E> {
@@ -62,7 +62,7 @@ impl<E: Pairing> FromBytes for Scalar<E> {
         Self(E::ScalarField::from_le_bytes_mod_order(bytes))
     }
 
-    fn from_random_bytes(bytes: &[u8; 16]) -> Self {
+    fn from_16_random_bytes(bytes: &[u8; 16]) -> Self {
         Self(E::ScalarField::from_le_bytes_mod_order(bytes))
     }
 }
@@ -71,16 +71,17 @@ impl FromBytes for blstrs::Scalar {
     const BYTE_SIZE: usize = crate::SCALAR_NUM_BYTES;
 
     fn from_uniform_bytes(bytes: &[u8]) -> Self {
+        // No assert_eq needed here because it is enforced by the function below
         random_scalar_from_uniform_bytes(bytes.try_into().expect("Wrong byte length"))
     }
 
-    fn from_random_bytes(bytes: &[u8; 16]) -> Self {
+    fn from_16_random_bytes(bytes: &[u8; 16]) -> Self {
         blstrs::Scalar::from_u128(u128::from_le_bytes(*bytes))
     }
 }
 
 impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
-    fn challenge_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
+    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
         let mut buf = vec![0u8; 2 * num_scalars * S::BYTE_SIZE];
         self.challenge_bytes(label, &mut buf); // Label is also appended here
 
@@ -93,7 +94,7 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
         result
     }
 
-    fn challenge_from_128bit_chunks(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
+    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
         // Allocate 16 bytes (128 bits) per scalar
         let mut buf = vec![0u8; num_scalars * 16];
         self.challenge_bytes(label, &mut buf);
@@ -101,7 +102,7 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
         let mut scalars = Vec::with_capacity(num_scalars);
 
         for chunk in buf.chunks(16) {
-            scalars.push(S::from_random_bytes(chunk.try_into().unwrap()));
+            scalars.push(S::from_16_random_bytes(chunk.try_into().unwrap()));
         }
 
         debug_assert_eq!(scalars.len(), num_scalars);
@@ -235,7 +236,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
         n_plus_1: usize,
     ) -> Vec<blstrs::Scalar> {
         let num_coeffs = n_plus_1 - t;
-        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_scalars(
+        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_full_scalars(
             self,
             b"challenge_dual_code_word_polynomial",
             num_coeffs,
@@ -243,7 +244,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     }
 
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar> {
-        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_scalars(
+        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_full_scalars(
             self,
             b"challenge_linear_combination",
             num_scalars,
@@ -306,7 +307,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField> {
         let challenges =
-            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_from_128bit_chunks(
+            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_128bit_scalars(
                 self,
                 b"challenge_for_quotient_polynomials",
                 ell + 1,
@@ -317,7 +318,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
 
     fn challenges_for_linear_combination(&mut self, num: usize) -> Vec<E::ScalarField> {
         let challenges =
-            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_from_128bit_chunks(
+            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_128bit_scalars(
                 self,
                 b"challenge_for_linear_combination",
                 num,
@@ -327,7 +328,7 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     }
 
     fn challenge_from_verifier(&mut self) -> E::ScalarField {
-        <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_scalar(
+        <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_full_scalar(
             self,
             b"verifier_challenge_for_linear_combination",
         )
@@ -375,7 +376,7 @@ where
     }
 
     fn challenge_for_sigma_protocol(&mut self) -> E::ScalarField {
-        <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_scalar(
+        <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_full_scalar(
             self,
             b"challenge_sigma_protocol",
         )
