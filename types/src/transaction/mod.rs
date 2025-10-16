@@ -1451,7 +1451,6 @@ impl From<KeptVMStatus> for ExecutionStatus {
                 function: func,
                 code_offset: offset,
                 message: _,
-                status_code: _,
             } => ExecutionStatus::ExecutionFailure {
                 location: loc,
                 function: func,

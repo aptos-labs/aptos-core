@@ -96,7 +96,6 @@ pub enum KeptVMStatus {
         function: u16,
         code_offset: u16,
         message: Option<String>,
-        status_code: Option<StatusCode>,
     },
     MiscellaneousError,
 }
@@ -252,7 +251,7 @@ impl VMStatus {
             } => Ok(KeptVMStatus::MiscellaneousError),
 
             VMStatus::ExecutionFailure {
-                status_code,
+                status_code: _status_code,
                 location,
                 function,
                 code_offset,
@@ -263,7 +262,6 @@ impl VMStatus {
                 function,
                 code_offset,
                 message,
-                status_code: Some(status_code),
             }),
             VMStatus::Error {
                 status_code: code,
@@ -291,7 +289,6 @@ impl VMStatus {
                         function: 0,
                         code_offset: 0,
                         message,
-                        status_code: Some(code),
                     }),
                 }
             },
@@ -345,11 +342,10 @@ impl fmt::Display for KeptVMStatus {
                 function,
                 code_offset,
                 message,
-                status_code,
             } => write!(
                 f,
-                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {} with error message {:?} and status code {:?}",
-                code_offset, function, location, message, status_code
+                "EXECUTION_FAILURE at bytecode offset {} in function index {} in {} with error message {:?}",
+                code_offset, function, location, message
             ),
         }
     }
@@ -409,14 +405,12 @@ impl fmt::Debug for KeptVMStatus {
                 function,
                 code_offset,
                 message,
-                status_code,
             } => f
                 .debug_struct("EXECUTION_FAILURE")
                 .field("location", location)
                 .field("function_definition", function)
                 .field("code_offset", code_offset)
                 .field("message", message)
-                .field("status_code", status_code)
                 .finish(),
             KeptVMStatus::MiscellaneousError => write!(f, "MISCELLANEOUS_ERROR"),
         }
