@@ -1248,7 +1248,7 @@ pub struct MovePackageOptions {
     pub optimize: Option<OptimizationLevel>,
 
     /// Experiments
-    #[clap(long, hide(true))]
+    #[clap(long, hide(true), num_args = 1.., value_delimiter = ',')]
     pub experiments: Vec<String>,
 
     /// ...or --bytecode BYTECODE_VERSION
