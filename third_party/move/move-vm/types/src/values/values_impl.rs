@@ -21,7 +21,6 @@ use move_core_types::value::{MoveStruct, MoveValue};
 use move_core_types::{
     account_address::AccountAddress,
     effects::Op,
-    gas_algebra::AbstractMemorySize,
     int256,
     value::{
         self, MoveStructLayout, MoveTypeLayout, MASTER_ADDRESS_FIELD_OFFSET, MASTER_SIGNER_VARIANT,
@@ -171,7 +170,8 @@ pub(crate) enum GlobalDataStatus {
     Dirty,
 }
 
-/// A Move reference pointing to an element in a container.
+/// A Move reference pointing to an element in a container. Used only for primitive types, e.g.,
+/// vectors of integers or an integer field in a struct.
 #[derive(Debug)]
 pub(crate) struct IndexedRef {
     idx: usize,
@@ -271,6 +271,75 @@ pub struct Locals(Rc<RefCell<Vec<Value>>>);
  *   Miscellaneous helper functions.
  *
  **************************************************************************************/
+
+/// Value's kind dictates the rules how values can be referenced or stored in containers. For
+/// example, primitive values like u8 cannot be stored in a generic [Container::Vec] and need to
+/// be stored in specialized variant ([Container::VecU8]).
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+enum ValueKind {
+    /// All primitive types which have a specialized vector container implementation.
+    SpecializedVecPrimitive,
+    /// All primitive types which do not have a specialized vector container implementation.
+    NonSpecializedVecPrimitive,
+    /// A container (struct, vector, locals).
+    Container,
+    /// Anything else, such as invalid local values or references.
+    RefOrInvalid,
+}
+
+impl Value {
+    /// Returns value's kind. This method must be kept in sync with checks below which return an
+    /// error if value's kind is not valid for a specific use case.
+    fn kind(&self) -> ValueKind {
+        use Value::*;
+        match self {
+            U8(_) | U16(_) | U32(_) | U64(_) | U128(_) | U256(_) | I8(_) | I16(_) | I32(_)
+            | I64(_) | I128(_) | I256(_) | Bool(_) | Address(_) => {
+                ValueKind::SpecializedVecPrimitive
+            },
+            DelayedFieldID { .. } | ClosureValue(_) => ValueKind::NonSpecializedVecPrimitive,
+            Container(_) => ValueKind::Container,
+            ContainerRef(_) | IndexedRef(_) | Invalid => ValueKind::RefOrInvalid,
+        }
+    }
+
+    /// Returns an error if value's kind is not valid for [Container::Vec].
+    fn check_valid_for_value_vector(&self) -> PartialVMResult<()> {
+        use ValueKind as K;
+
+        match self.kind() {
+            K::NonSpecializedVecPrimitive | K::Container => Ok(()),
+            K::SpecializedVecPrimitive | K::RefOrInvalid => {
+                Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                    .with_message(format!("vector of `Value`s cannot contain {:?}", self)))
+            },
+        }
+    }
+
+    /// [IndexedRef] can only point to primitive types of a container. For non-specialized vectors,
+    /// indexed ref cannot point to primitive types like u8 that have their specialized versions.
+    fn check_valid_for_indexed_ref(&self, indexed_ref: &IndexedRef) -> PartialVMResult<()> {
+        use ValueKind as K;
+
+        let container = indexed_ref.container_ref.container();
+        let is_ok = match self.kind() {
+            K::NonSpecializedVecPrimitive => true,
+            K::SpecializedVecPrimitive => !matches!(container, Container::Vec(_)),
+            K::Container | K::RefOrInvalid => false,
+        };
+        if !is_ok {
+            let msg = format!(
+                "invalid IndexedRef element {:?} for container {:?}",
+                self, container
+            );
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                    .with_message(msg),
+            );
+        }
+        Ok(())
+    }
+}
 
 impl Container {
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -1290,7 +1359,7 @@ impl IndexedRef {
 
             Locals(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
         };
-
+        res.check_valid_for_indexed_ref(&self)?;
         Ok(res)
     }
 }
@@ -1400,22 +1469,7 @@ impl ContainerRef {
 
 impl IndexedRef {
     fn write_ref(self, x: Value) -> PartialVMResult<()> {
-        match &x {
-            Value::IndexedRef(_)
-            | Value::ContainerRef(_)
-            | Value::Invalid
-            | Value::Container(_) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
-                            "cannot write value {:?} to indexed ref {:?}",
-                            x, self
-                        )),
-                )
-            },
-            _ => (),
-        }
-
+        x.check_valid_for_indexed_ref(&self)?;
         match (self.container_ref.container(), &x) {
             (Container::Locals(r), _) | (Container::Vec(r), _) | (Container::Struct(r), _) => {
                 let mut v = r.borrow_mut();
@@ -1783,20 +1837,36 @@ impl ContainerRef {
             );
         }
 
+        macro_rules! container_ref {
+            ($container:ident) => {
+                Value::ContainerRef(match self {
+                    Self::Local(_) => Self::Local($container.copy_by_ref()),
+                    Self::Global { status, .. } => Self::Global {
+                        status: Rc::clone(status),
+                        container: $container.copy_by_ref(),
+                    },
+                })
+            };
+        }
+
+        macro_rules! indexed_ref {
+            () => {
+                Value::IndexedRef(IndexedRef {
+                    idx,
+                    container_ref: self.copy_by_ref(),
+                })
+            };
+        }
+
         Ok(match self.container() {
-            Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
+            // Borrowing from vector produces IndexedRef only for delayed fields or closures. Other
+            // primitive fields must be handled by specialized containers. If the element is also a
+            // container, a ContainerRef is returned.
+            Container::Vec(r) => {
                 let v = r.borrow();
                 match &v[idx] {
-                    Value::Container(container) => {
-                        let r = match self {
-                            Self::Local(_) => Self::Local(container.copy_by_ref()),
-                            Self::Global { status, .. } => Self::Global {
-                                status: Rc::clone(status),
-                                container: container.copy_by_ref(),
-                            },
-                        };
-                        Value::ContainerRef(r)
-                    },
+                    Value::Container(container) => container_ref!(container),
+                    Value::ClosureValue(_) | Value::DelayedFieldID { .. } => indexed_ref!(),
 
                     Value::U8(_)
                     | Value::U16(_)
@@ -1812,21 +1882,53 @@ impl ContainerRef {
                     | Value::I256(_)
                     | Value::Bool(_)
                     | Value::Address(_)
+                    | Value::ContainerRef(_)
+                    | Value::Invalid
+                    | Value::IndexedRef(_) => {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message(format!("cannot borrow vector element {:?}", &v[idx])))
+                    },
+                }
+            },
+
+            // Borrowing from locals or structs produces IndexedRef only for primitive types. If
+            // element is also a container, we must produce ContainerRef.
+            Container::Locals(r) | Container::Struct(r) => {
+                let v = r.borrow();
+                match &v[idx] {
+                    Value::Container(container) => container_ref!(container),
+                    Value::U8(_)
+                    | Value::U16(_)
+                    | Value::U32(_)
+                    | Value::U64(_)
+                    | Value::U128(_)
+                    | Value::U256(_)
+                    | Value::I8(_)
+                    | Value::I16(_)
+                    | Value::I32(_)
+                    | Value::I64(_)
+                    | Value::I128(_)
+                    | Value::I256(_)
+                    | Value::Bool(_)
+                    | Value::Address(_)
                     | Value::ClosureValue(_)
-                    | Value::DelayedFieldID { .. } => Value::IndexedRef(IndexedRef {
-                        idx,
-                        container_ref: self.copy_by_ref(),
-                    }),
+                    | Value::DelayedFieldID { .. } => indexed_ref!(),
 
                     Value::ContainerRef(_) | Value::Invalid | Value::IndexedRef(_) => {
                         return Err(PartialVMError::new(
                             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
                         )
-                        .with_message(format!("cannot borrow element {:?}", &v[idx])))
+                        .with_message(format!(
+                            "cannot borrow struct / locals element {:?}",
+                            &v[idx]
+                        )))
                     },
                 }
             },
 
+            // Borrowing a primitive element from specialized container always produces IndexedRef.
             Container::VecU8(_)
             | Container::VecU16(_)
             | Container::VecU32(_)
@@ -1840,10 +1942,7 @@ impl ContainerRef {
             | Container::VecI128(_)
             | Container::VecI256(_)
             | Container::VecAddress(_)
-            | Container::VecBool(_) => Value::IndexedRef(IndexedRef {
-                idx,
-                container_ref: self.copy_by_ref(),
-            }),
+            | Container::VecBool(_) => indexed_ref!(),
         })
     }
 }
@@ -2294,11 +2393,23 @@ impl Value {
         ))))
     }
 
-    // REVIEW: This API can break
-    pub fn vector_for_testing_only(it: impl IntoIterator<Item = Value>) -> Self {
-        Value::Container(Container::Vec(Rc::new(RefCell::new(
-            it.into_iter().collect(),
-        ))))
+    /// Creates a vector of values.
+    ///
+    /// Use with caution. While there is a check for each value that its type is valid (i.e., it
+    /// cannot be a primitive like u8 for which there are specialized vectors, or a reference), it
+    /// is the caller's responsibility to ensure that the values have the same types and the final
+    /// collection is homogeneous.
+    pub fn vector_unchecked(it: impl IntoIterator<Item = Value>) -> PartialVMResult<Self> {
+        let values = it
+            .into_iter()
+            .map(|v| {
+                v.check_valid_for_value_vector()?;
+                Ok(v)
+            })
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        Ok(Self::Container(Container::Vec(Rc::new(RefCell::new(
+            values,
+        )))))
     }
 
     pub fn closure(
@@ -3801,155 +3912,6 @@ impl Vector {
                     .with_message("expected vector<u8>".to_string()),
             )
         }
-    }
-}
-
-/***************************************************************************************
- *
- * Abstract Memory Size
- *
- *   TODO(Gas): This is the oldest implementation of abstract memory size.
- *              It is now kept only as a reference impl, which is used to ensure
- *              the new implementation is fully backward compatible.
- *              We should be able to get this removed after we use the new impl
- *              for a while and gain enough confidence in that.
- *
- **************************************************************************************/
-
-/// The size in bytes for a non-string or address constant on the stack
-pub(crate) const LEGACY_CONST_SIZE: AbstractMemorySize = AbstractMemorySize::new(16);
-
-/// The size in bytes for a reference on the stack
-pub(crate) const LEGACY_REFERENCE_SIZE: AbstractMemorySize = AbstractMemorySize::new(8);
-
-/// The size of a struct in bytes
-pub(crate) const LEGACY_STRUCT_SIZE: AbstractMemorySize = AbstractMemorySize::new(2);
-
-/// The size of a closure in bytes
-pub(crate) const LEGACY_CLOSURE_SIZE: AbstractMemorySize = AbstractMemorySize::new(6);
-
-impl Container {
-    #[cfg(test)]
-    fn legacy_size(&self) -> AbstractMemorySize {
-        match self {
-            Self::Locals(r) | Self::Vec(r) | Self::Struct(r) => {
-                Struct::legacy_size_impl(&r.borrow())
-            },
-            Self::VecU8(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u8>()) as u64)
-            },
-            Self::VecU16(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u16>()) as u64)
-            },
-            Self::VecU32(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u32>()) as u64)
-            },
-            Self::VecU64(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u64>()) as u64)
-            },
-            Self::VecU128(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<u128>()) as u64)
-            },
-            Self::VecU256(r) => AbstractMemorySize::new(
-                (r.borrow().len() * std::mem::size_of::<int256::U256>()) as u64,
-            ),
-            Self::VecI8(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<i8>()) as u64)
-            },
-            Self::VecI16(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<i16>()) as u64)
-            },
-            Self::VecI32(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<i32>()) as u64)
-            },
-            Self::VecI64(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<i64>()) as u64)
-            },
-            Self::VecI128(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<i128>()) as u64)
-            },
-            Self::VecI256(r) => AbstractMemorySize::new(
-                (r.borrow().len() * std::mem::size_of::<int256::I256>()) as u64,
-            ),
-            Self::VecBool(r) => {
-                AbstractMemorySize::new((r.borrow().len() * std::mem::size_of::<bool>()) as u64)
-            },
-            Self::VecAddress(r) => AbstractMemorySize::new(
-                (r.borrow().len() * std::mem::size_of::<AccountAddress>()) as u64,
-            ),
-        }
-    }
-}
-
-impl ContainerRef {
-    #[cfg(test)]
-    fn legacy_size(&self) -> AbstractMemorySize {
-        LEGACY_REFERENCE_SIZE
-    }
-}
-
-impl IndexedRef {
-    #[cfg(test)]
-    fn legacy_size(&self) -> AbstractMemorySize {
-        LEGACY_REFERENCE_SIZE
-    }
-}
-
-impl Value {
-    #[cfg(test)]
-    pub(crate) fn legacy_size(&self) -> AbstractMemorySize {
-        use Value::*;
-
-        match self {
-            Invalid | U8(_) | U16(_) | U32(_) | U64(_) | U128(_) | U256(_) | I8(_) | I16(_)
-            | I32(_) | I64(_) | I128(_) | I256(_) | Bool(_) => LEGACY_CONST_SIZE,
-            Address(_) => AbstractMemorySize::new(AccountAddress::LENGTH as u64),
-            ContainerRef(r) => r.legacy_size(),
-            IndexedRef(r) => r.legacy_size(),
-            // TODO: in case the borrow fails the VM will panic.
-            Container(c) => c.legacy_size(),
-
-            // Legacy size is only used by event native functions (which should not even
-            // be part of move-stdlib), so we should never see any delayed values here.
-            DelayedFieldID { .. } => unreachable!("Delayed values do not have legacy size!"),
-
-            ClosureValue(..) => {
-                // TODO(#15664): similarly as with delayed values, closures should not appear here,
-                //   but this needs to be verified
-                unreachable!("Closures do not have legacy size!")
-            },
-        }
-    }
-}
-
-impl Struct {
-    #[cfg(test)]
-    fn legacy_size_impl(fields: &[Value]) -> AbstractMemorySize {
-        fields
-            .iter()
-            .fold(LEGACY_STRUCT_SIZE, |acc, v| acc + v.legacy_size())
-    }
-
-    #[cfg(test)]
-    pub(crate) fn legacy_size(&self) -> AbstractMemorySize {
-        Self::legacy_size_impl(&self.fields)
-    }
-}
-
-impl ReferenceImpl {
-    #[cfg(test)]
-    fn legacy_size(&self) -> AbstractMemorySize {
-        match self {
-            Self::ContainerRef(r) => r.legacy_size(),
-            Self::IndexedRef(r) => r.legacy_size(),
-        }
-    }
-}
-
-impl Reference {
-    #[cfg(test)]
-    pub(crate) fn legacy_size(&self) -> AbstractMemorySize {
-        self.0.legacy_size()
     }
 }
 
