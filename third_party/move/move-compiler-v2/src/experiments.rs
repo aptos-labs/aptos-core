@@ -117,9 +117,14 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::ALLOW_INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS.to_string(),
+            description: "Turns on or off restricting inlining optimization to primary target modules".to_string(),
+            default: Given(false),
+        },
+        Experiment {
             name: Experiment::SPEC_CHECK.to_string(),
             description: "Turns on or off specification checks".to_string(),
-            default: Inherited(Experiment::CHECKS.to_string()),
+            default: Given(false),
         },
         Experiment {
             name: Experiment::SPEC_REWRITE.to_string(),
@@ -306,6 +311,8 @@ impl Experiment {
     pub const ACCESS_CHECK: &'static str = "access-use-function-check";
     pub const ACQUIRES_CHECK: &'static str = "acquires-check";
     pub const ACROSS_PACKAGE_INLINING: &'static str = "across-package-inlining";
+    pub const ALLOW_INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS: &'static str =
+        "allow-inlining-optimization-to-non-primary-targets";
     pub const AST_SIMPLIFY: &'static str = "ast-simplify";
     pub const AST_SIMPLIFY_FULL: &'static str = "ast-simplify-full";
     pub const ATTACH_COMPILED_MODULE: &'static str = "attach-compiled-module";

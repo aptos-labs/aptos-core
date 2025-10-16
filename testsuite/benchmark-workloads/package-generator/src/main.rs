@@ -27,6 +27,9 @@ struct Args {
     /// If true, uses local aptos-framework from aptos-core.
     #[clap(long)]
     use_local_std: bool,
+    /// Experiments for compiler optimization
+    #[clap(long, num_args = 1.., value_delimiter = ',')]
+    experiments: Vec<String>,
 }
 
 /// Recursively traverses a directory to extract paths of all Move packages inside it.
@@ -66,6 +69,7 @@ fn main() -> anyhow::Result<()> {
         let config = PrebuiltPackageConfig {
             latest_language,
             use_local_std,
+            experiments: args.experiments.clone(),
         };
         visit(&package_path, &config, &mut all_package_paths)?;
     }
