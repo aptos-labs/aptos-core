@@ -117,8 +117,7 @@ on:
         description: The number of test jobs to run in parallel. If not specified, defaults to 1
         default: 1
 
-  schedule:
-    - cron: "0 22 * * 1-5" # The main branch cadence. This runs every Mon-Fri
+  # schedule: # NOTE: the schedule is dictated by PIES
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
