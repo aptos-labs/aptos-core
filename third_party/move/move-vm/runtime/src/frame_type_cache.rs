@@ -39,7 +39,9 @@ impl RuntimeCacheTraits for AllRuntimeCaches {
 #[derive(Clone)]
 pub(crate) enum PerInstructionCache {
     Nothing,
+    #[allow(dead_code)]
     Pack(u16),
+    #[allow(dead_code)]
     PackGeneric(u16),
     Call(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
     CallGeneric(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
