@@ -221,7 +221,7 @@ module aptos_experimental::bulk_order_book_types {
             metadata
         };
 
-        // Inline validation logic
+        // Ensure bid prices are in descending order and ask prices are in ascending order
         // Check if at least one side has orders
         if (req.bid_sizes.length() == 0 && req.ask_sizes.length() == 0) {
             return new_bulk_order_request_response_rejection(
@@ -230,31 +230,31 @@ module aptos_experimental::bulk_order_book_types {
         };
 
         // Check for zero sizes
-        if (!validate_not_zero_sizes_safe(&req.bid_sizes)) {
+        if (!validate_not_zero_sizes(&req.bid_sizes)) {
             return new_bulk_order_request_response_rejection(
                 std::string::utf8(b"Zero bid size")
             );
         };
-        if (!validate_not_zero_sizes_safe(&req.ask_sizes)) {
+        if (!validate_not_zero_sizes(&req.ask_sizes)) {
             return new_bulk_order_request_response_rejection(
                 std::string::utf8(b"Zero ask size")
             );
         };
 
         // Check price ordering
-        if (!validate_price_ordering_safe(&req.bid_prices, true)) {
+        if (!validate_price_ordering(&req.bid_prices, true)) {
             return new_bulk_order_request_response_rejection(
                 std::string::utf8(b"Bid order invalid")
             );
         };
-        if (!validate_price_ordering_safe(&req.ask_prices, false)) {
+        if (!validate_price_ordering(&req.ask_prices, false)) {
             return new_bulk_order_request_response_rejection(
                 std::string::utf8(b"Ask order invalid")
             );
         };
 
         // Check for price crossing
-        if (!validate_no_price_crossing_safe(&req.bid_prices, &req.ask_prices)) {
+        if (!validate_no_price_crossing(&req.bid_prices, &req.ask_prices)) {
             return new_bulk_order_request_response_rejection(
                 std::string::utf8(b"Price crossing")
             );
@@ -388,20 +388,7 @@ module aptos_experimental::bulk_order_book_types {
     /// # Arguments:
     /// - `sizes`: Vector of sizes to validate
     ///
-    /// # Aborts:
-    /// - If the vector is empty
-    /// - If any size is 0
-    fun validate_not_zero_sizes(
-        sizes: &vector<u64>
-    ) {
-        let i = 0;
-        while (i < sizes.length()) {
-            assert!(sizes[i] > 0, EINVLID_MM_ORDER_REQUEST);
-            i += 1;
-        };
-    }
-
-    fun validate_not_zero_sizes_safe(sizes: &vector<u64>): bool {
+    fun validate_not_zero_sizes(sizes: &vector<u64>): bool {
         let i = 0;
         while (i < sizes.length()) {
             if (sizes[i] == 0) {
@@ -418,27 +405,7 @@ module aptos_experimental::bulk_order_book_types {
     /// - `prices`: Vector of prices to validate
     /// - `is_descending`: True if prices should be in descending order, false for ascending
     ///
-    /// # Aborts:
-    /// - If prices are not in the correct order
     fun validate_price_ordering(
-        prices: &vector<u64>,
-        is_descending: bool
-    ) {
-        let i = 0;
-        if (prices.length() == 0) {
-            return ; // No prices to validate
-        };
-        while (i < prices.length() - 1) {
-            if (is_descending) {
-                assert!(prices[i] > prices[i + 1], EINVLID_MM_ORDER_REQUEST);
-            } else {
-                assert!(prices[i] < prices[i + 1], EINVLID_MM_ORDER_REQUEST);
-            };
-            i += 1;
-        };
-    }
-
-    fun validate_price_ordering_safe(
         prices: &vector<u64>,
         is_descending: bool
     ): bool {
@@ -470,20 +437,7 @@ module aptos_experimental::bulk_order_book_types {
     /// - `bid_prices`: Vector of bid prices (should be in descending order)
     /// - `ask_prices`: Vector of ask prices (should be in ascending order)
     ///
-    /// # Aborts:
-    /// - If the highest bid price is greater than or equal to the lowest ask price
     fun validate_no_price_crossing(
-        bid_prices: &vector<u64>,
-        ask_prices: &vector<u64>
-    ) {
-        if (bid_prices.length() > 0 && ask_prices.length() > 0) {
-            let highest_bid = bid_prices[0]; // First element is highest (descending order)
-            let lowest_ask = ask_prices[0];  // First element is lowest (ascending order)
-            assert!(highest_bid < lowest_ask, EPRICE_CROSSING);
-        };
-    }
-
-    fun validate_no_price_crossing_safe(
         bid_prices: &vector<u64>,
         ask_prices: &vector<u64>
     ): bool {
@@ -494,28 +448,6 @@ module aptos_experimental::bulk_order_book_types {
         };
         true
     }
-
-    /// Validates a bulk order request for correctness.
-    ///
-    /// # Arguments:
-    /// - `order_req`: The bulk order request to validate
-    ///
-    /// # Aborts:
-    /// - If any validation fails (price ordering, sizes, vector lengths, price crossing)
-    fun validate_bulk_order_request<M: store + copy + drop>(
-        order_req: &BulkOrderRequest<M>,
-    ) {
-        // Ensure bid prices are in descending order and ask prices are in ascending order
-        assert!(order_req.bid_sizes.length() > 0 || order_req.ask_sizes.length() > 0, EINVLID_MM_ORDER_REQUEST);
-        validate_not_zero_sizes(&order_req.bid_sizes);
-        validate_not_zero_sizes(&order_req.ask_sizes);
-        assert!(order_req.bid_prices.length() == order_req.bid_sizes.length(), EINVLID_MM_ORDER_REQUEST);
-        assert!(order_req.ask_prices.length() == order_req.ask_sizes.length(), EINVLID_MM_ORDER_REQUEST);
-        validate_price_ordering(&order_req.bid_prices, true);  // descending
-        validate_price_ordering(&order_req.ask_prices, false); // ascending
-        validate_no_price_crossing(&order_req.bid_prices, &order_req.ask_prices);
-    }
-
 
     fun discard_price_crossing_levels(
         prices: &vector<u64>,
@@ -564,7 +496,6 @@ module aptos_experimental::bulk_order_book_types {
                 order.get_account(),
                 order.get_unique_priority_idx(),
                 price,
-                0, // Original size is not applicable for bulk orders
                 remaining_size,
                 is_bid,
                 get_sequence_number_from_bulk_order(order),

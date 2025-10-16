@@ -212,7 +212,6 @@ module aptos_experimental::order_book_types {
             account: address,
             unique_priority_idx: UniqueIdxType,
             price: u64,
-            orig_size: u64,
             remaining_size: u64,
             is_bid: bool,
             sequence_number: u64,
@@ -262,19 +261,18 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun destroy_bulk_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, UniqueIdxType, u64, u64, u64, bool, u64, M) {
+    ): (OrderIdType, address, UniqueIdxType, u64, u64, bool, u64, M) {
         let OrderMatchDetails::BulkOrder {
             order_id,
             account,
             unique_priority_idx,
             price,
-            orig_size,
             remaining_size,
             is_bid,
             sequence_number,
             metadata,
         } = self;
-        (order_id, account, unique_priority_idx, price, orig_size, remaining_size, is_bid, sequence_number, metadata)
+        (order_id, account, unique_priority_idx, price, remaining_size, is_bid, sequence_number, metadata)
     }
 
     public fun get_matched_size<M: store + copy + drop>(
@@ -411,7 +409,6 @@ module aptos_experimental::order_book_types {
         account: address,
         unique_priority_idx: UniqueIdxType,
         price: u64,
-        orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
         sequence_number: u64,
@@ -422,7 +419,6 @@ module aptos_experimental::order_book_types {
             account,
             unique_priority_idx,
             price,
-            orig_size,
             remaining_size,
             is_bid,
             sequence_number,
@@ -465,7 +461,6 @@ module aptos_experimental::order_book_types {
                 account,
                 unique_priority_idx,
                 price,
-                orig_size,
                 remaining_size: _,
                 is_bid,
                 sequence_number,
@@ -476,7 +471,6 @@ module aptos_experimental::order_book_types {
                 account: *account,
                 unique_priority_idx: *unique_priority_idx,
                 price: *price,
-                orig_size: *orig_size,
                 remaining_size,
                 is_bid: *is_bid,
                 sequence_number: *sequence_number,
@@ -521,7 +515,6 @@ module aptos_experimental::order_book_types {
         self.account == other.account &&
         self.unique_priority_idx == other.unique_priority_idx &&
         self.price == other.price &&
-        self.orig_size == other.orig_size &&
         self.is_bid == other.is_bid &&
         self.sequence_number == other.sequence_number
     }

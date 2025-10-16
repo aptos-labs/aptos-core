@@ -145,7 +145,7 @@ module aptos_experimental::bulk_order_book_tests {
         expected_remaining_size: u64
     ) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _unique_priority_idx, price, _orig_size, remaining_size, is_bid, _sequence_number, _metadata) =
+        let (_order_id, account, _unique_priority_idx, price, remaining_size, is_bid, _sequence_number, _metadata) =
             matched_order.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
@@ -165,7 +165,7 @@ module aptos_experimental::bulk_order_book_tests {
         expected_is_bid: bool
     ) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _unique_priority_idx, price, _orig_size, _remaining_size, is_bid, _sequence_number, _metadata) =
+        let (_order_id, account, _unique_priority_idx, price, _remaining_size, is_bid, _sequence_number, _metadata) =
             matched_order.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
@@ -195,9 +195,9 @@ module aptos_experimental::bulk_order_book_tests {
         match_result: OrderMatch<TestMetadata>
     ): (address, u64, u64, u64, u64, bool) {
         let (matched_order, matched_size) = match_result.destroy_order_match();
-        let (_order_id, account, _unique_priority_idx, price, orig_size, remaining_size, is_bid, _sequence_number, _metadata) =
+        let (_order_id, account, _unique_priority_idx, price, remaining_size, is_bid, _sequence_number, _metadata) =
             matched_order.destroy_bulk_order_match_details();
-        (account, price, orig_size, matched_size, remaining_size, is_bid)
+        (account, price, 0, matched_size, remaining_size, is_bid)
     }
 
     // ===== HELPER FUNCTIONS TO REDUCE DUPLICATION =====
@@ -304,7 +304,7 @@ module aptos_experimental::bulk_order_book_tests {
         expected_is_bid: bool
     ) {
         let (matched_order_result, matched_size) = match_result.destroy_order_match();
-        let (_, account, _, price, _, _, is_bid, _, _) = matched_order_result.destroy_bulk_order_match_details();
+        let (_, account, _, price, _, is_bid, _, _) = matched_order_result.destroy_bulk_order_match_details();
 
         assert!(account == expected_account);
         assert!(price == expected_price);
