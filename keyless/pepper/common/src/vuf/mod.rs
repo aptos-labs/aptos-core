@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::Result;
-use ark_std::rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 
 /// Implement this to define a VUF (verifiable unpredictable function).
 pub trait VUF {
@@ -15,6 +15,7 @@ pub trait VUF {
 
     fn pk_from_sk(sk: &Self::PrivateKey) -> Result<Self::PublicKey>;
 
+    /// WARNING: Implementations of this MUST be constant-time w.r.t. to any `sk` and `input`.
     /// Return `(output, proof)`.
     fn eval(sk: &Self::PrivateKey, input: &[u8]) -> Result<(Vec<u8>, Vec<u8>)>;
 

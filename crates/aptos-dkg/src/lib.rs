@@ -17,14 +17,12 @@
 #![allow(clippy::to_string_in_format_args)]
 #![allow(clippy::borrow_interior_mutable_const)]
 
-use crate::constants::SCALAR_FIELD_ORDER;
+pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-pub use constants::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 pub use utils::random::DST_RAND_CORE_HELL;
 
 pub mod algebra;
-pub mod constants;
 pub(crate) mod fiat_shamir;
 pub mod pcs;
 pub mod pvss;

@@ -10,6 +10,7 @@ pub mod asymmetric_encryption;
 pub mod bls12381;
 pub mod bulletproofs;
 pub mod compat;
+pub mod constant_time;
 pub mod ed25519;
 pub mod elgamal;
 pub mod encoding_type;
@@ -25,6 +26,7 @@ pub mod traits;
 pub mod validatable;
 pub mod x25519;
 
+pub mod blstrs;
 pub mod poseidon_bn254;
 #[cfg(test)]
 mod unit_tests;

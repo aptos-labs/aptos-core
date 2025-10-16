@@ -6,18 +6,15 @@ use crate::utils::{
 };
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
-use blstrs::{pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt};
+use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
 use group::{Curve, Group};
 use num_traits::{One, Zero};
-use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
 use std::ops::{Mul, MulAssign};
 
-pub(crate) mod biguint;
 pub mod parallel_multi_pairing;
 pub mod random;
-pub mod serialization;
 pub mod test_utils;
 
 #[inline]
@@ -90,24 +87,6 @@ pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[blstrs::Scalar]) -> G2Pro
     }
 }
 
-pub fn multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
-where
-    I1: Iterator<Item = &'a G1Projective>,
-    I2: Iterator<Item = &'a G2Projective>,
-{
-    let res = <Bls12 as MultiMillerLoop>::multi_miller_loop(
-        lhs.zip(rhs)
-            .map(|(g1, g2)| (g1.to_affine(), G2Prepared::from(g2.to_affine())))
-            .collect::<Vec<(G1Affine, G2Prepared)>>()
-            .iter()
-            .map(|(g1, g2)| (g1, g2))
-            .collect::<Vec<(&G1Affine, &G2Prepared)>>()
-            .as_slice(),
-    );
-
-    res.final_exponentiation()
-}
-
 pub fn parallel_multi_pairing<'a, I1, I2>(
     lhs: I1,
     rhs: I2,
@@ -137,7 +116,7 @@ where
     I1: Iterator<Item = &'a G1Projective>,
     I2: Iterator<Item = &'a G2Projective>,
 {
-    multi_pairing(lhs, rhs)
+    aptos_crypto::blstrs::multi_pairing(lhs, rhs)
 }
 
 /// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
@@ -146,7 +125,7 @@ where
     I1: Iterator<Item = &'a G2Projective>,
     I2: Iterator<Item = &'a G1Projective>,
 {
-    multi_pairing(rhs, lhs)
+    aptos_crypto::blstrs::multi_pairing(rhs, lhs)
 }
 
 /// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).

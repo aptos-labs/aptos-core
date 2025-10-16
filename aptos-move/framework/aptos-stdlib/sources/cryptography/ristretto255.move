@@ -212,7 +212,7 @@ module aptos_std::ristretto255 {
     /// Decompresses a CompressedRistretto from storage into a RistrettoPoint which can be used for fast arithmetic.
     public fun point_decompress(point: &CompressedRistretto): RistrettoPoint {
         // NOTE: Our CompressedRistretto invariant assures us that every CompressedRistretto in storage is a valid
-        // RistrettoPoint
+        // point
         let (handle, _) = point_decompress_internal(point.data);
         RistrettoPoint { handle }
     }

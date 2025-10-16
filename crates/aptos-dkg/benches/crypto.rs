@@ -3,6 +3,7 @@
 
 #![allow(clippy::useless_conversion)]
 
+use aptos_crypto::blstrs::{multi_pairing, random_scalar};
 use aptos_dkg::{
     algebra::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
@@ -10,10 +11,10 @@ use aptos_dkg::{
         polynomials,
     },
     utils::{
-        g1_multi_exp, g2_multi_exp, hash_to_scalar, multi_pairing, parallel_multi_pairing,
+        g1_multi_exp, g2_multi_exp, hash_to_scalar, parallel_multi_pairing,
         random::{
             insecure_random_gt_point, insecure_random_gt_points, random_g1_point, random_g1_points,
-            random_g2_point, random_g2_points, random_scalar, random_scalars,
+            random_g2_point, random_g2_points, random_scalars,
         },
     },
     weighted_vuf::pinkas::MIN_MULTIPAIR_NUM_JOBS,
