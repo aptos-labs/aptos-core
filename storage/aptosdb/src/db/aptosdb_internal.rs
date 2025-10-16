@@ -20,6 +20,7 @@ use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
 use aptos_metrics_core::{IntGaugeVecHelper, TimerHelper};
 use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_schemadb::{Cache, Env};
 use aptos_storage_interface::{
     block_info::BlockInfo, db_ensure as ensure, db_other_bail as bail, AptosDbError, DbReader,
     Order, Result,
@@ -118,9 +119,20 @@ impl AptosDB {
             "Do not set prune_window when opening readonly.",
         );
 
+        let mut env =
+            Env::new().map_err(|err| AptosDbError::OtherRocksDbError(err.into_string()))?;
+        env.set_high_priority_background_threads(rocksdb_configs.high_priority_background_threads);
+        env.set_low_priority_background_threads(rocksdb_configs.low_priority_background_threads);
+        let block_cache = Cache::new_hyper_clock_cache(
+            rocksdb_configs.shared_block_cache_size,
+            /* estimated_entry_charge = */ 0,
+        );
+
         let (ledger_db, state_merkle_db, state_kv_db) = Self::open_dbs(
             db_paths,
             rocksdb_configs,
+            Some(&env),
+            Some(&block_cache),
             readonly,
             max_num_nodes_per_lru_cache_shard,
         )?;
