@@ -372,6 +372,7 @@ module aptos_experimental::market_types {
         parent: address,
         market: address,
         order_id: u128,
+        sequence_number: u64,
         user: address,
         bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
@@ -607,6 +608,7 @@ module aptos_experimental::market_types {
     public fun emit_event_for_bulk_order_placed<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
+        sequence_number: u64,
         user: address,
         bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
@@ -620,6 +622,7 @@ module aptos_experimental::market_types {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
+                    sequence_number,
                     user,
                     bid_sizes,
                     bid_prices,

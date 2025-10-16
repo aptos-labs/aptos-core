@@ -58,9 +58,9 @@ module aptos_experimental::market_bulk_order {
             ask_sizes,
             metadata,
         ));
-        let (order_id, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
+        let (order_id, _, _, sequence_number, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
         // Emit an event for the placed bulk order
-        market.emit_event_for_bulk_order_placed(order_id, account, bid_sizes, bid_prices, ask_sizes, ask_prices);
+        market.emit_event_for_bulk_order_placed(order_id, sequence_number, account, bid_sizes, bid_prices, ask_sizes, ask_prices);
         option::some(order_id)
     }
 
