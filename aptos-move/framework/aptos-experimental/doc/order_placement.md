@@ -750,7 +750,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         );
     };
 
-    callbacks.place_maker_order(
+    <b>let</b> result = callbacks.place_maker_order(
         new_clearinghouse_order_info(
             user_addr,
             order_id,
@@ -762,6 +762,10 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         ),
         remaining_size,
     );
+    <b>let</b> actions = result.get_place_maker_order_actions();
+    <b>if</b> (actions.is_some()) {
+        callback_results.push_back(actions.destroy_some());
+    };
     market.get_order_book_mut().place_maker_order(
         new_single_order_request(
             user_addr,
@@ -1334,7 +1338,7 @@ is done before calling this function if needed.
         is_taker_order, // is_taker
         remaining_size,
     );
-    <b>if</b> (!is_validation_result_valid(&validation_result)) {
+    <b>if</b> (!validation_result.is_validation_result_valid()) {
         <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>(
             market,
             user_addr,
@@ -1354,11 +1358,6 @@ is done before calling this function if needed.
             callbacks,
             <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
         );
-    };
-
-    <b>let</b> validation_actions = validation_result.get_validation_actions();
-    <b>if</b> (validation_actions.is_some()) {
-        callback_results.push_back(validation_actions.destroy_some());
     };
 
     <b>if</b> (client_order_id.is_some()) {
