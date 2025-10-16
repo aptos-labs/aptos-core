@@ -327,16 +327,16 @@ where
 /// ### Overview
 /// Suppose we need to verify a family of equations of the form:
 ///
-/// \[
-/// \sum_i g_{i,j} \cdot x_{i,j} = A_j + P_j \cdot c                         for each index \( j \).
-/// \]
+/// ```text
+/// ∑_i g_{i,j} * x_{i,j} = A_j + P_j * c      for each index j.
+/// ```
 ///
 /// Instead of checking each equation individually, we batch them using a random challenge \(\beta\).
 /// The verifier checks that:
 ///
-/// \[
-/// \sum_j \beta^j \cdot \left( \sum_i g_{i,j} \cdot x_{i,j} - A_j - P_j \cdot c \right) = 0
-/// \]
+/// ```text
+/// ∑_j β^j * ( ∑_i g_{i,j} * x_{i,j} - A_j - P_j * c ) = 0
+/// ```
 ///
 /// This reduces the verification of multiple MSM-based equations to a single MSM check,
 /// significantly improving efficiency.
