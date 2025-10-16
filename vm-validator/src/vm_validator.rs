@@ -299,9 +299,9 @@ pub struct PooledVMValidator {
 impl PooledVMValidator {
     pub fn new(db_reader: Arc<dyn DbReader>, pool_size: usize) -> Self {
         let mut vm_validators = Vec::new();
-        for _ in 0..pool_size {
-            vm_validators.push(Arc::new(Mutex::new(VMValidator::new(db_reader.clone()))));
-        }
+        // for _ in 0..pool_size {
+        //     vm_validators.push(Arc::new(Mutex::new(VMValidator::new(db_reader.clone()))));
+        // }
         PooledVMValidator { vm_validators }
     }
 
