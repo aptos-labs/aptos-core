@@ -20,6 +20,9 @@ pub enum TimedFeatureFlag {
 
     // Fixes the bug of table natives not tracking the memory usage of the global values they create.
     FixMemoryUsageTracking,
+
+    /// Fixes the bug that table natives double count the memory usage of the global values.
+    FixTableNativesMemoryDoubleCounting,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -117,6 +120,15 @@ impl TimedFeatureFlag {
                 .with_timezone(&Utc),
             (ChargeBytesForPrints, MAINNET) => Los_Angeles
                 .with_ymd_and_hms(2025, 3, 11, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
+            (FixTableNativesMemoryDoubleCounting, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 10, 16, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (FixTableNativesMemoryDoubleCounting, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 10, 21, 10, 0, 0)
                 .unwrap()
                 .with_timezone(&Utc),
 

@@ -4158,6 +4158,7 @@ version = "0.1.0"
 dependencies = [
  "aptos-gas-schedule",
  "aptos-native-interface",
+ "aptos-types",
  "better_any",
  "bytes",
  "move-binary-format",

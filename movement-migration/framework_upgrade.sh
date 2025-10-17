@@ -102,3 +102,6 @@ cargo run -p movement move run-script --script-path movement-migration/post-move
 cargo run -p movement move run-script --script-path movement-migration/post-move2-upgrade/scripts/after-move2-upgrade.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
 # Update staking lock period with the same value as Aptos
 cargo run -p movement move run-script --script-path movement-migration/update_recurring_lockup_duration/scripts/update_recurring_lockup_duration.move --args u64:1209600 --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
+
+# update gas schedules
+cargo run -p movement move run-script --script-path movement-migration/gas-schedule-update/sources/v0.1/proposal_1_upgrade_framework/0-gas-schedule.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
