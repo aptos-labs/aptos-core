@@ -347,6 +347,12 @@ where
 ///
 /// ### Notes
 /// - The random challenge \(\beta\) is currently sampled locally by the verifier, for composability with larger protocols. But this could be derived via Fiat–Shamir as well. (TODO: Pending discussion)
+///
+/// ### TODO
+/// - The code is currently set up on the case where the MSM input representation is
+///   `Vec<(Scalars, Bases)> = Vec<(E::ScalarField, E::G1Affine)>`. If we want to add a
+///   homomorphism whose codomain has components in both G_1 and G_2, we should probably put
+///   the `Bases` component and MsmOutput inside of enums.
 #[allow(non_snake_case)]
 pub fn verify_msm_hom<E: Pairing, H>(
     homomorphism: &H,
@@ -366,13 +372,17 @@ where
         fiat_shamir_challenge_for_sigma_protocol::<E, H>(fs_transcript, &prover_first_message, dst);
 
     // Step 2: Compute verifier-specific challenge (used for weighted MSM)
+
+    // While this could be derived deterministically via Fiat–Shamir, doing so would require
+    // integrating it into the prover as well for composability. For simplicity, we follow
+    // the standard approach instead.
+
     // let beta = fiat_shamir_challenge_for_msm_verifier::<E, H>(
     //     fs_transcript,
     //     public_statement,
     //     prover_last_message,
     //     dst_verifier,
     // );
-    // ); // TODO? Need to put this into the prover code, just as in the ZK range proof, it's not composable otherwise. Make that optional, in case composability is not needed?? For the moment:
     let mut rng = ark_std::rand::thread_rng();
     let beta = E::ScalarField::rand(&mut rng);
 

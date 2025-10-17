@@ -22,7 +22,8 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     /// The scalar type used in the MSMs.
     type Scalar: Clone;
 
-    /// The group/base type used in the MSMs.
+    /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
+    /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
     type Base: Clone;
 
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
@@ -33,7 +34,9 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
         + Clone
         + IsMsmInput<Self::Base, Self::Scalar>;
 
-    /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`
+    /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
+    /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
+    /// (TODO: Think this over)
     type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone;
 
     /// Represents the **shape** of the homomorphism's output, parameterized by an inner type `T`.
@@ -65,7 +68,8 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     /// yields the homomorphism’s output.
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput>;
 
-    /// Evaluates a single MSM instance given slices of bases and scalars.
+    /// Evaluates a single MSM instance given slices of bases and scalars. Current instantiations always use E::G1Affine
+    /// for the base, but we might want to use enums for the base and output in the future.
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput;
 
     /// Applies `msm_eval` elementwise to a collection of MSM inputs.
