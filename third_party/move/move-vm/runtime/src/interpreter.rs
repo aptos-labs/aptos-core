@@ -868,7 +868,7 @@ where
             .map_err(|e| self.set_location(e))?;
 
         let mut frame = self
-            .make_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+            .make_call_frame::<RTTCheck, RTRCheck>(
                 current_frame,
                 gas_meter,
                 function,
@@ -901,11 +901,7 @@ where
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
     #[cfg_attr(feature = "force-inline", inline(always))]
-    fn make_call_frame<
-        RTTCheck: RuntimeTypeCheck,
-        RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
-    >(
+    fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         current_frame: &Frame,
         gas_meter: &mut impl GasMeter,
