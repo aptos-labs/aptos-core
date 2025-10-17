@@ -17,9 +17,9 @@ fn test_barycentric_eval_() {
 
     let n = 128;
     let omega = F::get_root_of_unity(n).unwrap();
-    let roots: Vec<F> = (0..n).map(|i| omega.pow([i as u64])).collect();
+    let roots: Vec<F> = (0..n).map(|i| omega.pow([i])).collect();
     let evals: Vec<F> = roots.iter().map(|&root| poly.evaluate(&root)).collect();
-    let n_inv = F::from(n as u64).inverse().unwrap();
+    let n_inv = F::from(n).inverse().unwrap();
 
     for _ in 0..20 {
         let x = F::rand(&mut rng);
