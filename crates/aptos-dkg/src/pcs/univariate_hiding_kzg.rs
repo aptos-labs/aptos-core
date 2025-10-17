@@ -65,7 +65,7 @@ pub fn lagrange_basis<E: Pairing>(
     let powers_of_tau = crate::utils::powers(tau, n);
     let lagr_basis_scalars = eval_dom.ifft(&powers_of_tau);
     debug_assert!(lagr_basis_scalars.iter().sum::<E::ScalarField>() == E::ScalarField::ONE);
-    
+
     let lagr_g1_proj: Vec<E::G1> = lagr_basis_scalars.iter().map(|s| g1 * s).collect();
     E::G1::normalize_batch(&lagr_g1_proj)
 }
@@ -86,7 +86,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
         g1: one_1,
         g2: one_2,
     } = group_data;
-    let Trapdoor{xi, tau} = trapdoor;
+    let Trapdoor { xi, tau } = trapdoor;
 
     let xi_1 = (one_1 * xi).into_affine();
     let tau_1 = (one_1 * tau).into_affine();
@@ -238,10 +238,8 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 mod tests {
     use super::*;
     use ark_bls12_381::{Bls12_381, Fr};
-    use ark_std::{rand::thread_rng};
-    use ark_std::UniformRand;
-    use ark_poly::univariate::DensePolynomial;
-    use ark_poly::Polynomial;
+    use ark_poly::{univariate::DensePolynomial, Polynomial};
+    use ark_std::{rand::thread_rng, UniformRand};
 
     // TODO: Should set up a PCS trait, then make this test generic. Also make it generic over E and then run it for BN254 and BLS12-381?
     #[allow(non_snake_case)]
@@ -253,20 +251,16 @@ mod tests {
         let m = 64;
         let xi = Fr::rand(&mut rng);
         let tau = Fr::rand(&mut rng);
-        let (vk, ck) = setup::<Bls12_381, _>(m, group_data, Trapdoor{xi, tau}, &mut rng);
+        let (vk, ck) = setup::<Bls12_381, _>(m, group_data, Trapdoor { xi, tau }, &mut rng);
 
-        let f_coeffs: Vec<Fr> = (0..m)
-            .map(|_| Fr::rand(&mut rng))
-            .collect();
-        let poly = DensePolynomial::<Fr> {
-            coeffs: f_coeffs,
-        };
+        let f_coeffs: Vec<Fr> = (0..m).map(|_| Fr::rand(&mut rng)).collect();
+        let poly = DensePolynomial::<Fr> { coeffs: f_coeffs };
 
         // Polynomial values at the roots of unity
         let f_evals: Vec<Fr> = ck
             .roots_of_unity_in_eval_dom
             .iter()
-            .map(|&gamma| poly.evaluate(&gamma)) 
+            .map(|&gamma| poly.evaluate(&gamma))
             .collect();
 
         let rho = CommitmentRandomness::<Bls12_381>(Fr::rand(&mut rng));

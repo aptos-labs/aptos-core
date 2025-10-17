@@ -6,7 +6,7 @@ pub mod fft;
 pub mod lagrange;
 pub mod polynomials;
 
-use ark_ec::{pairing::Pairing};
+use ark_ec::pairing::Pairing;
 use ark_ff::UniformRand;
 use ark_serialize::CanonicalSerialize;
 use ark_std::rand::{CryptoRng, RngCore};
@@ -18,7 +18,6 @@ pub struct GroupGenerators<E: Pairing> {
 }
 
 impl<E: Pairing> GroupGenerators<E> {
-    /// Create a new GroupData with random G1 and G2 elements
     pub fn sample<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         Self {
             g1: E::G1Affine::rand(rng),
