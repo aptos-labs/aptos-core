@@ -1,8 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::traits::{AptosGasMeter, GasAlgebra};
-use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
+use crate::{
+    traits::{AptosGasMeter, GasAlgebra},
+    CacheValueSizes,
+};
+use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, NumTypeNodes};
 use aptos_gas_schedule::{
     gas_feature_versions::*,
     gas_params::{instr::*, txn::*},
@@ -381,9 +384,7 @@ where
             .abs_val
             .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
-        // Note(Gas): this makes a deep copy so we need to charge for the full value size
-        self.algebra
-            .charge_execution(READ_REF_BASE + READ_REF_PER_ABS_VAL_UNIT * (stack_size + heap_size))
+        self.charge_read_ref_cached(stack_size, heap_size)
     }
 
     #[inline]
@@ -617,5 +618,20 @@ where
         self.algebra
             .charge_execution(KEYLESS_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
+    }
+}
+
+impl<A> CacheValueSizes for StandardGasMeter<A>
+where
+    A: GasAlgebra,
+{
+    #[inline]
+    fn charge_read_ref_cached(
+        &mut self,
+        stack_size: AbstractValueSize,
+        heap_size: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        self.algebra
+            .charge_execution(READ_REF_BASE + READ_REF_PER_ABS_VAL_UNIT * (stack_size + heap_size))
     }
 }
