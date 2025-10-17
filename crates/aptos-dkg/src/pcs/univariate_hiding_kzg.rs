@@ -8,10 +8,8 @@ use crate::{
         homomorphism,
         homomorphism::{fixed_base_msms, fixed_base_msms::Trait as FixedBaseMsmsTrait, Trait},
     },
-    Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
@@ -22,21 +20,40 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+pub struct Commitment<E: Pairing>(pub E::G1);
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
+
+// TODO: Rename to OpeningProof?
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+pub struct Proof<E: Pairing> {
+    pi_1: Commitment<E>,
+    pi_2: E::G1,
+}
+
 #[derive(CanonicalSerialize, Debug, Clone)]
 pub struct VerificationKey<E: Pairing> {
-    pub(crate) xi_2: E::G2Affine,
-    pub(crate) tau_2: E::G2Affine,
-    pub(crate) group_data: GroupGenerators<E>,
+    pub xi_2: E::G2Affine,
+    pub tau_2: E::G2Affine,
+    pub group_data: GroupGenerators<E>,
 }
 
 #[derive(CanonicalSerialize, Debug, Clone)]
 pub struct CommitmentKey<E: Pairing> {
-    pub(crate) xi_1: E::G1Affine,
-    pub(crate) tau_1: E::G1Affine,
-    pub(crate) lagr_g1: Vec<E::G1Affine>,
-    pub(crate) eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>, // not used in this file, but used elsewhere
-    pub(crate) roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
-    pub(crate) one_1: E::G1Affine,
+    pub xi_1: E::G1Affine,
+    pub tau_1: E::G1Affine,
+    pub lagr_g1: Vec<E::G1Affine>,
+    pub eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>,
+    pub roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
+    pub one_1: E::G1Affine,
+}
+
+#[derive(CanonicalSerialize, Debug, Clone)]
+pub struct Trapdoor<E: Pairing> {
+    pub xi: E::ScalarField,
+    pub tau: E::ScalarField,
 }
 
 pub fn lagrange_basis<E: Pairing>(
@@ -48,22 +65,28 @@ pub fn lagrange_basis<E: Pairing>(
     let powers_of_tau = crate::utils::powers(tau, n);
     let lagr_basis_scalars = eval_dom.ifft(&powers_of_tau);
     debug_assert!(lagr_basis_scalars.iter().sum::<E::ScalarField>() == E::ScalarField::ONE);
+    
     let lagr_g1_proj: Vec<E::G1> = lagr_basis_scalars.iter().map(|s| g1 * s).collect();
-    let lagr_g1 = E::G1::normalize_batch(&lagr_g1_proj);
-    lagr_g1
+    E::G1::normalize_batch(&lagr_g1_proj)
 }
 
 pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
     m: usize,
     group_data: GroupGenerators<E>,
-    xi: E::ScalarField,
-    tau: E::ScalarField,
+    trapdoor: Trapdoor<E>,
     _rng: &mut R,
 ) -> (VerificationKey<E>, CommitmentKey<E>) {
+    assert!(
+        m.is_power_of_two(),
+        "Parameter m must be a power of 2, but got {}",
+        m
+    );
+
     let GroupGenerators {
         g1: one_1,
         g2: one_2,
     } = group_data;
+    let Trapdoor{xi, tau} = trapdoor;
 
     let xi_1 = (one_1 * xi).into_affine();
     let tau_1 = (one_1 * tau).into_affine();
@@ -108,19 +131,8 @@ fn commit_with_randomness<E: Pairing>(
     Commitment(commitment_hom.apply(&input).0)
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
-pub struct Commitment<E: Pairing>(pub E::G1);
-
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
-pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
-
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
-pub struct Proof<E: Pairing> {
-    pi_1: Commitment<E>,
-    pi_2: E::G1,
-}
-
 impl<'a, E: Pairing> Homomorphism<'a, E> {
+    // TODO: should maybe make y part of the input
     pub fn open(
         ck: &CommitmentKey<E>,
         f_evals: Vec<E::ScalarField>,
@@ -130,7 +142,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     ) -> Proof<E> {
         if ck.roots_of_unity_in_eval_dom.contains(&x) {
             panic!("x is not allowed to be a root of unity");
-        } // TODO: work with Result instead?
+        }
 
         let y = polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x);
 
@@ -201,7 +213,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         assert!(
             self.lagr_g1.len() >= input.1.len(),
-            "Not enough Lagrange basis elements for univariate KZG: required {}, got {}",
+            "Not enough Lagrange basis elements for univariate hiding KZG: required {}, got {}",
             input.1.len(),
             self.lagr_g1.len()
         );
@@ -214,7 +226,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         bases.push(self.xi_1);
         bases.extend(&self.lagr_g1[..input.1.len()]);
 
-        CodomainShape(homomorphism::fixed_base_msms::MsmInput { bases, scalars })
+        CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
@@ -222,49 +234,44 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     }
 }
 
-// TODO: DO I NEED THE SIGMA STUFF? PROBABLY NOT
-
-pub struct Sigma<'a, E: Pairing> {
-    pub lagr_g1: &'a [E::G1Affine],
-    pub xi_1: E::G1Affine,
-}
-
-#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
-pub struct Witness<E: Pairing> {
-    pub randomness: Scalar<E>,
-    pub values: Vec<Scalar<E>>,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_bls12_381::{Bls12_381, Fr, G1Projective, G2Projective};
-    use ark_ec::{AffineRepr, PrimeGroup};
-    use ark_poly::EvaluationDomain;
-    use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-    use ark_std::{rand::thread_rng, test_rng};
+    use ark_bls12_381::{Bls12_381, Fr};
+    use ark_std::{rand::thread_rng};
+    use ark_std::UniformRand;
+    use ark_poly::univariate::DensePolynomial;
+    use ark_poly::Polynomial;
 
+    // TODO: Should set up a PCS trait, then make this test generic. Also make it generic over E and then run it for BN254 and BLS12-381?
     #[allow(non_snake_case)]
     #[test]
     fn test_open_and_verify_roundtrip() {
-        let mut rng = thread_rng(); // not used
+        let mut rng = thread_rng();
         let group_data = GroupGenerators::sample(&mut rng);
 
-        let xi = Fr::from(11u64);
-        let tau = Fr::from(13u64);
-        let (vk, ck) = setup::<Bls12_381, _>(8, group_data, xi, tau, &mut rng);
+        let m = 64;
+        let xi = Fr::rand(&mut rng);
+        let tau = Fr::rand(&mut rng);
+        let (vk, ck) = setup::<Bls12_381, _>(m, group_data, Trapdoor{xi, tau}, &mut rng);
+
+        let f_coeffs: Vec<Fr> = (0..m)
+            .map(|_| Fr::rand(&mut rng))
+            .collect();
+        let poly = DensePolynomial::<Fr> {
+            coeffs: f_coeffs,
+        };
 
         // Polynomial values at the roots of unity
         let f_evals: Vec<Fr> = ck
             .roots_of_unity_in_eval_dom
             .iter()
-            .enumerate()
-            .map(|(i, _)| Fr::from((i as u64) + 1))
+            .map(|&gamma| poly.evaluate(&gamma)) 
             .collect();
 
-        let rho = CommitmentRandomness::<Bls12_381>(Fr::from(5u64));
-        let s = CommitmentRandomness::<Bls12_381>(Fr::from(2u64));
-        let x = Fr::from(3u64);
+        let rho = CommitmentRandomness::<Bls12_381>(Fr::rand(&mut rng));
+        let s = CommitmentRandomness::<Bls12_381>(Fr::rand(&mut rng));
+        let x = Fr::rand(&mut rng);
         let y = polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x);
 
         // Commit to f
@@ -274,10 +281,10 @@ mod tests {
         let proof = Homomorphism::<Bls12_381>::open(&ck, f_evals.clone(), rho.0, x, &s);
 
         // Verify proof
-        let result = Homomorphism::<Bls12_381>::verify(vk, C, x, y, proof);
+        let verification = Homomorphism::<Bls12_381>::verify(vk, C, x, y, proof);
 
         assert!(
-            result.is_ok(),
+            verification.is_ok(),
             "Verification should succeed for correct proof"
         );
     }

@@ -4,7 +4,8 @@
 #[cfg(test)]
 use aptos_dkg::range_proofs::traits::BatchedRangeProof;
 use aptos_dkg::{
-    range_proofs::dekart_univariate::{Proof, DST},
+    range_proofs::dekart_univariate::{Proof as UnivariateDeKART},
+    range_proofs::dekart_univariate_v2::{Proof as UnivariateDeKARTv2},
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;
@@ -17,17 +18,17 @@ fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(n: usize, e
         test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
     println!("setup finished for n={}, ell={}, prove starting", n, ell);
 
-    let mut fs_t = merlin::Transcript::new(DST);
+    let mut fs_t = merlin::Transcript::new(B::DST);
     let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
     println!("prove finished, vrfy1 starting (n={}, ell={})", n, ell);
 
-    let mut fs_t = merlin::Transcript::new(DST);
+    let mut fs_t = merlin::Transcript::new(B::DST);
     proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
 
     println!("vrfy finished, vrfy2 starting (n={}, ell={})", n, ell);
     let mut invalid_proof = proof.clone();
     invalid_proof.maul();
-    let mut fs_t = merlin::Transcript::new(DST);
+    let mut fs_t = merlin::Transcript::new(B::DST);
     assert!(invalid_proof.verify(&vk, n, ell, &comm, &mut fs_t).is_err())
 }
 
@@ -38,7 +39,7 @@ fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(n: usize, ell:
         test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
     println!("setup finished for n={}, ell={}, prove starting", n, ell);
 
-    let mut fs_t = merlin::Transcript::new(DST);
+    let mut fs_t = merlin::Transcript::new(B::DST);
     let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
 
     // === Serialize to memory ===
@@ -61,13 +62,13 @@ fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(n: usize, ell:
     let decoded = B::deserialize_compressed(&*encoded).expect("Deserialization failed");
 
     // Verify still succeeds
-    let mut fs_t = merlin::Transcript::new(DST);
+    let mut fs_t = merlin::Transcript::new(B::DST);
     decoded.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
 
     // Make invalid
     let mut invalid_proof = decoded.clone();
     invalid_proof.maul();
-    let mut fs_t = merlin::Transcript::new(DST);
+    let mut fs_t = merlin::Transcript::new(B::DST);
     assert!(invalid_proof.verify(&vk, n, ell, &comm, &mut fs_t).is_err());
 
     println!(
@@ -101,8 +102,11 @@ macro_rules! for_each_curve {
         use ark_bls12_381::Bls12_381;
         use ark_bn254::Bn254;
 
-        $f::<Bn254, Proof<Bn254>>($n, $ell);
-        $f::<Bls12_381, Proof<Bls12_381>>($n, $ell);
+        $f::<Bn254, UnivariateDeKART<Bn254>>($n, $ell);
+        $f::<Bls12_381, UnivariateDeKART<Bls12_381>>($n, $ell);
+
+        $f::<Bn254, UnivariateDeKARTv2<Bn254>>($n, $ell);
+        $f::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>($n, $ell);
     };
 }
 
