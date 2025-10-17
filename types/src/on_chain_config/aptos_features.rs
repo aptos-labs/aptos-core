@@ -150,6 +150,8 @@ pub enum FeatureFlag {
     ENABLE_ENUM_OPTION = 101,
     /// Enables bytecode version v9
     VM_BINARY_FORMAT_V9 = 102,
+    /// Enables reflection in the stdlib
+    ENABLE_FUNCTION_REFLECTION = 103,
 }
 
 impl FeatureFlag {
@@ -254,6 +256,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VM_BINARY_FORMAT_V9,
+            FeatureFlag::ENABLE_FUNCTION_REFLECTION,
         ]
     }
 }
