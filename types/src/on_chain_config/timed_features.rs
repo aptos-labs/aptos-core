@@ -22,6 +22,9 @@ pub enum TimedFeatureFlag {
     // Disable checking for captured option types.
     // Only when this feature is turned on, feature flag ENABLE_CAPTURE_OPTION can control whether the option type can be captured.
     DisabledCaptureOption,
+
+    /// Fixes the bug that table natives double count the memory usage of the global values.
+    FixTableNativesMemoryDoubleCounting,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -121,6 +124,16 @@ impl TimedFeatureFlag {
             (DisabledCaptureOption, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
             // For mainnet, always enable this feature.
             (DisabledCaptureOption, MAINNET) => BEGINNING_OF_TIME,
+
+            (FixTableNativesMemoryDoubleCounting, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 10, 16, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (FixTableNativesMemoryDoubleCounting, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 10, 21, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
             // For chains other than testnet and mainnet, a timed feature is considered enabled from
             // the very beginning, if left unspecified.
             (_, TESTING | DEVNET | PREMAINNET) => BEGINNING_OF_TIME,
