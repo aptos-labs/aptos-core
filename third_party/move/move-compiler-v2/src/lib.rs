@@ -472,9 +472,15 @@ pub fn env_optimization_pipeline<'a, 'b>(options: &'a Options) -> EnvProcessorPi
     // those simplifications can take advantage of the inlining.
     let do_inlining_optimization = options.experiment_on(Experiment::INLINING_OPTIMIZATION);
     if do_inlining_optimization {
+        // This allows inlining a call that comes from a different package
         let across_package = options.experiment_on(Experiment::ACROSS_PACKAGE_INLINING);
+        // This allows performing an inlining optimization to a function that does not belong to the primary target package
+        let allow_non_primary_targets =
+            options.experiment_on(Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS);
         env_pipeline.add("inlining optimization", {
-            move |env: &mut GlobalEnv| inlining_optimization::optimize(env, across_package)
+            move |env: &mut GlobalEnv| {
+                inlining_optimization::optimize(env, across_package, allow_non_primary_targets)
+            }
         });
     }
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
