@@ -108,6 +108,7 @@ pub(crate) trait RuntimeTypeCheck {
     ) -> PartialVMResult<()>;
 }
 
+// note(inline): improves perf a little bit, but increases `post_execution_type_stack_transition` by 20%
 #[cfg_attr(feature = "force-inline", inline(always))]
 fn verify_pack<'a>(
     operand_stack: &mut Stack,
@@ -274,7 +275,8 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
 impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// Note that most of the checks should happen after instruction execution, because gas charging will happen during
     /// instruction execution and we want to avoid running code without charging proper gas as much as possible.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): it should not be inlined, function calling overhead
+    // is not big enough to justify the increase in function size
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
@@ -419,7 +421,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     /// This function and `pre_execution_type_stack_transition` should
     /// constitute the full type stack transition for the paranoid
     /// mode.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): it should not be inlined, function calling overhead
+    // is not big enough to justify the increase in function size
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
