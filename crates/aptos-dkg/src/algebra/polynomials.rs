@@ -68,13 +68,13 @@ pub(crate) fn quotient_evaluations_batch<F: Field>(
 /// * `evals` - evaluations of the polynomial at the roots of unity
 /// * `roots_of_unity_in_eval_dom` - the roots of unity
 /// * `x` - the point at which to evaluate the polynomial
+/// * `n_inv` - precomputed inverse of n, where n is the number roots of unity
 ///
 /// # Returns
 /// * `f(x)` in `F`
 ///
 /// # TODO: Add some tests?
-pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F], x: F) -> F {
-    // TODO: Add n_inv precomputed
+pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F], x: F, n_inv: F) -> F {
     let n = evals.len();
     assert_eq!(n, roots_of_unity_in_eval_dom.len());
 
@@ -94,12 +94,11 @@ pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F],
     // Compute prefactor: (x^n - 1) / n
     let mut z_pow_n = x.pow([n as u64]);
     z_pow_n -= F::one();
-    let n_inv = F::from(n as u64).inverse().unwrap();
     let prefactor = z_pow_n * n_inv;
 
-    // Efficient batch inversion and multiply by prefactor in place
-    //ark_ff::batch_inversion_and_mul(&mut denoms, &prefactor);
-    ark_ff::batch_inversion(&mut denoms); // TODO: which approach is faster?
+    // Efficient batch inversion
+    ark_ff::batch_inversion_and_mul(&mut denoms, &prefactor);
+    ark_ff::batch_inversion(&mut denoms); // Using batch_inversion_and_mul here shouldn't speed things up
 
     // Compute sum_j (omega^j * f(omega^j) * (prefactor / (x - omega^j)))
     let mut sum = F::zero();
@@ -110,7 +109,7 @@ pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F],
     {
         sum += *omega_j * f_j * inv_pref_denom_j;
     }
-    sum *= prefactor; ///////
+    sum *= prefactor;
     sum
 }
 

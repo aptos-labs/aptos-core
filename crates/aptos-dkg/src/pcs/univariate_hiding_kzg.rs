@@ -48,6 +48,7 @@ pub struct CommitmentKey<E: Pairing> {
     pub eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>,
     pub roots_of_unity_in_eval_dom: Vec<E::ScalarField>,
     pub one_1: E::G1Affine,
+    pub m_inv: E::ScalarField,
 }
 
 #[derive(CanonicalSerialize, Debug, Clone)]
@@ -99,6 +100,8 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
     let lagr_g1 = lagrange_basis::<E>(m, one_1, eval_dom, tau);
     let roots_of_unity_in_eval_dom: Vec<E::ScalarField> = eval_dom.elements().collect();
 
+    let m_inv = E::ScalarField::from(m as u64).inverse().unwrap();
+
     (
         VerificationKey {
             xi_2,
@@ -112,6 +115,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
             eval_dom,
             roots_of_unity_in_eval_dom,
             one_1,
+            m_inv,
         },
     )
 }
@@ -144,7 +148,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             panic!("x is not allowed to be a root of unity");
         }
 
-        let y = polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x);
+        let y = polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x, ck.m_inv);
 
         let q_evals =
             polynomials::quotient_evaluations_batch(&f_evals, &ck.roots_of_unity_in_eval_dom, x, y);
@@ -266,7 +270,7 @@ mod tests {
         let rho = CommitmentRandomness::<Bls12_381>(Fr::rand(&mut rng));
         let s = CommitmentRandomness::<Bls12_381>(Fr::rand(&mut rng));
         let x = Fr::rand(&mut rng);
-        let y = polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x);
+        let y = polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x, ck.m_inv);
 
         // Commit to f
         let C = super::commit_with_randomness(&ck, &f_evals, &rho);
