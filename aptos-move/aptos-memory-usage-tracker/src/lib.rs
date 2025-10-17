@@ -4,7 +4,7 @@
 use aptos_gas_algebra::{
     AbstractValueSize, Fee, FeePerGasUnit, InternalGas, NumArgs, NumBytes, NumTypeNodes,
 };
-use aptos_gas_meter::AptosGasMeter;
+use aptos_gas_meter::{AptosGasMeter, CacheValueSizes};
 use aptos_types::{
     account_config::CORE_CODE_ADDRESS, contract_event::ContractEvent,
     state_store::state_key::StateKey, write_set::WriteOpSize,
@@ -35,7 +35,7 @@ pub struct MemoryTrackedGasMeter<G> {
 
 impl<G> MemoryTrackedGasMeter<G>
 where
-    G: AptosGasMeter,
+    G: AptosGasMeter + CacheValueSizes,
 {
     pub fn new(base: G) -> Self {
         let memory_quota = base.vm_gas_params().txn.memory_quota;
@@ -107,7 +107,7 @@ where
 
 impl<G> NativeGasMeter for MemoryTrackedGasMeter<G>
 where
-    G: AptosGasMeter,
+    G: AptosGasMeter + CacheValueSizes,
 {
     delegate! {
         fn legacy_gas_budget_in_native_context(&self) -> InternalGas;
@@ -125,7 +125,7 @@ where
 
 impl<G> GasMeter for MemoryTrackedGasMeter<G>
 where
-    G: AptosGasMeter,
+    G: AptosGasMeter + CacheValueSizes,
 {
     delegate_mut! {
         fn charge_simple_instr(&mut self, instr: SimpleInstruction) -> PartialVMResult<()>;
@@ -315,15 +315,13 @@ where
 
     #[inline]
     fn charge_copy_loc(&mut self, val: impl ValueView) -> PartialVMResult<()> {
-        let heap_size = self
+        let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_heap_size(&val, self.feature_version())?;
+            .abstract_value_size_stack_and_heap(&val, self.feature_version())?;
 
-        self.use_heap_memory(heap_size)?;
-
-        self.base.charge_copy_loc(val)
+        self.charge_copy_loc_cached(stack_size, heap_size)
     }
 
     #[inline]
@@ -391,15 +389,13 @@ where
 
     #[inline]
     fn charge_read_ref(&mut self, val: impl ValueView) -> PartialVMResult<()> {
-        let heap_size = self
+        let (stack_size, heap_size) = self
             .vm_gas_params()
             .misc
             .abs_val
-            .abstract_heap_size(&val, self.feature_version())?;
+            .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
-        self.use_heap_memory(heap_size)?;
-
-        self.base.charge_read_ref(val)
+        self.charge_read_ref_cached(stack_size, heap_size)
     }
 
     #[inline]
@@ -544,9 +540,36 @@ where
     }
 }
 
+impl<G> CacheValueSizes for MemoryTrackedGasMeter<G>
+where
+    G: AptosGasMeter + CacheValueSizes,
+{
+    #[inline]
+    fn charge_read_ref_cached(
+        &mut self,
+        stack_size: AbstractValueSize,
+        heap_size: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        self.use_heap_memory(heap_size)?;
+
+        self.base.charge_read_ref_cached(stack_size, heap_size)
+    }
+
+    #[inline]
+    fn charge_copy_loc_cached(
+        &mut self,
+        stack_size: AbstractValueSize,
+        heap_size: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        self.use_heap_memory(heap_size)?;
+
+        self.base.charge_copy_loc_cached(stack_size, heap_size)
+    }
+}
+
 impl<G> AptosGasMeter for MemoryTrackedGasMeter<G>
 where
-    G: AptosGasMeter,
+    G: AptosGasMeter + CacheValueSizes,
 {
     type Algebra = G::Algebra;
 
