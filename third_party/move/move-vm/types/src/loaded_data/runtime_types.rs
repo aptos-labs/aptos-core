@@ -1553,8 +1553,6 @@ impl<'a> TypeParamMap<'a> {
     /// as stored in the map. The expected type must be a concrete type (no [Type::TyParam]).
     ///
     /// Returns true if a successful match is made.
-    // TODO: is this really needed in presence of paranoid mode? This does a deep structural
-    //       comparison and is expensive.
     pub fn match_ty(&mut self, ty: &Type, expected_ty: &'a Type) -> bool {
         match (ty, expected_ty) {
             // The important case, deduce the type params.
