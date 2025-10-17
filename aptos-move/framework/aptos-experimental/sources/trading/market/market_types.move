@@ -645,6 +645,19 @@ module aptos_experimental::market_types {
                     user,
                 }
             );
+
+            event::emit(
+                BulkOrderModifiedEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    order_id: order_id.get_order_id_value(),
+                    user,
+                    bid_sizes: vector[],
+                    bid_prices: vector[],
+                    ask_sizes: vector[],
+                    ask_prices: vector[],
+                }
+            )
         };
     }
 
