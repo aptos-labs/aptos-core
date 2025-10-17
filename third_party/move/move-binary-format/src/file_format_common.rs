@@ -563,6 +563,9 @@ pub const VERSION_DEFAULT: u32 = VERSION_8;
 /// Mark which version is the default version if compiling Move 2.
 pub const VERSION_DEFAULT_LANG_V2: u32 = VERSION_8;
 
+/// Mark which version is the default version if compiling with language version 2.3
+pub const VERSION_DEFAULT_LANG_V2_3: u32 = VERSION_9;
+
 // Mark which oldest version is supported.
 pub const VERSION_MIN: u32 = VERSION_5;
 

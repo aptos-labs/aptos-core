@@ -575,12 +575,12 @@ impl AccumulatorConsistencyProof {
 /// left and `Y` and `Z` on the right.
 #[derive(Clone, Deserialize, Serialize)]
 pub struct AccumulatorRangeProof<H> {
-    /// The siblings on the left of the path from the first leaf to the root. Siblings near the root
-    /// are at the beginning of the vector.
+    /// The siblings on the left of the path from the first leaf to the root. Siblings are ordered
+    /// from the bottom level to the root level.
     left_siblings: Vec<HashValue>,
 
-    /// The sliblings on the right of the path from the last leaf to the root. Siblings near the root
-    /// are at the beginning of the vector.
+    /// The sliblings on the right of the path from the last leaf to the root. Siblings are ordered
+    /// from the bottom level to the root level.
     right_siblings: Vec<HashValue>,
 
     phantom: PhantomData<H>,

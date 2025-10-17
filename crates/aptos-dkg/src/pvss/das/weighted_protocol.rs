@@ -30,10 +30,6 @@ use std::ops::{Add, Mul, Neg, Sub};
 /// Scheme name
 pub const WEIGHTED_DAS_SK_IN_G1: &'static str = "provable_weighted_das_sk_in_g1";
 
-/// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
-const DAS_WEIGHTED_PVSS_FIAT_SHAMIR_DST: &[u8; 48] =
-    b"APTOS_DAS_WEIGHTED_PROVABLY_PVSS_FIAT_SHAMIR_DST";
-
 /// A weighted transcript where the max player weight is $M$.
 /// Each player has weight $w_i$ and the threshold weight is $w$.
 /// The total weight is $W = \sum_{i=1}^n w_i$.
@@ -96,6 +92,10 @@ impl traits::Transcript for Transcript {
     type SecretSharingConfig = WeightedConfig;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
+
+    fn dst() -> Vec<u8> {
+        b"APTOS_DAS_WEIGHTED_PROVABLY_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         WEIGHTED_DAS_SK_IN_G1.to_string()
@@ -201,7 +201,7 @@ impl traits::Transcript for Transcript {
             spks,
             eks,
             auxs,
-            &DAS_WEIGHTED_PVSS_FIAT_SHAMIR_DST[..],
+            &Self::dst(),
             2 + W * 3, // 3W+1 for encryption check, 1 for SoK verification.
         );
 

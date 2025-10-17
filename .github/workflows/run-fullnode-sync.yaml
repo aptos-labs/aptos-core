@@ -62,6 +62,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Dump all inputs to GITHUB_STEP_SUMMARY
+        run: echo "$${{ toJson(inputs) }}" >> $GITHUB_STEP_SUMMARY
+
       - uses: ./.github/actions/fullnode-sync
         with:
           GIT_REF: ${{ inputs.GIT_REF }}

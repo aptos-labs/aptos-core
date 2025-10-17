@@ -7,10 +7,48 @@ use aptos_keyless_pepper_common::{
     PepperV0VufPubKey,
 };
 use aptos_logger::{info, warn};
+use ark_bls12_381::G2Projective;
 use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use sha3::Digest;
+
+/// A simple struct that holds a VUF public and private keypair,
+/// including the VUF public key in JSON format.
+pub struct VUFKeypair {
+    vuf_private_key: ark_bls12_381::Fr,
+    vuf_public_key: G2Projective,
+    vuf_public_key_json: String,
+}
+
+impl VUFKeypair {
+    pub fn new(
+        vuf_private_key: ark_bls12_381::Fr,
+        vuf_public_key: G2Projective,
+        vuf_public_key_json: String,
+    ) -> Self {
+        Self {
+            vuf_private_key,
+            vuf_public_key,
+            vuf_public_key_json,
+        }
+    }
+
+    /// Returns a reference to the VUF private key
+    pub fn vuf_private_key(&self) -> &ark_bls12_381::Fr {
+        &self.vuf_private_key
+    }
+
+    /// Returns a reference to the VUF public key
+    pub fn vuf_public_key(&self) -> &G2Projective {
+        &self.vuf_public_key
+    }
+
+    /// Returns a reference to the VUF public key in JSON format
+    pub fn vuf_public_key_json(&self) -> &String {
+        &self.vuf_public_key_json
+    }
+}
 
 /// Derive the VUF private key from the given hex-encoded seed
 fn derive_vuf_private_key_from_seed(
@@ -118,11 +156,13 @@ fn get_pepper_service_vuf_private_key(
     panic!("No valid VUF private key could be derived or deserialized!");
 }
 
-/// Returns the VUF public key of the pepper service (in JSON format)
-fn get_pepper_service_vuf_public_key(vuf_private_key: &ark_bls12_381::Fr) -> String {
+/// Returns the VUF public key of the pepper service (both the G2Projective and JSON)
+pub fn get_pepper_service_vuf_public_key_and_json(
+    vuf_private_key: &ark_bls12_381::Fr,
+) -> (G2Projective, String) {
     info!("Deriving the VUF public key for the pepper service...");
 
-    // Fetch the corresponding public key
+    // Calculate the corresponding public key
     let vuf_public_key = match Bls12381G1Bls::pk_from_sk(vuf_private_key) {
         Ok(public_key) => public_key,
         Err(error) => panic!(
@@ -131,7 +171,7 @@ fn get_pepper_service_vuf_public_key(vuf_private_key: &ark_bls12_381::Fr) -> Str
         ),
     };
 
-    // Create the public key object
+    // Create the pepper public key object
     let mut public_key_buf = vec![];
     vuf_public_key
         .into_affine()
@@ -144,28 +184,32 @@ fn get_pepper_service_vuf_public_key(vuf_private_key: &ark_bls12_381::Fr) -> Str
     );
 
     // Transform the public key to a pretty JSON string
-    serde_json::to_string_pretty(&pepper_vuf_public_key)
-        .expect("Fail to format the VUF public key using pretty JSON!")
+    let vuf_public_key_json = serde_json::to_string_pretty(&pepper_vuf_public_key)
+        .expect("Fail to format the VUF public key using pretty JSON!");
+
+    (vuf_public_key, vuf_public_key_json)
 }
 
-/// Returns the VUF public and private keypair for the pepper service.
-/// Note: the public key is serialized and returned in JSON format.
+/// Returns the VUF keypair for the pepper service
 pub fn get_pepper_service_vuf_keypair(
     vuf_private_key_hex: Option<String>,
     vuf_private_key_seed_hex: Option<String>,
-) -> (String, ark_bls12_381::Fr) {
-    // Fetch the VUF private key, and derive the public key
+) -> VUFKeypair {
+    // Fetch the VUF private key
     let vuf_private_key =
         get_pepper_service_vuf_private_key(vuf_private_key_hex, vuf_private_key_seed_hex);
-    let vuf_public_key = get_pepper_service_vuf_public_key(&vuf_private_key);
 
-    // Return the keypair
-    (vuf_public_key, vuf_private_key)
+    // Get the VUF public key and its JSON representation
+    let (vuf_public_key, vuf_public_key_json) =
+        get_pepper_service_vuf_public_key_and_json(&vuf_private_key);
+
+    // Create a new VUFKeypair
+    VUFKeypair::new(vuf_private_key, vuf_public_key, vuf_public_key_json)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::vuf_pub_key;
+    use crate::vuf_keypair;
 
     // Useful test constants
     const TEST_VUF_KEY_SEED: &str =
@@ -177,34 +221,38 @@ mod tests {
     #[should_panic(expected = "No valid VUF private key could be derived or deserialized!")]
     fn test_get_pepper_service_vuf_keypair() {
         // Get the pepper service VUF keypair given both seed and hex
-        let (public_key, private_key) = vuf_pub_key::get_pepper_service_vuf_keypair(
+        let vuf_keypair = vuf_keypair::get_pepper_service_vuf_keypair(
             Some(TEST_VUF_KEY_HEX.into()),
             Some(TEST_VUF_KEY_SEED.into()),
         );
 
         // Verify the private key is derived from the seed
         let derived_private_key =
-            vuf_pub_key::derive_vuf_private_key_from_seed(TEST_VUF_KEY_SEED.into()).unwrap();
-        assert_eq!(private_key, derived_private_key);
+            vuf_keypair::derive_vuf_private_key_from_seed(TEST_VUF_KEY_SEED.into()).unwrap();
+        assert_eq!(vuf_keypair.vuf_private_key(), &derived_private_key);
 
-        // Verify the public key is correctly derived from the private key
-        let expected_public_key = vuf_pub_key::get_pepper_service_vuf_public_key(&private_key);
-        assert_eq!(public_key, expected_public_key);
+        // Verify the public keys are correctly derived
+        let (expected_public_key, expected_public_key_json) =
+            vuf_keypair::get_pepper_service_vuf_public_key_and_json(vuf_keypair.vuf_private_key());
+        assert_eq!(vuf_keypair.vuf_public_key(), &expected_public_key);
+        assert_eq!(vuf_keypair.vuf_public_key_json(), &expected_public_key_json);
 
         // Get the pepper service VUF keypair again (with only the hex)
-        let (public_key, private_key) =
-            vuf_pub_key::get_pepper_service_vuf_keypair(Some(TEST_VUF_KEY_HEX.into()), None);
+        let vuf_keypair =
+            vuf_keypair::get_pepper_service_vuf_keypair(Some(TEST_VUF_KEY_HEX.into()), None);
 
         // Verify the private key is derived from the fallback hex
         let deserialized_private_key =
-            vuf_pub_key::deserialize_vuf_private_key(TEST_VUF_KEY_HEX.to_string()).unwrap();
-        assert_eq!(private_key, deserialized_private_key);
+            vuf_keypair::deserialize_vuf_private_key(TEST_VUF_KEY_HEX.to_string()).unwrap();
+        assert_eq!(vuf_keypair.vuf_private_key(), &deserialized_private_key);
 
-        // Verify the public key is correctly derived from the private key
-        let expected_public_key = vuf_pub_key::get_pepper_service_vuf_public_key(&private_key);
-        assert_eq!(public_key, expected_public_key);
+        // Verify the public keys are correctly derived
+        let (expected_public_key, expected_public_key_json) =
+            vuf_keypair::get_pepper_service_vuf_public_key_and_json(vuf_keypair.vuf_private_key());
+        assert_eq!(vuf_keypair.vuf_public_key(), &expected_public_key);
+        assert_eq!(vuf_keypair.vuf_public_key_json(), &expected_public_key_json);
 
         // Get the pepper service VUF keypair again, with neither seed nor hex (this should panic)
-        let _ = vuf_pub_key::get_pepper_service_vuf_keypair(None, None);
+        let _ = vuf_keypair::get_pepper_service_vuf_keypair(None, None);
     }
 }
