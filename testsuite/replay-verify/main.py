@@ -13,7 +13,6 @@ import time
 import urllib.parse
 import yaml
 
-
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from testsuite import forge
@@ -31,7 +30,7 @@ RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
 TEARDOWN_DELAY = 30 * 60  # 30 minutes slack to allow for pod setup and teardown
 
-REPLAY_CONCURRENCY_LEVEL = 1
+REPLAY_CONCURRENCY_LEVEL = 4
 
 INT64_MAX = 9_223_372_036_854_775_807
 
@@ -56,15 +55,15 @@ logger = logging.getLogger(__name__)
 
 
 def construct_humio_url(
-    labels_run: str, pod_name: str, start_time: float, end_time: float
+        labels_run: str, pod_name: str, start_time: float, end_time: float
 ) -> str:
     query = f'#k8s.cluster = "devinfra-usce1-0" | k8s.labels.run = "{labels_run}" | "k8s.pod_name" = "{pod_name}"'
 
     params = {
         "live": "false",
         "query": query,
-        "start": f"{int(start_time*1000)}",
-        "end": f"{int(end_time*1000)}",
+        "start": f"{int(start_time * 1000)}",
+        "end": f"{int(end_time * 1000)}",
     }
 
     encoded_params = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
@@ -100,7 +99,7 @@ class ReplayConfig:
             self.range_size = 5_000_000
             self.timeout_secs = 9000
         else:
-            self.concurrent_replayer = 35
+            self.concurrent_replayer = 4
             self.pvc_number = 10
             self.min_range_size = 10_000
             self.range_size = 2_000_000
@@ -109,16 +108,16 @@ class ReplayConfig:
 
 class WorkerPod:
     def __init__(
-        self,
-        worker_id: int,
-        start_version: int,
-        end_version: int,
-        label: str,
-        image: str,
-        pvcs: list[str],
-        replay_config: ReplayConfig,
-        network: Network = Network.TESTNET,
-        namespace: str = "default",
+            self,
+            worker_id: int,
+            start_version: int,
+            end_version: int,
+            label: str,
+            image: str,
+            pvcs: list[str],
+            replay_config: ReplayConfig,
+            network: Network = Network.TESTNET,
+            namespace: str = "default",
     ) -> None:
         self.worker_id = worker_id
         self.client = client.CoreV1Api()
@@ -185,9 +184,9 @@ class WorkerPod:
         if self.status:
             container_statuses = self.status.status.container_statuses
             if (
-                container_statuses
-                and container_statuses[0].state
-                and container_statuses[0].state.terminated
+                    container_statuses
+                    and container_statuses[0].state
+                    and container_statuses[0].state.terminated
             ):
                 return container_statuses[0].state.terminated.exit_code == 2
         return False
@@ -237,9 +236,9 @@ class WorkerPod:
         ]
         # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
         if (
-            self.network == Network.TESTNET
-            and self.start_version >= 6700000000
-            and self.end_version < 6800000000
+                self.network == Network.TESTNET
+                and self.start_version >= 6700000000
+                and self.end_version < 6800000000
         ):
             pod_manifest["spec"]["containers"][0]["resources"]["requests"][
                 "memory"
@@ -339,17 +338,17 @@ class TaskStats:
 
 class ReplayScheduler:
     def __init__(
-        self,
-        id: str,
-        start_version: int,
-        end_version: int,
-        ranges_to_skip: list[tuple[int, int]],
-        worker_cnt: int,
-        range_size: int,
-        image: str,
-        replay_config: ReplayConfig,
-        network: Network = Network.TESTNET,
-        namespace: str = "default",
+            self,
+            id: str,
+            start_version: int,
+            end_version: int,
+            ranges_to_skip: list[tuple[int, int]],
+            worker_cnt: int,
+            range_size: int,
+            image: str,
+            replay_config: ReplayConfig,
+            network: Network = Network.TESTNET,
+            namespace: str = "default",
     ) -> None:
         KubernetesConfig.load_kube_config()
         self.client = client.CoreV1Api()
@@ -392,8 +391,8 @@ class ReplayScheduler:
         params = {
             "live": "false",
             "query": query,
-            "start": f"{int(start_time*1000)}",
-            "end": f"{int(end_time*1000)}",
+            "start": f"{int(start_time * 1000)}",
+            "end": f"{int(end_time * 1000)}",
         }
 
         encoded_params = urllib.parse.urlencode(params, quote_via=urllib.parse.quote)
@@ -414,6 +413,8 @@ class ReplayScheduler:
 
         # merge skip ranges
         ret = []
+        if len(sorted_skips) == 0:
+            return ret
         current_skip = sorted_skips.pop(0)
         for next_skip in sorted_skips:
             if next_skip[0] > current_skip[1] + 1:
@@ -440,9 +441,9 @@ class ReplayScheduler:
 
             # TODO(ibalajiarun): temporary hack to handle heavy ranges
             if (
-                self.network == Network.TESTNET
-                and current >= 6700000000
-                and current < 6800000000
+                    self.network == Network.TESTNET
+                    and current >= 6700000000
+                    and current < 6800000000
             ):
                 next_current = min(
                     current + heavy_range_size, self.end_version + 1, skip_start
@@ -572,14 +573,14 @@ class ReplayScheduler:
             pvc_bound_status = self.get_pvc_bound_status()
             for i in range(len(self.current_workers)):
                 if (
-                    self.current_workers[i] is None
-                    or self.current_workers[i].is_completed()
+                        self.current_workers[i] is None
+                        or self.current_workers[i].is_completed()
                 ) and (
-                    pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
+                        pvc_bound_status[i % len(self.pvcs)] or i < len(self.pvcs)
                 ):  # we only create a new pod to intialize the pvc before the PVC is bound
                     if (
-                        self.current_workers[i] is not None
-                        and self.current_workers[i].is_completed()
+                            self.current_workers[i] is not None
+                            and self.current_workers[i].is_completed()
                     ):
                         self.process_completed_pod(self.current_workers[i], i)
                     if len(self.tasks) == 0:
@@ -767,11 +768,11 @@ if __name__ == "__main__":
 
     if args.start is not None:
         assert (
-            args.start >= start
+                args.start >= start
         ), f"start version {args.start} is out of range {start} - {end}"
     if args.end is not None:
         assert (
-            args.end <= end
+                args.end <= end
         ), f"end version {args.end} is out of range {start} - {end}"
 
     scheduler = ReplayScheduler(

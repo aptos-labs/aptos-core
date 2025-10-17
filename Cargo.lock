@@ -1335,6 +1335,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
+ "aptos-vm-logging",
  "bcs 0.1.4",
  "clap 4.5.21",
  "itertools 0.13.0",
