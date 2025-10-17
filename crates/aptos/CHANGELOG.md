@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.10.0]
+- Add support into Move 2.3 for signed integer types and builtin constants (`MAX_U8`, ..., `MIN_U8`, ..., `__COMPILE_FOR_TESTING__`). Move 2.3 is not yet supported on testnet or mainnet, but can be used for local development by providing `--language-version 2.3` to the CLI.
+
 ## [7.9.1]
 - Add mem as pre-compiled module to avoid compatibility issue when using aptos-framework
 
