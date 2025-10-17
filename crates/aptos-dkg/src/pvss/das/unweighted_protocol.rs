@@ -29,7 +29,6 @@ use std::ops::{Add, Mul, Neg, Sub};
 pub const DAS_SK_IN_G1: &'static str = "das_sk_in_g1";
 
 /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
-const DAS_PVSS_FIAT_SHAMIR_DST: &[u8; 30] = b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, BCSCryptoHash, CryptoHasher)]
 #[allow(non_snake_case)]
@@ -83,6 +82,10 @@ impl traits::Transcript for Transcript {
     type SecretSharingConfig = ThresholdConfig;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
+
+    fn dst() -> Vec<u8> {
+        b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         DAS_SK_IN_G1.to_string()
@@ -167,16 +170,8 @@ impl traits::Transcript for Transcript {
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         // TODO: benchmark this
-        let (f, extra) = fiat_shamir::fiat_shamir_das(
-            self,
-            sc,
-            pp,
-            spks,
-            eks,
-            auxs,
-            &DAS_PVSS_FIAT_SHAMIR_DST[..],
-            2,
-        );
+        let (f, extra) =
+            fiat_shamir::fiat_shamir_das(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();

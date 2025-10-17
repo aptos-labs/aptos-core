@@ -1,7 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{algebra::polynomials, fiat_shamir, range_proofs::traits, utils};
+use crate::{
+    algebra::polynomials, fiat_shamir, pcs::univariate_kzg_commitment, range_proofs::traits,
+    sigma_protocol::homomorphism::Trait, utils,
+};
 use anyhow::ensure;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -33,6 +36,7 @@ pub struct Proof<E: Pairing> {
     c_hat: Vec<E::G2Affine>, // of size \ell
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PowersOfTau<E: Pairing> {
     t1: Vec<E::G1>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^max_n}, where `max_n` is the maximum batch size
     t2: Vec<E::G2>,
@@ -57,6 +61,7 @@ where
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment<E: Pairing>(E::G1);
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
     max_n: usize,
     max_ell: usize,
@@ -76,7 +81,7 @@ pub struct PublicStatement<E: Pairing> {
     comm: Commitment<E>,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     max_ell: usize,
     tau_1: E::G1,
@@ -112,6 +117,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
 
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = Commitment<E>;
+    type CommitmentKey = ProverKey<E>;
     type CommitmentRandomness = E::ScalarField;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
@@ -119,6 +125,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type VerificationKey = VerificationKey<E>;
 
     const DST: &[u8] = DST;
+
+    fn commitment_key_from_prover_key(pk: &Self::ProverKey) -> Self::CommitmentKey {
+        pk.clone()
+    }
 
     // The main bottlenecks are `powers_of_tau` and the IFFT steps.
     fn setup<R: RngCore + CryptoRng>(
@@ -193,19 +203,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         values: &[Self::Input],
         r: &Self::CommitmentRandomness,
     ) -> Commitment<E> {
-        debug_assert!(
-            pk.lagr_g1.len() > values.len(),
-            "pp.lagr_g1 must have at least z.len() + 1 elements"
-        );
+        let kzg_commit_hom: univariate_kzg_commitment::Homomorphism<'_, E> =
+            univariate_kzg_commitment::Homomorphism {
+                lagr_g1: &pk.lagr_g1,
+            };
 
-        let mut scalars = Vec::with_capacity(values.len() + 1);
-        scalars.push(*r);
-        scalars.extend_from_slice(values);
+        let input = (*r, values.to_vec());
 
-        Commitment(
-            E::G1::msm(&pk.lagr_g1[..scalars.len()], &scalars)
-                .expect("Failed to compute MSM in range proof commitment"),
-        )
+        Commitment(kzg_commit_hom.apply(&input).0)
     }
 
     #[allow(non_snake_case)]
@@ -644,20 +649,20 @@ fn fiat_shamir_challenges<E: Pairing>(
         public_statement,
     );
 
-    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_bit_commitments(
+    <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::append_f_j_commitments(
         fs_transcript,
         bit_commitments,
     );
 
     // Generate the Fiat–Shamir challenges from the updated transcript
     let beta_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenges_for_linear_combination(
             fs_transcript,
             num_scalars,
         );
 
     let alpha_vals =
-        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenge_linear_combination_128bit(
+        <merlin::Transcript as fiat_shamir::RangeProof<E, Proof<E>>>::challenges_for_linear_combination(
             fs_transcript,
             num_scalars,
         );
