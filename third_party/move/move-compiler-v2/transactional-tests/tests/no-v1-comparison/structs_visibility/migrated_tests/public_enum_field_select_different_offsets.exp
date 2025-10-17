@@ -13,7 +13,7 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x42::m,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(11), 1)],
+    offsets: [(FunctionDefinitionIndex(10), 1)],
 }
 task 6 lines 56-56:  run 0x42::test_m::test_get_y_v2
 return values: true
@@ -23,5 +23,5 @@ Error: Function execution failed with VMError: {
     sub_status: None,
     location: 0x42::m,
     indices: [],
-    offsets: [(FunctionDefinitionIndex(11), 1)],
+    offsets: [(FunctionDefinitionIndex(10), 1)],
 }

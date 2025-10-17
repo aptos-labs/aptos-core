@@ -668,7 +668,7 @@ impl Visibility {
         }
     }
 
-    pub fn is_not_private(&self) -> bool {
+    pub fn is_public_or_friend(&self) -> bool {
         match self {
             Self::Public | Self::Friend => true,
             Self::Private => false,
