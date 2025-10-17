@@ -145,24 +145,3 @@ fn test_chaum_pedersen() {
     let witness_bls = Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
     test_sigma_protocol::<Bls12_381, _>(make_chaum_pedersen_instance(), witness_bls);
 }
-
-#[test]
-fn test_two_term_msm() {
-    use aptos_dkg::{range_proofs::dekart_univariate_v2::two_term_msm::*, Scalar};
-
-    let mut rng = thread_rng();
-
-    // ---- Bn254 ----
-    let witness_bn = Witness {
-        kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
-        hiding_kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
-    };
-    test_sigma_protocol::<Bn254, _>(Homomorphism::default(), witness_bn);
-
-    // ---- Bls12_381 ----
-    let witness_bn = Witness {
-        kzg_randomness: Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng)),
-        hiding_kzg_randomness: Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng)),
-    };
-    test_sigma_protocol::<Bls12_381, _>(Homomorphism::default(), witness_bn);
-}

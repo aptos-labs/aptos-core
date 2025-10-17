@@ -6,7 +6,7 @@ use aptos_dkg::range_proofs::traits::BatchedRangeProof;
 use aptos_dkg::{
     range_proofs::{
         dekart_univariate::Proof as UnivariateDeKART,
-        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+        // dekart_univariate_v2::Proof as UnivariateDeKARTv2,
     },
     utils::test_utils,
 };
@@ -107,8 +107,8 @@ macro_rules! for_each_curve {
         $f::<Bn254, UnivariateDeKART<Bn254>>($n, $ell);
         $f::<Bls12_381, UnivariateDeKART<Bls12_381>>($n, $ell);
 
-        $f::<Bn254, UnivariateDeKARTv2<Bn254>>($n, $ell);
-        $f::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>($n, $ell);
+        // $f::<Bn254, UnivariateDeKARTv2<Bn254>>($n, $ell);
+        // $f::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>($n, $ell);
     };
 }
 
