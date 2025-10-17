@@ -71,7 +71,8 @@ impl NeedlessReturn {
                         return T
                     }
                 */
-                if is_empty_tuple(else_branch.as_ref()) {
+                if is_non_empty_tuple(else_branch.as_ref()) {
+                    // The expression is a tuple with at least one item.
                     // No `else` branch.
                     return;
                 };
@@ -137,7 +138,8 @@ impl NeedlessReturn {
         if seq.len() < 2 {
             return;
         }
-        if !is_empty_tuple(expr) {
+        if !is_non_empty_tuple(expr) {
+            // The expression is either an empty tuple or not a tuple at all.
             if let Some(snd_to_last) = seq.get(seq.len() - 2) {
                 self.report_if_return(env, snd_to_last);
             }
@@ -145,6 +147,10 @@ impl NeedlessReturn {
     }
 }
 
-fn is_empty_tuple(expr: &ExpData) -> bool {
-    matches!(expr, ExpData::Call(_, Operation::Tuple, args) if !args.is_empty())
+fn is_non_empty_tuple(expr: &ExpData) -> bool {
+    if let ExpData::Call(_, Operation::Tuple, args) = expr {
+        !args.is_empty()
+    } else {
+        false
+    }
 }
