@@ -14,7 +14,7 @@ use move_model::{
     metadata::LanguageVersion,
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, StructId,
+        QualifiedInstId, StructEnv, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -399,8 +399,7 @@ impl<'env> Generator<'env> {
         mutable: bool,
         struct_name: String,
         field_name: Symbol,
-        variant: Option<Symbol>,
-        offset: usize,
+        variant_with_offset: Option<(Symbol, usize)>,
     ) -> Symbol {
         let mut fun_name = self.env().symbol_pool().make(&format!(
             "{}{}{}{}{}",
@@ -414,20 +413,16 @@ impl<'env> Generator<'env> {
             PUBLIC_STRUCT_DELIMITER,
             field_name.display(self.env().symbol_pool())
         ));
-        if let Some(variant) = variant {
+        if let Some((variant_name, offset)) = variant_with_offset {
             fun_name = self.env().symbol_pool().make(&format!(
-                "{}{}{}",
+                "{}{}{}{}{}",
                 fun_name.display(self.env().symbol_pool()),
                 PUBLIC_STRUCT_DELIMITER,
-                variant.display(self.env().symbol_pool())
+                variant_name.display(self.env().symbol_pool()),
+                PUBLIC_STRUCT_DELIMITER,
+                offset
             ));
         }
-        fun_name = self.env().symbol_pool().make(&format!(
-            "{}{}{}",
-            fun_name.display(self.env().symbol_pool()),
-            PUBLIC_STRUCT_DELIMITER,
-            offset
-        ));
         fun_name
     }
 
@@ -795,61 +790,31 @@ impl Generator<'_> {
             let raw_fun_temp = self.new_temp(raw_fun_ty);
             // This here should be well-defined because only structs can be wrappers.
             let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
-            let struct_id = wrapper_struct.get_qualified_id();
-            let different_module = struct_id.module_id != self.func_env.module_env.get_id();
-            let lang_v2_4 = self.check_version_for_cross_module_access();
-            let mut has_err_msg = false;
-            if different_module {
-                let wrapper_name = wrapper_struct.get_full_name_str();
-                let module_name = self
-                    .func_env
-                    .env()
-                    .get_module(struct_id.module_id)
-                    .get_full_name_str();
-                let visibility = wrapper_struct.get_visibility();
-                let err_msg = if !lang_v2_4 || visibility == Visibility::Private {
-                    Some(format!(
-                        "cannot unpack a wrapper struct `{}` (defined in a different module `{}`) and invoke the wrapped function value",
-                        wrapper_name, module_name,
-                    ))
-                } else if visibility == Visibility::Friend
-                    && !wrapper_struct
-                        .module_env
-                        .has_friend(&self.func_env.module_env.get_id())
-                {
-                    let visibility_str = if wrapper_struct.has_package_visibility() {
-                        "package"
-                    } else {
-                        "friend"
-                    };
-                    Some(format!(
-                                "wrapper struct `{}` (defined in a different module `{}`) has {} visibility so the wrapped function value cannot be invoked here",
-                                wrapper_name, module_name, visibility_str,
-                            ))
-                } else {
-                    None
-                };
-
-                if let Some(msg) = err_msg {
-                    has_err_msg = true;
-                    self.error(id, msg);
-                }
-            }
             let inst = inst.to_vec();
+            let struct_id = wrapper_struct.get_qualified_id();
+            let has_err_msg = self.check_pack_unpack_wrapper(
+                id,
+                self.func_env.module_env.get_id(),
+                fun_ty,
+                struct_id.module_id,
+                struct_id.id,
+                "unpack",
+                " and invoke the wrapped function value",
+            );
             let oper = if self.check_cross_module_access(&struct_id.module_id) {
                 let struct_env = self.func_env.env().get_struct(struct_id);
                 let struct_full_name = struct_env.get_full_name_for_public_api();
-                let fun_name =
-                    self.build_cross_module_access_api_name(UNPACK, struct_full_name, None);
-                if !has_err_msg {
-                    self.check_and_generate_internal_struct_api_error(
-                        id,
-                        &struct_id.module_id,
-                        "unpack",
-                        fun_name,
-                        struct_env.get_name(),
-                    );
-                }
+                let fun_name = self.check_and_generate_name(
+                    id,
+                    &struct_id.module_id,
+                    struct_full_name,
+                    UNPACK,
+                    "unpack",
+                    None,
+                    &struct_env,
+                    true,
+                    has_err_msg,
+                );
                 let fun_id = FunId::new(fun_name);
                 BytecodeOperation::Function(struct_id.module_id, fun_id, inst.clone())
             } else {
@@ -894,17 +859,17 @@ impl Generator<'_> {
                 let is_cross_module = self.check_cross_module_access(mid);
                 let struct_env = self.func_env.env().get_struct(mid.qualified(*sid));
                 let struct_full_name = struct_env.get_full_name_for_public_api();
-                let fun_name =
-                    self.build_cross_module_access_api_name(PACK, struct_full_name, *variant);
-                if is_cross_module {
-                    self.check_and_generate_internal_struct_api_error(
-                        id,
-                        mid,
-                        "pack",
-                        fun_name,
-                        struct_env.get_name(),
-                    );
-                }
+                let fun_name = self.check_and_generate_name(
+                    id,
+                    mid,
+                    struct_full_name,
+                    PACK,
+                    "pack",
+                    *variant,
+                    &struct_env,
+                    is_cross_module,
+                    false,
+                );
                 let fun_id = FunId::new(fun_name);
                 let oper = match (variant, is_cross_module) {
                     (_, true) => BytecodeOperation::Function(*mid, fun_id, inst),
@@ -1063,45 +1028,15 @@ impl Generator<'_> {
                 );
                 let target_ty = self.temp_type(targets[0]).clone();
                 if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty.clone() {
-                    let wrapper_struct = self.env().get_struct(wrapper_mid.qualified(wrapper_sid));
-                    let different_module = wrapper_mid != *mid;
-                    let lang_v2_4 = self.check_version_for_cross_module_access();
-                    let mut has_err_msg = false;
-                    if different_module {
-                        let wrapper_name = wrapper_struct.get_full_name_str();
-                        let module_name = self
-                            .func_env
-                            .env()
-                            .get_module(wrapper_mid)
-                            .get_full_name_str();
-
-                        let err_msg = if !lang_v2_4
-                            || wrapper_struct.get_visibility() == Visibility::Private
-                        {
-                            Some(format!(
-                                "cannot implicitly pack a wrapper struct `{}` defined in a different module `{}`",
-                                target_ty.display(&self.func_env.get_type_display_ctx()), module_name,
-                            ))
-                        } else if wrapper_struct.get_visibility() == Visibility::Friend
-                            && !wrapper_struct.module_env.has_friend(mid)
-                        {
-                            let visibility_str = if wrapper_struct.has_package_visibility() {
-                                "package"
-                            } else {
-                                "friend"
-                            };
-                            Some(format!(
-                                        "wrapper struct `{}` (defined in a different module `{}`) has {} visibility so cannot be implicitly packed here",
-                                        wrapper_name, module_name, visibility_str,
-                                    ))
-                        } else {
-                            None
-                        };
-                        if let Some(msg) = err_msg {
-                            has_err_msg = true;
-                            self.error(id, msg);
-                        }
-                    }
+                    let has_err_msg = self.check_pack_unpack_wrapper(
+                        id,
+                        *mid,
+                        target_ty,
+                        wrapper_mid,
+                        wrapper_sid,
+                        "pack",
+                        "",
+                    );
                     // Implicitly convert to a function wrapper.
                     let fun_ty = self
                         .env()
@@ -1121,17 +1056,17 @@ impl Generator<'_> {
                         .get_struct(wrapper_mid.qualified(wrapper_sid));
                     let struct_full_name = struct_env.get_full_name_for_public_api();
                     let oper = if self.check_cross_module_access(&wrapper_mid) {
-                        let fun_name =
-                            self.build_cross_module_access_api_name(PACK, struct_full_name, None);
-                        if !has_err_msg {
-                            self.check_and_generate_internal_struct_api_error(
-                                id,
-                                &wrapper_mid,
-                                "pack",
-                                fun_name,
-                                struct_env.get_name(),
-                            );
-                        }
+                        let fun_name = self.check_and_generate_name(
+                            id,
+                            &wrapper_mid,
+                            struct_full_name,
+                            PACK,
+                            "pack",
+                            None,
+                            &struct_env,
+                            true,
+                            has_err_msg,
+                        );
                         let fun_id = FunId::new(fun_name);
                         BytecodeOperation::Function(wrapper_mid, fun_id, wrapper_inst.clone())
                     } else {
@@ -1227,6 +1162,64 @@ impl Generator<'_> {
                 format!("unsupported specification construct: `{:?}`", op),
             ),
         }
+    }
+
+    /// Check whether we can pack/unpack a wrapper struct, if not, return true
+    /// if public struct is not supported, pack/unpack can only happen in the module that defines the wrapper struct
+    /// otherwise, return true when either the struct is private or the struct is package/friend
+    /// and pack/unpack happens in modules that are not a friend of the module that defines the wrapper struct
+    fn check_pack_unpack_wrapper(
+        &mut self,
+        id: NodeId,
+        mid: ModuleId,
+        target_ty: Type,
+        wrapper_mid: ModuleId,
+        wrapper_sid: StructId,
+        oper: &str,
+        extra_msg: &str,
+    ) -> bool {
+        let wrapper_struct = self.env().get_struct(wrapper_mid.qualified(wrapper_sid));
+        let different_module = wrapper_mid != mid;
+        let lang_pub_api = self.check_version_for_cross_module_access();
+        let mut has_err_msg = false;
+        if different_module {
+            let wrapper_name = wrapper_struct.get_full_name_str();
+            let module_name = self
+                .func_env
+                .env()
+                .get_module(wrapper_mid)
+                .get_full_name_str();
+
+            let err_msg = if !lang_pub_api || wrapper_struct.get_visibility() == Visibility::Private
+            {
+                Some(format!(
+                    "cannot implicitly {} a wrapper struct `{}` defined in a different module `{}`{}",
+                    oper,
+                    target_ty.display(&self.func_env.get_type_display_ctx()),
+                    module_name,
+                    extra_msg,
+                ))
+            } else if wrapper_struct.get_visibility() == Visibility::Friend
+                && !wrapper_struct.module_env.has_friend(&mid)
+            {
+                let visibility_str = if wrapper_struct.has_package_visibility() {
+                    "package"
+                } else {
+                    "friend"
+                };
+                Some(format!(
+                            "cannot implicitly {} a wrapper struct `{}` defined in a different module `{}`{} because it has {} visibility",
+                            oper, wrapper_name, module_name, extra_msg, visibility_str,
+                        ))
+            } else {
+                None
+            };
+            if let Some(msg) = err_msg {
+                has_err_msg = true;
+                self.error(id, msg);
+            }
+        }
+        has_err_msg
     }
 
     fn gen_test_variants(
@@ -1758,116 +1751,17 @@ impl Generator<'_> {
             struct_env_full_name.clone(),
             field_name,
             None,
-            struct_env.get_field(fields[0]).get_offset(),
         );
-        if !struct_env.has_variants() {
-            // handle non-enum structs
-            assert_eq!(fields.len(), 1);
-            self.check_and_generate_internal_struct_api_error(
-                id,
-                &mid,
-                "borrow field",
-                fun_name,
-                struct_name_symbol,
-            );
-            let fun_id = FunId::new(fun_name);
-            self.emit_call(
-                id,
-                vec![dest],
-                BytecodeOperation::Function(mid, fun_id, str.inst.to_owned()),
-                vec![src],
-            );
-        } else {
-            // by default, we group fields by offset
-            let mut fields_by_offset: BTreeMap<usize, BTreeSet<FieldId>> = BTreeMap::new();
-            for field in fields {
-                fields_by_offset
-                    .entry(struct_env.get_field(*field).get_offset())
-                    .or_default()
-                    .insert(*field);
-            }
-            let mut ordered_groups = fields_by_offset
-                .into_iter()
-                .sorted_by(|g1, g2| g1.1.len().cmp(&g2.1.len()))
-                .collect_vec();
-            let mut variant = None;
-            // if the function is not available, we handle each field individually based on its variant
-            if self.env().get_module(mid).find_function(fun_name).is_none() {
-                ordered_groups.clear();
-                for fid in fields {
-                    let offset = struct_env.get_field(*fid).get_offset();
-                    let fid_set = BTreeSet::from_iter(vec![*fid]);
-                    ordered_groups.push((offset, fid_set));
-                }
-            }
-            let mut bool_temp: Option<TempIndex> = None;
-            let end_label = if ordered_groups.len() > 1 {
-                Some(self.new_label(id))
-            } else {
-                None
-            };
-            while let Some((offset, group_fields)) = ordered_groups.pop() {
-                let variants = group_fields
-                    .iter()
-                    .map(|fid| {
-                        self.env()
-                            .get_struct(str.to_qualified_id())
-                            .get_field(*fid)
-                            .get_variant()
-                            .expect("variant name defined")
-                    })
-                    .collect_vec();
-                let next_group_label = if !ordered_groups.is_empty() {
-                    let next_group_label = self.new_label(id);
-                    let this_group_label = self.new_label(id);
-                    self.gen_test_variants_operation(
-                        id,
-                        &mut bool_temp,
-                        this_group_label,
-                        &str,
-                        variants.clone(),
-                        src,
-                    );
-                    self.emit_with(id, |attr| Bytecode::Jump(attr, next_group_label));
-                    self.emit_with(id, |attr| Bytecode::Label(attr, this_group_label));
-                    Some(next_group_label)
-                } else {
-                    None
-                };
-                if self.env().get_module(mid).find_function(fun_name).is_none() {
-                    assert_eq!(variants.len(), 1);
-                    variant = Some(variants[0]);
-                }
-                let fun_name = self.build_cross_module_access_borrow_field_api_name(
-                    dest_type.is_mutable_reference(),
-                    struct_env_full_name.clone(),
-                    field_name,
-                    variant,
-                    offset,
-                );
-                self.check_and_generate_internal_struct_api_error(
-                    id,
-                    &mid,
-                    "borrow field",
-                    fun_name,
-                    struct_name_symbol,
-                );
-                let fun_id = FunId::new(fun_name);
-                self.emit_call(
-                    id,
-                    vec![dest],
-                    BytecodeOperation::Function(mid, fun_id, str.inst.to_owned()),
-                    vec![src],
-                );
-                if let Some(label) = next_group_label {
-                    self.emit_with(id, |attr| Bytecode::Jump(attr, end_label.unwrap()));
-                    self.emit_with(id, |attr| Bytecode::Label(attr, label))
-                }
-            }
-            if let Some(label) = end_label {
-                self.emit_with(id, |attr| Bytecode::Label(attr, label))
-            }
+        if self.env().get_module(mid).find_function(fun_name).is_none() {
+            self.error(id, format!("cannot perform borrow operation for field `{}` of struct `{}` since it has different types in variants", field_name.display(self.env().symbol_pool()), struct_name_symbol.display(self.env().symbol_pool())));
         }
+        let fun_id = FunId::new(fun_name);
+        self.emit_call(
+            id,
+            vec![dest],
+            BytecodeOperation::Function(mid, fun_id, str.inst.to_owned()),
+            vec![src],
+        );
     }
 
     /// Generate a borrow field operation, possibly for a variant struct, which may require
@@ -1980,17 +1874,16 @@ impl Generator<'_> {
         let cross_module = self.check_cross_module_access(&str.module_id);
         for variant in variants {
             let oper = if cross_module {
-                let fun_name = self.build_cross_module_access_api_name(
-                    TEST_VARIANT,
-                    struct_full_name.clone(),
-                    Some(variant),
-                );
-                self.check_and_generate_internal_struct_api_error(
+                let fun_name = self.check_and_generate_name(
                     id,
                     &str.module_id,
+                    struct_full_name.clone(),
+                    TEST_VARIANT,
                     "test variant",
-                    fun_name,
-                    struct_env.get_name(),
+                    Some(variant),
+                    &struct_env,
+                    true,
+                    false,
                 );
                 let fun_id = FunId::new(fun_name);
                 BytecodeOperation::Function(str.module_id, fun_id, str.inst.to_owned())
@@ -2362,6 +2255,32 @@ impl Generator<'_> {
         }
     }
 
+    fn check_and_generate_name(
+        &self,
+        id: NodeId,
+        mid: &ModuleId,
+        struct_full_name: String,
+        oper_in_api_name: &str,
+        operation: &str,
+        variant: Option<Symbol>,
+        struct_env: &StructEnv,
+        across_module: bool,
+        has_err_msg: bool,
+    ) -> Symbol {
+        let fun_name =
+            self.build_cross_module_access_api_name(oper_in_api_name, struct_full_name, variant);
+        if across_module && !has_err_msg {
+            self.check_and_generate_internal_struct_api_error(
+                id,
+                mid,
+                operation,
+                fun_name,
+                struct_env.get_name(),
+            );
+        }
+        fun_name
+    }
+
     /// Generate match of values against pattern.
     fn gen_match_from_temp(
         &mut self,
@@ -2406,20 +2325,17 @@ impl Generator<'_> {
                 {
                     let struct_env = self.env().get_struct(str.to_qualified_id());
                     let struct_full_name = struct_env.get_full_name_for_public_api();
-                    let src_ty = self.temp_type(value).clone();
-                    let conversion_flag = src_ty.is_mutable_reference();
                     let oper = if cross_module {
-                        let fun_name = self.build_cross_module_access_api_name(
-                            TEST_VARIANT,
-                            struct_full_name,
-                            Some(*variant),
-                        );
-                        self.check_and_generate_internal_struct_api_error(
+                        let fun_name = self.check_and_generate_name(
                             *id,
                             &mid,
+                            struct_full_name,
+                            TEST_VARIANT,
                             "test variant",
-                            fun_name,
-                            struct_env.get_name(),
+                            Some(*variant),
+                            &struct_env,
+                            true,
+                            false,
                         );
                         let fun_id = FunId::new(fun_name);
                         BytecodeOperation::Function(mid, fun_id, str.inst.to_owned())
@@ -2431,6 +2347,9 @@ impl Generator<'_> {
                             str.inst.clone(),
                         )
                     };
+                    let src_ty = self.temp_type(value).clone();
+                    // test variant function take immutable reference as input, thus we need to freeze first
+                    let conversion_flag = src_ty.is_mutable_reference();
                     let mut test_value = value;
                     if conversion_flag && cross_module {
                         let target_ty = Type::Reference(
@@ -2489,17 +2408,16 @@ impl Generator<'_> {
                         let struct_env = self.func_env.env().get_struct(mid.qualified(sid));
                         let struct_full_name = struct_env.get_full_name_for_public_api();
                         let get_function = |variant: Option<Symbol>| {
-                            let fun_name = self.build_cross_module_access_api_name(
-                                UNPACK,
-                                struct_full_name,
-                                variant,
-                            );
-                            self.check_and_generate_internal_struct_api_error(
+                            let fun_name = self.check_and_generate_name(
                                 *id,
                                 &mid,
+                                struct_full_name,
+                                UNPACK,
                                 "unpack",
-                                fun_name,
-                                struct_env.get_name(),
+                                variant,
+                                &struct_env,
+                                cross_module,
+                                false,
                             );
                             let fun_id = FunId::new(fun_name);
                             BytecodeOperation::Function(mid, fun_id, inst.clone())
@@ -2561,8 +2479,11 @@ impl Generator<'_> {
         }
     }
 
-    /// Generate borrow_field when unpacking a reference to a struct
+    /// Generate borrow_field for match when unpacking a reference to a struct
     /// when the operation is from another module.
+    /// for a mutable borrow to all fields of struct,  just call the unpack_mut_ref function, e,g let (&mut x, &mut y) = unpack_mut_ref(s);
+    /// where x and y are fields of s.
+    /// Otherwise, borrow field one by one from `sub_matches`.
     fn gen_borrow_field_for_unpack_ref_for_cross_module_access(
         &mut self,
         id: &NodeId,
@@ -2587,17 +2508,16 @@ impl Generator<'_> {
         {
             let mut res_temp = vec![];
             if sub_matches.len() == fields.len() {
-                let fun_name = self.build_cross_module_access_api_name(
-                    UNPACK_MUT_REF,
-                    struct_name_full.clone(),
-                    variant,
-                );
-                self.check_and_generate_internal_struct_api_error(
+                let fun_name = self.check_and_generate_name(
                     *id,
                     &mid,
-                    "borrow field",
-                    fun_name,
-                    struct_name_symbol,
+                    struct_name_full.clone(),
+                    UNPACK_MUT_REF,
+                    "borrow",
+                    variant,
+                    &struct_env,
+                    true,
+                    false,
                 );
                 for (temp, _) in sub_matches.values() {
                     res_temp.push(*temp);
@@ -2617,21 +2537,21 @@ impl Generator<'_> {
                 struct_name_full.clone(),
                 *field_name,
                 None,
-                *offset,
             );
-            if variant.is_some() && self.env().get_module(mid).find_function(fun_name).is_none() {
-                fun_name = self.build_cross_module_access_borrow_field_api_name(
-                    dest_type.is_mutable_reference(),
-                    struct_name_full.clone(),
-                    *field_name,
-                    variant,
-                    *offset,
-                );
+            if let Some(variant) = variant {
+                if self.env().get_module(mid).find_function(fun_name).is_none() {
+                    fun_name = self.build_cross_module_access_borrow_field_api_name(
+                        dest_type.is_mutable_reference(),
+                        struct_name_full.clone(),
+                        *field_name,
+                        Some((variant, *offset)),
+                    );
+                }
             }
             self.check_and_generate_internal_struct_api_error(
                 *id,
                 &mid,
-                "borrow field",
+                "borrow",
                 fun_name,
                 struct_name_symbol,
             );

@@ -371,7 +371,7 @@ impl<'env> ModelBuilder<'env> {
             .env
             .language_version()
             .language_version_for_public_struct()
-            && visibility.is_not_private()
+            && visibility.is_public_or_friend()
             && abilities.has_ability(Ability::Key)
         {
             self.env.error(

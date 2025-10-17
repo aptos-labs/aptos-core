@@ -19,6 +19,7 @@ use crate::{
     constant_folder::ConstantFolder,
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     intrinsics::process_intrinsic_declaration,
+    metadata::LANGUAGE_VERSION_FOR_PUBLIC_STRUCT,
     model::{
         self, EqIgnoringLoc, FieldData, FieldId, FunId, FunctionData, FunctionKind, FunctionLoc,
         Loc, ModuleId, MoveIrLoc, NamedConstantData, NamedConstantId, NodeId, Parameter, SchemaId,
@@ -3575,7 +3576,7 @@ impl ModuleBuilder<'_, '_> {
     }
 
     /// Used to build a specific API function (such as an accessor) for non-private structs
-    fn build_function_data(
+    fn build_function_data_for_struct_api(
         &self,
         fun_name: Symbol,
         struct_entry: &StructEntry,
@@ -3816,7 +3817,7 @@ impl ModuleBuilder<'_, '_> {
         )
     }
 
-    /// Build the pack api `_pack_struct[_variant]<generic type params>(_field_name: field_type, ...): struct_type` for structs/enums
+    /// Build the pack api `pack$address$module$struct[$variant]<generic type params>(_field_name: field_type, ...): struct_type` for structs/enums
     fn build_pack_function(
         &self,
         fun_name: Symbol,
@@ -3859,7 +3860,7 @@ impl ModuleBuilder<'_, '_> {
         let oper = Operation::Pack(struct_entry.module_id, struct_entry.struct_id, variant);
         let def: Exp = ExpData::Call(def_node, oper, var_list).into();
 
-        self.build_function_data(fun_name, struct_entry, params, result_type, def)
+        self.build_function_data_for_struct_api(fun_name, struct_entry, params, result_type, def)
     }
 
     /// Build the unpack api `unpack$struct[$variant]<generic type params>(_s: struct_type): (field_type, ...)` for structs/enums
@@ -3938,10 +3939,10 @@ impl ModuleBuilder<'_, '_> {
         )
         .into_exp();
 
-        self.build_function_data(fun_name, struct_entry, params, result_type, def)
+        self.build_function_data_for_struct_api(fun_name, struct_entry, params, result_type, def)
     }
 
-    /// Build the unpack mut ref api `unpack_mut_ref$structname[$variantname]<generic type params>(_s: &mut struct_type): (&mut field_type, ...)` for structs/enums
+    /// Build the unpack mut ref api `unpack_mut_ref$address$module$structname[$variantname]<generic type params>(_s: &mut struct_type): (&mut field_type, ...)` for structs/enums
     fn build_unpack_mut_ref_function(
         &self,
         fun_name: Symbol,
@@ -4027,7 +4028,7 @@ impl ModuleBuilder<'_, '_> {
         );
         let return_exp_block = ExpData::Call(return_block_node, Operation::Tuple, borrow_mut_list);
 
-        self.build_function_data(
+        self.build_function_data_for_struct_api(
             fun_name,
             struct_entry,
             params,
@@ -4036,7 +4037,7 @@ impl ModuleBuilder<'_, '_> {
         )
     }
 
-    /// Create the test variant api `test_variant$enum_name$variant_name<generic type params>(_s: &enum_type): bool` for enums
+    /// Create the test variant api `test_variant$address$module$enum_name$variant_name<generic type params>(_s: &enum_type): bool` for enums
     fn create_struct_test_variant_api(
         &self,
         struct_name: Symbol,
@@ -4090,7 +4091,7 @@ impl ModuleBuilder<'_, '_> {
                     vec![local_para_var.clone()],
                 )
                 .into_exp();
-                let data = self.build_function_data(
+                let data = self.build_function_data_for_struct_api(
                     fun_name,
                     struct_entry,
                     vec![para.clone()],
@@ -4103,78 +4104,97 @@ impl ModuleBuilder<'_, '_> {
         test_variant_map
     }
 
-    fn collect_shared_variant_fields(
+    /// This function traverses variants and returns two maps
+    /// For a specific field name, if all variants have the same field type, the map contains the corresponding field id,
+    /// , offset, return type
+    /// If the field name corresponds to different types (including generic types), we will generate a function for borrowing
+    /// the field for that particular variant.
+    fn collect_field_ids_with_variants(
         &self,
         variants: &[StructVariant],
         symbol_pool: &SymbolPool,
     ) -> (
-        BTreeMap<(Symbol, usize), (Vec<FieldId>, Type, bool)>,
-        BTreeMap<(Symbol, Symbol), (FieldId, Type, usize)>,
+        BTreeMap<Symbol, (Vec<FieldId>, BTreeSet<usize>, Type, bool)>,
+        BTreeMap<(Symbol, Symbol), (FieldId, usize, Type)>,
     ) {
-        // partition fields by name and offset when they have the same type
-        // fields that only appear in one variant are also put in here by default.
-        let mut field_name_map = BTreeMap::<(Symbol, usize), Vec<(FieldId, Symbol)>>::new();
-        let mut field_type_map = BTreeMap::<(Symbol, usize), Type>::new();
-        // for fields that share across variants but have different types, they are moved to here.
-        let mut stand_alone_field = BTreeSet::<Symbol>::new();
-        let mut stand_alone_map = BTreeMap::<(Symbol, Symbol), (FieldId, Type, usize)>::new();
-
+        let mut field_ids_map =
+            BTreeMap::<Symbol, (Vec<FieldId>, BTreeSet<usize>, Type, bool)>::new();
+        let mut field_ids_variant_map = BTreeMap::<Symbol, BTreeSet<(Symbol, usize)>>::new();
+        let mut stand_alone_map = BTreeMap::<(Symbol, Symbol), (FieldId, usize, Type)>::new();
+        let mut field_name_type_map = BTreeMap::<Symbol, Type>::new();
+        let mut no_borrow_fields = BTreeSet::<Symbol>::new();
         for variant in variants {
             for (field_name, field) in Self::sorted_fields(&variant.fields) {
-                let offset = field.offset;
+                //let offset = field.offset;
                 let fid = FieldId::new(symbol_pool.make(&FieldId::make_variant_field_id_str(
                     symbol_pool.string(variant.name).as_str(),
                     symbol_pool.string(*field_name).as_str(),
                 )));
-                if stand_alone_field.contains(field_name) {
-                    stand_alone_map
-                        .insert((*field_name, variant.name), (fid, field.ty.clone(), offset));
-                    continue;
-                }
-
-                match (
-                    field_type_map.get(&(*field_name, offset)),
-                    field_name_map.get_mut(&(*field_name, offset)),
-                ) {
-                    (Some(existing_ty), Some(fids)) if existing_ty == &field.ty => {
-                        fids.push((fid, variant.name));
-                    },
-                    (Some(_), _) => {
-                        // once we find a field with same name, same offset but different type, we move it to stand_alone_field and stand_alone_map
-                        stand_alone_field.insert(*field_name);
+                let ty = field.ty.clone();
+                if field_name_type_map.contains_key(field_name) {
+                    // If we find a field name has different types in different variants, all corresponding
+                    // fields with that name will be added to the stand_alone_map
+                    if field_name_type_map.get(field_name).unwrap() != &ty {
+                        no_borrow_fields.insert(*field_name);
                         stand_alone_map
-                            .insert((*field_name, variant.name), (fid, field.ty.clone(), offset));
-                        let ids = field_name_map.remove(&(*field_name, offset));
-                        let ty = field_type_map.remove(&(*field_name, offset));
-                        if let (Some(ids), Some(ty)) = (ids, ty) {
-                            for (fid, variant_name) in ids {
-                                stand_alone_map
-                                    .insert((*field_name, variant_name), (fid, ty.clone(), offset));
-                            }
+                            .insert((*field_name, variant.name), (fid, field.offset, ty.clone()));
+                        for (variant_name, offset) in field_ids_variant_map.get(field_name).unwrap()
+                        {
+                            let new_fid = FieldId::new(symbol_pool.make(
+                                &FieldId::make_variant_field_id_str(
+                                    symbol_pool.string(*variant_name).as_str(),
+                                    symbol_pool.string(*field_name).as_str(),
+                                ),
+                            ));
+                            stand_alone_map.insert(
+                                (*field_name, *variant_name),
+                                (
+                                    new_fid,
+                                    *offset,
+                                    field_name_type_map.get(field_name).unwrap().clone(),
+                                ),
+                            );
                         }
-                    },
-                    // find a field with unseen name and type
-                    (None, _) => {
-                        field_type_map.insert((*field_name, offset), field.ty.clone());
-
-                        field_name_map.insert((*field_name, offset), vec![(fid, variant.name)]);
-                    },
+                        field_ids_map.remove(field_name);
+                        field_name_type_map.remove(field_name);
+                    }
+                } else if !no_borrow_fields.contains(field_name) {
+                    field_name_type_map.insert(*field_name, ty.clone());
+                }
+                if field_ids_map.contains_key(field_name) {
+                    field_ids_variant_map
+                        .get_mut(field_name)
+                        .unwrap()
+                        .insert((variant.name, field.offset));
+                    field_ids_map.get_mut(field_name).unwrap().0.push(fid);
+                    field_ids_map
+                        .get_mut(field_name)
+                        .unwrap()
+                        .1
+                        .insert(field.offset);
+                } else if !no_borrow_fields.contains(field_name) {
+                    field_ids_map.insert(
+                        *field_name,
+                        (
+                            vec![fid],
+                            BTreeSet::from_iter([field.offset]),
+                            ty.clone(),
+                            true,
+                        ),
+                    );
+                    field_ids_variant_map.insert(
+                        *field_name,
+                        BTreeSet::from_iter([(variant.name, field.offset)]),
+                    );
+                } else if no_borrow_fields.contains(field_name)
+                    && !stand_alone_map.contains_key(&(*field_name, variant.name))
+                {
+                    stand_alone_map
+                        .insert((*field_name, variant.name), (fid, field.offset, ty.clone()));
                 }
             }
         }
-
-        (
-            field_name_map
-                .into_iter()
-                .filter_map(|((field_name, offset), fids)| {
-                    field_type_map.get(&(field_name, offset)).map(|ty| {
-                        let fids = fids.iter().map(|(fid, _)| *fid).collect_vec();
-                        ((field_name, offset), (fids, ty.clone(), true))
-                    })
-                })
-                .collect(),
-            stand_alone_map,
-        )
+        (field_ids_map, stand_alone_map)
     }
 
     /// build borrow field api for `struct_name`
@@ -4221,36 +4241,42 @@ impl ModuleBuilder<'_, '_> {
                 .iter()
                 .map(|(name, field)| {
                     (
-                        (*name, field.offset),
-                        (vec![FieldId::new(*name)], field.ty.clone(), false),
+                        (*name),
+                        (
+                            vec![FieldId::new(*name)],
+                            BTreeSet::from_iter([field.offset]),
+                            field.ty.clone(),
+                            false,
+                        ),
                     )
                 })
                 .collect(),
             StructLayout::Variants(variants) => {
-                let (field_map, stand_alone_map) =
-                    self.collect_shared_variant_fields(variants, symbol_pool);
-                for ((field_name, variant_name), (field_id, ty, offset)) in stand_alone_map {
+                let (field_ids_map, stand_alone_map) =
+                    self.collect_field_ids_with_variants(variants, symbol_pool);
+                for ((field_name, variant_name), (field_ids, offset, ty)) in stand_alone_map {
+                    // to generate the api `borrow[_mut]$address$module$struct_field$variant$offset
+                    // which is used later in the stackless bytecode to borrow the field from the match statement
                     let fun_data = self.build_borrow_function(
                         struct_name,
                         field_name,
-                        vec![field_id],
+                        vec![field_ids],
                         &param,
                         &local_para_var,
                         &ty,
                         struct_entry,
                         mutable,
                         true,
-                        Some(variant_name),
-                        offset,
+                        Some((variant_name, offset)),
                     );
                     let fun_id = FunId::new(fun_data.name);
                     function_data.insert(fun_id, fun_data);
                 }
-                field_map
+                field_ids_map
             },
             StructLayout::None => BTreeMap::new(),
         };
-        for ((field_name, offset), (field_ids, ty, is_variant)) in field_map {
+        for (field_name, (field_ids, _, ty, is_variant)) in field_map {
             let fun_data = self.build_borrow_function(
                 struct_name,
                 field_name,
@@ -4262,14 +4288,13 @@ impl ModuleBuilder<'_, '_> {
                 mutable,
                 is_variant,
                 None,
-                offset,
             );
             let fun_id = FunId::new(fun_data.name);
             function_data.insert(fun_id, fun_data);
         }
     }
 
-    /// Create the borrow field api `borrow[_mut]$struct_field[$variant]$offset(_s: &[mut] struct_type): &[mut] field_type` for structs/enums
+    /// Create the borrow field api `borrow[_mut]$address$module$struct_field[$variant$offset](_s: &[mut] struct_type): &[mut] field_type` for structs/enums
     fn build_borrow_function(
         &self,
         struct_name: Symbol,
@@ -4281,8 +4306,7 @@ impl ModuleBuilder<'_, '_> {
         struct_entry: &StructEntry,
         dst_mutable: bool,
         is_variant: bool,
-        variant_name_opt: Option<Symbol>,
-        offset: usize,
+        variant_name_opt: Option<(Symbol, usize)>,
     ) -> FunctionData {
         let symbol_pool = self.parent.env.symbol_pool();
 
@@ -4292,7 +4316,7 @@ impl ModuleBuilder<'_, '_> {
         );
 
         let fun_name_str = format!(
-            "{}{}{}{}{}{}{}{}",
+            "{}{}{}{}{}{}",
             if dst_mutable {
                 BORROW_MUT_NAME
             } else {
@@ -4302,17 +4326,17 @@ impl ModuleBuilder<'_, '_> {
             struct_name.display(symbol_pool),
             PUBLIC_STRUCT_DELIMITER,
             field_name.display(symbol_pool),
-            if let Some(variant_name) = variant_name_opt {
+            if let Some((variant_name, offset)) = variant_name_opt {
                 format!(
-                    "{}{}",
+                    "{}{}{}{}",
                     PUBLIC_STRUCT_DELIMITER,
-                    variant_name.display(symbol_pool)
+                    variant_name.display(symbol_pool),
+                    PUBLIC_STRUCT_DELIMITER,
+                    offset
                 )
             } else {
                 "".to_string()
             },
-            PUBLIC_STRUCT_DELIMITER,
-            offset,
         );
         let fun_name = symbol_pool.make(&fun_name_str);
 
@@ -4350,7 +4374,7 @@ impl ModuleBuilder<'_, '_> {
         )
         .into_exp();
 
-        self.build_function_data(
+        self.build_function_data_for_struct_api(
             fun_name,
             struct_entry,
             vec![param.clone()],
@@ -4446,7 +4470,8 @@ impl ModuleBuilder<'_, '_> {
                 } else {
                     self.parent.env.warning(
                         &loc,
-                        "structs/enums with visibility modifier are only supported at version 2.4 or later",
+                        &format!("structs/enums with visibility modifier are only supported at version {} or later",
+                        LANGUAGE_VERSION_FOR_PUBLIC_STRUCT)
                     );
                 }
             }

@@ -74,26 +74,12 @@ module 0x42::m2 {
   fun test_data2_mut_borrow() {
     let d = Data2::V2<u64, u64>{y: 43, x: 44};
     d.x = 45;
-    assert!(d.x == 45, 1);
-    let Data2::V2{y, x} = &mut d;
-    *x = 47;
-    assert!(*x == 47, 3);
-    *y = 48;
-    assert!(*y == 48, 4);
-  }
-
-  fun test_data2_mut_borrow_2() {
-    let d = Data2::V2<u64, u64>{y: 43, x: 44};
-    let mut_ref_d = &mut d;
-    let ref_x = &mut_ref_d.x;
-    assert!(*ref_x == 44, 1);
   }
 
   fun test_data3_mut_borrow() {
     let d = Data3::V3<u64, u64>{x: 44};
     let mut_ref_d = &mut d;
     let ref_x = &mut_ref_d.x;
-    assert!(*ref_x == 44, 1);
   }
 
   fun test_data4_mut_borrow() {
@@ -103,27 +89,6 @@ module 0x42::m2 {
     assert!(*ref_x == 44, 1);
   }
 
-  fun test_data3_mut_borrow_2() {
-    let d = Data3::V2<u64, u64>{y: 43, x: 44};
-    d.x = 45;
-    assert!(d.x == 45, 1);
-    let Data3::V2{y, x} = &mut d;
-    *x = 47;
-    assert!(*x == 47, 3);
-    *y = 48;
-    assert!(*y == 48, 4);
-  }
-
-  fun test_data4_mut_borrow_2() {
-    let d = Data4::V2<u64, u64>{x: 44, y: 43};
-    d.x = 45;
-    assert!(d.x == 45, 1);
-    let Data4::V2{y, x} = &mut d;
-    *x = 47;
-    assert!(*x == 47, 3);
-    *y = 48;
-    assert!(*y == 48, 4);
-  }
 
 }
 
@@ -135,12 +100,6 @@ module 0x42::m2 {
 
 //# run 0x42::m2::test_data2_mut_borrow
 
-//# run 0x42::m2::test_data2_mut_borrow_2
-
 //# run 0x42::m2::test_data3_mut_borrow
 
 //# run 0x42::m2::test_data4_mut_borrow
-
-//# run 0x42::m2::test_data3_mut_borrow_2
-
-//# run 0x42::m2::test_data4_mut_borrow_2

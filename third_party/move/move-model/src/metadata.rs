@@ -21,6 +21,7 @@ pub const LATEST_STABLE_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersio
 pub const LATEST_STABLE_COMPILER_VERSION_VALUE: CompilerVersion = CompilerVersion::V2_0;
 pub const LATEST_STABLE_LANGUAGE_VERSION: &str = LATEST_STABLE_LANGUAGE_VERSION_VALUE.to_str();
 pub const LATEST_STABLE_COMPILER_VERSION: &str = LATEST_STABLE_COMPILER_VERSION_VALUE.to_str();
+pub const LANGUAGE_VERSION_FOR_PUBLIC_STRUCT: LanguageVersion = LanguageVersion::V2_3;
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 
@@ -297,7 +298,7 @@ impl LanguageVersion {
     }
 
     pub fn language_version_for_public_struct(&self) -> bool {
-        self.is_at_least(LanguageVersion::V2_3)
+        self.is_at_least(LANGUAGE_VERSION_FOR_PUBLIC_STRUCT)
     }
 
     /// If the bytecode version is not specified, infer it from the language version. For

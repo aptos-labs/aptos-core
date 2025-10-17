@@ -156,7 +156,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::COMPILE_FOR_TESTING, true)],
         language_version: LanguageVersion::latest(),
         include: &["/testing-constant/"],
-        exclude: &[],
+        exclude: &["/structs_visibility/"],
         cross_compile: false,
     },
     TestConfig {
@@ -165,7 +165,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         experiments: &[(Experiment::COMPILE_FOR_TESTING, false)],
         language_version: LanguageVersion::latest(),
         include: &["/testing-constant/"],
-        exclude: &[],
+        exclude: &["/structs_visibility/"],
         cross_compile: false,
     },
 ];

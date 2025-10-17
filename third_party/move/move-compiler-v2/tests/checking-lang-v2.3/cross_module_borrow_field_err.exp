@@ -36,16 +36,16 @@ module 0xc0ffee::m {
     public fun unpack_mut_ref$0xc0ffee$m$Wrapper$V2(_s: &mut Wrapper): (&mut u64) {
         Tuple(Borrow(Mutable)(select_variants m::Wrapper.V2.0(_s)))
     }
-    public fun borrow$0xc0ffee$m$Wrapper$0$0(_s: &Wrapper): &u64 {
+    public fun borrow$0xc0ffee$m$Wrapper$0(_s: &Wrapper): &u64 {
         Borrow(Immutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0(_s))
     }
-    public fun borrow$0xc0ffee$m$Wrapper$1$1(_s: &Wrapper): &u64 {
+    public fun borrow$0xc0ffee$m$Wrapper$1(_s: &Wrapper): &u64 {
         Borrow(Immutable)(select_variants m::Wrapper.V1.1(_s))
     }
-    public fun borrow_mut$0xc0ffee$m$Wrapper$0$0(_s: &mut Wrapper): &mut u64 {
+    public fun borrow_mut$0xc0ffee$m$Wrapper$0(_s: &mut Wrapper): &mut u64 {
         Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0(_s))
     }
-    public fun borrow_mut$0xc0ffee$m$Wrapper$1$1(_s: &mut Wrapper): &mut u64 {
+    public fun borrow_mut$0xc0ffee$m$Wrapper$1(_s: &mut Wrapper): &mut u64 {
         Borrow(Mutable)(select_variants m::Wrapper.V1.1(_s))
     }
     public fun test_variant$0xc0ffee$m$Wrapper$V1(_s: &Wrapper): bool {
@@ -147,16 +147,16 @@ module 0xc0ffee::m {
     public fun unpack_mut_ref_0xc0ffee_m_Wrapper_V2(_s: &mut Wrapper): (&mut u64) {
         (&mut _s.0)
     }
-    public fun borrow_0xc0ffee_m_Wrapper_0_0(_s: &Wrapper): &u64 {
+    public fun borrow_0xc0ffee_m_Wrapper_0(_s: &Wrapper): &u64 {
         &_s.0
     }
-    public fun borrow_0xc0ffee_m_Wrapper_1_1(_s: &Wrapper): &u64 {
+    public fun borrow_0xc0ffee_m_Wrapper_1(_s: &Wrapper): &u64 {
         &_s.1
     }
-    public fun borrow_mut_0xc0ffee_m_Wrapper_0_0(_s: &mut Wrapper): &mut u64 {
+    public fun borrow_mut_0xc0ffee_m_Wrapper_0(_s: &mut Wrapper): &mut u64 {
         &mut _s.0
     }
-    public fun borrow_mut_0xc0ffee_m_Wrapper_1_1(_s: &mut Wrapper): &mut u64 {
+    public fun borrow_mut_0xc0ffee_m_Wrapper_1(_s: &mut Wrapper): &mut u64 {
         &mut _s.1
     }
     public fun test_variant_0xc0ffee_m_Wrapper_V1(_s: &Wrapper): bool {
@@ -278,7 +278,7 @@ public fun m::unpack_mut_ref$0xc0ffee$m$Wrapper$V2($t0: &mut 0xc0ffee::m::Wrappe
 
 
 [variant baseline]
-public fun m::borrow$0xc0ffee$m$Wrapper$0$0($t0: &0xc0ffee::m::Wrapper): &u64 {
+public fun m::borrow$0xc0ffee$m$Wrapper$0($t0: &0xc0ffee::m::Wrapper): &u64 {
      var $t1: &u64
   0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t0)
   1: return $t1
@@ -286,7 +286,7 @@ public fun m::borrow$0xc0ffee$m$Wrapper$0$0($t0: &0xc0ffee::m::Wrapper): &u64 {
 
 
 [variant baseline]
-public fun m::borrow$0xc0ffee$m$Wrapper$1$1($t0: &0xc0ffee::m::Wrapper): &u64 {
+public fun m::borrow$0xc0ffee$m$Wrapper$1($t0: &0xc0ffee::m::Wrapper): &u64 {
      var $t1: &u64
   0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t0)
   1: return $t1
@@ -294,7 +294,7 @@ public fun m::borrow$0xc0ffee$m$Wrapper$1$1($t0: &0xc0ffee::m::Wrapper): &u64 {
 
 
 [variant baseline]
-public fun m::borrow_mut$0xc0ffee$m$Wrapper$0$0($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+public fun m::borrow_mut$0xc0ffee$m$Wrapper$0($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
      var $t1: &mut u64
   0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t0)
   1: return $t1
@@ -302,7 +302,7 @@ public fun m::borrow_mut$0xc0ffee$m$Wrapper$0$0($t0: &mut 0xc0ffee::m::Wrapper):
 
 
 [variant baseline]
-public fun m::borrow_mut$0xc0ffee$m$Wrapper$1$1($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
+public fun m::borrow_mut$0xc0ffee$m$Wrapper$1($t0: &mut 0xc0ffee::m::Wrapper): &mut u64 {
      var $t1: &mut u64
   0: $t1 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t0)
   1: return $t1
@@ -349,9 +349,9 @@ fun n::test_1() {
   0: $t1 := 22
   1: $t0 := m::make($t1)
   2: $t3 := borrow_local($t0)
-  3: $t2 := m::borrow_mut$0xc0ffee$m$Wrapper$0$0($t3)
+  3: $t2 := m::borrow_mut$0xc0ffee$m$Wrapper$0($t3)
   4: $t5 := borrow_local($t0)
-  5: $t4 := m::borrow_mut$0xc0ffee$m$Wrapper$1$1($t5)
+  5: $t4 := m::borrow_mut$0xc0ffee$m$Wrapper$1($t5)
   6: $t6 := infer($t2)
   7: n::foo($t6, $t4)
   8: return ()
@@ -371,9 +371,9 @@ fun n::test_2() {
   0: $t1 := 22
   1: $t0 := m::make($t1)
   2: $t3 := borrow_local($t0)
-  3: $t2 := m::borrow_mut$0xc0ffee$m$Wrapper$0$0($t3)
+  3: $t2 := m::borrow_mut$0xc0ffee$m$Wrapper$0($t3)
   4: $t5 := borrow_local($t0)
-  5: $t4 := m::borrow_mut$0xc0ffee$m$Wrapper$1$1($t5)
+  5: $t4 := m::borrow_mut$0xc0ffee$m$Wrapper$1($t5)
   6: $t6 := 23
   7: write_ref($t2, $t6)
   8: $t7 := 24
@@ -435,11 +435,11 @@ fun n::test_no_err() {
   1: $t0 := m::make($t1)
   2: $t2 := 23
   3: $t4 := borrow_local($t0)
-  4: $t3 := m::borrow_mut$0xc0ffee$m$Wrapper$0$0($t4)
+  4: $t3 := m::borrow_mut$0xc0ffee$m$Wrapper$0($t4)
   5: write_ref($t3, $t2)
   6: $t5 := 24
   7: $t7 := borrow_local($t0)
-  8: $t6 := m::borrow_mut$0xc0ffee$m$Wrapper$1$1($t7)
+  8: $t6 := m::borrow_mut$0xc0ffee$m$Wrapper$1($t7)
   9: write_ref($t6, $t5)
  10: return ()
 }
