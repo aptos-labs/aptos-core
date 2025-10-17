@@ -868,7 +868,7 @@ where
             .map_err(|e| self.set_location(e))?;
 
         let mut frame = self
-            .make_call_frame::<RTTCheck, RTRCheck, RTCaches>(
+            .make_call_frame::<RTTCheck, RTRCheck>(
                 current_frame,
                 gas_meter,
                 function,
@@ -904,7 +904,6 @@ where
     fn make_call_frame<
         RTTCheck: RuntimeTypeCheck,
         RTRCheck: RuntimeRefCheck,
-        RTCaches: RuntimeCacheTraits,
     >(
         &mut self,
         current_frame: &Frame,
