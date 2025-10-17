@@ -24,35 +24,34 @@ pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     coeffs.truncate(degree);
 }
 
-/// Computes a batch of quotient evaluations of the form `(f(ω^i) - y) / (ω^i - x)`
-/// for a set of field elements `ω^i`.
+/// Computes a batch of quotient evaluations of the form `(f_i - y) / (x_i - x)`
+/// for slices of field elements `f_vals` and `x_vals`.
 ///
 /// # Arguments
-/// * `f_evals` - Slice of field elements representing `f(ω^i)`.
-/// * `roots` - Slice of field elements representing `ω^i`. Must have the same length as `f_evals`.
-/// * `x` - The field element `x` in the denominator `(ω^i - x)`.
-/// * `y` - The field element `y` subtracted from each `f(ω^i)` in the numerator.
+/// * `f_vals` - Slice of field elements representing `f_i`.
+/// * `x_vals` - Slice of field elements representing `x_i`. Must have the same length as `f_vals`.
+/// * `x` - The field element `x` appearing in each denominator `(x_i - x)`.
+/// * `y` - The field element `y` subtracted from each `f_i` in the numerator.
 ///
 /// # Returns
-/// A `Vec<F>` containing the evaluations of `(f(ω^i) - y) / (ω^i - x)` for each `i`.
-///
-/// # TODO: Add some tests?
+/// A `Vec<F>` containing the evaluations of `(f_i - y) / (x_i - x)` for each index `i`.
+/// Or will panic if one of the `x_i` equals `x`.
 pub(crate) fn quotient_evaluations_batch<F: Field>(
-    f_evals: &[F], // f(ω^i)
-    roots: &[F],   // ω^i
+    f_vals: &[F],
+    x_vals: &[F],
     x: F,
     y: F,
 ) -> Vec<F> {
-    assert_eq!(f_evals.len(), roots.len());
+    assert_eq!(f_vals.len(), x_vals.len());
 
-    // Step 1: compute denominators ω^i - x
-    let mut denoms: Vec<F> = roots.iter().map(|&r| r - x).collect();
+    // Step 1: compute denominators x_i - x
+    let mut denoms: Vec<F> = x_vals.iter().map(|&xi| xi - x).collect();
 
     // Step 2: batch inversion in place
     ark_ff::batch_inversion(&mut denoms);
 
     // Step 3: multiply numerators by inverses
-    f_evals
+    f_vals
         .iter()
         .zip(denoms.iter())
         .map(|(&f_val, &denom_inv)| (f_val - y) * denom_inv)
@@ -72,8 +71,6 @@ pub(crate) fn quotient_evaluations_batch<F: Field>(
 ///
 /// # Returns
 /// * `f(x)` in `F`
-///
-/// # TODO: Add some tests?
 pub fn barycentric_eval<F: Field>(
     evals: &[F],
     roots_of_unity_in_eval_dom: &[F],
