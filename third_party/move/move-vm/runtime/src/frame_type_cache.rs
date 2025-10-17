@@ -85,7 +85,11 @@ pub(crate) struct FrameTypeCache {
 }
 
 impl FrameTypeCache {
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline):
+    // needs to always be inlined, closure will be optimized out in this case. When it gets inlined,
+    // LLVM also inlines `BTreeMap::entry()` with it to optimize, so the final instruction count is pretty big -
+    // do not inline the dependent functions.
+    #[inline(always)]
     fn get_or<K: Copy + Ord + Eq, V, F>(
         map: &mut BTreeMap<K, V>,
         idx: K,
@@ -103,7 +107,7 @@ impl FrameTypeCache {
         }
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_field_type_and_struct_type(
         &mut self,
         idx: FieldInstantiationIndex,
@@ -120,6 +124,7 @@ impl FrameTypeCache {
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_variant_field_type_and_struct_type(
         &mut self,
         idx: VariantFieldInstantiationIndex,
@@ -141,7 +146,7 @@ impl FrameTypeCache {
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_type(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -155,7 +160,7 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_variant_type(
         &mut self,
         idx: StructVariantInstantiationIndex,
@@ -174,7 +179,7 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_fields_types(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -196,7 +201,7 @@ impl FrameTypeCache {
         )?)
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_variant_fields_types(
         &mut self,
         idx: StructVariantInstantiationIndex,
@@ -218,7 +223,7 @@ impl FrameTypeCache {
         )?)
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_signature_index_type(
         &mut self,
         idx: SignatureIndex,
