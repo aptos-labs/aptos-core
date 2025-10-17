@@ -439,25 +439,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let first_h_eval = {
             let mut pow2 = E::ScalarField::ONE;
-            let mut sum_pow2_fj = E::ScalarField::ZERO;
-            for f_j_eval in f_js_evals.iter() {
-                sum_pow2_fj += pow2 * f_j_eval[0];
-                pow2 = pow2.double(); // multiply by 2 each iteration
-            }
-
-            // sum_j betas[j] * f_j(0) * (f_j(0) - 1)
-            let mut sum_betas_term = E::ScalarField::ZERO;
-            for (beta_j, f_j) in betas.iter().zip(f_js_evals.iter()) {
-                sum_betas_term += *beta_j * f_j[0] * (f_j[0] - E::ScalarField::ONE);
-            }
-
-            // numerator: β * (f_evals[0] - Σ 2^j f_j_evals[0]) + Σ β_j f_j(0)(f_j(0) - 1)
-            let numerator = beta * (hat_f_evals[0] - sum_pow2_fj) + sum_betas_term;
-
-            numerator / E::ScalarField::from((n + 1) as u64)
-        };
-        let first_h_eval_two = {
-            let mut pow2 = E::ScalarField::ONE;
             let mut sum_pow2_rs = E::ScalarField::ZERO;
             for r_j in rs.iter() {
                 sum_pow2_rs += pow2 * r_j;
@@ -475,7 +456,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
             numerator / E::ScalarField::from((n + 1) as u64)
         };
-        assert_eq!(first_h_eval, first_h_eval_two);
         h_evals.insert(0, first_h_eval);
 
         let rho_h = E::ScalarField::rand(rng);
@@ -601,13 +581,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             base_1: *zeroth_lagr,
             base_2: *xi_1,
         };
-        assert!(sigma_protocol
-            .verify(
-                &two_term_msm::CodomainShape(*hatC - comm.0),
-                pi_PoK,
-                fs_transcript,
-            )
-            .is_ok()); // TODO: propagate error
+        sigma_protocol.verify(
+            &two_term_msm::CodomainShape(*hatC - comm.0),
+            pi_PoK,
+            fs_transcript,
+        )?;
 
         fiat_shamir::append_sigma_proof(fs_transcript, &pi_PoK);
 
@@ -658,18 +636,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             a_u,
             pi_gamma.clone(),
         )?;
-
-        // assert!(univariate_hiding_kzg::Homomorphism::verify(
-        //     univariate_hiding_kzg::VerificationKey {
-        //         xi_2: *xi_2,
-        //         tau_2: *tau_2,
-        //         group_data: group_data.clone()
-        //     },
-        //     univariate_hiding_kzg::Commitment(U),
-        //     gamma,
-        //     a_u,
-        //     pi_gamma.clone()
-        // ).is_ok());
 
         // Step 9
         let gamma_pow = gamma.pow(&[(n + 1) as u64]); // gamma^(n+1) // TODO: change to some max_n ?
