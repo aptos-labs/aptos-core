@@ -74,7 +74,12 @@ pub(crate) fn quotient_evaluations_batch<F: Field>(
 /// * `f(x)` in `F`
 ///
 /// # TODO: Add some tests?
-pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F], x: F, n_inv: F) -> F {
+pub fn barycentric_eval<F: Field>(
+    evals: &[F],
+    roots_of_unity_in_eval_dom: &[F],
+    x: F,
+    n_inv: F,
+) -> F {
     let n = evals.len();
     assert_eq!(n, roots_of_unity_in_eval_dom.len());
 
@@ -97,7 +102,6 @@ pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F],
     let prefactor = z_pow_n * n_inv;
 
     // Efficient batch inversion
-    ark_ff::batch_inversion_and_mul(&mut denoms, &prefactor);
     ark_ff::batch_inversion(&mut denoms); // Using batch_inversion_and_mul here shouldn't speed things up
 
     // Compute sum_j (omega^j * f(omega^j) * (prefactor / (x - omega^j)))
