@@ -9,7 +9,10 @@ use aptos_keyless_pepper_service::{
         },
     },
     external_resources::{
-        jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher, resource_fetcher::CachedResources,
+        jwk_fetcher,
+        jwk_fetcher::{JWKCache, JWKIssuer},
+        resource_fetcher,
+        resource_fetcher::CachedResources,
     },
     metrics,
     metrics::DEFAULT_METRICS_SERVER_PORT,
@@ -97,6 +100,15 @@ struct Args {
         conflicts_with = "vuf_private_key_hex"
     )]
     vuf_private_key_seed_hex: Option<String>,
+
+    /// A list of JWK URLs the pepper service should monitor in addition to the default issuers.
+    /// This can also be used to override the JWK URL of default issuers.
+    ///
+    /// For example:
+    /// --jwk-issuers-override="https://accounts.google.com https://www.googleapis.com/oauth2/v999/certs"
+    /// --jwk-issuers-override="https://www.facebook.com https://www.facebook.com/.well-known/oauth/openid/jwks"
+    #[arg(long)]
+    jwk_issuers_override: Vec<JWKIssuer>,
 }
 
 #[tokio::main]
@@ -153,7 +165,7 @@ async fn main() {
         };
 
     // Start the JWK fetchers
-    let jwk_cache = jwk_fetcher::start_jwk_fetchers();
+    let jwk_cache = jwk_fetcher::start_jwk_fetchers(args.jwk_issuers_override.clone());
 
     // Start the pepper service
     let vuf_keypair = Arc::new((vuf_public_key, Arc::new(vuf_private_key)));
