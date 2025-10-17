@@ -11,7 +11,7 @@ module aptos_experimental::market_test_utils {
         order_status_filled,
         order_status_open,
         MarketClearinghouseCallbacks, Market, get_order_id_from_event, BulkOrderFilledEvent,
-        BulkOrderCancelledEvent
+        BulkOrderModifiedEvent
     };
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::TimeInForce;
@@ -286,10 +286,18 @@ module aptos_experimental::market_test_utils {
         let user_addr = signer::address_of(user);
         if (is_bulk) {
             let cancell_event_store = new_event_store();
-            let events = latest_emitted_events<BulkOrderCancelledEvent>(&mut cancell_event_store, option::some(1));
+            let events = latest_emitted_events<BulkOrderModifiedEvent>(&mut cancell_event_store, option::some(1));
             assert!(events.length() == 1);
-            let bulk_order_cancel_event = events[0];
-            bulk_order_cancel_event.verify_bulk_order_cancelled_event(order_id, market.get_market_address(), user_addr);
+            let bulk_order_modified_event = events[0];
+            bulk_order_modified_event.verify_bulk_order_modified_event(
+                order_id,
+                market.get_market_address(),
+                user_addr,
+                vector[],
+                vector[],
+                vector[],
+                vector[]
+            );
         } else {
             let events = latest_emitted_events<OrderEvent>(event_store, option::some(1));
             assert!(events.length() == 1);

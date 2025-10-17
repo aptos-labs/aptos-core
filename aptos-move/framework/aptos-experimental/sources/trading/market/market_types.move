@@ -378,15 +378,6 @@ module aptos_experimental::market_types {
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
     }
-
-    #[event]
-    struct BulkOrderCancelledEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        user: address,
-    }
-
     #[event]
     struct BulkOrderFilledEvent has drop, copy, store {
         parent: address,
@@ -638,15 +629,6 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderCancelledEvent {
-                    parent: self.parent,
-                    market: self.market,
-                    order_id: order_id.get_order_id_value(),
-                    user,
-                }
-            );
-
-            event::emit(
                 BulkOrderModifiedEvent {
                     parent: self.parent,
                     market: self.market,
@@ -788,18 +770,6 @@ module aptos_experimental::market_types {
     }
 
     #[test_only]
-    public fun verify_bulk_order_cancelled_event(
-        self: BulkOrderCancelledEvent,
-        order_id: OrderIdType,
-        market: address,
-        user: address,
-    ) {
-        assert!(self.order_id == order_id.get_order_id_value());
-        assert!(self.market == market);
-        assert!(self.user == user);
-    }
-
-    #[test_only]
     public fun verify_bulk_order_filled_event(
         self: BulkOrderFilledEvent,
         order_id: OrderIdType,
@@ -815,5 +785,25 @@ module aptos_experimental::market_types {
         assert!(self.filled_size == filled_size);
         assert!(self.price == price);
         assert!(self.is_bid == is_bid);
+    }
+
+    #[test_only]
+    public fun verify_bulk_order_modified_event(
+        self: BulkOrderModifiedEvent,
+        order_id: OrderIdType,
+        market: address,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+    ) {
+        assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.market == market);
+        assert!(self.user == user);
+        assert!(self.bid_sizes == bid_sizes);
+        assert!(self.bid_prices == bid_prices);
+        assert!(self.ask_sizes == ask_sizes);
+        assert!(self.ask_prices == ask_prices);
     }
 }

@@ -15,7 +15,6 @@
 -  [Enum `MarketConfig`](#0x7_market_types_MarketConfig)
 -  [Struct `OrderEvent`](#0x7_market_types_OrderEvent)
 -  [Struct `BulkOrderPlacedEvent`](#0x7_market_types_BulkOrderPlacedEvent)
--  [Struct `BulkOrderCancelledEvent`](#0x7_market_types_BulkOrderCancelledEvent)
 -  [Struct `BulkOrderFilledEvent`](#0x7_market_types_BulkOrderFilledEvent)
 -  [Struct `BulkOrderModifiedEvent`](#0x7_market_types_BulkOrderModifiedEvent)
 -  [Constants](#@Constants_0)
@@ -807,52 +806,6 @@
 </dd>
 <dt>
 <code>ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x7_market_types_BulkOrderCancelledEvent"></a>
-
-## Struct `BulkOrderCancelledEvent`
-
-
-
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="market_types.md#0x7_market_types_BulkOrderCancelledEvent">BulkOrderCancelledEvent</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>parent: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>market: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>order_id: u128</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>user: <b>address</b></code>
 </dt>
 <dd>
 
@@ -2529,13 +2482,17 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market_types.md#0x7_market_types_BulkOrderCancelledEvent">BulkOrderCancelledEvent</a> {
+            <a href="market_types.md#0x7_market_types_BulkOrderModifiedEvent">BulkOrderModifiedEvent</a> {
                 parent: self.parent,
                 market: self.market,
                 order_id: order_id.get_order_id_value(),
                 user,
+                bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+                bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+                ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
+                ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[],
             }
-        );
+        )
     };
 }
 </code></pre>
