@@ -382,6 +382,7 @@ module aptos_experimental::market_types {
         cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
         cancelled_ask_sizes: vector<u64>,
+        previous_seq_num: u64,
     }
 
     #[event]
@@ -637,6 +638,7 @@ module aptos_experimental::market_types {
         cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
         cancelled_ask_sizes: vector<u64>,
+        previous_seq_num: u64,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -655,6 +657,7 @@ module aptos_experimental::market_types {
                     cancelled_bid_sizes,
                     cancelled_ask_prices,
                     cancelled_ask_sizes,
+                    previous_seq_num,
                 }
             );
         };
