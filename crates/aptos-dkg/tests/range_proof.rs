@@ -4,8 +4,10 @@
 #[cfg(test)]
 use aptos_dkg::range_proofs::traits::BatchedRangeProof;
 use aptos_dkg::{
-    range_proofs::dekart_univariate::{Proof as UnivariateDeKART},
-    range_proofs::dekart_univariate_v2::{Proof as UnivariateDeKARTv2},
+    range_proofs::{
+        dekart_univariate::Proof as UnivariateDeKART,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+    },
     utils::test_utils,
 };
 use ark_ec::pairing::Pairing;
