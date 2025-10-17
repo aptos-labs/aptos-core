@@ -136,7 +136,7 @@ fn commit_with_randomness<E: Pairing>(
 }
 
 impl<'a, E: Pairing> Homomorphism<'a, E> {
-    // TODO: should maybe make y part of the input
+    // TODO: should maybe make `y` part of the input, since it's often computed before invoking `open()`
     pub fn open(
         ck: &CommitmentKey<E>,
         f_evals: Vec<E::ScalarField>,
@@ -246,7 +246,7 @@ mod tests {
     use ark_poly::{univariate::DensePolynomial, Polynomial};
     use ark_std::{rand::thread_rng, UniformRand};
 
-    // TODO: Should set up a PCS trait, then make this test generic. Also make it generic over E and then run it for BN254 and BLS12-381?
+    // TODO: Should set up a PCS trait, then make this test generic? Also make it generic over E and then run it for BN254 and BLS12-381?
     #[allow(non_snake_case)]
     #[test]
     fn test_open_and_verify_roundtrip() {
