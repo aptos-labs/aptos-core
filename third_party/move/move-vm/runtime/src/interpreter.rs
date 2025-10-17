@@ -542,21 +542,29 @@ where
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
-                            let function = Rc::new(self.load_function_no_visibility_checks(
-                                gas_meter,
-                                traversal_context,
-                                &current_frame,
-                                fh_idx,
-                            )?);
-                            let frame_cache =
-                                function_caches.get_or_create_frame_cache_non_generic(&function);
-
+                            let (function, frame_cache) =
+                                match current_frame_cache.function_cache.entry(fh_idx) {
+                                    Entry::Vacant(e) => {
+                                        let function = self
+                                            .load_function_no_visibility_checks(
+                                                gas_meter,
+                                                traversal_context,
+                                                &current_frame,
+                                                fh_idx,
+                                            )
+                                            .map(Rc::new)?;
+                                        let frame_cache = function_caches
+                                            .get_or_create_frame_cache_non_generic(&function);
+                                        e.insert((function.clone(), frame_cache.clone()));
+                                        (function, frame_cache)
+                                    },
+                                    Entry::Occupied(e) => e.into_mut().clone(),
+                                };
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
                                 PerInstructionCache::Call(
                                     Rc::clone(&function),
                                     Rc::clone(&frame_cache),
                                 );
-
                             (function, frame_cache)
                         }
                     } else {
@@ -624,8 +632,8 @@ where
                         {
                             (Rc::clone(function), Rc::clone(frame_cache))
                         } else {
-                            let function =
-                                match current_frame_cache.generic_sub_frame_cache.entry(idx) {
+                            let (function, frame_cache) =
+                                match current_frame_cache.generic_function_cache.entry(idx) {
                                     Entry::Vacant(e) => {
                                         let function = Rc::new(
                                             self.load_generic_function_no_visibility_checks(
@@ -635,13 +643,13 @@ where
                                                 idx,
                                             )?,
                                         );
-                                        e.insert(function.clone());
-                                        function
+                                        let frame_cache = function_caches
+                                            .get_or_create_frame_cache_generic(&function);
+                                        e.insert((function.clone(), frame_cache.clone()));
+                                        (function, frame_cache)
                                     },
                                     Entry::Occupied(e) => e.into_mut().clone(),
                                 };
-                            let frame_cache =
-                                function_caches.get_or_create_frame_cache_generic(&function);
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
                                 PerInstructionCache::CallGeneric(
                                     Rc::clone(&function),
