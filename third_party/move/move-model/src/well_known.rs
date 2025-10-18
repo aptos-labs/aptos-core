@@ -25,6 +25,14 @@ pub fn is_verify_only_attribute_name(s: &str) -> bool {
     s == "verify_only"
 }
 
+// For public struct/enum APIs
+pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
+pub const PACK: &str = "pack";
+pub const UNPACK: &str = "unpack";
+pub const UNPACK_MUT_REF: &str = "unpack_mut_ref";
+pub const TEST_VARIANT: &str = "test_variant";
+pub const PARAM_NAME: &str = "_s";
+
 pub const VECTOR_MODULE: &str = "vector";
 pub const VECTOR_BORROW_MUT: &str = "vector::borrow_mut";
 pub const EVENT_EMIT_EVENT: &str = "event::emit_event";

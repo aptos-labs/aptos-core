@@ -1,0 +1,49 @@
+
+Diagnostics:
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+  ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:6:20
+  │
+6 │     fun f1() reads undef {
+  │                    ^^^^^^
+
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+  ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:9:20
+  │
+9 │     fun f2() reads 0x42::undef::* {
+  │                    ^^^^^^^^^^^^^^^
+
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+   ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:12:20
+   │
+12 │     fun f3() reads 0x42::*::S {
+   │                    ^^^^^^^^^^^
+
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+   ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:15:20
+   │
+15 │     fun f4() reads G {
+   │                    ^^
+
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+   ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:18:30
+   │
+18 │     fun f5(x: address) reads *(y) {
+   │                              ^^^^
+
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+   ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:21:30
+   │
+21 │     fun f6(x: address) reads *(make_up_address(y)) {
+   │                              ^^^^^^^^^^^^^^^^^^^^^
+
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+   ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:24:26
+   │
+24 │     fun f7(x: u64) reads *(make_up_address_wrong(x)) {
+   │                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error: not supported before language version `2.4-unstable`: read/write access specifiers.
+   ┌─ tests/checking-lang-v2.4/access_specifiers/access_err.move:27:26
+   │
+27 │     fun f8(x: u64) reads *(undefined(x)) {
+   │                          ^^^^^^^^^^^^^^^
