@@ -402,6 +402,7 @@ module aptos_experimental::market_types {
         user: address,
         filled_size: u64,
         price: u64,
+        orig_price: u64,
         is_bid: bool,
     }
 
@@ -688,6 +689,7 @@ module aptos_experimental::market_types {
         user: address,
         filled_size: u64,
         price: u64,
+        orig_price: u64,
         is_bid: bool,
     ) {
         // Final check whether event sending is enabled
@@ -701,6 +703,7 @@ module aptos_experimental::market_types {
                     user,
                     filled_size,
                     price,
+                    orig_price,
                     is_bid,
                 }
             );
