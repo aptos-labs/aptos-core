@@ -416,38 +416,44 @@ where
 
     #[inline]
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        self.release_heap_memory(
-            self.vm_gas_params()
+        if lhs.is_ref() {
+            self.base.charge_eq(lhs, rhs)
+        } else {
+            let (lhs_stack, lhs_heap) = self
+                .vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&lhs, self.feature_version())?,
-        );
-        self.release_heap_memory(
-            self.vm_gas_params()
-                .misc
-                .abs_val
-                .abstract_heap_size(&rhs, self.feature_version())?,
-        );
+                .abstract_value_size_stack_and_heap(lhs, self.feature_version())?;
 
-        self.base.charge_eq(lhs, rhs)
+            let (rhs_stack, rhs_heap) = self
+                .vm_gas_params()
+                .misc
+                .abs_val
+                .abstract_value_size_stack_and_heap(rhs, self.feature_version())?;
+
+            self.charge_eq_val_cached(lhs_stack, lhs_heap, rhs_stack, rhs_heap)
+        }
     }
 
     #[inline]
     fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
-        self.release_heap_memory(
-            self.vm_gas_params()
+        if lhs.is_ref() {
+            self.base.charge_neq(lhs, rhs)
+        } else {
+            let (lhs_stack, lhs_heap) = self
+                .vm_gas_params()
                 .misc
                 .abs_val
-                .abstract_heap_size(&lhs, self.feature_version())?,
-        );
-        self.release_heap_memory(
-            self.vm_gas_params()
-                .misc
-                .abs_val
-                .abstract_heap_size(&rhs, self.feature_version())?,
-        );
+                .abstract_value_size_stack_and_heap(lhs, self.feature_version())?;
 
-        self.base.charge_neq(lhs, rhs)
+            let (rhs_stack, rhs_heap) = self
+                .vm_gas_params()
+                .misc
+                .abs_val
+                .abstract_value_size_stack_and_heap(rhs, self.feature_version())?;
+
+            self.charge_neq_val_cached(lhs_stack, lhs_heap, rhs_stack, rhs_heap)
+        }
     }
 
     #[inline]
@@ -564,6 +570,36 @@ where
         self.use_heap_memory(heap_size)?;
 
         self.base.charge_copy_loc_cached(stack_size, heap_size)
+    }
+
+    #[inline]
+    fn charge_eq_val_cached(
+        &mut self,
+        lhs_stack: AbstractValueSize,
+        lhs_heap: AbstractValueSize,
+        rhs_stack: AbstractValueSize,
+        rhs_heap: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        self.release_heap_memory(lhs_heap);
+        self.release_heap_memory(rhs_heap);
+
+        self.base
+            .charge_eq_val_cached(lhs_stack, lhs_heap, rhs_stack, rhs_heap)
+    }
+
+    #[inline]
+    fn charge_neq_val_cached(
+        &mut self,
+        lhs_stack: AbstractValueSize,
+        lhs_heap: AbstractValueSize,
+        rhs_stack: AbstractValueSize,
+        rhs_heap: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        self.release_heap_memory(lhs_heap);
+        self.release_heap_memory(rhs_heap);
+
+        self.base
+            .charge_neq_val_cached(lhs_stack, lhs_heap, rhs_stack, rhs_heap)
     }
 }
 

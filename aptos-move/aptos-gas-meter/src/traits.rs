@@ -279,4 +279,20 @@ pub trait CacheValueSizes: AptosGasMeter {
         stack_size: AbstractValueSize,
         heap_size: AbstractValueSize,
     ) -> PartialVMResult<()>;
+
+    fn charge_eq_val_cached(
+        &mut self,
+        lhs_stack: AbstractValueSize,
+        lhs_heap: AbstractValueSize,
+        rhs_stack: AbstractValueSize,
+        rhs_heap: AbstractValueSize,
+    ) -> PartialVMResult<()>;
+
+    fn charge_neq_val_cached(
+        &mut self,
+        lhs_stack: AbstractValueSize,
+        lhs_heap: AbstractValueSize,
+        rhs_stack: AbstractValueSize,
+        rhs_heap: AbstractValueSize,
+    ) -> PartialVMResult<()>;
 }

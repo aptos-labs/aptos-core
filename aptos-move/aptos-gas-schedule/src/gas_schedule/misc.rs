@@ -443,233 +443,229 @@ impl AbstractValueSizeGasParameters {
     }
 }
 
+struct AbstractStackSizeVisitor<'a> {
+    feature_version: u64,
+    params: &'a AbstractValueSizeGasParameters,
+    res: Option<AbstractValueSize>,
+    max_value_nest_depth: Option<u64>,
+}
+
+impl AbstractStackSizeVisitor<'_> {
+    check_depth_impl!();
+}
+
+impl ValueVisitor for AbstractStackSizeVisitor<'_> {
+    #[inline]
+    fn visit_delayed(&mut self, depth: u64, _val: DelayedFieldID) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.u64);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_u8(&mut self, depth: u64, _val: u8) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.u8);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_u16(&mut self, depth: u64, _val: u16) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.u16);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_u32(&mut self, depth: u64, _val: u32) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.u32);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_u64(&mut self, depth: u64, _val: u64) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.u64);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_u128(&mut self, depth: u64, _val: u128) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.u128);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_u256(&mut self, depth: u64, _val: U256) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.u256);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_i8(&mut self, depth: u64, _val: i8) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.i8);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_i16(&mut self, depth: u64, _val: i16) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.i16);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_i32(&mut self, depth: u64, _val: i32) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.i32);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_i64(&mut self, depth: u64, _val: i64) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.i64);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_i128(&mut self, depth: u64, _val: i128) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.i128);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_i256(&mut self, depth: u64, _val: I256) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.i256);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_bool(&mut self, depth: u64, _val: bool) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.bool);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_address(&mut self, depth: u64, _val: AccountAddress) -> PartialVMResult<()> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.address);
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_struct(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.struct_);
+        Ok(false)
+    }
+
+    #[inline]
+    fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.closure);
+        Ok(false)
+    }
+
+    #[inline]
+    fn visit_vec(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.vector);
+        Ok(false)
+    }
+
+    #[inline]
+    fn visit_ref(&mut self, depth: u64, _is_global: bool) -> PartialVMResult<bool> {
+        self.check_depth(depth)?;
+        self.res = Some(self.params.reference);
+        Ok(false)
+    }
+
+    // TODO(Gas): The following function impls are necessary due to a bug upstream.
+    //            Remove them once the bug is fixed.
+    #[inline]
+    fn visit_vec_u8(&mut self, depth: u64, vals: &[u8]) -> PartialVMResult<()> {
+        if self.feature_version < 3 {
+            self.res = Some(0.into());
+        } else {
+            self.visit_vec(depth, vals.len())?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_vec_u16(&mut self, depth: u64, vals: &[u16]) -> PartialVMResult<()> {
+        self.visit_vec(depth, vals.len())?;
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_vec_u32(&mut self, depth: u64, vals: &[u32]) -> PartialVMResult<()> {
+        self.visit_vec(depth, vals.len())?;
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_vec_u64(&mut self, depth: u64, vals: &[u64]) -> PartialVMResult<()> {
+        if self.feature_version < 3 {
+            self.res = Some(0.into());
+        } else {
+            self.visit_vec(depth, vals.len())?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_vec_u128(&mut self, depth: u64, vals: &[u128]) -> PartialVMResult<()> {
+        if self.feature_version < 3 {
+            self.res = Some(0.into());
+        } else {
+            self.visit_vec(depth, vals.len())?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_vec_u256(&mut self, depth: u64, vals: &[U256]) -> PartialVMResult<()> {
+        self.visit_vec(depth, vals.len())?;
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_vec_bool(&mut self, depth: u64, vals: &[bool]) -> PartialVMResult<()> {
+        if self.feature_version < 3 {
+            self.res = Some(0.into());
+        } else {
+            self.visit_vec(depth, vals.len())?;
+        }
+        Ok(())
+    }
+
+    #[inline]
+    fn visit_vec_address(&mut self, depth: u64, vals: &[AccountAddress]) -> PartialVMResult<()> {
+        if self.feature_version < 3 {
+            self.res = Some(0.into());
+        } else {
+            self.visit_vec(depth, vals.len())?;
+        }
+        Ok(())
+    }
+}
+
 impl AbstractValueSizeGasParameters {
     pub fn abstract_stack_size(
         &self,
         val: impl ValueView,
         feature_version: u64,
     ) -> PartialVMResult<AbstractValueSize> {
-        struct Visitor<'a> {
-            feature_version: u64,
-            params: &'a AbstractValueSizeGasParameters,
-            res: Option<AbstractValueSize>,
-            max_value_nest_depth: Option<u64>,
-        }
-
-        impl Visitor<'_> {
-            check_depth_impl!();
-        }
-
-        impl ValueVisitor for Visitor<'_> {
-            #[inline]
-            fn visit_delayed(&mut self, depth: u64, _val: DelayedFieldID) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.u64);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_u8(&mut self, depth: u64, _val: u8) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.u8);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_u16(&mut self, depth: u64, _val: u16) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.u16);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_u32(&mut self, depth: u64, _val: u32) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.u32);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_u64(&mut self, depth: u64, _val: u64) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.u64);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_u128(&mut self, depth: u64, _val: u128) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.u128);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_u256(&mut self, depth: u64, _val: U256) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.u256);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_i8(&mut self, depth: u64, _val: i8) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.i8);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_i16(&mut self, depth: u64, _val: i16) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.i16);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_i32(&mut self, depth: u64, _val: i32) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.i32);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_i64(&mut self, depth: u64, _val: i64) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.i64);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_i128(&mut self, depth: u64, _val: i128) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.i128);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_i256(&mut self, depth: u64, _val: I256) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.i256);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_bool(&mut self, depth: u64, _val: bool) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.bool);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_address(&mut self, depth: u64, _val: AccountAddress) -> PartialVMResult<()> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.address);
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_struct(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.struct_);
-                Ok(false)
-            }
-
-            #[inline]
-            fn visit_closure(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.closure);
-                Ok(false)
-            }
-
-            #[inline]
-            fn visit_vec(&mut self, depth: u64, _len: usize) -> PartialVMResult<bool> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.vector);
-                Ok(false)
-            }
-
-            #[inline]
-            fn visit_ref(&mut self, depth: u64, _is_global: bool) -> PartialVMResult<bool> {
-                self.check_depth(depth)?;
-                self.res = Some(self.params.reference);
-                Ok(false)
-            }
-
-            // TODO(Gas): The following function impls are necessary due to a bug upstream.
-            //            Remove them once the bug is fixed.
-            #[inline]
-            fn visit_vec_u8(&mut self, depth: u64, vals: &[u8]) -> PartialVMResult<()> {
-                if self.feature_version < 3 {
-                    self.res = Some(0.into());
-                } else {
-                    self.visit_vec(depth, vals.len())?;
-                }
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_vec_u16(&mut self, depth: u64, vals: &[u16]) -> PartialVMResult<()> {
-                self.visit_vec(depth, vals.len())?;
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_vec_u32(&mut self, depth: u64, vals: &[u32]) -> PartialVMResult<()> {
-                self.visit_vec(depth, vals.len())?;
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_vec_u64(&mut self, depth: u64, vals: &[u64]) -> PartialVMResult<()> {
-                if self.feature_version < 3 {
-                    self.res = Some(0.into());
-                } else {
-                    self.visit_vec(depth, vals.len())?;
-                }
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_vec_u128(&mut self, depth: u64, vals: &[u128]) -> PartialVMResult<()> {
-                if self.feature_version < 3 {
-                    self.res = Some(0.into());
-                } else {
-                    self.visit_vec(depth, vals.len())?;
-                }
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_vec_u256(&mut self, depth: u64, vals: &[U256]) -> PartialVMResult<()> {
-                self.visit_vec(depth, vals.len())?;
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_vec_bool(&mut self, depth: u64, vals: &[bool]) -> PartialVMResult<()> {
-                if self.feature_version < 3 {
-                    self.res = Some(0.into());
-                } else {
-                    self.visit_vec(depth, vals.len())?;
-                }
-                Ok(())
-            }
-
-            #[inline]
-            fn visit_vec_address(
-                &mut self,
-                depth: u64,
-                vals: &[AccountAddress],
-            ) -> PartialVMResult<()> {
-                if self.feature_version < 3 {
-                    self.res = Some(0.into());
-                } else {
-                    self.visit_vec(depth, vals.len())?;
-                }
-                Ok(())
-            }
-        }
-
-        let mut visitor = Visitor {
+        let mut visitor = AbstractStackSizeVisitor {
             feature_version,
             params: self,
             res: None,
@@ -677,6 +673,23 @@ impl AbstractValueSizeGasParameters {
         };
         val.visit(&mut visitor)?;
         visitor.res.ok_or_else(|| {
+            PartialVMError::new_invariant_violation("Visitor should have set the `res` value")
+        })
+    }
+
+    pub fn abstract_stack_size_dereferenced(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> PartialVMResult<AbstractValueSize> {
+        let mut visitor = DerefVisitor::new(AbstractStackSizeVisitor {
+            feature_version,
+            params: self,
+            res: None,
+            max_value_nest_depth: Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+        });
+        val.visit(&mut visitor)?;
+        visitor.into_inner().res.ok_or_else(|| {
             PartialVMError::new_invariant_violation("Visitor should have set the `res` value")
         })
     }
@@ -900,6 +913,18 @@ impl AbstractValueSizeGasParameters {
     ) -> PartialVMResult<(AbstractValueSize, AbstractValueSize)> {
         let stack_size = self.abstract_stack_size(&val, feature_version)?;
         let abs_size = self.abstract_value_size(val, feature_version)?;
+        let heap_size = abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into());
+
+        Ok((stack_size, heap_size))
+    }
+
+    pub fn abstract_value_size_dereferenced_stack_and_heap(
+        &self,
+        val: impl ValueView,
+        feature_version: u64,
+    ) -> PartialVMResult<(AbstractValueSize, AbstractValueSize)> {
+        let stack_size = self.abstract_stack_size_dereferenced(&val, feature_version)?;
+        let abs_size = self.abstract_value_size_dereferenced(val, feature_version)?;
         let heap_size = abs_size.checked_sub(stack_size).unwrap_or_else(|| 0.into());
 
         Ok((stack_size, heap_size))

@@ -398,26 +398,24 @@ where
     fn charge_eq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
         let abs_val_params = &self.vm_gas_params().misc.abs_val;
 
-        let cost = EQ_BASE
-            + EQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
-                    + abs_val_params
-                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
+        let (lhs_stack, lhs_heap) = abs_val_params
+            .abstract_value_size_dereferenced_stack_and_heap(lhs, self.feature_version())?;
+        let (rhs_stack, rhs_heap) = abs_val_params
+            .abstract_value_size_dereferenced_stack_and_heap(rhs, self.feature_version())?;
 
-        self.algebra.charge_execution(cost)
+        self.charge_eq_val_cached(lhs_stack, lhs_heap, rhs_stack, rhs_heap)
     }
 
     #[inline]
     fn charge_neq(&mut self, lhs: impl ValueView, rhs: impl ValueView) -> PartialVMResult<()> {
         let abs_val_params = &self.vm_gas_params().misc.abs_val;
 
-        let cost = NEQ_BASE
-            + NEQ_PER_ABS_VAL_UNIT
-                * (abs_val_params.abstract_value_size_dereferenced(lhs, self.feature_version())?
-                    + abs_val_params
-                        .abstract_value_size_dereferenced(rhs, self.feature_version())?);
+        let (lhs_stack, lhs_heap) = abs_val_params
+            .abstract_value_size_dereferenced_stack_and_heap(lhs, self.feature_version())?;
+        let (rhs_stack, rhs_heap) = abs_val_params
+            .abstract_value_size_dereferenced_stack_and_heap(rhs, self.feature_version())?;
 
-        self.algebra.charge_execution(cost)
+        self.charge_neq_val_cached(lhs_stack, lhs_heap, rhs_stack, rhs_heap)
     }
 
     #[inline]
@@ -642,5 +640,31 @@ where
         // Note(Gas): this makes a deep copy so we need to charge for the full value size
         self.algebra
             .charge_execution(COPY_LOC_BASE + COPY_LOC_PER_ABS_VAL_UNIT * (stack_size + heap_size))
+    }
+
+    #[inline]
+    fn charge_eq_val_cached(
+        &mut self,
+        lhs_stack: AbstractValueSize,
+        lhs_heap: AbstractValueSize,
+        rhs_stack: AbstractValueSize,
+        rhs_heap: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        let cost = EQ_BASE + EQ_PER_ABS_VAL_UNIT * (lhs_stack + lhs_heap + rhs_stack + rhs_heap);
+
+        self.algebra.charge_execution(cost)
+    }
+
+    #[inline]
+    fn charge_neq_val_cached(
+        &mut self,
+        lhs_stack: AbstractValueSize,
+        lhs_heap: AbstractValueSize,
+        rhs_stack: AbstractValueSize,
+        rhs_heap: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        let cost = NEQ_BASE + NEQ_PER_ABS_VAL_UNIT * (lhs_stack + lhs_heap + rhs_stack + rhs_heap);
+
+        self.algebra.charge_execution(cost)
     }
 }

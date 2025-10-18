@@ -24,6 +24,8 @@ pub trait TypeView {
 pub trait ValueView {
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()>;
 
+    fn is_ref(&self) -> bool;
+
     /// Returns the abstract memory size of the value.
     ///
     /// The concept of abstract memory size is not well-defined and is only kept for backward compatibility.
@@ -354,6 +356,10 @@ where
 
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         <T as ValueView>::visit(*self, visitor)
+    }
+
+    fn is_ref(&self) -> bool {
+        <T as ValueView>::is_ref(*self)
     }
 }
 

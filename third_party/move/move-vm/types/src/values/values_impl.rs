@@ -5384,6 +5384,14 @@ impl ValueView for Value {
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.visit_impl(visitor, 0)
     }
+
+    fn is_ref(&self) -> bool {
+        match self {
+            Value::ContainerRef(_r) => true,
+            Value::IndexedRef(_r) => true,
+            _ => false,
+        }
+    }
 }
 
 impl ValueView for Struct {
@@ -5395,11 +5403,19 @@ impl ValueView for Struct {
         }
         Ok(())
     }
+
+    fn is_ref(&self) -> bool {
+        false
+    }
 }
 
 impl ValueView for Vector {
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.0.visit_impl(visitor, 0)
+    }
+
+    fn is_ref(&self) -> bool {
+        false
     }
 }
 
@@ -5412,17 +5428,29 @@ impl ValueView for Reference {
             IndexedRef(r) => r.visit_impl(visitor, 0),
         }
     }
+
+    fn is_ref(&self) -> bool {
+        true
+    }
 }
 
 impl ValueView for VectorRef {
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.0.visit_impl(visitor, 0)
     }
+
+    fn is_ref(&self) -> bool {
+        true
+    }
 }
 
 impl ValueView for StructRef {
     fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
         self.0.visit_impl(visitor, 0)
+    }
+
+    fn is_ref(&self) -> bool {
+        true
     }
 }
 
@@ -5445,6 +5473,10 @@ impl Vector {
         impl ValueView for ElemView<'_> {
             fn visit(&self, visitor: &mut impl ValueVisitor) -> PartialVMResult<()> {
                 self.container.visit_indexed(visitor, 0, self.idx)
+            }
+
+            fn is_ref(&self) -> bool {
+                false
             }
         }
 
@@ -5470,6 +5502,10 @@ impl Reference {
                     IndexedRef(r) => r.container_ref.container().visit_indexed(visitor, 0, r.idx),
                 }
             }
+
+            fn is_ref(&self) -> bool {
+                false
+            }
         }
 
         ValueBehindRef(&self.0)
@@ -5491,6 +5527,10 @@ impl GlobalValue {
                     }
                 }
                 Ok(())
+            }
+
+            fn is_ref(&self) -> bool {
+                false
             }
         }
 
