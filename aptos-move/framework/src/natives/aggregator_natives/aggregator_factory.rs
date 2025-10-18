@@ -48,7 +48,7 @@ fn native_new_aggregator(
     // the strategy from `table` implementation: taking hash of transaction and
     // number of aggregator instances created so far.
     let mut hasher = DefaultHasher::new(&[0_u8; 0]);
-    hasher.update(&aggregator_context.txn_hash());
+    hasher.update(&aggregator_context.session_hash());
     hasher.update(&(aggregator_data.num_aggregators() as u32).to_be_bytes());
     let hash = hasher.finish().to_vec();
 

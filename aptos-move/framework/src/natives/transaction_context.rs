@@ -16,7 +16,7 @@ use aptos_types::{
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -36,7 +36,7 @@ use move_core_types::language_storage::{OPTION_NONE_TAG, OPTION_SOME_TAG};
 /// is accessible from natives of this extension.
 #[derive(Tid)]
 pub struct NativeTransactionContext {
-    txn_hash: Vec<u8>,
+    session_hash: Vec<u8>,
     /// The number of AUIDs (Aptos unique identifiers) issued during the
     /// execution of this transaction.
     auid_counter: u64,
@@ -53,18 +53,38 @@ pub struct NativeTransactionContext {
     session_counter: u8,
 }
 
+impl SessionListener for NativeTransactionContext {
+    fn start(&mut self, session_hash: &[u8; 32], script_hash: &[u8], session_counter: u8) {
+        self.session_hash = session_hash.to_vec();
+        self.auid_counter = 0;
+        self.local_counter = 0;
+        self.script_hash = script_hash.to_vec();
+        // Chain ID is persisted.
+        // User transaction context is persisted.
+        self.session_counter = session_counter;
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
+}
+
 impl NativeTransactionContext {
     /// Create a new instance of a native transaction context. This must be passed in via an
     /// extension into VM session functions.
     pub fn new(
-        txn_hash: Vec<u8>,
+        session_hash: Vec<u8>,
         script_hash: Vec<u8>,
         chain_id: u8,
         user_transaction_context_opt: Option<UserTransactionContext>,
         session_counter: u8,
     ) -> Self {
         Self {
-            txn_hash,
+            session_hash,
             auid_counter: 0,
             local_counter: 0,
             script_hash,
@@ -94,7 +114,7 @@ fn native_get_txn_hash(
     let transaction_context = context.extensions().get::<NativeTransactionContext>();
 
     Ok(smallvec![Value::vector_u8(
-        transaction_context.txn_hash.clone()
+        transaction_context.session_hash.clone()
     )])
 }
 
@@ -117,7 +137,7 @@ fn native_generate_unique_address(
     transaction_context.auid_counter += 1;
 
     let auid = AuthenticationKey::auid(
-        transaction_context.txn_hash.clone(),
+        transaction_context.session_hash.clone(),
         transaction_context.auid_counter,
     )
     .account_address();
@@ -472,4 +492,35 @@ pub fn make_all(
     ];
 
     builder.make_named_natives(natives)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extension_update() {
+        let mut ctx = NativeTransactionContext::new(vec![2; 32], vec![1; 2], 2, None, 32);
+        ctx.auid_counter = 100;
+        ctx.local_counter = 23;
+        ctx.start(&[4; 32], &[2; 3], 44);
+
+        let NativeTransactionContext {
+            session_hash,
+            auid_counter,
+            local_counter,
+            script_hash,
+            chain_id,
+            user_transaction_context_opt,
+            session_counter,
+        } = ctx;
+
+        assert_eq!(session_hash, vec![4; 32]);
+        assert_eq!(auid_counter, 0);
+        assert_eq!(local_counter, 0);
+        assert_eq!(script_hash, vec![2; 3]);
+        assert_eq!(chain_id, 2);
+        assert!(user_transaction_context_opt.is_none());
+        assert_eq!(session_counter, 44);
+    }
 }
