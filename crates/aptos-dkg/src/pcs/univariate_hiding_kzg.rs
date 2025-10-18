@@ -211,7 +211,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone;
-    type MsmInput = homomorphism::fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
