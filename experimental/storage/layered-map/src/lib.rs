@@ -35,7 +35,7 @@ impl<T: Clone> Value for T {}
 ///
 /// Addressing bits in the order of MSB to LSB, so that sorting by the numeric order is the same
 /// as sorting by bits.
-#[derive(Copy, Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
+#[derive(Copy, Clone, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct KeyHash(u64);
 
 impl KeyHash {
@@ -49,5 +49,11 @@ impl KeyHash {
 
     fn iter_bits(&self) -> impl Iterator<Item = bool> + '_ {
         self.0.view_bits::<Msb0>().iter().by_vals()
+    }
+}
+
+impl std::fmt::Debug for KeyHash {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "KeyHash({:064b})", self.0)
     }
 }
