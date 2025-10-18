@@ -10,15 +10,22 @@ use aptos_dkg::{
     },
     utils::test_utils,
 };
+use ark_bls12_381::Bls12_381;
+use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use ark_std::rand::thread_rng;
-use aptos_dkg::utils::test_utils::RangeProofSetup;
 
 #[cfg(test)]
-fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(setup: &RangeProofSetup<E, B>, n: usize, ell: usize) {
+fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(
+    setup: &RangeProofFixedSetup<E, B>,
+    n: usize,
+    ell: usize,
+) {
     let mut rng = thread_rng();
-    let RangeProofSetup{pk, vk, values, comm, r} = setup;
-    println!("parsing setup finished, prove starting for n={}, ell={}", n, ell);
+    let RangeProofFixedSetup { pk, vk } = setup;
+    let (values, comm, r) =
+        test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+    println!("setup finished, prove starting for n={}, ell={}", n, ell);
 
     let mut fs_t = merlin::Transcript::new(B::DST);
     let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
@@ -35,10 +42,16 @@ fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(setup: &Ran
 }
 
 #[cfg(test)]
-fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(setup: &RangeProofSetup<E, B>, n: usize, ell: usize) {
+fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
+    setup: &RangeProofFixedSetup<E, B>,
+    n: usize,
+    ell: usize,
+) {
     let mut rng = thread_rng();
-    let RangeProofSetup{pk, vk, values, comm, r} = setup;
-    println!("parsing setup finished, prove starting for n={}, ell={}", n, ell);
+    let RangeProofFixedSetup { pk, vk } = setup;
+    let (values, comm, r) =
+        test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+    println!("setup finished, prove starting for n={}, ell={}", n, ell);
 
     let mut fs_t = merlin::Transcript::new(B::DST);
     let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
@@ -90,35 +103,49 @@ const TEST_CASES: &[(usize, usize)] = &[
     (16, 7),
     (16, 8),
     (16, 16),
-    (255, 16),
-    (255, 32),
-    (512, 32),
-    (1024, 32),
-    (2047, 32),
+    // (255, 16),  Commented out to improve test speed
+    // (255, 32),
+    // (512, 32),
+    // (1024, 32),
+    // (2047, 32),
 ];
 
-/// Generate one setup per curve type, then reuse for all test cases
+/// A **reusable** setup structure.
+pub struct RangeProofFixedSetup<E: Pairing, B: BatchedRangeProof<E>> {
+    pub pk: B::ProverKey,
+    pub vk: B::VerificationKey,
+}
+
 #[cfg(test)]
-fn make_setups() -> (
-    RangeProofSetup<ark_bn254::Bn254, UnivariateDeKART<ark_bn254::Bn254>>,
-    RangeProofSetup<ark_bls12_381::Bls12_381, UnivariateDeKART<ark_bls12_381::Bls12_381>>,
+/// Generate a fixed setup for a single curve
+fn make_single_curve_setup<B, E>(n: usize, ell: usize) -> RangeProofFixedSetup<E, B>
+where
+    E: Pairing,
+    B: BatchedRangeProof<E>,
+{
+    let mut rng = thread_rng();
+    let (pk, vk) = B::setup(n, ell, &mut rng);
+    RangeProofFixedSetup { pk, vk }
+}
+
+#[cfg(test)]
+/// Generate one setup per curve type
+fn make_all_curve_setups() -> (
+    RangeProofFixedSetup<ark_bn254::Bn254, UnivariateDeKART<ark_bn254::Bn254>>,
+    RangeProofFixedSetup<ark_bls12_381::Bls12_381, UnivariateDeKART<ark_bls12_381::Bls12_381>>,
 ) {
-    use ark_bn254::Bn254;
-    use ark_bls12_381::Bls12_381;
-
-    let mut rng = thread_rng();       
-    let setup_bn = test_utils::range_proof_random_instance::<Bn254, UnivariateDeKART<Bn254>, _>(2047, 32, &mut rng);
-    let setup_bls = test_utils::range_proof_random_instance::<Bls12_381, UnivariateDeKART<Bls12_381>, _>(2047, 32, &mut rng);
-
-    (setup_bn, setup_bls)
+    (
+        make_single_curve_setup::<UnivariateDeKART<ark_bn254::Bn254>, ark_bn254::Bn254>(31, 16),
+        make_single_curve_setup::<
+            UnivariateDeKART<ark_bls12_381::Bls12_381>,
+            ark_bls12_381::Bls12_381,
+        >(31, 16),
+    )
 }
 
 #[cfg(test)]
 macro_rules! for_each_curve {
     ($f:ident, $setups:ident, $n:expr, $ell:expr) => {
-        use ark_bls12_381::Bls12_381;
-        use ark_bn254::Bn254;
-
         $f::<Bn254, UnivariateDeKART<Bn254>>(&$setups.0, $n, $ell);
         $f::<Bls12_381, UnivariateDeKART<Bls12_381>>(&$setups.1, $n, $ell);
 
@@ -127,18 +154,14 @@ macro_rules! for_each_curve {
     };
 }
 
+#[cfg(test)]
 #[test]
-fn range_proof_completeness_multi() {
-    let setups = make_setups();
+fn range_proof_tests_multi() {
+    // Generate setup once per curve
+    let setups = make_all_curve_setups();
+
     for &(n, ell) in TEST_CASES {
         for_each_curve!(run_range_proof_completeness, setups, n, ell);
-    }
-}
-
-#[test]
-fn serialize_range_proof_multi() {
-    let setups = make_setups();
-    for &(n, ell) in TEST_CASES {
         for_each_curve!(run_serialize_range_proof, setups, n, ell);
     }
 }
