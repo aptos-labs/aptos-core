@@ -6,7 +6,10 @@ use crate::{
     LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, StructKey,
     WithRuntimeEnvironment,
 };
-use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
@@ -95,7 +98,7 @@ pub trait ModuleMetadataLoader {
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
-    ) -> PartialVMResult<Vec<Metadata>>;
+    ) -> PartialVMResult<Arc<CompiledModule>>;
 }
 
 /// Configuration used by legacy eager loader only. Used to allow single implementation for both
