@@ -735,7 +735,7 @@ rand = "0.7.3"
 rand_core = "0.5.1"
 random_word = "0.3.0"
 rapidhash = "1.4.0"
-rayon = "1.5.2"
+rayon = "1.11.0"
 redis = { version = "0.22.3", features = [
     "tokio-comp",
     "script",
@@ -810,13 +810,13 @@ tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
 triomphe = "0.1.14"
 trybuild = "1.0.80"
 try_match = "0.4.2"
-tokio = { version = "1.35.1", features = ["full"] }
-tokio-io-timeout = "1.2.0"
+tokio = { version = "1.47.1", features = ["full"] }
+tokio-io-timeout = "1.2.1"
 tokio-retry = "0.3.0"
 tokio-scoped = { version = "0.2.0" }
-tokio-stream = { version = "0.1.14", features = ["fs"] }
-tokio-test = "0.4.1"
-tokio-util = { version = "0.7.2", features = ["compat", "codec"] }
+tokio-stream = { version = "0.1.17", features = ["fs"] }
+tokio-test = "0.4.4"
+tokio-util = { version = "0.7.16", features = ["compat", "codec"] }
 toml = "0.7.4"
 tonic = { version = "0.12.3", features = [
     "tls-roots",
