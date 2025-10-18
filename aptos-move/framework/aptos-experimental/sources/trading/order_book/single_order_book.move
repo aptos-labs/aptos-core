@@ -24,7 +24,7 @@ module aptos_experimental::single_order_book {
         AccountClientOrderId,
         new_unique_idx_type,
         new_account_client_order_id,
-        new_default_big_ordered_map, OrderMatch, new_order_match, new_order_match_details, OrderMatchDetails,
+        new_default_big_ordered_map, OrderMatch, new_order_match, new_single_order_match_details, OrderMatchDetails,
         UniqueIdxType, single_order_book_type
     };
     use aptos_experimental::single_order_types::{
@@ -126,9 +126,8 @@ module aptos_experimental::single_order_book {
             remaining_size,
             is_bid,
             time_in_force,
-            metadata,
-            _single_order_book_type
-        ) = order_match_details.destroy_order_match_details();
+            metadata
+        ) = order_match_details.destroy_single_order_match_details();
         SingleOrderRequest::V1 {
             account,
             order_id,
@@ -317,7 +316,7 @@ module aptos_experimental::single_order_book {
         reinsert_order: OrderMatchDetails<M>,
         original_order: &OrderMatchDetails<M>,
     ) {
-        assert!(reinsert_order.validate_reinsertion_request(original_order), E_REINSERT_ORDER_MISMATCH);
+        assert!(reinsert_order.validate_single_order_reinsertion_request(original_order), E_REINSERT_ORDER_MISMATCH);
         let order_id = reinsert_order.get_order_id_from_match_details();
         let unique_idx = reinsert_order.get_unique_priority_idx_from_match_details();
 
@@ -411,7 +410,7 @@ module aptos_experimental::single_order_book {
             metadata
         ) = order.destroy_single_order();
         assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
-        new_order_match(new_order_match_details(order_id, account, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata, single_order_book_type()), matched_size)
+        new_order_match(new_single_order_match_details(order_id, account, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata), matched_size)
     }
 
     /// Decrease the size of the order by the given size delta. The API aborts if the order is not found in the order book or
