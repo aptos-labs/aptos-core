@@ -11,7 +11,7 @@ use crate::{
 use aptos_config::config::{PrunerConfig, RocksdbConfigs, StorageDirPaths};
 use aptos_db_indexer::{db_indexer::InternalIndexerDB, Indexer};
 use aptos_logger::prelude::*;
-use aptos_schemadb::{batch::SchemaBatch, Env};
+use aptos_schemadb::{batch::SchemaBatch, Cache, Env};
 use aptos_storage_interface::{db_ensure as ensure, AptosDbError, Result};
 use aptos_types::{ledger_info::LedgerInfoWithSignatures, transaction::Version};
 use std::{path::Path, sync::Arc, time::Instant};
@@ -104,31 +104,31 @@ impl AptosDB {
     pub fn open_dbs(
         db_paths: &StorageDirPaths,
         rocksdb_configs: RocksdbConfigs,
+        env: Option<&Env>,
+        block_cache: Option<&Cache>,
         readonly: bool,
         max_num_nodes_per_lru_cache_shard: usize,
     ) -> Result<(LedgerDb, StateMerkleDb, StateKvDb)> {
-        let mut env =
-            Env::new().map_err(|err| AptosDbError::OtherRocksDbError(err.into_string()))?;
-        env.set_high_priority_background_threads(rocksdb_configs.high_priority_background_threads);
-        env.set_low_priority_background_threads(rocksdb_configs.low_priority_background_threads);
-
         let ledger_db = LedgerDb::new(
             db_paths.ledger_db_root_path(),
             rocksdb_configs,
-            Some(&env),
+            env,
+            block_cache,
             readonly,
         )?;
         let state_kv_db = StateKvDb::new(
             db_paths,
             rocksdb_configs,
-            Some(&env),
+            env,
+            block_cache,
             readonly,
             ledger_db.metadata_db_arc(),
         )?;
         let state_merkle_db = StateMerkleDb::new(
             db_paths,
             rocksdb_configs,
-            Some(&env),
+            env,
+            block_cache,
             readonly,
             max_num_nodes_per_lru_cache_shard,
         )?;
