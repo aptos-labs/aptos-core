@@ -39,11 +39,11 @@ haproxy:
     pullPolicy: IfNotPresent
   resources:
     limits:
-      cpu: 7
-      memory: 16Gi
+      cpu: 2
+      memory: 2Gi
     requests:
-      cpu: 7
-      memory: 16Gi
+      cpu: 1
+      memory: 1Gi
   nodeSelector: {}
   tolerations: []
   affinity: {}
@@ -55,6 +55,15 @@ haproxy:
     user: nobody
   # -- Name of the Kubernetes TLS secret to use for HAProxy
   tls_secret:
+
+tools:
+  image:
+    # -- Image repo to use for tools images
+    repo: aptoslabs/tools
+    # -- Image tag to use for tools images. If set, overrides `imageTag`
+    tag:
+    # -- Image pull policy to use for tools images
+    pullPolicy: IfNotPresent
 
 validator:
   # -- Internal: name of your validator for use in labels
@@ -94,7 +103,11 @@ validator:
   podAnnotations:
     # Determines which log levels are retained by the Vector pipeline
     # aptos.dev/min-log-level-to-retain: warn
-  useConsensusHealthCheckAsStartupProbe: false # once https://github.com/aptos-labs/aptos-core/pull/15512 is rolled out to all networks (at the time of writing (dec 21 2024) it's only in devnet) we can remove this flag and always add this probe
+  healthChecks:
+    enabled: false
+    enableLivenessProbe: false
+    # If set, only update certain replicas. An useful hack for staged rollout.
+    filterReplicas:
 
 fullnode:
   # -- Specify fullnode groups by `name` and number of `replicas`
@@ -194,6 +207,7 @@ loadTestGenesis: false
 enablePrivilegedMode: false
 
 genesis_blob_upload_url: https://us-west1-aptos-forge-gcp-0.cloudfunctions.net/signed-url?cluster_name=unknown&era=1
+genesis_bucket_path:
 cluster_name: unknown
 
 # Additional labels
