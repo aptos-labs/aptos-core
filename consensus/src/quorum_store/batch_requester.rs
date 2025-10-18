@@ -42,21 +42,25 @@ impl BatchRequesterState {
             let mut rng = rand::thread_rng();
             // make sure nodes request from the different set of nodes
             self.next_index = rng.r#gen::<usize>() % signers.len();
-            counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers as u64);
+            counters::SENT_BATCH_REQUEST_COUNT.inc_by(num_peers.min(signers.len()) as u64);
         } else {
-            counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers as u64);
+            counters::SENT_BATCH_REQUEST_RETRY_COUNT.inc_by(num_peers.min(signers.len()) as u64);
         }
         if self.num_retries < self.retry_limit {
             self.num_retries += 1;
-            let ret = signers
-                .iter()
-                .cycle()
-                .skip(self.next_index)
-                .take(num_peers)
-                .cloned()
-                .collect();
-            self.next_index = (self.next_index + num_peers) % signers.len();
-            Some(ret)
+            if signers.len() <= num_peers {
+                Some(signers.iter().cloned().collect())
+            } else {
+                let ret = signers
+                    .iter()
+                    .cycle()
+                    .skip(self.next_index)
+                    .take(num_peers)
+                    .cloned()
+                    .collect();
+                self.next_index = (self.next_index + num_peers) % signers.len();
+                Some(ret)
+            }
         } else {
             None
         }
