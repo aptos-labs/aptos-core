@@ -2,7 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
+//#![forbid(unsafe_code)]
 
 /// Returns the hash (SHA-3-256) of the bytes.
 pub fn sha3_256(bytes: &[u8]) -> [u8; 32] {
@@ -36,7 +36,9 @@ macro_rules! debug_writeln {
 pub mod code;
 pub mod delayed_values;
 pub mod gas;
+pub mod interner;
 pub mod loaded_data;
+pub mod module_id_interner;
 pub mod natives;
 pub mod resolver;
 pub mod ty_interner;

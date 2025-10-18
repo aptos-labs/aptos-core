@@ -399,15 +399,20 @@ mod test {
         V: Deref<Target = Arc<D>>,
         E: WithSize,
     {
-        assert_ok!(manager
-            .environment
-            .as_mut()
-            .unwrap()
-            .runtime_environment()
-            .struct_name_to_idx_for_test(StructIdentifier {
-                module: ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap()),
+        let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
+
+        let module_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap());
+        let interned_module_id = runtime_environment
+            .module_id_pool()
+            .intern(module_id.clone());
+
+        assert_ok!(
+            runtime_environment.struct_name_to_idx_for_test(StructIdentifier {
+                module: module_id,
+                interned_module_id,
                 name: Identifier::new(name).unwrap()
-            }));
+            })
+        );
     }
 
     fn assert_struct_name_index_map_size_eq<K, D, V, E>(
