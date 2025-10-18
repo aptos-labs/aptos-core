@@ -3,7 +3,7 @@
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 
-pub mod fixedbasemsms;
+pub mod fixed_base_msms;
 pub mod tuple;
 
 /// A `Homomorphism` represents a structure-preserving map between algebraic objects.

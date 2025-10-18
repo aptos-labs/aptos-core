@@ -5,7 +5,7 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
-        homomorphism::{fixedbasemsms::Trait, EntrywiseMap},
+        homomorphism::{fixed_base_msms::Trait, EntrywiseMap},
         Witness,
     },
 };

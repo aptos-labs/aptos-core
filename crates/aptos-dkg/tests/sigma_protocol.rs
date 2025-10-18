@@ -4,7 +4,7 @@
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{fixedbasemsms, fixedbasemsms::Trait, tuple::TupleHomomorphism},
+        homomorphism::{fixed_base_msms, fixed_base_msms::Trait, tuple::TupleHomomorphism},
     },
     Scalar,
 };
@@ -61,18 +61,18 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> fixedbasemsms::Trait for Schnorr<E> {
+    impl<E: Pairing> fixed_base_msms::Trait for Schnorr<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone;
-        type MsmInput = fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-            CodomainShape(fixedbasemsms::MsmInput {
+            CodomainShape(fixed_base_msms::MsmInput {
                 bases: vec![self.g],
                 scalars: vec![input.0],
             })

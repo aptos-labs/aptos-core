@@ -5,19 +5,14 @@ use crate::range_proofs::traits::BatchedRangeProof;
 use ark_ec::pairing::Pairing;
 use ark_std::rand::{CryptoRng, RngCore};
 
+/// Generate a **random instance** (values + commitment) given a fixed setup.
 pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCore + CryptoRng>(
+    pk: &B::ProverKey,
     n: usize,
     ell: usize,
     rng: &mut R,
-) -> (
-    B::ProverKey,
-    B::VerificationKey,
-    Vec<B::Input>,
-    B::Commitment,
-    B::CommitmentRandomness,
-) {
-    let (pk, vk) = B::setup(n, ell, rng); // TODO: potentially change these values back to n + 10 and ell + 10?
-
+) -> (Vec<B::Input>, B::Commitment, B::CommitmentRandomness) {
+    // TODO: One might want to assert something like n <= pk.max_n here, for which you'd have to e.g. add a trait HasMaxN to ProverKey
     let ell_bit_values: Vec<B::Input> = (0..n)
         .map(|_| {
             let val = rng.next_u64() >> (64 - ell);
@@ -25,10 +20,7 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
         })
         .collect();
 
-    let (comm, r) = B::commit(
-        &B::commitment_key_from_prover_key(&pk),
-        &ell_bit_values,
-        rng,
-    );
-    (pk, vk, ell_bit_values, comm, r)
+    let (comm, r) = B::commit(&B::commitment_key_from_prover_key(pk), &ell_bit_values, rng);
+
+    (ell_bit_values, comm, r)
 }
