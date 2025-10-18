@@ -349,16 +349,24 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public fun destroy_bulk_order_place_response<M: store + copy + drop>(
+    public fun is_bulk_order_success_response<M: store + copy + drop>(
+        response: &BulkOrderPlaceResponse<M>
+    ): bool {
+        response is BulkOrderPlaceResponse::Success
+    }
+
+    public fun destroy_bulk_order_place_success_response<M: store + copy + drop>(
         response: BulkOrderPlaceResponse<M>
-    ): (option::Option<BulkOrder<M>>, option::Option<std::string::String>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, option::Option<u64>) {
-        if (response is BulkOrderPlaceResponse::Success) {
-            let BulkOrderPlaceResponse::Success { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
-            (option::some(order), option::none(), cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
-        } else {
-            let BulkOrderPlaceResponse::Rejection { reason } = response;
-            (option::none(), option::some(reason), vector::empty<u64>(), vector::empty<u64>(), vector::empty<u64>(), vector::empty<u64>(), option::none())
-        }
+    ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, option::Option<u64>) {
+        let BulkOrderPlaceResponse::Success { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
+        (order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
+    }
+
+    public fun destroy_bulk_order_place_reject_response<M: store + copy + drop>(
+        response: BulkOrderPlaceResponse<M>
+    ): std::string::String {
+        let BulkOrderPlaceResponse::Rejection { reason } = response;
+        reason
     }
 
     public fun new_bulk_order_request_response_success<M: store + copy + drop>(
