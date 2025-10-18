@@ -83,6 +83,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         };
 
         // Builtin Constants (for specifications)
+
+        // Unsigned integers
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U8"),
             mk_int_const(
@@ -132,6 +134,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             ),
         );
 
+        // Signed integers
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I8"),
             mk_int_const(

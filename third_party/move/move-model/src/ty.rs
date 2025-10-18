@@ -1235,6 +1235,36 @@ impl Type {
         false
     }
 
+    /// Returns true if this is signed int type.
+    pub fn is_signed_int(&self) -> bool {
+        matches!(
+            self,
+            Type::Primitive(
+                PrimitiveType::I8
+                    | PrimitiveType::I16
+                    | PrimitiveType::I32
+                    | PrimitiveType::I64
+                    | PrimitiveType::I128
+                    | PrimitiveType::I256
+            )
+        )
+    }
+
+    /// Returns true if this is unsigned int type.
+    pub fn is_unsigned_int(&self) -> bool {
+        matches!(
+            self,
+            Type::Primitive(
+                PrimitiveType::U8
+                    | PrimitiveType::U16
+                    | PrimitiveType::U32
+                    | PrimitiveType::U64
+                    | PrimitiveType::U128
+                    | PrimitiveType::U256
+            )
+        )
+    }
+
     /// Returns compatible number type if `self` and `ty` are compatible number types.
     pub fn is_compatible_num_type(&self, ty: &Type) -> Option<Type> {
         let skip_reference_self = self.skip_reference();
