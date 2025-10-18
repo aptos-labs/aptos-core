@@ -12,6 +12,7 @@ pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCo
     ell: usize,
     rng: &mut R,
 ) -> (Vec<B::Input>, B::Commitment, B::CommitmentRandomness) {
+    // TODO: One might want to assert something like n <= pk.max_n here, for which you'd have to e.g. add a trait HasMaxN to ProverKey
     let ell_bit_values: Vec<B::Input> = (0..n)
         .map(|_| {
             let val = rng.next_u64() >> (64 - ell);
