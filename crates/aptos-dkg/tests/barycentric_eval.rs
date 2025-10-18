@@ -7,7 +7,7 @@ use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, Polynomial};
 use ark_std::UniformRand;
 
 #[test]
-fn test_barycentric_eval_() {
+fn test_barycentric_eval() {
     type F = ark_bls12_381::Fr;
     let mut rng = ark_std::rand::thread_rng();
 

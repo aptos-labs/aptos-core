@@ -110,6 +110,7 @@ const TEST_CASES: &[(usize, usize)] = &[
     // (2047, 32),
 ];
 
+#[cfg(test)]
 /// A **reusable** setup structure.
 struct RangeProofFixedSetup<E: Pairing, B: BatchedRangeProof<E>> {
     pk: B::ProverKey,
