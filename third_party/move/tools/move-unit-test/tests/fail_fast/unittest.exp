@@ -1,0 +1,46 @@
+Running Move unit tests
+[ FAIL    ] 0x1::UnitTest::test_ba
+[ PASS    ] 0x1::UnitTest::test_bar
+[ FAIL    ] 0x1::UnitTest::test_baz
+[ PASS    ] 0x1::UnitTest::test_foo
+0x1::UnitTest::test_ba
+Output: Ok(Changes { accounts: {} })
+0x1::UnitTest::test_bar
+Output: Ok(Changes { accounts: {} })
+0x1::UnitTest::test_baz
+Output: Ok(Changes { accounts: {} })
+0x1::UnitTest::test_foo
+Output: Ok(Changes { accounts: {} })
+
+Test failures:
+
+Failures in 0x1::UnitTest:
+
+┌── test_ba ──────
+│ error[E11001]: test failure
+│    ┌─ unittest.move:19:9
+│    │
+│ 17 │     fun test_ba() {
+│    │         ------- In this function in 0x1::UnitTest
+│ 18 │         let ret = bar(17);
+│ 19 │         assert!(ret == 19, ONE);
+│    │         ^^^^^^ Test was not expected to error, but it aborted with code 131073 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::UnitTest rooted here
+│ 
+│ 
+└──────────────────
+
+
+┌── test_baz ──────
+│ error[E11001]: test failure
+│    ┌─ unittest.move:13:9
+│    │
+│ 11 │     fun test_baz() {
+│    │         -------- In this function in 0x1::UnitTest
+│ 12 │         let ret = bar(17);
+│ 13 │         assert!(ret == 18, ONE);
+│    │         ^^^^^^ Test was not expected to error, but it aborted with code 131073 originating in the module 0000000000000000000000000000000000000000000000000000000000000001::UnitTest rooted here
+│ 
+│ 
+└──────────────────
+
+Test result: FAILED. Total tests: 4; passed: 2; failed: 2
