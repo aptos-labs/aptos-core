@@ -6,7 +6,7 @@ use crate::{
     natives::aptos_natives_with_builder,
     prod_configs::{
         aptos_default_ty_builder, aptos_prod_ty_builder, aptos_prod_vm_config,
-        get_timed_feature_override,
+        get_async_runtime_checks, get_timed_feature_override,
     },
 };
 use aptos_gas_algebra::DynamicExpression;
@@ -120,6 +120,11 @@ impl AptosEnvironment {
     pub fn verifier_config_bytes(&self) -> &Vec<u8> {
         &self.0.verifier_bytes
     }
+
+    /// Returns true if runtime checks can be performed after execution.
+    pub fn async_runtime_checks_enabled(&self) -> bool {
+        self.0.async_runtime_checks_enabled
+    }
 }
 
 impl Clone for AptosEnvironment {
@@ -174,6 +179,11 @@ struct Environment {
     /// We stored bytes instead of hash because config is expected to be smaller than the crypto
     /// hash itself.
     verifier_bytes: Vec<u8>,
+
+    /// If true, runtime checks such as paranoid may be not performed during execution, and instead
+    /// at post-commit time in Block-STM based on the collected execution trace. This is a node
+    /// config and will never change for the lifetime of the environment.
+    async_runtime_checks_enabled: bool,
 }
 
 impl Environment {
@@ -261,6 +271,7 @@ impl Environment {
             inject_create_signer_for_gov_sim,
             hash,
             verifier_bytes,
+            async_runtime_checks_enabled: get_async_runtime_checks(),
         }
     }
 

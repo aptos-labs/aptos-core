@@ -243,23 +243,14 @@ pub trait MoveTestAdapter<'a>: Sized {
                     .collect::<Vec<_>>();
 
                 let (unit, opt_model, warnings_opt) = {
-                    // Run the V2 compiler if requested
-                    let TestRunConfig {
-                        language_version,
-                        experiments,
-                        vm_config: _,
-                        use_masm: _,
-                        echo: _,
-                        cross_compilation_targets: _,
-                    } = run_config;
                     compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
                         &deps,
                         data_path.to_owned(),
                         self.known_attributes(),
-                        language_version,
-                        experiments,
+                        run_config.language_version,
+                        run_config.experiments,
                     )?
                 };
                 let (named_addr_opt, module) = match unit {
@@ -323,15 +314,6 @@ pub trait MoveTestAdapter<'a>: Sized {
         let (script, opt_model, warning_opt) = match syntax {
             SyntaxChoice::Source => {
                 let (unit, opt_model, warning_opt) = {
-                    // Run the V2 compiler.
-                    let TestRunConfig {
-                        language_version,
-                        experiments: v2_experiments,
-                        vm_config: _,
-                        use_masm: _,
-                        echo: _,
-                        cross_compilation_targets: _,
-                    } = run_config;
                     compile_source_unit_v2(
                         state.pre_compiled_deps_v2,
                         state.named_address_mapping.clone(),
@@ -342,8 +324,8 @@ pub trait MoveTestAdapter<'a>: Sized {
                             .collect::<Vec<_>>(),
                         data_path.to_owned(),
                         self.known_attributes(),
-                        language_version,
-                        v2_experiments,
+                        run_config.language_version,
+                        run_config.experiments,
                     )?
                 };
                 match unit {

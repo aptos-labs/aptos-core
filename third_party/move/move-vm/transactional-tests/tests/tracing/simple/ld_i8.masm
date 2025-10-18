@@ -1,0 +1,8 @@
+//# publish
+module 0x22::test
+
+public fun ld_i8_instr(): i8
+    ld_i8 -8
+    ret
+
+//# run --verbose 0x22::test::ld_i8_instr --display-trace

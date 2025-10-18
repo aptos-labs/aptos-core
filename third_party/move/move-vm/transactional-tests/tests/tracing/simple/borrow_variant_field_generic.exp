@@ -1,0 +1,19 @@
+processed 2 tasks
+task 0 lines 1-16:  publish [module 0x22::test]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000022::test'. Got VMError: {
+    major_status: NUMBER_OF_TYPE_ARGUMENTS_MISMATCH,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 1 lines 18-18:  run --verbose 0x22::test::borrow_variant_field_generic_instr --display-trace
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000022::test doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

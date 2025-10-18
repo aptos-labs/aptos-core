@@ -38,7 +38,9 @@ use aptos_transaction_generator_lib::WorkflowProgress;
 use aptos_transaction_workloads_lib::args::TransactionTypeArg;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
-use aptos_vm_environment::prod_configs::{set_layout_caches, set_paranoid_type_checks};
+use aptos_vm_environment::prod_configs::{
+    set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
+};
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
 use std::{
@@ -628,6 +630,7 @@ fn main() {
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
     }
+    set_async_runtime_checks(true);
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
