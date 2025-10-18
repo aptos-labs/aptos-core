@@ -15,6 +15,18 @@ use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 
+pub(crate) fn differentiate<F: Field>(coeffs: &Vec<F>) -> Vec<F> {
+    // TODO: use arkworks instead?
+    let degree = coeffs.len().saturating_sub(1);
+    let mut result = Vec::with_capacity(degree);
+
+    for i in 0..degree {
+        result.push(coeffs[i + 1].mul(F::from((i + 1) as u64)));
+    }
+
+    result
+}
+
 pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
     for i in 0..degree {
@@ -22,6 +34,96 @@ pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     }
 
     coeffs.truncate(degree);
+}
+
+/// Computes a batch of quotient evaluations of the form `(f(ω^i) - y) / (ω^i - x)`
+/// for a set of field elements `ω^i`.
+///
+/// # Arguments
+/// * `f_evals` - Slice of field elements representing `f(ω^i)`.
+/// * `roots` - Slice of field elements representing `ω^i`. Must have the same length as `f_evals`.
+/// * `x` - The field element `x` in the denominator `(ω^i - x)`.
+/// * `y` - The field element `y` subtracted from each `f(ω^i)` in the numerator.
+///
+/// # Returns
+/// A `Vec<F>` containing the evaluations of `(f(ω^i) - y) / (ω^i - x)` for each `i`.
+///
+/// # TODO: Add some tests?
+pub(crate) fn quotient_evaluations_batch<F: Field>(
+    f_evals: &[F], // f(ω^i)
+    roots: &[F],   // ω^i
+    x: F,
+    y: F,
+) -> Vec<F> {
+    assert_eq!(f_evals.len(), roots.len());
+
+    // Step 1: compute denominators ω^i - x
+    let mut denoms: Vec<F> = roots.iter().map(|&r| r - x).collect();
+
+    // Step 2: batch inversion in place
+    ark_ff::batch_inversion(&mut denoms);
+
+    // Step 3: multiply numerators by inverses
+    f_evals
+        .iter()
+        .zip(denoms.iter())
+        .map(|(&f_val, &denom_inv)| (f_val - y) * denom_inv)
+        .collect()
+}
+
+/// Evaluate a polynomial given by its values at roots of unity
+/// using the barycentric formula in a field `F`.
+///
+/// `evals[j] = f(roots_of_unity_in_eval_dom[j])`
+///
+/// # Arguments
+/// * `evals` - evaluations of the polynomial at the roots of unity
+/// * `roots_of_unity_in_eval_dom` - the roots of unity
+/// * `x` - the point at which to evaluate the polynomial
+///
+/// # Returns
+/// * `f(x)` in `F`
+///
+/// # TODO: Add some tests?
+pub fn barycentric_eval<F: Field>(evals: &[F], roots_of_unity_in_eval_dom: &[F], x: F) -> F {
+    // TODO: Add n_inv precomputed
+    let n = evals.len();
+    assert_eq!(n, roots_of_unity_in_eval_dom.len());
+
+    // If x exactly matches a root, return the corresponding evaluation
+    for (root, val) in roots_of_unity_in_eval_dom.iter().zip(evals.iter()) {
+        if *root == x {
+            return *val;
+        }
+    }
+
+    // Compute denominators (x - omega^j)
+    let mut denoms: Vec<F> = roots_of_unity_in_eval_dom
+        .iter()
+        .map(|&omega_j| x - omega_j)
+        .collect();
+
+    // Compute prefactor: (x^n - 1) / n
+    let mut z_pow_n = x.pow([n as u64]);
+    z_pow_n -= F::one();
+    let n_inv = F::from(n as u64).inverse().unwrap();
+    let prefactor = z_pow_n * n_inv;
+
+    // Efficient batch inversion and multiply by prefactor in place
+    //ark_ff::batch_inversion_and_mul(&mut denoms, &prefactor);
+    ark_ff::batch_inversion(&mut denoms); // TODO: which approach is faster?
+
+    // Compute sum_j (omega^j * f(omega^j) * (prefactor / (x - omega^j)))
+    let mut sum = F::zero();
+    for ((omega_j, &f_j), &inv_pref_denom_j) in roots_of_unity_in_eval_dom
+        .iter()
+        .zip(evals.iter())
+        .zip(denoms.iter())
+    {
+        sum += *omega_j * f_j * inv_pref_denom_j;
+    }
+    sum *= prefactor; ///////
+    sum
 }
 
 /// Returns $\[1, \tau, \tau^2, \tau^3, \ldots, \tau^{n-1}\]$.

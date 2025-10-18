@@ -148,23 +148,18 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
-    #[allow(dead_code)]
     fn append_hat_f_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
-    #[allow(dead_code)]
     fn append_sigma_proof<A: CanonicalSerialize>(&mut self, sigma_proof: &A);
 
     fn append_f_j_commitments<A: CanonicalSerialize>(&mut self, f_j_commitments: &A);
 
-    #[allow(dead_code)]
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
-    #[allow(dead_code)]
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
     fn challenges_for_linear_combination(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
-    #[allow(dead_code)]
     fn challenge_from_verifier(&mut self) -> E::ScalarField;
 }
 

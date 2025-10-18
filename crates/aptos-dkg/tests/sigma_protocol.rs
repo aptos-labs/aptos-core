@@ -4,7 +4,7 @@
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
-        homomorphism::{fixedbasemsms, fixedbasemsms::Trait, tuple::TupleHomomorphism},
+        homomorphism::{fixed_base_msms, fixed_base_msms::Trait, tuple::TupleHomomorphism},
     },
     Scalar,
 };
@@ -61,18 +61,18 @@ mod schnorr {
         }
     }
 
-    impl<E: Pairing> fixedbasemsms::Trait for Schnorr<E> {
+    impl<E: Pairing> fixed_base_msms::Trait for Schnorr<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone;
-        type MsmInput = fixedbasemsms::MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-            CodomainShape(fixedbasemsms::MsmInput {
+            CodomainShape(fixed_base_msms::MsmInput {
                 bases: vec![self.g],
                 scalars: vec![input.0],
             })
@@ -144,4 +144,25 @@ fn test_chaum_pedersen() {
     // ---- Bls12_381 ----
     let witness_bls = Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
     test_sigma_protocol::<Bls12_381, _>(make_chaum_pedersen_instance(), witness_bls);
+}
+
+#[test]
+fn test_two_term_msm() {
+    use aptos_dkg::{range_proofs::dekart_univariate_v2::two_term_msm::*, Scalar};
+
+    let mut rng = thread_rng();
+
+    // ---- Bn254 ----
+    let witness_bn = Witness {
+        kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
+        hiding_kzg_randomness: Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng)),
+    };
+    test_sigma_protocol::<Bn254, _>(Homomorphism::default(), witness_bn);
+
+    // ---- Bls12_381 ----
+    let witness_bn = Witness {
+        kzg_randomness: Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng)),
+        hiding_kzg_randomness: Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng)),
+    };
+    test_sigma_protocol::<Bls12_381, _>(Homomorphism::default(), witness_bn);
 }

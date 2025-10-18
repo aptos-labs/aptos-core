@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::polynomials, fiat_shamir, pcs::univariate_kzg_commitment, range_proofs::traits,
+    algebra::polynomials, fiat_shamir, pcs::univariate_kzg, range_proofs::traits,
     sigma_protocol::homomorphism::Trait, utils,
 };
 use anyhow::ensure;
@@ -203,10 +203,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         values: &[Self::Input],
         r: &Self::CommitmentRandomness,
     ) -> Commitment<E> {
-        let kzg_commit_hom: univariate_kzg_commitment::Homomorphism<'_, E> =
-            univariate_kzg_commitment::Homomorphism {
-                lagr_g1: &pk.lagr_g1,
-            };
+        let kzg_commit_hom: univariate_kzg::Homomorphism<'_, E> = univariate_kzg::Homomorphism {
+            lagr_g1: &pk.lagr_g1,
+        };
 
         let input = (*r, values.to_vec());
 

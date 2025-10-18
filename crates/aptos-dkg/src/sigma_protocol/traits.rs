@@ -5,7 +5,7 @@ use crate::{
     fiat_shamir,
     sigma_protocol::{
         homomorphism,
-        homomorphism::fixedbasemsms::{IsMsmInput, Trait as FixedBaseMsmsTrait},
+        homomorphism::fixed_base_msms::{IsMsmInput, Trait as FixedBaseMsmsTrait},
     },
     utils, Scalar,
 };
