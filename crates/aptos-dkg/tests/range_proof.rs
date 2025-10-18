@@ -24,21 +24,21 @@ fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(
     let mut rng = thread_rng();
     let RangeProofFixedSetup { pk, vk } = setup;
     let (values, comm, r) =
-        test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+        test_utils::range_proof_random_instance::<_, B, _>(pk, n, ell, &mut rng);
     println!("setup finished, prove starting for n={}, ell={}", n, ell);
 
     let mut fs_t = merlin::Transcript::new(B::DST);
-    let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+    let proof = B::prove(pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
     println!("prove finished, vrfy1 starting (n={}, ell={})", n, ell);
 
     let mut fs_t = merlin::Transcript::new(B::DST);
-    proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
+    proof.verify(vk, n, ell, &comm, &mut fs_t).unwrap();
 
     println!("vrfy finished, vrfy2 starting (n={}, ell={})", n, ell);
     let mut invalid_proof = proof.clone();
     invalid_proof.maul();
     let mut fs_t = merlin::Transcript::new(B::DST);
-    assert!(invalid_proof.verify(&vk, n, ell, &comm, &mut fs_t).is_err())
+    assert!(invalid_proof.verify(vk, n, ell, &comm, &mut fs_t).is_err())
 }
 
 #[cfg(test)]
@@ -50,11 +50,11 @@ fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
     let mut rng = thread_rng();
     let RangeProofFixedSetup { pk, vk } = setup;
     let (values, comm, r) =
-        test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+        test_utils::range_proof_random_instance::<_, B, _>(pk, n, ell, &mut rng);
     println!("setup finished, prove starting for n={}, ell={}", n, ell);
 
     let mut fs_t = merlin::Transcript::new(B::DST);
-    let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+    let proof = B::prove(pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
 
     // === Serialize to memory ===
     let encoded = {
@@ -77,13 +77,13 @@ fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
 
     // Verify still succeeds
     let mut fs_t = merlin::Transcript::new(B::DST);
-    decoded.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
+    decoded.verify(vk, n, ell, &comm, &mut fs_t).unwrap();
 
     // Make invalid
     let mut invalid_proof = decoded.clone();
     invalid_proof.maul();
     let mut fs_t = merlin::Transcript::new(B::DST);
-    assert!(invalid_proof.verify(&vk, n, ell, &comm, &mut fs_t).is_err());
+    assert!(invalid_proof.verify(vk, n, ell, &comm, &mut fs_t).is_err());
 
     println!(
         "Serialization round-trip test passed for n={}, ell={}",
@@ -111,9 +111,9 @@ const TEST_CASES: &[(usize, usize)] = &[
 ];
 
 /// A **reusable** setup structure.
-pub struct RangeProofFixedSetup<E: Pairing, B: BatchedRangeProof<E>> {
-    pub pk: B::ProverKey,
-    pub vk: B::VerificationKey,
+struct RangeProofFixedSetup<E: Pairing, B: BatchedRangeProof<E>> {
+    pk: B::ProverKey,
+    vk: B::VerificationKey,
 }
 
 #[cfg(test)]
