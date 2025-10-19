@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use aptos_dkg::algebra::polynomials::barycentric_eval;
 use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_ff::{FftField, Field, UniformRand};
