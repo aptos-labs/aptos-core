@@ -859,27 +859,27 @@ The first price levels of both bid and ask sides will be activated in the active
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
     ascending_id_generator: &<b>mut</b> AscendingIdGenerator,
     order_req: BulkOrderRequest&lt;M&gt;
-) : aptos_experimental::bulk_order_book_types::BulkOrderPlaceResponse&lt;M&gt; {
+) : BulkOrderPlaceResponse&lt;M&gt; {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = get_account_from_order_request(&order_req);
-    <b>let</b> new_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_order_request(&order_req);
+    <b>let</b> new_sequence_number = get_sequence_number_from_order_request(&order_req);
     <b>let</b> order_option = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-    <b>let</b> order_id = <b>if</b> (order_option.is_some()) {
+    <b>let</b> (order_id, previous_seq_num) = <b>if</b> (order_option.is_some()) {
         <b>let</b> old_order = order_option.destroy_some();
-        <b>let</b> existing_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_bulk_order(&old_order);
+        <b>let</b> existing_sequence_number = get_sequence_number_from_bulk_order(&old_order);
         <b>if</b> (new_sequence_number &lt;= existing_sequence_number) {
             // Return rejection response for invalid sequence number
-            <b>return</b> aptos_experimental::bulk_order_book_types::new_bulk_order_place_response_rejection(
+            <b>return</b> new_bulk_order_place_response_rejection(
                 std::string::utf8(b"Invalid sequence number")
             );
         };
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
-        old_order.get_order_id()
+        (old_order.get_order_id(), std::option::some(existing_sequence_number))
     } <b>else</b> {
         <b>let</b> order_id = new_order_id_type(ascending_id_generator.next_ascending_id());
         self.order_id_to_address.add(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-        order_id
+        (order_id, std::option::none())
     };
-    <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = aptos_experimental::bulk_order_book_types::new_bulk_order(
+    <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = new_bulk_order(
         order_id,
         new_unique_idx_type(ascending_id_generator.next_ascending_id()),
         order_req,
@@ -889,12 +889,13 @@ The first price levels of both bid and ask sides will be activated in the active
     self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bulk_order);
     // Activate the first price levels in the active order book
     <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_levels">activate_first_price_levels</a>(price_time_idx, &bulk_order, order_id);
-    aptos_experimental::bulk_order_book_types::new_bulk_order_place_response_success(
+    new_bulk_order_place_response_success(
         bulk_order,
         cancelled_bid_prices,
         cancelled_bid_sizes,
         cancelled_ask_prices,
-        cancelled_ask_sizes
+        cancelled_ask_sizes,
+        previous_seq_num
     )
 }
 </code></pre>

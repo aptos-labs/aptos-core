@@ -757,8 +757,8 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_place_bulk_order">place_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: aptos_experimental::bulk_order_book_types::BulkOrderRequest&lt;M&gt;
-) : aptos_experimental::bulk_order_book_types::BulkOrderPlaceResponse&lt;M&gt; {
+    self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: BulkOrderRequest&lt;M&gt;
+) : BulkOrderPlaceResponse&lt;M&gt; {
     self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_place_bulk_order">place_bulk_order</a>(
         &<b>mut</b> self.price_time_idx,
         &<b>mut</b> self.ascending_id_generator,

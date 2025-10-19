@@ -539,12 +539,6 @@ identifier, account, priority index, price, sizes, and side.
 
 </dd>
 <dt>
-<code>orig_size: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
 <code>remaining_size: u64</code>
 </dt>
 <dd>
@@ -1258,7 +1252,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, u64, M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, bool, u64, M)
 </code></pre>
 
 
@@ -1269,19 +1263,18 @@ particular match operation.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, u64, M) {
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, bool, u64, M) {
     <b>let</b> OrderMatchDetails::BulkOrder {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         unique_priority_idx,
         price,
-        orig_size,
         remaining_size,
         is_bid,
         sequence_number,
         metadata,
     } = self;
-    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, unique_priority_idx, price, orig_size, remaining_size, is_bid, sequence_number, metadata)
+    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, unique_priority_idx, price, remaining_size, is_bid, sequence_number, metadata)
 }
 </code></pre>
 
@@ -1702,7 +1695,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, sequence_number: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, remaining_size: u64, is_bid: bool, sequence_number: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1716,7 +1709,6 @@ Validates that a reinsertion request is valid for the given original order.
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>,
     price: u64,
-    orig_size: u64,
     remaining_size: u64,
     is_bid: bool,
     sequence_number: u64,
@@ -1727,7 +1719,6 @@ Validates that a reinsertion request is valid for the given original order.
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         unique_priority_idx,
         price,
-        orig_size,
         remaining_size,
         is_bid,
         sequence_number,
@@ -1790,7 +1781,6 @@ Validates that a reinsertion request is valid for the given original order.
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
             unique_priority_idx,
             price,
-            orig_size,
             remaining_size: _,
             is_bid,
             sequence_number,
@@ -1801,7 +1791,6 @@ Validates that a reinsertion request is valid for the given original order.
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: *<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
             unique_priority_idx: *unique_priority_idx,
             price: *price,
-            orig_size: *orig_size,
             remaining_size,
             is_bid: *is_bid,
             sequence_number: *sequence_number,
@@ -1906,7 +1895,6 @@ Validates that a reinsertion request is valid for the given original order.
     self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == other.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> &&
     self.unique_priority_idx == other.unique_priority_idx &&
     self.price == other.price &&
-    self.orig_size == other.orig_size &&
     self.is_bid == other.is_bid &&
     self.sequence_number == other.sequence_number
 }

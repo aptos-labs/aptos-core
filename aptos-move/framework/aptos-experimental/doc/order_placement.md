@@ -1162,6 +1162,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 maker_order.get_account_from_match_details(),
                 settled_size,
                 maker_order.get_price_from_match_details(),
+                maker_order.get_price_from_match_details(),
                 !is_bid,
             );
         } <b>else</b> {
