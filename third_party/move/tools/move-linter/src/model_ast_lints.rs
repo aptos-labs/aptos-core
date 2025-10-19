@@ -16,6 +16,7 @@ mod needless_bool;
 mod needless_deref_ref;
 mod needless_ref_deref;
 mod needless_ref_in_field_access;
+mod needless_return;
 mod nonminimal_bool;
 mod self_assignment;
 mod simpler_bool_expression;
@@ -43,6 +44,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<needless_deref_ref::NeedlessDerefRef>::default(),
         Box::<needless_ref_deref::NeedlessRefDeref>::default(),
         Box::<needless_ref_in_field_access::NeedlessRefInFieldAccess>::default(),
+        Box::<needless_return::NeedlessReturn>::default(),
         Box::<nonminimal_bool::NonminimalBool>::default(),
         Box::<self_assignment::SelfAssignment>::default(),
         Box::<simpler_bool_expression::SimplerBoolExpression>::default(),

@@ -67,6 +67,10 @@ impl traits::Transcript for Transcript {
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
+    fn dst() -> Vec<u8> {
+        b"APTOS_INSECURE_FIELD_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
+
     fn scheme_name() -> String {
         "insecure_field_pvss".to_string()
     }

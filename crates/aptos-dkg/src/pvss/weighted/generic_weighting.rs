@@ -105,6 +105,12 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Generi
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 
+    fn dst() -> Vec<u8> {
+        let mut result = b"WEIGHTED_".to_vec();
+        result.extend(T::dst());
+        result
+    }
+
     fn scheme_name() -> String {
         format!("generic_weighted_{}", T::scheme_name())
     }

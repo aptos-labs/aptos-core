@@ -8,6 +8,7 @@ use crate::{
     dedicated_handlers::pepper_request::handle_pepper_request,
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    vuf_keypair::VUFKeypair,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
 use aptos_keyless_pepper_common::{
@@ -40,7 +41,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
     // TODO: is there a way we can remove the vuf_private_key param here?
     async fn handle_request(
         &self,
-        vuf_private_key: Arc<ark_bls12_381::Fr>,
+        vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: TRequest,
@@ -56,7 +57,7 @@ pub struct V0DelegatedFetchHandler;
 impl HandlerTrait<PepperRequestV2, PepperResponse> for V0DelegatedFetchHandler {
     async fn handle_request(
         &self,
-        vuf_private_key: Arc<ark_bls12_381::Fr>,
+        vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequestV2,
@@ -79,7 +80,7 @@ impl HandlerTrait<PepperRequestV2, PepperResponse> for V0DelegatedFetchHandler {
 
         // Fetch the pepper
         let (_pepper_base, pepper, address) = handle_pepper_request(
-            vuf_private_key,
+            vuf_keypair,
             jwk_cache,
             cached_resources,
             jwt,
@@ -109,7 +110,7 @@ pub struct V0FetchHandler;
 impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
     async fn handle_request(
         &self,
-        vuf_private_key: Arc<ark_bls12_381::Fr>,
+        vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
@@ -128,7 +129,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
 
         // Fetch the pepper
         let (_pepper_base, pepper, address) = handle_pepper_request(
-            vuf_private_key,
+            vuf_keypair,
             jwk_cache,
             cached_resources,
             jwt,
@@ -158,7 +159,7 @@ pub struct V0SignatureHandler;
 impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
     async fn handle_request(
         &self,
-        vuf_private_key: Arc<ark_bls12_381::Fr>,
+        vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: PepperRequest,
@@ -177,7 +178,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
 
         // Fetch the pepper base (i.e., VUF signature)
         let (pepper_base, _pepper, _address) = handle_pepper_request(
-            vuf_private_key,
+            vuf_keypair,
             jwk_cache,
             cached_resources,
             jwt,
@@ -207,7 +208,7 @@ pub struct V0VerifyHandler;
 impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
     async fn handle_request(
         &self,
-        _: Arc<ark_bls12_381::Fr>,
+        _: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
         cached_resources: CachedResources,
         request: VerifyRequest,

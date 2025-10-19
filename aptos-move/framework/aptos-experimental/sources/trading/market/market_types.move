@@ -372,22 +372,44 @@ module aptos_experimental::market_types {
         parent: address,
         market: address,
         order_id: u128,
+        sequence_number: u64,
         user: address,
         bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+        previous_seq_num: u64,
     }
     #[event]
     struct BulkOrderFilledEvent has drop, copy, store {
         parent: address,
         market: address,
         order_id: u128,
+        sequence_number: u64,
         user: address,
         filled_size: u64,
         price: u64,
+        orig_price: u64,
         is_bid: bool,
     }
+
+    #[event]
+    struct BulkRejectedEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        sequence_number: u64,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        details: std::string::String,
+    }
+
 
     #[event]
     // This event is emitted when a bulk order is modified - especially when some levels of the bulk orders
@@ -598,11 +620,17 @@ module aptos_experimental::market_types {
     public fun emit_event_for_bulk_order_placed<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
+        sequence_number: u64,
         user: address,
         bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+        previous_seq_num: u64,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -611,11 +639,17 @@ module aptos_experimental::market_types {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
+                    sequence_number,
                     user,
                     bid_sizes,
                     bid_prices,
                     ask_sizes,
                     ask_prices,
+                    cancelled_bid_prices,
+                    cancelled_bid_sizes,
+                    cancelled_ask_prices,
+                    cancelled_ask_sizes,
+                    previous_seq_num,
                 }
             );
         };
@@ -646,9 +680,11 @@ module aptos_experimental::market_types {
     public fun emit_event_for_bulk_order_filled<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
+        sequence_number: u64,
         user: address,
         filled_size: u64,
         price: u64,
+        orig_price: u64,
         is_bid: bool,
     ) {
         // Final check whether event sending is enabled
@@ -658,9 +694,11 @@ module aptos_experimental::market_types {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
+                    sequence_number,
                     user,
                     filled_size,
                     price,
+                    orig_price,
                     is_bid,
                 }
             );
@@ -688,6 +726,34 @@ module aptos_experimental::market_types {
                     bid_prices,
                     ask_sizes,
                     ask_prices,
+                }
+            );
+        };
+    }
+
+    public fun emit_event_for_bulk_order_rejected<M: store + copy + drop>(
+        self: &Market<M>,
+        sequence_number: u64,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        details: std::string::String,
+    ) {
+        // Final check whether event sending is enabled
+        if (self.config.allow_events_emission) {
+            event::emit(
+                BulkRejectedEvent {
+                    parent: self.parent,
+                    market: self.market,
+                    sequence_number,
+                    user,
+                    bid_sizes,
+                    bid_prices,
+                    ask_sizes,
+                    ask_prices,
+                    details,
                 }
             );
         };
@@ -773,6 +839,7 @@ module aptos_experimental::market_types {
     public fun verify_bulk_order_filled_event(
         self: BulkOrderFilledEvent,
         order_id: OrderIdType,
+        sequence_number: u64,
         market: address,
         user: address,
         filled_size: u64,
@@ -780,6 +847,7 @@ module aptos_experimental::market_types {
         is_bid: bool,
     ) {
         assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.sequence_number == sequence_number);
         assert!(self.market == market);
         assert!(self.user == user);
         assert!(self.filled_size == filled_size);

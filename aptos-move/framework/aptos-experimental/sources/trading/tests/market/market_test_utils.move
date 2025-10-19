@@ -487,6 +487,7 @@ module aptos_experimental::market_test_utils {
             let maker_order_fill_event = bulk_filled_events[fill_index];
             maker_order_fill_event.verify_bulk_order_filled_event(
                 maker_order_id,
+                1, // sequence_number - using default for test (bulk orders use sequence 1)
                 market.get_market_address(),
                 maker_addr,
                 fill_size,

@@ -11,6 +11,7 @@ use crate::{
     error::PepperServiceError,
     external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
     utils,
+    vuf_keypair::VUFKeypair,
 };
 use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
@@ -67,7 +68,7 @@ const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
-    vuf_private_key: Arc<ark_bls12_381::Fr>,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
@@ -102,7 +103,7 @@ where
     // Invoke the handler and generate the response
     match request_handler
         .handle_request(
-            vuf_private_key,
+            vuf_keypair,
             jwk_cache,
             cached_resources,
             pepper_request,
@@ -304,7 +305,7 @@ fn generate_text_response(
 /// Handles the given request and returns a response
 pub async fn handle_request(
     request: Request<Body>,
-    vuf_keypair: Arc<(String, Arc<ark_bls12_381::Fr>)>,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
@@ -346,22 +347,24 @@ pub async fn handle_request(
                 );
             },
             VUF_PUB_KEY_PATH => {
-                let (vuf_pub_key, _) = vuf_keypair.deref();
-                return generate_json_response(origin, StatusCode::OK, vuf_pub_key.clone());
+                return generate_json_response(
+                    origin,
+                    StatusCode::OK,
+                    vuf_keypair.vuf_public_key_json().clone(),
+                );
             },
             _ => { /* Continue below */ },
         };
     }
 
     // Handle any POST requests
-    let (_, vuf_priv_key) = vuf_keypair.deref();
     if request_method == Method::POST {
         match request_path {
             DELEGATED_FETCH_PATH => {
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0DelegatedFetchHandler,
@@ -374,7 +377,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0FetchHandler,
@@ -387,7 +390,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0SignatureHandler,
@@ -400,7 +403,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0VerifyHandler,

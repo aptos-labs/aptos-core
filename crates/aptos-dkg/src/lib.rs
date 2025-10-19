@@ -18,13 +18,51 @@
 #![allow(clippy::borrow_interior_mutable_const)]
 
 use crate::constants::SCALAR_FIELD_ORDER;
+use ark_ec::pairing::Pairing;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 pub use constants::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 pub use utils::random::DST_RAND_CORE_HELL;
 
 pub mod algebra;
 pub mod constants;
 pub(crate) mod fiat_shamir;
+pub mod pcs;
 pub mod pvss;
 pub mod range_proofs;
+pub mod sigma_protocol;
 pub mod utils;
 pub mod weighted_vuf;
+
+/// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
+///
+/// Without this wrapper, implementing a trait both for `blstrs::Scalar` and for
+/// `E::ScalarField` would cause conflicts. For example, Rust would reject:
+/// - `impl<Trait> for blstrs::Scalar`
+/// - `impl<Trait> for E::ScalarField`
+///
+/// because some pairing engine `E` might (now or in the future) define
+/// `E::ScalarField = blstrs::Scalar`.
+///
+/// Similarly, this issue also arises with blanket implementations like:
+/// `impl<T: Trait> for Vec<T>`, since `Vec<T>` could itself be an
+/// `E::ScalarField`.
+/// #[repr(transparent)]
+#[repr(transparent)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Scalar<E: Pairing>(pub E::ScalarField);
+
+impl<E: Pairing> Scalar<E> {
+    /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]` without copying.
+    ///
+    /// # Safety
+    /// This function is safe because `Scalar<E>` is `#[repr(transparent)]`
+    /// over `E::ScalarField`, so the memory layouts are guaranteed to match.
+    pub fn slice_as_inner(slice: &[Self]) -> &[E::ScalarField] {
+        unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const E::ScalarField, slice.len()) }
+    }
+
+    pub fn vec_into_inner(v: Vec<Self>) -> Vec<E::ScalarField> {
+        let v = std::mem::ManuallyDrop::new(v);
+        unsafe { Vec::from_raw_parts(v.as_ptr() as *mut E::ScalarField, v.len(), v.capacity()) }
+    }
+}

@@ -1158,8 +1158,10 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         <b>if</b> (is_bulk_order) {
             market.emit_event_for_bulk_order_filled(
                 maker_order.get_order_id_from_match_details(),
+                maker_order.get_sequence_number_from_match_details(),
                 maker_order.get_account_from_match_details(),
                 settled_size,
+                maker_order.get_price_from_match_details(),
                 maker_order.get_price_from_match_details(),
                 !is_bid,
             );

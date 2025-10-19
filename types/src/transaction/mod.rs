@@ -1536,10 +1536,17 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, features: &Features) -> Self {
+    pub fn from_vm_status(
+        vm_status: VMStatus,
+        features: &Features,
+        memory_limit_exceeded_as_miscellaneous_error: bool,
+    ) -> Self {
         let status_code = vm_status.status_code();
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard(features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES)) {
+        match vm_status.keep_or_discard(
+            features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES),
+            memory_limit_exceeded_as_miscellaneous_error,
+        ) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
