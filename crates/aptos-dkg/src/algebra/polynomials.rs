@@ -101,7 +101,7 @@ pub fn barycentric_eval<F: Field>(
     let prefactor = z_pow_n * n_inv;
 
     // Efficient batch inversion
-    ark_ff::batch_inversion(&mut denoms); // Using batch_inversion_and_mul here instead shouldn't speed things up
+    ark_ff::batch_inversion(&mut denoms); // Using `batch_inversion_and_mul()` here instead shouldn't speed things up
 
     // Compute sum_j (omega^j * f(omega^j) * (prefactor / (x - omega^j)))
     let mut sum = F::zero();

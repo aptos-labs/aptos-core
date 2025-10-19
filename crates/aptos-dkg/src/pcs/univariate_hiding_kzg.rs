@@ -26,9 +26,8 @@ pub struct Commitment<E: Pairing>(pub E::G1);
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
 
-// TODO: Rename to OpeningProof?
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
-pub struct Proof<E: Pairing> {
+pub struct OpeningProof<E: Pairing> {
     pi_1: Commitment<E>,
     pi_2: E::G1,
 }
@@ -136,29 +135,26 @@ fn commit_with_randomness<E: Pairing>(
 }
 
 impl<'a, E: Pairing> Homomorphism<'a, E> {
-    // TODO: should maybe make `y` part of the input, since it's often computed before invoking `open()`
     pub fn open(
         ck: &CommitmentKey<E>,
         f_evals: Vec<E::ScalarField>,
         rho: E::ScalarField,
         x: E::ScalarField,
+        y: E::ScalarField,
         s: &CommitmentRandomness<E>,
-    ) -> Proof<E> {
+    ) -> OpeningProof<E> {
         if ck.roots_of_unity_in_eval_dom.contains(&x) {
             panic!("x is not allowed to be a root of unity");
         }
-
-        let y =
-            polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x, ck.m_inv);
-
         let q_evals =
             polynomials::quotient_evaluations_batch(&f_evals, &ck.roots_of_unity_in_eval_dom, x, y);
 
         let pi_1 = commit_with_randomness(ck, &q_evals, s);
 
+        // For this small MSM, the direct approach seems to be faster than using `E::G1::msm()`
         let pi_2 = (ck.one_1 * rho) - (ck.tau_1 - ck.one_1 * x) * s.0;
 
-        Proof { pi_1, pi_2 }
+        OpeningProof { pi_1, pi_2 }
     }
 
     #[allow(non_snake_case)]
@@ -167,7 +163,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         C: Commitment<E>,
         x: E::ScalarField,
         y: E::ScalarField,
-        pi: Proof<E>,
+        pi: OpeningProof<E>,
     ) -> anyhow::Result<()> {
         let VerificationKey {
             xi_2,
@@ -178,7 +174,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
                     g2: one_2,
                 },
         } = vk;
-        let Proof { pi_1, pi_2 } = pi;
+        let OpeningProof { pi_1, pi_2 } = pi;
 
         let check = E::multi_pairing(vec![C.0 - one_1 * y, -pi_1.0, -pi_2], vec![
             one_2,
@@ -277,8 +273,8 @@ mod tests {
         // Commit to f
         let comm = super::commit_with_randomness(&ck, &f_evals, &rho);
 
-        // Open at x
-        let proof = Homomorphism::<E>::open(&ck, f_evals, rho.0, x, &s);
+        // Open at x, will fail when x is a root of unity but the odds of that should be negligible
+        let proof = Homomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
 
         // Verify proof
         let verification = Homomorphism::<E>::verify(vk, comm, x, y, proof);
