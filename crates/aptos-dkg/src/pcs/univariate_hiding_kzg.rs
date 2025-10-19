@@ -242,50 +242,60 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use ark_bls12_381::{Bls12_381, Fr};
+    use ark_ec::pairing::Pairing;
     use ark_poly::{univariate::DensePolynomial, Polynomial};
     use ark_std::{rand::thread_rng, UniformRand};
 
-    // TODO: Should set up a PCS trait, then make this test generic? Also make it generic over E and then run it for BN254 and BLS12-381?
-    #[allow(non_snake_case)]
-    #[test]
-    fn test_open_and_verify_roundtrip() {
+    // TODO: Should set up a PCS trait, then make these tests generic?
+    fn generic_test_open_and_verify_roundtrip<E: Pairing>() {
         let mut rng = thread_rng();
         let group_data = GroupGenerators::sample(&mut rng);
 
-        let m = 64;
-        let xi = Fr::rand(&mut rng);
-        let tau = Fr::rand(&mut rng);
-        let (vk, ck) = setup::<Bls12_381, _>(m, group_data, Trapdoor { xi, tau }, &mut rng);
+        type Fr<E> = <E as Pairing>::ScalarField;
 
-        let f_coeffs: Vec<Fr> = (0..m).map(|_| Fr::rand(&mut rng)).collect();
-        let poly = DensePolynomial::<Fr> { coeffs: f_coeffs };
+        let m = 64;
+        let xi = Fr::<E>::rand(&mut rng);
+        let tau = Fr::<E>::rand(&mut rng);
+        let (vk, ck) = setup::<E, _>(m, group_data, Trapdoor { xi, tau }, &mut rng);
+
+        let f_coeffs: Vec<Fr<E>> = (0..m).map(|_| Fr::<E>::rand(&mut rng)).collect();
+        let poly = DensePolynomial::<Fr<E>> { coeffs: f_coeffs };
 
         // Polynomial values at the roots of unity
-        let f_evals: Vec<Fr> = ck
+        let f_evals: Vec<Fr<E>> = ck
             .roots_of_unity_in_eval_dom
             .iter()
             .map(|&gamma| poly.evaluate(&gamma))
             .collect();
 
-        let rho = CommitmentRandomness::<Bls12_381>(Fr::rand(&mut rng));
-        let s = CommitmentRandomness::<Bls12_381>(Fr::rand(&mut rng));
-        let x = Fr::rand(&mut rng);
+        let rho = CommitmentRandomness::<E>(Fr::<E>::rand(&mut rng));
+        let s = CommitmentRandomness::<E>(Fr::<E>::rand(&mut rng));
+        let x = Fr::<E>::rand(&mut rng);
         let y =
             polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x, ck.m_inv);
 
         // Commit to f
-        let C = super::commit_with_randomness(&ck, &f_evals, &rho);
+        let comm = super::commit_with_randomness(&ck, &f_evals, &rho);
 
         // Open at x
-        let proof = Homomorphism::<Bls12_381>::open(&ck, f_evals.clone(), rho.0, x, &s);
+        let proof = Homomorphism::<E>::open(&ck, f_evals.clone(), rho.0, x, &s);
 
         // Verify proof
-        let verification = Homomorphism::<Bls12_381>::verify(vk, C, x, y, proof);
+        let verification = Homomorphism::<E>::verify(vk, comm, x, y, proof);
 
         assert!(
             verification.is_ok(),
             "Verification should succeed for correct proof"
         );
+    }
+
+    #[test]
+    fn test_open_and_verify_roundtrip_for_bn254() {
+        generic_test_open_and_verify_roundtrip::<ark_bn254::Bn254>();
+    }
+
+    #[test]
+    fn test_open_and_verify_roundtrip_for_bls12_381() {
+        generic_test_open_and_verify_roundtrip::<ark_bls12_381::Bls12_381>();
     }
 }
