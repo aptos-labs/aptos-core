@@ -16,7 +16,7 @@ use ark_ec::pairing::Pairing;
 use ark_std::rand::thread_rng;
 
 #[cfg(test)]
-fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(
+fn run_range_proof_roundtrip<E: Pairing, B: BatchedRangeProof<E>>(
     setup: &RangeProofFixedSetup<E, B>,
     n: usize,
     ell: usize,
@@ -29,32 +29,9 @@ fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(
 
     let mut fs_t = merlin::Transcript::new(B::DST);
     let proof = B::prove(pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
-    println!("prove finished, vrfy1 starting (n={}, ell={})", n, ell);
 
     let mut fs_t = merlin::Transcript::new(B::DST);
     proof.verify(vk, n, ell, &comm, &mut fs_t).unwrap();
-
-    println!("vrfy finished, vrfy2 starting (n={}, ell={})", n, ell);
-    let mut invalid_proof = proof.clone();
-    invalid_proof.maul();
-    let mut fs_t = merlin::Transcript::new(B::DST);
-    assert!(invalid_proof.verify(vk, n, ell, &comm, &mut fs_t).is_err())
-}
-
-#[cfg(test)]
-fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
-    setup: &RangeProofFixedSetup<E, B>,
-    n: usize,
-    ell: usize,
-) {
-    let mut rng = thread_rng();
-    let RangeProofFixedSetup { pk, vk } = setup;
-    let (values, comm, r) =
-        test_utils::range_proof_random_instance::<_, B, _>(pk, n, ell, &mut rng);
-    println!("setup finished, prove starting for n={}, ell={}", n, ell);
-
-    let mut fs_t = merlin::Transcript::new(B::DST);
-    let proof = B::prove(pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
 
     // === Serialize to memory ===
     let encoded = {
@@ -79,16 +56,16 @@ fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
     let mut fs_t = merlin::Transcript::new(B::DST);
     decoded.verify(vk, n, ell, &comm, &mut fs_t).unwrap();
 
+    println!(
+        "Serialization round-trip test passed for n={}, ell={}",
+        n, ell
+    );
+
     // Make invalid
     let mut invalid_proof = decoded.clone();
     invalid_proof.maul();
     let mut fs_t = merlin::Transcript::new(B::DST);
     assert!(invalid_proof.verify(vk, n, ell, &comm, &mut fs_t).is_err());
-
-    println!(
-        "Serialization round-trip test passed for n={}, ell={}",
-        n, ell
-    );
 }
 
 #[cfg(test)]
@@ -162,7 +139,6 @@ fn range_proof_tests_multi() {
     let setups = make_all_curve_setups();
 
     for &(n, ell) in TEST_CASES {
-        for_each_curve!(run_range_proof_completeness, setups, n, ell);
-        for_each_curve!(run_serialize_range_proof, setups, n, ell);
+        for_each_curve!(run_range_proof_roundtrip, setups, n, ell);
     }
 }
