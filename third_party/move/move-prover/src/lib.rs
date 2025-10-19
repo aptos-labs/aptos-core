@@ -300,7 +300,7 @@ pub fn create_and_process_bytecode(options: &Options, env: &GlobalEnv) -> Functi
             &mut targets,
             &dump_file_base,
             options.prover.dump_cfg,
-            &|_| {},
+            &|target| target.register_annotation_formatters_for_test(),
             || true,
         )
     } else {

@@ -1,0 +1,30 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/closure_refs.move:56:9
+   │
+56 │         ensures result == 33; // expected to fail
+   │         ^^^^^^^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/closure_refs.move:47: update_a
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/closure_refs.move:48: update_a
+   =     at tests/sources/functional/closures/closure_refs.move:42: update_indirect
+   =         s = <redacted>
+   =         borrow = <redacted>
+   =         new_value = <redacted>
+   =     at tests/sources/functional/closures/closure_refs.move:43: update_indirect
+   =     at tests/sources/functional/closures/closure_refs.move:34: borrow_a
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/closure_refs.move:35: borrow_a
+   =         result = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/closure_refs.move:36: borrow_a
+   =         <redacted> = <redacted>
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/closure_refs.move:44: update_indirect
+   =         s = <redacted>
+   =     at tests/sources/functional/closures/closure_refs.move:49: update_a
+   =     at tests/sources/functional/closures/closure_refs.move:46: update_a
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/closure_refs.move:50: update_a
+   =     at tests/sources/functional/closures/closure_refs.move:56: update_a (spec)

@@ -240,10 +240,12 @@ impl BorrowInfo {
             "borrowed_by",
             self.borrowed_by.iter().map(borrows_str).join(", "),
         );
+        /*
         add(
             "borrows_from",
             self.borrows_from.iter().map(borrows_str).join(", "),
         );
+         */
         parts.iter().join("\n")
     }
 
@@ -791,6 +793,34 @@ impl TransferFunctions for BorrowAnalysis<'_> {
                             srcs,
                             dests,
                         );
+                    },
+                    Invoke => {
+                        // For Invoke, we have no function summaries and do not know the
+                        // borrow relation. Directly draw the `Invoke` edges. We only need to
+                        // look at mutable references since others are eliminated.
+                        for dest in dests {
+                            if self
+                                .func_target
+                                .get_local_type(*dest)
+                                .is_mutable_reference()
+                            {
+                                let dest_node = BorrowNode::Reference(*dest);
+                                state.add_node(dest_node.clone());
+                                // Moves overapproximation: draw a borrow edge from each
+                                // input ref to the output ref
+                                for src in srcs {
+                                    if self.func_target.get_local_type(*src).is_mutable_reference()
+                                    {
+                                        let src_node = BorrowNode::Reference(*src);
+                                        state.add_edge(
+                                            src_node,
+                                            dest_node.clone(),
+                                            BorrowEdge::Invoke,
+                                        );
+                                    }
+                                }
+                            }
+                        }
                     },
                     OpaqueCallBegin(_, _, _) | OpaqueCallEnd(_, _, _) => {
                         // just skip
