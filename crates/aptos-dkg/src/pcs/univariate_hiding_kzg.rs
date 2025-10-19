@@ -37,7 +37,7 @@ pub struct Proof<E: Pairing> {
 pub struct VerificationKey<E: Pairing> {
     pub xi_2: E::G2Affine,
     pub tau_2: E::G2Affine,
-    pub group_data: GroupGenerators<E>,
+    pub group_generators: GroupGenerators<E>,
 }
 
 #[derive(CanonicalSerialize, Debug, Clone)]
@@ -73,7 +73,7 @@ pub fn lagrange_basis<E: Pairing>(
 
 pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
     m: usize,
-    group_data: GroupGenerators<E>,
+    group_generators: GroupGenerators<E>,
     trapdoor: Trapdoor<E>,
     _rng: &mut R,
 ) -> (VerificationKey<E>, CommitmentKey<E>) {
@@ -86,7 +86,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
     let GroupGenerators {
         g1: one_1,
         g2: one_2,
-    } = group_data;
+    } = group_generators;
     let Trapdoor { xi, tau } = trapdoor;
 
     let xi_1 = (one_1 * xi).into_affine();
@@ -106,7 +106,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
         VerificationKey {
             xi_2,
             tau_2,
-            group_data,
+            group_generators,
         },
         CommitmentKey {
             xi_1,
@@ -172,7 +172,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         let VerificationKey {
             xi_2,
             tau_2,
-            group_data:
+            group_generators:
                 GroupGenerators {
                     g1: one_1,
                     g2: one_2,
@@ -235,7 +235,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, &scalars).expect("MSM failed in univariate KZG")
+        E::G1::msm(bases, &scalars).expect("MSM computation failed in univariate KZG")
     }
 }
 
@@ -278,7 +278,7 @@ mod tests {
         let comm = super::commit_with_randomness(&ck, &f_evals, &rho);
 
         // Open at x
-        let proof = Homomorphism::<E>::open(&ck, f_evals.clone(), rho.0, x, &s);
+        let proof = Homomorphism::<E>::open(&ck, f_evals, rho.0, x, &s);
 
         // Verify proof
         let verification = Homomorphism::<E>::verify(vk, comm, x, y, proof);
@@ -289,13 +289,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_open_and_verify_roundtrip_for_bn254() {
-        generic_test_open_and_verify_roundtrip::<ark_bn254::Bn254>();
+    macro_rules! kzg_roundtrip_test {
+        ($name:ident, $curve:ty) => {
+            #[test]
+            fn $name() {
+                generic_test_open_and_verify_roundtrip::<$curve>();
+            }
+        };
     }
 
-    #[test]
-    fn test_open_and_verify_roundtrip_for_bls12_381() {
-        generic_test_open_and_verify_roundtrip::<ark_bls12_381::Bls12_381>();
-    }
+    kzg_roundtrip_test!(test_roundtrip_for_bn254, ark_bn254::Bn254);
+    kzg_roundtrip_test!(test_roundtrip_for_bls12_381, ark_bls12_381::Bls12_381);
 }
