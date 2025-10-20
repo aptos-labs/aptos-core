@@ -95,7 +95,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         for id in order.iter() {
             // check if part of current package
             if id.address() == cur_package_id.address() {
-                if let Some(module) = map.remove(cur_package_id) {
+                if let Some(module) = map.remove(id) {
                     cur.push(module);
                 }
             }
@@ -108,6 +108,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         &VM,
         ChainId::mainnet(),
         Arc::clone(&TP),
+        None,
     )
     .set_not_parallel();
 

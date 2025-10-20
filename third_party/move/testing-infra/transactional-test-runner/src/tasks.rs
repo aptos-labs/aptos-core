@@ -257,6 +257,7 @@ pub struct PublishCommand {
 pub struct RunCommand<ExtraValueArgs: ParsableValue> {
     #[clap(
         long = "signers",
+        alias = "signer",
         value_parser = ParsedAddress::parse,
         num_args = 0..
     )]
@@ -281,6 +282,8 @@ pub struct RunCommand<ExtraValueArgs: ParsableValue> {
     pub name: Option<(ParsedAddress, Identifier, Identifier)>,
     #[clap(long = "print-bytecode")]
     pub print_bytecode: bool,
+    #[clap(long = "exec-group", alias = "exec_group")]
+    pub exec_group: Option<u64>,
 }
 
 #[derive(Debug, Parser)]

@@ -7,6 +7,7 @@ use crate::tdbg;
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
 use aptos_framework::natives::code::{ModuleMetadata, PackageDep, PackageMetadata, UpgradePolicy};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
+use aptos_types::block_executor::transaction_slice_metadata::TransactionSliceMetadata;
 use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
 use arbitrary::Arbitrary;
 use fuzzer::UserAccount;
@@ -17,6 +18,8 @@ use move_core_types::{
     vm_status::{StatusCode, StatusType, VMStatus},
 };
 use std::collections::{BTreeMap, BTreeSet, HashSet};
+use std::sync::atomic::{AtomicU64, Ordering};
+use aptos_crypto::HashValue;
 
 pub const BYTECODE_VERSION: u32 = 8;
 
@@ -149,12 +152,25 @@ pub(crate) fn check_for_invariant_violation(e: VMStatus) {
     }
 }
 
+// Shared sequential block metadata across all cached publishes and executions in this fuzzer.
+// Ensures AptosModuleCacheManager sees consecutive (parent, child) pairs and preserves caches.
+static NEXT_BLOCK_ID: AtomicU64 = AtomicU64::new(1);
+
+pub(crate) fn next_block_metadata() -> TransactionSliceMetadata {
+    let child = NEXT_BLOCK_ID.fetch_add(1, Ordering::Relaxed);
+    TransactionSliceMetadata::block(
+        HashValue::from_u64(child - 1),
+        HashValue::from_u64(child),
+    )
+}
+
 pub(crate) fn publish_group(
     vm: &mut FakeExecutor,
     acc: &Account,
     group: &[CompiledModule],
     sequence_number: u64,
 ) -> Result<(), Corpus> {
+    tdbg!("publishing");
     let tx = acc
         .transaction()
         .gas_unit_price(100)
@@ -162,7 +178,6 @@ pub(crate) fn publish_group(
         .payload(publish_transaction_payload(group))
         .sign();
 
-    tdbg!("publishing");
     let res = vm
         .execute_block(vec![tx])
         .map_err(|e| {
@@ -187,7 +202,6 @@ pub(crate) fn publish_group(
         },
         _ => return Err(Corpus::Keep),
     };
-    tdbg!(&status);
     // apply write set to commit published packages
     vm.apply_write_set(res.write_set());
     match tdbg!(status) {

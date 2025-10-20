@@ -50,6 +50,13 @@ macro_rules! alert_or_println {
     };
 }
 
+#[cfg(fuzzing)]
+pub type ModuleHotCacheSnapshot = GlobalModuleCache<
+    ModuleId,
+    CompiledModule,
+    Module,
+    AptosModuleExtension,
+>;
 /// Manages module caches and the execution environment, possibly across multiple blocks.
 pub struct ModuleCacheManager<K, D, V, E> {
     /// Records the last observed metadata associated with a batch of executed transactions. When a
@@ -315,6 +322,20 @@ impl AptosModuleCacheManagerGuard<'_> {
             environment: AptosEnvironment::new(state_view),
             module_cache: GlobalModuleCache::empty(),
         }
+    }
+
+    /// Takes a shallow snapshot of the current global module cache (hot cache).
+    /// Only available under fuzzing. The snapshot shares underlying Arc module code.
+    #[cfg(fuzzing)]
+    pub fn snapshot_hot_cache(&self) -> ModuleHotCacheSnapshot {
+        self.module_cache().clone()
+    }
+
+    /// Rolls back the global module cache to a previously captured snapshot.
+    /// Only available under fuzzing.
+    #[cfg(fuzzing)]
+    pub fn rollback_hot_cache(&mut self, snapshot: ModuleHotCacheSnapshot) {
+        *self.module_cache_mut() = snapshot;
     }
 }
 
@@ -650,5 +671,38 @@ mod test {
         }
         let sum = handles.into_iter().map(|h| h.join().unwrap()).sum::<i32>();
         assert_eq!(sum, 1);
+    }
+
+    #[cfg(fuzzing)]
+    #[test]
+    fn test_snapshot_and_rollback_hot_cache() {
+        // Use a real state with framework so we can populate the hot cache with verified modules
+        let state_view = InMemoryStateStore::from_head_genesis();
+        let mut guard = AptosModuleCacheManagerGuard::none_for_state_view(&state_view);
+
+        // Prefetch Aptos framework into the hot cache
+        assert!(prefetch_aptos_framework(&state_view, &mut guard).is_ok());
+        assert!(guard.module_cache().num_modules() > 0);
+
+        let snapshot = guard.snapshot_hot_cache();
+        let size_before = guard.module_cache().size_in_bytes();
+        let count_before = guard.module_cache().num_modules();
+
+        // Mutate: mark a known framework module as overridden
+        let tx_val_id = ModuleId::new(
+            AccountAddress::ONE,
+            Identifier::new("transaction_validation").unwrap(),
+        );
+        // Ensure it's present before mutation
+        assert!(guard.module_cache().contains_not_overridden(&tx_val_id));
+        guard.module_cache().mark_overridden(&tx_val_id);
+        assert!(!guard.module_cache().contains_not_overridden(&tx_val_id));
+
+        // Rollback and verify restored state
+        guard.rollback_hot_cache(snapshot);
+
+        assert_eq!(guard.module_cache().size_in_bytes(), size_before);
+        assert_eq!(guard.module_cache().num_modules(), count_before);
+        assert!(guard.module_cache().contains_not_overridden(&tx_val_id));
     }
 }
