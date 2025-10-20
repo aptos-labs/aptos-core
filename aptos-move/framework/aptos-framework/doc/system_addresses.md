@@ -31,6 +31,7 @@
 
 
 <pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
+<b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 </code></pre>
 
@@ -145,7 +146,12 @@ The operation can only be performed by the VM
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="system_addresses.md#0x1_system_addresses_is_core_resource_address">is_core_resource_address</a>(addr: <b>address</b>): bool {
-    addr == @core_resources
+    // Check <b>if</b> the feature flag for decommissioning core resources is enabled.
+    <b>if</b> (get_decommission_core_resources_enabled()) {
+        <b>false</b>
+    } <b>else</b> {
+        addr == @core_resources
+    }
 }
 </code></pre>
 
@@ -497,6 +503,20 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 </code></pre>
 
 
+Specifies that a function aborts if the account does not have the root address.
+
+
+<a id="0x1_system_addresses_AbortsIfNotCoreResource"></a>
+
+
+<pre><code><b>schema</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotCoreResource">AbortsIfNotCoreResource</a> {
+    addr: <b>address</b>;
+    // This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+    <b>aborts_if</b> addr != @core_resources <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_PERMISSION_DENIED">error::PERMISSION_DENIED</a>;
+}
+</code></pre>
+
+
 
 <a id="@Specification_1_assert_aptos_framework"></a>
 
@@ -546,20 +566,6 @@ Return true if <code>addr</code> is either the VM address or an Aptos Framework 
 </code></pre>
 
 
-Specifies that a function aborts if the account does not have the aptos framework address.
-
-
-<a id="0x1_system_addresses_AbortsIfNotAptosFramework"></a>
-
-
-<pre><code><b>schema</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotAptosFramework">AbortsIfNotAptosFramework</a> {
-    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    // This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) != @aptos_framework <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_PERMISSION_DENIED">error::PERMISSION_DENIED</a>;
-}
-</code></pre>
-
-
 
 <a id="@Specification_1_assert_vm"></a>
 
@@ -574,20 +580,6 @@ Specifies that a function aborts if the account does not have the aptos framewor
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotVM">AbortsIfNotVM</a>;
-</code></pre>
-
-
-Specifies that a function aborts if the account does not have the VM reserved address.
-
-
-<a id="0x1_system_addresses_AbortsIfNotVM"></a>
-
-
-<pre><code><b>schema</b> <a href="system_addresses.md#0x1_system_addresses_AbortsIfNotVM">AbortsIfNotVM</a> {
-    <a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>;
-    // This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
-    <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>) != @vm_reserved <b>with</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_PERMISSION_DENIED">error::PERMISSION_DENIED</a>;
-}
 </code></pre>
 
 

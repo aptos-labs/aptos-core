@@ -149,6 +149,7 @@ pub enum FeatureFlag {
     EnableLazyLoading,
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
+    GovernedGasPool,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -395,6 +396,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
                 AptosFeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
             },
             FeatureFlag::DistributeTransactionFee => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
+            FeatureFlag::GovernedGasPool => AptosFeatureFlag::GOVERNED_GAS_POOL,
         }
     }
 }
@@ -568,6 +570,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
                 FeatureFlag::CalculateTransactionFeeForDistribution
             },
             AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
+            AptosFeatureFlag::GOVERNED_GAS_POOL => FeatureFlag::GovernedGasPool,
         }
     }
 }

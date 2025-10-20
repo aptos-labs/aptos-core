@@ -129,6 +129,14 @@ return true.
 -  [Function `default_to_concurrent_fungible_balance_enabled`](#0x1_features_default_to_concurrent_fungible_balance_enabled)
 -  [Function `get_abort_if_multisig_payload_mismatch_feature`](#0x1_features_get_abort_if_multisig_payload_mismatch_feature)
 -  [Function `abort_if_multisig_payload_mismatch_enabled`](#0x1_features_abort_if_multisig_payload_mismatch_enabled)
+-  [Function `get_atomic_bridge_feature`](#0x1_features_get_atomic_bridge_feature)
+-  [Function `abort_atomic_bridge_enabled`](#0x1_features_abort_atomic_bridge_enabled)
+-  [Function `get_native_bridge_feature`](#0x1_features_get_native_bridge_feature)
+-  [Function `abort_native_bridge_enabled`](#0x1_features_abort_native_bridge_enabled)
+-  [Function `get_governed_gas_pool_feature`](#0x1_features_get_governed_gas_pool_feature)
+-  [Function `governed_gas_pool_enabled`](#0x1_features_governed_gas_pool_enabled)
+-  [Function `get_decommission_core_resources_feature`](#0x1_features_get_decommission_core_resources_feature)
+-  [Function `get_decommission_core_resources_enabled`](#0x1_features_get_decommission_core_resources_enabled)
 -  [Function `get_transaction_simulation_enhancement_feature`](#0x1_features_get_transaction_simulation_enhancement_feature)
 -  [Function `transaction_simulation_enhancement_enabled`](#0x1_features_transaction_simulation_enhancement_enabled)
 -  [Function `get_collection_owner_feature`](#0x1_features_get_collection_owner_feature)
@@ -307,6 +315,17 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_ATOMIC_BRIDGE"></a>
+
+Whether the Atomic bridge is available
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a>: u64 = 224;
+</code></pre>
+
+
+
 <a id="0x1_features_BLAKE2B_256_NATIVE"></a>
 
 Whether the new BLAKE2B-256 hash function native is enabled.
@@ -422,7 +441,7 @@ Lifetime: transient
 
 <a id="0x1_features_COLLECT_AND_DISTRIBUTE_GAS_FEES"></a>
 
-Deprecated feature
+Whether gas fees are collected and distributed to the block proposers.
 Lifetime: transient
 
 
@@ -474,6 +493,16 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_CRYPTOGRAPHY_ALGEBRA_NATIVES">CRYPTOGRAPHY_ALGEBRA_NATIVES</a>: u64 = 12;
+</code></pre>
+
+
+
+<a id="0x1_features_DECOMMISSION_CORE_RESOURCES"></a>
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_DECOMMISSION_CORE_RESOURCES">DECOMMISSION_CORE_RESOURCES</a>: u64 = 222;
 </code></pre>
 
 
@@ -648,6 +677,18 @@ Lifetime: transient
 
 
 
+<a id="0x1_features_GOVERNED_GAS_POOL"></a>
+
+Whether the Governed Gas Pool is used to capture gas fees
+
+Lifetime: permanent
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_GOVERNED_GAS_POOL">GOVERNED_GAS_POOL</a>: u64 = 223;
+</code></pre>
+
+
+
 <a id="0x1_features_JWK_CONSENSUS"></a>
 
 Deprecated by <code>aptos_framework::jwk_consensus_config::JWKConsensusConfig</code>.
@@ -783,6 +824,17 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_MULTI_ED25519_PK_VALIDATE_V2_NATIVES">MULTI_ED25519_PK_VALIDATE_V2_NATIVES</a>: u64 = 7;
+</code></pre>
+
+
+
+<a id="0x1_features_NATIVE_BRIDGE"></a>
+
+Whether the Atomic bridge is available
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_NATIVE_BRIDGE">NATIVE_BRIDGE</a>: u64 = 225;
 </code></pre>
 
 
@@ -1038,11 +1090,6 @@ Lifetime: transient
 
 <a id="0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT"></a>
 
-Whether the simulation enhancement is enabled. This enables the simulation without an authentication check,
-the sponsored transaction simulation when the fee payer is set to 0x0, and the multisig transaction
-simulation consistnet with the execution.
-
-Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_TRANSACTION_SIMULATION_ENHANCEMENT">TRANSACTION_SIMULATION_ENHANCEMENT</a>: u64 = 78;
@@ -1285,7 +1332,6 @@ We do not expect use from Move, so for now only for documentation purposes here
 
 ## Function `get_collect_and_distribute_gas_fees_feature`
 
-Deprecated feature
 
 
 <pre><code>#[deprecated]
@@ -3346,6 +3392,195 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_if_multisig_payload_mismatch_enabled">abort_if_multisig_payload_mismatch_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_ABORT_IF_MULTISIG_PAYLOAD_MISMATCH">ABORT_IF_MULTISIG_PAYLOAD_MISMATCH</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_atomic_bridge_feature"></a>
+
+## Function `get_atomic_bridge_feature`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_atomic_bridge_feature">get_atomic_bridge_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_atomic_bridge_feature">get_atomic_bridge_feature</a>(): u64 { <a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_abort_atomic_bridge_enabled"></a>
+
+## Function `abort_atomic_bridge_enabled`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_atomic_bridge_enabled">abort_atomic_bridge_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_atomic_bridge_enabled">abort_atomic_bridge_enabled</a>(): bool {
+    <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_native_bridge_feature"></a>
+
+## Function `get_native_bridge_feature`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_native_bridge_feature">get_native_bridge_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_native_bridge_feature">get_native_bridge_feature</a>(): u64 { <a href="features.md#0x1_features_NATIVE_BRIDGE">NATIVE_BRIDGE</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_abort_native_bridge_enabled"></a>
+
+## Function `abort_native_bridge_enabled`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_native_bridge_enabled">abort_native_bridge_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_abort_native_bridge_enabled">abort_native_bridge_enabled</a>(): bool {
+    <b>true</b>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_governed_gas_pool_feature"></a>
+
+## Function `get_governed_gas_pool_feature`
+
+Whether the Governed Gas Pool is enabled.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_governed_gas_pool_feature">get_governed_gas_pool_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_governed_gas_pool_feature">get_governed_gas_pool_feature</a>(): u64 { <a href="features.md#0x1_features_GOVERNED_GAS_POOL">GOVERNED_GAS_POOL</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_governed_gas_pool_enabled"></a>
+
+## Function `governed_gas_pool_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_governed_gas_pool_enabled">governed_gas_pool_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_governed_gas_pool_enabled">governed_gas_pool_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_GOVERNED_GAS_POOL">GOVERNED_GAS_POOL</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_decommission_core_resources_feature"></a>
+
+## Function `get_decommission_core_resources_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_feature">get_decommission_core_resources_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_feature">get_decommission_core_resources_feature</a>(): u64 { <a href="features.md#0x1_features_DECOMMISSION_CORE_RESOURCES">DECOMMISSION_CORE_RESOURCES</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_decommission_core_resources_enabled"></a>
+
+## Function `get_decommission_core_resources_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_enabled">get_decommission_core_resources_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_decommission_core_resources_enabled">get_decommission_core_resources_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DECOMMISSION_CORE_RESOURCES">DECOMMISSION_CORE_RESOURCES</a>)
 }
 </code></pre>
 

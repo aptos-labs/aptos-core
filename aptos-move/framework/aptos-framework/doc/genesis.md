@@ -12,6 +12,7 @@
 -  [Constants](#@Constants_0)
 -  [Function `initialize`](#0x1_genesis_initialize)
 -  [Function `initialize_aptos_coin`](#0x1_genesis_initialize_aptos_coin)
+-  [Function `initialize_governed_gas_pool`](#0x1_genesis_initialize_governed_gas_pool)
 -  [Function `initialize_core_resources_and_aptos_coin`](#0x1_genesis_initialize_core_resources_and_aptos_coin)
 -  [Function `create_accounts`](#0x1_genesis_create_accounts)
 -  [Function `create_account`](#0x1_genesis_create_account)
@@ -29,7 +30,6 @@
     -  [Function `create_initialize_validators_with_commission`](#@Specification_1_create_initialize_validators_with_commission)
     -  [Function `create_initialize_validators`](#@Specification_1_create_initialize_validators)
     -  [Function `create_initialize_validator`](#@Specification_1_create_initialize_validator)
-    -  [Function `initialize_validator`](#@Specification_1_initialize_validator)
     -  [Function `set_genesis_end`](#@Specification_1_set_genesis_end)
 
 
@@ -48,6 +48,7 @@
 <b>use</b> <a href="execution_config.md#0x1_execution_config">0x1::execution_config</a>;
 <b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="gas_schedule.md#0x1_gas_schedule">0x1::gas_schedule</a>;
+<b>use</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool">0x1::governed_gas_pool</a>;
 <b>use</b> <a href="nonce_validation.md#0x1_nonce_validation">0x1::nonce_validation</a>;
 <b>use</b> <a href="reconfiguration.md#0x1_reconfiguration">0x1::reconfiguration</a>;
 <b>use</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map">0x1::simple_map</a>;
@@ -405,6 +406,33 @@ Genesis step 2: Initialize Aptos coin.
 
 </details>
 
+<a id="0x1_genesis_initialize_governed_gas_pool"></a>
+
+## Function `initialize_governed_gas_pool`
+
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_governed_gas_pool">initialize_governed_gas_pool</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_governed_gas_pool">initialize_governed_gas_pool</a>(
+    aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    delegation_pool_creation_seed: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;,
+) {
+    <a href="governed_gas_pool.md#0x1_governed_gas_pool_initialize">governed_gas_pool::initialize</a>(aptos_framework, delegation_pool_creation_seed);
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_genesis_initialize_core_resources_and_aptos_coin"></a>
 
 ## Function `initialize_core_resources_and_aptos_coin`
@@ -436,7 +464,6 @@ Only called for testnets and e2e tests.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_burn_cap">transaction_fee::store_aptos_coin_burn_cap</a>(aptos_framework, burn_cap);
     // Give <a href="transaction_fee.md#0x1_transaction_fee">transaction_fee</a> <b>module</b> MintCapability&lt;AptosCoin&gt; so it can mint refunds.
     <a href="transaction_fee.md#0x1_transaction_fee_store_aptos_coin_mint_cap">transaction_fee::store_aptos_coin_mint_cap</a>(aptos_framework, mint_cap);
-
     <b>let</b> core_resources = <a href="account.md#0x1_account_create_account">account::create_account</a>(@core_resources);
     <a href="account.md#0x1_account_rotate_authentication_key_internal">account::rotate_authentication_key_internal</a>(&core_resources, core_resources_auth_key);
     <a href="aptos_account.md#0x1_aptos_account_register_apt">aptos_account::register_apt</a>(&core_resources); // registers APT store
@@ -605,8 +632,6 @@ If it exists, it just returns the signer.
         };
 
         <b>let</b> validator = &employee_group.validator.validator_config;
-        // These checks ensure that validator accounts have 0x1::Account resource.
-        // So, validator accounts can't be stateless.
         <b>assert</b>!(
             <a href="account.md#0x1_account_exists_at">account::exists_at</a>(validator.owner_address),
             <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="genesis.md#0x1_genesis_EACCOUNT_DOES_NOT_EXIST">EACCOUNT_DOES_NOT_EXIST</a>),
@@ -1030,24 +1055,7 @@ The last step of genesis.
 
 
 
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
-<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
-</code></pre>
-
-
-
-<a id="@Specification_1_initialize_validator"></a>
-
-### Function `initialize_validator`
-
-
-<pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_validator">initialize_validator</a>(pool_address: <b>address</b>, validator: &<a href="genesis.md#0x1_genesis_ValidatorConfiguration">genesis::ValidatorConfiguration</a>)
-</code></pre>
-
-
-
-
-<pre><code><b>pragma</b> verify_duration_estimate = 120;
+<pre><code><b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
 </code></pre>
 
 
@@ -1085,6 +1093,7 @@ The last step of genesis.
     <b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
     <b>requires</b> len(<a href="execution_config.md#0x1_execution_config">execution_config</a>) &gt; 0;
     <b>requires</b> <b>exists</b>&lt;<a href="staking_config.md#0x1_staking_config_StakingRewardsConfig">staking_config::StakingRewardsConfig</a>&gt;(@aptos_framework);
+    <b>requires</b> <b>exists</b>&lt;<a href="stake.md#0x1_stake_ValidatorFees">stake::ValidatorFees</a>&gt;(@aptos_framework);
     <b>requires</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinInfo">coin::CoinInfo</a>&lt;AptosCoin&gt;&gt;(@aptos_framework);
     <b>include</b> <a href="genesis.md#0x1_genesis_CompareTimeRequires">CompareTimeRequires</a>;
 }

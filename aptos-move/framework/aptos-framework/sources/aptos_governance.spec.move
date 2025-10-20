@@ -604,7 +604,6 @@ spec aptos_framework::aptos_governance {
     /// Address @aptos_framework must exist GovernanceResponsbility.
     spec get_signer_testnet_only(core_resources: &signer, signer_address: address): signer {
         aborts_if signer::address_of(core_resources) != @core_resources;
-        aborts_if !exists<aptos_coin::MintCapStore>(signer::address_of(core_resources));
         include GetSignerAbortsIf;
     }
 

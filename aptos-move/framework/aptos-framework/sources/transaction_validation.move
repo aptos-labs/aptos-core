@@ -13,6 +13,7 @@ module aptos_framework::transaction_validation {
     use aptos_framework::chain_id;
     use aptos_framework::coin;
     use aptos_framework::create_signer;
+    use aptos_framework::governed_gas_pool;
     use aptos_framework::permissioned_signer;
     use aptos_framework::system_addresses;
     use aptos_framework::timestamp;
@@ -620,10 +621,17 @@ module aptos_framework::transaction_validation {
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(gas_payer, burn_amount);
+                if (features::governed_gas_pool_enabled()){
+                    governed_gas_pool::deposit_gas_fee_v2(gas_payer, burn_amount);
+                } else {
+                    transaction_fee::burn_fee(gas_payer, burn_amount);
+                }
             } else if (transaction_fee_amount < storage_fee_refunded) {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(gas_payer, mint_amount);
+                // TODO: we cannot mint to do storage refund. We need to have a storage refund pool
+                if (!features::governed_gas_pool_enabled()){
+                    transaction_fee::mint_and_refund(gas_payer, mint_amount);
+                }
             };
         };
 

@@ -10,6 +10,7 @@
 -  [Resource `AptosCoinMintCapability`](#0x1_transaction_fee_AptosCoinMintCapability)
 -  [Struct `FeeStatement`](#0x1_transaction_fee_FeeStatement)
 -  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
+-  [Resource `CopyCapabilitiesOneShot`](#0x1_transaction_fee_CopyCapabilitiesOneShot)
 -  [Constants](#@Constants_0)
 -  [Function `burn_fee`](#0x1_transaction_fee_burn_fee)
 -  [Function `mint_and_refund`](#0x1_transaction_fee_mint_and_refund)
@@ -19,7 +20,10 @@
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
 -  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
 -  [Function `upgrade_burn_percentage`](#0x1_transaction_fee_upgrade_burn_percentage)
+-  [Function `burn_from`](#0x1_transaction_fee_burn_from)
 -  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
+-  [Function `copy_capabilities_for_bridge`](#0x1_transaction_fee_copy_capabilities_for_bridge)
+-  [Function `copy_capabilities_for_native_bridge`](#0x1_transaction_fee_copy_capabilities_for_native_bridge)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -235,6 +239,34 @@ collected when executing the block.
 </dd>
 <dt>
 <code>burn_percentage: u8</code>
+</dt>
+<dd>
+
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_transaction_fee_CopyCapabilitiesOneShot"></a>
+
+## Resource `CopyCapabilitiesOneShot`
+
+
+
+<pre><code>#[deprecated]
+<b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_CopyCapabilitiesOneShot">CopyCapabilitiesOneShot</a> <b>has</b> key
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>dummy_field: bool</code>
 </dt>
 <dd>
 
@@ -524,6 +556,31 @@ DEPRECATED
 
 </details>
 
+<a id="0x1_transaction_fee_burn_from"></a>
+
+## Function `burn_from`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_from">burn_from</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _account: <b>address</b>, _fee: u64)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_burn_from">burn_from</a>(_aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _account: <b>address</b>, _fee: u64) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_transaction_fee_initialize_storage_refund"></a>
 
 ## Function `initialize_storage_refund`
@@ -541,6 +598,57 @@ DEPRECATED
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_initialize_storage_refund">initialize_storage_refund</a>(_: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_copy_capabilities_for_bridge"></a>
+
+## Function `copy_capabilities_for_bridge`
+
+
+
+<pre><code>#[deprecated]
+<b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_copy_capabilities_for_bridge">copy_capabilities_for_bridge</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): (<a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_copy_capabilities_for_bridge">copy_capabilities_for_bridge</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) : (MintCapability&lt;AptosCoin&gt;, BurnCapability&lt;AptosCoin&gt;){
+   <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_copy_capabilities_for_native_bridge"></a>
+
+## Function `copy_capabilities_for_native_bridge`
+
+Copy Mint and Burn capabilities over to bridge
+Can only be called once after which it will assert
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_copy_capabilities_for_native_bridge">copy_capabilities_for_native_bridge</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>): (<a href="coin.md#0x1_coin_MintCapability">coin::MintCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;, <a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;<a href="aptos_coin.md#0x1_aptos_coin_AptosCoin">aptos_coin::AptosCoin</a>&gt;)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_copy_capabilities_for_native_bridge">copy_capabilities_for_native_bridge</a>(aptos_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) : (MintCapability&lt;AptosCoin&gt;, BurnCapability&lt;AptosCoin&gt;){
     <b>abort</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_implemented">error::not_implemented</a>(<a href="transaction_fee.md#0x1_transaction_fee_ENO_LONGER_SUPPORTED">ENO_LONGER_SUPPORTED</a>)
 }
 </code></pre>

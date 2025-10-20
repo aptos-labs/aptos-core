@@ -23,13 +23,13 @@ module aptos_framework::aptos_governance {
     use aptos_std::table::{Self, Table};
 
     use aptos_framework::account::{Self, SignerCapability, create_signer_with_capability};
+    use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::coin;
     use aptos_framework::event::{Self, EventHandle};
     use aptos_framework::governance_proposal::{Self, GovernanceProposal};
     use aptos_framework::stake;
     use aptos_framework::staking_config;
     use aptos_framework::system_addresses;
-    use aptos_framework::aptos_coin::{Self, AptosCoin};
     use aptos_framework::consensus_config;
     use aptos_framework::permissioned_signer;
     use aptos_framework::randomness_config;
@@ -721,8 +721,6 @@ module aptos_framework::aptos_governance {
     public fun get_signer_testnet_only(
         core_resources: &signer, signer_address: address): signer acquires GovernanceResponsbility {
         system_addresses::assert_core_resource(core_resources);
-        // Core resources account only has mint capability in tests/testnets.
-        assert!(aptos_coin::has_mint_capability(core_resources), error::unauthenticated(EUNAUTHORIZED));
         get_signer(signer_address)
     }
 

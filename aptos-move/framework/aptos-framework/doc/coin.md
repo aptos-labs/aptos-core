@@ -93,6 +93,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `register`](#0x1_coin_register)
 -  [Function `transfer`](#0x1_coin_transfer)
 -  [Function `value`](#0x1_coin_value)
+-  [Function `withdraw_from`](#0x1_coin_withdraw_from)
 -  [Function `withdraw`](#0x1_coin_withdraw)
 -  [Function `zero`](#0x1_coin_zero)
 -  [Function `destroy_freeze_cap`](#0x1_coin_destroy_freeze_cap)
@@ -3363,6 +3364,64 @@ Returns the <code>value</code> passed in <code><a href="coin.md#0x1_coin">coin</
 
 <pre><code><b>public</b> <b>fun</b> <a href="coin.md#0x1_coin_value">value</a>&lt;CoinType&gt;(<a href="coin.md#0x1_coin">coin</a>: &<a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt;): u64 {
     <a href="coin.md#0x1_coin">coin</a>.value
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_withdraw_from"></a>
+
+## Function `withdraw_from`
+
+Withdraws a specifed <code>amount</code> of coin <code>CoinType</code> from the specified <code><a href="account.md#0x1_account">account</a></code>.
+@param account The account from which to withdraw the coin.
+@param amount The amount of coin to withdraw.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_withdraw_from">withdraw_from</a>&lt;CoinType&gt;(account_addr: <b>address</b>, amount: u64): <a href="coin.md#0x1_coin_Coin">coin::Coin</a>&lt;CoinType&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_withdraw_from">withdraw_from</a>&lt;CoinType&gt;(
+    account_addr: <b>address</b>,
+    amount: u64
+): <a href="coin.md#0x1_coin_Coin">Coin</a>&lt;CoinType&gt; <b>acquires</b> <a href="coin.md#0x1_coin_CoinStore">CoinStore</a>, <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_CoinInfo">CoinInfo</a>, <a href="coin.md#0x1_coin_PairedCoinType">PairedCoinType</a> {
+
+    <b>let</b> (coin_amount_to_withdraw, fa_amount_to_withdraw) = <a href="coin.md#0x1_coin_calculate_amount_to_withdraw">calculate_amount_to_withdraw</a>&lt;CoinType&gt;(
+        account_addr,
+        amount
+    );
+    <b>let</b> withdrawn_coin = <b>if</b> (coin_amount_to_withdraw &gt; 0) {
+        <b>let</b> coin_store = <b>borrow_global_mut</b>&lt;<a href="coin.md#0x1_coin_CoinStore">CoinStore</a>&lt;CoinType&gt;&gt;(account_addr);
+        <b>assert</b>!(
+            !coin_store.frozen,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_permission_denied">error::permission_denied</a>(<a href="coin.md#0x1_coin_EFROZEN">EFROZEN</a>),
+        );
+            <a href="event.md#0x1_event_emit_event">event::emit_event</a>&lt;<a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a>&gt;(
+            &<b>mut</b> coin_store.withdraw_events,
+            <a href="coin.md#0x1_coin_WithdrawEvent">WithdrawEvent</a> { amount: coin_amount_to_withdraw },
+        );
+        <a href="coin.md#0x1_coin_extract">extract</a>(&<b>mut</b> coin_store.<a href="coin.md#0x1_coin">coin</a>, coin_amount_to_withdraw)
+    } <b>else</b> {
+        <a href="coin.md#0x1_coin_zero">zero</a>()
+    };
+    <b>if</b> (fa_amount_to_withdraw &gt; 0) {
+        <b>let</b> store_addr = <a href="primary_fungible_store.md#0x1_primary_fungible_store_primary_store_address">primary_fungible_store::primary_store_address</a>(
+            account_addr,
+            <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_destroy_some">option::destroy_some</a>(<a href="coin.md#0x1_coin_paired_metadata">paired_metadata</a>&lt;CoinType&gt;())
+        );
+        <b>let</b> fa = <a href="fungible_asset.md#0x1_fungible_asset_unchecked_withdraw">fungible_asset::unchecked_withdraw</a>(store_addr, fa_amount_to_withdraw);
+        <a href="coin.md#0x1_coin_merge">merge</a>(&<b>mut</b> withdrawn_coin, <a href="coin.md#0x1_coin_fungible_asset_to_coin">fungible_asset_to_coin</a>&lt;CoinType&gt;(fa));
+    };
+
+    withdrawn_coin
 }
 </code></pre>
 

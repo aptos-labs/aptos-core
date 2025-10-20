@@ -30,6 +30,7 @@ module aptos_framework::genesis {
     use aptos_framework::transaction_validation;
     use aptos_framework::version;
     use aptos_framework::vesting;
+    use aptos_framework::governed_gas_pool;
 
     const EDUPLICATE_ACCOUNT: u64 = 1;
     const EACCOUNT_DOES_NOT_EXIST: u64 = 2;
@@ -148,6 +149,13 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
     }
 
+    fun initialize_governed_gas_pool(
+        aptos_framework: &signer,
+        delegation_pool_creation_seed: vector<u8>,
+    ) {
+        governed_gas_pool::initialize(aptos_framework, delegation_pool_creation_seed);
+    }
+
     /// Only called for testnets and e2e tests.
     fun initialize_core_resources_and_aptos_coin(
         aptos_framework: &signer,
@@ -164,7 +172,6 @@ module aptos_framework::genesis {
         transaction_fee::store_aptos_coin_burn_cap(aptos_framework, burn_cap);
         // Give transaction_fee module MintCapability<AptosCoin> so it can mint refunds.
         transaction_fee::store_aptos_coin_mint_cap(aptos_framework, mint_cap);
-
         let core_resources = account::create_account(@core_resources);
         account::rotate_authentication_key_internal(&core_resources, core_resources_auth_key);
         aptos_account::register_apt(&core_resources); // registers APT store
@@ -273,8 +280,6 @@ module aptos_framework::genesis {
             };
 
             let validator = &employee_group.validator.validator_config;
-            // These checks ensure that validator accounts have 0x1::Account resource.
-            // So, validator accounts can't be stateless.
             assert!(
                 account::exists_at(validator.owner_address),
                 error::not_found(EACCOUNT_DOES_NOT_EXIST),

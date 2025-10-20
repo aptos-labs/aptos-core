@@ -164,7 +164,29 @@ module aptos_framework::transaction_fee {
     }
 
     #[deprecated]
+    public fun burn_from(_aptos_framework: &signer, _account: address, _fee: u64) {
+        abort error::not_implemented(ENO_LONGER_SUPPORTED)
+    }
+
+
+    #[deprecated]
     public fun initialize_storage_refund(_: &signer) {
+        abort error::not_implemented(ENO_LONGER_SUPPORTED)
+    }
+
+    #[deprecated]
+    struct CopyCapabilitiesOneShot has key {}
+
+    /// Copy Mint and Burn capabilities over to bridge
+    /// Can only be called once after which it will assert
+    #[deprecated]
+    public fun copy_capabilities_for_bridge(aptos_framework: &signer) : (MintCapability<AptosCoin>, BurnCapability<AptosCoin>){
+       abort error::not_implemented(ENO_LONGER_SUPPORTED)
+    }
+
+    /// Copy Mint and Burn capabilities over to bridge
+    /// Can only be called once after which it will assert
+    public fun copy_capabilities_for_native_bridge(aptos_framework: &signer) : (MintCapability<AptosCoin>, BurnCapability<AptosCoin>){
         abort error::not_implemented(ENO_LONGER_SUPPORTED)
     }
 }
