@@ -14,7 +14,7 @@ use crate::{
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
-    metadata::LanguageVersion,
+    metadata::{lang_feature_versions::SINT_LANGUAGE_VERSION_VALUE, LanguageVersion},
     model::{
         FieldData, FieldId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
@@ -925,7 +925,7 @@ impl ExpTranslator<'_, '_, '_> {
         match &ty.value {
             Apply(access, args) => {
                 if let EA::ModuleAccess_::Name(n) = &access.value {
-                    let check_zero_args = |et: &mut Self, ty: Type| {
+                    let check_zero_args = |et: &Self, ty: Type| {
                         if args.is_empty() {
                             ty
                         } else {
@@ -938,6 +938,21 @@ impl ExpTranslator<'_, '_, '_> {
                                 ),
                             );
                             Type::Error
+                        }
+                    };
+                    let sint_gated_check_zero_args = |et: &Self, ty: Type| {
+                        if !self
+                            .env()
+                            .language_version
+                            .is_at_least(SINT_LANGUAGE_VERSION_VALUE)
+                        {
+                            et.error(
+                                loc,
+                                &format!("signed integer types not supported prior to language version {}", SINT_LANGUAGE_VERSION_VALUE.to_str()),
+                            );
+                            Type::Error
+                        } else {
+                            check_zero_args(et, ty)
                         }
                     };
                     // Attempt to resolve as builtin type.
@@ -956,22 +971,40 @@ impl ExpTranslator<'_, '_, '_> {
                             return check_zero_args(self, Type::new_prim(PrimitiveType::U256));
                         },
                         "i8" => {
-                            return check_zero_args(self, Type::new_prim(PrimitiveType::I8));
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I8),
+                            )
                         },
                         "i16" => {
-                            return check_zero_args(self, Type::new_prim(PrimitiveType::I16));
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I16),
+                            )
                         },
                         "i32" => {
-                            return check_zero_args(self, Type::new_prim(PrimitiveType::I32));
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I32),
+                            )
                         },
                         "i64" => {
-                            return check_zero_args(self, Type::new_prim(PrimitiveType::I64));
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I64),
+                            )
                         },
                         "i128" => {
-                            return check_zero_args(self, Type::new_prim(PrimitiveType::I128));
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I128),
+                            )
                         },
                         "i256" => {
-                            return check_zero_args(self, Type::new_prim(PrimitiveType::I256));
+                            return sint_gated_check_zero_args(
+                                self,
+                                Type::new_prim(PrimitiveType::I256),
+                            )
                         },
                         "num" => return check_zero_args(self, Type::new_prim(PrimitiveType::Num)),
                         "range" => {
@@ -3074,95 +3107,95 @@ impl ExpTranslator<'_, '_, '_> {
                 );
                 Some((value, ty))
             },
-            EA::Value_::U8(x) => Some(self.translate_number(
+            EA::Value_::U8(x) => self.translate_number(
                 &loc,
                 BigInt::from_u8(*x).unwrap(),
                 Some(PrimitiveType::U8),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U16(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U16(x) => self.translate_number(
                 &loc,
                 BigInt::from_u16(*x).unwrap(),
                 Some(PrimitiveType::U16),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U32(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U32(x) => self.translate_number(
                 &loc,
                 BigInt::from_u32(*x).unwrap(),
                 Some(PrimitiveType::U32),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U64(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U64(x) => self.translate_number(
                 &loc,
                 BigInt::from_u64(*x).unwrap(),
                 Some(PrimitiveType::U64),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U128(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U128(x) => self.translate_number(
                 &loc,
                 BigInt::from_u128(*x).unwrap(),
                 Some(PrimitiveType::U128),
                 expected_type,
                 context,
-            )),
-            EA::Value_::U256(x) => Some(self.translate_number(
+            ),
+            EA::Value_::U256(x) => self.translate_number(
                 &loc,
                 BigInt::from(*x),
                 Some(PrimitiveType::U256),
                 expected_type,
                 context,
-            )),
-            EA::Value_::I8(x) => Some(self.translate_number(
+            ),
+            EA::Value_::I8(x) => self.translate_number(
                 &loc,
                 BigInt::from_i8(*x).unwrap(),
                 Some(PrimitiveType::I8),
                 expected_type,
                 context,
-            )),
-            EA::Value_::I16(x) => Some(self.translate_number(
+            ),
+            EA::Value_::I16(x) => self.translate_number(
                 &loc,
                 BigInt::from_i16(*x).unwrap(),
                 Some(PrimitiveType::I16),
                 expected_type,
                 context,
-            )),
-            EA::Value_::I32(x) => Some(self.translate_number(
+            ),
+            EA::Value_::I32(x) => self.translate_number(
                 &loc,
                 BigInt::from_i32(*x).unwrap(),
                 Some(PrimitiveType::I32),
                 expected_type,
                 context,
-            )),
-            EA::Value_::I64(x) => Some(self.translate_number(
+            ),
+            EA::Value_::I64(x) => self.translate_number(
                 &loc,
                 BigInt::from_i64(*x).unwrap(),
                 Some(PrimitiveType::I64),
                 expected_type,
                 context,
-            )),
-            EA::Value_::I128(x) => Some(self.translate_number(
+            ),
+            EA::Value_::I128(x) => self.translate_number(
                 &loc,
                 BigInt::from_i128(*x).unwrap(),
                 Some(PrimitiveType::I128),
                 expected_type,
                 context,
-            )),
-            EA::Value_::I256(x) => Some(self.translate_number(
+            ),
+            EA::Value_::I256(x) => self.translate_number(
                 &loc,
                 BigInt::from(*x),
                 Some(PrimitiveType::I256),
                 expected_type,
                 context,
-            )),
+            ),
             EA::Value_::InferredNegNum(x) => {
-                Some(self.translate_number(&loc, BigInt::from(*x), None, expected_type, context))
+                self.translate_number(&loc, BigInt::from(*x), None, expected_type, context)
             },
             EA::Value_::InferredNum(x) => {
-                Some(self.translate_number(&loc, BigInt::from(*x), None, expected_type, context))
+                self.translate_number(&loc, BigInt::from(*x), None, expected_type, context)
             },
             EA::Value_::Bool(x) => Some((Value::Bool(*x), Type::new_prim(PrimitiveType::Bool))),
             EA::Value_::Bytearray(x) => {
@@ -3180,7 +3213,7 @@ impl ExpTranslator<'_, '_, '_> {
         requested_type: Option<PrimitiveType>,
         expected_type: &Type,
         context: &ErrorMessageContext,
-    ) -> (Value, Type) {
+    ) -> Option<(Value, Type)> {
         // First determine the type of the number.
         let mut possible_types = if let Some(requested) = requested_type {
             // The type of the constant is explicit (e.g. `0u64`)
@@ -3218,7 +3251,21 @@ impl ExpTranslator<'_, '_, '_> {
             )
         };
         let ty = self.check_type(loc, &ty, expected_type, context);
-        (Value::Number(value), ty)
+
+        if ty.is_signed_int()
+            && !self
+                .env()
+                .language_version()
+                .is_at_least(LanguageVersion::V2_3)
+        {
+            self.error(
+                loc,
+                "signed integer types are not supported in language versions prior to 2.3",
+            );
+            None
+        } else {
+            Some((Value::Number(value), ty))
+        }
     }
 
     /// Check whether value fits into primitive type, report error if not.
