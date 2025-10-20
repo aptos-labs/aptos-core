@@ -98,6 +98,7 @@ pub trait IsMsmInput<B, S> {
 
 /// Represents the input to a (not necessarily fixed-base) multi-scalar multiplication (MSM):
 /// a collection of bases and corresponding scalars.
+/// TODO: Might not be the right file for this struct, since not necessarily fixed-base
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
 pub struct MsmInput<
     B: CanonicalSerialize + CanonicalDeserialize,
