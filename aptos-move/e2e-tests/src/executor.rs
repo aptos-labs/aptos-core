@@ -814,7 +814,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 &state_view,
                 self.shared_module_cache_manager.as_ref().unwrap_or(&AptosModuleCacheManager::new()),
                 config,
-                metadata.unwrap_or_else(|| TransactionSliceMetadata::unknown()),
+                metadata.unwrap_or_else(TransactionSliceMetadata::unknown),
                 None,
             )
             .map(BlockOutput::into_transaction_outputs_forced)
