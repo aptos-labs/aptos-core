@@ -5,10 +5,13 @@
 
 use crate::tdbg;
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;
+use aptos_crypto::HashValue;
 use aptos_framework::natives::code::{ModuleMetadata, PackageDep, PackageMetadata, UpgradePolicy};
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
-use aptos_types::block_executor::transaction_slice_metadata::TransactionSliceMetadata;
-use aptos_types::transaction::{ExecutionStatus, TransactionPayload, TransactionStatus};
+use aptos_types::{
+    block_executor::transaction_slice_metadata::TransactionSliceMetadata,
+    transaction::{ExecutionStatus, TransactionPayload, TransactionStatus},
+};
 use arbitrary::Arbitrary;
 use fuzzer::UserAccount;
 use libfuzzer_sys::Corpus;
@@ -17,9 +20,10 @@ use move_core_types::{
     language_storage::ModuleId,
     vm_status::{StatusCode, StatusType, VMStatus},
 };
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::sync::atomic::{AtomicU64, Ordering};
-use aptos_crypto::HashValue;
+use std::{
+    collections::{BTreeMap, BTreeSet, HashSet},
+    sync::atomic::{AtomicU64, Ordering},
+};
 
 pub const BYTECODE_VERSION: u32 = 8;
 
@@ -158,10 +162,7 @@ static NEXT_BLOCK_ID: AtomicU64 = AtomicU64::new(1);
 
 pub(crate) fn next_block_metadata() -> TransactionSliceMetadata {
     let child = NEXT_BLOCK_ID.fetch_add(1, Ordering::Relaxed);
-    TransactionSliceMetadata::block(
-        HashValue::from_u64(child - 1),
-        HashValue::from_u64(child),
-    )
+    TransactionSliceMetadata::block(HashValue::from_u64(child - 1), HashValue::from_u64(child))
 }
 
 pub(crate) fn publish_group(

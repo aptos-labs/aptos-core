@@ -51,12 +51,8 @@ macro_rules! alert_or_println {
 }
 
 #[cfg(fuzzing)]
-pub type ModuleHotCacheSnapshot = GlobalModuleCache<
-    ModuleId,
-    CompiledModule,
-    Module,
-    AptosModuleExtension,
->;
+pub type ModuleHotCacheSnapshot =
+    GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>;
 /// Manages module caches and the execution environment, possibly across multiple blocks.
 pub struct ModuleCacheManager<K, D, V, E> {
     /// Records the last observed metadata associated with a batch of executed transactions. When a
