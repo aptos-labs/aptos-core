@@ -32,8 +32,8 @@ use std::{
 };
 mod utils;
 use fuzzer::{Authenticator, ExecVariant, RunnableState};
-use utils::vm::{check_for_invariant_violation, publish_group, sort_by_deps, BYTECODE_VERSION};
 use move_vm_runtime::RuntimeEnvironment;
+use utils::vm::{check_for_invariant_violation, publish_group, sort_by_deps, BYTECODE_VERSION};
 
 // genesis write set generated once for each fuzzing session
 static VM_WRITE_SET: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
