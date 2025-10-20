@@ -219,7 +219,7 @@ Parameters:
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> cancelled_bulk_order = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>(user);
-    <b>let</b> (order_id, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = cancelled_bulk_order.destroy_bulk_order();
+    <b>let</b> (order_id, _, _, sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = cancelled_bulk_order.destroy_bulk_order();
     <b>let</b> i = 0;
     <b>while</b> (i &lt; bid_sizes.length()) {
         callbacks.cleanup_bulk_order_at_price(user, order_id, <b>true</b>, bid_prices[i], bid_sizes[i]);
@@ -230,7 +230,15 @@ Parameters:
         callbacks.cleanup_bulk_order_at_price(user, order_id, <b>false</b>, ask_prices[j], ask_sizes[j]);
         j += 1;
     };
-    market.emit_event_for_bulk_order_cancelled(order_id, user);
+    market.emit_event_for_bulk_order_cancelled(
+        order_id,
+        sequence_number,
+        user,
+        bid_sizes,
+        bid_prices,
+        ask_sizes,
+        ask_prices
+    );
 }
 </code></pre>
 
