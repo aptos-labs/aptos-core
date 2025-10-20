@@ -166,7 +166,10 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
 }
 
 /// Represents a single operation in a transactional test sequence
-#[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary))]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
 #[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TransactionalOperation {
     /// Publish one or more modules

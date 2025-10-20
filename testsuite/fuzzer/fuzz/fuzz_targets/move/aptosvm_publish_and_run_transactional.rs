@@ -3,6 +3,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_block_executor::code_cache_global_manager::AptosModuleCacheManager;
 use aptos_language_e2e_tests::{account::Account, executor::FakeExecutor};
 use aptos_transaction_simulation::GENESIS_CHANGE_SET_HEAD;
 use aptos_types::{
@@ -16,7 +17,6 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptos_vm_environment::{prod_configs, prod_configs::LATEST_GAS_FEATURE_VERSION};
-use aptos_block_executor::code_cache_global_manager::AptosModuleCacheManager;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
@@ -471,12 +471,10 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         if block.is_empty() {
             continue;
         }
-        let outputs = vm
-            .execute_block(block)
-            .map_err(|e| {
-                check_for_invariant_violation(e);
-                Corpus::Keep
-            })?;
+        let outputs = vm.execute_block(block).map_err(|e| {
+            check_for_invariant_violation(e);
+            Corpus::Keep
+        })?;
 
         // Check all transaction outputs and apply write sets on success
         for res in outputs.into_iter() {

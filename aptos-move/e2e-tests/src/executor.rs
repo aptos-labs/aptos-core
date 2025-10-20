@@ -10,18 +10,21 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
-use aptos_block_executor::{
-    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::default::DefaultTxnProvider,
-};
 #[cfg(fuzzing)]
 use aptos_block_executor::code_cache_global_manager::ModuleHotCacheSnapshot;
-use aptos_block_executor::txn_provider::TxnProvider;
+use aptos_block_executor::{
+    code_cache_global_manager::AptosModuleCacheManager,
+    txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::{default::DefaultTxnProvider, TxnProvider},
+};
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_gas_schedule::{
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_keygen::KeyGen;
 use aptos_rest_client::AptosBaseUrl;
 use aptos_transaction_simulation::{
@@ -46,7 +49,8 @@ use aptos_types::{
     contract_event::ContractEvent,
     move_utils::MemberId,
     on_chain_config::{
-        AptosVersion, CurrentTimeMicroseconds, FeatureFlag, Features, OnChainConfig, ValidatorSet,
+        AptosVersion, CurrentTimeMicroseconds, FeatureFlag, Features, GasScheduleV2, OnChainConfig,
+        ValidatorSet,
     },
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
@@ -70,8 +74,6 @@ use aptos_vm::{
     AptosVM, VMValidator,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
-use aptos_gas_schedule::{AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION};
-use aptos_types::on_chain_config::GasScheduleV2;
 use aptos_vm_genesis::{generate_genesis_change_set_for_testing_with_count, GenesisOptions};
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{
@@ -98,7 +100,10 @@ use std::{
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::{atomic::{AtomicU64, Ordering}, Arc, Mutex},
+    sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc, Mutex,
+    },
     time::{Duration, Instant},
 };
 
@@ -384,9 +389,13 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         // Publish schedule for next epoch, then force end epoch to apply immediately.
         self.exec("gas_schedule", "set_for_next_epoch", vec![], vec![
             core_signer_arg.clone(),
-            MoveValue::vector_u8(schedule_bytes).simple_serialize().unwrap(),
+            MoveValue::vector_u8(schedule_bytes)
+                .simple_serialize()
+                .unwrap(),
         ]);
-        self.exec("aptos_governance", "force_end_epoch", vec![], vec![core_signer_arg]);
+        self.exec("aptos_governance", "force_end_epoch", vec![], vec![
+            core_signer_arg,
+        ]);
     }
 
     pub fn disable_block_executor_fallback(&mut self) {
@@ -812,7 +821,9 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 self.executor_thread_pool.clone(),
                 &txn_provider,
                 &state_view,
-                self.shared_module_cache_manager.as_ref().unwrap_or(&AptosModuleCacheManager::new()),
+                self.shared_module_cache_manager
+                    .as_ref()
+                    .unwrap_or(&AptosModuleCacheManager::new()),
                 config,
                 metadata.unwrap_or_else(TransactionSliceMetadata::unknown),
                 None,
@@ -862,15 +873,16 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
         // Use consecutive block metadata to enable cache reuse across calls. If comparison mode is enabled, is correc to not increment the counter.
-        let metadata: Option<TransactionSliceMetadata> = if self.shared_module_cache_manager.is_some() {
-            let child = self.next_block_id.fetch_add(1, Ordering::Relaxed);
-            Some(TransactionSliceMetadata::block(
-                HashValue::from_u64(child - 1),
-                HashValue::from_u64(child),
-            ))
-        } else {
-            None
-        };
+        let metadata: Option<TransactionSliceMetadata> =
+            if self.shared_module_cache_manager.is_some() {
+                let child = self.next_block_id.fetch_add(1, Ordering::Relaxed);
+                Some(TransactionSliceMetadata::block(
+                    HashValue::from_u64(child - 1),
+                    HashValue::from_u64(child),
+                ))
+            } else {
+                None
+            };
 
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
@@ -883,12 +895,19 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             onchain: onchain_config.clone(),
         };
 
-        #[cfg(fuzzing)]{
+        #[cfg(fuzzing)]
+        {
             if mode == ExecutorMode::BothComparison {
-                let mut guard = self.shared_module_cache_manager
-                .as_ref().unwrap()
-                .try_lock(state_view, &config.local.module_cache_config, metadata.unwrap())
-                .unwrap();
+                let mut guard = self
+                    .shared_module_cache_manager
+                    .as_ref()
+                    .unwrap()
+                    .try_lock(
+                        state_view,
+                        &config.local.module_cache_config,
+                        metadata.unwrap(),
+                    )
+                    .unwrap();
                 snapshot = Some(guard.snapshot_hot_cache());
             }
         }
@@ -908,15 +927,20 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         {
             if mode == ExecutorMode::BothComparison {
                 if let Some(s) = snapshot.take() {
-                    let mut guard = self.shared_module_cache_manager
-                        .as_ref().unwrap()
-                        .try_lock(state_view, &config.local.module_cache_config, metadata.unwrap())
+                    let mut guard = self
+                        .shared_module_cache_manager
+                        .as_ref()
+                        .unwrap()
+                        .try_lock(
+                            state_view,
+                            &config.local.module_cache_config,
+                            metadata.unwrap(),
+                        )
                         .unwrap();
                     guard.rollback_hot_cache(s);
                 }
             }
         }
-
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
             let config = BlockExecutorConfig {
