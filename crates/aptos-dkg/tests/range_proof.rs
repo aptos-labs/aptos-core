@@ -16,13 +16,13 @@ use ark_ec::pairing::Pairing;
 use ark_std::rand::thread_rng;
 
 #[cfg(test)]
-fn run_range_proof_roundtrip<E: Pairing, B: BatchedRangeProof<E>>(
-    setup: &RangeProofFixedSetup<E, B>,
+fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
+    setup: &RangeProofUniversalSetup<E, B>,
     n: usize,
     ell: usize,
 ) {
     let mut rng = thread_rng();
-    let RangeProofFixedSetup { pk, vk } = setup;
+    let RangeProofUniversalSetup { pk, vk } = setup;
     let (values, comm, r) =
         test_utils::range_proof_random_instance::<_, B, _>(pk, n, ell, &mut rng);
     println!("setup finished, prove starting for n={}, ell={}", n, ell);
@@ -89,28 +89,28 @@ const TEST_CASES: &[(usize, usize)] = &[
 
 #[cfg(test)]
 /// A **reusable** setup structure.
-struct RangeProofFixedSetup<E: Pairing, B: BatchedRangeProof<E>> {
+struct RangeProofUniversalSetup<E: Pairing, B: BatchedRangeProof<E>> {
     pk: B::ProverKey,
     vk: B::VerificationKey,
 }
 
 #[cfg(test)]
 /// Generate a fixed setup for a single curve
-fn make_single_curve_setup<B, E>(n: usize, ell: usize) -> RangeProofFixedSetup<E, B>
+fn make_single_curve_setup<B, E>(n: usize, ell: usize) -> RangeProofUniversalSetup<E, B>
 where
     E: Pairing,
     B: BatchedRangeProof<E>,
 {
     let mut rng = thread_rng();
     let (pk, vk) = B::setup(n, ell, &mut rng);
-    RangeProofFixedSetup { pk, vk }
+    RangeProofUniversalSetup { pk, vk }
 }
 
 #[cfg(test)]
 /// Generate one setup per curve type
 fn make_all_curve_setups() -> (
-    RangeProofFixedSetup<ark_bn254::Bn254, UnivariateDeKART<ark_bn254::Bn254>>,
-    RangeProofFixedSetup<ark_bls12_381::Bls12_381, UnivariateDeKART<ark_bls12_381::Bls12_381>>,
+    RangeProofUniversalSetup<ark_bn254::Bn254, UnivariateDeKART<ark_bn254::Bn254>>,
+    RangeProofUniversalSetup<ark_bls12_381::Bls12_381, UnivariateDeKART<ark_bls12_381::Bls12_381>>,
 ) {
     (
         make_single_curve_setup::<UnivariateDeKART<ark_bn254::Bn254>, ark_bn254::Bn254>(31, 16),
@@ -134,11 +134,11 @@ macro_rules! for_each_curve {
 
 #[cfg(test)]
 #[test]
-fn range_proof_tests_multi() {
+fn assert_correctness_of_all_range_proofs() {
     // Generate setup once per curve
     let setups = make_all_curve_setups();
 
     for &(n, ell) in TEST_CASES {
-        for_each_curve!(run_range_proof_roundtrip, setups, n, ell);
+        for_each_curve!(assert_range_proof_correctness, setups, n, ell);
     }
 }

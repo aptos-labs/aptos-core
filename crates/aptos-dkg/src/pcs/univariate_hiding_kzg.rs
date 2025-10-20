@@ -243,7 +243,7 @@ mod tests {
     use ark_std::{rand::thread_rng, UniformRand};
 
     // TODO: Should set up a PCS trait, then make these tests generic?
-    fn generic_test_open_and_verify_roundtrip<E: Pairing>() {
+    fn assert_kzg_opening_correctness<E: Pairing>() {
         let mut rng = thread_rng();
         let group_data = GroupGenerators::sample(&mut rng);
 
@@ -289,11 +289,14 @@ mod tests {
         ($name:ident, $curve:ty) => {
             #[test]
             fn $name() {
-                generic_test_open_and_verify_roundtrip::<$curve>();
+                assert_kzg_opening_correctness::<$curve>();
             }
         };
     }
 
-    kzg_roundtrip_test!(test_roundtrip_for_bn254, ark_bn254::Bn254);
-    kzg_roundtrip_test!(test_roundtrip_for_bls12_381, ark_bls12_381::Bls12_381);
+    kzg_roundtrip_test!(assert_kzg_opening_correctness_for_bn254, ark_bn254::Bn254);
+    kzg_roundtrip_test!(
+        assert_kzg_opening_correctness_for_bls12_381,
+        ark_bls12_381::Bls12_381
+    );
 }
