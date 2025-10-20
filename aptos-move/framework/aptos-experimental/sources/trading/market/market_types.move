@@ -888,19 +888,31 @@ module aptos_experimental::market_types {
     public fun verify_bulk_order_modified_event(
         self: BulkOrderModifiedEvent,
         order_id: OrderIdType,
+        sequence_number: u64,
         market: address,
         user: address,
         bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
+        previous_seq_num: u64,
     ) {
         assert!(self.order_id == order_id.get_order_id_value());
+        assert!(self.sequence_number == sequence_number);
         assert!(self.market == market);
         assert!(self.user == user);
         assert!(self.bid_sizes == bid_sizes);
         assert!(self.bid_prices == bid_prices);
         assert!(self.ask_sizes == ask_sizes);
         assert!(self.ask_prices == ask_prices);
+        assert!(self.cancelled_bid_sizes == cancelled_bid_sizes);
+        assert!(self.cancelled_bid_prices == cancelled_bid_prices);
+        assert!(self.cancelled_ask_sizes == cancelled_ask_sizes);
+        assert!(self.cancelled_ask_prices == cancelled_ask_prices);
+        assert!(self.previous_seq_num == previous_seq_num);
     }
 }
