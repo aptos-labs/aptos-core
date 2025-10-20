@@ -58,3 +58,6 @@ serde = { workspace = true }
 [features]
 default = []
 fuzzing = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(fuzzing)'] }

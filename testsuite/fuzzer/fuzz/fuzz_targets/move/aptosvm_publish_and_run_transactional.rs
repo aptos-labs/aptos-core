@@ -16,6 +16,7 @@ use aptos_types::{
 };
 use aptos_vm::AptosVM;
 use aptos_vm_environment::{prod_configs, prod_configs::LATEST_GAS_FEATURE_VERSION};
+use aptos_block_executor::code_cache_global_manager::AptosModuleCacheManager;
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
@@ -23,21 +24,24 @@ use move_binary_format::{
     errors::VMError,
     file_format::{CompiledModule, CompiledScript, SignatureToken},
 };
-use move_core_types::vm_status::{StatusCode, StatusType};
+use move_core_types::{
+    account_address::AccountAddress,
+    vm_status::{StatusCode, StatusType},
+};
 use move_transactional_test_runner::transactional_ops::TransactionalOperation;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     sync::Arc,
 };
 mod utils;
-use fuzzer::{ExecVariant, RunnableStateWithOperations};
+use fuzzer::RunnableStateWithOperations;
 use utils::vm::{check_for_invariant_violation, publish_group, sort_by_deps, BYTECODE_VERSION};
 
 // genesis write set generated once for each fuzzing session
 static VM_WRITE_SET: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
 
-const FUZZER_CONCURRENCY_LEVEL: usize = 1;
+const FUZZER_CONCURRENCY_LEVEL: usize = 4;
 static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
     Arc::new(
         rayon::ThreadPoolBuilder::new()
@@ -54,6 +58,7 @@ const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-byte
 const KNOWN_FALSE_POSITIVES: &[&str] = &["too many type parameters/arguments in the program"];
 
 fn check_for_invariant_violation_vmerror(e: VMError) {
+    tdbg!("check_for_invariant_violation_vmerror: {:?}", e.clone());
     if e.status_type() == StatusType::InvariantViolation {
         let is_known_false_positive = e.message().is_some_and(|msg| {
             KNOWN_FALSE_POSITIVES
@@ -119,47 +124,19 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     let deserializer_config = DeserializerConfig::new(BYTECODE_VERSION, 255);
 
     let mut dep_modules: Vec<CompiledModule> = vec![];
-    let mut exec_variant_opt: Option<ExecVariant> = None;
-
+    // Collect dependency modules and later we will verify runs individually
     for operation in input.operations.iter() {
         match operation {
             TransactionalOperation::PublishModule { _module } => {
                 dep_modules.push(_module.clone());
             },
-            TransactionalOperation::RunScript {
-                _script,
-                _type_args,
-                _args,
-            } => {
-                if exec_variant_opt.is_none() {
-                    exec_variant_opt = Some(ExecVariant::Script {
-                        _script: _script.clone(),
-                        _type_args: _type_args.clone(),
-                        _args: _args.clone(),
-                    });
-                }
-            },
-            TransactionalOperation::CallFunction {
-                _module,
-                _function,
-                _type_args,
-                _args,
-            } => {
-                if exec_variant_opt.is_none() {
-                    exec_variant_opt = Some(ExecVariant::CallFunction {
-                        _module: _module.clone(),
-                        _function: *_function,
-                        _type_args: _type_args.clone(),
-                        _args: _args.clone(),
-                    });
-                }
-            },
+            _ => (),
         }
     }
 
     tdbg!("verifying scripts");
-    for exec_variant in exec_variant_opt.iter() {
-        if let ExecVariant::Script { _script, .. } = exec_variant {
+    for operation in input.operations.iter() {
+        if let TransactionalOperation::RunScript { _script, .. } = operation {
             // reject bad scripts fast
             let mut script_code: Vec<u8> = vec![];
             tdbg!("serializing script");
@@ -251,13 +228,15 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         }
     }
 
+    let module_cache_manager = AptosModuleCacheManager::new();
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
         &VM_WRITE_SET,
         ChainId::mainnet(),
         Arc::clone(&TP),
+        Some(module_cache_manager),
     )
-    .set_not_parallel();
+    .set_parallel();
 
     // publish all packages
     for group in packages {
@@ -266,35 +245,79 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         publish_group(&mut vm, &acc, &group, 0)?;
     }
 
-    // TODO: use the sender from the input when added in future
-    let sender_acc = if true {
-        // create sender pub/priv key. initialize and fund account
-        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), 0)
-            .remove(0)
-    } else {
-        // only create sender pub/priv key. do not initialize
-        Account::new()
-    };
+    // Build blocks grouped by exec_group and sign with provided signers
+    tdbg!("building grouped tx blocks");
+    // Helper maps to reuse accounts and sequence numbers per sender
+    let mut accounts_by_addr: HashMap<AccountAddress, Account> = HashMap::new();
+    let mut next_seq_by_addr: HashMap<AccountAddress, u64> = HashMap::new();
+    let mut blocks: Vec<Vec<SignedTransaction>> = Vec::new();
+    let mut group_to_block_index: HashMap<u64, usize> = HashMap::new();
 
-    // build txs
-    tdbg!("building txs");
-    let mut txs = vec![];
-    for exec_variant in exec_variant_opt.iter() {
-        let tx = match exec_variant {
-            ExecVariant::Script {
+    // Fallback sender if no signers provided (rare)
+    let mut fallback_sender: Option<Account> = None;
+
+    // Convert operations into blocks
+    for operation in input.operations.iter() {
+        match operation {
+            TransactionalOperation::PublishModule { .. } => (),
+            TransactionalOperation::RunScript {
                 _script,
                 _type_args,
                 _args,
+                _signers,
+                _exec_group,
             } => {
+                // Determine block index for this operation
+                let block_index = if *_exec_group == 0 {
+                    blocks.push(Vec::new());
+                    blocks.len() - 1
+                } else if let Some(idx) = group_to_block_index.get(_exec_group).cloned() {
+                    idx
+                } else {
+                    let idx = blocks.len();
+                    blocks.push(Vec::new());
+                    group_to_block_index.insert(*_exec_group, idx);
+                    idx
+                };
+
+                // Build raw transaction
                 let mut script_bytes = vec![];
                 _script
                     .serialize_for_version(Some(BYTECODE_VERSION), &mut script_bytes)
                     .map_err(|_| Corpus::Reject)?;
-                sender_acc
+
+                // Prepare sender and secondary signers
+                let (sender_addr, secondary_addrs) = if !_signers.is_empty() {
+                    (_signers[0], _signers[1..].to_vec())
+                } else {
+                    // Create fallback sender lazily
+                    let f = fallback_sender.get_or_insert_with(|| {
+                        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), 0)
+                            .remove(0)
+                    });
+                    (*f.address(), vec![])
+                };
+
+                // Ensure accounts exist for sender and secondary signers
+                if !accounts_by_addr.contains_key(&sender_addr) {
+                    let acc = vm.new_account_at(sender_addr);
+                    accounts_by_addr.insert(sender_addr, acc);
+                }
+                for sec in secondary_addrs.iter() {
+                    if !accounts_by_addr.contains_key(sec) {
+                        let acc = vm.new_account_at(*sec);
+                        accounts_by_addr.insert(*sec, acc);
+                    }
+                }
+
+                let sender_acc = accounts_by_addr.get(&sender_addr).unwrap();
+                let sequence_number = *next_seq_by_addr.get(&sender_addr).unwrap_or(&0u64);
+
+                let tx_builder = sender_acc
                     .transaction()
                     .gas_unit_price(100)
                     .max_gas_amount(1000)
-                    .sequence_number(0)
+                    .sequence_number(sequence_number)
                     .payload(TransactionPayload::Script(Script::new(
                         script_bytes,
                         _type_args.clone(),
@@ -303,15 +326,59 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                             .map(|x| x.clone().try_into())
                             .collect::<Result<Vec<TransactionArgument>, _>>()
                             .map_err(|_| Corpus::Reject)?,
-                    )))
+                    )));
+
+                let raw_tx = tx_builder.raw();
+
+                // Sign transaction: single or multi-agent
+                let signed_tx = if secondary_addrs.is_empty() {
+                    raw_tx
+                        .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
+                        .map_err(|_| Corpus::Reject)?
+                        .into_inner()
+                } else {
+                    let secondary_accounts: Vec<_> = secondary_addrs
+                        .iter()
+                        .map(|a| accounts_by_addr.get(a).unwrap())
+                        .collect();
+                    let secondary_privs = secondary_accounts.iter().map(|a| &a.privkey).collect();
+                    raw_tx
+                        .sign_multi_agent(
+                            &sender_acc.privkey,
+                            secondary_addrs.clone(),
+                            secondary_privs,
+                        )
+                        .map_err(|_| Corpus::Reject)?
+                        .into_inner()
+                };
+
+                // Increment sender sequence
+                next_seq_by_addr.insert(sender_addr, sequence_number + 1);
+
+                blocks[block_index].push(signed_tx);
             },
-            ExecVariant::CallFunction {
+            TransactionalOperation::CallFunction {
                 _module,
                 _function,
                 _type_args,
                 _args,
+                _signers,
+                _exec_group,
             } => {
-                // convert FunctionDefinitionIndex to function name... {
+                // Determine block index for this operation
+                let block_index = if *_exec_group == 0 {
+                    blocks.push(Vec::new());
+                    blocks.len() - 1
+                } else if let Some(idx) = group_to_block_index.get(_exec_group).cloned() {
+                    idx
+                } else {
+                    let idx = blocks.len();
+                    blocks.push(Vec::new());
+                    group_to_block_index.insert(*_exec_group, idx);
+                    idx
+                };
+
+                // Resolve function name from index
                 let cm = dep_modules
                     .iter()
                     .find(|m| m.self_id() == *_module)
@@ -331,76 +398,121 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                     .get(function_identifier_index.0 as usize)
                     .ok_or(Corpus::Reject)?
                     .clone();
-                // }
-                sender_acc
+
+                // Prepare sender and secondary signers
+                let (sender_addr, secondary_addrs) = if !_signers.is_empty() {
+                    (_signers[0], _signers[1..].to_vec())
+                } else {
+                    // Create fallback sender lazily
+                    let f = fallback_sender.get_or_insert_with(|| {
+                        vm.create_accounts(1, input.tx_auth_type.sender().fund_amount(), 0)
+                            .remove(0)
+                    });
+                    (*f.address(), vec![])
+                };
+
+                // Ensure accounts exist for sender and secondary signers
+                if !accounts_by_addr.contains_key(&sender_addr) {
+                    let acc = vm.new_account_at(sender_addr);
+                    accounts_by_addr.insert(sender_addr, acc);
+                }
+                for sec in secondary_addrs.iter() {
+                    if !accounts_by_addr.contains_key(sec) {
+                        let acc = vm.new_account_at(*sec);
+                        accounts_by_addr.insert(*sec, acc);
+                    }
+                }
+
+                let sender_acc = accounts_by_addr.get(&sender_addr).unwrap();
+                let sequence_number = *next_seq_by_addr.get(&sender_addr).unwrap_or(&0u64);
+
+                let tx_builder = sender_acc
                     .transaction()
                     .gas_unit_price(100)
                     .max_gas_amount(1000)
-                    .sequence_number(0)
+                    .sequence_number(sequence_number)
                     .payload(TransactionPayload::EntryFunction(EntryFunction::new(
                         _module.clone(),
                         function_name,
                         _type_args.clone(),
                         _args.clone(),
-                    )))
+                    )));
+
+                let raw_tx = tx_builder.raw();
+
+                // Sign transaction: single or multi-agent
+                let signed_tx = if secondary_addrs.is_empty() {
+                    raw_tx
+                        .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
+                        .map_err(|_| Corpus::Reject)?
+                        .into_inner()
+                } else {
+                    let secondary_accounts: Vec<_> = secondary_addrs
+                        .iter()
+                        .map(|a| accounts_by_addr.get(a).unwrap())
+                        .collect();
+                    let secondary_privs = secondary_accounts.iter().map(|a| &a.privkey).collect();
+                    raw_tx
+                        .sign_multi_agent(
+                            &sender_acc.privkey,
+                            secondary_addrs.clone(),
+                            secondary_privs,
+                        )
+                        .map_err(|_| Corpus::Reject)?
+                        .into_inner()
+                };
+
+                // Increment sender sequence
+                next_seq_by_addr.insert(sender_addr, sequence_number + 1);
+
+                blocks[block_index].push(signed_tx);
             },
-        };
-        txs.push(tx);
+        }
     }
 
-    tdbg!("signing txs");
-    let txs: Vec<_> = txs
-        .into_iter()
-        .map(|tx| {
-            let raw_tx = tx.raw();
-            raw_tx
-                .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
-                .map_err(|_| Corpus::Reject)
-                .map(|signed_internal| signed_internal.into_inner())
-        })
-        .collect::<Result<Vec<SignedTransaction>, Corpus>>()?;
-
-    // exec tx
-    // Note: one tx per block.
+    // Execute blocks
     tdbg!("exec start");
-    for tx in txs.iter() {
-        let res = vm
-            .execute_block(vec![tx.clone()])
+    for block in blocks.into_iter() {
+        if block.is_empty() {
+            continue;
+        }
+        let outputs = vm
+            .execute_block(block)
             .map_err(|e| {
                 check_for_invariant_violation(e);
                 Corpus::Keep
-            })?
-            .pop()
-            .expect("expect 1 output");
+            })?;
 
-        // if error exit gracefully
-        let status = match tdbg!(res.status()) {
-            TransactionStatus::Keep(status) => status,
-            TransactionStatus::Discard(e) => {
-                if e.status_type() == StatusType::InvariantViolation {
-                    panic!("invariant violation {:?}", e);
-                }
-                return Err(Corpus::Keep);
-            },
-            _ => return Err(Corpus::Keep),
-        };
-        match tdbg!(status) {
-            ExecutionStatus::Success | ExecutionStatus::OutOfGas => {
-                vm.apply_write_set(res.write_set())
-            },
-            ExecutionStatus::MiscellaneousError(e) => {
-                if let Some(e) = e {
-                    if e.status_type() == StatusType::InvariantViolation
-                        && *e != StatusCode::TYPE_RESOLUTION_FAILURE
-                        && *e != StatusCode::STORAGE_ERROR
-                    {
-                        panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
+        // Check all transaction outputs and apply write sets on success
+        for res in outputs.into_iter() {
+            let status = match tdbg!(res.status()) {
+                TransactionStatus::Keep(status) => status,
+                TransactionStatus::Discard(e) => {
+                    if e.status_type() == StatusType::InvariantViolation {
+                        panic!("invariant violation {:?}", e);
                     }
-                }
-                return Err(Corpus::Keep);
-            },
-            _ => return Err(Corpus::Keep),
-        };
+                    return Err(Corpus::Keep);
+                },
+                _ => return Err(Corpus::Keep),
+            };
+            match tdbg!(status) {
+                ExecutionStatus::Success | ExecutionStatus::OutOfGas => {
+                    vm.apply_write_set(res.write_set())
+                },
+                ExecutionStatus::MiscellaneousError(e) => {
+                    if let Some(e) = e {
+                        if e.status_type() == StatusType::InvariantViolation
+                            && *e != StatusCode::TYPE_RESOLUTION_FAILURE
+                            && *e != StatusCode::STORAGE_ERROR
+                        {
+                            panic!("invariant violation {:?}, {:?}", e, res.auxiliary_data());
+                        }
+                    }
+                    return Err(Corpus::Keep);
+                },
+                _ => return Err(Corpus::Keep),
+            };
+        }
     }
     tdbg!("exec end");
 

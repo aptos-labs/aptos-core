@@ -33,6 +33,7 @@ use std::{
 mod utils;
 use fuzzer::{Authenticator, ExecVariant, RunnableState};
 use utils::vm::{check_for_invariant_violation, publish_group, sort_by_deps, BYTECODE_VERSION};
+use move_vm_runtime::RuntimeEnvironment;
 
 // genesis write set generated once for each fuzzing session
 static VM_WRITE_SET: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
@@ -178,7 +179,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         for id in order.iter() {
             // check if part of current package
             if id.address() == cur_package_id.address() {
-                if let Some(module) = map.remove(cur_package_id) {
+                if let Some(module) = map.remove(id) {
                     cur.push(module);
                 }
             }
@@ -191,6 +192,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         &VM_WRITE_SET,
         ChainId::mainnet(),
         Arc::clone(&TP),
+        None,
     )
     .set_not_parallel();
 
@@ -419,7 +421,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
             );
         }
     }
-
+    drop(vm);
+    RuntimeEnvironment::flush_verified_module_cache();
     Ok(())
 }
 
