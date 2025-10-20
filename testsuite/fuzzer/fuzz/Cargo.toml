@@ -111,9 +111,3 @@ name = "move_aptosvm_publish_and_run_transactional"
 path = "fuzz_targets/move/aptosvm_publish_and_run_transactional.rs"
 test = false
 doc = false
-
-[[bin]]
-name = "move_aptosvm_publish_and_run_cached"
-path = "fuzz_targets/move/aptosvm_publish_and_run_cached.rs"
-test = false
-doc = false
