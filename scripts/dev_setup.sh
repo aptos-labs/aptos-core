@@ -16,6 +16,8 @@
 # fast fail.
 set -eo pipefail
 
+cat /etc/os-release
+
 NODE_MAJOR_VERSION=20
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
@@ -968,8 +970,8 @@ install_pkg wget "$PACKAGE_MANAGER"
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
   install_pkg cmake "$PACKAGE_MANAGER"
-  install_pkg clang "$PACKAGE_MANAGER"
-  install_pkg llvm "$PACKAGE_MANAGER"
+  install_pkg clang-20 "$PACKAGE_MANAGER"
+  install_pkg llvm-20 "$PACKAGE_MANAGER"
 
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
