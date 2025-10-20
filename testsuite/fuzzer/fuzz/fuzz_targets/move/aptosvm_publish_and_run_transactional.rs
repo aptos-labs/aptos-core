@@ -126,11 +126,8 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     let mut dep_modules: Vec<CompiledModule> = vec![];
     // Collect dependency modules and later we will verify runs individually
     for operation in input.operations.iter() {
-        match operation {
-            TransactionalOperation::PublishModule { _module } => {
-                dep_modules.push(_module.clone());
-            },
-            _ => (),
+        if let TransactionalOperation::PublishModule { _module } = operation {
+            dep_modules.push(_module.clone());
         }
     }
 
@@ -299,10 +296,9 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                 };
 
                 // Ensure accounts exist for sender and secondary signers
-                if !accounts_by_addr.contains_key(&sender_addr) {
-                    let acc = vm.new_account_at(sender_addr);
-                    accounts_by_addr.insert(sender_addr, acc);
-                }
+                accounts_by_addr
+                    .entry(sender_addr)
+                    .or_insert_with(|| vm.new_account_at(sender_addr));
                 for sec in secondary_addrs.iter() {
                     if !accounts_by_addr.contains_key(sec) {
                         let acc = vm.new_account_at(*sec);
@@ -412,10 +408,9 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                 };
 
                 // Ensure accounts exist for sender and secondary signers
-                if !accounts_by_addr.contains_key(&sender_addr) {
-                    let acc = vm.new_account_at(sender_addr);
-                    accounts_by_addr.insert(sender_addr, acc);
-                }
+                accounts_by_addr
+                    .entry(sender_addr)
+                    .or_insert_with(|| vm.new_account_at(sender_addr));
                 for sec in secondary_addrs.iter() {
                     if !accounts_by_addr.contains_key(sec) {
                         let acc = vm.new_account_at(*sec);
