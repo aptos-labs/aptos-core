@@ -34,7 +34,7 @@ pub struct VMConfig {
     pub type_byte_cost: u64,
     pub delayed_field_optimization_enabled: bool,
     pub ty_builder: TypeBuilder,
-    pub use_call_tree_and_instruction_cache: bool,
+    pub enable_function_caches: bool,
     pub enable_lazy_loading: bool,
     pub enable_depth_checks: bool,
     /// Whether trusted code should be optimized, for example, excluding it from expensive
@@ -65,7 +65,7 @@ impl Default for VMConfig {
             type_byte_cost: 0,
             delayed_field_optimization_enabled: false,
             ty_builder: TypeBuilder::with_limits(128, 20),
-            use_call_tree_and_instruction_cache: true,
+            enable_function_caches: true,
             enable_lazy_loading: true,
             enable_depth_checks: true,
             optimize_trusted_code: false,
