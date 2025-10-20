@@ -340,6 +340,11 @@ module aptos_experimental::order_placement {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let cancelled_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
+
+        // Get the order state before cancellation to track what's being cancelled
+        let order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
+        let (_, _, _, sequence_number, cancelled_bid_sizes, cancelled_bid_prices, cancelled_ask_sizes, cancelled_ask_prices, _ ) = order_before_cancel.destroy_bulk_order();
+
         if (maker_order.get_remaining_size_from_match_details() != 0) {
                 // For bulk orders, we cancel all orders for the user
                 market.get_order_book_mut().cancel_bulk_order(maker_address);
@@ -353,11 +358,16 @@ module aptos_experimental::order_placement {
         let (_, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = modified_order.destroy_bulk_order();
         market.emit_event_for_bulk_order_modified(
             order_id,
+            sequence_number,
             maker_address,
             bid_sizes,
             bid_prices,
             ask_sizes,
-            ask_prices
+            ask_prices,
+            cancelled_bid_sizes,
+            cancelled_bid_prices,
+            cancelled_ask_sizes,
+            cancelled_ask_prices
         );
     }
 

@@ -384,6 +384,28 @@ module aptos_experimental::market_types {
         cancelled_ask_sizes: vector<u64>,
         previous_seq_num: u64,
     }
+
+
+    #[event]
+    // This event is emitted when a bulk order is modified - especially when some levels of the bulk orders
+    // are cancelled.
+    struct BulkOrderModifiedEvent has drop, copy, store {
+        parent: address,
+        market: address,
+        order_id: u128,
+        sequence_number: u64,
+        user: address,
+        bid_sizes: vector<u64>,
+        bid_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        ask_prices: vector<u64>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+        previous_seq_num: u64,
+    }
+
     #[event]
     struct BulkOrderFilledEvent has drop, copy, store {
         parent: address,
@@ -408,21 +430,6 @@ module aptos_experimental::market_types {
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
         details: std::string::String,
-    }
-
-
-    #[event]
-    // This event is emitted when a bulk order is modified - especially when some levels of the bulk orders
-    // are cancalled.
-    struct BulkOrderModifiedEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        user: address,
-        bid_sizes: vector<u64>,
-        bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-        ask_prices: vector<u64>,
     }
 
     public fun new_market_config(
@@ -658,7 +665,12 @@ module aptos_experimental::market_types {
     public fun emit_event_for_bulk_order_cancelled<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
+        sequence_number: u64,
         user: address,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -667,11 +679,17 @@ module aptos_experimental::market_types {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
+                    sequence_number,
                     user,
                     bid_sizes: vector[],
                     bid_prices: vector[],
                     ask_sizes: vector[],
                     ask_prices: vector[],
+                    cancelled_bid_prices,
+                    cancelled_bid_sizes,
+                    cancelled_ask_prices,
+                    cancelled_ask_sizes,
+                    previous_seq_num: sequence_number,
                 }
             )
         };
@@ -708,11 +726,16 @@ module aptos_experimental::market_types {
     public fun emit_event_for_bulk_order_modified<M: store + copy + drop>(
         self: &Market<M>,
         order_id: OrderIdType,
+        sequence_number: u64,
         user: address,
         bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
+        cancelled_bid_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
+        cancelled_ask_prices: vector<u64>,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -721,11 +744,17 @@ module aptos_experimental::market_types {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
+                    sequence_number,
                     user,
                     bid_sizes,
                     bid_prices,
                     ask_sizes,
                     ask_prices,
+                    cancelled_bid_prices,
+                    cancelled_bid_sizes,
+                    cancelled_ask_prices,
+                    cancelled_ask_sizes,
+                    previous_seq_num: sequence_number,
                 }
             );
         };

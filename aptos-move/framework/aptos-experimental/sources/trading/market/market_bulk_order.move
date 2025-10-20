@@ -140,7 +140,7 @@ module aptos_experimental::market_bulk_order {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let cancelled_bulk_order = market.get_order_book_mut().cancel_bulk_order(user);
-        let (order_id, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = cancelled_bulk_order.destroy_bulk_order();
+        let (order_id, _, _, sequence_number, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = cancelled_bulk_order.destroy_bulk_order();
         let i = 0;
         while (i < bid_sizes.length()) {
             callbacks.cleanup_bulk_order_at_price(user, order_id, true, bid_prices[i], bid_sizes[i]);
@@ -151,6 +151,14 @@ module aptos_experimental::market_bulk_order {
             callbacks.cleanup_bulk_order_at_price(user, order_id, false, ask_prices[j], ask_sizes[j]);
             j += 1;
         };
-        market.emit_event_for_bulk_order_cancelled(order_id, user);
+        market.emit_event_for_bulk_order_cancelled(
+            order_id,
+            sequence_number,
+            user,
+            bid_sizes,
+            bid_prices,
+            ask_sizes,
+            ask_prices
+        );
     }
 }
