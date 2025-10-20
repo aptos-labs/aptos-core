@@ -44,18 +44,18 @@ fn run_barycentric_case<E: Pairing>(degree: usize, n: usize, sample_points: usiz
     }
 
     // Test barycentric interpolation at the roots themselves, so check that the function returns the known values at the domain points
-    for (root, &eval) in omegas.iter().zip(evals.iter()) {
-        let val = barycentric_eval(&evals, &omegas, *root, n_inv);
+    for (omega, &eval) in omegas.iter().zip(evals.iter()) {
+        let val = barycentric_eval(&evals, &omegas, *omega, n_inv);
         assert_eq!(
             val, eval,
-            "Interpolation mismatch at root {:?} for degree {}, n = {}",
-            root, degree, n
+            "Interpolation mismatch at root {:?} for degree {}, domain size n = {}",
+            omega, degree, n
         );
     }
 }
 
 #[test]
-fn test_barycentric_eval_bls12_381() {
+fn test_barycentric_eval() {
     use ark_bls12_381::Bls12_381;
     use ark_bn254::Bn254;
     let cases = [
