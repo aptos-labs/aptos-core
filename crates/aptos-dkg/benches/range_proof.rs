@@ -4,8 +4,7 @@
 use aptos_dkg::{
     range_proofs::{
         dekart_univariate::Proof as UnivariateDeKART,
-        //dekart_univariate_v2::Proof as UnivariateDeKARTv2,
-        traits::BatchedRangeProof,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
     },
     utils::test_utils::{self},
 };
@@ -71,8 +70,8 @@ fn bench_groups(c: &mut Criterion) {
     bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254");
     bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381");
 
-    // bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
-    // bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");
+    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
+    bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");
 }
 
 criterion_group!(

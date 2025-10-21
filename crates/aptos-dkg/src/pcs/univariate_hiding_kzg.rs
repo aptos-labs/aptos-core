@@ -124,7 +124,7 @@ fn commit_with_randomness<E: Pairing>(
     values: &[E::ScalarField],
     r: &CommitmentRandomness<E>,
 ) -> Commitment<E> {
-    let commitment_hom: Homomorphism<'_, E> = Homomorphism {
+    let commitment_hom: FixedBaseHomomorphism<'_, E> = FixedBaseHomomorphism {
         lagr_g1: &ck.lagr_g1,
         xi_1: ck.xi_1,
     };
@@ -134,7 +134,7 @@ fn commit_with_randomness<E: Pairing>(
     Commitment(commitment_hom.apply(&input).0)
 }
 
-impl<'a, E: Pairing> Homomorphism<'a, E> {
+impl<'a, E: Pairing> FixedBaseHomomorphism<'a, E> {
     pub fn open(
         ck: &CommitmentKey<E>,
         f_evals: Vec<E::ScalarField>,
@@ -187,12 +187,56 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     }
 }
 
-pub struct Homomorphism<'a, E: Pairing> {
+/// A fixed-base homomorphism used for computing commitments in the
+/// *Hiding KZG (HKZG)* commitment scheme.
+///
+/// # Overview
+///
+/// This struct defines a linear homomorphism used to map scalars
+/// (the polynomial evaluations and blinding factor) into elliptic curve points,
+/// producing a commitment in the HKZG scheme as (presumably) described in Zeromorph [^KT23e].
+///
+/// The homomorphism corresponds to the commitment step:
+///
+/// \\[
+/// C = \rho \cdot \xi_1 + \sum_i f(\theta^i) \cdot \ell_i(\tau) \cdot g_1
+/// \\]
+///
+/// where:
+/// - `ρ` is the blinding scalar,
+/// - `ξ₁` is the fixed base obtained from a hiding trapdoor `ξ`,
+/// - `f(ωᵢ)` are polynomial evaluations at roots of unity ωᵢ,
+/// - `ℓᵢ(τ)` are the Lagrange basis polynomials evaluated at trapdoor `τ`,
+/// - `g₁` is the group generator in the first pairing group.
+///
+/// This homomorphism can be expressed as a *multi-scalar multiplication (MSM)*
+/// over fixed bases, making it compatible with the `fixed_base_msms` framework.
+/// This allows efficient and consistent computation across KZG variants.
+///
+///
+/// # Fields
+///
+/// - `lagr_g1`: A slice of precomputed Lagrange basis elements \\(\ell_i(\tau) \cdot G_1\\),
+///   used to commit to polynomial evaluations.
+/// - `xi_1`: The base point corresponding to the blinding term \\(\xi_1 = ξ \cdot G_1\\).
+///
+///
+/// # Implementation Notes
+///
+/// For consistency with `univariate_kzg.rs` and use in future sigma protocols, this implementation uses the
+/// `fixed_base_msms::Trait` to express the homomorphism as a sequence of `(base, scalar)` pairs:
+/// - The first pair encodes the hiding term `(ξ₁, ρ)`.
+/// - The remaining pairs encode the polynomial evaluation commitments `(ℓᵢ(τ)·G₁, f(ωᵢ))`.
+///
+/// The MSM evaluation is then performed using `E::G1::msm()`.
+///
+/// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
+pub struct FixedBaseHomomorphism<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
 }
 
-impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
+impl<'a, E: Pairing> homomorphism::Trait for FixedBaseHomomorphism<'a, E> {
     type Codomain = CodomainShape<E::G1>;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
@@ -201,7 +245,7 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
+impl<'a, E: Pairing> fixed_base_msms::Trait for FixedBaseHomomorphism<'a, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
@@ -274,10 +318,10 @@ mod tests {
         let comm = super::commit_with_randomness(&ck, &f_evals, &rho);
 
         // Open at x, will fail when x is a root of unity but the odds of that should be negligible
-        let proof = Homomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
+        let proof = FixedBaseHomomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
 
         // Verify proof
-        let verification = Homomorphism::<E>::verify(vk, comm, x, y, proof);
+        let verification = FixedBaseHomomorphism::<E>::verify(vk, comm, x, y, proof);
 
         assert!(
             verification.is_ok(),

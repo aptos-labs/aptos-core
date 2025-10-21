@@ -15,6 +15,17 @@ use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 
+pub(crate) fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
+    let degree = coeffs.len().saturating_sub(1);
+    let mut result = Vec::with_capacity(degree);
+
+    for i in 0..degree {
+        result.push(coeffs[i + 1].mul(F::from((i + 1) as u64)));
+    }
+
+    result
+}
+
 pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
     for i in 0..degree {
