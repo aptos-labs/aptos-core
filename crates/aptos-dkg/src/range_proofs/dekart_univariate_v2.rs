@@ -165,7 +165,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let mut values_shifted = vec![E::ScalarField::ZERO]; // start with 0,
         values_shifted.extend(values); // then append all values from the original vector
 
-        let hiding_kzg_hom = univariate_hiding_kzg::FixedBaseHomomorphism::<E> {
+        let hiding_kzg_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
             lagr_g1: &ck_S.lagr_g1,
             xi_1: ck_S.xi_1,
         };
@@ -182,7 +182,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ell: usize,
         comm: &Self::Commitment,
         rho: &Self::CommitmentRandomness,
-        fs_trs: &mut merlin::Transcript,
+        fs_t: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Proof<E>
     where
@@ -225,8 +225,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             m_inv: num_omegas_inv,
         } = ck_S;
 
+        debug_assert_eq!(*num_omegas_inv, E::ScalarField::from(num_omegas as u64).inverse().unwrap());
+
         // Step 1b
-        fiat_shamir::append_initial_data(fs_trs, DST, vk, n, ell, &comm);
+        fiat_shamir::append_initial_data(fs_t, DST, vk, n, ell, &comm);
 
         // Step 2a
         let r = E::ScalarField::rand(rng);
@@ -234,7 +236,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let hatC = *xi_1 * delta_rho + lagr_g1[0] * r + comm.0;
 
         // Step 2b
-        fiat_shamir::append_hat_f_commitment::<E>(fs_trs, &hatC);
+        fiat_shamir::append_hat_f_commitment::<E>(fs_t, &hatC);
 
         // Step 3a
         let sigma_protocol = two_term_msm::Homomorphism {
@@ -246,15 +248,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 kzg_randomness: Scalar(r),
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
-            fs_trs,
+            fs_t,
             rng,
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(fs_trs, &pi_PoK);
+        fiat_shamir::append_sigma_proof(fs_t, &pi_PoK);
 
         // Step 4a
-        let hkzg_commit = univariate_hiding_kzg::FixedBaseHomomorphism::<E> {
+        let hkzg_commit = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
             lagr_g1,
             xi_1: *xi_1,
         };
@@ -329,14 +331,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_trs, &Cj);
+        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cj);
 
         // Step 6
-        let (beta, betas) = fiat_shamir::get_beta_and_betas::<E>(fs_trs, ell);
+        let (beta, betas) = fiat_shamir::get_beta_and_betas::<E>(fs_t, ell);
 
-        let mut hat_f_evals = Vec::with_capacity(1 + values.len());
+        let mut hat_f_evals = Vec::with_capacity(num_omegas); // 1 + values.len()? / num_omegas
         hat_f_evals.push(r);
-        hat_f_evals.extend_from_slice(values); // TODO: resize to max_n? seems it's not needed
+        hat_f_evals.extend_from_slice(values);
+        hat_f_evals.resize(num_omegas, E::ScalarField::ZERO);
 
         let hat_f_coeffs = eval_dom.ifft(&hat_f_evals);
 
@@ -434,10 +437,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let D = hkzg_commit.apply(&(rho_h, h_evals.clone())).0;
 
         // Step 7b
-        fiat_shamir::append_h_commitment::<E>(fs_trs, &D);
+        fiat_shamir::append_h_commitment::<E>(fs_t, &D);
 
         // Step 8
-        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(fs_trs, ell);
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(fs_t, ell);
 
         let u_values: Vec<_> = (0..num_omegas)
             .map(|i| {
@@ -452,7 +455,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 9
-        let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_trs, &ck_S.roots_of_unity_in_eval_dom);
+        let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_t, &ck_S.roots_of_unity_in_eval_dom);
 
         let a: E::ScalarField = {
             let poly = ark_poly::univariate::DensePolynomial {
@@ -461,14 +464,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             poly.evaluate(&gamma)
         }; // This algorithm should be Horner's
 
-        let h_val = polynomials::barycentric_eval(
-            &h_evals,
-            &ck_S.roots_of_unity_in_eval_dom,
-            gamma,
-            *num_omegas_inv,
-        );
+        // let h_val = polynomials::barycentric_eval(
+        //     &h_evals,
+        //     &ck_S.roots_of_unity_in_eval_dom,
+        //     gamma,
+        //     *num_omegas_inv,
+        // );
         let a_h =
-            polynomials::barycentric_eval(&h_evals, &ck_S.roots_of_unity_in_eval_dom, gamma, h_val);
+            polynomials::barycentric_eval(&h_evals, &ck_S.roots_of_unity_in_eval_dom, gamma, *num_omegas_inv);
 
         let a_j: Vec<E::ScalarField> = (0..ell)
             .map(|i| {
@@ -496,7 +499,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             gamma,
             *num_omegas_inv,
         );
-        let pi_gamma = univariate_hiding_kzg::FixedBaseHomomorphism::open(
+        let pi_gamma = univariate_hiding_kzg::CommitmentHomomorphism::open(
             ck_S,
             u_values,
             rho_u,
@@ -610,7 +613,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .map(|(&a_j, &mu_j)| a_j * mu_j)
                 .sum::<E::ScalarField>();
 
-        univariate_hiding_kzg::FixedBaseHomomorphism::verify(
+        univariate_hiding_kzg::CommitmentHomomorphism::verify(
             univariate_hiding_kzg::VerificationKey {
                 xi_2: *xi_2,
                 tau_2: *tau_2,
@@ -622,8 +625,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             pi_gamma.clone(),
         )?;
 
+        let num_omegas = roots_of_unity.len();
+
         // Step 9
-        let gamma_pow = gamma.pow(&[(n + 1) as u64]); // gamma^(n+1) // TODO: change to some max_n ?
+        let gamma_pow = gamma.pow(&[num_omegas as u64]); // gamma^(n+1) // TODO: change to some max_n ?
         let V_eval_gamma =
             (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap();
 

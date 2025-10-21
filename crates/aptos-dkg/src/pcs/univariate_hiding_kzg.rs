@@ -124,7 +124,7 @@ fn commit_with_randomness<E: Pairing>(
     values: &[E::ScalarField],
     r: &CommitmentRandomness<E>,
 ) -> Commitment<E> {
-    let commitment_hom: FixedBaseHomomorphism<'_, E> = FixedBaseHomomorphism {
+    let commitment_hom: CommitmentHomomorphism<'_, E> = CommitmentHomomorphism {
         lagr_g1: &ck.lagr_g1,
         xi_1: ck.xi_1,
     };
@@ -134,7 +134,7 @@ fn commit_with_randomness<E: Pairing>(
     Commitment(commitment_hom.apply(&input).0)
 }
 
-impl<'a, E: Pairing> FixedBaseHomomorphism<'a, E> {
+impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     pub fn open(
         ck: &CommitmentKey<E>,
         f_evals: Vec<E::ScalarField>,
@@ -181,7 +181,7 @@ impl<'a, E: Pairing> FixedBaseHomomorphism<'a, E> {
             (tau_2 - one_2 * x).into_affine(),
             xi_2,
         ]);
-        ensure!(PairingOutput::<E>::ZERO == check);
+        ensure!(PairingOutput::<E>::ZERO == check, "Hiding KZG verification failed");
 
         Ok(())
     }
@@ -231,12 +231,12 @@ impl<'a, E: Pairing> FixedBaseHomomorphism<'a, E> {
 /// The MSM evaluation is then performed using `E::G1::msm()`.
 ///
 /// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
-pub struct FixedBaseHomomorphism<'a, E: Pairing> {
+pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
 }
 
-impl<'a, E: Pairing> homomorphism::Trait for FixedBaseHomomorphism<'a, E> {
+impl<'a, E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'a, E> {
     type Codomain = CodomainShape<E::G1>;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
@@ -245,7 +245,7 @@ impl<'a, E: Pairing> homomorphism::Trait for FixedBaseHomomorphism<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> fixed_base_msms::Trait for FixedBaseHomomorphism<'a, E> {
+impl<'a, E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'a, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
@@ -318,10 +318,10 @@ mod tests {
         let comm = super::commit_with_randomness(&ck, &f_evals, &rho);
 
         // Open at x, will fail when x is a root of unity but the odds of that should be negligible
-        let proof = FixedBaseHomomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
+        let proof = CommitmentHomomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
 
         // Verify proof
-        let verification = FixedBaseHomomorphism::<E>::verify(vk, comm, x, y, proof);
+        let verification = CommitmentHomomorphism::<E>::verify(vk, comm, x, y, proof);
 
         assert!(
             verification.is_ok(),

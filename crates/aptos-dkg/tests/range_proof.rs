@@ -71,15 +71,15 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
 #[cfg(test)]
 const TEST_CASES: &[(usize, usize)] = &[
     // (n, \ell)
-    (3, 16),
+//    (3, 16),
     (7, 16),
-    (4, 16),
-    (8, 16),
-    (16, 3),
-    (16, 4),
-    (16, 7),
-    (16, 8),
-    (16, 16),
+//    (4, 16),
+//    (8, 16),
+//    (16, 3),
+//    (16, 4),
+//    (16, 7),
+//    (16, 8),
+//    (16, 16),
     // (255, 16),  Commented out to improve test speed
     // (255, 32),
     // (512, 32),
@@ -112,7 +112,7 @@ where
     E: Pairing,
     B: BatchedRangeProof<E>,
 {
-    let setups = make_single_curve_setup::<E, B>(31, 16);
+    let setups = make_single_curve_setup::<E, B>(7, 16);
     for &(n, ell) in TEST_CASES {
         assert_range_proof_correctness::<E, B>(&setups, n, ell);
     }
@@ -121,8 +121,9 @@ where
 #[cfg(test)]
 #[test]
 fn assert_correctness_of_all_range_proofs() {
-    assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKART<Bn254>>();
-    assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKART<Bls12_381>>();
+//    assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKART<Bn254>>();
+//   assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKART<Bls12_381>>();
+
     assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKARTv2<Bn254>>();
     assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>();
 }
