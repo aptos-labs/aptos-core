@@ -25,3 +25,5 @@ Aptos is a layer 1 blockchain bringing a paradigm shift to Web3 through better t
 You can learn more about contributing to the Aptos project by reading our [Contribution Guide](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) and by viewing our [Code of Conduct](https://github.com/aptos-labs/aptos-core/blob/main/CODE_OF_CONDUCT.md).
 
 Aptos Core is licensed under [Apache 2.0](https://github.com/aptos-labs/aptos-core/blob/main/LICENSE).
+<br>## Welcome to Move Modules<br>Aptos' Move language ensures safe DeFi assets—new contributors, start with the SDK tutorial for your first module. Tip: Use Aptos CLI for testnet deploys! <br>
+
