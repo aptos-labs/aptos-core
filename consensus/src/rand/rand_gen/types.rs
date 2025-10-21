@@ -23,7 +23,7 @@ use sha3::{Digest, Sha3_256};
 use std::{fmt::Debug, sync::Arc};
 
 pub const NUM_THREADS_FOR_WVUF_DERIVATION: usize = 8;
-pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 200;
+pub const FUTURE_ROUNDS_TO_ACCEPT: u64 = 500;
 
 #[derive(PartialEq)]
 pub enum PathType {
