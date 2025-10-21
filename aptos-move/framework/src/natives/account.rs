@@ -10,7 +10,7 @@ use aptos_native_interface::{
 };
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
@@ -27,7 +27,7 @@ pub struct CreateAddressGasParameters {
 
 fn native_create_address(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());

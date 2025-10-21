@@ -20,7 +20,7 @@ macro_rules! panic_error {
 /// Represents a unique identifier for the struct name. Note that this index has no public
 /// constructor - the only way to construct it is via [StructNameIndexMap].
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StructNameIndex(u32);
+pub struct StructNameIndex(pub(crate) u32);
 
 impl StructNameIndex {
     /// Creates a new index for testing purposes only. For production, indices must always be

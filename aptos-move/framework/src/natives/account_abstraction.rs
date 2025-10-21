@@ -7,7 +7,7 @@ use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::SmallVec;
 use std::collections::VecDeque;
 
@@ -21,7 +21,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 pub(crate) fn native_dispatch(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
@@ -38,7 +38,7 @@ pub(crate) fn native_dispatch(
     Err(SafeNativeError::FunctionDispatch {
         module_name,
         func_name,
-        ty_args,
+        ty_args: ty_args.to_vec(),
         args: arguments.into_iter().collect(),
     })
 }
