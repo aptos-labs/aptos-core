@@ -21,7 +21,7 @@ use move_core_types::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::{TypeId, TypeRepr},
     values::{Closure, Reference, Struct, Value, Vector, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -532,7 +532,7 @@ fn native_format_impl(
 /// TODO: remove when old framework is completely removed
 pub(crate) fn native_format_debug(
     context: &mut SafeNativeContext,
-    ty: &Type,
+    ty: TypeId,
     v: Value,
 ) -> SafeNativeResult<String> {
     let layout =
@@ -558,13 +558,13 @@ pub(crate) fn native_format_debug(
 
 fn native_format(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
 
     let ty = context
-        .type_to_fully_annotated_layout(&ty_args[0])?
+        .type_to_fully_annotated_layout(ty_args[0])?
         .ok_or_else(|| SafeNativeError::Abort {
             abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
         })?;
@@ -592,11 +592,11 @@ fn native_format(
 
 fn native_format_list(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
-    let mut list_ty = &ty_args[0];
+    let mut list_ty = ty_args[0];
 
     let val = safely_pop_arg!(arguments, Reference);
     let mut val = val
@@ -643,18 +643,19 @@ fn native_format_list(
                 match_list_ty(context, list_ty, "Cons")?;
 
                 // We know that the type is a list, so we can safely unwrap
-                let ty_args = if let Type::StructInstantiation { ty_args, .. } = list_ty {
-                    ty_args
+                let pool = context.module_storage().runtime_environment().ty_pool();
+                let ty_args = if let TypeRepr::Struct { ty_args, .. } = pool.type_repr(list_ty) {
+                    pool.get_type_vec(ty_args)
                 } else {
                     unreachable!()
                 };
                 let mut it = val.value_as::<Struct>()?.unpack()?;
                 let car = it.next().unwrap();
                 val = it.next().unwrap();
-                list_ty = &ty_args[1];
+                list_ty = ty_args[1];
 
                 let ty = context
-                    .type_to_fully_annotated_layout(&ty_args[0])?
+                    .type_to_fully_annotated_layout(ty_args[0])?
                     .ok_or_else(|| SafeNativeError::Abort {
                         abort_code: EUNABLE_TO_FORMAT_DELAYED_FIELD,
                     })?;

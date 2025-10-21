@@ -3,8 +3,7 @@
 
 use crate::{
     module_traversal::TraversalContext, Function, LayoutCacheEntry, LayoutWithDelayedFields,
-    LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, StructKey,
-    WithRuntimeEnvironment,
+    LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
@@ -19,6 +18,7 @@ use move_vm_types::{
         runtime_types::{StructType, Type},
         struct_name_indexing::StructNameIndex,
     },
+    ty_interner::TypeId,
 };
 use std::{rc::Rc, sync::Arc};
 
@@ -44,17 +44,13 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
         &self,
         _gas_meter: &mut impl DependencyGasMeter,
         _traversal_context: &mut TraversalContext,
-        _key: &StructKey,
+        _key: TypeId,
     ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
         None
     }
 
     /// Stores computed layout to the layout cache.
-    fn store_layout_to_cache(
-        &self,
-        _key: &StructKey,
-        _entry: LayoutCacheEntry,
-    ) -> PartialVMResult<()> {
+    fn store_layout_to_cache(&self, _key: TypeId, _entry: LayoutCacheEntry) -> PartialVMResult<()> {
         // Default as no-op.
         Ok(())
     }

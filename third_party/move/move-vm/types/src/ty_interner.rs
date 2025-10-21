@@ -4,15 +4,87 @@
 //! Data structures and caches for interning types as unique compact identifiers. The lifetime of
 //! these caches is tied to the code cache, and is managed externally.
 
-use crate::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndex};
+use crate::loaded_data::{
+    runtime_types::{Type, TypeBuilder},
+    struct_name_indexing::StructNameIndex,
+};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    file_format::SignatureToken,
+};
+use move_core_types::{
+    ability::{Ability, AbilitySet},
+    vm_status::sub_status::unknown_invariant_violation::EPARANOID_FAILURE,
+};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use triomphe::Arc;
 
 /// Compactly represents a loaded type.
 #[repr(transparent)]
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct TypeId(u32);
+
+/// Well-known types (primitives and more).
+impl TypeId {
+    pub const ADDRESS: TypeId = TypeId(13);
+    pub const BOOL: TypeId = TypeId(0);
+    pub const I128: TypeId = TypeId(11);
+    pub const I16: TypeId = TypeId(8);
+    pub const I256: TypeId = TypeId(12);
+    pub const I32: TypeId = TypeId(9);
+    pub const I64: TypeId = TypeId(10);
+    pub const I8: TypeId = TypeId(7);
+    pub const SIGNER: TypeId = TypeId(14);
+    const TAG_BASE: u32 = 0 << Self::TAG_SHIFT;
+    const TAG_MASK: u32 = 0b11 << Self::TAG_SHIFT;
+    const TAG_MUT_REF: u32 = 2 << Self::TAG_SHIFT;
+    const TAG_REF: u32 = 1 << Self::TAG_SHIFT;
+    const TAG_SHIFT: u32 = 30;
+    pub const U128: TypeId = TypeId(5);
+    pub const U16: TypeId = TypeId(2);
+    pub const U256: TypeId = TypeId(6);
+    pub const U32: TypeId = TypeId(3);
+    pub const U64: TypeId = TypeId(4);
+    pub const U8: TypeId = TypeId(1);
+
+    #[inline(always)]
+    fn tag(self) -> u32 {
+        self.0 & Self::TAG_MASK
+    }
+
+    #[inline]
+    pub fn payload(self) -> TypeId {
+        TypeId(self.0 & !Self::TAG_MASK)
+    }
+
+    #[inline]
+    pub fn ref_of(inner: TypeId) -> TypeId {
+        assert_eq!(inner.tag(), Self::TAG_BASE);
+        TypeId(inner.0 | Self::TAG_REF)
+    }
+
+    #[inline]
+    pub fn ref_mut_of(inner: TypeId) -> TypeId {
+        assert_eq!(inner.tag(), Self::TAG_BASE);
+        TypeId(inner.0 | Self::TAG_MUT_REF)
+    }
+
+    #[inline]
+    pub fn is_ref(self) -> bool {
+        self.tag() == Self::TAG_REF
+    }
+
+    #[inline]
+    pub fn is_mut_ref(self) -> bool {
+        self.tag() == Self::TAG_MUT_REF
+    }
+
+    #[inline]
+    pub fn is_any_ref(self) -> bool {
+        self.is_ref() || self.is_mut_ref()
+    }
+}
 
 /// Compactly represents a vector of types.
 #[repr(transparent)]
@@ -20,8 +92,10 @@ pub struct TypeId(u32);
 pub struct TypeVecId(u32);
 
 /// Partially-interned representation containing top-level information.
+/// Abilities are cached for composite types (Vector, Struct, Function) to avoid recomputation.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
-enum TypeRepr {
+pub enum TypeRepr {
+    // Primitive types (abilities are constant)
     Bool,
     U8,
     U16,
@@ -37,16 +111,27 @@ enum TypeRepr {
     I256,
     Address,
     Signer,
-    Vector(TypeId),
+
+    // Composite types (abilities are cached)
+    Vector {
+        elem: TypeId,
+        abilities: AbilitySet,
+    },
+
+    // References always have REFERENCES abilities
     Reference(TypeId),
     MutableReference(TypeId),
+
     Struct {
         idx: StructNameIndex,
         ty_args: TypeVecId,
+        abilities: AbilitySet,
     },
+
     Function {
         args: TypeVecId,
         results: TypeVecId,
+        abilities: AbilitySet,
     },
 }
 
@@ -99,6 +184,90 @@ impl TypeInterner {
         inner.data.push(repr);
         inner.interned.insert(repr, id);
         id
+    }
+
+    fn warmup_if_empty(&self) {
+        let mut inner = self.inner.write();
+        if !inner.data.is_empty() {
+            return;
+        }
+
+        // Pre-populate primitive types with well-known TypeIds.
+        // The order must match the TypeId constants.
+        let bool_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::Bool);
+        inner.interned.insert(TypeRepr::Bool, bool_id);
+        assert_eq!(bool_id, TypeId::BOOL);
+
+        let u8_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::U8);
+        inner.interned.insert(TypeRepr::U8, u8_id);
+        assert_eq!(u8_id, TypeId::U8);
+
+        let u16_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::U16);
+        inner.interned.insert(TypeRepr::U16, u16_id);
+        assert_eq!(u16_id, TypeId::U16);
+
+        let u32_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::U32);
+        inner.interned.insert(TypeRepr::U32, u32_id);
+        assert_eq!(u32_id, TypeId::U32);
+
+        let u64_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::U64);
+        inner.interned.insert(TypeRepr::U64, u64_id);
+        assert_eq!(u64_id, TypeId::U64);
+
+        let u128_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::U128);
+        inner.interned.insert(TypeRepr::U128, u128_id);
+        assert_eq!(u128_id, TypeId::U128);
+
+        let u256_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::U256);
+        inner.interned.insert(TypeRepr::U256, u256_id);
+        assert_eq!(u256_id, TypeId::U256);
+
+        let i8_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::I8);
+        inner.interned.insert(TypeRepr::I8, i8_id);
+        assert_eq!(i8_id, TypeId::I8);
+
+        let i16_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::I16);
+        inner.interned.insert(TypeRepr::I16, i16_id);
+        assert_eq!(i16_id, TypeId::I16);
+
+        let i32_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::I32);
+        inner.interned.insert(TypeRepr::I32, i32_id);
+        assert_eq!(i32_id, TypeId::I32);
+
+        let i64_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::I64);
+        inner.interned.insert(TypeRepr::I64, i64_id);
+        assert_eq!(i64_id, TypeId::I64);
+
+        let i128_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::I128);
+        inner.interned.insert(TypeRepr::I128, i128_id);
+        assert_eq!(i128_id, TypeId::I128);
+
+        let i256_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::I256);
+        inner.interned.insert(TypeRepr::I256, i256_id);
+        assert_eq!(i256_id, TypeId::I256);
+
+        let address_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::Address);
+        inner.interned.insert(TypeRepr::Address, address_id);
+        assert_eq!(address_id, TypeId::ADDRESS);
+
+        let signer_id = TypeId(inner.data.len() as u32);
+        inner.data.push(TypeRepr::Signer);
+        inner.interned.insert(TypeRepr::Signer, signer_id);
+        assert_eq!(signer_id, TypeId::SIGNER);
     }
 }
 
@@ -208,386 +377,725 @@ impl InternedTypePool {
 
     /// Interns common type representations.
     fn warmup(&self) {
-        self.ty_interner.intern(TypeRepr::Bool);
-        let u8_id = self.ty_interner.intern(TypeRepr::U8);
-        self.ty_interner.intern(TypeRepr::U16);
-        self.ty_interner.intern(TypeRepr::U32);
-        let u64_id = self.ty_interner.intern(TypeRepr::U64);
-        self.ty_interner.intern(TypeRepr::U128);
-        self.ty_interner.intern(TypeRepr::U256);
-        self.ty_interner.intern(TypeRepr::I8);
-        self.ty_interner.intern(TypeRepr::I16);
-        self.ty_interner.intern(TypeRepr::I32);
-        self.ty_interner.intern(TypeRepr::I64);
-        self.ty_interner.intern(TypeRepr::I128);
-        self.ty_interner.intern(TypeRepr::I256);
-        self.ty_interner.intern(TypeRepr::Address);
-        self.ty_interner.intern(TypeRepr::Signer);
+        self.ty_interner.warmup_if_empty();
 
         self.ty_vec_interner.intern(&[]);
-        self.ty_vec_interner.intern(&[u8_id]);
-        self.ty_vec_interner.intern(&[u64_id]);
+        self.ty_vec_interner.intern(&[TypeId::U8]);
+        self.ty_vec_interner.intern(&[TypeId::U64]);
+    }
+
+    /// Converts a slice of fully-instantiated Type arguments to a Vec of TypeIds.
+    /// Does not intern the vector itself.
+    ///
+    /// Panics if there are non-instantiated type arguments.
+    pub fn ty_args_to_ty_ids(&self, ty_args: &[Type]) -> Vec<TypeId> {
+        ty_args
+            .iter()
+            .map(|t| self.instantiate_and_intern(t, &[]))
+            .collect()
     }
 
     /// Given a vector if fully-instantiated type arguments, returns the corresponding [TypeVecId].
     ///
     /// Panics if there are non-instantiated type arguments.
     pub fn intern_ty_args(&self, ty_args: &[Type]) -> TypeVecId {
-        let ty_args = ty_args
-            .iter()
-            .map(|t| self.instantiate_and_intern(t, &[]))
-            .collect::<Vec<_>>();
-        self.ty_vec_interner.intern_vec(ty_args)
+        let ty_arg_ids = self.ty_args_to_ty_ids(ty_args);
+        self.ty_vec_interner.intern_vec(ty_arg_ids)
+    }
+
+    // TODO: check bound at load-time.
+    pub fn create_constant_ty(&self, constant_tok: &SignatureToken) -> TypeId {
+        use SignatureToken as S;
+
+        match constant_tok {
+            S::Bool => self.bool_ty(),
+            S::U8 => self.u8_ty(),
+            S::U16 => self.u16_ty(),
+            S::U32 => self.u32_ty(),
+            S::U64 => self.u64_ty(),
+            S::U128 => self.u128_ty(),
+            S::U256 => self.u256_ty(),
+            S::I8 => self.i8_ty(),
+            S::I16 => self.i16_ty(),
+            S::I32 => self.i32_ty(),
+            S::I64 => self.i64_ty(),
+            S::I128 => self.i128_ty(),
+            S::I256 => self.i256_ty(),
+            S::Address => self.address_ty(),
+            S::Vector(elem_tok) => {
+                // TODO: optimize
+                let elem_ty = TypeBuilder::with_limits(100, 100)
+                    .create_constant_ty(elem_tok)
+                    .unwrap();
+                let elem = self.instantiate_and_intern(&elem_ty, &[]);
+                let abilities =
+                    AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                        self.abilities(elem)
+                    ])
+                    .expect("Vector ability computation should not fail");
+                self.ty_interner
+                    .intern(TypeRepr::Vector { elem, abilities })
+            },
+            S::Signer
+            | S::Struct(_)
+            | S::StructInstantiation(_, _)
+            | S::Function(..)
+            | S::Reference(_)
+            | S::MutableReference(_)
+            | S::TypeParameter(_) => unreachable!("Must be verified at load-time."),
+        }
     }
 
     /// Given a type containing type parameters, and a fully-interned type arguments, performs
-    /// type substitution with interning.
+    /// type substitution with interning. Abilities are computed from the input Type and cached
+    /// in the interned representation.
+    ///
+    /// # Panics
+    /// Panics if ability computation fails (indicates malformed type).
     pub fn instantiate_and_intern(&self, ty: &Type, subst: &[TypeId]) -> TypeId {
         use Type::*;
         match ty {
-            Bool => self.ty_interner.intern(TypeRepr::Bool),
-            U8 => self.ty_interner.intern(TypeRepr::U8),
-            U16 => self.ty_interner.intern(TypeRepr::U16),
-            U32 => self.ty_interner.intern(TypeRepr::U32),
-            U64 => self.ty_interner.intern(TypeRepr::U64),
-            U128 => self.ty_interner.intern(TypeRepr::U128),
-            U256 => self.ty_interner.intern(TypeRepr::U256),
-            I8 => self.ty_interner.intern(TypeRepr::I8),
-            I16 => self.ty_interner.intern(TypeRepr::I16),
-            I32 => self.ty_interner.intern(TypeRepr::I32),
-            I64 => self.ty_interner.intern(TypeRepr::I64),
-            I128 => self.ty_interner.intern(TypeRepr::I128),
-            I256 => self.ty_interner.intern(TypeRepr::I256),
-            Address => self.ty_interner.intern(TypeRepr::Address),
-            Signer => self.ty_interner.intern(TypeRepr::Signer),
+            // Fast path: return well-known constants for primitives
+            Bool => TypeId::BOOL,
+            U8 => TypeId::U8,
+            U16 => TypeId::U16,
+            U32 => TypeId::U32,
+            U64 => TypeId::U64,
+            U128 => TypeId::U128,
+            U256 => TypeId::U256,
+            I8 => TypeId::I8,
+            I16 => TypeId::I16,
+            I32 => TypeId::I32,
+            I64 => TypeId::I64,
+            I128 => TypeId::I128,
+            I256 => TypeId::I256,
+            Address => TypeId::ADDRESS,
+            Signer => TypeId::SIGNER,
             TyParam(idx) => subst[*idx as usize],
             Vector(elem_ty) => {
-                let id = self.instantiate_and_intern(elem_ty, subst);
-                self.vec_of(id)
+                let elem_id = self.instantiate_and_intern(elem_ty, subst);
+                // Compute abilities from the substituted element type
+                let elem_abilities = self.abilities(elem_id);
+                let abilities =
+                    AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+                        elem_abilities,
+                    ])
+                    .expect("Vector ability computation should not fail");
+                self.ty_interner.intern(TypeRepr::Vector {
+                    elem: elem_id,
+                    abilities,
+                })
             },
             Reference(inner_ty) => {
-                let id = self.instantiate_and_intern(inner_ty, subst);
-                self.ref_of(id)
+                let inner_id = self.instantiate_and_intern(inner_ty, subst);
+                TypeId::ref_of(inner_id)
             },
             MutableReference(inner_ty) => {
-                let id = self.instantiate_and_intern(inner_ty, subst);
-                self.ref_mut_of(id)
+                let inner_id = self.instantiate_and_intern(inner_ty, subst);
+                TypeId::ref_mut_of(inner_id)
             },
-            Struct { idx, .. } => self.struct_of(*idx),
-            StructInstantiation { idx, ty_args, .. } => {
-                let ty_args = ty_args
+            Struct { idx, ability } => {
+                // Get abilities from the struct's ability info
+                let abilities = ability.base_ability_set;
+                self.ty_interner.intern(TypeRepr::Struct {
+                    idx: *idx,
+                    ty_args: self.ty_vec_interner.intern(&[]),
+                    abilities,
+                })
+            },
+            StructInstantiation {
+                idx,
+                ty_args,
+                ability,
+            } => {
+                let ty_arg_ids = ty_args
                     .iter()
                     .map(|t| self.instantiate_and_intern(t, subst))
                     .collect::<Vec<_>>();
-                self.instantiated_struct_of(*idx, ty_args)
+                // Compute abilities from the substituted type arguments
+                let type_argument_abilities = ty_arg_ids
+                    .iter()
+                    .map(|&ty_id| self.abilities(ty_id))
+                    .collect::<Vec<_>>();
+                let abilities = AbilitySet::polymorphic_abilities(
+                    ability.base_ability_set,
+                    ability.phantom_ty_args_mask.iter(),
+                    type_argument_abilities,
+                )
+                .expect("StructInstantiation ability computation should not fail");
+                self.ty_interner.intern(TypeRepr::Struct {
+                    idx: *idx,
+                    ty_args: self.ty_vec_interner.intern_vec(ty_arg_ids),
+                    abilities,
+                })
             },
-            Function { args, results, .. } => {
-                let args = args
+            Function {
+                args,
+                results,
+                abilities,
+            } => {
+                let arg_ids = args
                     .iter()
                     .map(|t| self.instantiate_and_intern(t, subst))
                     .collect::<Vec<_>>();
-                let results = results
+                let result_ids = results
                     .iter()
                     .map(|t| self.instantiate_and_intern(t, subst))
                     .collect::<Vec<_>>();
                 self.ty_interner.intern(TypeRepr::Function {
-                    args: self.ty_vec_interner.intern_vec(args),
-                    results: self.ty_vec_interner.intern_vec(results),
+                    args: self.ty_vec_interner.intern_vec(arg_ids),
+                    results: self.ty_vec_interner.intern_vec(result_ids),
+                    abilities: *abilities,
                 })
             },
         }
     }
 
-    fn ref_of(&self, t: TypeId) -> TypeId {
-        self.ty_interner.intern(TypeRepr::Reference(t))
+    // ===== Type Construction APIs =====
+
+    /// Creates a vector type with the given element type.
+    /// Returns the TypeId of the vector type.
+    /// Abilities are computed based on the element type's abilities.
+    #[inline]
+    pub fn vec_of(&self, elem: TypeId) -> TypeId {
+        // Get element abilities
+        let elem_abilities = self.abilities(elem);
+
+        // Compute vector abilities using AbilitySet::polymorphic_abilities
+        // Vector's type parameter is not phantom, so we pass false
+        let abilities = AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
+            elem_abilities,
+        ])
+        .expect("Vector ability computation should not fail");
+
+        self.ty_interner
+            .intern(TypeRepr::Vector { elem, abilities })
     }
 
-    fn ref_mut_of(&self, t: TypeId) -> TypeId {
-        self.ty_interner.intern(TypeRepr::MutableReference(t))
+    // ===== Type Query APIs =====
+
+    /// Gets the TypeRepr for a given TypeId.
+    /// This is a lower-level API that other methods build upon.
+    ///
+    /// # Panics
+    /// Panics if the TypeId is invalid (not created through this pool).
+    #[inline]
+    pub fn type_repr(&self, ty: TypeId) -> TypeRepr {
+        if ty.is_ref() {
+            return TypeRepr::Reference(ty.payload());
+        }
+        if ty.is_mut_ref() {
+            return TypeRepr::MutableReference(ty.payload());
+        }
+
+        let inner = self.ty_interner.inner.read();
+        // SAFETY: TypeId is only created through interning, so the index is always valid
+        inner.data[ty.0 as usize]
     }
 
-    fn vec_of(&self, t: TypeId) -> TypeId {
-        self.ty_interner.intern(TypeRepr::Vector(t))
+    /// Gets the element type of a vector.
+    /// Returns None if the type is not a vector.
+    #[inline]
+    pub fn get_vec_elem_ty(&self, ty: TypeId) -> Option<TypeId> {
+        match self.type_repr(ty) {
+            TypeRepr::Vector { elem, .. } => Some(elem),
+            _ => None,
+        }
     }
 
-    fn struct_of(&self, idx: StructNameIndex) -> TypeId {
-        self.ty_interner.intern(TypeRepr::Struct {
-            idx,
-            ty_args: self.ty_vec_interner.intern(&[]),
+    /// Checks if a type is a vector.
+    #[inline]
+    pub fn is_vec(&self, ty: TypeId) -> bool {
+        matches!(self.type_repr(ty), TypeRepr::Vector { .. })
+    }
+
+    /// Gets the types from a TypeVecId.
+    /// Returns a slice of TypeIds.
+    ///
+    /// # Panics
+    /// Panics if the TypeVecId is invalid (not created through this pool).
+    #[inline]
+    pub fn get_type_vec(&self, id: TypeVecId) -> Arc<[TypeId]> {
+        let inner = self.ty_vec_interner.inner.read();
+        inner.data[id.0 as usize].clone()
+    }
+
+    // ===== Ability Query APIs =====
+
+    /// Returns the abilities for a type.
+    /// Abilities are pre-computed during type interning, so this is a simple lookup.
+    /// Optimized for primitives using direct TypeId comparisons.
+    #[inline]
+    pub fn abilities(&self, ty: TypeId) -> AbilitySet {
+        // Fast path for primitives using well-known TypeIds
+        // All primitives except Signer are consecutive (BOOL=0 to ADDRESS=13)
+        if ty >= TypeId::BOOL && ty <= TypeId::ADDRESS {
+            return AbilitySet::PRIMITIVES;
+        }
+        if ty == TypeId::SIGNER {
+            return AbilitySet::SIGNER;
+        }
+
+        if ty.is_ref() || ty.is_mut_ref() {
+            return AbilitySet::REFERENCES;
+        }
+
+        // Slow path for composite types - need to fetch TypeRepr
+        match self.type_repr(ty) {
+            // Composite types: abilities are cached
+            TypeRepr::Vector { abilities, .. } => abilities,
+            TypeRepr::Struct { abilities, .. } => abilities,
+            TypeRepr::Function { abilities, .. } => abilities,
+            // Primitives are handled above
+            _ => unreachable!("All primitive types should be handled by fast path"),
+        }
+    }
+
+    /// Checks if a type has a specific ability.
+    /// This is a convenience wrapper around `abilities()`.
+    #[inline]
+    pub fn has_ability(&self, ty: TypeId, ability: Ability) -> bool {
+        self.abilities(ty).has_ability(ability)
+    }
+
+    // ===== Primitive Type Creation Methods =====
+
+    /// Returns TypeId for Bool primitive type.
+    #[inline]
+    pub fn bool_ty(&self) -> TypeId {
+        TypeId::BOOL
+    }
+
+    /// Returns TypeId for U8 primitive type.
+    #[inline]
+    pub fn u8_ty(&self) -> TypeId {
+        TypeId::U8
+    }
+
+    /// Returns TypeId for U16 primitive type.
+    #[inline]
+    pub fn u16_ty(&self) -> TypeId {
+        TypeId::U16
+    }
+
+    /// Returns TypeId for U32 primitive type.
+    #[inline]
+    pub fn u32_ty(&self) -> TypeId {
+        TypeId::U32
+    }
+
+    /// Returns TypeId for U64 primitive type.
+    #[inline]
+    pub fn u64_ty(&self) -> TypeId {
+        TypeId::U64
+    }
+
+    /// Returns TypeId for U128 primitive type.
+    #[inline]
+    pub fn u128_ty(&self) -> TypeId {
+        TypeId::U128
+    }
+
+    /// Returns TypeId for U256 primitive type.
+    #[inline]
+    pub fn u256_ty(&self) -> TypeId {
+        TypeId::U256
+    }
+
+    /// Returns TypeId for I8 primitive type.
+    #[inline]
+    pub fn i8_ty(&self) -> TypeId {
+        TypeId::I8
+    }
+
+    /// Returns TypeId for I16 primitive type.
+    #[inline]
+    pub fn i16_ty(&self) -> TypeId {
+        TypeId::I16
+    }
+
+    /// Returns TypeId for I32 primitive type.
+    #[inline]
+    pub fn i32_ty(&self) -> TypeId {
+        TypeId::I32
+    }
+
+    /// Returns TypeId for I64 primitive type.
+    #[inline]
+    pub fn i64_ty(&self) -> TypeId {
+        TypeId::I64
+    }
+
+    /// Returns TypeId for I128 primitive type.
+    #[inline]
+    pub fn i128_ty(&self) -> TypeId {
+        TypeId::I128
+    }
+
+    /// Returns TypeId for I256 primitive type.
+    #[inline]
+    pub fn i256_ty(&self) -> TypeId {
+        TypeId::I256
+    }
+
+    /// Returns TypeId for Address primitive type.
+    #[inline]
+    pub fn address_ty(&self) -> TypeId {
+        TypeId::ADDRESS
+    }
+
+    /// Returns TypeId for Signer primitive type.
+    #[inline]
+    pub fn signer_ty(&self) -> TypeId {
+        TypeId::SIGNER
+    }
+
+    /// Creates a Function type with given arguments, results, and abilities (slice version).
+    #[inline]
+    pub fn function_of(
+        &self,
+        args: &[TypeId],
+        results: &[TypeId],
+        abilities: AbilitySet,
+    ) -> TypeId {
+        let args_id = self.ty_vec_interner.intern(args);
+        let results_id = self.ty_vec_interner.intern(results);
+        self.ty_interner.intern(TypeRepr::Function {
+            args: args_id,
+            results: results_id,
+            abilities,
         })
     }
 
-    fn instantiated_struct_of(&self, idx: StructNameIndex, ty_args: Vec<TypeId>) -> TypeId {
-        let ty_args = self.ty_vec_interner.intern_vec(ty_args);
-        self.ty_interner.intern(TypeRepr::Struct { idx, ty_args })
+    /// Creates a Function type with given arguments, results, and abilities (Vec version).
+    #[inline]
+    pub fn function_of_vec(
+        &self,
+        args: Vec<TypeId>,
+        results: Vec<TypeId>,
+        abilities: AbilitySet,
+    ) -> TypeId {
+        let args_id = self.ty_vec_interner.intern_vec(args);
+        let results_id = self.ty_vec_interner.intern_vec(results);
+        self.ty_interner.intern(TypeRepr::Function {
+            args: args_id,
+            results: results_id,
+            abilities,
+        })
     }
-}
 
-#[cfg(test)]
-mod test {
-    use super::*;
-    use crate::loaded_data::{runtime_types::AbilityInfo, struct_name_indexing::StructNameIndex};
-    use move_core_types::ability::AbilitySet;
-    use std::{collections::HashSet, thread};
+    // ===== Paranoid Type Check Methods (mirror Type paranoid methods) =====
 
-    #[test]
-    fn test_primitive_types() {
-        let ctx = InternedTypePool::new();
+    /// Paranoid check: verify type has a required ability.
+    #[inline]
+    pub fn paranoid_check_has_ability(&self, ty: TypeId, ability: Ability) -> PartialVMResult<()> {
+        if !self.has_ability(ty, ability) {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: type {:?} missing required ability {:?}",
+                self.type_repr(ty),
+                ability
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
+    }
 
-        let tys = [
-            Type::Bool,
-            Type::U8,
-            Type::U16,
-            Type::U32,
-            Type::U64,
-            Type::U128,
-            Type::U256,
-            Type::I8,
-            Type::I16,
-            Type::I32,
-            Type::I64,
-            Type::I128,
-            Type::I256,
-            Type::Address,
-            Type::Signer,
-        ];
+    /// Paranoid check: verify type has all required abilities.
+    #[inline]
+    pub fn paranoid_check_abilities(
+        &self,
+        ty: TypeId,
+        required: AbilitySet,
+    ) -> PartialVMResult<()> {
+        let ty_abilities = self.abilities(ty);
+        if !required.is_subset(ty_abilities) {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: type {:?} missing required abilities {:?}",
+                self.type_repr(ty),
+                required
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
+    }
 
-        for ty in &tys {
-            let id1 = ctx.instantiate_and_intern(ty, &[]);
-            let id2 = ctx.instantiate_and_intern(ty, &[]);
-            assert_eq!(id1, id2);
+    /// Paranoid check: verify type equality.
+    #[inline]
+    pub fn paranoid_check_eq(&self, ty: TypeId, expected: TypeId) -> PartialVMResult<()> {
+        if ty != expected {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: type mismatch, expected {:?} but got {:?}",
+                expected, ty
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
+    }
+
+    /// Paranoid check: verify type assignability (for functions and references).
+    #[inline]
+    pub fn paranoid_check_assignable(
+        &self,
+        given: TypeId,
+        expected: TypeId,
+    ) -> PartialVMResult<()> {
+        let ok = match (self.type_repr(expected), self.type_repr(given)) {
+            (
+                TypeRepr::Function {
+                    args: expected_args,
+                    results: expected_results,
+                    abilities: expected_abilities,
+                },
+                TypeRepr::Function {
+                    args: given_args,
+                    results: given_results,
+                    abilities: given_abilities,
+                },
+            ) => {
+                expected_args == given_args
+                    && expected_results == given_results
+                    && expected_abilities.is_subset(given_abilities)
+            },
+            (TypeRepr::Reference(expected_inner), TypeRepr::Reference(given_inner)) => {
+                self.paranoid_check_assignable(given_inner, expected_inner)?;
+                true
+            },
+            _ => expected == given,
+        };
+
+        if !ok {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: type mismatch, expected {:?} but got {:?}",
+                self.type_repr(expected),
+                self.type_repr(given)
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
+    }
+
+    /// Paranoid check: verify that ty is a reference (mutable or immutable based on is_mut)
+    /// to the expected_inner_ty.
+    /// Matches the semantics of Type::paranoid_check_ref_eq.
+    #[inline]
+    pub fn paranoid_check_ref_eq(
+        &self,
+        ty: TypeId,
+        expected_inner_ty: TypeId,
+        is_mut: bool,
+    ) -> PartialVMResult<()> {
+        match self.type_repr(ty) {
+            TypeRepr::MutableReference(inner) => {
+                self.paranoid_check_eq(inner, expected_inner_ty)?;
+                Ok(())
+            },
+            TypeRepr::Reference(inner) if !is_mut => {
+                self.paranoid_check_eq(inner, expected_inner_ty)?;
+                Ok(())
+            },
+            _ => Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected a (mutable: {}) reference type, got {:?}",
+                is_mut,
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE)),
         }
     }
 
-    #[test]
-    fn test_vector_types() {
-        let ctx = InternedTypePool::new();
-
-        let vec_u8 = Type::Vector(Arc::new(Type::U8));
-        let vec_u64 = Type::Vector(Arc::new(Type::U64));
-
-        let u8_id = ctx.instantiate_and_intern(&Type::U8, &[]);
-        let vec_u8_id1 = ctx.instantiate_and_intern(&vec_u8, &[]);
-        let vec_u8_id2 = ctx.instantiate_and_intern(&vec_u8, &[]);
-        let vec_u64_id = ctx.instantiate_and_intern(&vec_u64, &[]);
-
-        assert_eq!(vec_u8_id1, vec_u8_id2);
-        assert_ne!(vec_u8_id1, vec_u64_id);
-        assert_ne!(vec_u8_id1, u8_id);
+    /// Paranoid check: verify type is not a reference.
+    #[inline]
+    pub fn paranoid_check_is_no_ref(&self, ty: TypeId, msg: &str) -> PartialVMResult<()> {
+        match self.type_repr(ty) {
+            TypeRepr::Reference(_) | TypeRepr::MutableReference(_) => Err(
+                PartialVMError::new_invariant_violation(format!("{}: type is a reference", msg))
+                    .with_sub_status(EPARANOID_FAILURE),
+            ),
+            _ => Ok(()),
+        }
     }
 
-    #[test]
-    fn test_reference_types() {
-        let ctx = InternedTypePool::new();
-
-        let u64_ref = Type::Reference(Box::new(Type::U64));
-        let u64_mut_ref = Type::MutableReference(Box::new(Type::U64));
-        let u8_ref = Type::Reference(Box::new(Type::U8));
-
-        let u64_ref_id1 = ctx.instantiate_and_intern(&u64_ref, &[]);
-        let u64_ref_id2 = ctx.instantiate_and_intern(&u64_ref, &[]);
-        let u64_mut_ref_id = ctx.instantiate_and_intern(&u64_mut_ref, &[]);
-        let u8_ref_id = ctx.instantiate_and_intern(&u8_ref, &[]);
-
-        assert_eq!(u64_ref_id1, u64_ref_id2);
-        assert_ne!(u64_ref_id1, u64_mut_ref_id);
-        assert_ne!(u64_ref_id1, u8_ref_id);
+    /// Paranoid check: verify type is bool.
+    #[inline]
+    pub fn paranoid_check_is_bool_ty(&self, ty: TypeId) -> PartialVMResult<()> {
+        if ty != TypeId::BOOL {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected bool type, got {:?}",
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
     }
 
-    #[test]
-    fn test_struct_types() {
-        let ctx = InternedTypePool::new();
-
-        let struct_type = Type::Struct {
-            idx: StructNameIndex::new(0),
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-        };
-
-        let id1 = ctx.instantiate_and_intern(&struct_type, &[]);
-        let id2 = ctx.instantiate_and_intern(&struct_type, &[]);
-
-        assert_eq!(id1, id2);
+    /// Paranoid check: verify type is signed integer.
+    /// Uses range check since all signed integers are consecutive (I8=7 to I256=12).
+    #[inline]
+    pub fn paranoid_check_is_sint_ty(&self, ty: TypeId) -> PartialVMResult<()> {
+        if ty < TypeId::I8 || ty > TypeId::I256 {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected signed integer type, got {:?}",
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
     }
 
-    #[test]
-    fn test_structs() {
-        let ctx = InternedTypePool::new();
-
-        let struct_ty = Type::StructInstantiation {
-            idx: StructNameIndex::new(0),
-            ty_args: Arc::new(vec![Type::U64, Type::Bool]),
-            // Irrelevant for tests.
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-        };
-
-        let id1 = ctx.instantiate_and_intern(&struct_ty, &[]);
-        let id2 = ctx.instantiate_and_intern(&struct_ty, &[]);
-        assert_eq!(id1, id2);
-
-        let struct_inst2 = Type::StructInstantiation {
-            idx: StructNameIndex::new(0),
-            ty_args: Arc::new(vec![Type::Bool, Type::U64]),
-            // Irrelevant for tests.
-            ability: AbilityInfo::struct_(AbilitySet::EMPTY),
-        };
-
-        let id3 = ctx.instantiate_and_intern(&struct_inst2, &[]);
-        assert_ne!(id1, id3);
+    /// Paranoid check: verify type is u64.
+    #[inline]
+    pub fn paranoid_check_is_u64_ty(&self, ty: TypeId) -> PartialVMResult<()> {
+        if ty != TypeId::U64 {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected u64 type, got {:?}",
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
     }
 
-    #[test]
-    fn test_function_types() {
-        let ctx = InternedTypePool::new();
-
-        let func_ty = Type::Function {
-            args: vec![Type::U64, Type::Bool],
-            results: vec![Type::U8],
-            abilities: AbilitySet::EMPTY,
-        };
-
-        let id1 = ctx.instantiate_and_intern(&func_ty, &[]);
-        let id2 = ctx.instantiate_and_intern(&func_ty, &[]);
-
-        assert_eq!(id1, id2);
-
-        let func_ty = Type::Function {
-            args: vec![Type::U64],
-            results: vec![Type::U8],
-            abilities: AbilitySet::EMPTY,
-        };
-
-        let id3 = ctx.instantiate_and_intern(&func_ty, &[]);
-        assert_ne!(id1, id3);
-
-        let func_ty = Type::Function {
-            args: vec![Type::U64],
-            results: vec![Type::U8],
-            abilities: AbilitySet::ALL,
-        };
-        let id4 = ctx.instantiate_and_intern(&func_ty, &[]);
-        assert_eq!(id3, id4);
+    /// Paranoid check: verify type is address.
+    #[inline]
+    pub fn paranoid_check_is_address_ty(&self, ty: TypeId) -> PartialVMResult<()> {
+        if ty != TypeId::ADDRESS {
+            return Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected address type, got {:?}",
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE));
+        }
+        Ok(())
     }
 
-    #[test]
-    fn test_deeply_nested_type() {
-        let ctx = InternedTypePool::new();
+    /// Paranoid check: verify type is a reference to signer.
+    #[inline]
+    pub fn paranoid_check_is_signer_ref_ty(&self, ty: TypeId) -> PartialVMResult<()> {
+        match self.type_repr(ty) {
+            TypeRepr::Reference(inner) if inner == TypeId::SIGNER => Ok(()),
+            _ => Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected signer reference type, got {:?}",
+                ty
+            ))
+            .with_sub_status(EPARANOID_FAILURE)),
+        }
+    }
 
-        let mut ty = Type::U64;
-        for _ in 0..10 {
-            ty = Type::Vector(Arc::new(ty));
+    /// Paranoid check: verify type is a vector with expected element type.
+    #[inline]
+    pub fn paranoid_check_is_vec_ty(
+        &self,
+        ty: TypeId,
+        expected_elem: TypeId,
+    ) -> PartialVMResult<()> {
+        match self.type_repr(ty) {
+            TypeRepr::Vector { elem, .. } if elem == expected_elem => Ok(()),
+            _ => Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected vector<{:?}> type, got {:?}",
+                self.type_repr(expected_elem),
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE)),
+        }
+    }
+
+    /// Paranoid check: verify type is a reference to vector with expected element type.
+    /// A mutable reference is always acceptable (can be used for both mutable and immutable operations).
+    /// An immutable reference is only acceptable when IS_MUT is false.
+    #[inline]
+    pub fn paranoid_check_is_vec_ref_ty<const IS_MUT: bool>(
+        &self,
+        ty: TypeId,
+        expected_elem: TypeId,
+    ) -> PartialVMResult<()> {
+        // Check for mutable reference to vector - always OK
+        if ty.is_mut_ref() {
+            return self.paranoid_check_is_vec_ty(ty.payload(), expected_elem);
         }
 
-        let id1 = ctx.instantiate_and_intern(&ty, &[]);
-        let id2 = ctx.instantiate_and_intern(&ty, &[]);
-        assert_eq!(id1, id2);
-    }
-
-    #[test]
-    fn test_type_parameter_substitution() {
-        let ctx = InternedTypePool::new();
-
-        let u64_id = ctx.instantiate_and_intern(&Type::U64, &[]);
-        let substituted_id = ctx.instantiate_and_intern(&Type::TyParam(0), &[u64_id]);
-        assert_eq!(substituted_id, u64_id);
-    }
-
-    #[test]
-    fn test_empty_type_vectors() {
-        let ctx = InternedTypePool::new();
-        let id1 = ctx.intern_ty_args(&[]);
-        let id2 = ctx.intern_ty_args(&[]);
-        assert_eq!(id1, id2);
-    }
-
-    #[test]
-    fn test_type_vector_consistency() {
-        let ctx = InternedTypePool::new();
-
-        let u64_ty = Type::U64;
-        let bool_ty = Type::Bool;
-
-        let mut tys = vec![u64_ty, bool_ty];
-        let id1 = ctx.intern_ty_args(&tys);
-        let id2 = ctx.intern_ty_args(&tys);
-        assert_eq!(id1, id2);
-
-        tys.reverse();
-        let id3 = ctx.intern_ty_args(&tys);
-        assert_ne!(id1, id3);
-    }
-
-    #[test]
-    fn test_flush_clears_cache() {
-        let ctx = InternedTypePool::new();
-
-        ctx.intern_ty_args(&[Type::U64]);
-        ctx.instantiate_and_intern(&Type::U64, &[]);
-
-        let initial_ty_count = ctx.num_interned_tys();
-        let initial_ty_vec_count = ctx.num_interned_ty_vecs();
-
-        assert!(initial_ty_count > 0);
-        assert!(initial_ty_vec_count > 0);
-
-        ctx.flush_impl();
-
-        assert_eq!(ctx.num_interned_tys(), 0);
-        assert_eq!(ctx.num_interned_ty_vecs(), 0);
-    }
-
-    #[test]
-    fn test_concurrent_interning_same_type() {
-        let ctx = Arc::new(InternedTypePool::new());
-
-        let mut handles = Vec::new();
-        for _ in 0..10 {
-            let ctx = Arc::clone(&ctx);
-            let handle = thread::spawn(move || ctx.instantiate_and_intern(&Type::U64, &[]));
-            handles.push(handle);
+        // Check for immutable reference to vector - only OK if IS_MUT is false
+        if ty.is_ref() {
+            if !IS_MUT {
+                return self.paranoid_check_is_vec_ty(ty.payload(), expected_elem);
+            }
         }
 
-        let mut ids = HashSet::new();
-        for handle in handles {
-            let id = handle.join().unwrap();
-            ids.insert(id);
-        }
-        assert_eq!(ids.len(), 1);
+        Err(PartialVMError::new_invariant_violation(format!(
+            "Paranoid mode: expected a (mutable: {}) vector reference, got {:?}",
+            IS_MUT,
+            self.type_repr(ty)
+        ))
+        .with_sub_status(EPARANOID_FAILURE))
     }
 
-    #[test]
-    fn test_concurrent_interning_different_types() {
-        let ctx = Arc::new(InternedTypePool::new());
-        let tys = Arc::new(vec![
-            Type::Bool,
-            Type::U8,
-            Type::U16,
-            Type::U32,
-            Type::U64,
-            Type::U128,
-            Type::U256,
-            Type::I8,
-            Type::I16,
-            Type::I32,
-            Type::I64,
-            Type::I128,
-            Type::I256,
-            Type::Address,
-            Type::Signer,
-        ]);
-
-        let mut handles = Vec::new();
-        for i in 0..tys.len() {
-            let tys = Arc::clone(&tys);
-            let ctx = Arc::clone(&ctx);
-            let handle = thread::spawn(move || ctx.instantiate_and_intern(&tys[i], &[]));
-            handles.push(handle);
+    /// Paranoid check: read from a reference, returning the inner type.
+    /// Checks that the inner type has Copy ability.
+    #[inline]
+    pub fn paranoid_read_ref(&self, ty: TypeId) -> PartialVMResult<TypeId> {
+        if ty.is_any_ref() {
+            self.paranoid_check_has_ability(ty.payload(), Ability::Copy)?;
+            Ok(ty.payload())
+        } else {
+            Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected reference type for ReadRef, got {:?}",
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE))
         }
+    }
 
-        let mut ids = HashSet::new();
-        for handle in handles {
-            let id = handle.join().unwrap();
-            ids.insert(id);
+    /// Paranoid check: write to a mutable reference.
+    #[inline]
+    pub fn paranoid_write_ref(&self, ty: TypeId, val_ty: TypeId) -> PartialVMResult<()> {
+        if ty.is_mut_ref() {
+            self.paranoid_check_assignable(val_ty, ty.payload())?;
+            self.paranoid_check_has_ability(ty.payload(), Ability::Drop)?;
+            Ok(())
+        } else {
+            Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected mutable reference type for WriteRef, got {:?}",
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE))
         }
-        assert_eq!(ids.len(), tys.len());
+    }
+
+    /// Paranoid check: freeze a mutable reference to an immutable reference.
+    #[inline]
+    pub fn paranoid_freeze_ref_ty(&self, ty: TypeId) -> PartialVMResult<TypeId> {
+        if ty.is_mut_ref() {
+            Ok(TypeId::ref_of(ty.payload()))
+        } else {
+            Err(PartialVMError::new_invariant_violation(format!(
+                "Paranoid mode: expected mutable reference type for FreezeRef, got {:?}",
+                self.type_repr(ty)
+            ))
+            .with_sub_status(EPARANOID_FAILURE))
+        }
+    }
+
+    /// Paranoid check: verify vector and get element reference type.
+    #[inline]
+    pub fn paranoid_check_and_get_vec_elem_ref_ty<const IS_MUT: bool>(
+        &self,
+        vec_ref_ty: TypeId,
+        expected_elem: TypeId,
+    ) -> PartialVMResult<TypeId> {
+        self.paranoid_check_is_vec_ref_ty::<IS_MUT>(vec_ref_ty, expected_elem)?;
+        if IS_MUT {
+            Ok(TypeId::ref_mut_of(expected_elem))
+        } else {
+            Ok(TypeId::ref_of(expected_elem))
+        }
+    }
+
+    /// Paranoid check: verify mutable vector reference and get element type.
+    #[inline]
+    pub fn paranoid_check_and_get_vec_elem_ty<const IS_MUT: bool>(
+        &self,
+        vec_ref_ty: TypeId,
+        expected_elem: TypeId,
+    ) -> PartialVMResult<TypeId> {
+        self.paranoid_check_is_vec_ref_ty::<IS_MUT>(vec_ref_ty, expected_elem)?;
+        Ok(expected_elem)
     }
 }
