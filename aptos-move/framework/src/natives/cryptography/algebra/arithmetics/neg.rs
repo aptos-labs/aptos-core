@@ -15,17 +15,17 @@ use aptos_native_interface::{
     safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use ark_ff::Field;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Neg, rc::Rc};
 
 pub fn neg_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let structure_opt = structure_from_ty_arg!(context, ty_args[0]);
     abort_unless_arithmetics_enabled_for_structure!(context, structure_opt);
     match structure_opt {
         Some(Structure::BLS12381Fr) => ark_unary_op_internal!(

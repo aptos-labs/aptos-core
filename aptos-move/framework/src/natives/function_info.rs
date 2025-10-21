@@ -13,7 +13,7 @@ use move_core_types::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Reference, StructRef, Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -72,7 +72,7 @@ pub(crate) fn extract_function_info(
  **************************************************************************************************/
 fn native_check_dispatch_type_compatibility_impl(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(arguments.len() == 2);
@@ -142,7 +142,7 @@ fn native_check_dispatch_type_compatibility_impl(
  **************************************************************************************************/
 fn native_is_identifier(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(arguments.len() == 1);
@@ -174,7 +174,7 @@ fn native_is_identifier(
  **************************************************************************************************/
 fn native_load_function_impl(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(arguments.len() == 1);

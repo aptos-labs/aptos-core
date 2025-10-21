@@ -3,8 +3,7 @@
 
 use crate::{
     module_traversal::TraversalContext, Function, LayoutCacheEntry, LayoutWithDelayedFields,
-    LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, StructKey,
-    WithRuntimeEnvironment,
+    LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::errors::{Location, PartialVMResult, VMResult};
 use move_core_types::{
@@ -19,6 +18,7 @@ use move_vm_types::{
         runtime_types::{StructType, Type},
         struct_name_indexing::StructNameIndex,
     },
+    ty_interner::TypeId,
 };
 use std::{rc::Rc, sync::Arc};
 
@@ -44,17 +44,13 @@ pub trait StructDefinitionLoader: WithRuntimeEnvironment {
         &self,
         _gas_meter: &mut impl DependencyGasMeter,
         _traversal_context: &mut TraversalContext,
-        _key: &StructKey,
+        _key: TypeId,
     ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
         None
     }
 
     /// Stores computed layout to the layout cache.
-    fn store_layout_to_cache(
-        &self,
-        _key: &StructKey,
-        _entry: LayoutCacheEntry,
-    ) -> PartialVMResult<()> {
+    fn store_layout_to_cache(&self, _key: TypeId, _entry: LayoutCacheEntry) -> PartialVMResult<()> {
         // Default as no-op.
         Ok(())
     }
@@ -155,10 +151,9 @@ pub(crate) trait InstantiatedFunctionLoaderHelper: WithRuntimeEnvironment {
 
         Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
             .map_err(|e| e.finish(Location::Module(module.self_id().clone())))?;
-        let ty_args_id = self
-            .runtime_environment()
-            .ty_pool()
-            .intern_ty_args(&ty_args);
+        let pool = self.runtime_environment().ty_pool();
+        let ty_args_id = pool.intern_ty_args(&ty_args);
+        let ty_args = pool.get_type_vec(ty_args_id).to_vec();
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Module(module),
@@ -185,10 +180,9 @@ pub(crate) trait InstantiatedFunctionLoaderHelper: WithRuntimeEnvironment {
         let main = script.entry_point();
         Type::verify_ty_arg_abilities(main.ty_param_abilities(), &ty_args)
             .map_err(|err| err.finish(Location::Script))?;
-        let ty_args_id = self
-            .runtime_environment()
-            .ty_pool()
-            .intern_ty_args(&ty_args);
+        let pool = self.runtime_environment().ty_pool();
+        let ty_args_id = pool.intern_ty_args(&ty_args);
+        let ty_args = pool.get_type_vec(ty_args_id).to_vec();
 
         Ok(LoadedFunction {
             owner: LoadedFunctionOwner::Script(script),

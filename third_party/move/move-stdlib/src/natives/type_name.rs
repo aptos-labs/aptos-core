@@ -5,8 +5,8 @@ use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
+    ty_interner::TypeId,
     values::{Struct, Value},
 };
 use smallvec::smallvec;
@@ -21,13 +21,13 @@ pub struct GetGasParameters {
 fn native_get(
     gas_params: &GetGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert!(arguments.is_empty());
 
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+    let type_tag = context.type_to_type_tag(ty_args[0])?;
     let type_name = type_tag.to_canonical_string();
     // make a std::string::String
     let string_val = Value::struct_(Struct::pack(vec![Value::vector_u8(
