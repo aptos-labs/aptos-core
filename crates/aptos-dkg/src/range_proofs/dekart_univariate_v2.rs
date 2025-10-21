@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+// This file implements the range proof described here: https://alinush.github.io/dekart
+
 use crate::{
     algebra::{polynomials, GroupGenerators},
     pcs::univariate_hiding_kzg,
@@ -120,8 +122,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         max_ell: usize,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
-        let group = GroupGenerators::sample(rng);
-        let g1 = group.g1; // TODO: maybe make group part of the setup() parameters in trait?
+        let group_generators = GroupGenerators::sample(rng);
+        let g1 = group_generators.g1; // TODO: maybe make `group_generators` part of the setup() parameters in the trait?
 
         let max_n = (max_n + 1).next_power_of_two() - 1;
         let num_omegas = max_n + 1;
@@ -131,7 +133,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let trapdoor = univariate_hiding_kzg::Trapdoor::<E>::rand(rng);
         let xi_1_proj: E::G1 = g1 * trapdoor.xi;
 
-        let (vk_hkzg, ck_S) = univariate_hiding_kzg::setup(max_n + 1, group.clone(), trapdoor, rng);
+        let (vk_hkzg, ck_S) =
+            univariate_hiding_kzg::setup(max_n + 1, group_generators.clone(), trapdoor, rng);
 
         let powers_of_two: Vec<_> = (0..max_ell)
             .map(|j| E::ScalarField::from(1u64 << j))
@@ -279,7 +282,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof(fs_t, &pi_PoK); // TODO: should be "remainder of sigma proof" since the first message is already in there
 
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| E::ScalarField::rand(rng)).collect();
@@ -382,7 +385,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                     .sum();
 
                 let numerator = beta * (r - sum_pow2_rs) + sum_betas_term;
-                numerator / E::ScalarField::from(num_omegas as u64) // TODO!!!!!!!
+                numerator * num_omegas_inv
             };
             h.push(first_h_eval);
 
@@ -464,7 +467,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                     coeffs: f_j_coeffs[i].clone(),
                 };
                 poly.evaluate(&gamma)
-            }) // This algorithm should be Horner's
+            }) // Again, using Horner's here
             .collect();
 
         // Step 10
@@ -514,14 +517,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         comm: &Self::Commitment,
         fs_t: &mut merlin::Transcript,
     ) -> anyhow::Result<()> {
-        // TODO: Do we want vk to have a max_ell?? If so:
-        // assert!(
-        //     ell <= vk.max_ell,
-        //     "ell (got {}) must be ≤ max_ell (which is {})",
-        //     ell,
-        //     vk.max_ell
-        // );
-
         // Step 1
         let VerificationKey {
             xi_1,
@@ -530,6 +525,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             roots_of_unity,
             verifier_precomputed,
         } = vk;
+
+        // TODO: Easy to work around this if it fails?
+        assert!(
+            ell <= verifier_precomputed.powers_of_two.len(),
+            "ell (got {}) must be ≤ max_ell (which is {})",
+            ell,
+            verifier_precomputed.powers_of_two.len()
+        );
+
         let Proof {
             hatC,
             pi_PoK,
@@ -612,7 +616,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let num_omegas = roots_of_unity.len();
 
         let V_eval_gamma = {
-            let gamma_pow = gamma.pow([num_omegas as u64]); // gamma^(n+1) // TODO: change to some max_n ?
+            let gamma_pow = gamma.pow([num_omegas as u64]);
             (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap()
         };
 
@@ -675,7 +679,6 @@ mod fiat_shamir {
 
     #[allow(non_snake_case)]
     pub(crate) fn append_sigma_proof<E: Pairing>(
-        // TODO: should be "remainder of sigma proof" since the first message is already in there
         fs_transcript: &mut Transcript,
         pi_PoK: &sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
     ) {
@@ -763,7 +766,7 @@ pub mod two_term_msm {
         type Domain = Witness<E>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-            // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower
+            // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower! `msm_terms()` is still useful for verification though
             CodomainShape(
                 self.base_1 * input.kzg_randomness.0 + self.base_2 * input.hiding_kzg_randomness.0,
             )

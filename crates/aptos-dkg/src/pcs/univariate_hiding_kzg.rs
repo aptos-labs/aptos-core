@@ -55,6 +55,7 @@ pub struct CommitmentKey<E: Pairing> {
 
 #[derive(CanonicalSerialize, Debug, Clone)]
 pub struct Trapdoor<E: Pairing> {
+    // Not sure this is the ideal location for tau...
     pub xi: E::ScalarField,
     pub tau: E::ScalarField,
 }
@@ -208,22 +209,21 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 ///
 /// # Overview
 ///
-/// This struct defines a linear homomorphism used to map scalars
-/// (the polynomial evaluations and blinding factor) into elliptic curve points,
+/// This struct defines a homomorphism used to map scalars
+/// (the polynomial evaluations and blinding factor) into an elliptic curve point,
 /// producing a commitment in the HKZG scheme as (presumably) described in Zeromorph [^KT23e].
 ///
-/// The homomorphism corresponds to the commitment step:
+/// The homomorphism implements the following formula:
 ///
 /// \\[
-/// C = \rho \cdot \xi_1 + \sum_i f(\theta^i) \cdot \ell_i(\tau) \cdot g_1
+/// C = \rho \cdot \xi_1 + \sum_i f(\theta^i) \cdot \ell_i(\tau)_1
 /// \\]
 ///
 /// where:
 /// - `ρ` is the blinding scalar,
-/// - `ξ₁` is the fixed base obtained from a hiding trapdoor `ξ`,
+/// - `ξ₁` is the fixed base obtained from a trapdoor `ξ`,
 /// - `f(ωᵢ)` are polynomial evaluations at roots of unity ωᵢ,
-/// - `ℓᵢ(τ)` are the Lagrange basis polynomials evaluated at trapdoor `τ`,
-/// - `g₁` is the group generator in the first pairing group.
+/// - `ℓᵢ(τ)₁` are the Lagrange basis polynomials evaluated at trapdoor `τ`,
 ///
 /// This homomorphism can be expressed as a *multi-scalar multiplication (MSM)*
 /// over fixed bases, making it compatible with the `fixed_base_msms` framework.
@@ -231,9 +231,9 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 ///
 /// # Fields
 ///
-/// - `lagr_g1`: A slice of precomputed Lagrange basis elements \\(\ell_i(\tau) \cdot G_1\\),
+/// - `lagr_g1`: A slice of precomputed Lagrange basis elements \\(\ell_i(\tau) \cdot g_1\\),
 ///   used to commit to polynomial evaluations.
-/// - `xi_1`: The base point corresponding to the blinding term \\(\xi_1 = ξ \cdot G_1\\).
+/// - `xi_1`: The base point corresponding to the blinding term \\(\xi_1 = ξ \cdot g_1\\).
 ///
 ///
 /// # Implementation Notes
@@ -241,7 +241,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 /// For consistency with `univariate_kzg.rs` and use in future sigma protocols, this implementation uses the
 /// `fixed_base_msms::Trait` to express the homomorphism as a sequence of `(base, scalar)` pairs:
 /// - The first pair encodes the hiding term `(ξ₁, ρ)`.
-/// - The remaining pairs encode the polynomial evaluation commitments `(ℓᵢ(τ)·G₁, f(ωᵢ))`.
+/// - The remaining pairs encode the polynomial evaluation commitments `(ℓᵢ(τ)₁, f(ωᵢ))`.
 ///
 /// The MSM evaluation is then performed using `E::G1::msm()`.
 ///
