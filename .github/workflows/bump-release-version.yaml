@@ -15,7 +15,6 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: write
 
 jobs:
   update-version:
@@ -97,7 +96,7 @@ jobs:
         id: create-pr
         uses: peter-evans/create-pull-request@v7
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.APTOS_BOT_PAT }}
           branch: update-version-${{ github.run_id }}
           base: ${{ github.event.inputs.branch }}
           title: "[${{ steps.determine-version.outputs.releaseBranch }}] Bump version to ${{ steps.determine-version.outputs.newVersion }}"
