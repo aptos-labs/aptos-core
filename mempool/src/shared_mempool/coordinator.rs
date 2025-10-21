@@ -192,8 +192,7 @@ async fn handle_client_request<NetworkClient, TransactionValidator>(
                     txn,
                     callback,
                     task_start_timer,
-                ))
-                .await;
+                ));
         },
         MempoolClientRequest::GetTransactionByHash(hash, callback) => {
             // This timer measures how long it took for the bounded executor to *schedule* the

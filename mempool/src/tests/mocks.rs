@@ -188,7 +188,6 @@ impl MockSharedMempool {
                         None,
                         Some(BroadcastPeerPriority::Primary),
                     )
-                    .await
                     .code
                     != MempoolStatusCode::Accepted
                 {

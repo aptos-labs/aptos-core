@@ -622,7 +622,6 @@ where
                     priority: Priority::default(),
                     raw_msg: Vec::from(message.mdata.as_ref()),
                 });
-
                 match write_reqs_tx.push((), message) {
                     Ok(_) => {
                         self.update_outbound_direct_send_metrics(protocol_id, message_len as u64);
