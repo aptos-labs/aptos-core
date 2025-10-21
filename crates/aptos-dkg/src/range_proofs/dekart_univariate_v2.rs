@@ -612,7 +612,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let num_omegas = roots_of_unity.len();
 
         let V_eval_gamma = {
-            let gamma_pow = gamma.pow(&[num_omegas as u64]); // gamma^(n+1) // TODO: change to some max_n ?
+            let gamma_pow = gamma.pow([num_omegas as u64]); // gamma^(n+1) // TODO: change to some max_n ?
             (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap()
         };
 
@@ -639,7 +639,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     }
 
     fn maul(&mut self) {
-        self.D = self.D + E::G1::generator();
+        self.D += E::G1::generator();
     }
 }
 
@@ -758,7 +758,7 @@ pub mod two_term_msm {
         pub hiding_kzg_randomness: Scalar<E>,
     }
 
-    impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<E> {
+    impl<E: Pairing> homomorphism::Trait for Homomorphism<E> {
         type Codomain = CodomainShape<E::G1>;
         type Domain = Witness<E>;
 
@@ -770,7 +770,7 @@ pub mod two_term_msm {
         }
     }
 
-    impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<E> {
+    impl<E: Pairing> fixed_base_msms::Trait for Homomorphism<E> {
         type Base = E::G1Affine;
         type CodomainShape<T>
             = CodomainShape<T>
