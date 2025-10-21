@@ -94,6 +94,7 @@ pub fn barycentric_eval<F: Field>(
 ) -> F {
     let n = evals.len();
     assert_eq!(n, roots_of_unity_in_eval_dom.len());
+    debug_assert_eq!(n_inv, F::from(n as u64).inverse().unwrap());
 
     let mut denoms = Vec::with_capacity(roots_of_unity_in_eval_dom.len());
 

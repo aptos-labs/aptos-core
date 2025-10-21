@@ -17,7 +17,10 @@ use ark_ec::{
 use ark_ff::Field;
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::{CryptoRng, RngCore};
+use ark_std::{
+    rand::{CryptoRng, RngCore},
+    UniformRand,
+};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
@@ -54,6 +57,16 @@ pub struct CommitmentKey<E: Pairing> {
 pub struct Trapdoor<E: Pairing> {
     pub xi: E::ScalarField,
     pub tau: E::ScalarField,
+}
+
+impl<E: Pairing> Trapdoor<E> {
+    pub fn rand<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        // TODO: maybe new() is a better name?
+        Self {
+            xi: E::ScalarField::rand(rng),
+            tau: E::ScalarField::rand(rng),
+        }
+    }
 }
 
 pub fn lagrange_basis<E: Pairing>(
@@ -181,7 +194,10 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
             (tau_2 - one_2 * x).into_affine(),
             xi_2,
         ]);
-        ensure!(PairingOutput::<E>::ZERO == check, "Hiding KZG verification failed");
+        ensure!(
+            PairingOutput::<E>::ZERO == check,
+            "Hiding KZG verification failed"
+        );
 
         Ok(())
     }
@@ -211,7 +227,6 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 ///
 /// This homomorphism can be expressed as a *multi-scalar multiplication (MSM)*
 /// over fixed bases, making it compatible with the `fixed_base_msms` framework.
-/// This allows efficient and consistent computation across KZG variants.
 ///
 ///
 /// # Fields

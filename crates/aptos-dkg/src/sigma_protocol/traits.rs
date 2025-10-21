@@ -111,6 +111,7 @@ impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clo
 /// The “first item” recorded in a Σ-proof, which is one of:
 /// - The first message of the protocol, which is the commitment from the prover. This leads to a more compact proof.
 /// - The second message of the protocol, which is the challenge from the verifier. This leads to a proof which is amenable to batch verification.
+/// TODO: Better name? In https://github.com/sigma-rs/sigma-proofs these would be called "compact" and "batchable" proofs
 #[derive(Clone, Debug)]
 pub enum FirstProofItem<E: Pairing, H: homomorphism::Trait>
 where

@@ -9,7 +9,7 @@ use ark_std::rand::{CryptoRng, RngCore};
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize;
     type ProverKey;
-    type VerificationKey: Clone + CanonicalSerialize;
+    type VerificationKey: Clone + CanonicalSerialize; // Serialization because it's often appended to a Fiat-Shamir transcript
     type Input: From<u64>; // TODO: slightly hacky
     type Commitment;
     type CommitmentRandomness: Clone + ark_ff::UniformRand;
