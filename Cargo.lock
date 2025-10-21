@@ -13119,6 +13119,7 @@ name = "move-vm-types"
 version = "0.1.0"
 dependencies = [
  "ambassador",
+ "arc-swap",
  "bcs 0.1.4",
  "better_any",
  "bytes",

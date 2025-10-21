@@ -11,7 +11,7 @@ use move_core_types::{
     function::ClosureMask,
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_types::loaded_data::runtime_types::{Type, TypeBuilder};
+use move_vm_types::ty_interner::{InternedTypePool, TypeId};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.
@@ -110,13 +110,14 @@ pub(crate) trait RuntimeTypeCheck {
 
 // note(inline): improves perf a little bit, but increases `post_execution_type_stack_transition` by 20%
 #[cfg_attr(feature = "force-inline", inline(always))]
-fn verify_pack<'a>(
+fn verify_pack(
+    ty_pool: &InternedTypePool,
     operand_stack: &mut Stack,
     field_count: u16,
-    field_tys: impl Iterator<Item = &'a Type>,
-    output_ty: Type,
+    field_tys: impl Iterator<Item = TypeId>,
+    output_ty: TypeId,
 ) -> PartialVMResult<()> {
-    let ability = output_ty.abilities()?;
+    let ability = ty_pool.abilities(output_ty);
 
     // If the struct has a key ability, we expect all of its field to
     // have store ability but not key ability.
@@ -138,16 +139,16 @@ fn verify_pack<'a>(
         // For example, it is ok to have a struct that doesn't have a
         // copy capability where its field is a struct that has copy
         // capability but not vice versa.
-        ty.paranoid_check_abilities(field_expected_abilities)?;
+        ty_pool.paranoid_check_abilities(ty, field_expected_abilities)?;
         // Similar, we use assignability for the value moved in the field
-        ty.paranoid_check_assignable(expected_ty)?;
+        ty_pool.paranoid_check_assignable(ty, expected_ty)?;
     }
 
     operand_stack.push_ty(output_ty)
 }
 
 pub fn verify_pack_closure(
-    ty_builder: &TypeBuilder,
+    ty_pool: &InternedTypePool,
     operand_stack: &mut Stack,
     func: &LoadedFunction,
     mask: ClosureMask,
@@ -163,61 +164,42 @@ pub fn verify_pack_closure(
     let expected_capture_tys = mask.extract(func.param_tys(), true);
 
     let given_capture_tys = operand_stack.popn_tys(expected_capture_tys.len() as u16)?;
-    for (expected, given) in expected_capture_tys
+    for (expected_ty_type, given) in expected_capture_tys
         .into_iter()
         .zip(given_capture_tys.into_iter())
     {
-        expected.paranoid_check_is_no_ref("Captured argument type")?;
-        with_instantiation(ty_builder, func, expected, |expected| {
-            // Intersect the captured type with the accumulated abilities
-            abilities = abilities.intersect(given.abilities()?);
-            given.paranoid_check_assignable(expected)
-        })?
+        let expected = ty_pool.instantiate_and_intern(expected_ty_type, func.ty_args());
+        ty_pool.paranoid_check_is_no_ref(expected, "Captured argument type")?;
+
+        // Intersect the captured type with the accumulated abilities
+        abilities = abilities.intersect(ty_pool.abilities(given));
+        ty_pool.paranoid_check_assignable(given, expected)?;
     }
-    // Push result type onto stack
-    let args = mask
-        .extract(func.param_tys(), false)
-        .into_iter()
-        .map(|curried| with_owned_instantiation(ty_builder, func, curried, Ok))
-        .collect::<PartialVMResult<Vec<_>>>()?;
-    let results = func
-        .return_tys()
-        .iter()
-        .map(|ret| with_owned_instantiation(ty_builder, func, ret, Ok))
-        .collect::<PartialVMResult<Vec<_>>>()?;
-    operand_stack.push_ty(Type::Function {
-        args,
-        results,
-        abilities,
-    })?;
+
+    let func_ty = if func.ty_args.is_empty() {
+        let args = mask
+            .extract(func.param_ty_ids(), false)
+            .into_iter()
+            .copied()
+            .collect::<Vec<_>>();
+        ty_pool.function_of_vec(args, func.return_ty_ids().to_vec(), abilities)
+    } else {
+        let args = mask
+            .extract(func.param_tys(), false)
+            .into_iter()
+            .map(|curried| Ok(ty_pool.instantiate_and_intern(curried, &func.ty_args)))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        let results = func
+            .return_tys()
+            .iter()
+            .map(|ret| Ok(ty_pool.instantiate_and_intern(ret, &func.ty_args)))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        ty_pool.function_of_vec(args, results, abilities)
+    };
+
+    operand_stack.push_ty(func_ty)?;
 
     Ok(())
-}
-
-fn with_instantiation<R>(
-    ty_builder: &TypeBuilder,
-    func: &LoadedFunction,
-    ty: &Type,
-    action: impl FnOnce(&Type) -> PartialVMResult<R>,
-) -> PartialVMResult<R> {
-    if func.ty_args().is_empty() {
-        action(ty)
-    } else {
-        action(&ty_builder.create_ty_with_subst(ty, func.ty_args())?)
-    }
-}
-
-fn with_owned_instantiation<R>(
-    ty_builder: &TypeBuilder,
-    func: &LoadedFunction,
-    ty: &Type,
-    action: impl FnOnce(Type) -> PartialVMResult<R>,
-) -> PartialVMResult<R> {
-    if func.ty_args().is_empty() {
-        action(ty.clone())
-    } else {
-        action(ty_builder.create_ty_with_subst(ty, func.ty_args())?)
-    }
 }
 
 pub(crate) struct NoRuntimeTypeCheck;
@@ -294,9 +276,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // top of the stack. The argument types are checked when the frame
                 // is constructed in the interpreter, using the same code as for regular
                 // calls.
+                let ty_pool = frame.ty_pool();
                 let (expected_ty, _) = ty_cache.get_signature_index_type(*sig_idx, frame)?;
                 let given_ty = operand_stack.pop_ty()?;
-                given_ty.paranoid_check_assignable(expected_ty)?;
+                ty_pool.paranoid_check_assignable(given_ty, expected_ty)?;
             },
             Bytecode::Branch(_) => (),
             Bytecode::Ret => {
@@ -307,12 +290,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
             Bytecode::StLoc(idx) => {
-                let expected_ty = frame.local_ty_at(*idx as usize);
+                let ty_pool = frame.ty_pool();
+                let expected_ty = *frame.local_ty_at(*idx as usize);
                 let val_ty = operand_stack.pop_ty()?;
                 // For store, use assignability
-                val_ty.paranoid_check_assignable(expected_ty)?;
+                ty_pool.paranoid_check_assignable(val_ty, expected_ty)?;
                 if !frame.locals.is_invalid(*idx as usize)? {
-                    expected_ty.paranoid_check_has_ability(Ability::Drop)?;
+                    ty_pool.paranoid_check_has_ability(expected_ty, Ability::Drop)?;
                 }
             },
             // We will check the rest of the instructions after execution phase.
@@ -429,7 +413,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         instruction: &Bytecode,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
-        let ty_builder = frame.ty_builder();
+        let ty_pool = frame.ty_pool();
         match instruction {
             Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
             Bytecode::Branch(_)
@@ -445,129 +429,102 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::Pop => {
                 let ty = operand_stack.pop_ty()?;
-                ty.paranoid_check_has_ability(Ability::Drop)?;
+                ty_pool.paranoid_check_has_ability(ty, Ability::Drop)?;
             },
-            Bytecode::LdU8(_) => {
-                let u8_ty = ty_builder.create_u8_ty();
-                operand_stack.push_ty(u8_ty)?
-            },
-            Bytecode::LdU16(_) => {
-                let u16_ty = ty_builder.create_u16_ty();
-                operand_stack.push_ty(u16_ty)?
-            },
-            Bytecode::LdU32(_) => {
-                let u32_ty = ty_builder.create_u32_ty();
-                operand_stack.push_ty(u32_ty)?
-            },
-            Bytecode::LdU64(_) => {
-                let u64_ty = ty_builder.create_u64_ty();
-                operand_stack.push_ty(u64_ty)?
-            },
-            Bytecode::LdU128(_) => {
-                let u128_ty = ty_builder.create_u128_ty();
-                operand_stack.push_ty(u128_ty)?
-            },
-            Bytecode::LdU256(_) => {
-                let u256_ty = ty_builder.create_u256_ty();
-                operand_stack.push_ty(u256_ty)?
-            },
-            Bytecode::LdI8(_) => {
-                let i8_ty = ty_builder.create_i8_ty();
-                operand_stack.push_ty(i8_ty)?
-            },
-            Bytecode::LdI16(_) => {
-                let i16_ty = ty_builder.create_i16_ty();
-                operand_stack.push_ty(i16_ty)?
-            },
-            Bytecode::LdI32(_) => {
-                let i32_ty = ty_builder.create_i32_ty();
-                operand_stack.push_ty(i32_ty)?
-            },
-            Bytecode::LdI64(_) => {
-                let i64_ty = ty_builder.create_i64_ty();
-                operand_stack.push_ty(i64_ty)?
-            },
-            Bytecode::LdI128(_) => {
-                let i128_ty = ty_builder.create_i128_ty();
-                operand_stack.push_ty(i128_ty)?
-            },
-            Bytecode::LdI256(_) => {
-                let i256_ty = ty_builder.create_i256_ty();
-                operand_stack.push_ty(i256_ty)?
-            },
-            Bytecode::LdTrue | Bytecode::LdFalse => {
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?
-            },
+            Bytecode::LdU8(_) => operand_stack.push_ty(TypeId::U8)?,
+            Bytecode::LdU16(_) => operand_stack.push_ty(TypeId::U16)?,
+            Bytecode::LdU32(_) => operand_stack.push_ty(TypeId::U32)?,
+            Bytecode::LdU64(_) => operand_stack.push_ty(TypeId::U64)?,
+            Bytecode::LdU128(_) => operand_stack.push_ty(TypeId::U128)?,
+            Bytecode::LdU256(_) => operand_stack.push_ty(TypeId::U256)?,
+            Bytecode::LdI8(_) => operand_stack.push_ty(TypeId::I8)?,
+            Bytecode::LdI16(_) => operand_stack.push_ty(TypeId::I16)?,
+            Bytecode::LdI32(_) => operand_stack.push_ty(TypeId::I32)?,
+            Bytecode::LdI64(_) => operand_stack.push_ty(TypeId::I64)?,
+            Bytecode::LdI128(_) => operand_stack.push_ty(TypeId::I128)?,
+            Bytecode::LdI256(_) => operand_stack.push_ty(TypeId::I256)?,
+            Bytecode::LdTrue | Bytecode::LdFalse => operand_stack.push_ty(TypeId::BOOL)?,
             Bytecode::LdConst(i) => {
                 let constant = frame.constant_at(*i);
-                let ty = ty_builder.create_constant_ty(&constant.type_)?;
+                // TODO: cache at load-time.
+                let ty = ty_pool.create_constant_ty(&constant.type_);
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::CopyLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize).clone();
-                ty.paranoid_check_has_ability(Ability::Copy)?;
+                let ty = *frame.local_ty_at(*idx as usize);
+                ty_pool.paranoid_check_has_ability(ty, Ability::Copy)?;
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize).clone();
+                let ty = *frame.local_ty_at(*idx as usize);
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize);
-                let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
+                let ty = *frame.local_ty_at(*idx as usize);
+                let mut_ref_ty = TypeId::ref_mut_of(ty);
                 operand_stack.push_ty(mut_ref_ty)?;
             },
             Bytecode::ImmBorrowLoc(idx) => {
-                let ty = frame.local_ty_at(*idx as usize);
-                let ref_ty = ty_builder.create_ref_ty(ty, false)?;
+                let ty = *frame.local_ty_at(*idx as usize);
+                let ref_ty = TypeId::ref_of(ty);
                 operand_stack.push_ty(ref_ty)?;
             },
             Bytecode::ImmBorrowField(fh_idx) => {
                 let ty = operand_stack.pop_ty()?;
-                let expected_ty = frame.field_handle_to_struct(*fh_idx);
-                ty.paranoid_check_ref_eq(&expected_ty, false)?;
+                let expected_ty_type = frame.field_handle_to_struct(*fh_idx);
+                let expected_ty = ty_pool.instantiate_and_intern(&expected_ty_type, &[]);
+                ty_pool.paranoid_check_ref_eq(ty, expected_ty, false)?;
 
-                let field_ty = frame.get_field_ty(*fh_idx)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                let field_ty_type = frame.get_field_ty(*fh_idx)?;
+                let field_ty = ty_pool.instantiate_and_intern(field_ty_type, &[]);
+                let field_ref_ty = TypeId::ref_of(field_ty);
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowField(fh_idx) => {
                 let ref_ty = operand_stack.pop_ty()?;
-                let expected_inner_ty = frame.field_handle_to_struct(*fh_idx);
-                ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
+                let expected_inner_ty_type = frame.field_handle_to_struct(*fh_idx);
+                let expected_inner_ty =
+                    ty_pool.instantiate_and_intern(&expected_inner_ty_type, &[]);
+                ty_pool.paranoid_check_ref_eq(ref_ty, expected_inner_ty, true)?;
 
-                let field_ty = frame.get_field_ty(*fh_idx)?;
-                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
+                let field_ty_type = frame.get_field_ty(*fh_idx)?;
+                let field_ty = ty_pool.instantiate_and_intern(field_ty_type, &[]);
+                let field_mut_ref_ty = TypeId::ref_mut_of(field_ty);
                 operand_stack.push_ty(field_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, frame)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
+                ty_pool.paranoid_check_ref_eq(struct_ty, expected_struct_ty, false)?;
 
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                let field_ref_ty = TypeId::ref_of(field_ty);
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, frame)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
+                ty_pool.paranoid_check_ref_eq(struct_ty, expected_struct_ty, true)?;
 
-                let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
+                let field_mut_ref_ty = TypeId::ref_mut_of(field_ty);
                 operand_stack.push_ty(field_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowVariantField(fh_idx) | Bytecode::MutBorrowVariantField(fh_idx) => {
                 let is_mut = matches!(instruction, Bytecode::MutBorrowVariantField(..));
                 let field_info = frame.variant_field_info_at(*fh_idx);
                 let ty = operand_stack.pop_ty()?;
-                let expected_ty = frame.create_struct_ty(&field_info.definition_struct_type);
-                ty.paranoid_check_ref_eq(&expected_ty, is_mut)?;
-                let field_ty = &field_info.uninstantiated_field_ty;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
+                let expected_ty_type = frame.create_struct_ty(&field_info.definition_struct_type);
+                let expected_ty = ty_pool.instantiate_and_intern(&expected_ty_type, &[]);
+                ty_pool.paranoid_check_ref_eq(ty, expected_ty, is_mut)?;
+                let field_ty_type = &field_info.uninstantiated_field_ty;
+                let field_ty = ty_pool.instantiate_and_intern(field_ty_type, &[]);
+                let field_ref_ty = if is_mut {
+                    TypeId::ref_mut_of(field_ty)
+                } else {
+                    TypeId::ref_of(field_ty)
+                };
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::ImmBorrowVariantFieldGeneric(idx)
@@ -576,8 +533,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_variant_field_type_and_struct_type(*idx, frame)?;
-                struct_ty.paranoid_check_ref_eq(expected_struct_ty, is_mut)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
+                ty_pool.paranoid_check_ref_eq(struct_ty, expected_struct_ty, is_mut)?;
+                let field_ref_ty = if is_mut {
+                    TypeId::ref_mut_of(field_ty)
+                } else {
+                    TypeId::ref_of(field_ty)
+                };
                 operand_stack.push_ty(field_ref_ty)?;
             },
             Bytecode::PackClosure(..) | Bytecode::PackClosureGeneric(..) => {
@@ -587,13 +548,16 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::Pack(idx) => {
                 let field_count = frame.field_count(*idx);
                 let args_ty = frame.get_struct(*idx);
-                let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
+                let field_tys = args_ty
+                    .fields(None)?
+                    .iter()
+                    .map(|(_, ty)| ty_pool.instantiate_and_intern(ty, &[]));
                 let output_ty = frame.get_struct_ty(*idx);
-                verify_pack(operand_stack, field_count, field_tys, output_ty)?;
+                verify_pack(ty_pool, operand_stack, field_count, field_tys, output_ty)?;
             },
             Bytecode::PackGeneric(idx) => {
                 let field_count = frame.field_instantiation_count(*idx);
-                let output_ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
+                let output_ty = ty_cache.get_struct_type(*idx, frame)?.0;
                 let args_ty = ty_cache.get_struct_fields_types(*idx, frame)?;
 
                 if field_count as usize != args_ty.len() {
@@ -608,28 +572,30 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 }
 
                 verify_pack(
+                    ty_pool,
                     operand_stack,
                     field_count,
-                    args_ty.iter().map(|(ty, _)| ty),
+                    args_ty.iter().map(|(ty, _)| *ty),
                     output_ty,
                 )?;
             },
             Bytecode::Unpack(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
-                struct_ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
+                ty_pool.paranoid_check_eq(struct_ty, frame.get_struct_ty(*idx))?;
                 let struct_decl = frame.get_struct(*idx);
                 for (_name, ty) in struct_decl.fields(None)?.iter() {
-                    operand_stack.push_ty(ty.clone())?;
+                    let ty_id = ty_pool.instantiate_and_intern(ty, &[]);
+                    operand_stack.push_ty(ty_id)?;
                 }
             },
             Bytecode::UnpackGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
 
-                struct_ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
+                ty_pool.paranoid_check_eq(struct_ty, ty_cache.get_struct_type(*idx, frame)?.0)?;
 
                 let struct_fields_types = ty_cache.get_struct_fields_types(*idx, frame)?;
                 for (ty, _) in struct_fields_types {
-                    operand_stack.push_ty(ty.clone())?;
+                    operand_stack.push_ty(*ty)?;
                 }
             },
             Bytecode::PackVariant(idx) => {
@@ -638,125 +604,126 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .definition_struct_type
                     .fields(Some(info.variant))?
                     .iter()
-                    .map(|(_, ty)| ty);
-                let output_ty = frame.create_struct_ty(&info.definition_struct_type);
-                verify_pack(operand_stack, info.field_count, field_tys, output_ty)?;
+                    .map(|(_, ty)| ty_pool.instantiate_and_intern(ty, &[]));
+                let output_ty_type = frame.create_struct_ty(&info.definition_struct_type);
+                let output_ty = ty_pool.instantiate_and_intern(&output_ty_type, &[]);
+                verify_pack(
+                    ty_pool,
+                    operand_stack,
+                    info.field_count,
+                    field_tys,
+                    output_ty,
+                )?;
             },
             Bytecode::PackVariantGeneric(idx) => {
                 let info = frame.get_struct_variant_instantiation_at(*idx);
-                let output_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0.clone();
+                let output_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0;
                 let args_ty = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
                 verify_pack(
+                    ty_pool,
                     operand_stack,
                     info.field_count,
-                    args_ty.iter().map(|(ty, _)| ty),
+                    args_ty.iter().map(|(ty, _)| *ty),
                     output_ty,
                 )?;
             },
             Bytecode::UnpackVariant(idx) => {
                 let info = frame.get_struct_variant_at(*idx);
-                let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
+                let expected_struct_ty_type = frame.create_struct_ty(&info.definition_struct_type);
+                let expected_struct_ty =
+                    ty_pool.instantiate_and_intern(&expected_struct_ty_type, &[]);
                 let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_eq(&expected_struct_ty)?;
+                ty_pool.paranoid_check_eq(actual_struct_ty, expected_struct_ty)?;
                 for (_name, ty) in info
                     .definition_struct_type
                     .fields(Some(info.variant))?
                     .iter()
                 {
-                    operand_stack.push_ty(ty.clone())?;
+                    let ty_id = ty_pool.instantiate_and_intern(ty, &[]);
+                    operand_stack.push_ty(ty_id)?;
                 }
             },
             Bytecode::UnpackVariantGeneric(idx) => {
                 let expected_struct_type = ty_cache.get_struct_variant_type(*idx, frame)?.0;
                 let actual_struct_type = operand_stack.pop_ty()?;
-                actual_struct_type.paranoid_check_eq(expected_struct_type)?;
+                ty_pool.paranoid_check_eq(actual_struct_type, expected_struct_type)?;
                 let struct_fields_types = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
                 for (ty, _) in struct_fields_types {
-                    operand_stack.push_ty(ty.clone())?;
+                    operand_stack.push_ty(*ty)?;
                 }
             },
             Bytecode::TestVariant(idx) => {
                 let info = frame.get_struct_variant_at(*idx);
-                let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
+                let expected_struct_ty_type = frame.create_struct_ty(&info.definition_struct_type);
+                let expected_struct_ty =
+                    ty_pool.instantiate_and_intern(&expected_struct_ty_type, &[]);
                 let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
-                operand_stack.push_ty(ty_builder.create_bool_ty())?;
+                ty_pool.paranoid_check_ref_eq(actual_struct_ty, expected_struct_ty, false)?;
+                operand_stack.push_ty(TypeId::BOOL)?;
             },
             Bytecode::TestVariantGeneric(idx) => {
                 let expected_struct_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0;
                 let actual_struct_ty = operand_stack.pop_ty()?;
-                actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
-                operand_stack.push_ty(ty_builder.create_bool_ty())?;
+                ty_pool.paranoid_check_ref_eq(actual_struct_ty, expected_struct_ty, false)?;
+                operand_stack.push_ty(TypeId::BOOL)?;
             },
             Bytecode::ReadRef => {
                 let ref_ty = operand_stack.pop_ty()?;
-                let inner_ty = ref_ty.paranoid_read_ref()?;
+                let inner_ty = ty_pool.paranoid_read_ref(ref_ty)?;
                 operand_stack.push_ty(inner_ty)?;
             },
             Bytecode::WriteRef => {
                 let mut_ref_ty = operand_stack.pop_ty()?;
                 let val_ty = operand_stack.pop_ty()?;
-                mut_ref_ty.paranoid_write_ref(&val_ty)?;
+                ty_pool.paranoid_write_ref(mut_ref_ty, val_ty)?;
             },
             Bytecode::CastU8 => {
                 operand_stack.pop_ty()?;
-                let u8_ty = ty_builder.create_u8_ty();
-                operand_stack.push_ty(u8_ty)?;
+                operand_stack.push_ty(TypeId::U8)?;
             },
             Bytecode::CastU16 => {
                 operand_stack.pop_ty()?;
-                let u16_ty = ty_builder.create_u16_ty();
-                operand_stack.push_ty(u16_ty)?;
+                operand_stack.push_ty(TypeId::U16)?;
             },
             Bytecode::CastU32 => {
                 operand_stack.pop_ty()?;
-                let u32_ty = ty_builder.create_u32_ty();
-                operand_stack.push_ty(u32_ty)?;
+                operand_stack.push_ty(TypeId::U32)?;
             },
             Bytecode::CastU64 => {
                 operand_stack.pop_ty()?;
-                let u64_ty = ty_builder.create_u64_ty();
-                operand_stack.push_ty(u64_ty)?;
+                operand_stack.push_ty(TypeId::U64)?;
             },
             Bytecode::CastU128 => {
                 operand_stack.pop_ty()?;
-                let u128_ty = ty_builder.create_u128_ty();
-                operand_stack.push_ty(u128_ty)?;
+                operand_stack.push_ty(TypeId::U128)?;
             },
             Bytecode::CastU256 => {
                 operand_stack.pop_ty()?;
-                let u256_ty = ty_builder.create_u256_ty();
-                operand_stack.push_ty(u256_ty)?;
+                operand_stack.push_ty(TypeId::U256)?;
             },
             Bytecode::CastI8 => {
                 operand_stack.pop_ty()?;
-                let i8_ty = ty_builder.create_i8_ty();
-                operand_stack.push_ty(i8_ty)?;
+                operand_stack.push_ty(TypeId::I8)?;
             },
             Bytecode::CastI16 => {
                 operand_stack.pop_ty()?;
-                let i16_ty = ty_builder.create_i16_ty();
-                operand_stack.push_ty(i16_ty)?;
+                operand_stack.push_ty(TypeId::I16)?;
             },
             Bytecode::CastI32 => {
                 operand_stack.pop_ty()?;
-                let i32_ty = ty_builder.create_i32_ty();
-                operand_stack.push_ty(i32_ty)?;
+                operand_stack.push_ty(TypeId::I32)?;
             },
             Bytecode::CastI64 => {
                 operand_stack.pop_ty()?;
-                let i64_ty = ty_builder.create_i64_ty();
-                operand_stack.push_ty(i64_ty)?;
+                operand_stack.push_ty(TypeId::I64)?;
             },
             Bytecode::CastI128 => {
                 operand_stack.pop_ty()?;
-                let i128_ty = ty_builder.create_i128_ty();
-                operand_stack.push_ty(i128_ty)?;
+                operand_stack.push_ty(TypeId::I128)?;
             },
             Bytecode::CastI256 => {
                 operand_stack.pop_ty()?;
-                let i256_ty = ty_builder.create_i256_ty();
-                operand_stack.push_ty(i256_ty)?;
+                operand_stack.push_ty(TypeId::I256)?;
             },
             Bytecode::Add
             | Bytecode::Sub
@@ -769,13 +736,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::Or
             | Bytecode::And => {
                 let rhs_ty = operand_stack.pop_ty()?;
-                rhs_ty.paranoid_check_eq(operand_stack.top_ty()?)?;
+                ty_pool.paranoid_check_eq(rhs_ty, operand_stack.top_ty()?)?;
                 // NO-OP, same as the two lines below when the types are indeed the same:
                 // let lhs_ty = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(rhs_ty)?;
             },
             Bytecode::Negate => {
-                operand_stack.top_ty()?.paranoid_check_is_sint_ty()?;
+                ty_pool.paranoid_check_is_sint_ty(operand_stack.top_ty()?)?;
                 // NO-OP, leave stack as is
             },
             Bytecode::Shl | Bytecode::Shr => {
@@ -787,92 +754,86 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Bytecode::Lt | Bytecode::Le | Bytecode::Gt | Bytecode::Ge => {
                 let rhs_ty = operand_stack.pop_ty()?;
                 let lhs_ty = operand_stack.pop_ty()?;
-                rhs_ty.paranoid_check_eq(&lhs_ty)?;
-
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?;
+                ty_pool.paranoid_check_eq(rhs_ty, lhs_ty)?;
+                operand_stack.push_ty(TypeId::BOOL)?;
             },
             Bytecode::Eq | Bytecode::Neq => {
                 let rhs_ty = operand_stack.pop_ty()?;
                 let lhs_ty = operand_stack.pop_ty()?;
-                rhs_ty.paranoid_check_eq(&lhs_ty)?;
-                rhs_ty.paranoid_check_has_ability(Ability::Drop)?;
-
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?;
+                ty_pool.paranoid_check_eq(rhs_ty, lhs_ty)?;
+                ty_pool.paranoid_check_has_ability(rhs_ty, Ability::Drop)?;
+                operand_stack.push_ty(TypeId::BOOL)?;
             },
             Bytecode::MutBorrowGlobal(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                ty_pool.paranoid_check_is_address_ty(operand_stack.pop_ty()?)?;
                 let struct_ty = frame.get_struct_ty(*idx);
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_has_ability(struct_ty, Ability::Key)?;
 
-                let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
+                let struct_mut_ref_ty = TypeId::ref_mut_of(struct_ty);
                 operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobal(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                ty_pool.paranoid_check_is_address_ty(operand_stack.pop_ty()?)?;
                 let struct_ty = frame.get_struct_ty(*idx);
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_has_ability(struct_ty, Ability::Key)?;
 
-                let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
+                let struct_ref_ty = TypeId::ref_of(struct_ty);
                 operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::MutBorrowGlobalGeneric(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                ty_pool.paranoid_check_is_address_ty(operand_stack.pop_ty()?)?;
                 let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_has_ability(struct_ty, Ability::Key)?;
 
-                let struct_mut_ref_ty = ty_builder.create_ref_ty(struct_ty, true)?;
+                let struct_mut_ref_ty = TypeId::ref_mut_of(struct_ty);
                 operand_stack.push_ty(struct_mut_ref_ty)?;
             },
             Bytecode::ImmBorrowGlobalGeneric(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                ty_pool.paranoid_check_is_address_ty(operand_stack.pop_ty()?)?;
                 let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
-                struct_ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_has_ability(struct_ty, Ability::Key)?;
 
-                let struct_ref_ty = ty_builder.create_ref_ty(struct_ty, false)?;
+                let struct_ref_ty = TypeId::ref_of(struct_ty);
                 operand_stack.push_ty(struct_ref_ty)?;
             },
             Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-
-                let bool_ty = ty_builder.create_bool_ty();
-                operand_stack.push_ty(bool_ty)?;
+                ty_pool.paranoid_check_is_address_ty(operand_stack.pop_ty()?)?;
+                operand_stack.push_ty(TypeId::BOOL)?;
             },
             Bytecode::MoveTo(idx) => {
                 let ty = operand_stack.pop_ty()?;
-                operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_is_signer_ref_ty(operand_stack.pop_ty()?)?;
+                ty_pool.paranoid_check_eq(ty, frame.get_struct_ty(*idx))?;
+                ty_pool.paranoid_check_has_ability(ty, Ability::Key)?;
             },
             Bytecode::MoveToGeneric(idx) => {
                 let ty = operand_stack.pop_ty()?;
-                operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
-                ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_is_signer_ref_ty(operand_stack.pop_ty()?)?;
+                ty_pool.paranoid_check_eq(ty, ty_cache.get_struct_type(*idx, frame)?.0)?;
+                ty_pool.paranoid_check_has_ability(ty, Ability::Key)?;
             },
             Bytecode::MoveFrom(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
+                ty_pool.paranoid_check_is_address_ty(operand_stack.pop_ty()?)?;
                 let ty = frame.get_struct_ty(*idx);
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_has_ability(ty, Ability::Key)?;
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::MoveFromGeneric(idx) => {
-                operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
-                let ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
-                ty.paranoid_check_has_ability(Ability::Key)?;
+                ty_pool.paranoid_check_is_address_ty(operand_stack.pop_ty()?)?;
+                let ty = ty_cache.get_struct_type(*idx, frame)?.0;
+                ty_pool.paranoid_check_has_ability(ty, Ability::Key)?;
                 operand_stack.push_ty(ty)?;
             },
             Bytecode::FreezeRef => {
                 let mut_ref_ty = operand_stack.pop_ty()?;
-                let ref_ty = mut_ref_ty.paranoid_freeze_ref_ty()?;
+                let ref_ty = ty_pool.paranoid_freeze_ref_ty(mut_ref_ty)?;
                 operand_stack.push_ty(ref_ty)?;
             },
             Bytecode::Nop => (),
             Bytecode::Not => {
-                operand_stack.top_ty()?.paranoid_check_is_bool_ty()?;
+                ty_pool.paranoid_check_is_bool_ty(operand_stack.top_ty()?)?;
                 // NO-OP,  same as the two lines below:
-                // let bool_ty = ty_builder.create_bool_ty();
+                // let bool_ty = ty_pool.bool_ty();
                 // operand_stack.push_ty(bool_ty)?;
             },
             Bytecode::VecPack(si, num) => {
@@ -880,68 +841,57 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let elem_tys = operand_stack.popn_tys(*num as u16)?;
                 for elem_ty in elem_tys.iter() {
                     // For vector element types, use assignability
-                    elem_ty.paranoid_check_assignable(ty)?;
+                    ty_pool.paranoid_check_assignable(*elem_ty, ty)?;
                 }
 
-                let vec_ty = ty_builder.create_vec_ty(ty)?;
+                let vec_ty = ty_pool.vec_of(ty);
                 operand_stack.push_ty(vec_ty)?;
             },
             Bytecode::VecLen(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack
-                    .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<false>(ty)?;
-
-                let u64_ty = ty_builder.create_u64_ty();
-                operand_stack.push_ty(u64_ty)?;
+                ty_pool.paranoid_check_is_vec_ref_ty::<false>(operand_stack.pop_ty()?, ty)?;
+                operand_stack.push_ty(TypeId::U64)?;
             },
             Bytecode::VecImmBorrow(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                let elem_ref_ty = operand_stack
-                    .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty::<false>(ty)?;
+                ty_pool.paranoid_check_is_u64_ty(operand_stack.pop_ty()?)?;
+                let elem_ref_ty = ty_pool
+                    .paranoid_check_and_get_vec_elem_ref_ty::<false>(operand_stack.pop_ty()?, ty)?;
 
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecMutBorrow(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                let elem_ref_ty = operand_stack
-                    .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ref_ty::<true>(ty)?;
+                ty_pool.paranoid_check_is_u64_ty(operand_stack.pop_ty()?)?;
+                let elem_ref_ty = ty_pool
+                    .paranoid_check_and_get_vec_elem_ref_ty::<true>(operand_stack.pop_ty()?, ty)?;
                 operand_stack.push_ty(elem_ref_ty)?;
             },
             Bytecode::VecPushBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 // For pushing an element to a vector, use assignability
-                operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
-                operand_stack
-                    .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                ty_pool.paranoid_check_assignable(operand_stack.pop_ty()?, ty)?;
+                ty_pool.paranoid_check_is_vec_ref_ty::<true>(operand_stack.pop_ty()?, ty)?;
             },
             Bytecode::VecPopBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                let elem_ty = operand_stack
-                    .pop_ty()?
-                    .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
+                let elem_ty = ty_pool
+                    .paranoid_check_and_get_vec_elem_ty::<true>(operand_stack.pop_ty()?, ty)?;
                 operand_stack.push_ty(elem_ty)?;
             },
             Bytecode::VecUnpack(si, num) => {
                 let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let vec_ty = operand_stack.pop_ty()?;
-                vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
+                ty_pool.paranoid_check_is_vec_ty(vec_ty, expected_elem_ty)?;
                 for _ in 0..*num {
-                    operand_stack.push_ty(expected_elem_ty.clone())?;
+                    operand_stack.push_ty(expected_elem_ty)?;
                 }
             },
             Bytecode::VecSwap(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
-                operand_stack
-                    .pop_ty()?
-                    .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+                ty_pool.paranoid_check_is_u64_ty(operand_stack.pop_ty()?)?;
+                ty_pool.paranoid_check_is_u64_ty(operand_stack.pop_ty()?)?;
+                ty_pool.paranoid_check_is_vec_ref_ty::<true>(operand_stack.pop_ty()?, ty)?;
             },
         }
         Ok(())

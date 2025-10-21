@@ -24,8 +24,8 @@ use move_vm_runtime::{
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
-    gas::UnmeteredGasMeter, loaded_data::runtime_types::Type, natives::function::NativeResult,
-    pop_arg, values::Value,
+    gas::UnmeteredGasMeter, natives::function::NativeResult, pop_arg, ty_interner::TypeId,
+    values::Value,
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, env, fs, sync::Arc};
@@ -37,7 +37,7 @@ enum Entrypoint {
 }
 
 fn make_native_create_signer() -> NativeFunction {
-    Arc::new(|_context, ty_args: Vec<Type>, mut args: VecDeque<Value>| {
+    Arc::new(|_context, ty_args: &[TypeId], mut args: VecDeque<Value>| {
         assert!(ty_args.is_empty());
         assert_eq!(args.len(), 1);
 

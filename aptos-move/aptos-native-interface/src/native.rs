@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{context::SafeNativeContext, errors::SafeNativeResult};
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::SmallVec;
 use std::collections::VecDeque;
 
@@ -12,6 +12,6 @@ use std::collections::VecDeque;
 /// it can be used in the VM.
 pub type RawSafeNative = fn(
     &mut SafeNativeContext,
-    Vec<Type>,
+    &[TypeId],
     VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>>;

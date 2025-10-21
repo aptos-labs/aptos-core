@@ -11,7 +11,7 @@ use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -51,7 +51,7 @@ impl<'a> NativeStateStorageContext<'a> {
 /// guarantees a fresh state view then.
 fn native_get_usage(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert!(_ty_args.is_empty());

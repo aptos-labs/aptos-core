@@ -14,7 +14,7 @@ use aptos_native_interface::{
 use move_core_types::gas_algebra::NumBytes;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -36,7 +36,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 fn native_check_utf8(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 1);
@@ -62,7 +62,7 @@ fn native_check_utf8(
  **************************************************************************************************/
 fn native_is_char_boundary(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 2);
@@ -88,7 +88,7 @@ fn native_is_char_boundary(
  **************************************************************************************************/
 fn native_sub_string(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 3);
@@ -124,7 +124,7 @@ fn native_sub_string(
  **************************************************************************************************/
 fn native_index_of(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 2);

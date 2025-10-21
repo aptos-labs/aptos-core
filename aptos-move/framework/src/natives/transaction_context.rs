@@ -18,7 +18,7 @@ use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
 use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -107,7 +107,7 @@ impl NativeTransactionContext {
  **************************************************************************************************/
 fn native_get_txn_hash(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GET_TXN_HASH_BASE)?;
@@ -126,7 +126,7 @@ fn native_get_txn_hash(
  **************************************************************************************************/
 fn native_generate_unique_address(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GENERATE_UNIQUE_ADDRESS_BASE)?;
@@ -152,7 +152,7 @@ fn native_generate_unique_address(
  **************************************************************************************************/
 fn native_monotonically_increasing_counter_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_MONOTONICALLY_INCREASING_COUNTER_BASE)?;
@@ -200,7 +200,7 @@ fn native_monotonically_increasing_counter_internal(
  **************************************************************************************************/
 fn native_monotonically_increasing_counter_internal_for_test_only(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_MONOTONICALLY_INCREASING_COUNTER_BASE)?;
@@ -230,7 +230,7 @@ fn native_monotonically_increasing_counter_internal_for_test_only(
  **************************************************************************************************/
 fn native_get_script_hash(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GET_SCRIPT_HASH_BASE)?;
@@ -244,7 +244,7 @@ fn native_get_script_hash(
 
 fn native_sender_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_SENDER_BASE)?;
@@ -261,7 +261,7 @@ fn native_sender_internal(
 
 fn native_secondary_signers_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_SECONDARY_SIGNERS_BASE)?;
@@ -283,7 +283,7 @@ fn native_secondary_signers_internal(
 
 fn native_gas_payer_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_FEE_PAYER_BASE)?;
@@ -300,7 +300,7 @@ fn native_gas_payer_internal(
 
 fn native_max_gas_amount_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_MAX_GAS_AMOUNT_BASE)?;
@@ -317,7 +317,7 @@ fn native_max_gas_amount_internal(
 
 fn native_gas_unit_price_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_GAS_UNIT_PRICE_BASE)?;
@@ -334,7 +334,7 @@ fn native_gas_unit_price_internal(
 
 fn native_chain_id_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_CHAIN_ID_BASE)?;
@@ -414,7 +414,7 @@ fn create_entry_function_payload(
 
 fn native_entry_function_payload_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_ENTRY_FUNCTION_PAYLOAD_BASE)?;
@@ -442,7 +442,7 @@ fn native_entry_function_payload_internal(
 
 fn native_multisig_payload_internal(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     context.charge(TRANSACTION_CONTEXT_MULTISIG_PAYLOAD_BASE)?;

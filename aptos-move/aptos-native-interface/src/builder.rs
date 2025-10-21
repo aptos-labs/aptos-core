@@ -9,9 +9,7 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
-};
+use move_vm_types::{natives::function::NativeResult, ty_interner::TypeId, values::Value};
 use smallvec::SmallVec;
 use std::{collections::VecDeque, sync::Arc};
 
@@ -81,9 +79,9 @@ impl SafeNativeBuilder {
     /// allowing the client to use [`SafeNativeContext`] instead of Move VM's [`NativeContext`].
     pub fn make_native<F>(&self, native: F) -> NativeFunction
     where
-        F: Fn(
+        F: for<'a> Fn(
                 &mut SafeNativeContext,
-                Vec<Type>,
+                &'a [TypeId],
                 VecDeque<Value>,
             ) -> SafeNativeResult<SmallVec<[Value; 1]>>
             + Send
@@ -95,7 +93,7 @@ impl SafeNativeBuilder {
 
         let enable_incremental_gas_charging = self.enable_incremental_gas_charging;
 
-        let closure = move |context: &mut NativeContext, ty_args, args| {
+        let closure = move |context: &mut NativeContext, ty_args: &[TypeId], args| {
             use SafeNativeError::*;
 
             let mut context = SafeNativeContext {
@@ -175,9 +173,9 @@ impl SafeNativeBuilder {
     ) -> impl Iterator<Item = (String, NativeFunction)> + 'a
     where
         'b: 'a,
-        F: Fn(
+        F: for<'c> Fn(
                 &mut SafeNativeContext,
-                Vec<Type>,
+                &'c [TypeId],
                 VecDeque<Value>,
             ) -> SafeNativeResult<SmallVec<[Value; 1]>>
             + Send

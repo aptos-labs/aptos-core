@@ -8,9 +8,7 @@ use aptos_native_interface::{
 };
 use move_core_types::gas_algebra::NumBytes;
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{
-    loaded_data::runtime_types::Type, value_serde::ValueSerDeContext, values::Value,
-};
+use move_vm_types::{ty_interner::TypeId, value_serde::ValueSerDeContext, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
@@ -29,14 +27,14 @@ const EFROM_BYTES: u64 = 0x01_0001;
  **************************************************************************************************/
 fn native_from_bytes(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
 
     // TODO(Gas): charge for getting the layout
-    let layout = context.type_to_type_layout(&ty_args[0])?;
+    let layout = context.type_to_type_layout(ty_args[0])?;
 
     let bytes = safely_pop_arg!(args, Vec<u8>);
     context.charge(
