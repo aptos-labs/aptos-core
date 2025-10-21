@@ -23,8 +23,8 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::DependencyGasMeter,
-    loaded_data::runtime_types::Type,
     resolver::ResourceResolver,
+    ty_interner::TypeId,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Value},
 };
@@ -61,7 +61,7 @@ impl DataCacheEntry {
 /// for a data store related to a transaction. Clients should create an instance of this type
 /// and pass it to the Move VM.
 pub struct TransactionDataCache {
-    account_map: BTreeMap<AccountAddress, BTreeMap<Type, DataCacheEntry>>,
+    account_map: BTreeMap<AccountAddress, BTreeMap<TypeId, DataCacheEntry>>,
 }
 
 impl TransactionDataCache {
@@ -146,7 +146,7 @@ impl TransactionDataCache {
         module_storage: &dyn ModuleStorage,
         resource_resolver: &dyn ResourceResolver,
         addr: &AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
         let struct_tag = match module_storage.runtime_environment().ty_to_ty_tag(ty)? {
             TypeTag::Struct(struct_tag) => *struct_tag,
@@ -214,10 +214,10 @@ impl TransactionDataCache {
 
     /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The
     /// state of the cache does not chang when calling this function.
-    pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
+    pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: TypeId) -> bool {
         self.account_map
             .get(addr)
-            .is_some_and(|account_cache| account_cache.contains_key(ty))
+            .is_some_and(|account_cache| account_cache.contains_key(&ty))
     }
 
     /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
@@ -225,10 +225,10 @@ impl TransactionDataCache {
     pub(crate) fn insert_resource(
         &mut self,
         addr: AccountAddress,
-        ty: Type,
+        ty: TypeId,
         data_cache_entry: DataCacheEntry,
     ) -> PartialVMResult<()> {
-        match self.account_map.entry(addr).or_default().entry(ty.clone()) {
+        match self.account_map.entry(addr).or_default().entry(ty) {
             Entry::Vacant(entry) => entry.insert(data_cache_entry),
             Entry::Occupied(_) => {
                 let msg = format!("Entry for {:?} at {} already exists", ty, addr);
@@ -245,10 +245,10 @@ impl TransactionDataCache {
     pub(crate) fn get_resource_mut(
         &mut self,
         addr: &AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<&mut GlobalValue> {
         if let Some(account_cache) = self.account_map.get_mut(addr) {
-            if let Some(entry) = account_cache.get_mut(ty) {
+            if let Some(entry) = account_cache.get_mut(&ty) {
                 return Ok(&mut entry.value);
             }
         }

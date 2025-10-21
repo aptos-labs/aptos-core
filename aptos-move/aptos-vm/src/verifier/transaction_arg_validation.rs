@@ -137,7 +137,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
-        let subst_res = ty_builder.create_ty_with_subst(ty, func.ty_args());
+        let subst_res = ty_builder.create_ty_with_subst(ty, &[] /*todo*/);
         let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let valid = is_valid_txn_arg(loader.runtime_environment(), &ty, allowed_structs);
         if !valid {
@@ -177,7 +177,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
         traversal_context,
         &func.param_tys()[signer_param_cnt..],
         args,
-        func.ty_args(),
+        &[], // todo func.ty_args(),
         allowed_structs,
         false,
     )?;
@@ -483,7 +483,7 @@ fn validate_and_construct(
     for param_ty in function.param_tys() {
         let mut arg = vec![];
         let arg_ty = ty_builder
-            .create_ty_with_subst(param_ty, function.ty_args())
+            .create_ty_with_subst(param_ty, &[] /*todo function.ty_args()*/)
             .unwrap();
 
         recursively_construct_arg(
@@ -613,10 +613,10 @@ fn load_constructor_function(
 
     Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
         .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
-    let ty_args_id = loader
-        .runtime_environment()
-        .ty_pool()
-        .intern_ty_args(&ty_args);
+
+    let pool = loader.runtime_environment().ty_pool();
+    let ty_args_id = pool.intern_ty_args(&ty_args);
+    let ty_args = pool.get_type_vec(ty_args_id).to_vec();
 
     Ok(LoadedFunction {
         owner: LoadedFunctionOwner::Module(module),

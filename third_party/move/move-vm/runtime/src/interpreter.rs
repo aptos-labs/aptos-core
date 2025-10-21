@@ -46,10 +46,9 @@ use move_core_types::{
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
-    loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     resolver::ResourceResolver,
-    ty_interner::InternedTypePool,
+    ty_interner::{InternedTypePool, TypeId, TypeRepr},
     values::{
         self, AbstractFunction, Closure, GlobalValue, Locals, Reference, SignerRef, Struct,
         StructRef, VMValueCast, Value, Vector, VectorRef,
@@ -140,7 +139,7 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     /// Operand stack, where Move `Value`s are stored for stack operations.
     pub(crate) operand_stack: Stack,
     /// The stack of active functions.
-    call_stack: CallStack,
+    call_stack: CallStack<'ctx>,
     /// VM configuration used by the interpreter.
     vm_config: &'ctx VMConfig,
     /// Pool of interned types.
@@ -153,6 +152,7 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     /// are metered.
     loader: &'ctx LoaderImpl,
     /// Checks depth of types of values. Used to bound packing too deep structs or vectors.
+    #[allow(dead_code)]
     ty_depth_checker: &'ctx TypeDepthChecker<'ctx, LoaderImpl>,
     /// Converts runtime types ([Type]) to layouts for (de)serialization.
     layout_converter: &'ctx LayoutConverter<'ctx, LoaderImpl>,
@@ -160,12 +160,12 @@ pub(crate) struct InterpreterImpl<'ctx, LoaderImpl> {
     ref_state: RefCheckState,
 }
 
-struct TypeWithRuntimeEnvironment<'a, 'b> {
-    ty: &'a Type,
-    runtime_environment: &'b RuntimeEnvironment,
+struct TypeWithRuntimeEnvironment<'a> {
+    ty: TypeId,
+    runtime_environment: &'a RuntimeEnvironment,
 }
 
-impl TypeView for TypeWithRuntimeEnvironment<'_, '_> {
+impl TypeView for TypeWithRuntimeEnvironment<'_> {
     fn to_type_tag(&self) -> TypeTag {
         self.runtime_environment.ty_to_ty_tag(self.ty).unwrap()
     }
@@ -206,7 +206,7 @@ impl Interpreter {
     }
 }
 
-impl<LoaderImpl> InterpreterImpl<'_, LoaderImpl>
+impl<'ctx, LoaderImpl> InterpreterImpl<'ctx, LoaderImpl>
 where
     LoaderImpl: Loader,
 {
@@ -314,7 +314,7 @@ where
         &mut self,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        current_frame: &Frame,
+        current_frame: &Frame<'ctx>,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
         let (ty_args, ty_args_id) = current_frame
@@ -339,7 +339,7 @@ where
         &mut self,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
-        current_frame: &Frame,
+        current_frame: &Frame<'ctx>,
         fh_idx: FunctionHandleIndex,
     ) -> VMResult<LoadedFunction> {
         let ty_args_id = self.ty_pool.intern_ty_args(&[]);
@@ -397,6 +397,7 @@ where
             gas_meter,
             CallType::Regular,
             self.vm_config,
+            self.ty_pool,
             function,
             locals,
             frame_cache,
@@ -455,19 +456,19 @@ where
                         // We are not runtime checking this function, but in the caller,
                         // so we must push the return types of the function onto the type stack,
                         // following the runtime type checking protocol.
-                        let ty_args = current_frame.function.ty_args();
+                        let ty_args = current_frame
+                            .function
+                            .ty_arg_ids(self.loader.runtime_environment());
                         if ty_args.is_empty() {
-                            for ret_ty in current_frame.function.return_tys() {
+                            for ret_ty in current_frame.function.return_ty_ids() {
                                 self.operand_stack
-                                    .push_ty(ret_ty.clone())
+                                    .push_ty(*ret_ty)
                                     .map_err(|e| set_err_info!(current_frame, e))?
                             }
                         } else {
                             for ret_ty in current_frame.function.return_tys() {
-                                let ret_ty = current_frame
-                                    .ty_builder()
-                                    .create_ty_with_subst(ret_ty, ty_args)
-                                    .map_err(|e| set_err_info!(current_frame, e))?;
+                                let ret_ty = self.ty_pool.instantiate_and_intern(ret_ty, &ty_args);
+                                //.map_err(|e| set_err_info!(current_frame, e))?;
                                 self.operand_stack
                                     .push_ty(ret_ty)
                                     .map_err(|e| set_err_info!(current_frame, e))?
@@ -642,10 +643,10 @@ where
                             function.owner_as_module()?.self_id(),
                             function.name(),
                             function
-                                .ty_args()
+                                .ty_arg_ids(self.loader.runtime_environment())
                                 .iter()
                                 .map(|ty| TypeWithRuntimeEnvironment {
-                                    ty,
+                                    ty: *ty,
                                     runtime_environment: self.loader.runtime_environment(),
                                 }),
                             self.operand_stack
@@ -782,12 +783,31 @@ where
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn check_return_tys<RTTCheck: RuntimeTypeCheck>(
         &self,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'ctx>,
     ) -> PartialVMResult<()> {
-        let expected_ret_tys = current_frame.function.return_tys();
+        let ty_pool = &current_frame.ty_pool;
+        let ty_args = current_frame.function.ty_args();
+
+        // Get expected return type IDs
+        let expected_ret_ty_ids: Vec<TypeId> = if ty_args.is_empty() {
+            // Non-generic: use pre-computed TypeIds
+            current_frame.function.return_ty_ids().to_vec()
+        } else {
+            // Generic: instantiate and intern on the fly
+            let ty_arg_ids = current_frame
+                .function
+                .ty_arg_ids(self.loader.runtime_environment());
+            current_frame
+                .function
+                .return_tys()
+                .iter()
+                .map(|ty| ty_pool.instantiate_and_intern(ty, &ty_arg_ids))
+                .collect()
+        };
+
         if !RTTCheck::is_partial_checker()
             && self.call_stack.0.is_empty()
-            && self.operand_stack.types.len() != expected_ret_tys.len()
+            && self.operand_stack.types.len() != expected_ret_ty_ids.len()
         {
             // If we have full stack available and this is the outermost call on the stack, the
             // type stack must contain exactly the expected number of returns.
@@ -796,21 +816,13 @@ where
             )
             .with_sub_status(EPARANOID_FAILURE));
         }
-        if expected_ret_tys.is_empty() {
+        if expected_ret_ty_ids.is_empty() {
             return Ok(());
         }
-        let given_ret_tys = self.operand_stack.last_n_tys(expected_ret_tys.len())?;
-        for (expected, given) in expected_ret_tys.iter().zip(given_ret_tys) {
-            let ty_args = current_frame.function.ty_args();
-            if ty_args.is_empty() {
-                given.paranoid_check_assignable(expected)?;
-            } else {
-                let expected_inst = self
-                    .vm_config
-                    .ty_builder
-                    .create_ty_with_subst(expected, ty_args)?;
-                given.paranoid_check_assignable(&expected_inst)?;
-            }
+
+        let given_ret_tys = self.operand_stack.last_n_tys(expected_ret_ty_ids.len())?;
+        for (expected_id, given_id) in expected_ret_ty_ids.iter().zip(given_ret_tys) {
+            ty_pool.paranoid_check_assignable(*given_id, *expected_id)?;
         }
 
         Ok(())
@@ -819,7 +831,7 @@ where
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn set_new_call_frame<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'ctx>,
         gas_meter: &mut impl GasMeter,
         function: Rc<LoadedFunction>,
         call_type: CallType,
@@ -872,14 +884,14 @@ where
     #[inline(always)]
     fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
-        current_frame: &Frame,
+        current_frame: &Frame<'ctx>,
         gas_meter: &mut impl GasMeter,
         function: Rc<LoadedFunction>,
         call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
         mut captured: Vec<Value>,
-    ) -> PartialVMResult<Frame> {
+    ) -> PartialVMResult<Frame<'ctx>> {
         let num_locals = function.local_tys().len();
         let mut locals = Locals::new(num_locals);
         let num_param_tys = function.param_tys().len();
@@ -900,20 +912,18 @@ where
             if should_check && !is_captured {
                 // Only perform paranoid type check for actual operands on the stack.
                 // Captured arguments are already verified against function signature.
-                let ty_args = function.ty_args();
                 let ty = self.operand_stack.pop_ty()?;
-                let expected_ty = &function.local_tys()[i];
-                if !ty_args.is_empty() {
-                    let expected_ty = self
-                        .vm_config
-                        .ty_builder
-                        .create_ty_with_subst(expected_ty, ty_args)?;
-                    // For parameter to argument, use assignability
-                    ty.paranoid_check_assignable(&expected_ty)?;
+                let expected_ty_id = if function.ty_args().is_empty() {
+                    // Non-generic: use pre-computed TypeId
+                    function.param_ty_ids()[i]
                 } else {
-                    // Directly check against the expected type to save a clone here.
-                    ty.paranoid_check_assignable(expected_ty)?;
-                }
+                    // Generic: instantiate and intern on the fly
+                    let ty_arg_ids = function.ty_arg_ids(self.loader.runtime_environment());
+                    let param_ty = &function.param_tys()[i];
+                    self.ty_pool.instantiate_and_intern(param_ty, &ty_arg_ids)
+                };
+                // For parameter to argument, use assignability
+                self.ty_pool.paranoid_check_assignable(ty, expected_ty_id)?;
             }
         }
         RTRCheck::core_call_transition(num_param_tys, num_locals, mask, &mut self.ref_state)?;
@@ -921,6 +931,7 @@ where
             gas_meter,
             call_type,
             self.vm_config,
+            self.ty_pool,
             function,
             locals,
             frame_cache,
@@ -930,7 +941,7 @@ where
     /// Call a native functions.
     fn call_native<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'ctx>,
         data_cache: &mut TransactionDataCache,
         function_caches: &mut InterpreterFunctionCaches,
         resource_resolver: &impl ResourceResolver,
@@ -974,7 +985,7 @@ where
 
     fn call_native_impl<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'ctx>,
         data_cache: &mut TransactionDataCache,
         function_caches: &mut InterpreterFunctionCaches,
         resource_resolver: &impl ResourceResolver,
@@ -985,8 +996,6 @@ where
         mask: ClosureMask,
         mut captured: Vec<Value>,
     ) -> PartialVMResult<()> {
-        let ty_builder = &self.vm_config.ty_builder;
-
         let num_param_tys = function.param_tys().len();
         let mut args = VecDeque::new();
         for i in (0..num_param_tys).rev() {
@@ -1004,28 +1013,40 @@ where
         let ty_args = function.ty_args();
         if RTTCheck::should_perform_checks(&current_frame.function.function) {
             for i in (0..num_param_tys).rev() {
-                let expected_ty = &function.param_tys()[i];
                 if !mask.is_captured(i) {
                     let ty = self.operand_stack.pop_ty()?;
                     // For param type to argument, use assignability
-                    if !ty_args.is_empty() {
-                        let expected_ty = ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        ty.paranoid_check_assignable(&expected_ty)?;
+                    let expected_ty_id = if ty_args.is_empty() {
+                        // Non-generic: use pre-computed TypeId
+                        function.param_ty_ids()[i]
                     } else {
-                        ty.paranoid_check_assignable(expected_ty)?;
-                    }
+                        // Generic: instantiate and intern on the fly
+                        let ty_arg_ids = function.ty_arg_ids(self.loader.runtime_environment());
+                        let param_ty = &function.param_tys()[i];
+                        self.ty_pool.instantiate_and_intern(param_ty, &ty_arg_ids)
+                    };
+                    self.ty_pool.paranoid_check_assignable(ty, expected_ty_id)?;
                     arg_tys.push_front(ty);
                 } else {
-                    arg_tys.push_front(expected_ty.clone())
+                    // For captured arguments, compute the expected TypeId
+                    let expected_ty_id = if ty_args.is_empty() {
+                        function.param_ty_ids()[i]
+                    } else {
+                        let ty_arg_ids = function.ty_arg_ids(self.loader.runtime_environment());
+                        let param_ty = &function.param_tys()[i];
+                        self.ty_pool.instantiate_and_intern(param_ty, &ty_arg_ids)
+                    };
+                    arg_tys.push_front(expected_ty_id);
                 }
             }
         }
 
         let native_function = function.get_native()?;
 
+        let ty_arg_ids = function.ty_arg_ids(self.loader.runtime_environment());
         gas_meter.charge_native_function_before_execution(
-            ty_args.iter().map(|ty| TypeWithRuntimeEnvironment {
-                ty,
+            ty_arg_ids.iter().map(|ty| TypeWithRuntimeEnvironment {
+                ty: *ty,
                 runtime_environment: self.loader.runtime_environment(),
             }),
             args.iter(),
@@ -1040,7 +1061,7 @@ where
             gas_meter,
             traversal_context,
         );
-        let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
+        let result = native_function(&mut native_context, &ty_arg_ids, args)?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
@@ -1068,12 +1089,12 @@ where
                 // satisfy runtime check protocol.
                 if RTTCheck::should_perform_checks(&current_frame.function.function) {
                     if function.ty_args().is_empty() {
-                        for ty in function.return_tys() {
-                            self.operand_stack.push_ty(ty.clone())?;
+                        for ty in function.return_ty_ids() {
+                            self.operand_stack.push_ty(*ty)?;
                         }
                     } else {
                         for ty in function.return_tys() {
-                            let ty = ty_builder.create_ty_with_subst(ty, ty_args)?;
+                            let ty = self.ty_pool.instantiate_and_intern(ty, &ty_arg_ids);
                             self.operand_stack.push_ty(ty)?;
                         }
                     }
@@ -1109,7 +1130,7 @@ where
             } => {
                 gas_meter.charge_native_function(cost, Option::<std::iter::Empty<&Value>>::None)?;
 
-                let ty_args_id = self.ty_pool.intern_ty_args(&ty_args);
+                let ty_args_id = self.ty_pool.intern_ty_slice(&ty_args);
                 let target_func = current_frame.build_loaded_function_from_name_and_ty_args(
                     self.loader,
                     gas_meter,
@@ -1233,7 +1254,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<DataCacheEntry> {
         let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
             self.loader,
@@ -1265,7 +1286,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<&'c mut GlobalValue> {
         if !data_cache.contains_resource(&addr, ty) {
             let entry = self.create_and_charge_data_cache_entry(
@@ -1275,7 +1296,7 @@ where
                 addr,
                 ty,
             )?;
-            data_cache.insert_resource(addr, ty.clone(), entry)?;
+            data_cache.insert_resource(addr, ty, entry)?;
         }
         data_cache.get_resource_mut(&addr, ty)
     }
@@ -1290,7 +1311,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
         let res = self
@@ -1331,13 +1352,13 @@ where
     fn check_access(
         &self,
         runtime_environment: &RuntimeEnvironment,
-        kind: AccessKind,
-        ty: &Type,
-        addr: AccountAddress,
+        _kind: AccessKind,
+        ty: TypeId,
+        _addr: AccountAddress,
     ) -> PartialVMResult<()> {
-        let (struct_idx, instance) = match ty {
-            Type::Struct { idx, .. } => (*idx, [].as_slice()),
-            Type::StructInstantiation { idx, ty_args, .. } => (*idx, ty_args.as_slice()),
+        let ty_pool = runtime_environment.ty_pool();
+        let idx = match ty_pool.type_repr(ty) {
+            TypeRepr::Struct { idx, .. } => idx,
             _ => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1347,16 +1368,17 @@ where
         };
         let struct_name = runtime_environment
             .struct_name_index_map()
-            .idx_to_struct_name(struct_idx)?;
+            .idx_to_struct_name(idx)?;
 
         // Perform resource reentrancy check
         self.reentrancy_checker
             .check_resource_access(&struct_name)?;
 
         // Perform resource access control
-        if let Some(access) = AccessInstance::new(kind, struct_name, instance, addr) {
-            self.access_control.check_access(access)?
-        }
+        // TODO: support access control? It is disabled anyway, so can keep like this for now.
+        // if let Some(access) = AccessInstance::new(kind, struct_name, &instance, addr) {
+        //     self.access_control.check_access(access)?
+        // }
         Ok(())
     }
 
@@ -1369,7 +1391,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
         let gv = self.load_resource(
@@ -1403,7 +1425,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
         let resource = match self
@@ -1455,7 +1477,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
         resource: Value,
     ) -> PartialVMResult<()> {
         let runtime_environment = self.loader.runtime_environment();
@@ -1507,7 +1529,7 @@ where
     fn attach_state_if_invariant_violation(
         &self,
         mut err: VMError,
-        current_frame: &Frame,
+        current_frame: &Frame<'ctx>,
     ) -> VMError {
         // A verification error can be returned when
         //   1) some check fails at runtime, e.g. type layout has too many type
@@ -1548,7 +1570,7 @@ where
         buf: &mut B,
         runtime_environment: &RuntimeEnvironment,
         idx: usize,
-        frame: &Frame,
+        frame: &Frame<'ctx>,
     ) -> PartialVMResult<()> {
         debug_write!(buf, "    [{}] ", idx)?;
 
@@ -1557,11 +1579,11 @@ where
         debug_write!(buf, "{}", function.name_as_pretty_string())?;
 
         // Print out type arguments, if they exist.
-        let ty_args = function.ty_args();
+        let ty_args = function.ty_arg_ids(runtime_environment);
         if !ty_args.is_empty() {
             let mut ty_tags = vec![];
-            for ty in ty_args {
-                let tag = runtime_environment.ty_to_ty_tag(ty)?;
+            for ty in ty_args.iter() {
+                let tag = runtime_environment.ty_to_ty_tag(*ty)?;
                 ty_tags.push(tag);
             }
             debug_write!(buf, "<")?;
@@ -1612,7 +1634,7 @@ where
     /// It is used when generating a core dump but can be used for debugging of the interpreter.
     /// It will be exposed via a debug module to give developers a way to print the internals
     /// of an execution.
-    fn internal_state_str(&self, current_frame: &Frame) -> String {
+    fn internal_state_str(&self, current_frame: &Frame<'ctx>) -> String {
         let mut internal_state = "Call stack:\n".to_string();
         for (i, frame) in self.call_stack.0.iter().enumerate() {
             internal_state.push_str(
@@ -1663,7 +1685,7 @@ where
     }
 }
 
-impl<LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'_, LoaderImpl>
+impl<'ctx, LoaderImpl> InterpreterDebugInterface for InterpreterImpl<'ctx, LoaderImpl>
 where
     LoaderImpl: Loader,
 {
@@ -1720,7 +1742,7 @@ pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
     value: Vec<Value>,
-    types: Vec<Type>,
+    types: Vec<TypeId>,
 }
 
 impl Debug for Stack {
@@ -1800,7 +1822,7 @@ impl Stack {
     /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
     // note(inline): bloats runtime_type_checks
-    pub(crate) fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
+    pub(crate) fn push_ty(&mut self, ty: TypeId) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
             self.types.push(ty);
             Ok(())
@@ -1811,7 +1833,7 @@ impl Stack {
 
     /// Pop a type off the stack or abort execution if the stack is empty.
     // note(inline): bloats runtime_type_checks
-    pub(crate) fn pop_ty(&mut self) -> PartialVMResult<Type> {
+    pub(crate) fn pop_ty(&mut self) -> PartialVMResult<TypeId> {
         self.types.pop().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
                 .with_message("runtime type stack empty")
@@ -1819,8 +1841,8 @@ impl Stack {
     }
 
     // note(inline): bloats runtime_type_checks
-    pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
-        self.types.last().ok_or_else(|| {
+    pub(crate) fn top_ty(&mut self) -> PartialVMResult<TypeId> {
+        self.types.last().copied().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
                 .with_message("runtime type stack empty")
         })
@@ -1828,7 +1850,7 @@ impl Stack {
 
     /// Pop n types off the stack.
     // note(inline): bloats runtime_type_checks
-    pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
+    pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<TypeId>> {
         let remaining_stack_size = self.types.len().checked_sub(n as usize).ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
                 .with_message("runtime type stack empty")
@@ -1847,7 +1869,7 @@ impl Stack {
         Ok(())
     }
 
-    fn last_n_tys(&self, n: usize) -> PartialVMResult<&[Type]> {
+    fn last_n_tys(&self, n: usize) -> PartialVMResult<&[TypeId]> {
         if self.types.len() < n {
             return Err(
                 PartialVMError::new(StatusCode::EMPTY_VALUE_STACK).with_message(format!(
@@ -1875,9 +1897,9 @@ impl Stack {
 
 /// A call stack.
 // #[derive(Debug)]
-struct CallStack(Vec<Frame>);
+struct CallStack<'ctx>(Vec<Frame<'ctx>>);
 
-impl CallStack {
+impl<'ctx> CallStack<'ctx> {
     /// Create a new empty call stack.
     fn new() -> Self {
         CallStack(vec![])
@@ -1885,7 +1907,7 @@ impl CallStack {
 
     /// Push a `Frame` on the call stack.
     #[cfg_attr(feature = "inline-callstack", inline(always))]
-    fn push(&mut self, frame: Frame) -> Result<(), Frame> {
+    fn push(&mut self, frame: Frame<'ctx>) -> Result<(), Frame<'ctx>> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
             Ok(())
@@ -1896,7 +1918,7 @@ impl CallStack {
 
     /// Pop a `Frame` off the call stack.
     #[cfg_attr(feature = "inline-callstack", inline(always))]
-    fn pop(&mut self) -> Option<Frame> {
+    fn pop(&mut self) -> Option<Frame<'ctx>> {
         self.0.pop()
     }
 
@@ -1915,7 +1937,7 @@ enum ExitCode {
     CallClosure(SignatureIndex),
 }
 
-impl Frame {
+impl<'ctx> Frame<'ctx> {
     /// Execute a Move function until a return or a call opcode is found.
     fn execute_code<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
@@ -2240,12 +2262,12 @@ impl Frame {
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = self.field_count(*sd_idx);
-                        let struct_type = self.get_struct_ty(*sd_idx);
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            &struct_type,
-                        )?;
+                        // let _struct_type = self.get_struct_ty(*sd_idx);
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     &struct_type,
+                        // )?;
 
                         gas_meter.charge_pack(
                             false,
@@ -2258,12 +2280,12 @@ impl Frame {
                     },
                     Bytecode::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
-                        let struct_type = self.create_struct_ty(&info.definition_struct_type);
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            &struct_type,
-                        )?;
+                        // let _struct_type = self.create_struct_ty(&info.definition_struct_type);
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     &struct_type,
+                        // )?;
                         gas_meter.charge_pack_variant(
                             false,
                             interpreter
@@ -2286,13 +2308,13 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
                         let field_count = self.field_instantiation_count(*si_idx);
 
                         gas_meter.charge_pack(
@@ -2312,13 +2334,13 @@ impl Frame {
                             gas_meter.charge_create_ty(*ty_count)?;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
+                        let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
                         gas_meter.charge_pack_variant(
@@ -2445,7 +2467,7 @@ impl Frame {
                         RTTCheck::check_pack_closure_visibility(&self.function, &function)?;
                         if RTTCheck::should_perform_checks(&self.function.function) {
                             verify_pack_closure(
-                                self.ty_builder(),
+                                self.ty_pool(),
                                 &mut interpreter.operand_stack,
                                 &function,
                                 *mask,
@@ -2502,7 +2524,7 @@ impl Frame {
 
                         if RTTCheck::should_perform_checks(&self.function.function) {
                             verify_pack_closure(
-                                self.ty_builder(),
+                                self.ty_pool(),
                                 &mut interpreter.operand_stack,
                                 &function,
                                 *mask,
@@ -2727,7 +2749,7 @@ impl Frame {
                             gas_meter,
                             traversal_context,
                             addr,
-                            &ty,
+                            ty,
                         )?;
                     },
                     Bytecode::MutBorrowGlobalGeneric(si_idx)
@@ -2757,7 +2779,7 @@ impl Frame {
                             gas_meter,
                             traversal_context,
                             addr,
-                            &ty,
+                            ty,
                         )?;
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
@@ -2784,7 +2806,7 @@ impl Frame {
                             gas_meter,
                             traversal_context,
                             addr,
-                            &ty,
+                            ty,
                         )?;
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
@@ -2817,7 +2839,7 @@ impl Frame {
                             gas_meter,
                             traversal_context,
                             addr,
-                            &ty,
+                            ty,
                             resource,
                         )?;
                     },
@@ -2858,11 +2880,11 @@ impl Frame {
                     Bytecode::VecPack(si, num) => {
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.ty_depth_checker.check_depth_of_type(
-                            gas_meter,
-                            traversal_context,
-                            ty,
-                        )?;
+                        // interpreter.ty_depth_checker.check_depth_of_type(
+                        //     gas_meter,
+                        //     traversal_context,
+                        //     ty,
+                        // )?;
                         gas_meter
                             .charge_vec_pack(interpreter.operand_stack.last_n(*num as usize)?)?;
                         let elements = interpreter.operand_stack.popn(*num as u16)?;

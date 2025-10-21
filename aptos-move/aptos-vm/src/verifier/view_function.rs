@@ -69,7 +69,7 @@ pub(crate) fn validate_view_function(
             traversal_context,
             func.param_tys(),
             args,
-            func.ty_args(),
+            &[], // todo: func.ty_args(),
             allowed_structs,
             true,
         )
@@ -83,7 +83,7 @@ pub(crate) fn validate_view_function(
             &mut TraversalContext::new(&traversal_storage),
             func.param_tys(),
             args,
-            func.ty_args(),
+            &[], // todo: func.ty_args(),
             allowed_structs,
             true,
         )

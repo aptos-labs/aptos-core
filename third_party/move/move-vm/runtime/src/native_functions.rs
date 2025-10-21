@@ -11,7 +11,6 @@ use crate::{
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
-        layout_cache::StructKey,
         loader::traits::NativeModuleLoader,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
@@ -36,9 +35,9 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
-    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     resolver::ResourceResolver,
+    ty_interner::TypeId,
     values::{AbstractFunction, Value},
 };
 use std::{
@@ -47,7 +46,7 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
+pub type UnboxedNativeFunction = dyn for<'a> Fn(&mut NativeContext, &'a [TypeId], VecDeque<Value>) -> PartialVMResult<NativeResult>
     + Send
     + Sync
     + 'static;
@@ -155,7 +154,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn exists_at(
         &mut self,
         address: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<(bool, Option<NumBytes>)> {
         // TODO(#16516):
         //   Propagate exists call all the way to resolver, because we can implement the check more
@@ -165,8 +164,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
             let (entry, bytes_loaded) =
                 self.loader_context().create_data_cache_entry(address, ty)?;
             let exists = entry.value().exists()?;
-            self.data_store
-                .insert_resource(address, ty.clone(), entry)?;
+            self.data_store.insert_resource(address, ty, entry)?;
             (exists, Some(bytes_loaded))
         } else {
             let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
@@ -174,7 +172,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         })
     }
 
-    pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
+    pub fn type_to_type_tag(&self, ty: TypeId) -> PartialVMResult<TypeTag> {
         self.module_storage.runtime_environment().ty_to_ty_tag(ty)
     }
 
@@ -183,7 +181,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     /// NOTE: use with caution as this ignores the flag if layout contains delayed fields or not.
     pub fn type_to_type_layout(
         &mut self,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<TriompheArc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
@@ -197,7 +195,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     /// information whether there are any delayed fields in layouts is returned.
     pub fn type_to_type_layout_with_delayed_fields(
         &mut self,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
         self.loader_context()
             .type_to_type_layout_with_delayed_fields(ty)
@@ -207,7 +205,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     /// layout does not contain delayed fields (otherwise, invariant violation is returned).
     pub fn type_to_type_layout_check_no_delayed_fields(
         &mut self,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<TriompheArc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
@@ -224,7 +222,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     /// nodes are reached, or an internal invariant violation is raised).
     pub fn type_to_fully_annotated_layout(
         &mut self,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<Option<TriompheArc<MoveTypeLayout>>> {
         self.loader_context().type_to_fully_annotated_layout(ty)
     }
@@ -359,7 +357,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     /// Converts a runtime type into layout for (de)serialization.
     pub fn type_to_type_layout_with_delayed_fields(
         &mut self,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
         dispatch_loader!(&self.module_storage, loader, {
             LayoutConverter::new(&loader).type_to_type_layout_with_delayed_fields(
@@ -394,7 +392,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     fn create_data_cache_entry(
         &mut self,
         address: AccountAddress,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
         dispatch_loader!(&self.module_storage, loader, {
             TransactionDataCache::create_data_cache_entry(
@@ -413,7 +411,7 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
     /// Converts a runtime type into decorated layout for pretty-printing.
     fn type_to_fully_annotated_layout(
         &mut self,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<Option<TriompheArc<MoveTypeLayout>>> {
         let layout = dispatch_loader!(&self.module_storage, loader, {
             LayoutConverter::new(&loader).type_to_annotated_type_layout_with_delayed_fields(
@@ -432,11 +430,11 @@ struct ModuleStorageWrapper<'a> {
 }
 
 impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
-    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+    fn get_struct_layout(&self, key: TypeId) -> Option<LayoutCacheEntry> {
         self.module_storage.get_struct_layout(key)
     }
 
-    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
+    fn store_struct_layout(&self, key: TypeId, entry: LayoutCacheEntry) -> PartialVMResult<()> {
         self.module_storage.store_struct_layout(key, entry)
     }
 }

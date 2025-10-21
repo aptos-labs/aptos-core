@@ -14,9 +14,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::PartialVMError, values::Value,
-};
+use move_vm_types::{natives::function::PartialVMError, ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{
     cell::RefCell,
@@ -65,21 +63,23 @@ pub struct ExistsAtGasParameters {
 
 fn native_exists_at(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(ty_args.len(), 1);
     safely_assert_eq!(args.len(), 1);
 
-    let type_ = ty_args.pop().unwrap();
     let address = safely_pop_arg!(args, AccountAddress);
 
     context.charge(OBJECT_EXISTS_AT_BASE)?;
 
-    let (exists, num_bytes) = context.exists_at(address, &type_).map_err(|err| {
+    let (exists, num_bytes) = context.exists_at(address, ty_args[0]).map_err(|err| {
         PartialVMError::new(StatusCode::VM_EXTENSION_ERROR).with_message(format!(
             "Failed to read resource: {:?} at {}. With error: {}",
-            type_, address, err
+            // TODO: fix error message?
+            ty_args[0],
+            address,
+            err
         ))
     })?;
 
@@ -100,7 +100,7 @@ fn native_exists_at(
  **************************************************************************************************/
 fn native_create_user_derived_object_address_impl(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());

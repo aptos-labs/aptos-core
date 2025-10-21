@@ -29,7 +29,7 @@ use move_vm_runtime::{
     native_functions::{LoaderContext, NativeFunctionTable},
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Reference, StructRef, Value},
 };
@@ -206,8 +206,8 @@ impl TableData {
         &mut self,
         loader_context: &mut LoaderContext,
         handle: TableHandle,
-        key_ty: &Type,
-        value_ty: &Type,
+        key_ty: TypeId,
+        value_ty: TypeId,
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
@@ -230,7 +230,10 @@ impl TableData {
 }
 
 impl LayoutInfo {
-    fn from_value_ty(loader_context: &mut LoaderContext, value_ty: &Type) -> PartialVMResult<Self> {
+    fn from_value_ty(
+        loader_context: &mut LoaderContext,
+        value_ty: TypeId,
+    ) -> PartialVMResult<Self> {
         let (layout, contains_delayed_fields) = loader_context
             .type_to_type_layout_with_delayed_fields(value_ty)?
             .unpack();
@@ -347,7 +350,7 @@ fn charge_load_cost(
 
 fn native_new_table_handle(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 2);
@@ -368,8 +371,8 @@ fn native_new_table_handle(
     let bytes = digest.finalize().to_vec();
     let handle = AccountAddress::from_bytes(&bytes[0..AccountAddress::LENGTH])
         .map_err(|_| partial_extension_error("Unable to create table handle"))?;
-    let key_type = context.type_to_type_tag(&ty_args[0])?;
-    let value_type = context.type_to_type_tag(&ty_args[1])?;
+    let key_type = context.type_to_type_tag(ty_args[0])?;
+    let value_type = context.type_to_type_tag(ty_args[1])?;
     assert!(table_data
         .new_tables
         .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
@@ -380,7 +383,7 @@ fn native_new_table_handle(
 
 fn native_add_box(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);
@@ -400,7 +403,7 @@ fn native_add_box(
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
@@ -441,7 +444,7 @@ fn native_add_box(
 
 fn native_borrow_box(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);
@@ -460,7 +463,7 @@ fn native_borrow_box(
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
@@ -501,7 +504,7 @@ fn native_borrow_box(
 
 fn native_contains_box(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);
@@ -520,7 +523,7 @@ fn native_contains_box(
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
@@ -555,7 +558,7 @@ fn native_contains_box(
 
 fn native_remove_box(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);
@@ -574,7 +577,7 @@ fn native_remove_box(
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize_key(&function_value_extension, &table.key_layout, &key)?;
@@ -615,7 +618,7 @@ fn native_remove_box(
 
 fn native_destroy_empty_box(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);
@@ -629,7 +632,7 @@ fn native_destroy_empty_box(
 
     let handle = get_table_handle(&safely_pop_arg!(args, StructRef))?;
     // TODO: Can the following line be removed?
-    table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+    table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     assert!(table_data.removed_tables.insert(handle));
 
@@ -638,7 +641,7 @@ fn native_destroy_empty_box(
 
 fn native_drop_unchecked_box(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(ty_args.len(), 3);

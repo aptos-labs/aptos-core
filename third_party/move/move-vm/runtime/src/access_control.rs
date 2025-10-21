@@ -66,6 +66,7 @@ impl AccessControlState {
     }
 
     /// Check whether the given access is allowed in the current state.
+    #[allow(dead_code)]
     pub(crate) fn check_access(&self, access: AccessInstance) -> PartialVMResult<()> {
         for specifier in self.specifier_stack.iter().rev() {
             if !specifier.enables(&access) {

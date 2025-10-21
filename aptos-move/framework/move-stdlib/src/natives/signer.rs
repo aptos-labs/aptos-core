@@ -11,7 +11,7 @@ use aptos_native_interface::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{values_impl::SignerRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -26,7 +26,7 @@ use std::collections::VecDeque;
 #[inline]
 fn native_borrow_address(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());

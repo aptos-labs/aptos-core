@@ -6,13 +6,13 @@ use aptos_native_interface::{
 };
 use aptos_types::on_chain_config::OnChainConsensusConfig;
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
 pub fn validator_txn_enabled(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let config_bytes = safely_pop_arg!(args, Vec<u8>);

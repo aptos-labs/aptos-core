@@ -17,7 +17,7 @@ use move_core_types::gas_algebra::{
     InternalGas, InternalGasPerArg, InternalGasPerByte, NumArgs, NumBytes,
 };
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 #[cfg(feature = "testing")]
 use rand_core::OsRng;
 use smallvec::{smallvec, SmallVec};
@@ -38,7 +38,7 @@ pub mod abort_codes {
  **************************************************************************************************/
 fn native_public_key_validate(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -95,7 +95,7 @@ fn native_public_key_validate(
  **************************************************************************************************/
 fn native_signature_verify_strict(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -182,7 +182,7 @@ pub fn make_all(
 #[cfg(feature = "testing")]
 fn native_test_only_generate_keys_internal(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let key_pair = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng);
@@ -195,7 +195,7 @@ fn native_test_only_generate_keys_internal(
 #[cfg(feature = "testing")]
 fn native_test_only_sign_internal(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let msg_bytes = safely_pop_arg!(args, Vec<u8>);
