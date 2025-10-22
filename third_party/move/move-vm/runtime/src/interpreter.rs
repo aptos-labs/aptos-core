@@ -1204,10 +1204,10 @@ where
     #[inline(always)]
     fn binop_rel<F>(&mut self, f: F) -> PartialVMResult<()>
     where
-        F: FnOnce(Value, Value) -> PartialVMResult<bool>,
+        F: FnOnce(&mut Value, Value) -> PartialVMResult<bool>,
     {
         let (rhs, lhs) = self.operand_stack.pop_and_last_mut()?;
-        *lhs = Value::bool(f(*lhs, rhs)?);
+        *lhs = Value::bool(f(lhs, rhs)?);
         Ok(())
     }
 
