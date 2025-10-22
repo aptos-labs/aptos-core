@@ -49,13 +49,13 @@ impl Drop for ConcurrencyGauge {
     }
 }
 
-pub trait IntGaugeVecHelper {
+pub trait IntGaugeHelper {
     fn set_with(&self, labels: &[&str], val: i64);
 
     fn concurrency_with(&self, labels: &[&str]) -> ConcurrencyGauge;
 }
 
-impl IntGaugeVecHelper for IntGaugeVec {
+impl IntGaugeHelper for IntGaugeVec {
     fn set_with(&self, labels: &[&str], val: i64) {
         self.with_label_values(labels).set(val)
     }
@@ -65,7 +65,7 @@ impl IntGaugeVecHelper for IntGaugeVec {
     }
 }
 
-pub trait IntCounterVecHelper {
+pub trait IntCounterHelper {
     type IntType;
 
     fn inc_with(&self, labels: &[&str]);
@@ -73,7 +73,7 @@ pub trait IntCounterVecHelper {
     fn inc_with_by(&self, labels: &[&str], by: Self::IntType);
 }
 
-impl IntCounterVecHelper for IntCounterVec {
+impl IntCounterHelper for IntCounterVec {
     type IntType = u64;
 
     fn inc_with(&self, labels: &[&str]) {
