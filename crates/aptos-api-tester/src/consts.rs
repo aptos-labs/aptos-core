@@ -17,16 +17,16 @@ pub static NETWORK_NAME: Lazy<NetworkName> = Lazy::new(|| {
 });
 
 pub static DEVNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.devnet.aptoslabs.com").unwrap());
+    Lazy::new(|| Url::parse("https://devnet.movementnetwork.xyz").unwrap());
 
 pub static DEVNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.devnet.aptoslabs.com").unwrap());
+    Lazy::new(|| Url::parse("https://faucet.devnet.movementnetwork.xyz").unwrap());
 
 pub static TESTNET_NODE_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://fullnode.testnet.aptoslabs.com").unwrap());
+    Lazy::new(|| Url::parse("https://testnet.movementnetwork.xyz").unwrap());
 
 pub static TESTNET_FAUCET_URL: Lazy<Url> =
-    Lazy::new(|| Url::parse("https://faucet.testnet.aptoslabs.com").unwrap());
+    Lazy::new(|| Url::parse("https://faucet.testnet.movementnetwork.xyz").unwrap());
 
 pub const FUND_AMOUNT: u64 = 100_000_000;
 

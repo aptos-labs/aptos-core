@@ -23,9 +23,9 @@ pub enum AptosBaseUrl {
 impl AptosBaseUrl {
     pub fn to_url(&self) -> Url {
         match self {
-            AptosBaseUrl::Mainnet => Url::from_str("https://api.mainnet.aptoslabs.com").unwrap(),
-            AptosBaseUrl::Devnet => Url::from_str("https://api.devnet.aptoslabs.com").unwrap(),
-            AptosBaseUrl::Testnet => Url::from_str("https://api.testnet.aptoslabs.com").unwrap(),
+            AptosBaseUrl::Mainnet => Url::from_str("https://mainnet.movementnetwork.xyz").unwrap(),
+            AptosBaseUrl::Devnet => Url::from_str("https://devnet.movementnetwork.xyz").unwrap(),
+            AptosBaseUrl::Testnet => Url::from_str("https://testnet.movementnetwork.xyz").unwrap(),
             AptosBaseUrl::Custom(url) => url.to_owned(),
         }
     }

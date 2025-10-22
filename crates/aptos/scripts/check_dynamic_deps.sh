@@ -24,7 +24,7 @@ for dep in "${deps[@]}"; do
     echo "Checking for banned dependency $dep..."
 
     # Check for deps. As you can see, we only check for MacOS right now.
-    out=`cargo tree -e features,no-build,no-dev --target aarch64-apple-darwin -p aptos -i "$dep"`
+    out=`cargo tree -e features,no-build,no-dev --target aarch64-apple-darwin -p movement -i "$dep"`
 
     # If the exit status was non-zero, great, the dep couldn't be found.
     if [ $? -ne 0 ]; then

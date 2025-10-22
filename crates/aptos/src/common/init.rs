@@ -6,10 +6,9 @@ use crate::{
     account::key_rotation::lookup_address,
     common::{
         types::{
-            account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
-            CliTypedResult, ConfigSearchMode, EncodingOptions, HardwareWalletOptions,
-            PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions, RngArgs,
-            DEFAULT_PROFILE,
+            account_address_from_public_key, CliCommand, CliConfig, CliError, CliTypedResult,
+            ConfigSearchMode, EncodingOptions, HardwareWalletOptions, PrivateKeyInputOptions,
+            ProfileConfig, ProfileOptions, PromptOptions, RngArgs, DEFAULT_PROFILE,
         },
         utils::{
             explorer_account_link, fund_account, prompt_yes_with_override, read_line,
@@ -32,9 +31,9 @@ use std::{
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
 
-/// Tool to initialize current directory for the aptos tool
+/// Tool to initialize current directory for the Movement tool
 ///
-/// Configuration will be pushed into .aptos/config.yaml
+/// Configuration will be pushed into .movement/config.yaml
 #[derive(Debug, Parser)]
 pub struct InitTool {
     /// Network to use for default settings
@@ -56,7 +55,7 @@ pub struct InitTool {
 
     /// Whether you want to create a profile from your ledger account
     ///
-    /// Make sure that you have your Ledger device connected and unlocked, with the Aptos app installed and opened.
+    /// Make sure that you have your Ledger device connected and unlocked, with the Movement app installed and opened.
     /// You must also enable "Blind Signing" on your device to sign transactions from the CLI.
     #[clap(long)]
     pub ledger: bool,
@@ -97,7 +96,7 @@ impl CliCommand<()> for InitTool {
 
         // Select profile we're using
         let mut profile_config = if let Some(profile_config) = config.remove_profile(profile_name) {
-            prompt_yes_with_override(&format!("Aptos already initialized for profile {}, do you want to overwrite the existing config?", profile_name), self.prompt_options)?;
+            prompt_yes_with_override(&format!("Movement already initialized for profile {}, do you want to overwrite the existing config?", profile_name), self.prompt_options)?;
             profile_config
         } else {
             ProfileConfig::default()
@@ -141,23 +140,18 @@ impl CliCommand<()> for InitTool {
         // Ensure that there is at least a REST URL set for the network
         match network {
             Network::Mainnet => {
-                profile_config.rest_url =
-                    Some("https://fullnode.mainnet.aptoslabs.com".to_string());
+                profile_config.rest_url = Some("https://mainnet.movementnetwork.xyz".to_string());
                 profile_config.faucet_url = None;
             },
             Network::Testnet => {
-                profile_config.rest_url =
-                    Some("https://fullnode.testnet.aptoslabs.com".to_string());
-                // The faucet in testnet is only accessible with some kind of bypass.
-                // For regular users this can only really mean an auth token. So if
-                // there is no auth token set, we don't set the faucet URL. If the user
-                // is confident they want to use the testnet faucet without a token
-                // they can set it manually with `--network custom` and `--faucet-url`.
-                profile_config.faucet_url = None;
+                profile_config.rest_url = Some("https://testnet.movementnetwork.xyz".to_string());
+                profile_config.faucet_url =
+                    Some("https://faucet.testnet.movementnetwork.xyz".to_string());
             },
             Network::Devnet => {
-                profile_config.rest_url = Some("https://fullnode.devnet.aptoslabs.com".to_string());
-                profile_config.faucet_url = Some("https://faucet.devnet.aptoslabs.com".to_string());
+                profile_config.rest_url = Some("https://devnet.movementnetwork.xyz".to_string());
+                profile_config.faucet_url =
+                    Some("https://faucet.devnet.movementnetwork.xyz".to_string());
             },
             Network::Local => {
                 profile_config.rest_url = Some("http://localhost:8080".to_string());
@@ -339,39 +333,13 @@ impl CliCommand<()> for InitTool {
             .unwrap_or(DEFAULT_PROFILE);
 
         eprintln!(
-            "\n---\nAptos CLI is now set up for account {} as profile {}!\n---\n",
-            address, profile_name,
+            "\n---\nMovement CLI is now set up for account {} as profile {}!\n See the account here: {}\n 
+            Run `movement --help` for more information about commands. \n 
+            Visit https://faucet.movementlabs.xyz to use the testnet faucet.",
+            address,
+            profile_name,
+            explorer_account_link(address, Some(network))
         );
-
-        if !funded {
-            match network {
-                Network::Mainnet => {
-                    eprintln!("The account has not been funded on chain yet, you will need to create and fund the account by transferring funds from another account");
-                },
-                Network::Testnet => {
-                    let mint_site_url = get_mint_site_url(Some(address));
-                    eprintln!("The account has not been funded on chain yet. To fund the account and get APT on testnet you must visit {}", mint_site_url);
-                    // We don't use `prompt_yes_with_override` here because we only want to
-                    // automatically open the minting site if they're in an interactive setting.
-                    if !self.prompt_options.assume_yes {
-                        eprint!("Press [Enter] to go there now > ");
-                        read_line("Confirmation")?;
-                        open::that(&mint_site_url).map_err(|err| {
-                            CliError::UnexpectedError(format!(
-                                "Failed to open minting site: {}",
-                                err
-                            ))
-                        })?;
-                    }
-                },
-                _ => {},
-            }
-        } else {
-            eprintln!(
-                "See the account here: {}",
-                explorer_account_link(address, Some(network))
-            );
-        }
 
         Ok(())
     }
@@ -468,13 +436,17 @@ pub enum Network {
 
 impl Display for Network {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", match self {
-            Network::Mainnet => "mainnet",
-            Network::Testnet => "testnet",
-            Network::Devnet => "devnet",
-            Network::Local => "local",
-            Network::Custom => "custom",
-        })
+        write!(
+            f,
+            "{}",
+            match self {
+                Network::Mainnet => "mainnet",
+                Network::Testnet => "testnet",
+                Network::Devnet => "devnet",
+                Network::Local => "local",
+                Network::Custom => "custom",
+            }
+        )
     }
 }
 

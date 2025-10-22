@@ -56,9 +56,9 @@ impl NetworkSelection {
         use NetworkSelection::*;
 
         let s = match &self {
-            Mainnet => "https://fullnode.mainnet.aptoslabs.com",
-            Testnet => "https://fullnode.testnet.aptoslabs.com",
-            Devnet => "https://fullnode.devnet.aptoslabs.com",
+            Mainnet => "https://mainnet.movementnetwork.xyz",
+            Testnet => "https://testnet.movementnetwork.xyz",
+            Devnet => "https://devnet.movementnetwork.xyz",
             RestEndpoint(url) => url,
         };
 
@@ -159,7 +159,7 @@ pub enum Commands {
     },
     /// Print out current values of on chain configs.
     PrintConfigs {
-        /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
+        /// Url endpoint for the desired network. e.g: https://mainnet.movementnetwork.xyz/v1.
         #[clap(short, long)]
         endpoint: url::Url,
         /// Whether to print out the full gas schedule.
@@ -175,7 +175,7 @@ pub enum Commands {
     /// Usage: --endpoint '<URL>'
     /// --package-address <ADDRESS> --package-name <PACKAGE_NAME> [--print-json]
     PrintPackageMetadata {
-        /// Url endpoint for the desired network. e.g: https://fullnode.mainnet.aptoslabs.com/v1.
+        /// Url endpoint for the desired network. e.g: https://mainnet.movementnetwork.xyz/v1.
         #[clap(short, long)]
         endpoint: url::Url,
         /// The address under which the package is published

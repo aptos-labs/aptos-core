@@ -3,17 +3,17 @@
 
 use crate::{aptos_framework_path, components::ProposalMetadata, ExecutionMode, ReleaseConfig};
 use anyhow::Result;
-use aptos::{
-    common::types::CliCommand,
-    governance::{ExecuteProposal, SubmitProposal, SubmitVote},
-    move_tool::{RunFunction, RunScript},
-    stake::IncreaseLockup,
-};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_genesis::keys::PrivateIdentity;
 use aptos_temppath::TempPath;
 use aptos_types::account_address::AccountAddress;
 use clap::Parser;
+use movement::{
+    common::types::CliCommand,
+    governance::{ExecuteProposal, SubmitProposal, SubmitVote},
+    move_tool::{RunFunction, RunScript},
+    stake::IncreaseLockup,
+};
 use std::{
     fs,
     path::{Path, PathBuf},

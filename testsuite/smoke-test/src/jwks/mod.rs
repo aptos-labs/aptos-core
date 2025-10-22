@@ -8,10 +8,6 @@ mod jwk_consensus_per_key;
 mod jwk_consensus_provider_change_mind;
 
 use crate::smoke_test_environment::SwarmBuilder;
-use aptos::{
-    common::types::{GasOptions, TransactionSummary},
-    test::CliTestFramework,
-};
 use aptos_forge::{NodeExt, Swarm, SwarmExt};
 use aptos_logger::{debug, info};
 use aptos_rest_client::Client;
@@ -24,6 +20,10 @@ use aptos_types::{
     on_chain_config::OnChainJWKConsensusConfig,
 };
 use move_core_types::account_address::AccountAddress;
+use movement::{
+    common::types::{GasOptions, TransactionSummary},
+    test::CliTestFramework,
+};
 use std::time::Duration;
 
 pub async fn update_jwk_consensus_config(

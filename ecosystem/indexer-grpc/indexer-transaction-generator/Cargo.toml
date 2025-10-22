@@ -15,7 +15,7 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 # used for localnode.
-aptos = { workspace = true }
+movement = { workspace = true }
 aptos-config = { workspace = true }
 aptos-faucet-core = { workspace = true }
 aptos-indexer-grpc-utils = { workspace = true }

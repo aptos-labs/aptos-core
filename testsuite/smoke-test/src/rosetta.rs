@@ -3,11 +3,6 @@
 
 use crate::smoke_test_environment::SwarmBuilder;
 use anyhow::anyhow;
-use aptos::{
-    account::create::DEFAULT_FUNDED_COINS,
-    common::types::GasOptions,
-    test::{CliTestFramework, INVALID_ACCOUNT},
-};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_config::{config::ApiConfig, utils::get_available_port};
 use aptos_crypto::{
@@ -40,6 +35,11 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::{GasScheduleV2, OnChainRandomnessConfig},
     transaction::SignedTransaction,
+};
+use movement::{
+    account::create::DEFAULT_FUNDED_COINS,
+    common::types::GasOptions,
+    test::{CliTestFramework, INVALID_ACCOUNT},
 };
 use serde_json::json;
 use std::{
@@ -148,10 +148,13 @@ async fn test_block_transactions() {
     )
     .await
     .unwrap();
-    assert_eq!(response.block_identifier, BlockIdentifier {
-        index: 0,
-        hash: BlockHash::new(chain_id, 0).to_string(),
-    });
+    assert_eq!(
+        response.block_identifier,
+        BlockIdentifier {
+            index: 0,
+            hash: BlockHash::new(chain_id, 0).to_string(),
+        }
+    );
 
     // First fund account 1 with lots more gas
     cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 10))
@@ -268,10 +271,13 @@ async fn test_account_balance() {
     )
     .await
     .unwrap();
-    assert_eq!(response.block_identifier, BlockIdentifier {
-        index: 0,
-        hash: BlockHash::new(chain_id, 0).to_string(),
-    });
+    assert_eq!(
+        response.block_identifier,
+        BlockIdentifier {
+            index: 0,
+            hash: BlockHash::new(chain_id, 0).to_string(),
+        }
+    );
 
     // First fund account 1 with lots more gas
     cli.fund_account(0, Some(DEFAULT_FUNDED_COINS * 2))

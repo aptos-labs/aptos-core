@@ -14,7 +14,7 @@ rust-version = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }
-aptos = { workspace = true }
+movement = { workspace = true }
 aptos-logger = { workspace = true }
 aptos-rosetta = { workspace = true }
 aptos-types = { workspace = true }

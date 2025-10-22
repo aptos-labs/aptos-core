@@ -7,7 +7,6 @@ use crate::{
     state_sync::test_all_validator_failures,
     utils::{MAX_CONNECTIVITY_WAIT_SECS, MAX_HEALTHY_WAIT_SECS},
 };
-use aptos::test::CliTestFramework;
 use aptos_config::{
     config::{
         DiscoveryMethod, FileDiscovery, Identity, NetworkConfig, NodeConfig, OverrideNodeConfig,
@@ -20,6 +19,7 @@ use aptos_forge::{FullNode, Node, NodeExt, Swarm};
 use aptos_genesis::config::HostAndPort;
 use aptos_sdk::move_types::account_address::AccountAddress;
 use aptos_temppath::TempPath;
+use movement::test::CliTestFramework;
 use std::{
     collections::HashMap,
     path::Path,

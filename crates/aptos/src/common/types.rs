@@ -119,7 +119,7 @@ pub enum CliError {
     CommandArgumentError(String),
     #[error("Unable to load config: {0} {1}")]
     ConfigLoadError(String, String),
-    #[error("Unable to find config {0}, have you run `aptos init`?")]
+    #[error("Unable to find config {0}, have you run `movement init`?")]
     ConfigNotFoundError(String),
     #[error("Error accessing '{0}': {1}")]
     IO(String, #[source] std::io::Error),
@@ -249,7 +249,7 @@ impl From<EncodingError> for CliError {
     }
 }
 
-/// Config saved to `.aptos/config.yaml`
+/// Config saved to `.movement/config.yaml`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Map of profile configs
@@ -259,12 +259,12 @@ pub struct CliConfig {
 
 const CONFIG_FILE: &str = "config.yaml";
 const LEGACY_CONFIG_FILE: &str = "config.yml";
-pub const CONFIG_FOLDER: &str = ".aptos";
+pub const CONFIG_FOLDER: &str = ".movement";
 
 /// An individual profile
 #[derive(Debug, Default, Serialize, Deserialize)]
 pub struct ProfileConfig {
-    /// Name of network being used, if setup from aptos init
+    /// Name of network being used, if setup from movement init
     #[serde(skip_serializing_if = "Option::is_none")]
     pub network: Option<Network>,
     /// Private key for commands.
@@ -414,7 +414,7 @@ impl CliConfig {
         }
     }
 
-    /// Saves the config to ./.aptos/config.yaml
+    /// Saves the config to ./.movement/config.yaml
     pub fn save(&self) -> CliTypedResult<()> {
         let aptos_folder = Self::aptos_folder(ConfigSearchMode::CurrentDir)?;
 
@@ -422,7 +422,7 @@ impl CliConfig {
         let no_dir = !aptos_folder.exists();
         create_dir_if_not_exist(aptos_folder.as_path())?;
 
-        // If the `.aptos/` doesn't exist, we'll add a .gitignore in it to ignore the config file
+        // If the `.movement/` doesn't exist, we'll add a .gitignore in it to ignore the config file
         // so people don't save their credentials...
         if no_dir {
             write_to_user_only_file(
@@ -448,7 +448,7 @@ impl CliConfig {
         Ok(())
     }
 
-    /// Finds the current directory's .aptos folder
+    /// Finds the current directory's .movement folder
     fn aptos_folder(mode: ConfigSearchMode) -> CliTypedResult<PathBuf> {
         let global_config = GlobalConfig::load()?;
         global_config.get_config_location(mode)
@@ -1136,7 +1136,7 @@ impl RestOptions {
             reqwest::Url::parse(&url)
                 .map_err(|err| CliError::UnableToParse("Rest URL", err.to_string()))
         } else {
-            Err(CliError::CommandArgumentError("No rest url given.  Please add --url or add a rest_url to the .aptos/config.yaml for the current profile".to_string()))
+            Err(CliError::CommandArgumentError("No rest url given.  Please add --url or add a rest_url to the .movement/config.yaml for the current profile".to_string()))
         }
     }
 
@@ -1377,7 +1377,7 @@ pub fn load_account_arg(str: &str) -> Result<AccountAddress, CliError> {
         Ok(account_address_from_public_key(&public_key))
     } else {
         Err(CliError::CommandArgumentError(
-            "'--account' or '--profile' after using aptos init must be provided".to_string(),
+            "'--account' or '--profile' after using movement init must be provided".to_string(),
         ))
     }
 }
@@ -1624,7 +1624,7 @@ pub struct ChangeSummary {
 
 #[derive(Debug, Default, Parser)]
 pub struct FaucetOptions {
-    /// URL for the faucet endpoint e.g. `https://faucet.devnet.aptoslabs.com`
+    /// URL for the faucet endpoint e.g. `https://faucet.testnet.movementnetwork.xyz`
     #[clap(long)]
     pub faucet_url: Option<reqwest::Url>,
 
@@ -1665,13 +1665,13 @@ impl FaucetOptions {
                 .map_err(|err| CliError::UnableToParse("config faucet_url", err.to_string())),
             None => match profile.network {
                 Some(Network::Mainnet) => {
-                    Err(CliError::CommandArgumentError("There is no faucet for mainnet. Please create and fund the account by transferring funds from another account. If you are confident you want to use a faucet, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                    Err(CliError::CommandArgumentError("There is no faucet for mainnet. Please create and fund the account by transferring funds from another account. If you are confident you want to use a faucet, set --faucet-url or add a faucet URL to .movement/config.yaml for the current profile".to_string()))
                 },
                 Some(Network::Testnet) => {
-                    Err(CliError::CommandArgumentError(format!("To get testnet APT you must visit {}. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile", get_mint_site_url(None))))
+                    Err(CliError::CommandArgumentError(format!("To get testnet APT you must visit {}. If you are confident you want to use a faucet programmatically, set --faucet-url or add a faucet URL to .movement/config.yaml for the current profile", get_mint_site_url(None))))
                 },
                 _ => {
-                    Err(CliError::CommandArgumentError("No faucet given. Please set --faucet-url or add a faucet URL to .aptos/config.yaml for the current profile".to_string()))
+                    Err(CliError::CommandArgumentError("No faucet given. Please set --faucet-url or add a faucet URL to .movement/config.yaml for the current profile".to_string()))
                 },
             },
         }
@@ -2553,5 +2553,5 @@ pub fn get_mint_site_url(address: Option<AccountAddress>) -> String {
         Some(address) => format!("?address={}", address.to_standard_string()),
         None => "".to_string(),
     };
-    format!("https://aptos.dev/network/faucet{}", params)
+    format!("https://faucet.movementnetwork.xyz{}", params)
 }

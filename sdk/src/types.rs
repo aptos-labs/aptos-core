@@ -1299,7 +1299,7 @@ mod tests {
         if balance < 10000000 {
             println!("Funding account");
             let faucet_client = FaucetClient::new_from_rest_client(
-                Url::from_str("https://faucet.devnet.aptoslabs.com").unwrap(),
+                Url::from_str("https://faucet.devnet.movementnetwork.xyz").unwrap(),
                 aptos_rest_client.clone(),
             );
             faucet_client

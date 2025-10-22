@@ -207,9 +207,9 @@ impl FrameworkPackageArgs {
         prompt_options: PromptOptions,
     ) -> CliTypedResult<()> {
         const APTOS_FRAMEWORK: &str = "AptosFramework";
-        const APTOS_GIT_PATH: &str = "https://github.com/aptos-labs/aptos-framework.git";
-        const SUBDIR_PATH: &str = "aptos-framework";
-        const DEFAULT_BRANCH: &str = "mainnet";
+        const APTOS_GIT_PATH: &str = "https://github.com/movementlabsxyz/aptos-core.git";
+        const SUBDIR_PATH: &str = "aptos-move/framework/aptos-framework";
+        const DEFAULT_BRANCH: &str = "movement";
 
         let move_toml = package_dir.join(SourcePackageLayout::Manifest.path());
         check_if_file_exists(move_toml.as_path(), prompt_options)?;
@@ -232,24 +232,30 @@ impl FrameworkPackageArgs {
         // Add the framework dependency if it's provided
         let mut dependencies = BTreeMap::new();
         if let Some(ref path) = self.framework_local_dir {
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: Some(path.display().to_string()),
-                git: None,
-                rev: None,
-                subdir: None,
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: Some(path.display().to_string()),
+                    git: None,
+                    rev: None,
+                    subdir: None,
+                    aptos: None,
+                    address: None,
+                },
+            );
         } else {
             let git_rev = self.framework_git_rev.as_deref().unwrap_or(DEFAULT_BRANCH);
-            dependencies.insert(APTOS_FRAMEWORK.to_string(), Dependency {
-                local: None,
-                git: Some(APTOS_GIT_PATH.to_string()),
-                rev: Some(git_rev.to_string()),
-                subdir: Some(SUBDIR_PATH.to_string()),
-                aptos: None,
-                address: None,
-            });
+            dependencies.insert(
+                APTOS_FRAMEWORK.to_string(),
+                Dependency {
+                    local: None,
+                    git: Some(APTOS_GIT_PATH.to_string()),
+                    rev: Some(git_rev.to_string()),
+                    subdir: Some(SUBDIR_PATH.to_string()),
+                    aptos: None,
+                    address: None,
+                },
+            );
         }
 
         let manifest = MovePackageManifest {
@@ -279,7 +285,7 @@ impl FrameworkPackageArgs {
         write_to_file(
             gitignore.as_path(),
             GIT_IGNORE,
-            ".aptos/\nbuild/".as_bytes(),
+            ".movement/\nbuild/".as_bytes(),
         )
     }
 }
@@ -2301,9 +2307,9 @@ impl CliCommand<TransactionSummary> for Replay {
         }
 
         let rest_endpoint = match &self.network {
-            Mainnet => "https://fullnode.mainnet.aptoslabs.com",
-            Testnet => "https://fullnode.testnet.aptoslabs.com",
-            Devnet => "https://fullnode.devnet.aptoslabs.com",
+            Mainnet => "https://mainnet.movementnetwork.xyz",
+            Testnet => "https://testnet.movementnetwork.xyz",
+            Devnet => "https://devnet.movementnetwork.xyz",
             RestEndpoint(url) => url,
         };
 

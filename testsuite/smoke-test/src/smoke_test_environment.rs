@@ -2,7 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos::test::CliTestFramework;
 use aptos_config::{config::NodeConfig, keys::ConfigKey, utils::get_available_port};
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_faucet_core::server::{FunderKeyEnum, RunConfig};
@@ -12,6 +11,7 @@ use aptos_genesis::builder::{InitConfigFn, InitGenesisConfigFn, InitGenesisStake
 use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::chain_id::ChainId;
+use movement::test::CliTestFramework;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use std::{num::NonZeroUsize, sync::Arc};

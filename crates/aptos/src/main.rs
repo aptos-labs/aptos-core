@@ -9,8 +9,8 @@
 #[global_allocator]
 static ALLOC: jemallocator::Jemalloc = jemallocator::Jemalloc;
 
-use aptos::{move_tool, Tool};
 use clap::Parser;
+use movement::{move_tool, Tool};
 use std::{process::exit, time::Duration};
 
 fn main() {
