@@ -70,7 +70,7 @@ use aptos_consensus_types::{
     proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
-use aptos_crypto::{HashValue, bls12381::PrivateKey};
+use aptos_crypto::bls12381::PrivateKey;
 use aptos_dkg::{
     pvss::{traits::Transcript, Player},
     weighted_vuf::traits::WeightedVUF,
@@ -147,8 +147,11 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     execution_client: Arc<dyn TExecutionClient>,
+
     storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
+    key_storage: PersistentSafetyStorage,
+
     vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
@@ -173,8 +176,6 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
     proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
-    pending_blocks: Arc<Mutex<PendingBlocks>>,
-    key_storage: PersistentSafetyStorage,
 
     consensus_txn_filter_config: BlockTransactionFilterConfig,
     quorum_store_txn_filter_config: BatchTransactionFilterConfig,
@@ -187,15 +188,19 @@ pub struct RoundManagerInstance {
     round_manager_tx: Option<aptos_channel::Sender<(Author, Discriminant<VerifiedEvent>), (Author, VerifiedEvent)>>,
     buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
+    pending_blocks: Arc<Mutex<PendingBlocks>>,
+    safety_rules_manager: SafetyRulesManager,
 }
 
 impl RoundManagerInstance {
-    pub fn new(consensus_id: ConsensusId) -> Self {
+    pub fn new(consensus_id: ConsensusId, safety_rules_manager: SafetyRulesManager) -> Self {
         Self {
             consensus_id,
             round_manager_tx: None,
             buffered_proposal_tx: None,
             round_manager_close_tx: None,
+            pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
+            safety_rules_manager,
         }
     }
 
@@ -210,6 +215,50 @@ impl RoundManagerInstance {
     pub fn update_round_manager_close_tx(&mut self, round_manager_close_tx: oneshot::Sender<oneshot::Sender<()>>) {
         self.round_manager_close_tx = Some(round_manager_close_tx);
     }
+}
+
+/// Creates a namespaced SafetyRulesConfig for a specific consensus instance
+fn create_namespaced_safety_rules_config(
+    base_config: &aptos_config::config::SafetyRulesConfig,
+    consensus_id: &ConsensusId,
+) -> aptos_config::config::SafetyRulesConfig {
+    use aptos_config::config::SecureBackend;
+
+    let mut config = base_config.clone();
+
+    // Generate namespace suffix based on consensus_id
+    let namespace_suffix = match consensus_id {
+        ConsensusId::Primary => "primary".to_string(),
+        ConsensusId::Proxy(hash) => format!("proxy_{}", hex::encode(hash.as_ref())),
+    };
+
+    // Add namespace to the backend
+    match &mut config.backend {
+        SecureBackend::OnDiskStorage(disk_config) => {
+            // Append to existing namespace or create new one
+            let new_namespace = if let Some(existing) = &disk_config.namespace {
+                format!("{}/{}", existing, namespace_suffix)
+            } else {
+                namespace_suffix
+            };
+            disk_config.namespace = Some(new_namespace);
+        },
+        SecureBackend::Vault(vault_config) => {
+            // Append to existing namespace or create new one
+            let new_namespace = if let Some(existing) = &vault_config.namespace {
+                format!("{}/{}", existing, namespace_suffix)
+            } else {
+                namespace_suffix
+            };
+            vault_config.namespace = Some(new_namespace);
+        },
+        SecureBackend::InMemoryStorage => {
+            // InMemoryStorage doesn't support namespacing in production,
+            // but for tests this is fine as each SafetyRulesManager has its own instance
+        },
+    }
+
+    config
 }
 
 impl<P: OnChainConfigProvider> EpochManager<P> {
@@ -278,11 +327,24 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .time_to_live(Duration::from_secs(20))
                 .build(),
             consensus_publisher,
-            pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
             key_storage,
             consensus_txn_filter_config,
             quorum_store_txn_filter_config,
-            round_managers: CONSENSUS_IDS.iter().map(|consensus_id| (consensus_id.clone(), RoundManagerInstance::new(consensus_id.clone()))).collect(),
+            round_managers: CONSENSUS_IDS
+                .iter()
+                .map(|consensus_id| {
+                    // Create namespaced safety rules config for this instance
+                    let namespaced_sr_config = create_namespaced_safety_rules_config(
+                        &node_config.consensus.safety_rules,
+                        consensus_id,
+                    );
+                    let instance_sr_manager = SafetyRulesManager::new(&namespaced_sr_config);
+                    (
+                        consensus_id.clone(),
+                        RoundManagerInstance::new(consensus_id.clone(), instance_sr_manager),
+                    )
+                })
+                .collect(),
         }
     }
 
@@ -579,7 +641,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         // shutdown existing processor first to avoid race condition with state sync.
         self.shutdown_current_processor().await;
-        *self.pending_blocks.lock() = PendingBlocks::new();
+        self.round_managers.values_mut().for_each(|round_manager| {
+            *round_manager.pending_blocks.lock() = PendingBlocks::new();
+        });
         // make sure storage is on this ledger_info too, it should be no-op if it's already committed
         // panic if this doesn't succeed since the current processors are already shutdown.
         self.execution_client
@@ -725,7 +789,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let (close_tx, close_rx) = oneshot::channel();
         self.round_managers.get_mut(&consensus_id).unwrap().update_round_manager_close_tx(close_tx);
         let recovery_manager = RecoveryManager::new(
-            consensus_id,
+            consensus_id.clone(),
             epoch_state,
             network_sender,
             self.storage.clone(),
@@ -736,7 +800,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             self.payload_manager.clone(),
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
-            self.pending_blocks.clone(),
+            self.round_managers.get_mut(&consensus_id).unwrap().pending_blocks.clone(),
         );
         tokio::spawn(recovery_manager.start(recovery_manager_rx, close_rx));
         // daniel todo: add proxy recovery manager
@@ -856,8 +920,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(epoch = epoch, "Update SafetyRules");
 
+        let instance = self
+            .round_managers
+            .get(&consensus_id)
+            .expect("missing consensus instance");
         let mut safety_rules =
-            MetricsSafetyRules::new(self.safety_rules_manager.client(), self.storage.clone());
+            MetricsSafetyRules::new(instance.safety_rules_manager.client(), self.storage.clone());
         match safety_rules.perform_initialize() {
             Err(e) if matches!(e, Error::ValidatorNotInSet(_)) => {
                 warn!(
@@ -924,7 +992,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             payload_manager,
             onchain_consensus_config.order_vote_enabled(),
             onchain_consensus_config.window_size(),
-            self.pending_blocks.clone(),
+            self.round_managers.get_mut(&consensus_id).unwrap().pending_blocks.clone(),
             Some(pipeline_builder),
         ));
 
@@ -1600,7 +1668,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         }
 
         if let ConsensusMsg::ProxyConsensusMsg(proxy_consensus_msg) = &consensus_msg {
-            let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = proxy_consensus_msg.as_ref();
+            let ProxyConsensusMsg { proxy_consensus_message, consensus_id: _ } = proxy_consensus_msg.as_ref();
             if let ProxyConsensusMessage::ProposalMsg(proposal) = proxy_consensus_message {
                 observe_block_with_type(
                     proposal.proposal().timestamp_usecs(),
@@ -1656,17 +1724,16 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             // let round_manager_instance = self.round_managers.get(&consensus_id).unwrap();
             // let buffered_proposal_tx = round_manager_instance.buffered_proposal_tx.clone();
             // let round_manager_tx = round_manager_instance.round_manager_tx.clone();
-            let (round_manager_tx, buffered_proposal_tx) = if let Some(round_manager_instance) = self.round_managers.get(&consensus_id) {
-                (round_manager_instance.round_manager_tx.clone(), round_manager_instance.buffered_proposal_tx.clone())
+            let (round_manager_tx, buffered_proposal_tx, pending_blocks) = if let Some(round_manager_instance) = self.round_managers.get(&consensus_id) {
+                (round_manager_instance.round_manager_tx.clone(), round_manager_instance.buffered_proposal_tx.clone(), round_manager_instance.pending_blocks.clone())
             } else {
-                (None, None)
+                (None, None, Arc::new(Mutex::new(PendingBlocks::new())))
             };
             let my_peer_id = self.author;
             let max_num_batches = self.config.quorum_store.receiver_max_num_batches;
             let max_batch_expiry_gap_usecs =
                 self.config.quorum_store.batch_expiry_gap_when_init_usecs;
             let payload_manager = self.payload_manager.clone();
-            let pending_blocks = self.pending_blocks.clone();
             self.bounded_executor
                 .spawn(async move {
                     match monitor!(
@@ -1768,7 +1835,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 )?;
             },
             ConsensusMsg::ProxyConsensusMsg(ref proxy_consensus_msg) => {
-                let ProxyConsensusMsg { proxy_consensus_message, consensus_id } = proxy_consensus_msg.as_ref();
+                let ProxyConsensusMsg { proxy_consensus_message, consensus_id: _ } = proxy_consensus_msg.as_ref();
                 match proxy_consensus_message {
                     ProxyConsensusMessage::ProposalMsg(_)
                     | ProxyConsensusMessage::OptProposalMsg(_)
@@ -2009,7 +2076,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                     Ok(())
                 }
             },
-            IncomingRpcRequest::ProxyBlockRetrieval(request) => {
+            IncomingRpcRequest::ProxyBlockRetrieval(_request) => {
                 todo!()
             }
         }
