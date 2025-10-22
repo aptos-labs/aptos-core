@@ -122,9 +122,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
-        let max_n = (max_n + 1).next_power_of_two() - 1;
         let num_omegas = max_n + 1;
-        debug_assert!(num_omegas.is_power_of_two());
+        assert!(num_omegas.is_power_of_two());
 
         // Generate trapdoor elements
         let trapdoor = univariate_hiding_kzg::Trapdoor::<E>::rand(rng);
@@ -344,8 +343,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         debug_assert_eq!(hat_f_coeffs.len(), pk.max_n + 1);
 
         let diff_hat_f_evals: Vec<E::ScalarField> = {
-            let coeffs = polynomials::differentiate(&hat_f_coeffs);
-            eval_dom.fft(&coeffs)
+            let mut result = polynomials::differentiate(&hat_f_coeffs);
+            eval_dom.fft_in_place(&mut result);
+            result
         };
 
         let f_j_coeffs: Vec<Vec<E::ScalarField>> = (0..ell)
@@ -361,15 +361,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let diff_f_js_evals: Vec<Vec<E::ScalarField>> = f_js_evals
             .iter()
             .map(|f_j_eval| {
-                let mut coeffs = f_j_eval.clone();
-                eval_dom.ifft_in_place(&mut coeffs); // Convert to coefficients
-                let diff_coeffs = polynomials::differentiate(&coeffs); // Differentiate
-                eval_dom.fft(&diff_coeffs) // Convert back to evaluations
+                let mut result = eval_dom.ifft(f_j_eval); // Convert to coefficients
+                polynomials::differentiate_in_place(&mut result); // Differentiate
+                eval_dom.fft_in_place(&mut result); // Convert back to evaluations
+                result
             })
             .collect();
 
         let h_evals: Vec<E::ScalarField> = {
-            let mut h = Vec::with_capacity(num_omegas);
+            let mut result = Vec::with_capacity(num_omegas);
 
             let first_h_eval = {
                 let mut pow2 = E::ScalarField::ONE;
@@ -388,7 +388,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 let numerator = beta * (r - sum_pow2_rs) + sum_betas_term;
                 numerator * num_omegas_inv
             };
-            h.push(first_h_eval);
+            result.push(first_h_eval);
 
             for i in 1..num_omegas {
                 // First term: beta * diff_hat_f_evals[i]
@@ -418,10 +418,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 // Divide by precomputed denominator
                 val *= prover_precomputed.h_denom_eval[i];
 
-                h.push(val);
+                result.push(val);
             }
 
-            h
+            result
         };
 
         let rho_h = E::ScalarField::rand(rng);
@@ -527,13 +527,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             verifier_precomputed,
         } = vk;
 
-        // TODO: Easy to work around this if it fails?
         assert!(
             ell <= verifier_precomputed.powers_of_two.len(),
             "ell (got {}) must be ≤ max_ell (which is {})",
             ell,
             verifier_precomputed.powers_of_two.len()
-        );
+        ); // Easy to work around this if it fails...
 
         let Proof {
             hatC,
@@ -621,6 +620,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let num_omegas = roots_of_unity.len();
 
         let LHS = {
+            // First compute V_SS^*(gamma), where V_SS^*(X) is the polynomial (X^{max_n + 1} - 1) / (X - 1)
             let V_eval_gamma = {
                 let gamma_pow = gamma.pow([num_omegas as u64]);
                 (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap()
@@ -630,17 +630,21 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let RHS = {
+            // Compute sum_j 2^j a_j
             let sum1: E::ScalarField = verifier_precomputed
                 .powers_of_two
                 .iter()
+                .copied()
                 .zip(a_js.iter())
-                .map(|(power_of_two, aj)| *power_of_two * *aj)
+                .map(|(power_of_two, aj)| power_of_two * aj)
                 .sum();
 
+            // Compute sum_j beta_j a_j (a_j - 1)
             let sum2: E::ScalarField = beta_js
                 .iter()
-                .zip(a_js.iter())
-                .map(|(b, a)| *b * *a * (*a - E::ScalarField::ONE))
+                .copied()
+                .zip(a_js.iter().copied())
+                .map(|(b, a)| b * a * (a - E::ScalarField::ONE))
                 .sum();
 
             beta * (*a - sum1) + sum2
@@ -746,6 +750,14 @@ mod fiat_shamir {
     }
 }
 
+/// Implements a two-term multi-scalar multiplication (MSM) homomorphism
+/// used within a sigma protocol.  
+///
+/// This module defines a homomorphism that takes two scalar inputs and
+/// maps them to a single group element output using two fixed base points.
+/// Conceptually, this behaves similarly to a Pedersen commitment:
+///
+/// `output = base_1 * scalar_1 + base_2 * scalar_2`
 pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
@@ -753,9 +765,12 @@ pub mod two_term_msm {
     use aptos_crypto_derive::SigmaProtocolWitness;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
+    /// Represents a homomorphism with two base points over an elliptic curve group.
+    ///
+    /// This structure defines a map from two scalars to one group element:
+    /// `f(x1, x2) = base_1 * x1 + base_2 * x2`.
     #[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
     pub struct Homomorphism<E: Pairing> {
-        // This is rather similar to a Pedersen commitment
         pub base_1: E::G1Affine,
         pub base_2: E::G1Affine,
     }
