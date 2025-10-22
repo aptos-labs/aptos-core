@@ -5,7 +5,6 @@ use crate::{lru_node_cache::LruNodeCache, metrics::OTHER_TIMERS_SECONDS, state_m
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
 use aptos_infallible::RwLock;
 use aptos_jellyfish_merkle::node_type::NodeKey;
-use aptos_metrics_core::TimerHelper;
 use aptos_types::transaction::Version;
 use rayon::prelude::*;
 use std::{
@@ -41,7 +40,9 @@ impl VersionedNodeCache {
     }
 
     pub fn add_version(&self, version: Version, nodes: NodeCache) {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["version_cache_add"]);
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["version_cache_add"])
+            .start_timer();
 
         let mut locked = self.inner.write();
         if !locked.is_empty() {
@@ -57,7 +58,9 @@ impl VersionedNodeCache {
     }
 
     pub fn maybe_evict_version(&self, lru_cache: &LruNodeCache) {
-        let _timer = OTHER_TIMERS_SECONDS.timer_with(&["version_cache_evict"]);
+        let _timer = OTHER_TIMERS_SECONDS
+            .with_label_values(&["version_cache_evict"])
+            .start_timer();
 
         let to_evict = {
             let locked = self.inner.read();

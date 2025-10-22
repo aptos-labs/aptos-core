@@ -411,7 +411,9 @@ impl AptosDB {
             .collect::<Result<Vec<_>>>()?;
 
         {
-            let _timer = OTHER_TIMERS_SECONDS.timer_with(&["commit_events___commit"]);
+            let _timer = OTHER_TIMERS_SECONDS
+                .with_label_values(&["commit_events___commit"])
+                .start_timer();
             for batch in batches {
                 self.ledger_db.event_db().db().write_schemas(batch)?
             }
