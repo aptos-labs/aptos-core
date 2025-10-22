@@ -419,7 +419,7 @@ impl ContainerRef {
  *   equalities.
  *
  **************************************************************************************/
-trait VMValueRef<T> {
+pub trait VMValueRef<T> {
     fn value_ref(&self) -> PartialVMResult<&T>;
 }
 
@@ -463,7 +463,7 @@ impl_vm_value_ref!(bool, Bool);
 impl_vm_value_ref!(AccountAddress, Address);
 
 impl Value {
-    fn as_value_ref<T>(&self) -> PartialVMResult<&T>
+    pub fn as_value_ref<T>(&self) -> PartialVMResult<&T>
     where
         Self: VMValueRef<T>,
     {
@@ -2677,21 +2677,21 @@ impl Value {
  *
  **************************************************************************************/
 impl Value {
-    pub fn add_checked(self, other: Self) -> PartialVMResult<Self> {
+    pub fn add_checked(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_add(l, r).map(U8),
-            (U16(l), U16(r)) => u16::checked_add(l, r).map(U16),
-            (U32(l), U32(r)) => u32::checked_add(l, r).map(U32),
-            (U64(l), U64(r)) => u64::checked_add(l, r).map(U64),
-            (U128(l), U128(r)) => u128::checked_add(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_add(l, r).map(U256),
-            (I8(l), I8(r)) => i8::checked_add(l, r).map(I8),
-            (I16(l), I16(r)) => i16::checked_add(l, r).map(I16),
-            (I32(l), I32(r)) => i32::checked_add(l, r).map(I32),
-            (I64(l), I64(r)) => i64::checked_add(l, r).map(I64),
-            (I128(l), I128(r)) => i128::checked_add(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_add(l, r).map(I256),
+            (U8(l), U8(r)) => u8::checked_add(*l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_add(*l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_add(*l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_add(*l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_add(*l, r).map(U128),
+            (U256(l), U256(r)) => int256::U256::checked_add(*l, r).map(U256),
+            (I8(l), I8(r)) => i8::checked_add(*l, r).map(I8),
+            (I16(l), I16(r)) => i16::checked_add(*l, r).map(I16),
+            (I32(l), I32(r)) => i32::checked_add(*l, r).map(I32),
+            (I64(l), I64(r)) => i64::checked_add(*l, r).map(I64),
+            (I128(l), I128(r)) => i128::checked_add(*l, r).map(I128),
+            (I256(l), I256(r)) => int256::I256::checked_add(*l, r).map(I256),
             (l, r) => {
                 let msg = format!("Cannot add {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2703,21 +2703,21 @@ impl Value {
         })
     }
 
-    pub fn sub_checked(self, other: Self) -> PartialVMResult<Self> {
+    pub fn sub_checked(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_sub(l, r).map(U8),
-            (U16(l), U16(r)) => u16::checked_sub(l, r).map(U16),
-            (U32(l), U32(r)) => u32::checked_sub(l, r).map(U32),
-            (U64(l), U64(r)) => u64::checked_sub(l, r).map(U64),
-            (U128(l), U128(r)) => u128::checked_sub(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_sub(l, r).map(U256),
-            (I8(l), I8(r)) => i8::checked_sub(l, r).map(I8),
-            (I16(l), I16(r)) => i16::checked_sub(l, r).map(I16),
-            (I32(l), I32(r)) => i32::checked_sub(l, r).map(I32),
-            (I64(l), I64(r)) => i64::checked_sub(l, r).map(I64),
-            (I128(l), I128(r)) => i128::checked_sub(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_sub(l, r).map(I256),
+            (U8(l), U8(r)) => u8::checked_sub(*l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_sub(*l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_sub(*l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_sub(*l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_sub(*l, r).map(U128),
+            (U256(l), U256(r)) => int256::U256::checked_sub(*l, r).map(U256),
+            (I8(l), I8(r)) => i8::checked_sub(*l, r).map(I8),
+            (I16(l), I16(r)) => i16::checked_sub(*l, r).map(I16),
+            (I32(l), I32(r)) => i32::checked_sub(*l, r).map(I32),
+            (I64(l), I64(r)) => i64::checked_sub(*l, r).map(I64),
+            (I128(l), I128(r)) => i128::checked_sub(*l, r).map(I128),
+            (I256(l), I256(r)) => int256::I256::checked_sub(*l, r).map(I256),
             (l, r) => {
                 let msg = format!("Cannot sub {:?} from {:?}", r, l);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2729,21 +2729,21 @@ impl Value {
         })
     }
 
-    pub fn mul_checked(self, other: Self) -> PartialVMResult<Self> {
+    pub fn mul_checked(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_mul(l, r).map(U8),
-            (U16(l), U16(r)) => u16::checked_mul(l, r).map(U16),
-            (U32(l), U32(r)) => u32::checked_mul(l, r).map(U32),
-            (U64(l), U64(r)) => u64::checked_mul(l, r).map(U64),
-            (U128(l), U128(r)) => u128::checked_mul(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_mul(l, r).map(U256),
-            (I8(l), I8(r)) => i8::checked_mul(l, r).map(I8),
-            (I16(l), I16(r)) => i16::checked_mul(l, r).map(I16),
-            (I32(l), I32(r)) => i32::checked_mul(l, r).map(I32),
-            (I64(l), I64(r)) => i64::checked_mul(l, r).map(I64),
-            (I128(l), I128(r)) => i128::checked_mul(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_mul(l, r).map(I256),
+            (U8(l), U8(r)) => u8::checked_mul(*l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_mul(*l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_mul(*l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_mul(*l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_mul(*l, r).map(U128),
+            (U256(l), U256(r)) => int256::U256::checked_mul(*l, r).map(U256),
+            (I8(l), I8(r)) => i8::checked_mul(*l, r).map(I8),
+            (I16(l), I16(r)) => i16::checked_mul(*l, r).map(I16),
+            (I32(l), I32(r)) => i32::checked_mul(*l, r).map(I32),
+            (I64(l), I64(r)) => i64::checked_mul(*l, r).map(I64),
+            (I128(l), I128(r)) => i128::checked_mul(*l, r).map(I128),
+            (I256(l), I256(r)) => int256::I256::checked_mul(*l, r).map(I256),
             (l, r) => {
                 let msg = format!("Cannot mul {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2755,21 +2755,21 @@ impl Value {
         })
     }
 
-    pub fn div_checked(self, other: Self) -> PartialVMResult<Self> {
+    pub fn div_checked(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         let res = match (self, &other) {
-            (U8(l), U8(r)) => u8::checked_div(l, *r).map(U8),
-            (U16(l), U16(r)) => u16::checked_div(l, *r).map(U16),
-            (U32(l), U32(r)) => u32::checked_div(l, *r).map(U32),
-            (U64(l), U64(r)) => u64::checked_div(l, *r).map(U64),
-            (U128(l), U128(r)) => u128::checked_div(l, *r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_div(l, *r).map(U256),
-            (I8(l), I8(r)) => i8::checked_div(l, *r).map(I8),
-            (I16(l), I16(r)) => i16::checked_div(l, *r).map(I16),
-            (I32(l), I32(r)) => i32::checked_div(l, *r).map(I32),
-            (I64(l), I64(r)) => i64::checked_div(l, *r).map(I64),
-            (I128(l), I128(r)) => i128::checked_div(l, *r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_div(l, *r).map(I256),
+            (U8(l), U8(r)) => u8::checked_div(*l, *r).map(U8),
+            (U16(l), U16(r)) => u16::checked_div(*l, *r).map(U16),
+            (U32(l), U32(r)) => u32::checked_div(*l, *r).map(U32),
+            (U64(l), U64(r)) => u64::checked_div(*l, *r).map(U64),
+            (U128(l), U128(r)) => u128::checked_div(*l, *r).map(U128),
+            (U256(l), U256(r)) => int256::U256::checked_div(*l, *r).map(U256),
+            (I8(l), I8(r)) => i8::checked_div(*l, *r).map(I8),
+            (I16(l), I16(r)) => i16::checked_div(*l, *r).map(I16),
+            (I32(l), I32(r)) => i32::checked_div(*l, *r).map(I32),
+            (I64(l), I64(r)) => i64::checked_div(*l, *r).map(I64),
+            (I128(l), I128(r)) => i128::checked_div(*l, *r).map(I128),
+            (I256(l), I256(r)) => int256::I256::checked_div(*l, *r).map(I256),
             (l, r) => {
                 let msg = format!("Cannot div {:?} by {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2785,21 +2785,21 @@ impl Value {
         })
     }
 
-    pub fn rem_checked(self, other: Self) -> PartialVMResult<Self> {
+    pub fn rem_checked(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         let res = match (self, other) {
-            (U8(l), U8(r)) => u8::checked_rem(l, r).map(U8),
-            (U16(l), U16(r)) => u16::checked_rem(l, r).map(U16),
-            (U32(l), U32(r)) => u32::checked_rem(l, r).map(U32),
-            (U64(l), U64(r)) => u64::checked_rem(l, r).map(U64),
-            (U128(l), U128(r)) => u128::checked_rem(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_rem(l, r).map(U256),
-            (I8(l), I8(r)) => i8::checked_rem(l, r).map(I8),
-            (I16(l), I16(r)) => i16::checked_rem(l, r).map(I16),
-            (I32(l), I32(r)) => i32::checked_rem(l, r).map(I32),
-            (I64(l), I64(r)) => i64::checked_rem(l, r).map(I64),
-            (I128(l), I128(r)) => i128::checked_rem(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_rem(l, r).map(I256),
+            (U8(l), U8(r)) => u8::checked_rem(*l, r).map(U8),
+            (U16(l), U16(r)) => u16::checked_rem(*l, r).map(U16),
+            (U32(l), U32(r)) => u32::checked_rem(*l, r).map(U32),
+            (U64(l), U64(r)) => u64::checked_rem(*l, r).map(U64),
+            (U128(l), U128(r)) => u128::checked_rem(*l, r).map(U128),
+            (U256(l), U256(r)) => int256::U256::checked_rem(*l, r).map(U256),
+            (I8(l), I8(r)) => i8::checked_rem(*l, r).map(I8),
+            (I16(l), I16(r)) => i16::checked_rem(*l, r).map(I16),
+            (I32(l), I32(r)) => i32::checked_rem(*l, r).map(I32),
+            (I64(l), I64(r)) => i64::checked_rem(*l, r).map(I64),
+            (I128(l), I128(r)) => i128::checked_rem(*l, r).map(I128),
+            (I256(l), I256(r)) => int256::I256::checked_rem(*l, r).map(I256),
             (l, r) => {
                 let msg = format!("Cannot rem {:?} by {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2811,15 +2811,15 @@ impl Value {
         })
     }
 
-    pub fn negate_checked(self) -> PartialVMResult<Self> {
+    pub fn negate_checked(&mut self) -> PartialVMResult<Self> {
         use Value::*;
         let res = match self {
-            I8(x) => x.checked_neg().map(I8),
-            I16(x) => x.checked_neg().map(I16),
-            I32(x) => x.checked_neg().map(I32),
-            I64(x) => x.checked_neg().map(I64),
-            I128(x) => x.checked_neg().map(I128),
-            I256(x) => x.checked_neg().map(I256),
+            I8(x) => (*x).checked_neg().map(I8),
+            I16(x) => (*x).checked_neg().map(I16),
+            I32(x) => (*x).checked_neg().map(I32),
+            I64(x) => (*x).checked_neg().map(I64),
+            I128(x) => (*x).checked_neg().map(I128),
+            I256(x) => (*x).checked_neg().map(I256),
             _ => {
                 let msg = format!("Cannot negate {:?}", self);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2831,15 +2831,15 @@ impl Value {
         })
     }
 
-    pub fn bit_or(self, other: Self) -> PartialVMResult<Self> {
+    pub fn bit_or(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         Ok(match (self, other) {
-            (U8(l), U8(r)) => U8(l | r),
-            (U16(l), U16(r)) => U16(l | r),
-            (U32(l), U32(r)) => U32(l | r),
-            (U64(l), U64(r)) => U64(l | r),
-            (U128(l), U128(r)) => U128(l | r),
-            (U256(l), U256(r)) => U256(l | r),
+            (U8(l), U8(r)) => U8(*l | r),
+            (U16(l), U16(r)) => U16(*l | r),
+            (U32(l), U32(r)) => U32(*l | r),
+            (U64(l), U64(r)) => U64(*l | r),
+            (U128(l), U128(r)) => U128(*l | r),
+            (U256(l), U256(r)) => U256(*l | r),
             (l, r) => {
                 let msg = format!("Cannot bit_or {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2847,15 +2847,15 @@ impl Value {
         })
     }
 
-    pub fn bit_and(self, other: Self) -> PartialVMResult<Self> {
+    pub fn bit_and(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         Ok(match (self, other) {
-            (U8(l), U8(r)) => U8(l & r),
-            (U16(l), U16(r)) => U16(l & r),
-            (U32(l), U32(r)) => U32(l & r),
-            (U64(l), U64(r)) => U64(l & r),
-            (U128(l), U128(r)) => U128(l & r),
-            (U256(l), U256(r)) => U256(l & r),
+            (U8(l), U8(r)) => U8(*l & r),
+            (U16(l), U16(r)) => U16(*l & r),
+            (U32(l), U32(r)) => U32(*l & r),
+            (U64(l), U64(r)) => U64(*l & r),
+            (U128(l), U128(r)) => U128(*l & r),
+            (U256(l), U256(r)) => U256(*l & r),
             (l, r) => {
                 let msg = format!("Cannot bit_and {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2863,15 +2863,15 @@ impl Value {
         })
     }
 
-    pub fn bit_xor(self, other: Self) -> PartialVMResult<Self> {
+    pub fn bit_xor(&mut self, other: Self) -> PartialVMResult<Self> {
         use Value::*;
         Ok(match (self, other) {
-            (U8(l), U8(r)) => U8(l ^ r),
-            (U16(l), U16(r)) => U16(l ^ r),
-            (U32(l), U32(r)) => U32(l ^ r),
-            (U64(l), U64(r)) => U64(l ^ r),
-            (U128(l), U128(r)) => U128(l ^ r),
-            (U256(l), U256(r)) => U256(l ^ r),
+            (U8(l), U8(r)) => U8(*l ^ r),
+            (U16(l), U16(r)) => U16(*l ^ r),
+            (U32(l), U32(r)) => U32(*l ^ r),
+            (U64(l), U64(r)) => U64(*l ^ r),
+            (U128(l), U128(r)) => U128(*l ^ r),
+            (U256(l), U256(r)) => U256(*l ^ r),
             (l, r) => {
                 let msg = format!("Cannot bit_xor {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2879,16 +2879,16 @@ impl Value {
         })
     }
 
-    pub fn shl_checked(self, n_bits: u8) -> PartialVMResult<Self> {
+    pub fn shl_checked(&mut self, n_bits: u8) -> PartialVMResult<Self> {
         use Value::*;
 
         Ok(match self {
-            U8(x) if n_bits < 8 => U8(x << n_bits),
-            U16(x) if n_bits < 16 => U16(x << n_bits),
-            U32(x) if n_bits < 32 => U32(x << n_bits),
-            U64(x) if n_bits < 64 => U64(x << n_bits),
-            U128(x) if n_bits < 128 => U128(x << n_bits),
-            U256(x) => U256(x << int256::U256::from(n_bits)),
+            U8(x) if n_bits < 8 => U8(*x << n_bits),
+            U16(x) if n_bits < 16 => U16(*x << n_bits),
+            U32(x) if n_bits < 32 => U32(*x << n_bits),
+            U64(x) if n_bits < 64 => U64(*x << n_bits),
+            U128(x) if n_bits < 128 => U128(*x << n_bits),
+            U256(x) => U256(*x << int256::U256::from(n_bits)),
             _ => {
                 return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                     .with_message("Shift Left overflow".to_string()));
@@ -2896,16 +2896,16 @@ impl Value {
         })
     }
 
-    pub fn shr_checked(self, n_bits: u8) -> PartialVMResult<Self> {
+    pub fn shr_checked(&mut self, n_bits: u8) -> PartialVMResult<Self> {
         use Value::*;
 
         Ok(match self {
-            U8(x) if n_bits < 8 => U8(x >> n_bits),
-            U16(x) if n_bits < 16 => U16(x >> n_bits),
-            U32(x) if n_bits < 32 => U32(x >> n_bits),
-            U64(x) if n_bits < 64 => U64(x >> n_bits),
-            U128(x) if n_bits < 128 => U128(x >> n_bits),
-            U256(x) => U256(x >> int256::U256::from(n_bits)),
+            U8(x) if n_bits < 8 => U8(*x >> n_bits),
+            U16(x) if n_bits < 16 => U16(*x >> n_bits),
+            U32(x) if n_bits < 32 => U32(*x >> n_bits),
+            U64(x) if n_bits < 64 => U64(*x >> n_bits),
+            U128(x) if n_bits < 128 => U128(*x >> n_bits),
+            U256(x) => U256(*x >> int256::U256::from(n_bits)),
             _ => {
                 return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                     .with_message("Shift Right overflow".to_string()));
@@ -2913,22 +2913,22 @@ impl Value {
         })
     }
 
-    pub fn lt(self, other: Self) -> PartialVMResult<bool> {
+    pub fn lt(&mut self, other: Self) -> PartialVMResult<bool> {
         use Value::*;
 
         Ok(match (self, other) {
-            (U8(l), U8(r)) => l < r,
-            (U16(l), U16(r)) => l < r,
-            (U32(l), U32(r)) => l < r,
-            (U64(l), U64(r)) => l < r,
-            (U128(l), U128(r)) => l < r,
-            (U256(l), U256(r)) => l < r,
-            (I8(l), I8(r)) => l < r,
-            (I16(l), I16(r)) => l < r,
-            (I32(l), I32(r)) => l < r,
-            (I64(l), I64(r)) => l < r,
-            (I128(l), I128(r)) => l < r,
-            (I256(l), I256(r)) => l < r,
+            (U8(l), U8(r)) => *l < r,
+            (U16(l), U16(r)) => *l < r,
+            (U32(l), U32(r)) => *l < r,
+            (U64(l), U64(r)) => *l < r,
+            (U128(l), U128(r)) => *l < r,
+            (U256(l), U256(r)) => *l < r,
+            (I8(l), I8(r)) => *l < r,
+            (I16(l), I16(r)) => *l < r,
+            (I32(l), I32(r)) => *l < r,
+            (I64(l), I64(r)) => *l < r,
+            (I128(l), I128(r)) => *l < r,
+            (I256(l), I256(r)) => *l < r,
             (l, r) => {
                 let msg = format!(
                     "Cannot compare {:?} and {:?}: incompatible integer types",
@@ -2939,22 +2939,22 @@ impl Value {
         })
     }
 
-    pub fn le(self, other: Self) -> PartialVMResult<bool> {
+    pub fn le(&mut self, other: Self) -> PartialVMResult<bool> {
         use Value::*;
 
         Ok(match (self, other) {
-            (U8(l), U8(r)) => l <= r,
-            (U16(l), U16(r)) => l <= r,
-            (U32(l), U32(r)) => l <= r,
-            (U64(l), U64(r)) => l <= r,
-            (U128(l), U128(r)) => l <= r,
-            (U256(l), U256(r)) => l <= r,
-            (I8(l), I8(r)) => l <= r,
-            (I16(l), I16(r)) => l <= r,
-            (I32(l), I32(r)) => l <= r,
-            (I64(l), I64(r)) => l <= r,
-            (I128(l), I128(r)) => l <= r,
-            (I256(l), I256(r)) => l <= r,
+            (U8(l), U8(r)) => *l <= r,
+            (U16(l), U16(r)) => *l <= r,
+            (U32(l), U32(r)) => *l <= r,
+            (U64(l), U64(r)) => *l <= r,
+            (U128(l), U128(r)) => *l <= r,
+            (U256(l), U256(r)) => *l <= r,
+            (I8(l), I8(r)) => *l <= r,
+            (I16(l), I16(r)) => *l <= r,
+            (I32(l), I32(r)) => *l <= r,
+            (I64(l), I64(r)) => *l <= r,
+            (I128(l), I128(r)) => *l <= r,
+            (I256(l), I256(r)) => *l <= r,
 
             (l, r) => {
                 let msg = format!(
@@ -2966,22 +2966,22 @@ impl Value {
         })
     }
 
-    pub fn gt(self, other: Self) -> PartialVMResult<bool> {
+    pub fn gt(&mut self, other: Self) -> PartialVMResult<bool> {
         use Value::*;
 
         Ok(match (self, other) {
-            (U8(l), U8(r)) => l > r,
-            (U16(l), U16(r)) => l > r,
-            (U32(l), U32(r)) => l > r,
-            (U64(l), U64(r)) => l > r,
-            (U128(l), U128(r)) => l > r,
-            (U256(l), U256(r)) => l > r,
-            (I8(l), I8(r)) => l > r,
-            (I16(l), I16(r)) => l > r,
-            (I32(l), I32(r)) => l > r,
-            (I64(l), I64(r)) => l > r,
-            (I128(l), I128(r)) => l > r,
-            (I256(l), I256(r)) => l > r,
+            (U8(l), U8(r)) => *l > r,
+            (U16(l), U16(r)) => *l > r,
+            (U32(l), U32(r)) => *l > r,
+            (U64(l), U64(r)) => *l > r,
+            (U128(l), U128(r)) => *l > r,
+            (U256(l), U256(r)) => *l > r,
+            (I8(l), I8(r)) => *l > r,
+            (I16(l), I16(r)) => *l > r,
+            (I32(l), I32(r)) => *l > r,
+            (I64(l), I64(r)) => *l > r,
+            (I128(l), I128(r)) => *l > r,
+            (I256(l), I256(r)) => *l > r,
             (l, r) => {
                 let msg = format!(
                     "Cannot compare {:?} and {:?}: incompatible integer types",
@@ -2992,22 +2992,22 @@ impl Value {
         })
     }
 
-    pub fn ge(self, other: Self) -> PartialVMResult<bool> {
+    pub fn ge(&mut self, other: Self) -> PartialVMResult<bool> {
         use Value::*;
 
         Ok(match (self, other) {
-            (U8(l), U8(r)) => l >= r,
-            (U16(l), U16(r)) => l >= r,
-            (U32(l), U32(r)) => l >= r,
-            (U64(l), U64(r)) => l >= r,
-            (U128(l), U128(r)) => l >= r,
-            (U256(l), U256(r)) => l >= r,
-            (I8(l), I8(r)) => l >= r,
-            (I16(l), I16(r)) => l >= r,
-            (I32(l), I32(r)) => l >= r,
-            (I64(l), I64(r)) => l >= r,
-            (I128(l), I128(r)) => l >= r,
-            (I256(l), I256(r)) => l >= r,
+            (U8(l), U8(r)) => *l >= r,
+            (U16(l), U16(r)) => *l >= r,
+            (U32(l), U32(r)) => *l >= r,
+            (U64(l), U64(r)) => *l >= r,
+            (U128(l), U128(r)) => *l >= r,
+            (U256(l), U256(r)) => *l >= r,
+            (I8(l), I8(r)) => *l >= r,
+            (I16(l), I16(r)) => *l >= r,
+            (I32(l), I32(r)) => *l >= r,
+            (I64(l), I64(r)) => *l >= r,
+            (I128(l), I128(r)) => *l >= r,
+            (I256(l), I256(r)) => *l >= r,
             (l, r) => {
                 let msg = format!(
                     "Cannot compare {:?} and {:?}: incompatible integer types",
@@ -3130,247 +3130,248 @@ macro_rules! cast_int_with_try_from {
 }
 
 impl Value {
-    fn no_int_cast_err<T>(v: Self) -> PartialVMResult<T> {
+    #[cold]
+    fn no_int_cast_err<T>(v: &mut Self) -> PartialVMResult<T> {
         let msg = format!("Cannot cast {:?}: not an integer", v);
         Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg))
     }
 
-    pub fn cast_u8(self) -> PartialVMResult<u8> {
+    pub fn cast_u8(&mut self) -> PartialVMResult<u8> {
         use Value::*;
 
         match self {
-            U8(x) => Ok(x),
-            U16(x) => cast_int_narrowing!(u16, u8, x),
-            U32(x) => cast_int_narrowing!(u32, u8, x),
-            U64(x) => cast_int_narrowing!(u64, u8, x),
-            U128(x) => cast_int_narrowing!(u128, u8, x),
-            U256(x) => cast_int_with_try_from!(U256, u8, x),
-            I8(x) => cast_int_i2u_widening!(i8, u8, x),
-            I16(x) => cast_int_i2u_narrowing!(i16, u8, x),
-            I32(x) => cast_int_i2u_narrowing!(i32, u8, x),
-            I64(x) => cast_int_i2u_narrowing!(i64, u8, x),
-            I128(x) => cast_int_i2u_narrowing!(i128, u8, x),
-            I256(x) => cast_int_with_try_from!(I256, u8, x),
+            U8(x) => Ok(*x),
+            U16(x) => cast_int_narrowing!(u16, u8, *x),
+            U32(x) => cast_int_narrowing!(u32, u8, *x),
+            U64(x) => cast_int_narrowing!(u64, u8, *x),
+            U128(x) => cast_int_narrowing!(u128, u8, *x),
+            U256(x) => cast_int_with_try_from!(U256, u8, *x),
+            I8(x) => cast_int_i2u_widening!(i8, u8, *x),
+            I16(x) => cast_int_i2u_narrowing!(i16, u8, *x),
+            I32(x) => cast_int_i2u_narrowing!(i32, u8, *x),
+            I64(x) => cast_int_i2u_narrowing!(i64, u8, *x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u8, *x),
+            I256(x) => cast_int_with_try_from!(I256, u8, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_u16(self) -> PartialVMResult<u16> {
+    pub fn cast_u16(&mut self) -> PartialVMResult<u16> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_widening!(u8, u16, x),
-            U16(x) => Ok(x),
-            U32(x) => cast_int_narrowing!(u32, u16, x),
-            U64(x) => cast_int_narrowing!(u64, u16, x),
-            U128(x) => cast_int_narrowing!(u128, u16, x),
-            U256(x) => cast_int_with_try_from!(U256, u16, x),
-            I8(x) => cast_int_i2u_widening!(i8, u16, x),
-            I16(x) => cast_int_i2u_widening!(i16, u16, x),
-            I32(x) => cast_int_i2u_narrowing!(i32, u16, x),
-            I64(x) => cast_int_i2u_narrowing!(i64, u16, x),
-            I128(x) => cast_int_i2u_narrowing!(i128, u16, x),
-            I256(x) => cast_int_with_try_from!(I256, u16, x),
+            U8(x) => cast_int_widening!(u8, u16, *x),
+            U16(x) => Ok(*x),
+            U32(x) => cast_int_narrowing!(u32, u16, *x),
+            U64(x) => cast_int_narrowing!(u64, u16, *x),
+            U128(x) => cast_int_narrowing!(u128, u16, *x),
+            U256(x) => cast_int_with_try_from!(U256, u16, *x),
+            I8(x) => cast_int_i2u_widening!(i8, u16, *x),
+            I16(x) => cast_int_i2u_widening!(i16, u16, *x),
+            I32(x) => cast_int_i2u_narrowing!(i32, u16, *x),
+            I64(x) => cast_int_i2u_narrowing!(i64, u16, *x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u16, *x),
+            I256(x) => cast_int_with_try_from!(I256, u16, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_u32(self) -> PartialVMResult<u32> {
+    pub fn cast_u32(&mut self) -> PartialVMResult<u32> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_widening!(u8, u32, x),
-            U16(x) => cast_int_widening!(u16, u32, x),
-            U32(x) => Ok(x),
-            U64(x) => cast_int_narrowing!(u64, u32, x),
-            U128(x) => cast_int_narrowing!(u128, u32, x),
-            U256(x) => cast_int_with_try_from!(U256, u32, x),
-            I8(x) => cast_int_i2u_widening!(i8, u32, x),
-            I16(x) => cast_int_i2u_widening!(i16, u32, x),
-            I32(x) => cast_int_i2u_widening!(i32, u32, x),
-            I64(x) => cast_int_i2u_narrowing!(i64, u32, x),
-            I128(x) => cast_int_i2u_narrowing!(i128, u32, x),
-            I256(x) => cast_int_with_try_from!(I256, u32, x),
+            U8(x) => cast_int_widening!(u8, u32, *x),
+            U16(x) => cast_int_widening!(u16, u32, *x),
+            U32(x) => Ok(*x),
+            U64(x) => cast_int_narrowing!(u64, u32, *x),
+            U128(x) => cast_int_narrowing!(u128, u32, *x),
+            U256(x) => cast_int_with_try_from!(U256, u32, *x),
+            I8(x) => cast_int_i2u_widening!(i8, u32, *x),
+            I16(x) => cast_int_i2u_widening!(i16, u32, *x),
+            I32(x) => cast_int_i2u_widening!(i32, u32, *x),
+            I64(x) => cast_int_i2u_narrowing!(i64, u32, *x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u32, *x),
+            I256(x) => cast_int_with_try_from!(I256, u32, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_u64(self) -> PartialVMResult<u64> {
+    pub fn cast_u64(&mut self) -> PartialVMResult<u64> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_widening!(u8, u64, x),
-            U16(x) => cast_int_widening!(u16, u64, x),
-            U32(x) => cast_int_widening!(u32, u64, x),
-            U64(x) => Ok(x),
-            U128(x) => cast_int_narrowing!(u128, u64, x),
-            U256(x) => cast_int_with_try_from!(U256, u64, x),
-            I8(x) => cast_int_i2u_widening!(i8, u64, x),
-            I16(x) => cast_int_i2u_widening!(i16, u64, x),
-            I32(x) => cast_int_i2u_widening!(i32, u64, x),
-            I64(x) => cast_int_i2u_widening!(i64, u64, x),
-            I128(x) => cast_int_i2u_narrowing!(i128, u64, x),
-            I256(x) => cast_int_with_try_from!(I256, u64, x),
+            U8(x) => cast_int_widening!(u8, u64, *x),
+            U16(x) => cast_int_widening!(u16, u64, *x),
+            U32(x) => cast_int_widening!(u32, u64, *x),
+            U64(x) => Ok(*x),
+            U128(x) => cast_int_narrowing!(u128, u64, *x),
+            U256(x) => cast_int_with_try_from!(U256, u64, *x),
+            I8(x) => cast_int_i2u_widening!(i8, u64, *x),
+            I16(x) => cast_int_i2u_widening!(i16, u64, *x),
+            I32(x) => cast_int_i2u_widening!(i32, u64, *x),
+            I64(x) => cast_int_i2u_widening!(i64, u64, *x),
+            I128(x) => cast_int_i2u_narrowing!(i128, u64, *x),
+            I256(x) => cast_int_with_try_from!(I256, u64, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_u128(self) -> PartialVMResult<u128> {
+    pub fn cast_u128(&mut self) -> PartialVMResult<u128> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_widening!(u8, u128, x),
-            U16(x) => cast_int_widening!(u16, u128, x),
-            U32(x) => cast_int_widening!(u32, u128, x),
-            U64(x) => cast_int_widening!(u64, u128, x),
-            U128(x) => Ok(x),
-            U256(x) => cast_int_with_try_from!(U256, u128, x),
-            I8(x) => cast_int_i2u_widening!(i8, u128, x),
-            I16(x) => cast_int_i2u_widening!(i16, u128, x),
-            I32(x) => cast_int_i2u_widening!(i32, u128, x),
-            I64(x) => cast_int_i2u_widening!(i64, u128, x),
-            I128(x) => cast_int_i2u_widening!(i128, u128, x),
-            I256(x) => cast_int_with_try_from!(I256, u128, x),
+            U8(x) => cast_int_widening!(u8, u128, *x),
+            U16(x) => cast_int_widening!(u16, u128, *x),
+            U32(x) => cast_int_widening!(u32, u128, *x),
+            U64(x) => cast_int_widening!(u64, u128, *x),
+            U128(x) => Ok(*x),
+            U256(x) => cast_int_with_try_from!(U256, u128, *x),
+            I8(x) => cast_int_i2u_widening!(i8, u128, *x),
+            I16(x) => cast_int_i2u_widening!(i16, u128, *x),
+            I32(x) => cast_int_i2u_widening!(i32, u128, *x),
+            I64(x) => cast_int_i2u_widening!(i64, u128, *x),
+            I128(x) => cast_int_i2u_widening!(i128, u128, *x),
+            I256(x) => cast_int_with_try_from!(I256, u128, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_u256(self) -> PartialVMResult<int256::U256> {
+    pub fn cast_u256(&mut self) -> PartialVMResult<int256::U256> {
         use Value::*;
 
         Ok(match self {
-            U8(x) => int256::U256::from(x),
-            U16(x) => int256::U256::from(x),
-            U32(x) => int256::U256::from(x),
-            U64(x) => int256::U256::from(x),
-            U128(x) => int256::U256::from(x),
-            U256(x) => x,
-            I8(x) => cast_int_with_try_from!(i8, int256::U256, x)?,
-            I16(x) => cast_int_with_try_from!(i16, int256::U256, x)?,
-            I32(x) => cast_int_with_try_from!(i32, int256::U256, x)?,
-            I64(x) => cast_int_with_try_from!(i64, int256::U256, x)?,
-            I128(x) => cast_int_with_try_from!(i128, int256::U256, x)?,
-            I256(x) => cast_int_with_try_from!(I256, int256::U256, x)?,
+            U8(x) => int256::U256::from(*x),
+            U16(x) => int256::U256::from(*x),
+            U32(x) => int256::U256::from(*x),
+            U64(x) => int256::U256::from(*x),
+            U128(x) => int256::U256::from(*x),
+            U256(x) => *x,
+            I8(x) => cast_int_with_try_from!(i8, int256::U256, *x)?,
+            I16(x) => cast_int_with_try_from!(i16, int256::U256, *x)?,
+            I32(x) => cast_int_with_try_from!(i32, int256::U256, *x)?,
+            I64(x) => cast_int_with_try_from!(i64, int256::U256, *x)?,
+            I128(x) => cast_int_with_try_from!(i128, int256::U256, *x)?,
+            I256(x) => cast_int_with_try_from!(I256, int256::U256, *x)?,
             v => Self::no_int_cast_err(v)?,
         })
     }
 
-    pub fn cast_i8(self) -> PartialVMResult<i8> {
+    pub fn cast_i8(&mut self) -> PartialVMResult<i8> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_u2i_narrowing!(u8, i8, x),
-            U16(x) => cast_int_u2i_narrowing!(u16, i8, x),
-            U32(x) => cast_int_u2i_narrowing!(u32, i8, x),
-            U64(x) => cast_int_u2i_narrowing!(u64, i8, x),
-            U128(x) => cast_int_u2i_narrowing!(u128, i8, x),
-            U256(x) => cast_int_with_try_from!(U256, i8, x),
-            I8(x) => Ok(x),
-            I16(x) => cast_int_narrowing!(i16, i8, x),
-            I32(x) => cast_int_narrowing!(i32, i8, x),
-            I64(x) => cast_int_narrowing!(i64, i8, x),
-            I128(x) => cast_int_narrowing!(i128, i8, x),
-            I256(x) => cast_int_with_try_from!(I256, i8, x),
+            U8(x) => cast_int_u2i_narrowing!(u8, i8, *x),
+            U16(x) => cast_int_u2i_narrowing!(u16, i8, *x),
+            U32(x) => cast_int_u2i_narrowing!(u32, i8, *x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i8, *x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i8, *x),
+            U256(x) => cast_int_with_try_from!(U256, i8, *x),
+            I8(x) => Ok(*x),
+            I16(x) => cast_int_narrowing!(i16, i8, *x),
+            I32(x) => cast_int_narrowing!(i32, i8, *x),
+            I64(x) => cast_int_narrowing!(i64, i8, *x),
+            I128(x) => cast_int_narrowing!(i128, i8, *x),
+            I256(x) => cast_int_with_try_from!(I256, i8, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_i16(self) -> PartialVMResult<i16> {
+    pub fn cast_i16(&mut self) -> PartialVMResult<i16> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_u2i_widening!(u8, i16, x),
-            U16(x) => cast_int_u2i_narrowing!(u16, i16, x),
-            U32(x) => cast_int_u2i_narrowing!(u32, i16, x),
-            U64(x) => cast_int_u2i_narrowing!(u64, i16, x),
-            U128(x) => cast_int_u2i_narrowing!(u128, i16, x),
-            U256(x) => cast_int_with_try_from!(U256, i16, x),
-            I8(x) => cast_int_widening!(i8, i16, x),
-            I16(x) => Ok(x),
-            I32(x) => cast_int_narrowing!(i32, i16, x),
-            I64(x) => cast_int_narrowing!(i64, i16, x),
-            I128(x) => cast_int_narrowing!(i128, i16, x),
-            I256(x) => cast_int_with_try_from!(I256, i16, x),
+            U8(x) => cast_int_u2i_widening!(u8, i16, *x),
+            U16(x) => cast_int_u2i_narrowing!(u16, i16, *x),
+            U32(x) => cast_int_u2i_narrowing!(u32, i16, *x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i16, *x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i16, *x),
+            U256(x) => cast_int_with_try_from!(U256, i16, *x),
+            I8(x) => cast_int_widening!(i8, i16, *x),
+            I16(x) => Ok(*x),
+            I32(x) => cast_int_narrowing!(i32, i16, *x),
+            I64(x) => cast_int_narrowing!(i64, i16, *x),
+            I128(x) => cast_int_narrowing!(i128, i16, *x),
+            I256(x) => cast_int_with_try_from!(I256, i16, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_i32(self) -> PartialVMResult<i32> {
+    pub fn cast_i32(&mut self) -> PartialVMResult<i32> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_u2i_widening!(u8, i32, x),
-            U16(x) => cast_int_u2i_widening!(u16, i32, x),
-            U32(x) => cast_int_u2i_narrowing!(u32, i32, x),
-            U64(x) => cast_int_u2i_narrowing!(u64, i32, x),
-            U128(x) => cast_int_u2i_narrowing!(u128, i32, x),
-            U256(x) => cast_int_with_try_from!(U256, i32, x),
-            I8(x) => cast_int_widening!(i8, i32, x),
-            I16(x) => cast_int_widening!(i16, i32, x),
-            I32(x) => Ok(x),
-            I64(x) => cast_int_narrowing!(i64, i32, x),
-            I128(x) => cast_int_narrowing!(i128, i32, x),
-            I256(x) => cast_int_with_try_from!(I256, i32, x),
+            U8(x) => cast_int_u2i_widening!(u8, i32, *x),
+            U16(x) => cast_int_u2i_widening!(u16, i32, *x),
+            U32(x) => cast_int_u2i_narrowing!(u32, i32, *x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i32, *x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i32, *x),
+            U256(x) => cast_int_with_try_from!(U256, i32, *x),
+            I8(x) => cast_int_widening!(i8, i32, *x),
+            I16(x) => cast_int_widening!(i16, i32, *x),
+            I32(x) => Ok(*x),
+            I64(x) => cast_int_narrowing!(i64, i32, *x),
+            I128(x) => cast_int_narrowing!(i128, i32, *x),
+            I256(x) => cast_int_with_try_from!(I256, i32, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_i64(self) -> PartialVMResult<i64> {
+    pub fn cast_i64(&mut self) -> PartialVMResult<i64> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_u2i_widening!(u8, i64, x),
-            U16(x) => cast_int_u2i_widening!(u16, i64, x),
-            U32(x) => cast_int_u2i_widening!(u32, i64, x),
-            U64(x) => cast_int_u2i_narrowing!(u64, i64, x),
-            U128(x) => cast_int_u2i_narrowing!(u128, i64, x),
-            U256(x) => cast_int_with_try_from!(U256, i64, x),
-            I8(x) => cast_int_widening!(i8, i64, x),
-            I16(x) => cast_int_widening!(i16, i64, x),
-            I32(x) => cast_int_widening!(i32, i64, x),
-            I64(x) => Ok(x),
-            I128(x) => cast_int_narrowing!(i128, i64, x),
-            I256(x) => cast_int_with_try_from!(I256, i64, x),
+            U8(x) => cast_int_u2i_widening!(u8, i64, *x),
+            U16(x) => cast_int_u2i_widening!(u16, i64, *x),
+            U32(x) => cast_int_u2i_widening!(u32, i64, *x),
+            U64(x) => cast_int_u2i_narrowing!(u64, i64, *x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i64, *x),
+            U256(x) => cast_int_with_try_from!(U256, i64, *x),
+            I8(x) => cast_int_widening!(i8, i64, *x),
+            I16(x) => cast_int_widening!(i16, i64, *x),
+            I32(x) => cast_int_widening!(i32, i64, *x),
+            I64(x) => Ok(*x),
+            I128(x) => cast_int_narrowing!(i128, i64, *x),
+            I256(x) => cast_int_with_try_from!(I256, i64, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_i128(self) -> PartialVMResult<i128> {
+    pub fn cast_i128(&mut self) -> PartialVMResult<i128> {
         use Value::*;
 
         match self {
-            U8(x) => cast_int_u2i_widening!(u8, i128, x),
-            U16(x) => cast_int_u2i_widening!(u16, i128, x),
-            U32(x) => cast_int_u2i_widening!(u32, i128, x),
-            U64(x) => cast_int_u2i_widening!(u64, i128, x),
-            U128(x) => cast_int_u2i_narrowing!(u128, i128, x),
-            U256(x) => cast_int_with_try_from!(U256, i128, x),
-            I8(x) => cast_int_widening!(i8, i128, x),
-            I16(x) => cast_int_widening!(i16, i128, x),
-            I32(x) => cast_int_widening!(i32, i128, x),
-            I64(x) => cast_int_widening!(i64, i128, x),
-            I128(x) => Ok(x),
-            I256(x) => cast_int_with_try_from!(I256, i128, x),
+            U8(x) => cast_int_u2i_widening!(u8, i128, *x),
+            U16(x) => cast_int_u2i_widening!(u16, i128, *x),
+            U32(x) => cast_int_u2i_widening!(u32, i128, *x),
+            U64(x) => cast_int_u2i_widening!(u64, i128, *x),
+            U128(x) => cast_int_u2i_narrowing!(u128, i128, *x),
+            U256(x) => cast_int_with_try_from!(U256, i128, *x),
+            I8(x) => cast_int_widening!(i8, i128, *x),
+            I16(x) => cast_int_widening!(i16, i128, *x),
+            I32(x) => cast_int_widening!(i32, i128, *x),
+            I64(x) => cast_int_widening!(i64, i128, *x),
+            I128(x) => Ok(*x),
+            I256(x) => cast_int_with_try_from!(I256, i128, *x),
             v => Self::no_int_cast_err(v),
         }
     }
 
-    pub fn cast_i256(self) -> PartialVMResult<int256::I256> {
+    pub fn cast_i256(&mut self) -> PartialVMResult<int256::I256> {
         use Value::*;
 
         match self {
-            U8(x) => Ok(int256::I256::from(x)),
-            U16(x) => Ok(int256::I256::from(x)),
-            U32(x) => Ok(int256::I256::from(x)),
-            U64(x) => Ok(int256::I256::from(x)),
-            U128(x) => Ok(int256::I256::from(x)),
-            U256(x) => cast_int_with_try_from!(int256::U256, int256::I256, x),
-            I8(x) => Ok(int256::I256::from(x)),
-            I16(x) => Ok(int256::I256::from(x)),
-            I32(x) => Ok(int256::I256::from(x)),
-            I64(x) => Ok(int256::I256::from(x)),
-            I128(x) => Ok(int256::I256::from(x)),
-            I256(x) => Ok(x),
+            U8(x) => Ok(int256::I256::from(*x)),
+            U16(x) => Ok(int256::I256::from(*x)),
+            U32(x) => Ok(int256::I256::from(*x)),
+            U64(x) => Ok(int256::I256::from(*x)),
+            U128(x) => Ok(int256::I256::from(*x)),
+            U256(x) => cast_int_with_try_from!(int256::U256, int256::I256, *x),
+            I8(x) => Ok(int256::I256::from(*x)),
+            I16(x) => Ok(int256::I256::from(*x)),
+            I32(x) => Ok(int256::I256::from(*x)),
+            I64(x) => Ok(int256::I256::from(*x)),
+            I128(x) => Ok(int256::I256::from(*x)),
+            I256(x) => Ok(*x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3937,7 +3938,7 @@ impl Struct {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub fn unpack(self) -> PartialVMResult<impl Iterator<Item = Value>> {
+    pub fn unpack(self) -> PartialVMResult<impl ExactSizeIterator<Item = Value>> {
         Ok(self.fields.into_iter())
     }
 
@@ -3951,7 +3952,7 @@ impl Struct {
         self,
         variant: VariantIndex,
         variant_to_str: impl Fn(VariantIndex) -> String,
-    ) -> PartialVMResult<impl Iterator<Item = Value>> {
+    ) -> PartialVMResult<impl ExactSizeIterator<Item = Value>> {
         let (tag, values) = self.unpack_with_tag()?;
         if tag == variant {
             Ok(values)
@@ -3966,7 +3967,9 @@ impl Struct {
         }
     }
 
-    pub fn unpack_with_tag(self) -> PartialVMResult<(VariantIndex, impl Iterator<Item = Value>)> {
+    pub fn unpack_with_tag(
+        self,
+    ) -> PartialVMResult<(VariantIndex, impl ExactSizeIterator<Item = Value>)> {
         let Self { fields } = self;
         if fields.is_empty() {
             return Err(
