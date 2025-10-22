@@ -412,35 +412,25 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
 
         // Match types, inferring instantiation of function in `subst`.
         let mut subst = TypeParamMap::default();
-        if args.len() != func_ref.param_tys().len() || results.len() != func_ref.return_tys.len() {
+        if !subst.match_tys(func_ref.param_tys.iter(), args.iter())
+            || !subst.match_tys(func_ref.return_tys.iter(), results.iter())
+        {
             return Ok(Err(FunctionIncompatibleType));
         }
-        for (formal, actual) in args.iter().zip(&func_ref.param_tys) {
-            if !subst.match_ty(actual, formal) {
-                return Ok(Err(FunctionIncompatibleType));
-            }
-        }
-        for (formal, actual) in results.iter().zip(&func_ref.return_tys) {
-            if !subst.match_ty(actual, formal) {
-                return Ok(Err(FunctionIncompatibleType));
-            }
-        }
 
-        // Check whether we successfully inferred all type parameters. Notice
-        // this is not possible with all functions (e.g. `f<T>(x: u64)`).
-        let mut ty_args = vec![];
-        for (param, abilities) in func_ref.ty_param_abilities.iter().enumerate() {
-            if let Some(ty) = subst.get_ty_param(param as u16) {
-                // The inferred type must have all the required abilities
-                if ty.abilities()?.intersect(*abilities) == *abilities {
-                    ty_args.push(ty)
-                } else {
+        // Construct the type arguments from the match.
+        let ty_args = match subst.verify_and_extract_type_args(func_ref.ty_param_abilities()) {
+            Ok(ty_args) => ty_args,
+            Err(err) => match err.major_status() {
+                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH => {
+                    return Ok(Err(FunctionNotInstantiated));
+                },
+                StatusCode::CONSTRAINT_NOT_SATISFIED => {
                     return Ok(Err(FunctionIncompatibleType));
-                }
-            } else {
-                return Ok(Err(FunctionNotInstantiated));
-            }
-        }
+                },
+                _ => return Err(err),
+            },
+        };
 
         // Construct result.
         let env = self.module_storage.runtime_environment();
