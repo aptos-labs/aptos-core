@@ -8,7 +8,7 @@ use crate::{
     gas_schedule::NativeGasParameters,
     ver::gas_feature_versions::{
         RELEASE_V1_12, RELEASE_V1_13, RELEASE_V1_23, RELEASE_V1_26, RELEASE_V1_28, RELEASE_V1_36,
-        RELEASE_V1_38,
+        RELEASE_V1_39,
     },
 };
 use aptos_gas_algebra::{
@@ -360,6 +360,6 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [randomness_fetch_and_inc_counter: InternalGas, { RELEASE_V1_23.. => "randomness.fetch_and_inc_counter" }, 1],
 
         // Reflection
-        [reflect_resolve_base: InternalGas, { RELEASE_V1_38.. => "reflect.resolve_base" }, 4096],
+        [reflect_resolve_base: InternalGas, { RELEASE_V1_39.. => "reflect.resolve_base" }, 4096],
     ]
 );

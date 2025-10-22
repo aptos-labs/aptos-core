@@ -3,6 +3,7 @@
 
 # Module `0x1::reflect`
 
+Functionality for reflection in Move.
 
 
 -  [Enum `ReflectionError`](#0x1_reflect_ReflectionError)
@@ -126,7 +127,7 @@ TODO: make this public once language version 2.4 is available
 
 <a id="0x1_reflect_EFEATURE_NOT_ENABLED"></a>
 
-The reflection feature is not enabled.
+This error indicates that the reflection feature is not enabled.
 
 
 <pre><code><b>const</b> <a href="reflect.md#0x1_reflect_EFEATURE_NOT_ENABLED">EFEATURE_NOT_ENABLED</a>: u64 = 0;
@@ -138,16 +139,17 @@ The reflection feature is not enabled.
 
 ## Function `resolve`
 
-Attempts to resolve a function <code>addr::module_name::func_name</code> which is expected to have <code>FuncType</code>.
+Resolves a function specified by address and symbolic name, with expected type, into a typed function value.
+
 Example usage:
 
 ```
-let fn : |address|u64 has store = reflect::resolve(addr, module_name, func_name).unpack();
+let fn : |address|u64 has store = reflect::resolve(@somewhere, utf8(b"mod"), utf8(b"fn")).unwrap();
 assert!(fn(my_addr) == some_value)
 ```
 
 See <code><a href="reflect.md#0x1_reflect_ReflectionError">ReflectionError</a></code> for the possible errors which can result. On successful resolution,
-a function value is returned which can be safely used in future executions as indicated by its
+a function value is returned which can be safely used in future executions as indicated by the requested
 type.
 
 In order to be accessible, the resolved function must be public. This prevents reflection to
@@ -169,8 +171,12 @@ produced.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="reflect.md#0x1_reflect_resolve">resolve</a>&lt;FuncType&gt;(
-    addr: <b>address</b>, module_name: &String, func_name: &String): Result&lt;FuncType, <a href="reflect.md#0x1_reflect_ReflectionError">ReflectionError</a>&gt; {
-    <b>assert</b>!(<a href="features.md#0x1_features_is_function_reflection_enabled">features::is_function_reflection_enabled</a>(), <a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reflect.md#0x1_reflect_EFEATURE_NOT_ENABLED">EFEATURE_NOT_ENABLED</a>));
+    addr: <b>address</b>, module_name: &String, func_name: &String
+): Result&lt;FuncType, <a href="reflect.md#0x1_reflect_ReflectionError">ReflectionError</a>&gt; {
+    <b>assert</b>!(
+        <a href="features.md#0x1_features_is_function_reflection_enabled">features::is_function_reflection_enabled</a>(),
+        <a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reflect.md#0x1_reflect_EFEATURE_NOT_ENABLED">EFEATURE_NOT_ENABLED</a>)
+    );
     <a href="reflect.md#0x1_reflect_native_resolve">native_resolve</a>(addr, module_name, func_name)
 }
 </code></pre>
@@ -196,7 +202,7 @@ Returns numerical code associated with error.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="reflect.md#0x1_reflect_error_code">error_code</a>(self: <a href="reflect.md#0x1_reflect_ReflectionError">ReflectionError</a>): u64 {
-    match (self) {
+    match(self) {
         InvalidIdentifier =&gt; 0,
         FunctionNotFound =&gt; 1,
         FunctionNotAccessible =&gt; 2,
@@ -226,7 +232,8 @@ Returns numerical code associated with error.
 
 
 <pre><code><b>native</b> <b>fun</b> <a href="reflect.md#0x1_reflect_native_resolve">native_resolve</a>&lt;FuncType&gt;(
-    addr: <b>address</b>, module_name: &String, func_name: &String): Result&lt;FuncType, <a href="reflect.md#0x1_reflect_ReflectionError">ReflectionError</a>&gt;;
+    addr: <b>address</b>, module_name: &String, func_name: &String
+): Result&lt;FuncType, <a href="reflect.md#0x1_reflect_ReflectionError">ReflectionError</a>&gt;;
 </code></pre>
 
 

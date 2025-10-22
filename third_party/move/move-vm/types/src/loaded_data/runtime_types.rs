@@ -1549,6 +1549,10 @@ impl<'a> TypeParamMap<'a> {
         self.map.get(&idx).map(|ty| (*ty).clone())
     }
 
+    pub fn arity(&self) -> usize {
+        self.map.len()
+    }
+
     /// Matches the actual type to the expected type, binding any type args to the necessary type
     /// as stored in the map. The expected type must be a concrete type (no [Type::TyParam]).
     ///
@@ -1662,6 +1666,35 @@ impl<'a> TypeParamMap<'a> {
             | (Type::MutableReference(_), _)
             | (Type::Reference(_), _) => false,
         }
+    }
+
+    pub fn match_tys(
+        &mut self,
+        actuals: impl ExactSizeIterator<Item = &'a Type>,
+        formals: impl ExactSizeIterator<Item = &'a Type>,
+    ) -> bool {
+        if actuals.len() != formals.len() {
+            return false;
+        }
+        for (actual, formal) in actuals.zip(formals) {
+            if !self.match_ty(actual, formal) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Produces a type parameter instantiation from the type params in the map,
+    /// verifying abilities against type parameter declarations.
+    pub fn verify_and_extract_type_args(
+        &mut self,
+        param_decls: &[AbilitySet],
+    ) -> PartialVMResult<Vec<Type>> {
+        let args = (0..param_decls.len())
+            .filter_map(|idx| self.map.get(&(idx as u16)).cloned().cloned())
+            .collect_vec();
+        Type::verify_ty_arg_abilities(param_decls, &args)?;
+        Ok(args)
     }
 }
 
