@@ -254,7 +254,7 @@ fn derive_pepper(
 }
 
 /// Derives the pepper base, pepper bytes and account address
-fn derive_pepper_and_account_address(
+pub fn derive_pepper_and_account_address(
     vuf_keypair: Arc<VUFKeypair>,
     derivation_path: Option<String>,
     pepper_input: &PepperInput,

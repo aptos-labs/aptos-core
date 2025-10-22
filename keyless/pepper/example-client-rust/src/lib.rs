@@ -439,6 +439,14 @@ async fn verify_firestore_pepper_entry(
         .await
         .unwrap();
 
+    // Wait for a short duration to ensure the firestore entry is available.
+    // This is required because firestore writes may be asynchronous.
+    utils::print(
+        "Waiting for 2 seconds to ensure the firestore entry is available...",
+        false,
+    );
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+
     // Query the firestore DB for the pepper input entry
     let docs: Vec<AccountRecoveryDbEntry> = firestore_db
         .fluent()
