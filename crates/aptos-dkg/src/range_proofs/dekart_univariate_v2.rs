@@ -57,7 +57,7 @@ pub struct PublicStatement<E: Pairing> {
 #[derive(Clone, Debug)]
 pub struct VerificationKey<E: Pairing> {
     xi_1: E::G1Affine,
-    zeroth_lagr: E::G1Affine,
+    lagr_0: E::G1Affine,
     vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
     roots_of_unity: Vec<E::ScalarField>,
     verifier_precomputed: VerifierPrecomputed<E>,
@@ -71,8 +71,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
         compress: Compress,
     ) -> Result<(), SerializationError> {
         self.xi_1.serialize_with_mode(&mut writer, compress)?;
-        self.zeroth_lagr
-            .serialize_with_mode(&mut writer, compress)?;
+        self.lagr_0.serialize_with_mode(&mut writer, compress)?;
         self.vk_hkzg.serialize_with_mode(&mut writer, compress)?;
         self.roots_of_unity[0].serialize_with_mode(&mut writer, compress)?;
 
@@ -82,7 +81,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
     fn serialized_size(&self, compress: Compress) -> usize {
         let mut size = 0;
         size += self.xi_1.serialized_size(compress);
-        size += self.zeroth_lagr.serialized_size(compress);
+        size += self.lagr_0.serialized_size(compress);
         size += self.vk_hkzg.serialized_size(compress);
         size += self.roots_of_unity[0].serialized_size(compress);
 
@@ -120,18 +119,16 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
         max_ell: usize,
+        group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
-        let group_generators = GroupGenerators::sample(rng);
-        let g1 = group_generators.g1; // TODO: maybe make `group_generators` part of the setup() parameters in the trait?
-
         let max_n = (max_n + 1).next_power_of_two() - 1;
         let num_omegas = max_n + 1;
         debug_assert!(num_omegas.is_power_of_two());
 
         // Generate trapdoor elements
         let trapdoor = univariate_hiding_kzg::Trapdoor::<E>::rand(rng);
-        let xi_1_proj: E::G1 = g1 * trapdoor.xi;
+        let xi_1_proj: E::G1 = group_generators.g1 * trapdoor.xi;
 
         let (vk_hkzg, ck_S) =
             univariate_hiding_kzg::setup(max_n + 1, group_generators.clone(), trapdoor, rng);
@@ -169,7 +166,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let vk = VerificationKey {
             xi_1: xi_1_proj.into_affine(),
-            zeroth_lagr: ck_S.lagr_g1[0],
+            lagr_0: ck_S.lagr_g1[0],
             vk_hkzg,
             roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone(),
             verifier_precomputed,
@@ -257,7 +254,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 1b
-        fiat_shamir::append_initial_data(fs_t, DST, vk, n, ell, &comm);
+        fiat_shamir::append_initial_data(fs_t, DST, vk, PublicStatement {
+            n,
+            ell,
+            comm: comm.clone(),
+        });
 
         // Step 2a
         let r = E::ScalarField::rand(rng);
@@ -274,7 +275,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         }
         .prove(
             &two_term_msm::Witness {
-                kzg_randomness: Scalar(r),
+                poly_randomness: Scalar(r),
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
             fs_t,
@@ -282,7 +283,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(fs_t, &pi_PoK); // TODO: should be "remainder of sigma proof" since the first message is already in there
+        fiat_shamir::append_sigma_proof(fs_t, &pi_PoK); // TODO: should be changed to "remainder of sigma proof" since the first message is already in there
 
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| E::ScalarField::rand(rng)).collect();
@@ -520,7 +521,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 1
         let VerificationKey {
             xi_1,
-            zeroth_lagr,
+            lagr_0,
             vk_hkzg,
             roots_of_unity,
             verifier_precomputed,
@@ -546,14 +547,18 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = self;
 
         // Step 2a
-        fiat_shamir::append_initial_data(fs_t, DST, vk, n, ell, &comm);
+        fiat_shamir::append_initial_data(fs_t, DST, vk, PublicStatement {
+            n,
+            ell,
+            comm: comm.clone(),
+        });
 
         // Step 2b
         fiat_shamir::append_hat_f_commitment::<E>(fs_t, &hatC);
 
         // Step 3
         two_term_msm::Homomorphism {
-            base_1: *zeroth_lagr,
+            base_1: *lagr_0,
             base_2: *xi_1,
         }
         .verify(&(two_term_msm::CodomainShape(*hatC - comm.0)), pi_PoK, fs_t)?;
@@ -615,27 +620,31 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 11
         let num_omegas = roots_of_unity.len();
 
-        let V_eval_gamma = {
-            let gamma_pow = gamma.pow([num_omegas as u64]);
-            (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap()
+        let LHS = {
+            let V_eval_gamma = {
+                let gamma_pow = gamma.pow([num_omegas as u64]);
+                (gamma_pow - E::ScalarField::ONE) * (gamma - E::ScalarField::ONE).inverse().unwrap()
+            };
+
+            *a_h * V_eval_gamma
         };
 
-        let LHS = *a_h * V_eval_gamma;
+        let RHS = {
+            let sum1: E::ScalarField = verifier_precomputed
+                .powers_of_two
+                .iter()
+                .zip(a_js.iter())
+                .map(|(power_of_two, aj)| *power_of_two * *aj)
+                .sum();
 
-        let sum1: E::ScalarField = verifier_precomputed
-            .powers_of_two
-            .iter()
-            .zip(a_js.iter())
-            .map(|(power_of_two, aj)| *power_of_two * *aj)
-            .sum();
+            let sum2: E::ScalarField = beta_js
+                .iter()
+                .zip(a_js.iter())
+                .map(|(b, a)| *b * *a * (*a - E::ScalarField::ONE))
+                .sum();
 
-        let sum2: E::ScalarField = beta_js
-            .iter()
-            .zip(a_js.iter())
-            .map(|(b, a)| *b * *a * (*a - E::ScalarField::ONE))
-            .sum();
-
-        let RHS = beta * (*a - sum1) + sum2;
+            beta * (*a - sum1) + sum2
+        };
 
         anyhow::ensure!(LHS == RHS);
 
@@ -656,17 +665,11 @@ mod fiat_shamir {
         fs_t: &mut Transcript,
         dst: &[u8],
         vk: &VerificationKey<E>,
-        n: usize,
-        ell: usize,
-        comm: &Commitment<E>,
+        ps: PublicStatement<E>,
     ) {
         <Transcript as RangeProof<E, Proof<E>>>::append_sep(fs_t, dst);
         <Transcript as RangeProof<E, Proof<E>>>::append_vk(fs_t, vk);
-        <Transcript as RangeProof<E, Proof<E>>>::append_public_statement(fs_t, PublicStatement {
-            n,
-            ell,
-            comm: comm.clone(),
-        });
+        <Transcript as RangeProof<E, Proof<E>>>::append_public_statement(fs_t, ps);
     }
 
     #[allow(non_snake_case)]
@@ -702,7 +705,9 @@ mod fiat_shamir {
                 fs_transcript,
                 ell,
             );
-        let beta = betas.pop().expect("betas must have at least one element");
+        let beta = betas
+            .pop()
+            .expect("The betas must have at least one element");
         (beta, betas)
     }
 
@@ -720,8 +725,8 @@ mod fiat_shamir {
             ell + 2,
         );
 
-        let mu = mus.pop().expect("mus must have at least one element");
-        let mu_h = mus.pop().expect("mus must have at least two elements");
+        let mu = mus.pop().expect("The mus must have at least one element");
+        let mu_h = mus.pop().expect("The mus must have at least two elements");
 
         (mu, mu_h, mus)
     }
@@ -742,7 +747,7 @@ mod fiat_shamir {
 }
 
 pub mod two_term_msm {
-    // TODO: maybe fixed_base_msms should become a folder, put its code inside mod.rs? Then put this inside of that folder?
+    // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
     use crate::sigma_protocol::homomorphism::fixed_base_msms;
     use aptos_crypto_derive::SigmaProtocolWitness;
@@ -757,7 +762,7 @@ pub mod two_term_msm {
 
     #[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone)]
     pub struct Witness<E: Pairing> {
-        pub kzg_randomness: Scalar<E>,
+        pub poly_randomness: Scalar<E>,
         pub hiding_kzg_randomness: Scalar<E>,
     }
 
@@ -766,9 +771,11 @@ pub mod two_term_msm {
         type Domain = Witness<E>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
-            // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower! `msm_terms()` is still useful for verification though
+            // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower!
+            // `msm_terms()` is still useful for verification though: there the code will use it to produce an MSM
+            //  of size 2+2 (the latter two are for the first prover message A and the statement P)
             CodomainShape(
-                self.base_1 * input.kzg_randomness.0 + self.base_2 * input.hiding_kzg_randomness.0,
+                self.base_1 * input.poly_randomness.0 + self.base_2 * input.hiding_kzg_randomness.0,
             )
         }
     }
@@ -785,7 +792,7 @@ pub mod two_term_msm {
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             let mut scalars = Vec::with_capacity(2);
-            scalars.push(input.kzg_randomness.0);
+            scalars.push(input.poly_randomness.0);
             scalars.push(input.hiding_kzg_randomness.0);
 
             let mut bases = Vec::with_capacity(2);

@@ -4,6 +4,7 @@
 #[cfg(test)]
 use aptos_dkg::range_proofs::traits::BatchedRangeProof;
 use aptos_dkg::{
+    algebra::GroupGenerators,
     range_proofs::{
         dekart_univariate::Proof as UnivariateDeKART,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2,
@@ -97,7 +98,8 @@ where
     B: BatchedRangeProof<E>,
 {
     let mut rng = thread_rng();
-    let (pk, vk) = B::setup(n, ell, &mut rng);
+    let group_generators = GroupGenerators::sample(&mut rng);
+    let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
     RangeProofUniversalSetup { pk, vk }
 }
 

@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::algebra::GroupGenerators;
 use ark_ec::pairing::Pairing;
 use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -23,6 +24,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
         max_ell: usize,
+        group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (Self::ProverKey, Self::VerificationKey);
 

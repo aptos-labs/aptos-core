@@ -62,7 +62,6 @@ pub struct Trapdoor<E: Pairing> {
 
 impl<E: Pairing> Trapdoor<E> {
     pub fn rand<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
-        // TODO: maybe new() is a better name?
         Self {
             xi: E::ScalarField::rand(rng),
             tau: E::ScalarField::rand(rng),
