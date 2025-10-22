@@ -908,7 +908,8 @@ where
     ///
     /// Native functions do not push a frame at the moment and as such errors from a native
     /// function are incorrectly attributed to the caller.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): single usage
+    #[inline(always)]
     fn make_call_frame<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
         &mut self,
         current_frame: &Frame,
@@ -1793,7 +1794,7 @@ impl Stack {
 
     /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): increases function size 25%, DOES NOT improve performance, do not inline.
     fn push(&mut self, value: Value) -> PartialVMResult<()> {
         if self.value.len() < OPERAND_STACK_SIZE_LIMIT {
             self.value.push(value);
@@ -1804,7 +1805,7 @@ impl Stack {
     }
 
     /// Pop a `Value` off the stack or abort execution if the stack is empty.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline]
     fn pop(&mut self) -> PartialVMResult<Value> {
         self.value
             .pop()
@@ -1813,8 +1814,8 @@ impl Stack {
 
     /// Pop a `Value` of a given type off the stack. Abort if the value is not of the given
     /// type or if the stack is empty.
-    // Note(inline): expensive to inline, adds a few seconds of compile time
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): do not inline this, it bloats interpreter loop 20% and does not adds enough perf to justify,
+    // instead we're inlining `value_as()` and all VM casts.
     fn pop_as<T>(&mut self) -> PartialVMResult<T>
     where
         Value: VMValueCast<T>,
@@ -1823,7 +1824,6 @@ impl Stack {
     }
 
     /// Pop n values off the stack.
-    #[cfg_attr(feature = "force-inline", inline(always))]
     fn popn(&mut self, n: u16) -> PartialVMResult<Vec<Value>> {
         let remaining_stack_size = self
             .value
@@ -1834,7 +1834,6 @@ impl Stack {
         Ok(args)
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
     fn last_n(&self, n: usize) -> PartialVMResult<impl ExactSizeIterator<Item = &Value> + Clone> {
         if self.value.len() < n {
             return Err(
@@ -1849,7 +1848,7 @@ impl Stack {
 
     /// Push a type on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): bloats runtime_type_checks
     pub(crate) fn push_ty(&mut self, ty: Type) -> PartialVMResult<()> {
         if self.types.len() < OPERAND_STACK_SIZE_LIMIT {
             self.types.push(ty);
@@ -1860,7 +1859,7 @@ impl Stack {
     }
 
     /// Pop a type off the stack or abort execution if the stack is empty.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): bloats runtime_type_checks
     pub(crate) fn pop_ty(&mut self) -> PartialVMResult<Type> {
         self.types.pop().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1868,7 +1867,7 @@ impl Stack {
         })
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): bloats runtime_type_checks
     pub(crate) fn top_ty(&mut self) -> PartialVMResult<&Type> {
         self.types.last().ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1877,7 +1876,7 @@ impl Stack {
     }
 
     /// Pop n types off the stack.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    // note(inline): bloats runtime_type_checks
     pub(crate) fn popn_tys(&mut self, n: u16) -> PartialVMResult<Vec<Type>> {
         let remaining_stack_size = self.types.len().checked_sub(n as usize).ok_or_else(|| {
             PartialVMError::new(StatusCode::EMPTY_VALUE_STACK)
@@ -1934,7 +1933,7 @@ impl CallStack {
     }
 
     /// Push a `Frame` on the call stack.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[cfg_attr(feature = "inline-callstack", inline(always))]
     fn push(&mut self, frame: Frame) -> Result<(), Frame> {
         if self.0.len() < CALL_STACK_SIZE_LIMIT {
             self.0.push(frame);
@@ -1945,7 +1944,7 @@ impl CallStack {
     }
 
     /// Pop a `Frame` off the call stack.
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[cfg_attr(feature = "inline-callstack", inline(always))]
     fn pop(&mut self) -> Option<Frame> {
         self.0.pop()
     }
