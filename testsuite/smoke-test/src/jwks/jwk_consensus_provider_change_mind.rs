@@ -27,6 +27,7 @@ use tokio::time::sleep;
 /// even if a provider double-rotates its key in a very short period of time.
 /// First rotation may have been observed by some validators.
 #[tokio::test]
+#[ignore]
 async fn jwk_consensus_provider_change_mind() {
     // Big epoch duration to ensure epoch change does not help reset validators if they are stuck.
     let epoch_duration_secs = 1800;

@@ -1200,6 +1200,12 @@ impl TypeBuilder {
             S::U64 => U64,
             S::U128 => U128,
             S::U256 => U256,
+            S::I8 => I8,
+            S::I16 => I16,
+            S::I32 => I32,
+            S::I64 => I64,
+            S::I128 => I128,
+            S::I256 => I256,
             S::Address => Address,
             S::Vector(elem_tok) => {
                 let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
@@ -1213,12 +1219,16 @@ impl TypeBuilder {
                 );
             },
 
-            tok => {
+            S::Signer
+            | S::Function(..)
+            | S::Reference(_)
+            | S::MutableReference(_)
+            | S::TypeParameter(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
                             "{:?} is not allowed or is not a meaningful token for a constant",
-                            tok
+                            const_tok
                         )),
                 );
             },
@@ -1906,6 +1916,12 @@ mod unit_tests {
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U64)), U64);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U128)), U128);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U256)), U256);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I8)), I8);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I16)), I16);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I32)), I32);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I64)), I64);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I128)), I128);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I256)), I256);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::Bool)), Bool);
         assert_eq!(
             assert_ok!(ty_builder.create_constant_ty(&S::Address)),
