@@ -1070,8 +1070,8 @@ module aptos_token_objects::collection {
     /// Get all data from Mint event
     public fun get_mint_event_data(
         event: &Mint
-    ): (address, AggregatorSnapshot<u64>, address) {
-        (event.collection, event.index, event.token)
+    ): (address, u64, address) {
+        (event.collection, aggregator_v2::read_snapshot(&event.index), event.token)
     }
 
     #[test_only]
