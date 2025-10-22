@@ -434,8 +434,13 @@ macro_rules! impl_vm_value_ref {
                 };
                 #[cold]
                 fn __cannot_ref_cast(v: &Value) -> PartialVMResult<&$ty> {
-                    Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("cannot take {:?} as &{}", v, stringify!($ty))))
+                    Err(
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                            "cannot take {:?} as &{}",
+                            v,
+                            stringify!($ty)
+                        )),
+                    )
                 }
             }
         }
@@ -2455,8 +2460,13 @@ macro_rules! impl_vm_value_cast {
                 };
                 #[cold]
                 fn __cannot_cast(v: Value) -> PartialVMResult<$ty> {
-                    Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("cannot cast {:?} to {}", v, stringify!($ty))))
+                    Err(
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                            "cannot cast {:?} to {}",
+                            v,
+                            stringify!($ty)
+                        )),
+                    )
                 }
             }
         }
