@@ -34,6 +34,7 @@ pub const MAX_MAKE_VEC_ARGS: usize = 4;
 pub const TABLE_NATIVE_SPEC_ERROR: &str =
     "Native functions defined in Table cannot be used as specification functions";
 const NUM_TYPE_BASE_ERROR: &str = "cannot infer concrete integer type from `num`, consider using a concrete integer type or explicit type cast";
+const BV_TYPE_NOT_ENABLED_ERROR: &str = "signed integer cannot be turned into bit vector";
 
 /// Return boogie name of given module.
 pub fn boogie_module_name(env: &ModuleEnv<'_>) -> String {
@@ -338,14 +339,11 @@ pub fn boogie_type(env: &GlobalEnv, ty: &Type) -> String {
     use Type::*;
     match ty {
         Primitive(p) => match p {
-            U8 | U16 | U32 | U64 | U128 | U256 | Num | Address => "int".to_string(),
+            U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256 | Num
+            | Address => "int".to_string(),
             Signer => "$signer".to_string(),
             Bool => "bool".to_string(),
             Range | EventStore => panic!("unexpected type"),
-            I8 | I16 | I32 | I64 | I128 | I256 => {
-                // TODO(#17645): add support
-                unimplemented!("signed integer not supported");
-            },
         },
         Vector(et) => format!("Vec ({})", boogie_type(env, et)),
         Struct(mid, sid, inst) => boogie_struct_name(&env.get_module(*mid).into_struct(*sid), inst),
@@ -389,17 +387,16 @@ pub fn boogie_bv_type(env: &GlobalEnv, ty: &Type) -> String {
             U64 => "bv64".to_string(),
             U128 => "bv128".to_string(),
             U256 => "bv256".to_string(),
+            I8 | I16 | I32 | I64 | I128 | I256 => {
+                unimplemented!("{}", BV_TYPE_NOT_ENABLED_ERROR)
+            },
             Address => "int".to_string(),
             Signer => "$signer".to_string(),
             Bool => "bool".to_string(),
             Range | EventStore => panic!("unexpected type"),
             Num => {
                 //TODO(tengzhang): add error message with accurate location info
-                "<<num is not unsupported here>>".to_string()
-            },
-            I8 | I16 | I32 | I64 | I128 | I256 => {
-                // TODO(#17645): add support
-                unimplemented!("signed integer not supported")
+                "<<num is not supported here>>".to_string()
             },
         },
         Vector(et) => format!("Vec ({})", boogie_bv_type(env, et)),
@@ -424,9 +421,18 @@ pub fn boogie_num_type_base_bv(env: &GlobalEnv, loc: Option<Loc>, ty: &Type) -> 
         Type::Primitive(PrimitiveType::U64) => "Bv64",
         Type::Primitive(PrimitiveType::U128) => "Bv128",
         Type::Primitive(PrimitiveType::U256) => "Bv256",
+        Type::Primitive(PrimitiveType::I8)
+        | Type::Primitive(PrimitiveType::I16)
+        | Type::Primitive(PrimitiveType::I32)
+        | Type::Primitive(PrimitiveType::I64)
+        | Type::Primitive(PrimitiveType::I128)
+        | Type::Primitive(PrimitiveType::I256) => {
+            env.error(&loc.unwrap_or_default(), BV_TYPE_NOT_ENABLED_ERROR);
+            "<<signed integer is not supported here>>"
+        },
         Type::Primitive(PrimitiveType::Num) => {
             env.error(&loc.unwrap_or_default(), NUM_TYPE_BASE_ERROR);
-            "<<num is not unsupported here>>"
+            "<<num is not supported here>>"
         },
         _ => unreachable!(),
     };
@@ -454,13 +460,13 @@ pub fn boogie_num_literal(num: &String, base: usize, bv_flag: bool) -> String {
     }
 }
 
-pub fn boogie_num_type_string(num: &str, bv_flag: bool) -> String {
-    let pre = if bv_flag { "bv" } else { "u" };
+pub fn boogie_num_type_string(kind: &str, num: &str, bv_flag: bool) -> String {
+    let pre = if bv_flag { "bv" } else { kind };
     [pre, num].join("")
 }
 
-pub fn boogie_num_type_string_capital(num: &str, bv_flag: bool) -> String {
-    let pre = if bv_flag { "Bv" } else { "U" };
+pub fn boogie_num_type_string_capital(kind: &str, num: &str, bv_flag: bool) -> String {
+    let pre = if bv_flag { "Bv" } else { kind };
     [pre, num].join("")
 }
 
@@ -475,9 +481,13 @@ pub fn boogie_num_type_base(env: &GlobalEnv, loc: Option<Loc>, ty: &Type) -> Str
             U64 => "64".to_string(),
             U128 => "128".to_string(),
             U256 => "256".to_string(),
+            I8 | I16 | I32 | I64 | I128 | I256 => {
+                env.error(&loc.unwrap_or_default(), BV_TYPE_NOT_ENABLED_ERROR);
+                "<<signed integer is not supported here>>".to_string()
+            },
             Num => {
                 env.error(&loc.unwrap_or_default(), NUM_TYPE_BASE_ERROR);
-                "<<num is not unsupported here>>".to_string()
+                "<<num is not supported here>>".to_string()
             },
             _ => format!("<<unsupported {:?}>>", ty),
         },
@@ -492,16 +502,22 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
 
     match ty {
         Primitive(p) => match p {
-            U8 => boogie_num_type_string("8", bv_flag),
-            U16 => boogie_num_type_string("16", bv_flag),
-            U32 => boogie_num_type_string("32", bv_flag),
-            U64 => boogie_num_type_string("64", bv_flag),
-            U128 => boogie_num_type_string("128", bv_flag),
-            U256 => boogie_num_type_string("256", bv_flag),
+            U8 => boogie_num_type_string("u", "8", bv_flag),
+            U16 => boogie_num_type_string("u", "16", bv_flag),
+            U32 => boogie_num_type_string("u", "32", bv_flag),
+            U64 => boogie_num_type_string("u", "64", bv_flag),
+            U128 => boogie_num_type_string("u", "128", bv_flag),
+            U256 => boogie_num_type_string("u", "256", bv_flag),
+            I8 => boogie_num_type_string("i", "8", bv_flag),
+            I16 => boogie_num_type_string("i", "16", bv_flag),
+            I32 => boogie_num_type_string("i", "32", bv_flag),
+            I64 => boogie_num_type_string("i", "64", bv_flag),
+            I128 => boogie_num_type_string("i", "128", bv_flag),
+            I256 => boogie_num_type_string("i", "256", bv_flag),
             Num => {
                 if bv_flag {
                     //TODO(tengzhang): add error message with accurate location info
-                    "<<num is not unsupported here>>".to_string()
+                    "<<num is not supported here>>".to_string()
                 } else {
                     "num".to_string()
                 }
@@ -511,10 +527,6 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
             Bool => "bool".to_string(),
             Range => "range".to_string(),
             EventStore => format!("<<unsupported {:?}>>", ty),
-            I8 | I16 | I32 | I64 | I128 | I256 => {
-                // TODO(#17645): add support
-                unimplemented!("signed integer not supported")
-            },
         },
         Vector(et) => format!(
             "vec{}",
@@ -704,9 +716,17 @@ pub fn boogie_constant(env: &GlobalEnv, _options: &BoogieOptions, val: &Constant
         Constant::Bool(true) => "true".to_string(),
         Constant::Bool(false) => "false".to_string(),
         Constant::U8(num) => num.to_string(),
+        Constant::U16(num) => num.to_string(),
+        Constant::U32(num) => num.to_string(),
         Constant::U64(num) => num.to_string(),
         Constant::U128(num) => num.to_string(),
         Constant::U256(num) => num.to_string(),
+        Constant::I8(num) => num.to_string(),
+        Constant::I16(num) => num.to_string(),
+        Constant::I32(num) => num.to_string(),
+        Constant::I64(num) => num.to_string(),
+        Constant::I128(num) => num.to_string(),
+        Constant::I256(num) => num.to_string(),
         Constant::Address(v) => boogie_address(env, v),
         Constant::ByteArray(v) => boogie_byte_blob(_options, v, false),
         Constant::AddressArray(v) => boogie_address_blob(env, _options, v),
@@ -715,17 +735,6 @@ pub fn boogie_constant(env: &GlobalEnv, _options: &BoogieOptions, val: &Constant
                 .map(|v| boogie_constant(env, _options, v))
                 .collect_vec(),
         ),
-        Constant::U16(num) => num.to_string(),
-        Constant::U32(num) => num.to_string(),
-        Constant::I8(_)
-        | Constant::I16(_)
-        | Constant::I32(_)
-        | Constant::I64(_)
-        | Constant::I128(_)
-        | Constant::I256(_) => {
-            // TODO(#17645): add support
-            unimplemented!("signed integer not supported")
-        },
     }
 }
 
@@ -967,6 +976,12 @@ fn type_name_to_ident_tokens(
         Type::Primitive(PrimitiveType::U64) => TypeIdentToken::make("u64"),
         Type::Primitive(PrimitiveType::U128) => TypeIdentToken::make("u128"),
         Type::Primitive(PrimitiveType::U256) => TypeIdentToken::make("u256"),
+        Type::Primitive(PrimitiveType::I8) => TypeIdentToken::make("i8"),
+        Type::Primitive(PrimitiveType::I16) => TypeIdentToken::make("i16"),
+        Type::Primitive(PrimitiveType::I32) => TypeIdentToken::make("i32"),
+        Type::Primitive(PrimitiveType::I64) => TypeIdentToken::make("i64"),
+        Type::Primitive(PrimitiveType::I128) => TypeIdentToken::make("i128"),
+        Type::Primitive(PrimitiveType::I256) => TypeIdentToken::make("i256"),
         Type::Primitive(PrimitiveType::Address) => TypeIdentToken::make("address"),
         Type::Primitive(PrimitiveType::Signer) => TypeIdentToken::make("signer"),
         Type::Vector(element) => {
@@ -1021,15 +1036,6 @@ fn type_name_to_ident_tokens(
         // temporary types
         Type::Error | Type::Var(..) => {
             unreachable!("Unexpected temporary type in type_name call");
-        },
-        Type::Primitive(PrimitiveType::I8)
-        | Type::Primitive(PrimitiveType::I16)
-        | Type::Primitive(PrimitiveType::I32)
-        | Type::Primitive(PrimitiveType::I64)
-        | Type::Primitive(PrimitiveType::I128)
-        | Type::Primitive(PrimitiveType::I256) => {
-            // TODO(#17645): add support
-            unimplemented!("signed integer not supported")
         },
     }
 }
@@ -1103,6 +1109,12 @@ fn type_name_to_info_pack(env: &GlobalEnv, ty: &Type) -> Option<TypeInfoPack> {
         | Type::Primitive(PrimitiveType::U64)
         | Type::Primitive(PrimitiveType::U128)
         | Type::Primitive(PrimitiveType::U256)
+        | Type::Primitive(PrimitiveType::I8)
+        | Type::Primitive(PrimitiveType::I16)
+        | Type::Primitive(PrimitiveType::I32)
+        | Type::Primitive(PrimitiveType::I64)
+        | Type::Primitive(PrimitiveType::I128)
+        | Type::Primitive(PrimitiveType::I256)
         | Type::Primitive(PrimitiveType::Address)
         | Type::Primitive(PrimitiveType::Signer)
         | Type::Vector(_) => None,
@@ -1122,15 +1134,6 @@ fn type_name_to_info_pack(env: &GlobalEnv, ty: &Type) -> Option<TypeInfoPack> {
         // temporary types
         Type::Error | Type::Var(..) => {
             unreachable!("Unexpected temporary type in type_name call");
-        },
-        Type::Primitive(PrimitiveType::I8)
-        | Type::Primitive(PrimitiveType::I16)
-        | Type::Primitive(PrimitiveType::I32)
-        | Type::Primitive(PrimitiveType::I64)
-        | Type::Primitive(PrimitiveType::I128)
-        | Type::Primitive(PrimitiveType::I256) => {
-            // TODO(#17645): add support
-            unimplemented!("signed integer not supported")
         },
     }
 }

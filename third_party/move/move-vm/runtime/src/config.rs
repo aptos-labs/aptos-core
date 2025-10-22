@@ -48,6 +48,7 @@ pub struct VMConfig {
     /// If true, Move VM will try to fetch layout from remote cache.
     pub enable_layout_caches: bool,
     pub propagate_dependency_limit_error: bool,
+    pub enable_framework_for_option: bool,
 }
 
 impl Default for VMConfig {
@@ -74,6 +75,7 @@ impl Default for VMConfig {
             enable_enum_option: true,
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
+            enable_framework_for_option: true,
         }
     }
 }

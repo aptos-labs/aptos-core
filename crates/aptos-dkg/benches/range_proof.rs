@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_dkg::{
-    range_proofs::{dekart_univariate::Proof as UnivariateDeKART, traits::BatchedRangeProof},
-    utils::test_utils,
+    range_proofs::{
+        dekart_univariate::Proof as UnivariateDeKART,
+        //dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+        traits::BatchedRangeProof,
+    },
+    utils::test_utils::{self},
 };
 use ark_ec::pairing::Pairing;
 use ark_std::rand::thread_rng;
@@ -27,9 +31,10 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let (pk, _, values, comm, comm_r) =
-                    test_utils::range_proof_random_instance::<_, B, _>(n, ell, &mut rng);
-                (pk, values, comm, comm_r)
+                let (pk, _) = B::setup(n, ell, &mut rng);
+                let (values, comm, r) =
+                    test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+                (pk, values, comm, r)
             },
             |(pk, values, comm, r)| {
                 let mut fs_t = merlin::Transcript::new(B::DST);
@@ -43,8 +48,9 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(c: &mut Criterion, cur
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let (pk, vk, values, comm, r) =
-                    test_utils::range_proof_random_instance::<_, B, _>(n, ell, &mut rng);
+                let (pk, vk) = B::setup(n, ell, &mut rng);
+                let (values, comm, r) =
+                    test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
                 let mut fs_t = merlin::Transcript::new(B::DST);
                 let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
                 (vk, n, ell, comm, proof)
@@ -64,6 +70,9 @@ fn bench_groups(c: &mut Criterion) {
 
     bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254");
     bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381");
+
+    // bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254");
+    // bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381");
 }
 
 criterion_group!(

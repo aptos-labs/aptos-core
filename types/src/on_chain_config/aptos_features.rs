@@ -151,6 +151,7 @@ pub enum FeatureFlag {
     ENABLE_ENUM_OPTION = 101,
     /// Enables bytecode version v9
     VM_BINARY_FORMAT_V9 = 102,
+    ENABLE_FRAMEWORK_FOR_OPTION = 103,
 }
 
 impl FeatureFlag {
@@ -255,6 +256,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VM_BINARY_FORMAT_V9,
+            FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
         ]
     }
 }

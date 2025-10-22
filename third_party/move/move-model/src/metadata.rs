@@ -24,6 +24,12 @@ pub const LATEST_STABLE_COMPILER_VERSION: &str = LATEST_STABLE_COMPILER_VERSION_
 
 pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 
+// Language versions enabling specific features
+pub mod lang_feature_versions {
+    use crate::LanguageVersion;
+    pub const SINT_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_3;
+}
+
 // ================================================================================'
 // Metadata for compilation result (WORK IN PROGRESS)
 
