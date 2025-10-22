@@ -7,7 +7,6 @@ use aptos_crypto::hash::HashValue;
 use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::BlockExecutorTrait;
 use aptos_logger::info;
-use aptos_metrics_core::TimerHelper;
 use aptos_types::block_executor::{
     config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock,
 };
@@ -64,7 +63,7 @@ where
         );
         let num_input_txns = executable_block.transactions.num_transactions();
         {
-            let _timer = TIMER.timer_with(&["execute"]);
+            let _timer = TIMER.with_label_values(&["execute"]).start_timer();
             self.executor
                 .execute_and_update_state(
                     executable_block,

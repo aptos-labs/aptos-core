@@ -14,7 +14,6 @@ use crate::{
     },
     Sender,
 };
-use aptos_metrics_core::TimerHelper;
 use aptos_types::{
     block_executor::partitioner::{
         CrossShardDependencies, RoundId, ShardId, ShardedTxnIndex, SubBlock,
@@ -117,7 +116,9 @@ impl PartitionState {
         cross_shard_dep_avoid_threshold: f32,
         partition_last_round: bool,
     ) -> Self {
-        let _timer = MISC_TIMERS_SECONDS.timer_with(&["new"]);
+        let _timer = MISC_TIMERS_SECONDS
+            .with_label_values(&["new"])
+            .start_timer();
         let num_txns = txns.len();
         let sender_counter = AtomicUsize::new(0);
         let key_counter = AtomicUsize::new(0);

@@ -2,10 +2,6 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-pub use crate::{
-    avg_counter::{register_avg_counter, register_avg_counter_vec},
-    thread_local::{ThreadLocalHistogramVec, ThreadLocalIntCounter, ThreadLocalIntCounterVec},
-};
 // Re-export counter types from prometheus crate
 pub use prometheus::{
     exponential_buckets, gather, histogram_opts, register_counter, register_gauge,
@@ -16,29 +12,23 @@ pub use prometheus::{
 };
 
 mod avg_counter;
+pub use avg_counter::{register_avg_counter, register_avg_counter_vec};
 pub mod const_metric;
 pub mod op_counters;
-pub mod thread_local;
 
 pub trait TimerHelper {
-    type TimerType<'a>
-    where
-        Self: 'a;
+    fn timer_with(&self, labels: &[&str]) -> HistogramTimer;
 
-    fn timer_with<'a>(&'static self, labels: &'a [&str]) -> Self::TimerType<'a>;
-
-    fn observe_with(&'static self, labels: &[&str], val: f64);
+    fn observe_with(&self, labels: &[&str], val: f64);
 }
 
 impl TimerHelper for HistogramVec {
-    type TimerType<'a> = HistogramTimer;
-
-    fn timer_with<'a>(&'static self, labels: &'a [&str]) -> Self::TimerType<'a> {
-        self.with_label_values(labels).start_timer()
+    fn timer_with(&self, vals: &[&str]) -> HistogramTimer {
+        self.with_label_values(vals).start_timer()
     }
 
-    fn observe_with(&'static self, labels: &[&str], val: f64) {
-        self.with_label_values(labels).observe(val);
+    fn observe_with(&self, labels: &[&str], val: f64) {
+        self.with_label_values(labels).observe(val)
     }
 }
 
@@ -59,13 +49,13 @@ impl Drop for ConcurrencyGauge {
     }
 }
 
-pub trait IntGaugeVecHelper {
+pub trait IntGaugeHelper {
     fn set_with(&self, labels: &[&str], val: i64);
 
     fn concurrency_with(&self, labels: &[&str]) -> ConcurrencyGauge;
 }
 
-impl IntGaugeVecHelper for IntGaugeVec {
+impl IntGaugeHelper for IntGaugeVec {
     fn set_with(&self, labels: &[&str], val: i64) {
         self.with_label_values(labels).set(val)
     }
@@ -75,30 +65,22 @@ impl IntGaugeVecHelper for IntGaugeVec {
     }
 }
 
-pub trait IntCounterVecHelper {
-    type IntType;
-
-    fn inc_with(&'static self, labels: &[&str]);
-
-    fn inc_with_by(&'static self, labels: &[&str], by: Self::IntType);
-}
-
-impl IntCounterVecHelper for IntCounterVec {
-    type IntType = u64;
-
-    fn inc_with(&'static self, labels: &[&str]) {
-        self.with_label_values(labels).inc()
-    }
-
-    fn inc_with_by(&'static self, labels: &[&str], v: Self::IntType) {
-        self.with_label_values(labels).inc_by(v)
-    }
-}
-
 pub trait IntCounterHelper {
     type IntType;
 
-    fn inc(&'static self);
+    fn inc_with(&self, labels: &[&str]);
 
-    fn inc_by(&'static self, v: Self::IntType);
+    fn inc_with_by(&self, labels: &[&str], by: Self::IntType);
+}
+
+impl IntCounterHelper for IntCounterVec {
+    type IntType = u64;
+
+    fn inc_with(&self, labels: &[&str]) {
+        self.with_label_values(labels).inc()
+    }
+
+    fn inc_with_by(&self, labels: &[&str], v: Self::IntType) {
+        self.with_label_values(labels).inc_by(v)
+    }
 }

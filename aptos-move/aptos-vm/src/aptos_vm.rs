@@ -44,7 +44,6 @@ use aptos_gas_schedule::{
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
-use aptos_metrics_core::IntCounterVecHelper;
 #[cfg(any(test, feature = "testing"))]
 use aptos_types::state_store::StateViewId;
 use aptos_types::{
@@ -2868,7 +2867,7 @@ impl AptosVM {
                     TransactionStatus::Retry => None,
                 };
                 if let Some(label) = counter_label {
-                    USER_TRANSACTIONS_EXECUTED.inc_with(&[label]);
+                    USER_TRANSACTIONS_EXECUTED.with_label_values(&[label]).inc();
                 }
                 (vm_status, output)
             },
@@ -3139,7 +3138,9 @@ impl VMValidator for AptosVM {
             ),
         };
 
-        TRANSACTIONS_VALIDATED.inc_with(&[counter_label]);
+        TRANSACTIONS_VALIDATED
+            .with_label_values(&[counter_label])
+            .inc();
 
         result
     }

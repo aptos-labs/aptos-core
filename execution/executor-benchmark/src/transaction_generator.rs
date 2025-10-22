@@ -8,7 +8,6 @@ use crate::{
 };
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_logger::info;
-use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_sdk::{
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::LocalAccount,
@@ -684,7 +683,7 @@ impl TransactionGenerator {
         F: Fn(T, &AccountCache) -> Option<Transaction> + Send + Sync,
         S: Fn(&T) -> usize,
     {
-        let _timer = TIMER.timer_with(&["generate_block"]);
+        let _timer = TIMER.with_label_values(&["generate_block"]).start_timer();
         let block_size = inputs.len();
         let mut jobs = Vec::new();
         jobs.resize_with(self.num_workers, BTreeMap::new);
@@ -742,7 +741,9 @@ impl TransactionGenerator {
             );
         }
 
-        NUM_TXNS.inc_with_by(&["generation_done"], transactions.len() as u64);
+        NUM_TXNS
+            .with_label_values(&["generation_done"])
+            .inc_by(transactions.len() as u64);
 
         if let Some(sender) = &self.block_sender {
             sender.send(transactions).unwrap();

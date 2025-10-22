@@ -14,7 +14,6 @@ use aptos_executor::block_executor::BlockExecutor;
 use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecutorTrait};
 use aptos_infallible::Mutex;
 use aptos_logger::info;
-use aptos_metrics_core::IntCounterVecHelper;
 use aptos_types::{
     block_executor::partitioner::ExecutableBlock,
     transaction::{Transaction, TransactionPayload, Version},
@@ -208,7 +207,9 @@ where
                         }
                     }
 
-                    NUM_TXNS.inc_with_by(&["execution"], block_size);
+                    NUM_TXNS
+                        .with_label_values(&["execution"])
+                        .inc_by(block_size);
                     info!("Received block of size {:?} to execute", block_size);
                     executed += block_size;
                     stage_executed += block_size;
@@ -273,7 +274,8 @@ where
 
                 while let Ok(ledger_update_msg) = ledger_update_receiver.recv() {
                     NUM_TXNS
-                        .inc_with_by(&["ledger_update"], ledger_update_msg.num_input_txns as u64);
+                        .with_label_values(&["ledger_update"])
+                        .inc_by(ledger_update_msg.num_input_txns as u64);
                     ledger_update_stage.ledger_update(ledger_update_msg);
                 }
                 start_commit_tx.map(|tx| tx.send(()));
