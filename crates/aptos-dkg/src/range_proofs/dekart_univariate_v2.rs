@@ -750,8 +750,7 @@ mod fiat_shamir {
     }
 }
 
-/// Implements a two-term multi-scalar multiplication (MSM) homomorphism
-/// used within a sigma protocol.  
+/// Implements a two-term multi-scalar multiplication (MSM) homomorphism used within a sigma protocol.  
 ///
 /// This module defines a homomorphism that takes two scalar inputs and
 /// maps them to a single group element output using two fixed base points.
