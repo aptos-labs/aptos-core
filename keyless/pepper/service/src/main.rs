@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::constant_time;
+use aptos_keyless_pepper_common::PepperInput;
 use aptos_keyless_pepper_service::{
     accounts::{
         account_managers::{AccountRecoveryManager, AccountRecoveryManagers},
@@ -9,6 +10,8 @@ use aptos_keyless_pepper_service::{
             AccountRecoveryDBInterface, FirestoreAccountRecoveryDB, TestAccountRecoveryDB,
         },
     },
+    dedicated_handlers::pepper_request,
+    deployment_information::DeploymentInformation,
     external_resources::{
         jwk_fetcher,
         jwk_fetcher::{JWKCache, JWKIssuer},
@@ -33,6 +36,20 @@ use more_asserts::assert_le;
 use num_traits::ToPrimitive;
 use std::{convert::Infallible, net::SocketAddr, sync::Arc, time::Instant};
 
+// The key used to store the derived pepper in the deployment information
+const DERIVED_PEPPER_ON_STARTUP_KEY: &str = "derived_pepper_on_startup";
+
+// Constants for deriving the fixed pepper on startup. These are
+// hardcoded to ensure that the pepper derivation logic remains
+// consistent and backwards compatible across deployments.
+const FIXED_PEPPER_INPUT_ISS: &str = "fixed_issuer";
+const FIXED_PEPPER_INPUT_UID_KEY: &str = "fixed_sub";
+const FIXED_PEPPER_INPUT_UID_VAL: &str = "fixed_user_id";
+const FIXED_PEPPER_INPUT_AUD: &str = "fixed_audience";
+
+// The field name in the VUF JSON that contains the public key
+const PUBLIC_KEY_FIELD_NAME: &str = "public_key";
+
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
 struct Args {
@@ -49,6 +66,20 @@ struct Args {
     /// By default, async updates are enabled to avoid blocking request handlers.
     #[arg(long)]
     disable_async_db_updates: bool, // Defaults to false if not provided
+
+    /// If provided, the pepper service will compute a locally derived pepper
+    /// and compare it against this expected (hex encoded) value. This helps to
+    /// ensure that the pepper derivation logic is consistent and backwards
+    /// compatible. If no value is provided, no verification will be done.
+    #[arg(long)]
+    expected_derived_pepper_on_startup: Option<String>,
+
+    /// If provided, the pepper service will verify that the VUF public key
+    /// matches this expected (hex encoded) value on startup. This helps to
+    /// ensure that the correct VUF keypair is being used by the service. If
+    /// no value is provided, no verification will be done.
+    #[arg(long)]
+    expected_vuf_pubkey_on_startup: Option<String>,
 
     /// The Firestore database ID (required to connect to Firestore).
     /// Only required if not running in local development mode.
@@ -127,35 +158,6 @@ async fn main() {
     // Fetch the command line arguments
     let args = Args::parse();
 
-    // Ensure a timing side channel does not exist
-    let abs_max_t = ctbench::run_bench(
-        &BenchName("blstrs_scalar_mul/random_bases"),
-        constant_time::blstrs_scalar_mul::run_bench_with_random_bases,
-        None,
-    )
-    .1
-    .max_t
-    .abs()
-    .ceil()
-    .to_i64()
-    .expect("Floating point arithmetic went awry.");
-
-    assert_le!(abs_max_t, ABS_MAX_T);
-
-    let abs_max_t = ctbench::run_bench(
-        &BenchName("blstrs_scalar_mul/fixed_bases"),
-        constant_time::blstrs_scalar_mul::run_bench_with_fixed_bases,
-        None,
-    )
-    .1
-    .max_t
-    .abs()
-    .ceil()
-    .to_i64()
-    .expect("Floating point arithmetic went awry.");
-
-    assert_le!(abs_max_t, ABS_MAX_T);
-
     // Start the logger
     aptos_logger::Logger::new().init();
     info!("Starting the Pepper service...");
@@ -163,15 +165,27 @@ async fn main() {
     // Start the metrics server
     start_metrics_server();
 
+    // Get the deployment information
+    let deployment_information = DeploymentInformation::new();
+
     // Fetch the VUF public and private keypair (this will load the private key into memory)
     info!("Fetching the VUF public and private keypair for the pepper service...");
-    let vuf_keypair = vuf_keypair::get_pepper_service_vuf_keypair(
+    let vuf_keypair = Arc::new(vuf_keypair::get_pepper_service_vuf_keypair(
         args.vuf_private_key_hex,
         args.vuf_private_key_seed_hex,
-    );
+    ));
     info!(
         "Retrieved the VUF public key: {:?}",
         vuf_keypair.vuf_public_key_json()
+    );
+
+    // Verify the critical service invariants
+    info!("Verifying critical service invariants...");
+    verify_critical_service_invariants(
+        args.expected_vuf_pubkey_on_startup,
+        args.expected_derived_pepper_on_startup,
+        vuf_keypair.clone(),
+        deployment_information.clone(),
     );
 
     // Collect the account recovery managers
@@ -211,7 +225,6 @@ async fn main() {
     let jwk_cache = jwk_fetcher::start_jwk_fetchers(args.jwk_issuers_override.clone());
 
     // Start the pepper service
-    let vuf_keypair = Arc::new(vuf_keypair);
     start_pepper_service(
         args.pepper_service_port,
         vuf_keypair,
@@ -219,6 +232,7 @@ async fn main() {
         cached_resources,
         account_recovery_managers,
         account_recovery_db,
+        deployment_information,
     )
     .await;
 }
@@ -250,6 +264,7 @@ async fn start_pepper_service(
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
+    deployment_information: DeploymentInformation,
 ) {
     info!(
         "Starting the Pepper service request handler on port {}...",
@@ -264,6 +279,7 @@ async fn start_pepper_service(
         let cached_resources = cached_resources.clone();
         let account_recovery_managers = account_recovery_managers.clone();
         let account_recovery_db = account_recovery_db.clone();
+        let deployment_information = deployment_information.clone();
 
         async move {
             Ok::<_, Infallible>(service_fn(move |request| {
@@ -281,6 +297,7 @@ async fn start_pepper_service(
                 let cached_resources = cached_resources.clone();
                 let account_recovery_managers = account_recovery_managers.clone();
                 let account_recovery_db = account_recovery_db.clone();
+                let deployment_information = deployment_information.clone();
 
                 // Handle the request
                 async move {
@@ -292,6 +309,7 @@ async fn start_pepper_service(
                         cached_resources.clone(),
                         account_recovery_managers.clone(),
                         account_recovery_db.clone(),
+                        deployment_information.clone(),
                     )
                     .await;
 
@@ -338,5 +356,132 @@ async fn start_pepper_service(
     let server = Server::bind(&socket_addr).serve(make_service);
     if let Err(error) = server.await {
         panic!("Pepper service error! Error: {}", error);
+    }
+}
+
+/// Verifies that scalar multiplication is constant time
+fn verify_constant_time_scalar_multiplication() {
+    // Run the constant time benchmarks for random bases
+    let abs_max_t = ctbench::run_bench(
+        &BenchName("blstrs_scalar_mul/random_bases"),
+        constant_time::blstrs_scalar_mul::run_bench_with_random_bases,
+        None,
+    )
+    .1
+    .max_t
+    .abs()
+    .ceil()
+    .to_i64()
+    .expect("Floating point arithmetic went awry.");
+    assert_le!(abs_max_t, ABS_MAX_T);
+
+    // Run the constant time benchmarks for fixed bases
+    let abs_max_t = ctbench::run_bench(
+        &BenchName("blstrs_scalar_mul/fixed_bases"),
+        constant_time::blstrs_scalar_mul::run_bench_with_fixed_bases,
+        None,
+    )
+    .1
+    .max_t
+    .abs()
+    .ceil()
+    .to_i64()
+    .expect("Floating point arithmetic went awry.");
+    assert_le!(abs_max_t, ABS_MAX_T);
+}
+
+/// Verifies critical service invariants. If any of the invariants fail,
+/// this function will panic. This helps to ensure that no critical properties
+/// are violated during development, or after deployment.
+fn verify_critical_service_invariants(
+    expected_vuf_pubkey_on_startup: Option<String>,
+    expected_derived_pepper_on_startup: Option<String>,
+    vuf_keypair: Arc<VUFKeypair>,
+    deployment_information: DeploymentInformation,
+) {
+    // Verify constant-time scalar multiplication
+    info!("Verifying constant-time scalar multiplication...");
+    verify_constant_time_scalar_multiplication();
+
+    // Verify the VUF public key
+    if let Some(expected_vuf_pubkey) = expected_vuf_pubkey_on_startup {
+        info!("Verifying expected VUF public key...");
+        verify_expected_vuf_public_key(vuf_keypair.clone(), &expected_vuf_pubkey);
+    } else {
+        warn!("No expected VUF public key provided for startup verification!");
+    }
+
+    // Verify the expected derived pepper
+    if let Some(expected_derived_pepper) = expected_derived_pepper_on_startup {
+        info!("Verifying expected derived pepper...");
+        verify_expected_derived_pepper(
+            vuf_keypair,
+            &expected_derived_pepper,
+            deployment_information,
+        );
+    } else {
+        warn!("No expected derived pepper provided for startup verification!");
+    }
+}
+
+/// Verifies that the locally derived pepper matches the expected
+/// value, and if so, inserts it into the deployment information.
+/// This is useful for observability and debugging purposes.
+fn verify_expected_derived_pepper(
+    vuf_keypair: Arc<VUFKeypair>,
+    expected_derived_pepper: &str,
+    mut deployment_information: DeploymentInformation,
+) {
+    // Create the pepper input
+    let pepper_input = PepperInput {
+        iss: FIXED_PEPPER_INPUT_ISS.into(),
+        uid_key: FIXED_PEPPER_INPUT_UID_KEY.into(),
+        uid_val: FIXED_PEPPER_INPUT_UID_VAL.into(),
+        aud: FIXED_PEPPER_INPUT_AUD.into(),
+    };
+
+    // Derive the pepper locally and hex encode it
+    let (_, derived_pepper_bytes, _) =
+        pepper_request::derive_pepper_and_account_address(vuf_keypair, None, &pepper_input)
+            .unwrap();
+    let derived_pepper = hex::encode(derived_pepper_bytes);
+
+    // Verify the derived pepper matches the expected value
+    if derived_pepper != expected_derived_pepper {
+        panic!(
+            "The derived pepper does not match the expected value! Derived: {:?}, Expected: {:?}",
+            derived_pepper, expected_derived_pepper
+        );
+    }
+
+    // Insert the derived pepper into the deployment information
+    deployment_information
+        .extend_deployment_information(DERIVED_PEPPER_ON_STARTUP_KEY.into(), derived_pepper);
+}
+
+/// Verifies that the local public key matches the expected value
+fn verify_expected_vuf_public_key(vuf_keypair: Arc<VUFKeypair>, expected_vuf_public_key: &str) {
+    // Get the public key as a JSON value
+    let vuf_public_key_json = vuf_keypair.vuf_public_key_json();
+    let vuf_public_key_value = serde_json::from_str::<serde_json::Value>(vuf_public_key_json)
+        .expect("Failed to parse VUF public key as JSON!");
+
+    // Extract the public key from the JSON value
+    let vuf_public_key = vuf_public_key_value
+        .get(PUBLIC_KEY_FIELD_NAME)
+        .and_then(|value| value.as_str())
+        .unwrap_or_else(|| {
+            panic!(
+                "VUF public key JSON does not contain the {} field!",
+                PUBLIC_KEY_FIELD_NAME
+            )
+        });
+
+    // Verify the public key matches the expected value
+    if vuf_public_key != expected_vuf_public_key {
+        panic!(
+            "The VUF public key does not match the expected value! Actual: {:?}, Expected: {:?}",
+            vuf_public_key, expected_vuf_public_key
+        );
     }
 }
