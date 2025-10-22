@@ -3939,6 +3939,7 @@ dependencies = [
  "aptos-temppath",
  "byteorder",
  "dunce",
+ "once_cell",
  "proptest",
  "rand 0.7.3",
  "rocksdb",

@@ -265,8 +265,7 @@ impl DB {
     }
 
     fn write_schemas_inner(&self, batch: impl IntoRawBatch, option: &WriteOptions) -> DbResult<()> {
-        let labels = [self.name.as_str()];
-        let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS.timer_with(&labels);
+        let _timer = APTOS_SCHEMADB_BATCH_COMMIT_LATENCY_SECONDS.timer_with(&[&self.name]);
 
         let raw_batch = batch.into_raw_batch(self)?;
 

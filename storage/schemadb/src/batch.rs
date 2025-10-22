@@ -174,8 +174,7 @@ impl WriteBatch for SchemaBatch {
 
 impl IntoRawBatch for SchemaBatch {
     fn into_raw_batch(self, db: &DB) -> DbResult<RawBatch> {
-        let labels = ["schema_batch_to_raw_batch", &db.name];
-        let _timer = TIMER.timer_with(&labels);
+        let _timer = TIMER.timer_with(&["schema_batch_to_raw_batch", &db.name]);
 
         let Self { rows, stats } = self;
 
