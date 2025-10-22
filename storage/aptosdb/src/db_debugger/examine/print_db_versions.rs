@@ -41,9 +41,13 @@ impl Cmd {
             enable_storage_sharding: self.sharding_config.enable_storage_sharding,
             ..Default::default()
         };
+        let env = None;
+        let block_cache = None;
         let (ledger_db, state_merkle_db, state_kv_db) = AptosDB::open_dbs(
             &StorageDirPaths::from_path(&self.db_dir),
             rocksdb_config,
+            env,
+            block_cache,
             /*readonly=*/ true,
             /*max_num_nodes_per_lru_cache_shard=*/ 0,
         )?;
