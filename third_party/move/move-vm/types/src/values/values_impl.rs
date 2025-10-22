@@ -426,6 +426,7 @@ trait VMValueRef<T> {
 macro_rules! impl_vm_value_ref {
     ($ty:ty, $tc:ident) => {
         impl VMValueRef<$ty> for Value {
+            #[cfg_attr(feature = "inline-vm-casts", inline)]
             fn value_ref(&self) -> PartialVMResult<&$ty> {
                 return match self {
                     Value::$tc(x) => Ok(x),
