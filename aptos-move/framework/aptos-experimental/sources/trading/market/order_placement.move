@@ -63,7 +63,7 @@ module aptos_experimental::order_placement {
         is_pre_cancelled
     };
     use aptos_experimental::order_book_types::{
-        OrderIdType, OrderMatchDetails, single_order_book_type, OrderBookType
+        OrderIdType, OrderMatchDetails, single_order_type, OrderType
     };
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book_types::{TimeInForce, immediate_or_cancel, post_only};
@@ -281,6 +281,7 @@ module aptos_experimental::order_placement {
                 is_bid,
                 limit_price,
                 time_in_force,
+                single_order_type(),
                 metadata
             ),
             remaining_size,
@@ -407,7 +408,7 @@ module aptos_experimental::order_placement {
         time_in_force: TimeInForce,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
-        let is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_book_type();
+        let is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_type();
         if (is_bulk_order) {
             return cancel_bulk_maker_order_internal(
                 market,
@@ -520,6 +521,7 @@ module aptos_experimental::order_placement {
                 is_bid,
                 limit_price,
                 time_in_force,
+                single_order_type(),
                 metadata
             ),
             size_delta,
@@ -539,7 +541,7 @@ module aptos_experimental::order_placement {
         user_addr: address,
         order_id: OrderIdType,
         client_order_id: Option<String>,
-        book_type: OrderBookType,
+        order_type: OrderType,
         is_bid: bool,
         time_in_force: TimeInForce,
         cleanup_size: u64,
@@ -548,7 +550,7 @@ module aptos_experimental::order_placement {
         callbacks: &MarketClearinghouseCallbacks<M, R>,
         is_taker: bool
     ) {
-        if (book_type == single_order_book_type()) {
+        if (order_type == single_order_type()) {
             callbacks.cleanup_order(
                 new_clearinghouse_order_info(
                     user_addr,
@@ -557,6 +559,7 @@ module aptos_experimental::order_placement {
                     is_bid,
                     price,
                     time_in_force,
+                    single_order_type(),
                     metadata
                 ),
                 cleanup_size,
@@ -587,7 +590,7 @@ module aptos_experimental::order_placement {
             market.get_order_book_mut()
                 .get_single_match_for_taker(price, *remaining_size, is_bid);
         let (maker_order, maker_matched_size) = result.destroy_order_match();
-        let is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_book_type();
+        let is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_type();
         if (!market.is_allowed_self_trade() && maker_order.get_account_from_match_details() == user_addr) {
             cancel_maker_order_internal(
                 market,
@@ -613,7 +616,8 @@ module aptos_experimental::order_placement {
                 is_bid,
                 price,
                 time_in_force,
-                metadata
+                single_order_type(),
+                metadata,
             ),
             new_clearinghouse_order_info(
                 maker_order.get_account_from_match_details(),
@@ -622,6 +626,7 @@ module aptos_experimental::order_placement {
                 maker_order.is_bid_from_match_details(),
                 maker_order.get_price_from_match_details(),
                 maker_order.get_time_in_force_from_match_details(),
+                maker_order.get_book_type_from_match_details(),
                 maker_order.get_metadata_from_match_details()
             ),
             fill_id,
@@ -788,6 +793,7 @@ module aptos_experimental::order_placement {
                 is_bid,
                 limit_price,
                 time_in_force,
+                single_order_type(),
                 metadata
             ),
             remaining_size,
@@ -984,7 +990,7 @@ module aptos_experimental::order_placement {
             };
             if (remaining_size == 0) {
                 cleanup_order_internal(
-                    user_addr, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, 0, limit_price, metadata, callbacks, true
+                    user_addr, order_id, client_order_id, single_order_type(), is_bid, time_in_force, 0, limit_price, metadata, callbacks, true
                 );
                 break;
             };

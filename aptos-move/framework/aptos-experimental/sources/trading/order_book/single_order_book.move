@@ -25,7 +25,7 @@ module aptos_experimental::single_order_book {
         new_unique_idx_type,
         new_account_client_order_id,
         new_default_big_ordered_map, OrderMatch, new_order_match, new_single_order_match_details, OrderMatchDetails,
-        UniqueIdxType, single_order_book_type
+        UniqueIdxType, single_order_type
     };
     use aptos_experimental::single_order_types::{
         OrderWithState,
@@ -298,7 +298,7 @@ module aptos_experimental::single_order_book {
         };
         price_time_idx.place_maker_order(
             order_req.order_id,
-            single_order_book_type(),
+            single_order_type(),
             order_req.price,
             ascending_idx,
             order_req.remaining_size,
@@ -374,7 +374,7 @@ module aptos_experimental::single_order_book {
     ): OrderMatch<M> {
         let (order_id, matched_size, remaining_size, order_book_type) =
             active_matched_order.destroy_active_matched_order();
-        assert!(order_book_type == single_order_book_type(), ENOT_SINGLE_ORDER_BOOK);
+        assert!(order_book_type == single_order_type(), ENOT_SINGLE_ORDER_BOOK);
 
         let order_with_state = if (remaining_size == 0) {
             let order = self.orders.remove(&order_id);
