@@ -41,7 +41,7 @@ use crate::{
         mixed::MixedPayloadClient, user::quorum_store_client::QuorumStoreClient, PayloadClient,
     },
     payload_manager::{DirectMempoolPayloadManager, TPayloadManager},
-    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData},
+    persistent_liveness_storage::{LedgerRecoveryData, PersistentLivenessStorage, RecoveryData, StorageWriteProxy},
     pipeline::execution_client::TExecutionClient,
     quorum_store::{
         quorum_store_builder::{DirectMempoolInnerBuilder, InnerBuilder, QuorumStoreBuilder},
@@ -147,11 +147,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     quorum_store_enabled: bool,
     quorum_store_to_mempool_sender: Sender<QuorumStoreRequest>,
     execution_client: Arc<dyn TExecutionClient>,
-
-    storage: Arc<dyn PersistentLivenessStorage>,
-    safety_rules_manager: SafetyRulesManager,
     key_storage: PersistentSafetyStorage,
-
     vtxn_pool: VTxnPoolState,
     reconfig_events: ReconfigNotificationListener<P>,
     // channels to rand manager
@@ -189,17 +185,23 @@ pub struct RoundManagerInstance {
     buffered_proposal_tx: Option<aptos_channel::Sender<Author, VerifiedEvent>>,
     round_manager_close_tx: Option<oneshot::Sender<oneshot::Sender<()>>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
+    storage: Arc<dyn PersistentLivenessStorage>,
     safety_rules_manager: SafetyRulesManager,
 }
 
 impl RoundManagerInstance {
-    pub fn new(consensus_id: ConsensusId, safety_rules_manager: SafetyRulesManager) -> Self {
+    pub fn new(
+        consensus_id: ConsensusId,
+        storage: Arc<dyn PersistentLivenessStorage>,
+        safety_rules_manager: SafetyRulesManager,
+    ) -> Self {
         Self {
             consensus_id,
             round_manager_tx: None,
             buffered_proposal_tx: None,
             round_manager_close_tx: None,
             pending_blocks: Arc::new(Mutex::new(PendingBlocks::new())),
+            storage,
             safety_rules_manager,
         }
     }
@@ -284,7 +286,6 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         let config = node_config.consensus.clone();
         let dag_config = node_config.dag_consensus.clone();
         let sr_config = &node_config.consensus.safety_rules;
-        let safety_rules_manager = SafetyRulesManager::new(sr_config);
         let key_storage = safety_rules_manager::storage(sr_config);
         let consensus_txn_filter_config = node_config.transaction_filters.consensus_filter.clone();
         let quorum_store_txn_filter_config =
@@ -302,8 +303,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             quorum_store_enabled: false,
             quorum_store_to_mempool_sender,
             execution_client,
-            storage,
-            safety_rules_manager,
+            key_storage,
             vtxn_pool,
             reconfig_events,
             rand_manager_msg_tx: None,
@@ -327,21 +327,38 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .time_to_live(Duration::from_secs(20))
                 .build(),
             consensus_publisher,
-            key_storage,
             consensus_txn_filter_config,
             quorum_store_txn_filter_config,
             round_managers: CONSENSUS_IDS
                 .iter()
                 .map(|consensus_id| {
+                    // Generate namespace suffix based on consensus_id
+                    let namespace_suffix = match consensus_id {
+                        ConsensusId::Primary => "primary".to_string(),
+                        ConsensusId::Proxy(hash) => format!("proxy_{}", hex::encode(hash.as_ref())),
+                    };
+
+                    // Create per-instance storage with namespace
+                    let instance_storage = Arc::new(StorageWriteProxy::new_with_namespace(
+                        node_config,
+                        storage.aptos_db(),
+                        &namespace_suffix,
+                    ));
+
                     // Create namespaced safety rules config for this instance
                     let namespaced_sr_config = create_namespaced_safety_rules_config(
                         &node_config.consensus.safety_rules,
                         consensus_id,
                     );
                     let instance_sr_manager = SafetyRulesManager::new(&namespaced_sr_config);
+
                     (
                         consensus_id.clone(),
-                        RoundManagerInstance::new(consensus_id.clone(), instance_sr_manager),
+                        RoundManagerInstance::new(
+                            consensus_id.clone(),
+                            instance_storage,
+                            instance_sr_manager,
+                        ),
                     )
                 })
                 .collect(),
@@ -377,6 +394,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         &self,
         epoch_state: &EpochState,
         onchain_config: &OnChainConsensusConfig,
+        consensus_id: ConsensusId,
     ) -> Arc<dyn ProposerElection + Send + Sync> {
         let proposers = epoch_state
             .verifier
@@ -431,7 +449,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 let backend = Arc::new(AptosDBBackend::new(
                     window_size,
                     seek_len,
-                    self.storage.aptos_db(),
+                    self.round_managers.get(&consensus_id).expect("Consensus instance must exist").storage.aptos_db(),
                 ));
                 let voting_powers: Vec<_> = if weight_by_voting_power {
                     proposers
@@ -514,7 +532,10 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         );
         // If we are considering beyond the current epoch, we need to fetch validators for those epochs
         if epoch_state.epoch > first_epoch_to_consider {
-            self.storage
+            self.round_managers
+                .get(&ConsensusId::Primary)
+                .expect("Primary instance must exist")
+                .storage
                 .aptos_db()
                 .get_epoch_ending_ledger_infos(first_epoch_to_consider - 1, epoch_state.epoch)
                 .map_err(Into::into)
@@ -549,6 +570,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "[EpochManager] receive {}", request,
         );
         let proof = self
+            .round_managers
+            .get(&ConsensusId::Primary)
+            .expect("Primary instance must exist")
             .storage
             .aptos_db()
             .get_epoch_ending_ledger_infos(request.start_epoch, request.end_epoch)
@@ -788,11 +812,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         let (close_tx, close_rx) = oneshot::channel();
         self.round_managers.get_mut(&consensus_id).unwrap().update_round_manager_close_tx(close_tx);
+        let instance_storage = self
+            .round_managers
+            .get(&consensus_id)
+            .expect("Consensus instance must exist")
+            .storage
+            .clone();
         let recovery_manager = RecoveryManager::new(
             consensus_id.clone(),
             epoch_state,
             network_sender,
-            self.storage.clone(),
+            instance_storage,
             self.execution_client.clone(),
             ledger_data.committed_round(),
             self.config
@@ -838,7 +868,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 consensus_to_quorum_store_rx,
                 self.quorum_store_to_mempool_sender.clone(),
                 self.config.mempool_txn_pull_timeout_ms,
-                self.storage.aptos_db().clone(),
+                self.round_managers
+                    .get(&ConsensusId::Primary)
+                    .expect("Primary instance must exist")
+                    .storage
+                    .aptos_db()
+                    .clone(),
                 network_sender,
                 epoch_state.verifier.clone(),
                 self.proof_cache.clone(),
@@ -924,8 +959,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             .round_managers
             .get(&consensus_id)
             .expect("missing consensus instance");
+        let instance_storage = instance.storage.clone();
         let mut safety_rules =
-            MetricsSafetyRules::new(instance.safety_rules_manager.client(), self.storage.clone());
+            MetricsSafetyRules::new(instance.safety_rules_manager.client(), instance_storage.clone());
         match safety_rules.perform_initialize() {
             Err(e) if matches!(e, Error::ValidatorNotInSet(_)) => {
                 warn!(
@@ -950,7 +986,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
 
         info!(epoch = epoch, "Create ProposerElection");
         let proposer_election =
-            self.create_proposer_election(&epoch_state, &onchain_consensus_config);
+            self.create_proposer_election(&epoch_state, &onchain_consensus_config, consensus_id.clone());
         let chain_health_backoff_config =
             ChainHealthBackoffConfig::new(self.config.chain_health_backoff.clone());
         let pipeline_backpressure_config = PipelineBackpressureConfig::new(
@@ -983,7 +1019,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         // Read the last vote, before "moving" `recovery_data`
         let last_vote = recovery_data.last_vote();
         let block_store = Arc::new(BlockStore::new(
-            Arc::clone(&self.storage),
+            Arc::clone(&instance_storage),
             recovery_data,
             self.execution_client.clone(),
             self.config.max_pruned_blocks_in_mem,
@@ -1075,7 +1111,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             proposal_generator,
             safety_rules_container,
             network_sender,
-            self.storage.clone(),
+            instance_storage.clone(),
             onchain_consensus_config,
             buffered_proposal_tx,
             self.consensus_txn_filter_config.clone(),
@@ -1487,7 +1523,13 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
         fast_rand_config: Option<RandConfig>,
         rand_msg_rx: aptos_channel::Receiver<AccountAddress, IncomingRandGenRequest>,
     ) {
-        match self.storage.start(
+        let instance_storage = self
+            .round_managers
+            .get(&consensus_id)
+            .expect("Consensus instance must exist")
+            .storage
+            .clone();
+        match instance_storage.start(
             consensus_config.order_vote_enabled(),
             consensus_config.window_size(),
         ) {
@@ -1552,6 +1594,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             "decoupled execution must be enabled"
         );
         let highest_committed_round = self
+            .round_managers
+            .get(&ConsensusId::Primary)
+            .expect("Primary instance must exist")
             .storage
             .aptos_db()
             .get_latest_ledger_info()
@@ -1582,11 +1627,17 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
             epoch_state.verifier.get_ordered_account_addresses(),
             onchain_dag_consensus_config.dag_ordering_causal_history_window as u64,
         );
+        let primary_storage = self
+            .round_managers
+            .get(&ConsensusId::Primary)
+            .expect("Primary instance must exist")
+            .storage
+            .clone();
         let dag_storage = Arc::new(StorageAdapter::new(
             epoch,
             epoch_to_validators,
-            self.storage.consensus_db(),
-            self.storage.aptos_db(),
+            primary_storage.consensus_db(),
+            primary_storage.aptos_db(),
         ));
 
         let network_sender_arc = Arc::new(network_sender);

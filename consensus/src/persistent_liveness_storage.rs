@@ -488,6 +488,18 @@ impl StorageWriteProxy {
         let db = Arc::new(ConsensusDB::new(config.storage.dir()));
         StorageWriteProxy { db, aptos_db }
     }
+
+    /// Create a StorageWriteProxy with a namespaced subdirectory for consensus state
+    /// e.g., <storage_dir>/consensus_primary/consensus_db
+    pub fn new_with_namespace(
+        config: &NodeConfig,
+        aptos_db: Arc<dyn DbReader>,
+        namespace: &str,
+    ) -> Self {
+        let namespaced_dir = config.storage.dir().join(format!("consensus_{}", namespace));
+        let db = Arc::new(ConsensusDB::new(namespaced_dir));
+        StorageWriteProxy { db, aptos_db }
+    }
 }
 
 impl PersistentLivenessStorage for StorageWriteProxy {
