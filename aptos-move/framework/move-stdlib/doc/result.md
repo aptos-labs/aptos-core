@@ -3,6 +3,7 @@
 
 # Module `0x1::result`
 
+Provides the <code><a href="result.md#0x1_result_Result">Result</a>&lt;T, E&gt;</code> type, which allows to represent a success value <code>T</code> or an error value <code>E</code>.
 
 
 -  [Enum `Result`](#0x1_result_Result)

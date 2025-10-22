@@ -29,8 +29,12 @@ module std::reflect {
     /// `T = u64` can be derived. If not all type parameters can be inferred, an error will be
     /// produced.
     public fun resolve<FuncType>(
-        addr: address, module_name: &String, func_name: &String): Result<FuncType, ReflectionError> {
-        assert!(features::is_function_reflection_enabled(), error::invalid_state(EFEATURE_NOT_ENABLED));
+        addr: address, module_name: &String, func_name: &String
+    ): Result<FuncType, ReflectionError> {
+        assert!(
+            features::is_function_reflection_enabled(),
+            error::invalid_state(EFEATURE_NOT_ENABLED)
+        );
         native_resolve(addr, module_name, func_name)
     }
 
@@ -46,7 +50,7 @@ module std::reflect {
 
     /// Returns numerical code associated with error.
     public fun error_code(self: ReflectionError): u64 {
-        match (self) {
+        match(self) {
             InvalidIdentifier => 0,
             FunctionNotFound => 1,
             FunctionNotAccessible => 2,
@@ -56,5 +60,6 @@ module std::reflect {
     }
 
     native fun native_resolve<FuncType>(
-        addr: address, module_name: &String, func_name: &String): Result<FuncType, ReflectionError>;
+        addr: address, module_name: &String, func_name: &String
+    ): Result<FuncType, ReflectionError>;
 }
