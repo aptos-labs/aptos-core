@@ -427,10 +427,14 @@ macro_rules! impl_vm_value_ref {
     ($ty:ty, $tc:ident) => {
         impl VMValueRef<$ty> for Value {
             fn value_ref(&self) -> PartialVMResult<&$ty> {
-                match self {
+                return match self {
                     Value::$tc(x) => Ok(x),
-                    _ => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("cannot take {:?} as &{}", self, stringify!($ty)))),
+                    _ => __cannot_ref_cast(self),
+                };
+                #[cold]
+                fn __cannot_ref_cast(v: &Value) -> PartialVMResult<&$ty> {
+                    Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("cannot take {:?} as &{}", v, stringify!($ty))))
                 }
             }
         }
@@ -2444,10 +2448,14 @@ macro_rules! impl_vm_value_cast {
         impl VMValueCast<$ty> for Value {
             #[cfg_attr(feature = "inline-vm-casts", inline)]
             fn cast(self) -> PartialVMResult<$ty> {
-                match self {
+                return match self {
                     Value::$tc(x) => Ok(x),
-                    v => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                        .with_message(format!("cannot cast {:?} to {}", v, stringify!($ty)))),
+                    v => __cannot_cast(v),
+                };
+                #[cold]
+                fn __cannot_cast(v: Value) -> PartialVMResult<$ty> {
+                    Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                        .with_message(format!("cannot cast {:?} to {}", v, stringify!($ty))))
                 }
             }
         }
