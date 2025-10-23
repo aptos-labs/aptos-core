@@ -18,7 +18,6 @@ types of pending orders are supported.
 
 -  [Enum `SingleOrderRequest`](#0x7_single_order_book_SingleOrderRequest)
 -  [Enum `SingleOrderBook`](#0x7_single_order_book_SingleOrderBook)
--  [Enum `OrderType`](#0x7_single_order_book_OrderType)
 -  [Struct `TestMetadata`](#0x7_single_order_book_TestMetadata)
 -  [Constants](#@Constants_0)
 -  [Function `__lambda__1__get_single_match_for_taker`](#0x7_single_order_book___lambda__1__get_single_match_for_taker)
@@ -197,71 +196,6 @@ types of pending orders are supported.
 <dd>
 
 </dd>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
-<a id="0x7_single_order_book_OrderType"></a>
-
-## Enum `OrderType`
-
-
-
-<pre><code>enum <a href="single_order_book.md#0x7_single_order_book_OrderType">OrderType</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>GoodTilCancelled</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>PostOnly</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>FillOrKill</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
 </dl>
 
 
