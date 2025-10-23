@@ -2009,12 +2009,12 @@ impl Frame {
                             gas_meter.charge_br_true(Some(*offset))?;
                             self.pc = *offset;
                             trace_logger.record_successful_instruction();
-                            trace_logger.record_branch_taken();
+                            trace_logger.record_branch(true);
                             break;
                         } else {
                             gas_meter.charge_br_true(None)?;
                             trace_logger.record_successful_instruction();
-                            trace_logger.record_branch_not_taken();
+                            trace_logger.record_branch(false);
                         }
                     },
                     Bytecode::BrFalse(offset) => {
@@ -2022,12 +2022,12 @@ impl Frame {
                             gas_meter.charge_br_false(Some(*offset))?;
                             self.pc = *offset;
                             trace_logger.record_successful_instruction();
-                            trace_logger.record_branch_taken();
+                            trace_logger.record_branch(true);
                             break;
                         } else {
                             gas_meter.charge_br_false(None)?;
                             trace_logger.record_successful_instruction();
-                            trace_logger.record_branch_not_taken();
+                            trace_logger.record_branch(false);
                         }
                     },
                     Bytecode::Branch(offset) => {

@@ -494,7 +494,7 @@ impl SimpleVMTestAdapter<'_> {
                     &mut logger,
                 );
                 let trace = logger.finish();
-                let replay_result = AsyncRuntimeTypeCheck::new(code_storage).replay(trace.clone());
+                let replay_result = AsyncRuntimeTypeCheck::new(code_storage).replay(&trace);
                 match replay_result {
                     Ok(_) => match result {
                         Ok(return_values) => (return_values, Some(trace)),
