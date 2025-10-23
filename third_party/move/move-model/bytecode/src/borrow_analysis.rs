@@ -240,12 +240,10 @@ impl BorrowInfo {
             "borrowed_by",
             self.borrowed_by.iter().map(borrows_str).join(", "),
         );
-        /*
         add(
             "borrows_from",
             self.borrows_from.iter().map(borrows_str).join(", "),
         );
-         */
         parts.iter().join("\n")
     }
 
