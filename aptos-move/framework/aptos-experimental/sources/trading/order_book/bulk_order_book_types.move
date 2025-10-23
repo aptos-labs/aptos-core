@@ -566,6 +566,12 @@ module aptos_experimental::bulk_order_book_types {
         self.account
     }
 
+    public(friend) fun get_sequence_number<M: store + copy + drop>(
+        self: &BulkOrder<M>,
+    ): u64 {
+        self.order_sequence_number
+    }
+
     /// Gets the active price for a specific side of a bulk order.
     ///
     /// # Arguments:
