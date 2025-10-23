@@ -189,9 +189,9 @@ module aptos_experimental::price_time_index {
         unique_priority_idx: UniqueIdxType, is_bid: bool
     ): UniqueIdxType {
         if (is_bid) {
-            unique_priority_idx
-        } else {
             unique_priority_idx.descending_idx()
+        } else {
+            unique_priority_idx
         }
     }
 
@@ -546,6 +546,131 @@ module aptos_experimental::price_time_index {
         );
         active_order_book.destroy_price_time_idx();
     }
+
+    #[test_only]
+    fun test_time_based_priority_helper(maker_is_bid: bool) {
+        let active_order_book = new_price_time_idx();
+
+        assert!(active_order_book.best_bid_price().is_none());
+        assert!(active_order_book.best_ask_price().is_none());
+
+        // $200 - 10000
+        // --
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xAA,
+                    order_id: new_order_id_type(0),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(0),
+                    is_bid: maker_is_bid
+                }
+            );
+        assert!(match_result.is_empty());
+
+        // Another order at same price, later timestamp
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xBB,
+                    order_id: new_order_id_type(1),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(1),
+                    is_bid: maker_is_bid
+                }
+            );
+        assert!(match_result.is_empty());
+
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xDD,
+                    order_id: new_order_id_type(2),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(2),
+                    is_bid: maker_is_bid
+                }
+            );
+        assert!(match_result.is_empty());
+
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xCC,
+                    order_id: new_order_id_type(3),
+                    price: 200,
+                    size: 500,
+                    unique_idx: new_unique_idx_type(3),
+                    is_bid: !maker_is_bid
+                }
+            );
+        assert!(match_result.length() == 1);
+        // TODO - seems like we have no match price in ActiveMatchResult any more
+        // we need to add it back, and assert?
+        // Maker order was partially filled 100 -> 900 remaining
+        assert!(
+            match_result
+                == vector[
+                new_active_matched_order(
+                    new_order_id_type(0),
+                    500, // matched size
+                    500, // remaining size
+                    single_order_type()
+                )
+            ]
+        );
+
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xCC,
+                    order_id: new_order_id_type(4),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(4),
+                    is_bid: !maker_is_bid
+                }
+            );
+
+        assert!(match_result.length() == 2);
+        // First maker order fully filled
+        assert!(
+            match_result[0]
+                == new_active_matched_order(
+                    new_order_id_type(0),
+                    500, // matched size
+                    0, // remaining size
+                    single_order_type()
+                )
+        );
+        // Second maker order partially filled
+        assert!(
+            match_result[1]
+                == new_active_matched_order(
+                    new_order_id_type(1),
+                    500, // matched size
+                    500, // remaining size
+                    single_order_type()
+                )
+        );
+
+        active_order_book.destroy_price_time_idx();
+    }
+
+    #[test]
+    fun test_time_based_priority_for_bid() {
+        test_time_based_priority_helper(true);
+    }
+
+    #[test]
+    fun test_time_based_priority_for_sell() {
+        test_time_based_priority_helper(false);
+    }
+
+
 
     #[test]
     fun test_get_impact_sell_price() {

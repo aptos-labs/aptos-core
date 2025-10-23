@@ -350,6 +350,7 @@ module aptos_experimental::bulk_order_book {
             let existing_sequence_number = get_sequence_number_from_bulk_order(&old_order);
             if (new_sequence_number <= existing_sequence_number) {
                 // Return rejection response for invalid sequence number
+                self.orders.add(account, old_order); // Re-add the old order back since we are rejecting the new one
                 return new_bulk_order_place_response_rejection(
                     std::string::utf8(b"Invalid sequence number")
                 );
