@@ -3,6 +3,8 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+- Update the default version of move formatter to 1.3.7
+- Update the default version of move mutation test tool to 2.0.0
 
 ## [7.10.0]
 - Add support into Move 2.3 for signed integer types and builtin constants (`MAX_U8`, ..., `MIN_U8`, ..., `__COMPILE_FOR_TESTING__`). Move 2.3 is not yet supported on testnet or mainnet, but can be used for local development by providing `--language-version 2.3` to the CLI.
