@@ -1383,7 +1383,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_bytes",
- "sha3 0.9.1",
+ "sha3 0.10.8",
  "static_assertions",
 ]
 

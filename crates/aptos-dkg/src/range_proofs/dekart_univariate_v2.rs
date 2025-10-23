@@ -39,7 +39,7 @@ pub struct Proof<E: Pairing> {
 pub struct Commitment<E: Pairing>(E::G1);
 
 #[allow(non_snake_case)]
-#[derive(Clone, Debug)]
+#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
     vk: VerificationKey<E>,
     ck_S: univariate_hiding_kzg::CommitmentKey<E>,
@@ -54,7 +54,7 @@ pub struct PublicStatement<E: Pairing> {
     comm: Commitment<E>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     xi_1: E::G1Affine,
     lagr_0: E::G1Affine,
@@ -89,13 +89,13 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProverPrecomputed<E: Pairing> {
     powers_of_two: Vec<E::ScalarField>,
     h_denom_eval: Vec<E::ScalarField>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
 pub struct VerifierPrecomputed<E: Pairing> {
     powers_of_two: Vec<E::ScalarField>,
 }

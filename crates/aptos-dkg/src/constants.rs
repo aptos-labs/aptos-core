@@ -4,6 +4,9 @@
 use num_bigint::BigUint;
 use once_cell::sync::Lazy;
 
+#[path = "../shared/build_constants.rs"]
+pub mod build_constants;
+
 //
 // Sizes
 //

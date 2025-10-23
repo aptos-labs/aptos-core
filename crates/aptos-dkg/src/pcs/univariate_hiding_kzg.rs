@@ -35,14 +35,14 @@ pub struct OpeningProof<E: Pairing> {
     pi_2: E::G1,
 }
 
-#[derive(CanonicalSerialize, Debug, Clone)]
+#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     pub xi_2: E::G2Affine,
     pub tau_2: E::G2Affine,
     pub group_generators: GroupGenerators<E>,
 }
 
-#[derive(CanonicalSerialize, Debug, Clone)]
+#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
 pub struct CommitmentKey<E: Pairing> {
     pub xi_1: E::G1Affine,
     pub tau_1: E::G1Affine,

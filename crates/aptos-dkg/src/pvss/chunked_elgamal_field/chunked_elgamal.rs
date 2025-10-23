@@ -9,9 +9,11 @@ use crate::{
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_ec::AffineRepr;
 // use crate::sigma_protocol;
 // use aptos_crypto_derive::SigmaProtocolWitness;
 // use ark_std::rand::{RngCore, CryptoRng};
+
 
 type Base<E> = <E as Pairing>::G1Affine;
 
@@ -117,5 +119,48 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
         E::G1::msm(bases, Scalar::slice_as_inner(scalars)).expect("MSM failed in ChunkedElGamal")
+    }
+}
+
+// TODO: this should be identical for ElGamal public parameters, so move elsewhere?
+#[derive(CanonicalSerialize, PartialEq, Clone, Eq, Debug)]
+pub struct PublicParameters<E: Pairing> {
+    /// A group element $g \in G$, where $G$ is $G_1$, $G_2$ or $G_T$ used to exponentiate
+    /// both the (1) ciphertext randomness and the (2) the DSK when computing its EK.
+    g: E::G1Affine,
+    /// A group element $h \in G$ that is raised to the encrypted message
+    h: E::G1Affine,
+}
+
+impl<E: Pairing> PublicParameters<E> {
+    pub fn new(g: E::G1Affine, h: E::G1Affine) -> Self {
+        Self { g, h }
+    }
+
+    // pub fn to_bytes(&self) -> [u8; 2 * $GT_PROJ_NUM_BYTES] {
+    //     let mut bytes = [0u8; 2 * $GT_PROJ_NUM_BYTES];
+
+    //     // Copy bytes from g.to_compressed() into the first half of the bytes array.
+    //     bytes[..$GT_PROJ_NUM_BYTES].copy_from_slice(&self.g.to_compressed());
+
+    //     // Copy bytes from h.to_compressed() into the second half of the bytes array.
+    //     bytes[$GT_PROJ_NUM_BYTES..].copy_from_slice(&self.h.to_compressed());
+
+    //     bytes
+    // }
+
+    pub fn pubkey_base(&self) -> &E::G1Affine {
+        &self.g
+    }
+
+    pub fn message_base(&self) -> &E::G1Affine {
+        &self.h
+    }
+
+    pub fn default() -> Self {
+        let g = E::G1Affine::generator();
+        let h = E::G1Affine::generator(); // TODO: CHANGE THIS!!!!!!
+        debug_assert_ne!(g, h);
+        Self { g, h }
     }
 }
