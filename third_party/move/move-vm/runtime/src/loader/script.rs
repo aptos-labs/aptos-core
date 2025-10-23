@@ -5,7 +5,10 @@ use super::{
     convert_tok_to_type, single_signature_loader::load_single_signatures_for_script, Function,
     FunctionHandle, FunctionInstantiation,
 };
-use crate::loader::type_loader::convert_toks_to_types;
+use crate::{
+    execution_format::converter::ExecutionFormatConverter,
+    loader::type_loader::convert_toks_to_types,
+};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -96,7 +99,7 @@ impl Script {
             });
         }
 
-        let code = script.code.code.clone();
+        let code = ExecutionFormatConverter::for_script(&script).convert_code(&script.code.code)?;
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters

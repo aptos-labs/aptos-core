@@ -2,8 +2,10 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::InterpreterDebugInterface, LoadedFunction, RuntimeEnvironment};
-use move_binary_format::file_format::Bytecode;
+use crate::{
+    execution_format::instructions::Bytecode, interpreter::InterpreterDebugInterface,
+    LoadedFunction, RuntimeEnvironment,
+};
 use move_vm_types::values::{self, Locals};
 use std::{
     collections::BTreeSet,

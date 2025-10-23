@@ -78,12 +78,14 @@
 //! one of the reference parameters. They are also transformed to point to the
 //! corresponding access path tree node in the caller's frame (if it exists).
 
-use crate::{frame::Frame, frame_type_cache::FrameTypeCache, LoadedFunction};
+use crate::{
+    execution_format::instructions::Bytecode, frame::Frame, frame_type_cache::FrameTypeCache,
+    LoadedFunction,
+};
 use fxhash::FxBuildHasher;
 use hashbrown::HashMap;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
-    file_format::Bytecode,
     safe_assert, safe_unwrap, safe_unwrap_err,
 };
 use move_core_types::{
