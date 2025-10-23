@@ -2,19 +2,38 @@
 remote_endpoint: https://fullnode.mainnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
-name: "vX.YY.Z"
+name: "AIP-132 Zaptos"
 proposals:
-  - name: proposal_1_upgrade_framework
+  - name: enable zaptos on validators
     metadata:
-      title: "Multi-step proposal to upgrade mainnet framework, version vX.YY.Z"
-      description: "This includes changes in https://github.com/aptos-labs/aptos-core/releases/tag/aptos-node-vX.YY.Z"
+      title: "Proposal to enable zaptos in consensus config, enable skipping generating randomness if not needed"
+      description: "See https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-132.md"
     execution_mode: MultiStep
     update_sequence:
-      - Gas:
-          new: current
-          # replace with below for actual release, above "current" is needed for compat tests:
-          # old: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.WW.Z.json
-          # new: https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/gas/vX.YY.Z.json
-      - Framework:
-          bytecode_version: 8
-          git_hash: ~
+      - Consensus:
+          V5:
+            alg:
+              JolteonV2:
+                main:
+                  decoupled_execution: true
+                  back_pressure_limit: 10
+                  exclude_round: 100
+                  proposer_election_type:
+                    leader_reputation:
+                      proposer_and_voter_v2:
+                        active_weight: 1000
+                        inactive_weight: 10
+                        failed_weight: 1
+                        failure_threshold_percent: 10
+                        proposer_window_num_validators_multiplier: 10
+                        voter_window_num_validators_multiplier: 1
+                        weight_by_voting_power: true
+                        use_history_from_previous_epoch_max_count: 5
+                  max_failed_authors_to_store: 10
+                quorum_store_enabled: true
+                order_vote_enabled: true
+            vtxn:
+              V1:
+                per_block_limit_txn_count: 3
+                per_block_limit_total_bytes: 2097152
+            rand_check_enabled: true
