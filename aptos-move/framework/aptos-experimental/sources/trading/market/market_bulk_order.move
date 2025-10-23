@@ -157,8 +157,8 @@ module aptos_experimental::market_bulk_order {
             user,
             bid_prices,
             bid_sizes,
-            ask_prices
-            ask_sizes,
+            ask_prices,
+            ask_sizes
         );
     }
 }
