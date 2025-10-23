@@ -410,6 +410,15 @@ impl AptosVM {
         self.move_vm.env.clone()
     }
 
+    /// Returns true if runtime checks for transactions should be performed asynchronously, that
+    /// is:
+    ///   1. a trace is collected first, during execution,
+    ///   2. runtime checks are done during post-commit hook in Block-STM.
+    /// If returns false (i.e., doing the checks async is likely non-profitable), checks (if any)
+    /// are performed in-place. Tge current heuristic for deciding if transaction should have the
+    /// checks done later is the following:
+    ///   1. it is a script, or
+    ///   2. it's payload is an entry function defined at non-special (i.e. untrusted) address.
     fn should_perform_async_runtime_checks(&self, txn: &SignedTransaction) -> bool {
         self.async_runtime_checks_enabled
             && match txn.payload().executable_ref() {

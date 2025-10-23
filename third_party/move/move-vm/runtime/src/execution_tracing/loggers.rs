@@ -25,16 +25,15 @@ pub trait TraceLogger {
     /// records only successful instructions.
     fn record_successful_instruction(&mut self);
 
-    /// Called for successful every taken conditional branch.
-    fn record_branch_taken(&mut self);
+    /// Called for every successfully executed conditional branch.
+    fn record_branch(&mut self, taken: bool);
 
-    /// Called for every successful non-taken conditional branch.
-    fn record_branch_not_taken(&mut self);
-
-    /// Called for an entrypoint (entry function or script).
+    /// Called for every successful set-up of the entrypoint (entry function or script). That is,
+    /// setting up frame, stack, and other structures before actually executing the bytecode.
     fn record_entrypoint(&mut self, function: &LoadedFunction);
 
-    /// Called for every successful closure call.
+    /// Called for every successful set-up of the closure call (i.e., immediately before the first
+    /// instruction of the callee is executed).
     fn record_call_closure(&mut self, function: &LoadedFunction, mask: ClosureMask);
 }
 
@@ -77,13 +76,8 @@ impl TraceLogger for FullTraceLogger {
     }
 
     #[inline(always)]
-    fn record_branch_taken(&mut self) {
-        self.branches.push(true);
-    }
-
-    #[inline(always)]
-    fn record_branch_not_taken(&mut self) {
-        self.branches.push(false);
+    fn record_branch(&mut self, taken: bool) {
+        self.branches.push(taken);
     }
 
     #[inline(always)]
@@ -115,10 +109,7 @@ impl TraceLogger for NoOpTraceLogger {
     fn record_successful_instruction(&mut self) {}
 
     #[inline(always)]
-    fn record_branch_taken(&mut self) {}
-
-    #[inline(always)]
-    fn record_branch_not_taken(&mut self) {}
+    fn record_branch(&mut self, _taken: bool) {}
 
     #[inline(always)]
     fn record_entrypoint(&mut self, _function: &LoadedFunction) {}
@@ -130,6 +121,7 @@ impl TraceLogger for NoOpTraceLogger {
 #[cfg(test)]
 mod testing {
     use super::*;
+    use crate::execution_tracing::TraceCursor;
     use claims::{assert_none, assert_some_eq};
 
     #[test]
@@ -163,19 +155,18 @@ mod testing {
             true, true, false, true, false, false, false, true, false, false, true, true, true,
         ];
         for taken in expected {
-            if taken {
-                logger.record_branch_taken();
-            } else {
-                logger.record_branch_not_taken();
-            }
+            logger.record_branch(taken);
         }
 
-        let mut trace = logger.finish();
+        let trace = logger.finish();
+        assert!(!trace.is_empty());
+
+        let mut cursor = TraceCursor::new(&trace);
         for taken in expected {
-            let recorded = trace.consume_cond_br();
+            let recorded = cursor.consume_cond_br();
             assert_some_eq!(recorded, taken);
         }
-        assert_none!(trace.consume_cond_br());
-        assert!(trace.is_empty());
+        assert_none!(cursor.consume_cond_br());
+        assert!(cursor.is_done());
     }
 }

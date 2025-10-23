@@ -8,3 +8,4 @@ pub use loggers::{FullTraceLogger, NoOpTraceLogger, TraceLogger};
 
 mod trace;
 pub use trace::Trace;
+pub(crate) use trace::TraceCursor;

@@ -1238,7 +1238,7 @@ where
             // advance.
             let result = {
                 let _timer = TRACE_REPLAY_SECONDS.start_timer();
-                AsyncRuntimeTypeCheck::new(&latest_view).replay(trace)
+                AsyncRuntimeTypeCheck::new(&latest_view).replay(&trace)
             };
 
             // In case of runtime type check errors, fallback to sequential execution. There errors

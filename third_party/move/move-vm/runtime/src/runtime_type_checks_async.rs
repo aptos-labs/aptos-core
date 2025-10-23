@@ -17,7 +17,7 @@
 
 use crate::{
     config::VMConfig,
-    execution_tracing::Trace,
+    execution_tracing::{Trace, TraceCursor},
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     interpreter::{CallStack, Stack},
@@ -72,7 +72,7 @@ enum ExitCode {
 /// Runtime type checker based on tracing.
 pub struct AsyncRuntimeTypeCheck<'a, T> {
     /// Stores type information for type checks.
-    stack: Stack,
+    type_stack: Stack,
     /// Stores function frames of callers.
     call_stack: CallStack,
     /// Stores frame caches for functions used during replay.
@@ -99,7 +99,7 @@ where
         let ty_builder = &vm_config.ty_builder;
 
         Self {
-            stack: Stack::new(),
+            type_stack: Stack::new(),
             call_stack: CallStack::new(),
             function_caches: InterpreterFunctionCaches::new(),
             module_storage,
@@ -110,7 +110,7 @@ where
     }
 
     /// Replays the trace performing type checks. If any checks fail, an error is returned.
-    pub fn replay(mut self, trace: Trace) -> VMResult<()> {
+    pub fn replay(mut self, trace: &Trace) -> VMResult<()> {
         // If there is no type checks ar all: no need to replay the trace.
         if !self.vm_config.paranoid_type_checks {
             debug_assert!(!self.vm_config.optimize_trusted_code);
@@ -124,11 +124,17 @@ where
 
         // Otherwise, the trace is replayed with full type checks or type checks only for untrusted
         // code.
+        let mut cursor = TraceCursor::new(trace);
         if self.vm_config.optimize_trusted_code {
-            self.replay_impl::<UntrustedOnlyRuntimeTypeCheck>(trace)
+            self.replay_impl::<UntrustedOnlyRuntimeTypeCheck>(&mut cursor)?;
         } else {
-            self.replay_impl::<FullRuntimeTypeCheck>(trace)
+            self.replay_impl::<FullRuntimeTypeCheck>(&mut cursor)?;
         }
+
+        if cursor.is_done() {
+            return Err(PartialVMError::new_invariant_violation("Trace replay finished but there are still some branches/dynamic calls not yet processed").finish(Location::Undefined));
+        }
+        Ok(())
     }
 }
 
@@ -137,22 +143,22 @@ where
     T: ModuleStorage,
 {
     /// Internal implementation of trace replay, with configurable type checker.
-    fn replay_impl<RTTCheck>(&mut self, mut trace: Trace) -> VMResult<()>
+    fn replay_impl<RTTCheck>(&mut self, cursor: &mut TraceCursor) -> VMResult<()>
     where
         RTTCheck: RuntimeTypeCheck,
     {
         let mut current_frame = self
-            .set_entrypoint_frame::<RTTCheck>(&mut trace)
+            .set_entrypoint_frame::<RTTCheck>(cursor)
             .map_err(|err| err.finish(Location::Undefined))?;
         loop {
             let exit = self
-                .execute_instructions::<RTTCheck>(&mut current_frame, &mut trace)
+                .execute_instructions::<RTTCheck>(cursor, &mut current_frame)
                 .map_err(|err| set_err_info!(current_frame, err))?;
             match exit {
                 ExitCode::Done => return Ok(()),
                 ExitCode::Return => {
                     self.call_stack
-                        .type_check_return::<RTTCheck>(&mut self.stack, &mut current_frame)
+                        .type_check_return::<RTTCheck>(&mut self.type_stack, &mut current_frame)
                         .map_err(|err| set_err_info!(current_frame, err))?;
                     if let Some(frame) = self.call_stack.pop() {
                         // Return control to the caller, advance PC past the call instruction.
@@ -167,7 +173,7 @@ where
                         .load_function(&mut current_frame, idx)
                         .map_err(|err| set_err_info!(current_frame, err))?;
                     self.execute_regular_call::<RTTCheck>(
-                        &mut trace,
+                        cursor,
                         &mut current_frame,
                         callee,
                         callee_frame_cache,
@@ -178,20 +184,20 @@ where
                         .load_function_generic(&mut current_frame, idx)
                         .map_err(|err| set_err_info!(current_frame, err))?;
                     self.execute_regular_call::<RTTCheck>(
-                        &mut trace,
+                        cursor,
                         &mut current_frame,
                         callee,
                         callee_frame_cache,
                     )?;
                 },
                 ExitCode::CallClosure => {
-                    let (callee, mask) = trace.consume_closure_call().ok_or_else(|| {
+                    let (callee, mask) = cursor.consume_closure_call().ok_or_else(|| {
                         PartialVMError::new_invariant_violation("Call closure should be recorded")
                             .finish(Location::Undefined)
                     })?;
                     let callee_frame_cache = FrameTypeCache::make_rc_for_function(&callee);
                     self.execute_closure_call::<RTTCheck>(
-                        &mut trace,
+                        cursor,
                         &mut current_frame,
                         callee,
                         callee_frame_cache,
@@ -206,8 +212,8 @@ where
     /// error if checks during execution fail, or there is an internal invariant violation.
     fn execute_instructions<RTTCheck>(
         &mut self,
+        cursor: &mut TraceCursor,
         frame: &mut Frame,
-        trace: &mut Trace,
     ) -> PartialVMResult<ExitCode>
     where
         RTTCheck: RuntimeTypeCheck,
@@ -215,10 +221,10 @@ where
         loop {
             // Check if we need to execute this instruction, if so, decrement the number of
             // remaining instructions to replay.
-            if trace.is_done() {
+            if cursor.no_instructions_remaining() {
                 return Ok(ExitCode::Done);
             }
-            trace.consume_instruction_unchecked();
+            cursor.consume_instruction_unchecked();
 
             let pc = frame.pc as usize;
             if pc >= frame.function.function.code.len() {
@@ -232,7 +238,7 @@ where
 
             RTTCheck::pre_execution_type_stack_transition(
                 frame,
-                &mut self.stack,
+                &mut self.type_stack,
                 instr,
                 &mut frame_cache,
             )?;
@@ -266,7 +272,7 @@ where
                     continue;
                 },
                 Bytecode::BrTrue(target) | Bytecode::BrFalse(target) => {
-                    let taken = trace.consume_cond_br().ok_or_else(|| {
+                    let taken = cursor.consume_cond_br().ok_or_else(|| {
                         PartialVMError::new_invariant_violation(
                             "All conditional branches must be recorded",
                         )
@@ -292,7 +298,12 @@ where
                     let function = self.idx_to_loaded_function(frame, *idx)?;
                     RTTCheck::check_pack_closure_visibility(&frame.function, &function)?;
                     if RTTCheck::should_perform_checks(&frame.function.function) {
-                        verify_pack_closure(self.ty_builder, &mut self.stack, &function, *mask)?;
+                        verify_pack_closure(
+                            self.ty_builder,
+                            &mut self.type_stack,
+                            &function,
+                            *mask,
+                        )?;
                     }
                 },
                 // Pack closure generic is not checked in pre- or post-execution type transition.
@@ -300,7 +311,12 @@ where
                     let function = self.instantiation_idx_to_loaded_function(frame, *idx)?;
                     RTTCheck::check_pack_closure_visibility(&frame.function, &function)?;
                     if RTTCheck::should_perform_checks(&frame.function.function) {
-                        verify_pack_closure(self.ty_builder, &mut self.stack, &function, *mask)?;
+                        verify_pack_closure(
+                            self.ty_builder,
+                            &mut self.type_stack,
+                            &function,
+                            *mask,
+                        )?;
                     }
                 },
                 Bytecode::Pop
@@ -398,7 +414,7 @@ where
 
             RTTCheck::post_execution_type_stack_transition(
                 frame,
-                &mut self.stack,
+                &mut self.type_stack,
                 instr,
                 &mut frame_cache,
             )?;
@@ -409,7 +425,7 @@ where
     /// Called when encountering instruction that makes a static call.
     fn execute_regular_call<RTTCheck>(
         &mut self,
-        trace: &mut Trace,
+        cursor: &mut TraceCursor,
         current_frame: &mut Frame,
         callee: Rc<LoadedFunction>,
         callee_frame_cache: Rc<RefCell<FrameTypeCache>>,
@@ -418,7 +434,7 @@ where
         RTTCheck: RuntimeTypeCheck,
     {
         self.execute_call::<RTTCheck>(
-            trace,
+            cursor,
             current_frame,
             callee,
             callee_frame_cache,
@@ -430,7 +446,7 @@ where
     /// Called when encountering instruction that makes a call via closure dynamic dispatch.
     fn execute_closure_call<RTTCheck>(
         &mut self,
-        trace: &mut Trace,
+        cursor: &mut TraceCursor,
         current_frame: &mut Frame,
         callee: Rc<LoadedFunction>,
         callee_frame_cache: Rc<RefCell<FrameTypeCache>>,
@@ -440,7 +456,7 @@ where
         RTTCheck: RuntimeTypeCheck,
     {
         self.execute_call::<RTTCheck>(
-            trace,
+            cursor,
             current_frame,
             callee,
             callee_frame_cache,
@@ -453,7 +469,7 @@ where
     #[inline(always)]
     fn execute_call<RTTCheck>(
         &mut self,
-        trace: &mut Trace,
+        cursor: &mut TraceCursor,
         current_frame: &mut Frame,
         callee: Rc<LoadedFunction>,
         callee_frame_cache: Rc<RefCell<FrameTypeCache>>,
@@ -467,7 +483,7 @@ where
             .map_err(|err| set_err_info!(current_frame, err))?;
 
         if callee.is_native() {
-            self.execute_native_call::<RTTCheck>(trace, current_frame, &callee, mask)
+            self.execute_native_call::<RTTCheck>(cursor, current_frame, &callee, mask)
                 .map_err(|err| {
                     // Preserving same behavior as interpreter.
                     err.at_code_offset(callee.index(), 0)
@@ -487,7 +503,7 @@ where
     /// Replays execution of a native function, type checking both parameter and return types.
     fn execute_native_call<RTTCheck>(
         &mut self,
-        trace: &mut Trace,
+        cursor: &mut TraceCursor,
         current_frame: &mut Frame,
         native: &LoadedFunction,
         mask: ClosureMask,
@@ -502,7 +518,7 @@ where
             for i in (0..num_params).rev() {
                 let expected_ty = &native.param_tys()[i];
                 if !mask.is_captured(i) {
-                    let ty = self.stack.pop_ty()?;
+                    let ty = self.type_stack.pop_ty()?;
                     if ty_args.is_empty() {
                         ty.paranoid_check_assignable(expected_ty)?;
                     } else {
@@ -525,7 +541,7 @@ where
         }
 
         if native.function.is_dispatchable_native {
-            let target_func = trace.consume_entrypoint().ok_or_else(|| {
+            let target_func = cursor.consume_entrypoint().ok_or_else(|| {
                 PartialVMError::new_invariant_violation("Call closure should be recorded")
             })?;
             let frame_cache = self.function_caches.get_or_create_frame_cache(&target_func);
@@ -534,7 +550,7 @@ where
             if RTTCheck::should_perform_checks(&current_frame.function.function) {
                 arg_tys.pop_back();
                 for ty in arg_tys {
-                    self.stack.push_ty(ty)?;
+                    self.type_stack.push_ty(ty)?;
                 }
             }
             self.set_new_frame::<RTTCheck>(
@@ -548,12 +564,12 @@ where
             if RTTCheck::should_perform_checks(&current_frame.function.function) {
                 if ty_args.is_empty() {
                     for ty in native.return_tys() {
-                        self.stack.push_ty(ty.clone())?;
+                        self.type_stack.push_ty(ty.clone())?;
                     }
                 } else {
                     for ty in native.return_tys() {
                         let ty = self.ty_builder.create_ty_with_subst(ty, ty_args)?;
-                        self.stack.push_ty(ty)?;
+                        self.type_stack.push_ty(ty)?;
                     }
                 }
             }
@@ -564,11 +580,11 @@ where
     }
 
     /// Returns the entry-point frame when replay starts.
-    fn set_entrypoint_frame<RTTCheck>(&mut self, trace: &mut Trace) -> PartialVMResult<Frame>
+    fn set_entrypoint_frame<RTTCheck>(&mut self, cursor: &mut TraceCursor) -> PartialVMResult<Frame>
     where
         RTTCheck: RuntimeTypeCheck,
     {
-        let function = trace.consume_entrypoint().ok_or_else(|| {
+        let function = cursor.consume_entrypoint().ok_or_else(|| {
             PartialVMError::new_invariant_violation("Entry-point should be always recorded")
         })?;
         let frame_cache = self.function_caches.get_or_create_frame_cache(&function);
@@ -612,7 +628,7 @@ where
             locals.store_loc(i, dummy_local())?;
 
             if should_check && !mask.is_captured(i) {
-                let ty = self.stack.pop_ty()?;
+                let ty = self.type_stack.pop_ty()?;
                 let expected_ty = &callee.local_tys()[i];
 
                 if ty_args.is_empty() {
