@@ -20,7 +20,11 @@ use move_binary_format::{
         StructFieldInformation, StructHandle, StructHandleIndex,
     },
 };
-use move_core_types::{account_address::AccountAddress, identifier::IdentStr};
+use move_core_types::{
+    account_address::AccountAddress,
+    identifier::{IdentStr, Identifier},
+    language_storage::{ModuleId, LEGACY_OPTION_VEC},
+};
 use std::borrow::Borrow;
 
 pub trait Bytecode {
@@ -133,6 +137,7 @@ pub trait Bytecode {
 
     fn new_move_struct(&self, def: &StructDefinition) -> MoveStruct {
         let handle = self.struct_handle_at(def.struct_handle);
+        let mut is_enum = self.struct_is_enum(def);
         let (is_native, fields) = match &def.field_information {
             StructFieldInformation::Native => (true, vec![]),
             StructFieldInformation::Declared(fields) => (
@@ -142,14 +147,33 @@ pub trait Bytecode {
                     .map(|f| self.new_move_struct_field(f))
                     .collect(),
             ),
-            StructFieldInformation::DeclaredVariants(..) => {
-                // TODO(#13806): implement for enums. Currently we pretend they don't have fields
-                (false, vec![])
+            StructFieldInformation::DeclaredVariants(variant_defs) => {
+                // For `Option`, we want to keep it backwards compatible with the old representation
+                // instead of enum representation, we convert it to a struct with `vec` field.
+                let module_handle = self.module_handle_at(handle.module);
+                let mid = ModuleId {
+                    address: *self.address_identifier_at(module_handle.address),
+                    name: self.identifier_at(module_handle.name).to_owned(),
+                };
+                if mid.is_option() && variant_defs.len() == 2 {
+                    is_enum = false;
+                    let variant = &variant_defs[1];
+                    let field_type = MoveType::Vector {
+                        items: Box::new(self.new_move_type(&variant.fields[0].signature.0)),
+                    };
+                    let field = MoveStructField {
+                        name: Identifier::new(LEGACY_OPTION_VEC).unwrap().into(),
+                        typ: field_type,
+                    };
+                    (false, vec![field])
+                } else {
+                    // TODO(#13806): implement for enums. Currently we pretend they don't have fields
+                    (false, vec![])
+                }
             },
         };
         let name = self.identifier_at(handle.name).to_owned();
         let is_event = self.struct_is_event(&name);
-        let is_enum = self.struct_is_enum(def);
         let abilities = handle
             .abilities
             .into_iter()
