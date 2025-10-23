@@ -27,6 +27,7 @@ pub struct DbDir {
 impl DbDir {
     pub fn open_state_merkle_db(&self) -> Result<StateMerkleDb> {
         let env = None;
+        let block_cache = None;
         StateMerkleDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
             RocksdbConfigs {
@@ -34,6 +35,7 @@ impl DbDir {
                 ..Default::default()
             },
             env,
+            block_cache,
             false,
             0,
         )
@@ -42,6 +44,7 @@ impl DbDir {
     pub fn open_state_kv_db(&self) -> Result<StateKvDb> {
         let leger_db = self.open_ledger_db()?;
         let env = None;
+        let block_cache = None;
         StateKvDb::new(
             &StorageDirPaths::from_path(&self.db_dir),
             RocksdbConfigs {
@@ -49,6 +52,7 @@ impl DbDir {
                 ..Default::default()
             },
             env,
+            block_cache,
             true,
             leger_db.metadata_db_arc(),
         )
@@ -56,6 +60,7 @@ impl DbDir {
 
     pub fn open_ledger_db(&self) -> Result<LedgerDb> {
         let env = None;
+        let block_cache = None;
         LedgerDb::new(
             self.db_dir.as_path(),
             RocksdbConfigs {
@@ -63,6 +68,7 @@ impl DbDir {
                 ..Default::default()
             },
             env,
+            block_cache,
             true,
         )
     }

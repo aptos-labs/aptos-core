@@ -35,6 +35,9 @@ async fn jwk_consensus_basic() {
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
         }))
+        .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
+            *genesis_stake_amount = 100_000_000_000_000;
+        }))
         .build_with_cli(0)
         .await;
     let client = swarm.validators().next().unwrap().rest_client();

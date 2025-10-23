@@ -24,14 +24,18 @@ ark-groth16 = { workspace = true }
 ark-std = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
+bls12_381 = { workspace = true }
 blst = { workspace = true }
+blstrs = { workspace = true }
 bulletproofs = { workspace = true }
 bytes = { workspace = true }
 curve25519-dalek = { workspace = true }
 curve25519-dalek-ng = { workspace = true }
 digest = { workspace = true }
+dudect-bencher = { workspace = true }
 ed25519-dalek = { workspace = true }
 ff = { workspace = true }
+group = { workspace = true }
 hex = { workspace = true }
 hkdf = { workspace = true }
 libsecp256k1 = { workspace = true }
@@ -40,8 +44,10 @@ more-asserts = { workspace = true }
 neptune = { workspace = true }
 num-bigint = { workspace = true }
 num-integer = { workspace = true }
+num-traits = { workspace = true }
 once_cell = { workspace = true }
 p256 = { workspace = true }
+pairing = { workspace = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 rand = { workspace = true }
@@ -128,3 +134,8 @@ harness = false
 name = "secp256k1"
 harness = false
 
+[[example]]
+name = "is_blstrs_constant_time"
+
+[[example]]
+name = "is_zkcrypto_constant_time"
