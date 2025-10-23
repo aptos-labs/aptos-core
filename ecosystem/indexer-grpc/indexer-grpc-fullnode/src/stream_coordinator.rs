@@ -47,7 +47,7 @@ pub struct IndexerStreamCoordinator {
 }
 
 // Single batch of transactions to fetch, convert, and stream
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct TransactionBatchInfo {
     pub start_version: u64,
     pub head_version: u64,
@@ -86,10 +86,22 @@ impl IndexerStreamCoordinator {
     /// 3. Convert into protobuf objects
     /// 4. Encode protobuf objects (base64)
     pub async fn process_next_batch(&mut self) -> Vec<Result<EndVersion, Status>> {
+        info!(
+            "process_next_batch: current_version = {}, end_version = {}, processor_task_count = {}, processor_batch_size = {}, output_batch_size = {}",
+            self.current_version,
+            self.end_version,
+            self.processor_task_count,
+            self.processor_batch_size,
+            self.output_batch_size,
+        );
         let fetching_start_time = std::time::Instant::now();
         // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
             self.fetch_transactions_from_storage().await;
+        info!(
+            "process_next_batch: fetched {} transactions from storage",
+            sorted_transactions_from_storage_with_size.len()
+        );
         let first_version = sorted_transactions_from_storage_with_size
             .first()
             .map(|(txn, _)| txn.version)
@@ -99,6 +111,10 @@ impl IndexerStreamCoordinator {
             .map(|(txn, _)| txn.version)
             .unwrap() as i64;
         let num_transactions = sorted_transactions_from_storage_with_size.len();
+        info!(
+            "process_next_batch: transaction version range: {} to {} ({} txns)",
+            first_version, end_version, num_transactions
+        );
         let highest_known_version = self.highest_known_version as i64;
         let (_, _, block_event) = self
             .context
@@ -134,15 +150,19 @@ impl IndexerStreamCoordinator {
         for (txn, size) in sorted_transactions_from_storage_with_size {
             current_batch.push(txn);
             current_batch_size += size;
-            if current_batch_size > MINIMUM_TASK_LOAD_SIZE_IN_BYTES {
+          //  if current_batch_size > MINIMUM_TASK_LOAD_SIZE_IN_BYTES {
                 task_batches.push(current_batch);
                 current_batch = vec![];
                 current_batch_size = 0;
-            }
+            //}
         }
         if !current_batch.is_empty() {
             task_batches.push(current_batch);
         }
+        info!(
+            "process_next_batch: created {} task batches for parallel processing",
+            task_batches.len()
+        );
 
         let output_batch_size = self.output_batch_size;
         let ledger_chain_id = self.context.chain_id().id();
@@ -151,8 +171,10 @@ impl IndexerStreamCoordinator {
             let context = self.context.clone();
             let task = tokio::task::spawn_blocking(move || {
                 let raw_txns = batch;
+                info!("raw_txns {:?}", raw_txns);
                 let api_txns = Self::convert_to_api_txns(context, raw_txns);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
+                info!("pb_txns {:?}", pb_txns);
                 let mut responses = vec![];
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {
@@ -179,6 +201,10 @@ impl IndexerStreamCoordinator {
                 err
             ),
         };
+        info!(
+            "process_next_batch: generated {} response messages to send",
+            responses.len()
+        );
         log_grpc_step_fullnode(
             IndexerGrpcStep::FullnodeDecodedBatch,
             Some(first_version),
@@ -191,12 +217,21 @@ impl IndexerStreamCoordinator {
         );
         // Stage 3: send responses to stream
         let sending_start_time = std::time::Instant::now();
-        for response in responses {
+        let total_responses = responses.len();
+        for (idx, response) in responses.into_iter().enumerate() {
             if self.transactions_sender.send(Ok(response)).await.is_err() {
                 // Error from closed channel. This means the client has disconnected.
+                info!(
+                    "process_next_batch: client disconnected after sending {}/{} responses",
+                    idx, total_responses
+                );
                 return vec![];
             }
         }
+        info!(
+            "process_next_batch: successfully sent all {} responses to stream",
+            total_responses
+        );
         log_grpc_step_fullnode(
             IndexerGrpcStep::FullnodeSentBatch,
             Some(first_version),
@@ -207,19 +242,28 @@ impl IndexerStreamCoordinator {
             Some(sending_start_time.elapsed().as_secs_f64()),
             Some(num_transactions as i64),
         );
+        info!(
+            "process_next_batch: returning end_version = {} (current_version was {})",
+            end_version, self.current_version
+        );
         vec![Ok(end_version as u64)]
     }
 
     /// Fetches transactions from storage with each transaction's size.
     /// Results are transactions sorted by version.
     async fn fetch_transactions_from_storage(&mut self) -> Vec<(TransactionOnChainData, usize)> {
-        let batches = self.get_batches().await;
+        let batches: Vec<TransactionBatchInfo> = self.get_batches().await;
+        info!("batches {:?}", batches);
+
         let mut storage_fetch_tasks = vec![];
         let ledger_version = self.highest_known_version;
         for batch in batches {
             let context = self.context.clone();
             let task = tokio::spawn(async move {
-                Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await
+                info!("fetching start: ledger_version {}; batch {:?}", ledger_version, batch);
+                let t = Self::fetch_raw_txns_with_retries(context.clone(), ledger_version, batch).await;
+                info!("fetching end: ledger_version {}; batch {:?}", ledger_version, batch);
+                t
             });
             storage_fetch_tasks.push(task);
         }
@@ -232,8 +276,8 @@ impl IndexerStreamCoordinator {
                     err
                 ),
             };
-
-        transactions_from_storage
+        info!("transactions_from_storage {:?}", transactions_from_storage);
+        let result = transactions_from_storage
             .into_iter()
             .flatten()
             .sorted_by(|a, b| a.version.cmp(&b.version))
@@ -241,7 +285,9 @@ impl IndexerStreamCoordinator {
                 let size = bcs::serialized_size(&txn).expect("Unable to serialize txn");
                 (txn, size)
             })
-            .collect::<Vec<_>>()
+            .collect::<Vec<_>>();
+        info!("result {:?}", result);
+        result
     }
 
     /// Gets the last version of the batch if the entire batch is successful, otherwise return error
@@ -542,4 +588,9 @@ impl IndexerStreamCoordinator {
             }
         }
     }
+}
+
+#[test]
+fn dummy_test() {
+
 }
