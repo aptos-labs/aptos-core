@@ -2570,77 +2570,77 @@ impl Frame {
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u16(integer_value.cast_u16()?))?;
+                            .push_unchecked(Value::u16(integer_value.cast_u16()?));
                     },
                     Bytecode::CastU32 => {
                         gas_meter.charge_simple_instr(S::CastU32)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u32(integer_value.cast_u32()?))?;
+                            .push_unchecked(Value::u32(integer_value.cast_u32()?));
                     },
                     Bytecode::CastU64 => {
                         gas_meter.charge_simple_instr(S::CastU64)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u64(integer_value.cast_u64()?))?;
+                            .push_unchecked(Value::u64(integer_value.cast_u64()?));
                     },
                     Bytecode::CastU128 => {
                         gas_meter.charge_simple_instr(S::CastU128)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u128(integer_value.cast_u128()?))?;
+                            .push_unchecked(Value::u128(integer_value.cast_u128()?));
                     },
                     Bytecode::CastU256 => {
                         gas_meter.charge_simple_instr(S::CastU256)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u256(integer_value.cast_u256()?))?;
+                            .push_unchecked(Value::u256(integer_value.cast_u256()?));
                     },
                     Bytecode::CastI8 => {
                         gas_meter.charge_simple_instr(S::CastI8)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i8(integer_value.cast_i8()?))?;
+                            .push_unchecked(Value::i8(integer_value.cast_i8()?));
                     },
                     Bytecode::CastI16 => {
                         gas_meter.charge_simple_instr(S::CastI16)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i16(integer_value.cast_i16()?))?;
+                            .push_unchecked(Value::i16(integer_value.cast_i16()?));
                     },
                     Bytecode::CastI32 => {
                         gas_meter.charge_simple_instr(S::CastI32)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i32(integer_value.cast_i32()?))?;
+                            .push_unchecked(Value::i32(integer_value.cast_i32()?));
                     },
                     Bytecode::CastI64 => {
                         gas_meter.charge_simple_instr(S::CastI64)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i64(integer_value.cast_i64()?))?;
+                            .push_unchecked(Value::i64(integer_value.cast_i64()?));
                     },
                     Bytecode::CastI128 => {
                         gas_meter.charge_simple_instr(S::CastI128)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i128(integer_value.cast_i128()?))?;
+                            .push_unchecked(Value::i128(integer_value.cast_i128()?));
                     },
                     Bytecode::CastI256 => {
                         gas_meter.charge_simple_instr(S::CastI256)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i256(integer_value.cast_i256()?))?;
+                            .push_unchecked(Value::i256(integer_value.cast_i256()?));
                     },
 
                     // Arithmetic Operations
@@ -2684,13 +2684,13 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Shl)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
                         let lhs = interpreter.operand_stack.pop()?;
-                        interpreter.operand_stack.push(lhs.shl_checked(rhs)?)?;
+                        interpreter.operand_stack.push_unchecked(lhs.shl_checked(rhs)?);
                     },
                     Bytecode::Shr => {
                         gas_meter.charge_simple_instr(S::Shr)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
                         let lhs = interpreter.operand_stack.pop()?;
-                        interpreter.operand_stack.push(lhs.shr_checked(rhs)?)?;
+                        interpreter.operand_stack.push_unchecked(lhs.shr_checked(rhs)?);
                     },
                     Bytecode::Or => {
                         gas_meter.charge_simple_instr(S::Or)?;
