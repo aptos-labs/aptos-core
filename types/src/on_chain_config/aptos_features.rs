@@ -141,7 +141,6 @@ pub enum FeatureFlag {
     ORDERLESS_TRANSACTIONS = 94,
     // TODO(lazy-loading): Add link to AIP and its number + brief description.
     ENABLE_LAZY_LOADING = 95,
-
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
     MONOTONICALLY_INCREASING_COUNTER = 98,
@@ -152,6 +151,9 @@ pub enum FeatureFlag {
     /// Enables bytecode version v9
     VM_BINARY_FORMAT_V9 = 102,
     ENABLE_FRAMEWORK_FOR_OPTION = 103,
+    /// If enabled, new single session is used by the VM to avoid squashing write-sets and cache
+    /// reads between sessions (e.g., between transaction prologue, user session and epilogue).
+    SESSION_CONTINUATION = 104,
 }
 
 impl FeatureFlag {
@@ -456,6 +458,10 @@ impl Features {
 
     pub fn is_enum_option_enabled(&self) -> bool {
         self.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION)
+    }
+
+    pub fn is_session_continuation_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::SESSION_CONTINUATION)
     }
 
     pub fn get_max_identifier_size(&self) -> u64 {
