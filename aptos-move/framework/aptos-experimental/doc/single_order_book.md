@@ -878,7 +878,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
     };
     price_time_idx.<a href="single_order_book.md#0x7_single_order_book_place_maker_order">place_maker_order</a>(
         order_req.order_id,
-        single_order_book_type(),
+        single_order_type(),
         order_req.price,
         ascending_idx,
         order_req.remaining_size,
@@ -1013,7 +1013,7 @@ API to ensure that the order is a taker order before calling this API, otherwise
 ): OrderMatch&lt;M&gt; {
     <b>let</b> (order_id, matched_size, remaining_size, order_book_type) =
         active_matched_order.destroy_active_matched_order();
-    <b>assert</b>!(order_book_type == single_order_book_type(), <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>);
+    <b>assert</b>!(order_book_type == single_order_type(), <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>);
 
     <b>let</b> order_with_state = <b>if</b> (remaining_size == 0) {
         <b>let</b> order = self.orders.remove(&order_id);

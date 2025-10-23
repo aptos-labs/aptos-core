@@ -8,6 +8,7 @@
 /// the settlement might also fail. The fill_id is an incremental counter for matched orders and can be used to track specific fills
 ///  - validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
 ///  an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
+///  This API is called for both maker and taker order placements.
 ///  Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 ///  the position size of the user and does not do any validation.
 ///
@@ -19,6 +20,7 @@
 /// The clearinhouse can perform any cleanup operations like removing the order from the pending orders list. For every order placement
 /// that passes the validate_order_placement check,
 /// the market guarantees that the cleanup_order API will be called once and only once with the remaining size of the order.
+/// the remaining size of the order being cleaned up - it can be 0, if the order was fully matched
 ///
 /// - decrease_order_size(account, order_id, is_bid, price, size) -> Called by the market when a maker order is decreased
 /// in size by the user. Please note that this API will only be called after place_maker_order is called and the order is

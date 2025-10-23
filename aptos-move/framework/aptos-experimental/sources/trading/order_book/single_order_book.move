@@ -81,12 +81,6 @@ module aptos_experimental::single_order_book {
         }
     }
 
-    enum OrderType has store, drop, copy {
-        GoodTilCancelled,
-        PostOnly,
-        FillOrKill
-    }
-
     public(friend) fun new_single_order_request<M: store + copy + drop>(
         account: address,
         order_id: OrderIdType,
