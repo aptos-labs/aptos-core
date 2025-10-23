@@ -15,6 +15,7 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::on_chain_config::TimedFeatureFlag;
 use better_any::{Tid, TidAble};
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -22,8 +23,6 @@ use move_core_types::{
     account_address::AccountAddress, effects::Op, gas_algebra::NumBytes, identifier::Identifier,
     value::MoveTypeLayout, vm_status::StatusCode,
 };
-// ===========================================================================================
-// Public Data Structures and Constants
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
 use move_vm_runtime::native_functions::{LoaderContext, NativeFunctionTable};
 use move_vm_types::{
@@ -39,6 +38,9 @@ use std::{
     mem::drop,
     sync::Arc,
 };
+
+// ===========================================================================================
+// Public Data Structures and Constants
 
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this
@@ -367,6 +369,8 @@ fn native_add_box(
     assert_eq!(args.len(), 3);
 
     context.charge(ADD_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -386,14 +390,17 @@ fn native_add_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
 
     let res = match gv.move_to(val) {
         Ok(_) => Ok(smallvec![]),
@@ -423,6 +430,8 @@ fn native_borrow_box(
     assert_eq!(args.len(), 2);
 
     context.charge(BORROW_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -441,14 +450,17 @@ fn native_borrow_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
 
     let res = match gv.borrow_global() {
         Ok(ref_val) => Ok(smallvec![ref_val]),
@@ -478,6 +490,8 @@ fn native_contains_box(
     assert_eq!(args.len(), 2);
 
     context.charge(CONTAINS_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -496,14 +510,17 @@ fn native_contains_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
     let exists = Value::bool(gv.exists()?);
 
     drop(table_data);
@@ -527,6 +544,8 @@ fn native_remove_box(
     assert_eq!(args.len(), 2);
 
     context.charge(REMOVE_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -545,14 +564,17 @@ fn native_remove_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
 
     let res = match gv.move_from() {
         Ok(val) => Ok(smallvec![val]),
