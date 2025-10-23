@@ -2,8 +2,8 @@
 module 0x22::test
 
 public fun shl_instr(a: u64): u64
-    ld_u8 1
     move_loc a
+    ld_u8 1
     shl
     ret
 

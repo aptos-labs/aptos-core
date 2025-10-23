@@ -57,5 +57,3 @@ l0: move_loc l1
 
 task 2 lines 37-68:  publish --private-key Alice [module Alice::game {]
 task 3 lines 70-70:  run Alice::game::test_upgrade --signers Alice --private-key Alice
-mutable inputs after call: local#0: 0
-return values: 0

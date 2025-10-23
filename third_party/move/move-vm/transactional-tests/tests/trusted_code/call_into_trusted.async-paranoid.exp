@@ -1,0 +1,15 @@
+processed 4 tasks
+task 0 lines 1-6:  publish [module 0x9::trusted]
+task 1 lines 8-25:  publish [module 0x99::not_trusted]
+task 2 lines 28-28:  run --verbose 0x99::not_trusted::checks_parameter_types
+Error: Function execution failed with VMError: {
+    message: Expected type u64, got u32 which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 3 lines 30-30:  run --verbose 0x99::not_trusted::checks_return_types
+return values: 33

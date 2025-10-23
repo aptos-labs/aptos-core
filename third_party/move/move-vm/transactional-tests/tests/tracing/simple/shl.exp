@@ -1,19 +1,8 @@
 processed 2 tasks
 task 0 lines 1-8:  publish [module 0x22::test]
-Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000022::test'. Got VMError: {
-    major_status: INTEGER_OP_TYPE_MISMATCH_ERROR,
-    sub_status: None,
-    location: 0x22::test,
-    indices: [(FunctionDefinition, 0)],
-    offsets: [(FunctionDefinitionIndex(0), 2)],
-}
 task 1 lines 10-10:  run --verbose 0x22::test::shl_instr --args 1u64 --display-trace
-Error: Function execution failed with VMError: {
-    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000022::test doesn't exist,
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-    exec_state: None,
-}
+instructions: 4
+branches: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::shl_instr
+return values: 2

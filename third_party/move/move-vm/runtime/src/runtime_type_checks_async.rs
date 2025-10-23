@@ -131,7 +131,7 @@ where
             self.replay_impl::<FullRuntimeTypeCheck>(&mut cursor)?;
         }
 
-        if cursor.is_done() {
+        if !cursor.is_done() {
             return Err(PartialVMError::new_invariant_violation("Trace replay finished but there are still some branches/dynamic calls not yet processed").finish(Location::Undefined));
         }
         Ok(())
@@ -479,7 +479,7 @@ where
     where
         RTTCheck: RuntimeTypeCheck,
     {
-        RTTCheck::check_call_visibility(&current_frame.function, &callee, CallType::Regular)
+        RTTCheck::check_call_visibility(&current_frame.function, &callee, call_type)
             .map_err(|err| set_err_info!(current_frame, err))?;
 
         if callee.is_native() {

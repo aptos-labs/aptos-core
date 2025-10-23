@@ -629,8 +629,10 @@ fn main() {
     set_layout_caches(true);
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
+    } else {
+        // If we do paranoid checks, then they will run async in post-commit hook.
+        set_async_runtime_checks(true);
     }
-    set_async_runtime_checks(true);
     AptosVM::set_num_shards_once(execution_shards);
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
