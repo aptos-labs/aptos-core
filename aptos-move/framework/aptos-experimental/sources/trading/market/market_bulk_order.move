@@ -108,7 +108,7 @@ module aptos_experimental::market_bulk_order {
                 sequence_number,
                 account,
                 bid_prices,
-                bid_sizes, 
+                bid_sizes,
                 ask_prices,
                 ask_sizes,
                 rejection_reason,
