@@ -52,7 +52,7 @@ module aptos_experimental::bulk_order_book {
         new_bulk_order_place_response_rejection, get_account_from_order_request,
         get_sequence_number_from_order_request, get_sequence_number_from_bulk_order
     };
-    use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_book_type};
+    use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_type};
     use aptos_experimental::order_book_types::{
         OrderIdType,
         AscendingIdGenerator, new_order_id_type, new_unique_idx_type
@@ -123,7 +123,7 @@ module aptos_experimental::bulk_order_book {
     ): OrderMatch<M> {
         let (order_id, matched_size, remaining_size, order_book_type) =
             active_matched_order.destroy_active_matched_order();
-        assert!(order_book_type == bulk_order_book_type(), ENOT_BULK_ORDER);
+        assert!(order_book_type == bulk_order_type(), ENOT_BULK_ORDER);
         let order_address = self.order_id_to_address.get(&order_id).destroy_some();
         let order = self.orders.remove(&order_address);
         let order_match = new_bulk_order_match<M>(
@@ -137,7 +137,7 @@ module aptos_experimental::bulk_order_book {
             let size = next_size.destroy_some();
             price_time_idx.place_maker_order(
                 order_id,
-                bulk_order_book_type(),
+                bulk_order_type(),
                 price,
                 order.get_unique_priority_idx(),
                 size,
@@ -199,7 +199,7 @@ module aptos_experimental::bulk_order_book {
         if (active_price.is_some()) {
             price_time_idx.place_maker_order(
                 order_id,
-                bulk_order_book_type(),
+                bulk_order_type(),
                 active_price.destroy_some(),
                 order.get_unique_priority_idx(),
                 active_size.destroy_some(),

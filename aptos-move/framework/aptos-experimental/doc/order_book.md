@@ -617,7 +617,7 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 ): OrderMatch&lt;M&gt; {
     <b>let</b> result = self.price_time_idx.get_single_match_result(price, size, is_bid);
     <b>let</b> book_type = result.get_active_matched_book_type();
-    <b>if</b> (book_type == single_order_book_type()) {
+    <b>if</b> (book_type == single_order_type()) {
         self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(result)
     } <b>else</b> {
         self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(&<b>mut</b> self.price_time_idx, result, is_bid)
@@ -651,7 +651,7 @@ Checks if the order is a taker order i.e., matched immediatedly with the active 
 ) {
     <b>assert</b>!(reinsert_order.get_book_type_from_match_details()
         == original_order.get_book_type_from_match_details(), <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
-    <b>if</b> (reinsert_order.get_book_type_from_match_details() == single_order_book_type()) {
+    <b>if</b> (reinsert_order.get_book_type_from_match_details() == single_order_type()) {
         self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_reinsert_order">reinsert_order</a>(
             &<b>mut</b> self.price_time_idx, reinsert_order, original_order
         )

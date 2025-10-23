@@ -6,7 +6,7 @@ module aptos_experimental::order_book {
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
     use aptos_experimental::order_book_types::{AscendingIdGenerator, OrderIdType, new_ascending_id_generator,
-        OrderMatch, OrderMatchDetails, single_order_book_type
+        OrderMatch, OrderMatchDetails, single_order_type
     };
     use aptos_experimental::single_order_types::{SingleOrder};
     use aptos_experimental::order_book_types::TriggerCondition;
@@ -172,7 +172,7 @@ module aptos_experimental::order_book {
     ): OrderMatch<M> {
         let result = self.price_time_idx.get_single_match_result(price, size, is_bid);
         let book_type = result.get_active_matched_book_type();
-        if (book_type == single_order_book_type()) {
+        if (book_type == single_order_type()) {
             self.single_order_book.get_single_match_for_taker(result)
         } else {
             self.bulk_order_book.get_single_match_for_taker(&mut self.price_time_idx, result, is_bid)
@@ -186,7 +186,7 @@ module aptos_experimental::order_book {
     ) {
         assert!(reinsert_order.get_book_type_from_match_details()
             == original_order.get_book_type_from_match_details(), E_REINSERT_ORDER_MISMATCH);
-        if (reinsert_order.get_book_type_from_match_details() == single_order_book_type()) {
+        if (reinsert_order.get_book_type_from_match_details() == single_order_type()) {
             self.single_order_book.reinsert_order(
                 &mut self.price_time_idx, reinsert_order, original_order
             )
