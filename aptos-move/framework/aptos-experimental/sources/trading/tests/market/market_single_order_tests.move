@@ -573,7 +573,7 @@ module aptos_experimental::market_single_order_tests {
     }
 
     #[test(
-        admin = @0x1, market_signer = @0x123, maker = @0x456, maker2 = @0x789
+        admin = @0x1, market_signer = @0x123, maker = @0x456
     )]
     public fun test_place_maker_order_cancelled(
         admin: &signer,
