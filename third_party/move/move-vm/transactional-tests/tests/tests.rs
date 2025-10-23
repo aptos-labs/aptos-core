@@ -56,7 +56,11 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             vm_config: vm_config_for_tests(
                 VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
             ),
-            include: &["/paranoid-tests/"],
+            include: &[
+                "/function_values_safety/",
+                "/trusted_code/",
+                "/paranoid-tests/",
+            ],
             exclude: &[],
             tracing: true,
         },

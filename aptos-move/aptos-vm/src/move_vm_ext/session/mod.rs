@@ -151,12 +151,11 @@ where
         MoveVM::execute_loaded_function_with_tracing(
             func,
             args,
-            &mut self.data_cache,
+            &mut MoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, loader),
             gas_meter,
             traversal_context,
             &mut self.extensions,
             loader,
-            self.resolver,
             trace_logger,
         )
     }
