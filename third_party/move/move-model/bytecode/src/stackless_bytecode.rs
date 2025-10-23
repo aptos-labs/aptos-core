@@ -445,6 +445,8 @@ pub enum BorrowEdge {
     Field(QualifiedInstId<StructId>, Option<Vec<Symbol>>, usize),
     /// Vector borrow with dynamic index.
     Index(IndexEdgeKind),
+    /// Borrow via a function value, unknown structure
+    Invoke,
     /// Composed sequence of edges.
     Hyper(Vec<BorrowEdge>),
 }
@@ -1596,6 +1598,7 @@ impl std::fmt::Display for BorrowEdgeDisplay<'_> {
             },
             Index(_) => write!(f, "[]"),
             Direct => write!(f, "@"),
+            Invoke => write!(f, ">"),
             Hyper(es) => {
                 write!(
                     f,

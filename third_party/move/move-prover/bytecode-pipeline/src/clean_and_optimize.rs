@@ -131,6 +131,14 @@ impl TransferFunctions for Optimizer<'_> {
                         }
                     }
                 },
+                Invoke => {
+                    // Need to assume effect
+                    for src in srcs {
+                        if self.target.get_local_type(*src).is_mutable_reference() {
+                            state.unwritten.insert(Reference(*src));
+                        }
+                    }
+                },
                 _ => {},
             }
         }
