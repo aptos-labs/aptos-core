@@ -642,9 +642,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             // Compute sum_j beta_j a_j (a_j - 1)
             let sum2: E::ScalarField = beta_js
                 .iter()
-                .copied()
                 .zip(a_js.iter().copied())
-                .map(|(b, a)| b * a * (a - E::ScalarField::ONE))
+                .map(|(beta, a)| a * (a - E::ScalarField::ONE) * beta) // TODO: submit PR to change arkworks so beta can be on the left...
                 .sum();
 
             beta * (*a - sum1) + sum2

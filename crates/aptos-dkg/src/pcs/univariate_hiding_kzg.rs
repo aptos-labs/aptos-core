@@ -250,7 +250,7 @@ pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub xi_1: E::G1Affine,
 }
 
-impl<'a, E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'a, E> {
+impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
@@ -259,7 +259,7 @@ impl<'a, E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'a, E> {
+impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>

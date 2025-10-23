@@ -32,9 +32,16 @@ where
 {
     pub hom1: H1,
     pub hom2: H2,
-    pub dst: Vec<u8>,
-    pub dst_verifier: Vec<u8>,
+    pub dst: Vec<u8>, // Included here to allow implementing `sigma_protocol::Trait` automatically, avoiding Rust’s orphan rule restrictions
+    pub dst_verifier: Vec<u8>, // Same
 }
+// One method to leave out the dst would be to later define in this file:
+// struct TupleHomomorphismWithDsts<'a, H1, H2> {
+//     hom: &'a TupleHomomorphism<H1, H2>,
+//     dst: Vec<u8>,
+//     dst_verifier: Vec<u8>,
+// }
+// and then defining the sigma protocol trait there. Probably not worth it
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
 /// component homomorphisms to the same input and returning their results
@@ -148,7 +155,9 @@ where
 ///
 /// This allows combining two homomorphisms that share the same `Domain`.
 /// For simplicity, we currently require that the MSM types (`MsmInput` and `MsmOutput`) match;
-/// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future. Similarly, we **implicitly** that the two msm_eval methods are identical.
+/// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future. 
+/// For the moment, we **implicitly** assume that the two msm_eval methods are identical, but is probably
+/// not necessary through enums.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
 impl<H1, H2> Trait for TupleHomomorphism<H1, H2>

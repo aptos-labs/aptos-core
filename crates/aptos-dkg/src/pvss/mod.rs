@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod contribution;
+pub mod chunked_elgamal_field;
 pub mod das;
 pub(crate) mod dealt_pub_key;
 pub(crate) mod dealt_pub_key_share;
