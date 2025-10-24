@@ -1,0 +1,563 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::o {
+    public fun not_inlined_o(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(41)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::o
+module 0xc0ffee::n {
+    public fun indirect_inlined(x: &mut u64) {
+        o::not_inlined_o(x);
+        Tuple()
+    }
+    public fun inlined(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(43)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(44)
+          };
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+    public fun not_inlined(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+    public fun not_inlined_non_constant_error_code(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          Tuple()
+        } else {
+          Abort(error::invalid_argument(42))
+        };
+        x = 42;
+        Tuple()
+    }
+    public fun not_inlined_non_constant_error_code_2(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          Tuple()
+        } else {
+          Abort(error::canonical(13, 42))
+        };
+        x = 42;
+        Tuple()
+    }
+    public fun not_inlined_non_constant_error_code_3(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          Tuple()
+        } else {
+          Abort(error::canonical(12, 45))
+        };
+        x = 42;
+        Tuple()
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        {
+          let x: u64 = 3;
+          n::not_inlined(Borrow(Mutable)(x));
+          n::inlined(Borrow(Mutable)(x));
+          n::indirect_inlined(Borrow(Mutable)(x));
+          m::one(Borrow(Mutable)(x));
+          n::not_inlined_non_constant_error_code(Borrow(Mutable)(x));
+          n::not_inlined_non_constant_error_code_2(Borrow(Mutable)(x));
+          n::not_inlined_non_constant_error_code_3(Borrow(Mutable)(x));
+          Add<u64>(x, m::two())
+        }
+    }
+    private fun one(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 43);
+          Tuple()
+        }
+    }
+    public fun two(): u64 {
+        2
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::o {
+    public fun not_inlined_o(x: &mut u64) {
+        if (*x > 5) {
+            if (*x > 5) () else abort 41;
+            *x = 42;
+        } else {
+            *x = *x + 1;
+        }
+    }
+}
+module 0xc0ffee::n {
+    public fun indirect_inlined(x: &mut u64) {
+        0xc0ffee::o::not_inlined_o(x);
+    }
+    public fun inlined(x: &mut u64) {
+        if (*x > 5) {
+            if (*x > 5) () else abort 43;
+            *x = 42;
+        } else {
+            if (*x > 5) () else abort 44;
+            *x = *x + 1;
+        }
+    }
+    public fun not_inlined(x: &mut u64) {
+        if (*x > 5) {
+            if (*x > 5) () else abort 42;
+            *x = 42;
+        } else {
+            *x = *x + 1;
+        }
+    }
+    public fun not_inlined_non_constant_error_code(x: &mut u64) {
+        if (*x > 5) () else abort 0x1::error::invalid_argument(42);
+        *x = 42;
+    }
+    public fun not_inlined_non_constant_error_code_2(x: &mut u64) {
+        if (*x > 5) () else abort 0x1::error::canonical(13, 42);
+        *x = 42;
+    }
+    public fun not_inlined_non_constant_error_code_3(x: &mut u64) {
+        if (*x > 5) () else abort 0x1::error::canonical(12, 45);
+        *x = 42;
+    }
+}
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        let x = 3;
+        0xc0ffee::n::not_inlined(&mut x);
+        0xc0ffee::n::inlined(&mut x);
+        0xc0ffee::n::indirect_inlined(&mut x);
+        one(&mut x);
+        0xc0ffee::n::not_inlined_non_constant_error_code(&mut x);
+        0xc0ffee::n::not_inlined_non_constant_error_code_2(&mut x);
+        0xc0ffee::n::not_inlined_non_constant_error_code_3(&mut x);
+        x + two()
+    }
+    fun one(x: &mut u64) {
+        if (*x > 5) {
+            if (*x > 5) () else abort 42;
+            *x = 42;
+        } else {
+            *x = *x + 43;
+        }
+    }
+    public fun two(): u64 {
+        2
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::o {
+    public fun not_inlined_o(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(41)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::o
+module 0xc0ffee::n {
+    public fun indirect_inlined(x: &mut u64) {
+        o::not_inlined_o(x);
+        Tuple()
+    }
+    public fun inlined(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(43)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(44)
+          };
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+    public fun not_inlined(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+    public fun not_inlined_non_constant_error_code(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          Tuple()
+        } else {
+          Abort(error::invalid_argument(42))
+        };
+        x = 42;
+        Tuple()
+    }
+    public fun not_inlined_non_constant_error_code_2(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          Tuple()
+        } else {
+          Abort(852010)
+        };
+        x = 42;
+        Tuple()
+    }
+    public fun not_inlined_non_constant_error_code_3(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          Tuple()
+        } else {
+          Abort(786477)
+        };
+        x = 42;
+        Tuple()
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        {
+          let x: u64 = 3;
+          n::not_inlined(Borrow(Mutable)(x));
+          n::inlined(Borrow(Mutable)(x));
+          {
+            let (x: &mut u64): (&mut u64) = Tuple(Borrow(Mutable)(x));
+            o::not_inlined_o(x);
+            Tuple()
+          };
+          m::one(Borrow(Mutable)(x));
+          n::not_inlined_non_constant_error_code(Borrow(Mutable)(x));
+          n::not_inlined_non_constant_error_code_2(Borrow(Mutable)(x));
+          n::not_inlined_non_constant_error_code_3(Borrow(Mutable)(x));
+          Add<u64>(x, 2)
+        }
+    }
+    private fun one(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 43);
+          Tuple()
+        }
+    }
+    public fun two(): u64 {
+        2
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Move bytecode v9
+module c0ffee.o {
+
+
+public not_inlined_o(x: &mut u64) /* def_idx: 0 */ {
+B0:
+	0: CopyLoc[0](x: &mut u64)
+	1: ReadRef
+	2: LdU64(5)
+	3: Gt
+	4: BrFalse(18)
+B1:
+	5: CopyLoc[0](x: &mut u64)
+	6: ReadRef
+	7: LdU64(5)
+	8: Gt
+	9: BrFalse(14)
+B2:
+	10: LdU64(42)
+	11: MoveLoc[0](x: &mut u64)
+	12: WriteRef
+B3:
+	13: Ret
+B4:
+	14: MoveLoc[0](x: &mut u64)
+	15: Pop
+	16: LdU64(41)
+	17: Abort
+B5:
+	18: CopyLoc[0](x: &mut u64)
+	19: ReadRef
+	20: LdU64(1)
+	21: Add
+	22: MoveLoc[0](x: &mut u64)
+	23: WriteRef
+	24: Branch(13)
+}
+}// Move bytecode v9
+module c0ffee.n {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::o;
+use 0000000000000000000000000000000000000000000000000000000000000001::error;
+
+
+
+
+public indirect_inlined(x: &mut u64) /* def_idx: 0 */ {
+B0:
+	0: MoveLoc[0](x: &mut u64)
+	1: Call o::not_inlined_o(&mut u64)
+	2: Ret
+}
+public inlined(x: &mut u64) /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](x: &mut u64)
+	1: ReadRef
+	2: LdU64(5)
+	3: Gt
+	4: BrFalse(18)
+B1:
+	5: CopyLoc[0](x: &mut u64)
+	6: ReadRef
+	7: LdU64(5)
+	8: Gt
+	9: BrFalse(14)
+B2:
+	10: LdU64(42)
+	11: MoveLoc[0](x: &mut u64)
+	12: WriteRef
+B3:
+	13: Ret
+B4:
+	14: MoveLoc[0](x: &mut u64)
+	15: Pop
+	16: LdU64(43)
+	17: Abort
+B5:
+	18: CopyLoc[0](x: &mut u64)
+	19: ReadRef
+	20: LdU64(5)
+	21: Gt
+	22: BrFalse(30)
+B6:
+	23: CopyLoc[0](x: &mut u64)
+	24: ReadRef
+	25: LdU64(1)
+	26: Add
+	27: MoveLoc[0](x: &mut u64)
+	28: WriteRef
+	29: Branch(13)
+B7:
+	30: MoveLoc[0](x: &mut u64)
+	31: Pop
+	32: LdU64(44)
+	33: Abort
+}
+public not_inlined(x: &mut u64) /* def_idx: 2 */ {
+B0:
+	0: CopyLoc[0](x: &mut u64)
+	1: ReadRef
+	2: LdU64(5)
+	3: Gt
+	4: BrFalse(18)
+B1:
+	5: CopyLoc[0](x: &mut u64)
+	6: ReadRef
+	7: LdU64(5)
+	8: Gt
+	9: BrFalse(14)
+B2:
+	10: LdU64(42)
+	11: MoveLoc[0](x: &mut u64)
+	12: WriteRef
+B3:
+	13: Ret
+B4:
+	14: MoveLoc[0](x: &mut u64)
+	15: Pop
+	16: LdU64(42)
+	17: Abort
+B5:
+	18: CopyLoc[0](x: &mut u64)
+	19: ReadRef
+	20: LdU64(1)
+	21: Add
+	22: MoveLoc[0](x: &mut u64)
+	23: WriteRef
+	24: Branch(13)
+}
+public not_inlined_non_constant_error_code(x: &mut u64) /* def_idx: 3 */ {
+B0:
+	0: CopyLoc[0](x: &mut u64)
+	1: ReadRef
+	2: LdU64(5)
+	3: Gt
+	4: BrFalse(9)
+B1:
+	5: LdU64(42)
+	6: MoveLoc[0](x: &mut u64)
+	7: WriteRef
+	8: Ret
+B2:
+	9: MoveLoc[0](x: &mut u64)
+	10: Pop
+	11: LdU64(42)
+	12: Call error::invalid_argument(u64): u64
+	13: Abort
+}
+public not_inlined_non_constant_error_code_2(x: &mut u64) /* def_idx: 4 */ {
+B0:
+	0: CopyLoc[0](x: &mut u64)
+	1: ReadRef
+	2: LdU64(5)
+	3: Gt
+	4: BrFalse(9)
+B1:
+	5: LdU64(42)
+	6: MoveLoc[0](x: &mut u64)
+	7: WriteRef
+	8: Ret
+B2:
+	9: MoveLoc[0](x: &mut u64)
+	10: Pop
+	11: LdU64(852010)
+	12: Abort
+}
+public not_inlined_non_constant_error_code_3(x: &mut u64) /* def_idx: 5 */ {
+B0:
+	0: CopyLoc[0](x: &mut u64)
+	1: ReadRef
+	2: LdU64(5)
+	3: Gt
+	4: BrFalse(9)
+B1:
+	5: LdU64(42)
+	6: MoveLoc[0](x: &mut u64)
+	7: WriteRef
+	8: Ret
+B2:
+	9: MoveLoc[0](x: &mut u64)
+	10: Pop
+	11: LdU64(786477)
+	12: Abort
+}
+}// Move bytecode v9
+module c0ffee.m {
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::n;
+use 0000000000000000000000000000000000000000000000000000000000c0ffee::o;
+
+
+
+
+public compute(): u64 /* def_idx: 0 */ {
+L0:	x: u64
+B0:
+	0: LdU64(3)
+	1: StLoc[0](x: u64)
+	2: MutBorrowLoc[0](x: u64)
+	3: Call n::not_inlined(&mut u64)
+	4: MutBorrowLoc[0](x: u64)
+	5: Call n::inlined(&mut u64)
+	6: MutBorrowLoc[0](x: u64)
+	7: Call o::not_inlined_o(&mut u64)
+	8: MutBorrowLoc[0](x: u64)
+	9: Call one(&mut u64)
+	10: MutBorrowLoc[0](x: u64)
+	11: Call n::not_inlined_non_constant_error_code(&mut u64)
+	12: MutBorrowLoc[0](x: u64)
+	13: Call n::not_inlined_non_constant_error_code_2(&mut u64)
+	14: MutBorrowLoc[0](x: u64)
+	15: Call n::not_inlined_non_constant_error_code_3(&mut u64)
+	16: MoveLoc[0](x: u64)
+	17: LdU64(2)
+	18: Add
+	19: Ret
+}
+one(x: &mut u64) /* def_idx: 1 */ {
+B0:
+	0: CopyLoc[0](x: &mut u64)
+	1: ReadRef
+	2: LdU64(5)
+	3: Gt
+	4: BrFalse(18)
+B1:
+	5: CopyLoc[0](x: &mut u64)
+	6: ReadRef
+	7: LdU64(5)
+	8: Gt
+	9: BrFalse(14)
+B2:
+	10: LdU64(42)
+	11: MoveLoc[0](x: &mut u64)
+	12: WriteRef
+B3:
+	13: Ret
+B4:
+	14: MoveLoc[0](x: &mut u64)
+	15: Pop
+	16: LdU64(42)
+	17: Abort
+B5:
+	18: CopyLoc[0](x: &mut u64)
+	19: ReadRef
+	20: LdU64(43)
+	21: Add
+	22: MoveLoc[0](x: &mut u64)
+	23: WriteRef
+	24: Branch(13)
+}
+public two(): u64 /* def_idx: 2 */ {
+B0:
+	0: LdU64(2)
+	1: Ret
+}
+}
+============ bytecode verification succeeded ========

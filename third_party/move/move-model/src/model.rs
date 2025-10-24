@@ -3071,6 +3071,24 @@ pub struct ModuleEnv<'env> {
 }
 
 impl<'env> ModuleEnv<'env> {
+    /// Check whether a named constant in this module has `value` as its value
+    pub fn has_error_code_with_value(&self, value: &Value) -> bool {
+        let value_big_int = match value {
+            Value::Number(big_int) => Some(u64::try_from(big_int).unwrap()),
+            _ => None,
+        };
+        if let Some(value_big_int) = value_big_int {
+            return self.get_named_constants().any(|named_constant| {
+                if let Some(abort_code) = named_constant.get_abort_code() {
+                    return (abort_code & well_known::LOWER_3_BYTES_MASK)
+                        == (value_big_int & well_known::LOWER_3_BYTES_MASK);
+                }
+                false
+            });
+        }
+        false
+    }
+
     /// Returns the id of this module in the global env.
     pub fn get_id(&self) -> ModuleId {
         self.data.id
@@ -3700,6 +3718,10 @@ impl<'env> ModuleEnv<'env> {
         self.is_module_in_std("vector")
     }
 
+    pub fn is_std_error(&self) -> bool {
+        self.is_module_in_std("error")
+    }
+
     pub fn is_table(&self) -> bool {
         self.is_module_in_std("table")
             || self.is_module_in_std("table_with_length")
@@ -4304,6 +4326,18 @@ impl NamedConstantEnv<'_> {
             module_name: Some(self.module_env.get_name().clone()),
             used_modules: self.module_env.get_used_modules(false),
             ..TypeDisplayContext::new(self.module_env.env)
+        }
+    }
+
+    /// Returns the abort code of this is an error code
+    pub fn get_abort_code(&self) -> Option<u64> {
+        let name = self.module_env.env.symbol_pool().string(self.get_name());
+        if !name.starts_with(well_known::ERROR_PREFIX) {
+            return None;
+        }
+        match self.get_value() {
+            Value::Number(big_int) => Some(u64::try_from(big_int).unwrap()),
+            _ => None,
         }
     }
 }
