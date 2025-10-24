@@ -16,8 +16,7 @@ use move_core_types::{
 use move_model::{
     ast::{Attribute, AttributeValue, Value},
     model::{
-        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, NamedConstantEnv, Parameter, QualifiedId,
-        StructEnv, StructId,
+        FunId, FunctionEnv, GlobalEnv, Loc, ModuleEnv, Parameter, QualifiedId, StructEnv, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -38,7 +37,6 @@ const ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE: &str = "lint::allow_unsafe_randomness";
 const FMT_SKIP_ATTRIBUTE: &str = "fmt::skip";
 const INIT_MODULE_FUN: &str = "init_module";
 const LEGACY_ENTRY_FUN_ATTRIBUTE: &str = "legacy_entry_fun";
-const ERROR_PREFIX: &str = "E";
 const EVENT_STRUCT_ATTRIBUTE: &str = "event";
 const MUTATION_SKIP_ATTRIBUTE: &str = "mutation::skip";
 const RANDOMNESS_ATTRIBUTE: &str = "randomness";
@@ -836,18 +834,16 @@ impl ExtendedChecker<'_> {
         let mut error_map = ErrorMapping::default();
         for named_constant in module.get_named_constants() {
             let name = self.name_string(named_constant.get_name());
-            if name.starts_with(ERROR_PREFIX) {
-                if let Some(abort_code) = self.get_abort_code(&named_constant) {
-                    // If an error is returned (because of duplicate entry) ignore it.
-                    let _ = error_map.add_module_error(
-                        &module_id.to_string(),
-                        abort_code,
-                        ErrorDescription {
-                            code_name: name.trim().to_string(),
-                            code_description: named_constant.get_doc().trim().to_string(),
-                        },
-                    );
-                }
+            if let Some(abort_code) = named_constant.get_abort_code() {
+                // If an error is returned (because of duplicate entry) ignore it.
+                let _ = error_map.add_module_error(
+                    &module_id.to_string(),
+                    abort_code,
+                    ErrorDescription {
+                        code_name: name.trim().to_string(),
+                        code_description: named_constant.get_doc().trim().to_string(),
+                    },
+                );
             }
         }
         // Inject it into runtime info
@@ -855,13 +851,6 @@ impl ExtendedChecker<'_> {
             .module_error_maps
             .remove(&module_id.to_string())
             .unwrap_or_default();
-    }
-
-    fn get_abort_code(&self, constant: &NamedConstantEnv<'_>) -> Option<u64> {
-        match constant.get_value() {
-            Value::Number(big_int) => u64::try_from(big_int).ok(),
-            _ => None,
-        }
     }
 }
 
