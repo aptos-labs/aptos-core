@@ -29,6 +29,55 @@ public fun m::test() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
+     var $t3: u64
+     # live vars:
+  0: $t0 := m::one()
+     # live vars: $t0
+  1: $t1 := m::one()
+     # flush: $t2
+     # live vars: $t0, $t1
+  2: $t2 := m::one()
+     # live vars: $t0, $t1, $t2
+  3: m::consume_1($t0)
+     # live vars: $t1, $t2
+  4: $t3 := infer($t1)
+     # live vars: $t2, $t3
+  5: m::consume_2($t3, $t2)
+     # live vars:
+  6: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume_1($t0: u64) {
+     # live vars: $t0
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_2($t0: u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
      var $t3: u64 [unused]
      # flush: $t0
      # live vars:

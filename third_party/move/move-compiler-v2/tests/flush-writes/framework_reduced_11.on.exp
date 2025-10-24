@@ -3,6 +3,103 @@
 [variant baseline]
 fun m::consume($t0: u64, $t1: &u64) {
      # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test($t0: vector<u64>) {
+     var $t1: u64
+     var $t2: &vector<u64>
+     var $t3: &vector<u64>
+     var $t4: u64
+     var $t5: bool
+     var $t6: u64
+     var $t7: u64
+     var $t8: &u64
+     var $t9: &u64
+     var $t10: &vector<u64>
+     var $t11: &u64
+     var $t12: u64
+     var $t13: u64
+     var $t14: u64
+     var $t15: u64
+     # flush: $t1
+     # live vars: $t0
+  0: $t1 := m::one()
+     # live vars: $t0, $t1
+  1: $t3 := borrow_local($t0)
+     # flush: $t2
+     # live vars: $t1, $t3
+  2: $t2 := infer($t3)
+     # flush: $t4
+     # live vars: $t1, $t2
+  3: $t4 := 0
+     # live vars: $t1, $t2, $t4
+  4: label L0
+     # live vars: $t1, $t2, $t4
+  5: $t6 := infer($t4)
+     # live vars: $t1, $t2, $t4, $t6
+  6: $t7 := vector::length<u64>($t2)
+     # live vars: $t1, $t2, $t4, $t6, $t7
+  7: $t5 := <($t6, $t7)
+     # live vars: $t1, $t2, $t4, $t5
+  8: if ($t5) goto 9 else goto 21
+     # live vars: $t1, $t2, $t4
+  9: label L2
+     # live vars: $t1, $t2, $t4
+ 10: $t10 := infer($t2)
+     # live vars: $t1, $t2, $t4, $t10
+ 11: $t9 := vector::borrow<u64>($t10, $t4)
+     # live vars: $t1, $t2, $t4, $t9
+ 12: $t8 := infer($t9)
+     # flush: $t11
+     # live vars: $t1, $t2, $t4, $t8
+ 13: $t11 := infer($t8)
+     # live vars: $t1, $t2, $t4, $t11
+ 14: $t12 := infer($t1)
+     # live vars: $t1, $t2, $t4, $t11, $t12
+ 15: m::consume($t12, $t11)
+     # live vars: $t1, $t2, $t4
+ 16: $t14 := infer($t4)
+     # live vars: $t1, $t2, $t14
+ 17: $t15 := 1
+     # live vars: $t1, $t2, $t14, $t15
+ 18: $t13 := +($t14, $t15)
+     # flush: $t4
+     # live vars: $t1, $t2, $t13
+ 19: $t4 := infer($t13)
+     # live vars: $t1, $t2, $t4
+ 20: goto 23
+     # live vars: $t1, $t2, $t4
+ 21: label L3
+     # live vars:
+ 22: goto 25
+     # live vars: $t1, $t2, $t4
+ 23: label L4
+     # live vars: $t1, $t2, $t4
+ 24: goto 4
+     # live vars:
+ 25: label L1
+     # live vars:
+ 26: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume($t0: u64, $t1: &u64) {
+     # live vars: $t0, $t1
   0: drop($t1)
      # live vars:
   1: return ()
