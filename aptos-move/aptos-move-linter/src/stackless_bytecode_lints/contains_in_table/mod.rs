@@ -13,7 +13,7 @@ mod dataflow;
 use move_compiler_v2::external_checks::StacklessBytecodeChecker;
 use move_linter::temp_equivalence_analyzer::{TempEquivalenceAnalyzer, TempEquivalenceState};
 use move_model::{
-    ast::TempIndex,
+    ast::{Attribute, TempIndex},
     model::{FunId, ModuleId, Visibility},
 };
 use move_stackless_bytecode::{
@@ -30,6 +30,8 @@ use self::{
     dataflow::{analyze_contains_function, ContainsTransfer},
 };
 
+const VIEW_FUNCTION_ATTRIBUTE: &str = "view";
+
 #[derive(Default)]
 pub struct ContainsInTable {}
 
@@ -39,7 +41,9 @@ impl StacklessBytecodeChecker for ContainsInTable {
     }
 
     fn check(&self, target: &FunctionTarget) {
-        if target.func_env.visibility() != Visibility::Public {
+        if target.func_env.visibility() != Visibility::Public
+            || has_function_attribute(target, VIEW_FUNCTION_ATTRIBUTE)
+        {
             return;
         }
 
@@ -218,4 +222,14 @@ fn is_table_function(full_name: &str, operation: &str) -> bool {
         format!("std::table::{}", operation),
     ];
     patterns.iter().any(|pattern| full_name.ends_with(pattern))
+}
+
+fn has_function_attribute(target: &FunctionTarget, attr_name: &str) -> bool {
+    let symbol_pool = target.func_env.symbol_pool();
+    target.func_env.get_attributes().iter().any(|attribute| {
+        matches!(
+            attribute,
+            Attribute::Apply(_, name, _) if symbol_pool.string(*name).as_str() == attr_name
+        )
+    })
 }
