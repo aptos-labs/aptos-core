@@ -147,6 +147,15 @@ impl<'env> FunctionTarget<'env> {
         }
     }
 
+    /// Returns the location of the bytecode at the given offset.
+    pub fn get_bytecode_loc_at_offset(&self, offset: CodeOffset) -> Loc {
+        if let Some(bytecode) = self.data.code.get(offset as usize) {
+            self.get_bytecode_loc(bytecode.get_attr_id())
+        } else {
+            self.func_env.module_env.env.internal_loc()
+        }
+    }
+
     /// Returns the debug comment, if any, associated with the given attribute.
     pub fn get_debug_comment(&self, attr_id: AttrId) -> Option<&String> {
         self.data.debug_comments.get(&attr_id)

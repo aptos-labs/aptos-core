@@ -20,11 +20,18 @@ fun one(): u64
     local l1: u64
     local l2: u64
     call one
-    call one
+    st_loc l1
+    copy_loc l1
+    copy_loc l1
     move_loc l0
-    call consume_1
-    call consume_2
     // @5
+    call consume_1
+    st_loc l2
+    move_loc l1
+    move_loc l2
+    call consume_2
+    // @10
+    pop
     ret
 
 

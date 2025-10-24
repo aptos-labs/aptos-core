@@ -1813,6 +1813,57 @@ impl Type {
             false
         }
     }
+
+    /// Estimate the size of a type in bytes statically
+    /// Warining: this can be inaccurate for complex types
+    /// For vector: we multiply the estimated size of the inner type with `vec_size`
+    pub fn estimate_size(&self, env: &GlobalEnv, vec_size: usize) -> usize {
+        use Type::*;
+        match self {
+            Primitive(PrimitiveType::Bool) => 1,
+            Primitive(PrimitiveType::U8) | Primitive(PrimitiveType::I8) => 1,
+            Primitive(PrimitiveType::U16) | Primitive(PrimitiveType::I16) => 2,
+            Primitive(PrimitiveType::U32) | Primitive(PrimitiveType::I32) => 4,
+            Primitive(PrimitiveType::U64) | Primitive(PrimitiveType::I64) => 8,
+            Primitive(PrimitiveType::U128) | Primitive(PrimitiveType::I128) => 16,
+            Primitive(PrimitiveType::U256) | Primitive(PrimitiveType::I256) => 32,
+            Primitive(PrimitiveType::Address) => 32,
+            Primitive(PrimitiveType::Signer) => 32,
+            Tuple(ts) => ts.iter().map(|t| t.estimate_size(env, vec_size)).sum(),
+            Vector(inner_ty) => inner_ty.estimate_size(env, vec_size) * vec_size,
+            Reference(_, _) => 8, // pointer size ?
+            Struct(mid, sid, _) => {
+                let struct_env = env.get_module(*mid).into_struct(*sid);
+                if struct_env.has_variants() {
+                    let mut variants_size = BTreeMap::new();
+                    struct_env.get_fields().for_each(|field| {
+                        if let Some(variant) = field.get_variant() {
+                            let size = field.get_type().estimate_size(env, vec_size);
+                            variants_size
+                                .entry(variant)
+                                .and_modify(|v| *v += size)
+                                .or_insert(size);
+                        }
+                    });
+                    *variants_size.values().max().unwrap_or(&0)
+                } else {
+                    struct_env
+                        .get_fields()
+                        .map(|field| field.get_type().estimate_size(env, vec_size))
+                        .sum()
+                }
+            },
+            Fun(arg_ty, ret_ty, _) => {
+                arg_ty.estimate_size(env, vec_size) + ret_ty.estimate_size(env, vec_size)
+            },
+            TypeParameter(_) => 32, // an insane constant here
+            // specification only types
+            Primitive(PrimitiveType::Num) => 0,
+            Primitive(PrimitiveType::Range) => 0,
+            Primitive(PrimitiveType::EventStore) => 0,
+            TypeDomain(_) | ResourceDomain(_, _, _) | Var(_) | Error => 0,
+        }
+    }
 }
 
 /// A parameter for type unification that specifies the type compatibility rules to follow.

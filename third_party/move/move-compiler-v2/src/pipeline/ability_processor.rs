@@ -280,6 +280,7 @@ impl Transformer<'_> {
                     self.check_explicit_copy(id, src);
                     self.builder.emit(Assign(id, dst, src, AssignKind::Copy))
                 },
+                AssignKind::Dup => self.builder.emit(Assign(id, dst, src, AssignKind::Dup)),
                 AssignKind::Move => {
                     self.check_explicit_move(code_offset, id, src);
                     self.builder.emit(Assign(id, dst, src, AssignKind::Move))

@@ -85,6 +85,11 @@ pub enum AssignKind {
     Store,
     /// The assign kind should be inferred based on livevar analysis
     Inferred,
+    /// The assign also copies the rhs value.
+    // It's a hack to let the FF generator always copies the rhs value from a local and
+    // pushes it onto the stack, even if the rhs value is already on the stack.
+    // Currently, it is only used by the common subexpression elimination optimization for better efficiency.
+    Dup,
 }
 
 /// The type of variable that is being havoc-ed
@@ -395,6 +400,22 @@ impl Operation {
             Operation::TraceGlobalMem(..) => false,
         }
     }
+
+    /// Returns true if the operation is commutative.
+    pub fn is_commutative(&self) -> bool {
+        matches!(
+            self,
+            Operation::Add
+                | Operation::Mul
+                | Operation::BitAnd
+                | Operation::BitOr
+                | Operation::Xor
+                | Operation::Eq
+                | Operation::Neq
+                | Operation::And
+                | Operation::Or
+        )
+    }
 }
 
 /// A borrow node -- used in memory operations.
@@ -581,6 +602,37 @@ impl Bytecode {
         )
     }
 
+    pub fn is_loc_borrowing(&self) -> bool {
+        matches!(
+            self,
+            Bytecode::Call(
+                _,
+                _,
+                Operation::BorrowLoc
+                    | Operation::BorrowField(..)
+                    | Operation::BorrowVariantField(..),
+                _,
+                _
+            )
+        )
+    }
+
+    pub fn is_borrowing(&self) -> bool {
+        matches!(
+            self,
+            Bytecode::Call(
+                _,
+                _,
+                Operation::BorrowLoc
+                    | Operation::BorrowField(..)
+                    | Operation::BorrowGlobal(..)
+                    | Operation::BorrowVariantField(..),
+                _,
+                _
+            )
+        )
+    }
+
     pub fn is_possibly_branching(&self) -> bool {
         matches!(self, Bytecode::Call(_, _, _, _, Some(_)))
     }
@@ -600,6 +652,153 @@ impl Bytecode {
     pub fn is_spec_only(&self) -> bool {
         use Bytecode::*;
         matches!(self, SaveMem(..) | SaveSpecVar(..) | Prop(..))
+    }
+
+    /// Return true if the bytecode is pure:
+    /// - the results only depend on the operands
+    /// - has no side effects on `memory` (including write via references), control flow (including `abort`), or external state (global storage)
+    /// - recomputing it multiple times has no semantic effect.
+    /// TODO[#18203]: revisit this function rigorously to make sure it is correct.
+    /// TODO[#18203]: rehandle spec only instructions; now they are bindly classified as impure.
+    pub fn is_pure(&self) -> bool {
+        match self {
+            Bytecode::Label(..) => true, // does not participate in execution
+            Bytecode::Nop(..) => true, // produces no execution effect
+            Bytecode::Load(..) => true, // all effects stay in the result
+
+            Bytecode::SpecBlock(..) |
+            Bytecode::SaveMem(..) |
+            Bytecode::SaveSpecVar(..) |
+            Bytecode::Prop(..) => false,
+
+            Bytecode::Assign(..) | // has side effects on operands (e.g., `move(v1)`)
+            Bytecode::Ret(..) | // change control flow
+            Bytecode::Branch(..) | // change control flow
+            Bytecode::Jump(..) | // change control flow
+            Bytecode::Abort(..) => false,
+
+            Bytecode::Call(_, _, op, _, _) => {
+                match op {
+                    Operation::Closure(..) => true,
+                    Operation::Pack(..) => true,
+                    Operation::Unpack(..) => true,
+                    Operation::TestVariant(..) => true,
+                    Operation::PackVariant(..) => true,
+                    Operation::BitOr => true,
+                    Operation::BitAnd => true,
+                    Operation::Xor => true,
+                    Operation::Lt => true,
+                    Operation::Gt => true,
+                    Operation::Le => true,
+                    Operation::Ge => true,
+                    Operation::Or => true,
+                    Operation::And => true,
+                    Operation::Eq => true,
+                    Operation::Neq => true,
+                    Operation::Not => true,
+                    Operation::Vector => true,
+
+                    Operation::BorrowLoc => false, // depends on memory states
+                    Operation::BorrowField(..) => false, // depends on memory states
+                    Operation::Function(..) => false,
+                    Operation::Invoke => false,
+                    Operation::UnpackVariant(..) => false, // aborts if not given variant
+                    Operation::BorrowVariantField(..) => false, // depends on memory states and aborts if not given variant
+                    Operation::MoveTo(..) => false, // depends on global state
+                    Operation::MoveFrom(..) => false, // depends on global state
+                    Operation::Exists(..) => false, // depends on global state
+                    Operation::BorrowGlobal(..) => false, // depends on global state
+                    Operation::Drop => false, // change state of locals
+                    Operation::Release => false, // change state of references
+                    Operation::ReadRef => false, // depends on referenced value
+                    Operation::WriteRef => false, // change state of referenced value
+                    Operation::FreezeRef(_) => false, // change state of references
+                    Operation::Shl => false, // can abort on overflow
+                    Operation::Shr => false, // can abort on overflow
+                    Operation::CastU8 => false, // can abort on overflow
+                    Operation::CastU16 => false, // can abort on overflow
+                    Operation::CastU32 => false, // can abort on overflow
+                    Operation::CastU64 => false, // can abort on overflow
+                    Operation::CastU128 => false, // can abort on overflow
+                    Operation::CastU256 => false, // can abort on overflow
+                    Operation::CastI8 => false, // can abort on overflow
+                    Operation::CastI16 => false, // can abort on overflow
+                    Operation::CastI32 => false, // can abort on overflow
+                    Operation::CastI64 => false, // can abort on overflow
+                    Operation::CastI128 => false, // can abort on overflow
+                    Operation::CastI256 => false, // can abort on overflow
+                    Operation::Negate => false, // can abort on overflow
+                    Operation::Add => false, // can abort on overflow
+                    Operation::Sub => false, // can abort on overflow
+                    Operation::Mul => false, // can abort on overflow
+                    Operation::Div => false, // can abort on overflow
+                    Operation::Mod => false, // can abort on overflow
+
+                    Operation::TraceLocal(_)
+                    | Operation::TraceReturn(_)
+                    | Operation::TraceAbort
+                    | Operation::TraceExp(_, _)
+                    | Operation::TraceGlobalMem(_)
+                    | Operation::EmitEvent
+                    | Operation::EventStoreDiverge
+                    | Operation::OpaqueCallBegin(_, _, _)
+                    | Operation::OpaqueCallEnd(_, _, _)
+                    | Operation::GetField(_, _, _, _)
+                    | Operation::GetVariantField(_, _, _, _, _)
+                    | Operation::GetGlobal(_, _, _)
+                    | Operation::Uninit
+                    | Operation::Havoc(_)
+                    | Operation::Stop
+                    | Operation::IsParent(_, _)
+                    | Operation::WriteBack(_, _)
+                    | Operation::UnpackRef
+                    | Operation::PackRef
+                    | Operation::UnpackRefDeep
+                    | Operation::PackRefDeep => false,
+                }
+            },
+        }
+    }
+
+    /// Return true if the bytecode is pure if we ignore arithmetic errors (overflows, division by zero).
+    pub fn pure_if_no_arith_error(&self) -> bool {
+        matches!(
+            self,
+            Bytecode::Call(
+                _,
+                _,
+                Operation::Shl
+                    | Operation::Shr
+                    | Operation::CastU8
+                    | Operation::CastU16
+                    | Operation::CastU32
+                    | Operation::CastU64
+                    | Operation::CastU128
+                    | Operation::CastU256
+                    | Operation::CastI8
+                    | Operation::CastI16
+                    | Operation::CastI32
+                    | Operation::CastI64
+                    | Operation::CastI128
+                    | Operation::CastI256
+                    | Operation::Negate
+                    | Operation::Add
+                    | Operation::Sub
+                    | Operation::Mul
+                    | Operation::Div
+                    | Operation::Mod,
+                _,
+                _
+            )
+        )
+    }
+
+    /// Return true if the bytecode is pure if we ignore type mismatch errors (e.g., a wrong variant is given).
+    pub fn pure_if_no_type_error(&self) -> bool {
+        matches!(
+            self,
+            Bytecode::Call(_, _, Operation::UnpackVariant(..), _, _)
+        )
     }
 
     /// Return the sources of the instruction (for non-spec-only instructions).
@@ -1050,6 +1249,9 @@ impl fmt::Display for BytecodeDisplay<'_> {
             },
             Assign(_, dst, src, AssignKind::Inferred) => {
                 write!(f, "{} := infer({})", self.lstr(*dst), self.lstr(*src))?
+            },
+            Assign(_, dst, src, AssignKind::Dup) => {
+                write!(f, "{} := dup({})", self.lstr(*dst), self.lstr(*src))?
             },
             Call(_, dsts, oper, args, aa) => {
                 if !dsts.is_empty() {

@@ -88,21 +88,20 @@ use 0x42::m1
     call m1::pack$Result$Ok<u64, u64>
     st_loc l0
     copy_loc l0
-    ld_u64 42
+    copy_loc l0
     // @5
-    call m1::pack$Result$Ok<u64, u64>
     eq
     br_false l0
     move_loc l0
     call m1::unpack$Result$Err<u64, u64>
-    // @10
     ld_u64 42
+    // @10
     eq
     br_false l1
     ret
 l1: ld_u64 2
-    // @15
     abort
+    // @15
 l0: ld_u64 1
     abort
 

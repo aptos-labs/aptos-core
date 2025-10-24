@@ -42,6 +42,50 @@ public fun m::test() {
   3: return ()
 }
 
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::one_one(): (u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: $t1 := 1
+     # live vars: $t0, $t1
+  2: return ($t0, $t1)
+}
+
+
+[variant baseline]
+fun m::take1($t0: u64) {
+     # live vars: $t0
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::take2($t0: u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     # flush: $t1
+     # live vars:
+  0: ($t0, $t1) := m::one_one()
+     # live vars: $t0, $t1
+  1: m::take1($t0)
+     # live vars: $t1
+  2: m::take1($t1)
+     # live vars:
+  3: return ()
+}
+
 
 ============ disassembled file-format ==================
 // Bytecode version v10
