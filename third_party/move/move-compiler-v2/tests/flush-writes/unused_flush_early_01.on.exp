@@ -12,8 +12,8 @@ fun m::one(): u64 {
 
 [variant baseline]
 public fun m::test1(): (u64, u64) {
-     var $t0: u64 [unused]
-     var $t1: u64 [unused]
+     var $t0: u64
+     var $t1: u64
      var $t2: u64
      var $t3: u64
      var $t4: u64
@@ -25,16 +25,18 @@ public fun m::test1(): (u64, u64) {
      # live vars: $t3
   2: $t4 := m::one()
      # live vars: $t3, $t4
-  3: $t3 := move($t3)
-     # live vars: $t3, $t4
-  4: return ($t3, $t4)
+  3: $t0 := infer($t3)
+     # live vars: $t0, $t4
+  4: $t1 := infer($t4)
+     # live vars: $t0, $t1
+  5: return ($t0, $t1)
 }
 
 
 [variant baseline]
 public fun m::test2(): (u64, u64) {
-     var $t0: u64 [unused]
-     var $t1: u64 [unused]
+     var $t0: u64
+     var $t1: u64
      var $t2: u64
      var $t3: u64
      var $t4: u64
@@ -46,9 +48,88 @@ public fun m::test2(): (u64, u64) {
      # live vars: $t2
   2: $t4 := m::one()
      # live vars: $t2, $t4
-  3: $t2 := move($t2)
+  3: $t0 := infer($t2)
+     # live vars: $t0, $t4
+  4: $t1 := infer($t4)
+     # live vars: $t0, $t1
+  5: return ($t0, $t1)
+}
+
+
+[variant baseline]
+public fun m::test3(): (u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     # live vars:
+  0: $t2 := m::one()
+     # flush: $t3
+     # live vars: $t2
+  1: $t3 := m::one()
+     # live vars: $t2
+  2: $t4 := m::one()
      # live vars: $t2, $t4
-  4: return ($t2, $t4)
+  3: $t0 := infer($t4)
+     # live vars: $t0, $t2
+  4: $t1 := infer($t2)
+     # live vars: $t0, $t1
+  5: return ($t0, $t1)
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test1(): (u64, u64) {
+     var $t0: u64 [unused]
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64 [unused]
+     # flush: $t2
+     # live vars:
+  0: $t2 := m::one()
+     # live vars: $t2
+  1: $t3 := copy($t2)
+     # live vars: $t2, $t3
+  2: $t3 := move($t3)
+     # live vars: $t2, $t3
+  3: return ($t3, $t2)
+}
+
+
+[variant baseline]
+public fun m::test2(): (u64, u64) {
+     var $t0: u64 [unused]
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64 [unused]
+     var $t4: u64 [unused]
+     # live vars:
+  0: $t2 := m::one()
+     # live vars: $t2
+  1: $t2 := dup($t2)
+     # flush: $t2
+     # live vars: $t2
+  2: $t2 := move($t2)
+     # flush: $t2
+     # live vars: $t2
+  3: $t2 := dup($t2)
+     # live vars: $t2
+  4: $t1 := dup($t2)
+     # live vars: $t1, $t2
+  5: return ($t2, $t1)
 }
 
 
@@ -57,16 +138,16 @@ public fun m::test3(): (u64, u64) {
      var $t0: u64 [unused]
      var $t1: u64 [unused]
      var $t2: u64
-     var $t3: u64
+     var $t3: u64 [unused]
      var $t4: u64
      # flush: $t2
      # live vars:
   0: $t2 := m::one()
-     # flush: $t3
+     # flush: $t2
      # live vars: $t2
-  1: $t3 := m::one()
+  1: $t2 := dup($t2)
      # live vars: $t2
-  2: $t4 := m::one()
+  2: $t4 := dup($t2)
      # live vars: $t2, $t4
   3: $t4 := move($t4)
      # live vars: $t2, $t4
@@ -87,19 +168,18 @@ fun one(): u64
     local l0: u64
     local l1: u64
     call one
-    pop
-    call one
-    call one
+    st_loc l0
+    copy_loc l0
+    move_loc l0
     ret
 
 // Function definition at index 2
 #[persistent] public fun test2(): (u64, u64)
     local l0: u64
-    local l1: u64
     call one
-    call one
-    pop
-    call one
+    st_loc l0
+    copy_loc l0
+    copy_loc l0
     ret
 
 // Function definition at index 3
@@ -108,10 +188,12 @@ fun one(): u64
     local l1: u64
     call one
     st_loc l0
-    call one
-    pop
-    call one
+    copy_loc l0
+    copy_loc l0
+    st_loc l1
     // @5
+    pop
+    move_loc l1
     move_loc l0
     ret
 

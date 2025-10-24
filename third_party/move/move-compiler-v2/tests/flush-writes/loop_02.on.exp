@@ -2,6 +2,67 @@
 
 [variant baseline]
 fun m::inc($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: u64
+     # flush: $t0
+     # live vars:
+  0: $t0 := 0
+     # live vars: $t0
+  1: label L0
+     # live vars: $t0
+  2: $t1 := m::inc($t0)
+     # flush: $t0
+     # live vars: $t1
+  3: $t0 := infer($t1)
+     # live vars: $t0
+  4: $t3 := infer($t0)
+     # live vars: $t0, $t3
+  5: $t4 := 10
+     # live vars: $t0, $t3, $t4
+  6: $t2 := >($t3, $t4)
+     # live vars: $t0, $t2
+  7: if ($t2) goto 8 else goto 11
+     # live vars: $t0
+  8: label L2
+     # live vars:
+  9: goto 14
+     # live vars: $t0
+ 10: goto 12
+     # live vars: $t0
+ 11: label L3
+     # live vars: $t0
+ 12: label L4
+     # live vars: $t0
+ 13: goto 1
+     # live vars:
+ 14: label L1
+     # live vars:
+ 15: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::inc($t0: u64): u64 {
      var $t1: u64 [unused]
      var $t2: u64 [unused]
      var $t3: u64

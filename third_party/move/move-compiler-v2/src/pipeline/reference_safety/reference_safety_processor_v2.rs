@@ -1530,7 +1530,7 @@ impl LifetimeAnalysisStep<'_, '_> {
         if self.is_ref(src) {
             match kind {
                 AssignKind::Move => self.state.move_ref(dest, src),
-                AssignKind::Copy => self.state.copy_ref(dest, src),
+                AssignKind::Copy | AssignKind::Dup => self.state.copy_ref(dest, src),
                 AssignKind::Inferred => {
                     if self.state.label_for_temp_with_children(src).is_none()
                         && !self.alive.after.contains_key(&src)

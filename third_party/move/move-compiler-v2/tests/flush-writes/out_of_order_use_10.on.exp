@@ -29,22 +29,74 @@ public fun m::test() {
      var $t0: u64
      var $t1: u64
      var $t2: u64
-     var $t3: u64 [unused]
-     # flush: $t0
+     var $t3: u64
      # live vars:
   0: $t0 := m::one()
      # live vars: $t0
   1: $t1 := m::one()
+     # flush: $t2
      # live vars: $t0, $t1
   2: $t2 := m::one()
      # live vars: $t0, $t1, $t2
   3: m::consume_1($t0)
      # live vars: $t1, $t2
-  4: $t1 := move($t1)
-     # live vars: $t1, $t2
-  5: m::consume_2($t1, $t2)
+  4: $t3 := infer($t1)
+     # live vars: $t2, $t3
+  5: m::consume_2($t3, $t2)
      # live vars:
   6: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume_1($t0: u64) {
+     # live vars: $t0
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_2($t0: u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64 [unused]
+     # flush: $t0
+     # live vars:
+  0: $t0 := m::one()
+     # flush: $t0
+     # live vars: $t0
+  1: $t0 := dup($t0)
+     # live vars: $t0
+  2: $t1 := dup($t0)
+     # live vars: $t0, $t1
+  3: $t2 := dup($t0)
+     # live vars: $t0, $t1, $t2
+  4: m::consume_1($t0)
+     # live vars: $t1, $t2
+  5: $t1 := move($t1)
+     # live vars: $t1, $t2
+  6: m::consume_2($t1, $t2)
+     # live vars:
+  7: return ()
 }
 
 
@@ -71,12 +123,14 @@ fun one(): u64
     local l2: u64
     call one
     st_loc l0
-    call one
-    call one
-    move_loc l0
+    copy_loc l0
+    copy_loc l0
+    copy_loc l0
     // @5
+    move_loc l0
     call consume_1
     call consume_2
+    pop
     ret
 
 
