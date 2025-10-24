@@ -1,15 +1,15 @@
-/// This module provides a generic trading engine implementation for a market. On a high level, its a data structure,
+/// This module provides a generic trading engine implementation for a market. On a high level, it's a data structure,
 /// that stores an order book and provides APIs to place orders, cancel orders, and match orders. The market also acts
 /// as a wrapper around the order book and pluggable clearinghouse implementation.
 /// A clearing house implementation is expected to implement the following APIs
 ///  - settle_trade(taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size): SettleTradeResult ->
-/// Called by the market when there is an match between taker and maker. The clearinghouse is expected to settle the trade
-/// and return the result. Please note that the clearing house settlment size might not be the same as the order match size and
+/// Called by the market when there is a match between taker and maker. The clearinghouse is expected to settle the trade
+/// and return the result. Please note that the clearing house settlement size might not be the same as the order match size and
 /// the settlement might also fail. The fill_id is an incremental counter for matched orders and can be used to track specific fills
 ///  - validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
-///  an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
+///  an order when it's placed. The clearinghouse is expected to validate the order and return true if the order is valid.
 ///  This API is called for both maker and taker order placements.
-///  Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
+///  Check out clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 ///  the position size of the user and does not do any validation.
 ///
 /// - place_maker_order(account, order_id, is_bid, price, size, metadata) -> Called by the market before placing the
@@ -46,11 +46,11 @@
 /// taker orders. IOC orders are orders that are valid only if they are taker orders.
 ///
 /// In addition, the market also supports trigger conditions for orders. An order with trigger condition is not put
-/// on the order book until its trigger conditions are met. Following trigger conditions are supported:
-/// TakeProfit(price): If its a buy order its triggered when the market price is greater than or equal to the price. If
-/// its a sell order its triggered when the market price is less than or equal to the price.
-/// StopLoss(price): If its a buy order its triggered when the market price is less than or equal to the price. If its
-/// a sell order its triggered when the market price is greater than or equal to the price.
+/// on the order book until its trigger conditions are met. The following trigger conditions are supported:
+/// TakeProfit(price): If it's a buy order it's triggered when the market price is greater than or equal to the price. If
+/// it's a sell order it's triggered when the market price is less than or equal to the price.
+/// StopLoss(price): If it's a buy order it's triggered when the market price is less than or equal to the price. If it's
+/// a sell order it's triggered when the market price is greater than or equal to the price.
 /// TimeBased(time): The order is triggered when the current time is greater than or equal to the time.
 ///
 module aptos_experimental::order_placement {
@@ -143,7 +143,7 @@ module aptos_experimental::order_placement {
         self.order_id
     }
 
-    /// Places a limt order - If its a taker order, it will be matched immediately and if its a maker order, it will simply
+    /// Places a limit order - If it's a taker order, it will be matched immediately and if it's a maker order, it will simply
     /// be placed in the order book. An order id is generated when the order is placed and this id can be used to
     /// uniquely identify the order for this market and can also be used to get the status of the order or cancel the order.
     /// The order is placed with the following parameters:
@@ -165,7 +165,7 @@ module aptos_experimental::order_placement {
     /// This knob is present to configure maximum amount of gas any order placement transaction might consume and avoid
     /// hitting the maximum has limit of the blockchain.
     /// - cancel_on_match_limit: bool: Whether to cancel the given order when the match limit is reached.
-    /// This is used ful as the caller might not want to cancel the order when the limit is reached and can continue
+    /// This is useful as the caller might not want to cancel the order when the limit is reached and can continue
     /// that order in a separate transaction.
     /// - callbacks: The callbacks for the market clearinghouse. This is a struct that implements the MarketClearinghouseCallbacks
     /// interface. This is used to validate the order and settle the trade.
@@ -758,7 +758,7 @@ module aptos_experimental::order_placement {
     }
 
     /// Core function to place an order with a given order id. If the order id is not provided, a new order id is generated.
-    /// The function itself doesn't do any validation of the user_address, it is up to the caller to ensure that signer validation
+    /// The function itself doesn't do any validation of the user_address, it's up to the caller to ensure that signer validation
     /// is done before calling this function if needed.
     public fun place_order_with_order_id<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
@@ -781,6 +781,8 @@ module aptos_experimental::order_placement {
             orig_size > 0 && remaining_size > 0,
             EINVALID_ORDER
         );
+        assert!(max_match_limit > 0, EINVALID_ORDER);
+        assert!(limit_price > 0, EINVALID_ORDER);
         if (order_id.is_none()) {
             // If order id is not provided, generate a new order id
             order_id = option::some(market.next_order_id());
