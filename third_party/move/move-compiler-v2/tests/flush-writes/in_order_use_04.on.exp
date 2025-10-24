@@ -41,6 +41,88 @@ public fun m::test() {
      var $t3: u64
      var $t4: u64
      var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     # flush: $t3
+     # live vars:
+  0: ($t0, $t1, $t2, $t3) := m::four()
+     # flush: $t5
+     # live vars: $t0, $t1, $t2, $t3
+  1: ($t4, $t5) := m::two()
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  2: $t6 := infer($t4)
+     # live vars: $t0, $t1, $t2, $t3, $t5, $t6
+  3: m::consume_2($t6, $t5)
+     # live vars: $t0, $t1, $t2, $t3
+  4: $t7 := infer($t0)
+     # live vars: $t1, $t2, $t3, $t7
+  5: $t8 := infer($t1)
+     # live vars: $t2, $t3, $t7, $t8
+  6: $t9 := infer($t2)
+     # live vars: $t3, $t7, $t8, $t9
+  7: m::consume_4($t7, $t8, $t9, $t3)
+     # live vars:
+  8: return ()
+}
+
+
+[variant baseline]
+fun m::two(): (u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     # live vars:
+  0: $t0 := 5
+     # live vars: $t0
+  1: $t1 := 6
+     # live vars: $t0, $t1
+  2: return ($t0, $t1)
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume_2($t0: u64, $t1: u64) {
+     # live vars: $t0, $t1
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_4($t0: u64, $t1: u64, $t2: u64, $t3: u64) {
+     # live vars: $t0, $t1, $t2, $t3
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::four(): (u64, u64, u64, u64) {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: $t1 := 2
+     # live vars: $t0, $t1
+  2: $t2 := 3
+     # live vars: $t0, $t1, $t2
+  3: $t3 := 4
+     # live vars: $t0, $t1, $t2, $t3
+  4: return ($t0, $t1, $t2, $t3)
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
      var $t6: u64 [unused]
      var $t7: u64 [unused]
      var $t8: u64 [unused]

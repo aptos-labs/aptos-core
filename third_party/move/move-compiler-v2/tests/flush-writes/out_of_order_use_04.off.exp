@@ -15,15 +15,19 @@ fun one(): u64
 #[persistent] public fun test()
     local l0: u64
     local l1: u64
-    call one
+    local l2: u64
     call one
     st_loc l0
+    copy_loc l0
+    copy_loc l0
     st_loc l1
-    copy_loc l1
     // @5
-    move_loc l0
+    st_loc l2
     move_loc l1
+    move_loc l2
+    move_loc l0
     call consume
+    // @10
     ret
 
 
