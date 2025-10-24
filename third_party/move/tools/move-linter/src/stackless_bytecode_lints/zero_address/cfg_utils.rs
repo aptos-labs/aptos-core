@@ -60,15 +60,12 @@ pub(super) fn collect_branch_info(
         let Some(&else_block) = label_to_block.get(else_label) else {
             continue;
         };
-        map.insert(
-            block_id,
-            BranchInfo {
-                last_offset,
-                then_block,
-                else_block,
-                cond: *cond,
-            },
-        );
+        map.insert(block_id, BranchInfo {
+            last_offset,
+            then_block,
+            else_block,
+            cond: *cond,
+        });
     }
     map
 }

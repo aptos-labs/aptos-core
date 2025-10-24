@@ -3,8 +3,6 @@
 
 //! Flow-sensitive temp equivalence analyzer for stackless bytecode temporaries.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use move_binary_format::file_format::CodeOffset;
 use move_model::{
     ast::{Address, TempIndex},
@@ -16,6 +14,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Constant, Operation},
     stackless_control_flow_graph::StacklessControlFlowGraph,
 };
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FieldInfo {
@@ -424,6 +423,7 @@ impl TempEquivalenceAnalyzer {
 
 impl TransferFunctions for TempEquivalenceAnalyzer {
     type State = TempEquivalenceState;
+
     const BACKWARD: bool = false;
 
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, _offset: CodeOffset) {
@@ -446,16 +446,12 @@ impl TransferFunctions for TempEquivalenceAnalyzer {
                         if let Some(&base) = srcs.first() {
                             for (field_offset, &dest) in dests.iter().enumerate() {
                                 state.isolate(dest);
-                                state.set_field_ref(
-                                    dest,
-                                    base,
-                                    FieldInfo {
-                                        module_id: *mid,
-                                        struct_id: *sid,
-                                        variant_path: None,
-                                        field_offset,
-                                    },
-                                );
+                                state.set_field_ref(dest, base, FieldInfo {
+                                    module_id: *mid,
+                                    struct_id: *sid,
+                                    variant_path: None,
+                                    field_offset,
+                                });
                             }
                             return;
                         }
@@ -464,16 +460,12 @@ impl TransferFunctions for TempEquivalenceAnalyzer {
                     Operation::BorrowField(mid, sid, _, field_offset) => {
                         if let (Some(&dest), Some(&base)) = (dests.first(), srcs.first()) {
                             state.isolate(dest);
-                            state.set_field_ref(
-                                dest,
-                                base,
-                                FieldInfo {
-                                    module_id: *mid,
-                                    struct_id: *sid,
-                                    variant_path: None,
-                                    field_offset: *field_offset,
-                                },
-                            );
+                            state.set_field_ref(dest, base, FieldInfo {
+                                module_id: *mid,
+                                struct_id: *sid,
+                                variant_path: None,
+                                field_offset: *field_offset,
+                            });
                             return;
                         }
                     },
@@ -481,16 +473,12 @@ impl TransferFunctions for TempEquivalenceAnalyzer {
                     Operation::BorrowVariantField(mid, sid, variants, _, field_offset) => {
                         if let (Some(&dest), Some(&base)) = (dests.first(), srcs.first()) {
                             state.isolate(dest);
-                            state.set_field_ref(
-                                dest,
-                                base,
-                                FieldInfo {
-                                    module_id: *mid,
-                                    struct_id: *sid,
-                                    variant_path: Some(variants.clone()),
-                                    field_offset: *field_offset,
-                                },
-                            );
+                            state.set_field_ref(dest, base, FieldInfo {
+                                module_id: *mid,
+                                struct_id: *sid,
+                                variant_path: Some(variants.clone()),
+                                field_offset: *field_offset,
+                            });
                             return;
                         }
                     },

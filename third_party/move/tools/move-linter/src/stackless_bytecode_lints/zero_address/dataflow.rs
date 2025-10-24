@@ -151,6 +151,7 @@ impl<'a> ZeroTransfer<'a> {
 
 impl TransferFunctions for ZeroTransfer<'_> {
     type State = ZeroDomain;
+
     const BACKWARD: bool = false;
 
     fn execute(&self, state: &mut Self::State, instr: &Bytecode, offset: CodeOffset) {
@@ -184,13 +185,10 @@ pub(super) fn analyze_zero_function(
     let mut state_map: StateMap<ZeroDomain> = StateMap::new();
     let mut work_list = VecDeque::new();
     let entry = cfg.entry_block();
-    state_map.insert(
-        entry,
-        BlockState {
-            pre: ZeroDomain::default(),
-            post: ZeroDomain::default(),
-        },
-    );
+    state_map.insert(entry, BlockState {
+        pre: ZeroDomain::default(),
+        post: ZeroDomain::default(),
+    });
     work_list.push_back(entry);
 
     while let Some(block_id) = work_list.pop_front() {
@@ -246,13 +244,10 @@ pub(super) fn analyze_zero_function(
                     }
                 },
                 None => {
-                    state_map.insert(
-                        succ,
-                        BlockState {
-                            pre: succ_state.clone(),
-                            post: ZeroDomain::default(),
-                        },
-                    );
+                    state_map.insert(succ, BlockState {
+                        pre: succ_state.clone(),
+                        post: ZeroDomain::default(),
+                    });
                     work_list.push_back(succ);
                 },
             }

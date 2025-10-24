@@ -18,7 +18,7 @@ use crate::temp_equivalence_analyzer::{TempEquivalenceAnalyzer, TempEquivalenceS
 use move_binary_format::file_format::CodeOffset;
 use move_compiler_v2::external_checks::StacklessBytecodeChecker;
 use move_model::{
-    ast::TempIndex,
+    ast::{Attribute, TempIndex},
     model::{FunId, ModuleId},
     ty::{PrimitiveType, Type},
 };
@@ -66,6 +66,8 @@ const DANGEROUS_FUNCTION_NAMES: &[&str] = &[
     "issue",
 ];
 
+const VIEW_FUNCTION_ATTRIBUTE: &str = "view";
+
 #[derive(Default)]
 pub struct ZeroAddress;
 
@@ -79,7 +81,11 @@ impl StacklessBytecodeChecker for ZeroAddress {
             return;
         }
 
-        if !target.func_env.is_exposed() {
+        if !target.func_env.is_entry() {
+            return;
+        }
+
+        if has_function_attribute(target, VIEW_FUNCTION_ATTRIBUTE) {
             return;
         }
 
@@ -254,13 +260,10 @@ fn collect_zero_comparisons(
         };
 
         let dest = dests[0];
-        map.insert(
-            dest,
-            ZeroComparison {
-                address: address_temp,
-                op: effective_op,
-            },
-        );
+        map.insert(dest, ZeroComparison {
+            address: address_temp,
+            op: effective_op,
+        });
     }
 
     map
@@ -314,4 +317,14 @@ fn get_function_name(target: &FunctionTarget, module_id: ModuleId, function_id: 
         module_env.get_full_name_str(),
         function_env.get_name_str()
     )
+}
+
+fn has_function_attribute(target: &FunctionTarget, attr_name: &str) -> bool {
+    let symbol_pool = target.func_env.symbol_pool();
+    target.func_env.get_attributes().iter().any(|attribute| {
+        matches!(
+            attribute,
+            Attribute::Apply(_, name, _) if symbol_pool.string(*name).as_str() == attr_name
+        )
+    })
 }
