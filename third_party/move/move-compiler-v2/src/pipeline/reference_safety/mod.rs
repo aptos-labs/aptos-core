@@ -5,7 +5,10 @@
 use move_binary_format::file_format::CodeOffset;
 use move_model::{ast::TempIndex, ty::ReferenceKind};
 use move_stackless_bytecode::function_target::FunctionTarget;
-use std::{collections::BTreeMap, rc::Rc};
+use std::{
+    collections::{BTreeMap, BTreeSet},
+    rc::Rc,
+};
 
 pub mod reference_safety_processor_v2;
 pub mod reference_safety_processor_v3;
@@ -57,6 +60,17 @@ impl LifetimeInfoAtCodeOffset {
         self.after.borrow_kind(temp)
     }
 
+    /// Returns the list of temporaries referenced by `temp`
+    /// before the given program point. If `temp` itself is not a mutable reference,
+    /// nothing will be returned.
+    pub fn referenced_temps_before(&self, temp: TempIndex) -> BTreeSet<TempIndex> {
+        self.before.referenced_temps(temp)
+    }
+
+    pub fn referenced_temps_after(&self, temp: TempIndex) -> BTreeSet<TempIndex> {
+        self.after.referenced_temps(temp)
+    }
+
     /// Returns true if the given temporary is borrowed before or after the program point.
     pub fn is_borrowed(&self, temp: TempIndex) -> bool {
         self.borrow_kind_before(temp).is_some() || self.borrow_kind_after(temp).is_some()
@@ -66,6 +80,8 @@ impl LifetimeInfoAtCodeOffset {
 /// A trait to be implemented by reference safety processors
 pub trait LifetimeInfo {
     fn borrow_kind(&self, temp: TempIndex) -> Option<ReferenceKind>;
+
+    fn referenced_temps(&self, temp: TempIndex) -> BTreeSet<TempIndex>;
 
     // For debugging
     fn display(&self, target: &FunctionTarget) -> Option<String>;
@@ -81,6 +97,10 @@ impl LifetimeInfo for NoLifetimeInfo {
 
     fn display(&self, _target: &FunctionTarget) -> Option<String> {
         None
+    }
+
+    fn referenced_temps(&self, _temp: TempIndex) -> BTreeSet<TempIndex> {
+        BTreeSet::new()
     }
 }
 

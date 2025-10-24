@@ -1182,6 +1182,33 @@ impl LifetimeInfo for LifetimeState {
     fn display(&self, target: &FunctionTarget) -> Option<String> {
         Some(self.display(target).to_string())
     }
+
+    // Get all temps which are referenced by the given temp before a given program point
+    fn referenced_temps(&self, temp: TempIndex) -> BTreeSet<TempIndex> {
+        let mut result = BTreeSet::new();
+
+        // Get the reference id for the temp
+        let abs_val = self.locals[temp];
+        let AbstractValue::Reference(ref_id) = abs_val else {
+            return BTreeSet::new();
+        };
+
+        let mut todo = vec![ref_id];
+        let mut done = BTreeSet::new();
+        // recursively traverse the borrow graph to get ancestors
+        while let Some(next) = todo.pop() {
+            done.insert(next);
+            for (_loc, parent, path, _strong) in self.borrow_graph.in_edges(next) {
+                if let Some(Label::Local(parent_local)) = path.first() {
+                    result.insert(*parent_local);
+                }
+                if !done.insert(parent) {
+                    todo.push(parent)
+                }
+            }
+        }
+        result
+    }
 }
 
 // ===============================================================================

@@ -2152,6 +2152,25 @@ impl LifetimeInfo for LifetimeState {
     fn display(&self, target: &FunctionTarget) -> Option<String> {
         Some(self.display(target).to_string())
     }
+
+    // Get all temps which are referenced by the given temp before a given program point
+    fn referenced_temps(&self, temp: TempIndex) -> BTreeSet<TempIndex> {
+        let label = self.label_for_temp(temp);
+        let Some(label) = label else {
+            return BTreeSet::new();
+        };
+        let mut result = BTreeSet::new();
+        // Collect the roots of this nodes, which are the original locations being borrowed
+        for root in self.roots(label).iter() {
+            let node = self.node(root);
+            for loc in node.locations.iter() {
+                if let MemoryLocation::Local(t) = loc {
+                    result.insert(*t);
+                }
+            }
+        }
+        result
+    }
 }
 
 // ===============================================================================================

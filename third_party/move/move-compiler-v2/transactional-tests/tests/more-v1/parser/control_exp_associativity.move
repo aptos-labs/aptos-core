@@ -18,7 +18,6 @@ module 0x42::M {
         assert!(x == 0, 0);
         42
     }
-
 }
 
 //# run 0x42::M::t

@@ -3871,7 +3871,7 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      var $t16: i64 [unused]
      var $t17: &0x42::valid_logic::S1 [unused]
      var $t18: &i64 [unused]
-     var $t19: i64 [unused]
+     var $t19: i64
      var $t20: &0x42::valid_logic::S3<i64>
      var $t21: &i64 [unused]
      var $t22: i64 [unused]
@@ -3918,18 +3918,6 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
   7: if ($t9) goto 8 else goto 78
      # live vars: $t0, $t1, $t2
   8: label L0
-     # live vars: $t0, $t1, $t2
-  9: $t11 := borrow_local($t0)
-     # live vars: $t0, $t1, $t2, $t11
- 10: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
-     # live vars: $t0, $t1, $t2, $t12
- 11: $t10 := read_ref($t12)
-     # live vars: $t0, $t1, $t2, $t10
- 12: $t20 := borrow_local($t2)
-     # live vars: $t0, $t1, $t2, $t10, $t20
- 13: $t12 := borrow_field<0x42::valid_logic::S3<i64>>.x($t20)
-     # live vars: $t0, $t1, $t2, $t10, $t12
- 14: $t13 := read_ref($t12)
      # live vars: $t0, $t1, $t2, $t10, $t13
  15: $t9 := <=($t10, $t13)
      # live vars: $t0, $t1, $t2, $t9
@@ -3993,37 +3981,37 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t10, $t13
  45: $t5 := <($t10, $t13)
      # live vars: $t0, $t1, $t5
- 46: label L11
+ 34: label L11
      # live vars: $t0, $t1, $t5
  47: if ($t5) goto 48 else goto 66
      # live vars: $t0, $t1
- 48: label L12
+ 36: label L12
      # live vars: $t0, $t1
- 49: $t11 := borrow_local($t0)
+ 37: $t11 := borrow_local($t0)
      # live vars: $t0, $t1, $t11
- 50: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+ 38: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
      # live vars: $t0, $t1, $t12
- 51: $t14 := borrow_local($t1)
+ 39: $t14 := borrow_local($t1)
      # live vars: $t0, $t1, $t12, $t14
- 52: $t42 := borrow_field<0x42::valid_logic::S2>.y($t14)
+ 40: $t42 := borrow_field<0x42::valid_logic::S2>.y($t14)
      # live vars: $t0, $t1, $t12, $t42
- 53: $t4 := ==($t12, $t42)
+ 41: $t4 := ==($t12, $t42)
      # live vars: $t0, $t1, $t4
- 54: label L14
+ 42: label L14
      # live vars: $t0, $t1, $t4
  55: if ($t4) goto 56 else goto 63
      # live vars: $t0, $t1
- 56: label L15
+ 44: label L15
      # live vars: $t0, $t1
- 57: $t11 := borrow_local($t0)
+ 45: $t11 := borrow_local($t0)
      # live vars: $t1, $t11
- 58: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
+ 46: $t12 := borrow_field<0x42::valid_logic::S1>.y($t11)
      # live vars: $t1, $t12
- 59: $t14 := borrow_local($t1)
+ 47: $t14 := borrow_local($t1)
      # live vars: $t12, $t14
- 60: $t42 := borrow_field<0x42::valid_logic::S2>.y($t14)
+ 48: $t42 := borrow_field<0x42::valid_logic::S2>.y($t14)
      # live vars: $t12, $t42
- 61: $t3 := ==($t12, $t42)
+ 49: $t3 := ==($t12, $t42)
      # live vars: $t3
  62: return $t3
      # live vars: $t0, $t1
@@ -4083,7 +4071,7 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      var $t16: i128 [unused]
      var $t17: &0x42::valid_logic::S1 [unused]
      var $t18: &i128 [unused]
-     var $t19: i128 [unused]
+     var $t19: i128
      var $t20: &0x42::valid_logic::S3<i128>
      var $t21: &i128 [unused]
      var $t22: i128 [unused]
@@ -4130,18 +4118,6 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
   7: if ($t9) goto 8 else goto 78
      # live vars: $t0, $t1, $t2
   8: label L0
-     # live vars: $t0, $t1, $t2
-  9: $t11 := borrow_local($t0)
-     # live vars: $t0, $t1, $t2, $t11
- 10: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
-     # live vars: $t0, $t1, $t2, $t12
- 11: $t10 := read_ref($t12)
-     # live vars: $t0, $t1, $t2, $t10
- 12: $t20 := borrow_local($t2)
-     # live vars: $t0, $t1, $t2, $t10, $t20
- 13: $t12 := borrow_field<0x42::valid_logic::S3<i128>>.x($t20)
-     # live vars: $t0, $t1, $t2, $t10, $t12
- 14: $t13 := read_ref($t12)
      # live vars: $t0, $t1, $t2, $t10, $t13
  15: $t9 := <=($t10, $t13)
      # live vars: $t0, $t1, $t2, $t9
@@ -4205,37 +4181,37 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t10, $t13
  45: $t5 := <($t10, $t13)
      # live vars: $t0, $t1, $t5
- 46: label L11
+ 34: label L11
      # live vars: $t0, $t1, $t5
  47: if ($t5) goto 48 else goto 66
      # live vars: $t0, $t1
- 48: label L12
+ 36: label L12
      # live vars: $t0, $t1
- 49: $t11 := borrow_local($t0)
+ 37: $t11 := borrow_local($t0)
      # live vars: $t0, $t1, $t11
- 50: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+ 38: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
      # live vars: $t0, $t1, $t12
- 51: $t14 := borrow_local($t1)
+ 39: $t14 := borrow_local($t1)
      # live vars: $t0, $t1, $t12, $t14
- 52: $t42 := borrow_field<0x42::valid_logic::S2>.z($t14)
+ 40: $t42 := borrow_field<0x42::valid_logic::S2>.z($t14)
      # live vars: $t0, $t1, $t12, $t42
- 53: $t4 := ==($t12, $t42)
+ 41: $t4 := ==($t12, $t42)
      # live vars: $t0, $t1, $t4
- 54: label L14
+ 42: label L14
      # live vars: $t0, $t1, $t4
  55: if ($t4) goto 56 else goto 63
      # live vars: $t0, $t1
- 56: label L15
+ 44: label L15
      # live vars: $t0, $t1
- 57: $t11 := borrow_local($t0)
+ 45: $t11 := borrow_local($t0)
      # live vars: $t1, $t11
- 58: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
+ 46: $t12 := borrow_field<0x42::valid_logic::S1>.z($t11)
      # live vars: $t1, $t12
- 59: $t14 := borrow_local($t1)
+ 47: $t14 := borrow_local($t1)
      # live vars: $t12, $t14
- 60: $t42 := borrow_field<0x42::valid_logic::S2>.z($t14)
+ 48: $t42 := borrow_field<0x42::valid_logic::S2>.z($t14)
      # live vars: $t12, $t42
- 61: $t3 := ==($t12, $t42)
+ 49: $t3 := ==($t12, $t42)
      # live vars: $t3
  62: return $t3
      # live vars: $t0, $t1
