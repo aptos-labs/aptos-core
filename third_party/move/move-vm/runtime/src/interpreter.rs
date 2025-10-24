@@ -421,11 +421,7 @@ where
 
             match exit_code {
                 ExitCode::Return => {
-                    let non_ref_vals = current_frame
-                        .locals
-                        .drop_all_values()
-                        .map(|(_idx, val)| val)
-                        .collect::<Vec<_>>();
+                    let non_ref_vals = current_frame.locals.drop_all_values();
 
                     gas_meter
                         .charge_drop_frame(non_ref_vals.iter())
