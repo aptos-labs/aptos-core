@@ -106,4 +106,19 @@ async fn test_abi(use_txn_payload_v2_format: bool, use_orderless_transactions: b
 
     // Confirm that State is not considered an enum.
     assert_eq!(my_struct["is_enum"], false);
+
+    let test_option = structs
+        .iter()
+        .find(|s| s["name"].as_str().unwrap() == "TestOption")
+        .unwrap();
+    assert_eq!(test_option["fields"][0]["name"], "o");
+
+    let option_module = context.get("/accounts/0x1/module/option").await;
+
+    let option_structs = option_module["abi"]["structs"].as_array().unwrap();
+
+    assert_eq!(option_structs[0]["name"], "Option");
+    assert_eq!(option_structs[0]["fields"][0]["name"], "vec");
+    assert_eq!(option_structs[0]["is_enum"], false);
+    assert_eq!(option_structs[0]["fields"][0]["type"], "vector<T0>");
 }
