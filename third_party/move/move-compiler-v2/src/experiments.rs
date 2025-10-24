@@ -158,6 +158,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Given(false),
         },
         Experiment {
+            name: Experiment::COMMON_SUBEXP_ELIMINATION.to_string(),
+            description: "Whether to run common subexpression elimination".to_string(),
+            default: Inherited(Experiment::OPTIMIZE.to_string()),
+        },
+        Experiment {
             name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
             description: "Turns on optimizations waiting for comparison testing".to_string(),
             default: Given(false),
@@ -317,6 +322,7 @@ impl Experiment {
     pub const CFG_SIMPLIFICATION: &'static str = "cfg-simplification";
     pub const CHECKS: &'static str = "checks";
     pub const CMP_REWRITE: &'static str = "cmp-rewrite";
+    pub const COMMON_SUBEXP_ELIMINATION: &'static str = "common-subexp-elimination";
     pub const COMPILE_FOR_TESTING: &'static str = "compile-for-testing";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";

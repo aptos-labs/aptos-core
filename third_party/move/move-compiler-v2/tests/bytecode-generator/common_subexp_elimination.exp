@@ -1,0 +1,245 @@
+// -- Model dump before first bytecode pipeline
+module 0x8675::M {
+    struct S {
+        x: u64,
+    }
+    private fun test(data: S,a: u64,b: u64): u64 {
+        a: u64 = Add<u64>(a, 1);
+        b: u64 = Mul<u64>(b, 2);
+        a: u64 = Add<u64>(a, b);
+        if Neq<u64>(select M::S.x<S>(data), 0) {
+          Add<u64>(Div<u64>(a, select M::S.x<S>(data)), Mul<u64>(b, select M::S.x<S>(data)))
+        } else {
+          Mul<u64>(b, select M::S.x<S>(data))
+        }
+    }
+} // end 0x8675::M
+
+// -- Sourcified model before first bytecode pipeline
+module 0x8675::M {
+    struct S has copy, drop {
+        x: u64,
+    }
+    fun test(data: S, a: u64, b: u64): u64 {
+        a = a + 1;
+        b = b * 2;
+        a = a + b;
+        if (data.x != 0) a / data.x + b * data.x else b * data.x
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::test($t0: 0x8675::M::S, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: bool
+     var $t13: u64
+     var $t14: &0x8675::M::S
+     var $t15: &u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: &0x8675::M::S
+     var $t21: &u64
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64
+     var $t25: &0x8675::M::S
+     var $t26: &u64
+     var $t27: u64
+     var $t28: u64
+     var $t29: &0x8675::M::S
+     var $t30: &u64
+  0: $t5 := infer($t1)
+  1: $t6 := 1
+  2: $t4 := +($t5, $t6)
+  3: $t1 := infer($t4)
+  4: $t8 := infer($t2)
+  5: $t9 := 2
+  6: $t7 := *($t8, $t9)
+  7: $t2 := infer($t7)
+  8: $t11 := infer($t1)
+  9: $t10 := +($t11, $t2)
+ 10: $t1 := infer($t10)
+ 11: $t14 := borrow_local($t0)
+ 12: $t15 := borrow_field<0x8675::M::S>.x($t14)
+ 13: $t13 := read_ref($t15)
+ 14: $t16 := 0
+ 15: $t12 := !=($t13, $t16)
+ 16: if ($t12) goto 17 else goto 30
+ 17: label L0
+ 18: $t18 := infer($t1)
+ 19: $t20 := borrow_local($t0)
+ 20: $t21 := borrow_field<0x8675::M::S>.x($t20)
+ 21: $t19 := read_ref($t21)
+ 22: $t17 := /($t18, $t19)
+ 23: $t23 := infer($t2)
+ 24: $t25 := borrow_local($t0)
+ 25: $t26 := borrow_field<0x8675::M::S>.x($t25)
+ 26: $t24 := read_ref($t26)
+ 27: $t22 := *($t23, $t24)
+ 28: $t3 := +($t17, $t22)
+ 29: goto 36
+ 30: label L1
+ 31: $t27 := infer($t2)
+ 32: $t29 := borrow_local($t0)
+ 33: $t30 := borrow_field<0x8675::M::S>.x($t29)
+ 34: $t28 := read_ref($t30)
+ 35: $t3 := *($t27, $t28)
+ 36: label L2
+ 37: return $t3
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x8675::M {
+    struct S {
+        x: u64,
+    }
+    private fun test(data: S,a: u64,b: u64): u64 {
+        a: u64 = Add<u64>(a, 1);
+        b: u64 = Mul<u64>(b, 2);
+        a: u64 = Add<u64>(a, b);
+        if Neq<u64>(select M::S.x<S>(data), 0) {
+          Add<u64>(Div<u64>(a, select M::S.x<S>(data)), Mul<u64>(b, select M::S.x<S>(data)))
+        } else {
+          Mul<u64>(b, select M::S.x<S>(data))
+        }
+    }
+} // end 0x8675::M
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun M::test($t0: 0x8675::M::S, $t1: u64, $t2: u64): u64 {
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     var $t10: u64
+     var $t11: u64
+     var $t12: bool
+     var $t13: u64
+     var $t14: &0x8675::M::S
+     var $t15: &u64
+     var $t16: u64
+     var $t17: u64
+     var $t18: u64
+     var $t19: u64
+     var $t20: &0x8675::M::S
+     var $t21: &u64
+     var $t22: u64
+     var $t23: u64
+     var $t24: u64
+     var $t25: &0x8675::M::S
+     var $t26: &u64
+     var $t27: u64
+     var $t28: u64
+     var $t29: &0x8675::M::S
+     var $t30: &u64
+  0: $t5 := infer($t1)
+  1: $t6 := 1
+  2: $t4 := +($t5, $t6)
+  3: $t1 := infer($t4)
+  4: $t8 := infer($t2)
+  5: $t9 := 2
+  6: $t7 := *($t8, $t9)
+  7: $t2 := infer($t7)
+  8: $t11 := infer($t1)
+  9: $t10 := +($t11, $t2)
+ 10: $t1 := infer($t10)
+ 11: $t14 := borrow_local($t0)
+ 12: $t15 := borrow_field<0x8675::M::S>.x($t14)
+ 13: $t13 := read_ref($t15)
+ 14: $t16 := 0
+ 15: $t12 := !=($t13, $t16)
+ 16: if ($t12) goto 17 else goto 30
+ 17: label L0
+ 18: $t18 := infer($t1)
+ 19: $t20 := borrow_local($t0)
+ 20: $t21 := borrow_field<0x8675::M::S>.x($t20)
+ 21: $t19 := read_ref($t21)
+ 22: $t17 := /($t18, $t19)
+ 23: $t23 := infer($t2)
+ 24: $t25 := borrow_local($t0)
+ 25: $t26 := borrow_field<0x8675::M::S>.x($t25)
+ 26: $t24 := read_ref($t26)
+ 27: $t22 := *($t23, $t24)
+ 28: $t3 := +($t17, $t22)
+ 29: goto 36
+ 30: label L1
+ 31: $t27 := infer($t2)
+ 32: $t29 := borrow_local($t0)
+ 33: $t30 := borrow_field<0x8675::M::S>.x($t29)
+ 34: $t28 := read_ref($t30)
+ 35: $t3 := *($t27, $t28)
+ 36: label L2
+ 37: return $t3
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v9
+module 8675.M {
+struct S has copy, drop {
+	x: u64
+}
+
+test(data: S, a: u64, b: u64): u64 /* def_idx: 0 */ {
+L3:	$t5: u64
+B0:
+	0: MoveLoc[1](a: u64)
+	1: LdU64(1)
+	2: Add
+	3: MoveLoc[2](b: u64)
+	4: LdU64(2)
+	5: Mul
+	6: StLoc[2](b: u64)
+	7: CopyLoc[2](b: u64)
+	8: Add
+	9: StLoc[1](a: u64)
+	10: ImmBorrowLoc[0](data: S)
+	11: ImmBorrowField[0](S.x: u64)
+	12: ReadRef
+	13: LdU64(0)
+	14: Neq
+	15: BrFalse(30)
+B1:
+	16: MoveLoc[1](a: u64)
+	17: ImmBorrowLoc[0](data: S)
+	18: ImmBorrowField[0](S.x: u64)
+	19: ReadRef
+	20: Div
+	21: MoveLoc[2](b: u64)
+	22: ImmBorrowLoc[0](data: S)
+	23: ImmBorrowField[0](S.x: u64)
+	24: ReadRef
+	25: Mul
+	26: Add
+	27: StLoc[3]($t5: u64)
+B2:
+	28: MoveLoc[3]($t5: u64)
+	29: Ret
+B3:
+	30: MoveLoc[2](b: u64)
+	31: ImmBorrowLoc[0](data: S)
+	32: ImmBorrowField[0](S.x: u64)
+	33: ReadRef
+	34: Mul
+	35: StLoc[3]($t5: u64)
+	36: Branch(28)
+}
+}
+============ bytecode verification succeeded ========
