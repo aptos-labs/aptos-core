@@ -475,9 +475,9 @@ aborts if there are no sells
     unique_priority_idx: UniqueIdxType, is_bid: bool
 ): UniqueIdxType {
     <b>if</b> (is_bid) {
-        unique_priority_idx
-    } <b>else</b> {
         unique_priority_idx.descending_idx()
+    } <b>else</b> {
+        unique_priority_idx
     }
 }
 </code></pre>
