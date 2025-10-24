@@ -315,7 +315,7 @@
 <pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;, order_req: SingleOrderRequest&lt;M&gt;
 ) {
-    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_place_maker_order">place_maker_order</a>(
+    self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.place_maker_or_pending_order(
         &<b>mut</b> self.price_time_idx,
         &<b>mut</b> self.ascending_id_generator,
         order_req

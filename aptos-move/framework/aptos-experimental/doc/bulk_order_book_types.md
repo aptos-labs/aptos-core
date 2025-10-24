@@ -118,6 +118,7 @@ ask_sizes
 -  [Function `get_account`](#0x7_bulk_order_book_types_get_account)
     -  [Arguments:](#@Arguments:_22)
     -  [Returns:](#@Returns:_23)
+-  [Function `get_sequence_number`](#0x7_bulk_order_book_types_get_sequence_number)
 -  [Function `get_active_price`](#0x7_bulk_order_book_types_get_active_price)
     -  [Arguments:](#@Arguments:_24)
     -  [Returns:](#@Returns:_25)
@@ -1474,6 +1475,32 @@ The account that placed the order.
     self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
 ): <b>address</b> {
     self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_book_types_get_sequence_number"></a>
+
+## Function `get_sequence_number`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number">get_sequence_number</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number">get_sequence_number</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
+): u64 {
+    self.order_sequence_number
 }
 </code></pre>
 
