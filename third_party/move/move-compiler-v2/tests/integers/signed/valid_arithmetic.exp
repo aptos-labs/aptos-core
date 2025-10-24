@@ -3656,10 +3656,10 @@ fun valid_arithmetic::test_mix3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::vali
      var $t11: i64
      var $t12: &0x42::valid_arithmetic::S2
      var $t13: &i64 [unused]
-     var $t14: i64 [unused]
+     var $t14: i64
      var $t15: &0x42::valid_arithmetic::S3<i64>
      var $t16: &i64 [unused]
-     var $t17: i64 [unused]
+     var $t17: i64
      var $t18: &0x42::valid_arithmetic::S1 [unused]
      var $t19: &i64 [unused]
      var $t20: i64 [unused]
@@ -3676,46 +3676,34 @@ fun valid_arithmetic::test_mix3($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::vali
   2: $t8 := read_ref($t10)
      # live vars: $t0, $t1, $t2, $t8
   3: $t12 := borrow_local($t1)
-     # live vars: $t0, $t1, $t2, $t8, $t12
+     # live vars: $t0, $t2, $t8, $t12
   4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t12)
-     # live vars: $t0, $t1, $t2, $t8, $t10
+     # live vars: $t0, $t2, $t8, $t10
   5: $t11 := read_ref($t10)
-     # live vars: $t0, $t1, $t2, $t8, $t11
+     # live vars: $t0, $t2, $t8, $t11
   6: $t8 := +($t8, $t11)
-     # live vars: $t0, $t1, $t2, $t8
+     # live vars: $t0, $t2, $t8, $t11
   7: $t15 := borrow_local($t2)
-     # live vars: $t0, $t1, $t2, $t8, $t15
+     # live vars: $t0, $t8, $t11, $t15
   8: $t10 := borrow_field<0x42::valid_arithmetic::S3<i64>>.x($t15)
-     # live vars: $t0, $t1, $t2, $t8, $t10
-  9: $t11 := read_ref($t10)
-     # live vars: $t0, $t1, $t2, $t8, $t11
- 10: $t8 := -($t8, $t11)
-     # live vars: $t0, $t1, $t2, $t8
+     # live vars: $t0, $t8, $t10, $t11
+  9: $t14 := read_ref($t10)
+     # live vars: $t0, $t8, $t11, $t14
+ 10: $t8 := -($t8, $t14)
+     # live vars: $t0, $t8, $t11, $t14
  11: $t9 := borrow_local($t0)
-     # live vars: $t1, $t2, $t8, $t9
+     # live vars: $t8, $t9, $t11, $t14
  12: $t10 := borrow_field<0x42::valid_arithmetic::S1>.y($t9)
-     # live vars: $t1, $t2, $t8, $t10
- 13: $t11 := read_ref($t10)
-     # live vars: $t1, $t2, $t8, $t11
- 14: $t8 := *($t8, $t11)
-     # live vars: $t1, $t2, $t8
- 15: $t12 := borrow_local($t1)
-     # live vars: $t2, $t8, $t12
- 16: $t10 := borrow_field<0x42::valid_arithmetic::S2>.y($t12)
-     # live vars: $t2, $t8, $t10
- 17: $t11 := read_ref($t10)
-     # live vars: $t2, $t8, $t11
- 18: $t8 := /($t8, $t11)
-     # live vars: $t2, $t8
- 19: $t15 := borrow_local($t2)
-     # live vars: $t8, $t15
- 20: $t10 := borrow_field<0x42::valid_arithmetic::S3<i64>>.x($t15)
-     # live vars: $t8, $t10
- 21: $t11 := read_ref($t10)
-     # live vars: $t8, $t11
- 22: $t8 := %($t8, $t11)
+     # live vars: $t8, $t10, $t11, $t14
+ 13: $t17 := read_ref($t10)
+     # live vars: $t8, $t11, $t14, $t17
+ 14: $t8 := *($t8, $t17)
+     # live vars: $t8, $t11, $t14
+ 15: $t8 := /($t8, $t11)
+     # live vars: $t8, $t14
+ 16: $t8 := %($t8, $t14)
      # live vars: $t8
- 23: return $t8
+ 17: return $t8
 }
 
 
@@ -3732,10 +3720,10 @@ fun valid_arithmetic::test_mix4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::vali
      var $t11: i128
      var $t12: &0x42::valid_arithmetic::S2
      var $t13: &i128 [unused]
-     var $t14: i128 [unused]
+     var $t14: i128
      var $t15: &0x42::valid_arithmetic::S3<i128>
      var $t16: &i128 [unused]
-     var $t17: i128 [unused]
+     var $t17: i128
      var $t18: &0x42::valid_arithmetic::S1 [unused]
      var $t19: &i128 [unused]
      var $t20: i128 [unused]
@@ -3752,46 +3740,34 @@ fun valid_arithmetic::test_mix4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::vali
   2: $t8 := read_ref($t10)
      # live vars: $t0, $t1, $t2, $t8
   3: $t12 := borrow_local($t1)
-     # live vars: $t0, $t1, $t2, $t8, $t12
+     # live vars: $t0, $t2, $t8, $t12
   4: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t12)
-     # live vars: $t0, $t1, $t2, $t8, $t10
+     # live vars: $t0, $t2, $t8, $t10
   5: $t11 := read_ref($t10)
-     # live vars: $t0, $t1, $t2, $t8, $t11
+     # live vars: $t0, $t2, $t8, $t11
   6: $t8 := +($t8, $t11)
-     # live vars: $t0, $t1, $t2, $t8
+     # live vars: $t0, $t2, $t8, $t11
   7: $t15 := borrow_local($t2)
-     # live vars: $t0, $t1, $t2, $t8, $t15
+     # live vars: $t0, $t8, $t11, $t15
   8: $t10 := borrow_field<0x42::valid_arithmetic::S3<i128>>.x($t15)
-     # live vars: $t0, $t1, $t2, $t8, $t10
-  9: $t11 := read_ref($t10)
-     # live vars: $t0, $t1, $t2, $t8, $t11
- 10: $t8 := -($t8, $t11)
-     # live vars: $t0, $t1, $t2, $t8
+     # live vars: $t0, $t8, $t10, $t11
+  9: $t14 := read_ref($t10)
+     # live vars: $t0, $t8, $t11, $t14
+ 10: $t8 := -($t8, $t14)
+     # live vars: $t0, $t8, $t11, $t14
  11: $t9 := borrow_local($t0)
-     # live vars: $t1, $t2, $t8, $t9
+     # live vars: $t8, $t9, $t11, $t14
  12: $t10 := borrow_field<0x42::valid_arithmetic::S1>.z($t9)
-     # live vars: $t1, $t2, $t8, $t10
- 13: $t11 := read_ref($t10)
-     # live vars: $t1, $t2, $t8, $t11
- 14: $t8 := *($t8, $t11)
-     # live vars: $t1, $t2, $t8
- 15: $t12 := borrow_local($t1)
-     # live vars: $t2, $t8, $t12
- 16: $t10 := borrow_field<0x42::valid_arithmetic::S2>.z($t12)
-     # live vars: $t2, $t8, $t10
- 17: $t11 := read_ref($t10)
-     # live vars: $t2, $t8, $t11
- 18: $t8 := /($t8, $t11)
-     # live vars: $t2, $t8
- 19: $t15 := borrow_local($t2)
-     # live vars: $t8, $t15
- 20: $t10 := borrow_field<0x42::valid_arithmetic::S3<i128>>.x($t15)
-     # live vars: $t8, $t10
- 21: $t11 := read_ref($t10)
-     # live vars: $t8, $t11
- 22: $t8 := %($t8, $t11)
+     # live vars: $t8, $t10, $t11, $t14
+ 13: $t17 := read_ref($t10)
+     # live vars: $t8, $t11, $t14, $t17
+ 14: $t8 := *($t8, $t17)
+     # live vars: $t8, $t11, $t14
+ 15: $t8 := /($t8, $t11)
+     # live vars: $t8, $t14
+ 16: $t8 := %($t8, $t14)
      # live vars: $t8
- 23: return $t8
+ 17: return $t8
 }
 
 
@@ -4361,6 +4337,8 @@ fun test_mix2(l0: i128, l1: i128, l2: i128): i128
 
 // Function definition at index 10
 fun test_mix3(l0: S1, l1: S2, l2: S3<i64>): i64
+    local l3: i64
+    local l4: i64
     borrow_loc l0
     borrow_field S1, y
     read_ref
@@ -4368,30 +4346,32 @@ fun test_mix3(l0: S1, l1: S2, l2: S3<i64>): i64
     borrow_field S2, y
     // @5
     read_ref
+    st_loc l3
+    copy_loc l3
     add
     borrow_loc l2
+    // @10
     borrow_field S3<i64>, x
     read_ref
-    // @10
+    st_loc l4
+    copy_loc l4
     sub
+    // @15
     borrow_loc l0
     borrow_field S1, y
     read_ref
     mul
-    // @15
-    borrow_loc l1
-    borrow_field S2, y
-    read_ref
-    div
-    borrow_loc l2
+    move_loc l3
     // @20
-    borrow_field S3<i64>, x
-    read_ref
+    div
+    move_loc l4
     mod
     ret
 
 // Function definition at index 11
 fun test_mix4(l0: S1, l1: S2, l2: S3<i128>): i128
+    local l3: i128
+    local l4: i128
     borrow_loc l0
     borrow_field S1, z
     read_ref
@@ -4399,25 +4379,25 @@ fun test_mix4(l0: S1, l1: S2, l2: S3<i128>): i128
     borrow_field S2, z
     // @5
     read_ref
+    st_loc l3
+    copy_loc l3
     add
     borrow_loc l2
+    // @10
     borrow_field S3<i128>, x
     read_ref
-    // @10
+    st_loc l4
+    copy_loc l4
     sub
+    // @15
     borrow_loc l0
     borrow_field S1, z
     read_ref
     mul
-    // @15
-    borrow_loc l1
-    borrow_field S2, z
-    read_ref
-    div
-    borrow_loc l2
+    move_loc l3
     // @20
-    borrow_field S3<i128>, x
-    read_ref
+    div
+    move_loc l4
     mod
     ret
 
