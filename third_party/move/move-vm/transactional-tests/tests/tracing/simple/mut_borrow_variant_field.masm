@@ -1,0 +1,18 @@
+//# publish
+module 0x22::test
+
+enum E has drop
+  V1
+    a: u64
+
+public fun mut_borrow_variant_field_instr(): u64
+    local e: E
+    ld_u64 3
+    pack_variant E, V1
+    st_loc e
+    mut_borrow_loc e
+    mut_borrow_variant_field E, V1::a
+    read_ref
+    ret
+
+//# run --verbose 0x22::test::mut_borrow_variant_field_instr --display-trace

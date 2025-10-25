@@ -1,0 +1,12 @@
+//# publish
+module 0x22::test
+
+public fun vec_pop_back_instr(): u64
+    local v: vector<u64>
+    ld_const<vector<u64>> [1, 2]
+    st_loc v
+    mut_borrow_loc v
+    vec_pop_back <u64>
+    ret
+
+//# run --verbose 0x22::test::vec_pop_back_instr --display-trace

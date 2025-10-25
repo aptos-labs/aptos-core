@@ -12,7 +12,9 @@ use aptos_types::{
     account_config::ChainIdResource, chain_id::ChainId, on_chain_config::OnChainConfig,
 };
 use aptos_vm::AptosVM;
-use aptos_vm_environment::prod_configs::{set_layout_caches, set_paranoid_type_checks};
+use aptos_vm_environment::prod_configs::{
+    set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
+};
 
 /// Error message to display when non-production features are enabled
 pub const ERROR_MSG_BAD_FEATURE_FLAGS: &str = r#"
@@ -51,6 +53,7 @@ pub fn fetch_chain_id(db: &DbReaderWriter) -> anyhow::Result<ChainId> {
 pub fn set_aptos_vm_configurations(node_config: &NodeConfig) {
     set_layout_caches(node_config.execution.layout_caches_enabled);
     set_paranoid_type_checks(node_config.execution.paranoid_type_verification);
+    set_async_runtime_checks(node_config.execution.async_runtime_checks);
     let effective_concurrency_level = if node_config.execution.concurrency_level == 0 {
         ((num_cpus::get() / 2) as u16).clamp(1, DEFAULT_EXECUTION_CONCURRENCY_LEVEL)
     } else {

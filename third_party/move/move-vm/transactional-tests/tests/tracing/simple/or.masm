@@ -1,0 +1,10 @@
+//# publish
+module 0x22::test
+
+public fun or_instr(): bool
+    ld_true
+    ld_false
+    or
+    ret
+
+//# run --verbose 0x22::test::or_instr --display-trace

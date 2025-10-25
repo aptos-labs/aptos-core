@@ -1,0 +1,15 @@
+//# publish
+module 0x22::test
+
+fun branch_instr()
+l1: nop
+    nop
+    branch l3
+l2: nop
+    nop
+l3: branch l5
+l4: branch l6
+l5: branch l4
+l6: ret
+
+//# run --verbose 0x22::test::branch_instr --display-trace

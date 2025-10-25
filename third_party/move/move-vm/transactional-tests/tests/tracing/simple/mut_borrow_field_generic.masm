@@ -1,0 +1,17 @@
+//# publish
+module 0x22::test
+
+struct A<T> has drop
+  x: T
+
+public fun mut_borrow_field_generic_instr(): u64
+    local a: A<u64>
+    ld_u64 3
+    pack A<u64>
+    st_loc a
+    mut_borrow_loc a
+    mut_borrow_field A<u64>, x
+    read_ref
+    ret
+
+//# run --verbose 0x22::test::mut_borrow_field_generic_instr --display-trace
