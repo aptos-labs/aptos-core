@@ -4,7 +4,7 @@
 use crate::{
     flatten_perfect_tree::{FlattenPerfectTree, FptRef, FptRefMut},
     metrics::TIMER,
-    node::{CollisionCell, LeafContent, LeafNode, NodeRef, NodeStrongRef},
+    node::{CollisionCell, LeafContent, LeafNode, NodeRawPtr, NodeRef},
     utils::binary_tree_height,
     Key, KeyHash, LayeredMap, MapLayer, Value,
 };
@@ -15,8 +15,9 @@ use std::collections::BTreeMap;
 
 impl<K, V, S> LayeredMap<K, V, S>
 where
-    K: ArcAsyncDrop + Key,
-    V: ArcAsyncDrop + Value,
+    K: ArcAsyncDrop + Key + std::fmt::Debug,
+    V: ArcAsyncDrop + Value + std::fmt::Debug,
+    S: Default,
 {
     pub fn new_layer_with_hasher(&self, kvs: &[(K, V)], hash_builder: &S) -> MapLayer<K, V>
     where
@@ -36,18 +37,23 @@ where
             })
             .sorted_by_key(Item::full_key)
             .collect_vec();
+        // println!("kvs: {:?}", kvs);
+        // println!("items: {:?}", items);
 
         let height = Self::new_peak_height(self.top_layer.peak().num_leaves(), items.len());
+        let new_layer = self.top_layer.layer() + 1;
         let mut new_peak = FlattenPerfectTree::new_with_empty_nodes(height);
         let builder = SubTreeBuilder {
-            layer: self.top_layer.layer() + 1,
+            layer: new_layer,
             base_layer: self.base_layer(),
             depth: 0,
             position_info: PositionInfo::new(self.top_layer.peak(), self.base_layer()),
             output_position_info: OutputPositionInfo::new(new_peak.get_mut()),
             items: &items,
+            old_root_layer: self.top_layer.layer(),
         };
         builder.build().finalize();
+        // println!("new_peak: {:?}", new_peak);
 
         self.top_layer.spawn(new_peak, self.base_layer())
     }
@@ -66,6 +72,7 @@ where
     }
 }
 
+#[derive(Debug)]
 pub(crate) struct Item<'a, K, V> {
     key_hash: KeyHash,
     kv: &'a (K, V),
@@ -95,11 +102,12 @@ impl<'a, K, V> Item<'a, K, V> {
 
 enum PositionInfo<'a, K, V> {
     AbovePeakFeet(FptRef<'a, K, V>),
-    PeakFootOrBelow(NodeStrongRef<K, V>),
+    /// NodeRawPtr can be Empty, which corresponds to no layer. So the layer is an option.
+    PeakFootOrBelow((NodeRawPtr<K, V>, u32)),
 }
 
 impl<'a, K, V> PositionInfo<'a, K, V> {
-    fn new(peak: FptRef<'a, K, V>, base_layer: u64) -> Self {
+    fn new(peak: FptRef<'a, K, V>, base_layer: u32) -> Self {
         if peak.num_leaves() == 1 {
             Self::PeakFootOrBelow(peak.expect_single_node(base_layer))
         } else {
@@ -111,14 +119,22 @@ impl<'a, K, V> PositionInfo<'a, K, V> {
         matches!(self, Self::AbovePeakFeet(..))
     }
 
-    fn expect_peak_foot_or_below(&self) -> NodeStrongRef<K, V> {
+    fn expect_peak_foot_or_below(&self) -> NodeRawPtr<K, V> {
         match self {
             Self::AbovePeakFeet(..) => panic!("Still in Peak"),
-            Self::PeakFootOrBelow(node) => node.clone(),
+            Self::PeakFootOrBelow((node, _layer)) => node.clone(),
         }
     }
 
-    fn children(self, depth: usize, base_layer: u64) -> (Self, Self) {
+    // None if it's deeper than existing trees (basically Empty nodes).
+    fn subtree_root_layer(&self) -> u32 {
+        match self {
+            Self::AbovePeakFeet(fpt) => fpt.root_layer(),
+            Self::PeakFootOrBelow((_node, layer)) => *layer,
+        }
+    }
+
+    fn children(self, depth: usize, base_layer: u32) -> (Self, Self) {
         use PositionInfo::*;
 
         match self {
@@ -133,9 +149,12 @@ impl<'a, K, V> PositionInfo<'a, K, V> {
                     (AbovePeakFeet(left), AbovePeakFeet(right))
                 }
             },
-            PeakFootOrBelow(node) => {
-                let (left, right) = node.children(depth, base_layer);
-                (PeakFootOrBelow(left), PeakFootOrBelow(right))
+            PeakFootOrBelow((node, _layer)) => {
+                let ((left, left_layer), (right, right_layer)) = node.children(depth, base_layer);
+                (
+                    PeakFootOrBelow((left, left_layer)),
+                    PeakFootOrBelow((right, right_layer)),
+                )
             },
         }
     }
@@ -198,19 +217,20 @@ impl<'a, K, V> OutputPositionInfo<'a, K, V> {
 
 enum PendingBuild<'a, K, V> {
     AbovePeakFeet,
-    FootOfPeak(&'a mut NodeRef<K, V>),
+    FootOfPeak(&'a mut (NodeRef<K, V>, u32)),
     BelowPeakFeet,
 }
 
 impl<K, V> PendingBuild<'_, K, V> {
-    fn seal_with_node(&mut self, node: NodeRef<K, V>) -> BuiltSubTree<K, V> {
+    fn seal_with_node(&mut self, node: NodeRef<K, V>, node_layer: u32) -> BuiltSubTree<K, V> {
         match self {
             PendingBuild::AbovePeakFeet => unreachable!("Trying to put node above peak feet."),
-            PendingBuild::FootOfPeak(ref_mut) => {
-                **ref_mut = node;
+            PendingBuild::FootOfPeak((node_refmut, layer_refmut)) => {
+                *node_refmut = node;
+                *layer_refmut = node_layer;
                 BuiltSubTree::InOrAtFootOfPeak
             },
-            PendingBuild::BelowPeakFeet => BuiltSubTree::BelowPeak(node),
+            PendingBuild::BelowPeakFeet => BuiltSubTree::BelowPeak((node, node_layer)),
         }
     }
 
@@ -218,7 +238,7 @@ impl<K, V> PendingBuild<'_, K, V> {
         &mut self,
         left: BuiltSubTree<K, V>,
         right: BuiltSubTree<K, V>,
-        layer: u64,
+        layer: u32,
     ) -> BuiltSubTree<K, V> {
         match (left, right) {
             (BuiltSubTree::InOrAtFootOfPeak, BuiltSubTree::InOrAtFootOfPeak) => {
@@ -228,22 +248,62 @@ impl<K, V> PendingBuild<'_, K, V> {
                 );
                 BuiltSubTree::InOrAtFootOfPeak
             },
-            (BuiltSubTree::BelowPeak(left), BuiltSubTree::BelowPeak(right)) => {
-                let internal_node = Self::merge_subtrees(left, right, layer);
-                self.seal_with_node(internal_node)
+            (
+                BuiltSubTree::BelowPeak((left, left_layer)),
+                BuiltSubTree::BelowPeak((right, right_layer)),
+            ) => {
+                let (internal_node, node_l) =
+                    Self::merge_subtrees(left, right, layer, left_layer, right_layer);
+                self.seal_with_node(internal_node, node_l)
             },
             _ => unreachable!("Children should be of same flavor."),
         }
     }
 
-    fn merge_subtrees(left: NodeRef<K, V>, right: NodeRef<K, V>, layer: u64) -> NodeRef<K, V> {
+    fn merge_subtrees(
+        left: NodeRef<K, V>,
+        right: NodeRef<K, V>,
+        layer: u32,
+        left_layer: u32,
+        right_layer: u32,
+    ) -> (NodeRef<K, V>, u32) {
         use crate::node::NodeRef::*;
 
+        // println!(
+        //     "merging subtrees... layer: {}, left_layer: {:?}, right_layer: {:?}",
+        //     layer, left_layer, right_layer
+        // );
+
         match (&left, &right) {
-            (Empty, Leaf(..)) => right,
-            (Leaf(..), Empty) => left,
-            (Empty, Empty) => Empty,
-            _ => NodeRef::new_internal(left, right, layer),
+            (Empty, Leaf(leaf)) => {
+                // println!("Empty + Leaf");
+                (right, right_layer)
+            },
+            (Leaf(_), Empty) => {
+                // println!("Leaf + Empty");
+                (left, left_layer)
+            },
+            (Empty, Empty) => {
+                // println!("Empty + Empty");
+                (Empty, 0)
+            },
+            (l, r) => {
+                let l_debug = match l {
+                    NodeRef::Empty => "Empty",
+                    NodeRef::Leaf(_) => "Leaf",
+                    NodeRef::Internal(_) => "Internal",
+                };
+                let r_debug = match r {
+                    NodeRef::Empty => "Empty",
+                    NodeRef::Leaf(_) => "Leaf",
+                    NodeRef::Internal(_) => "Internal",
+                };
+                // println!("{} + {}", l_debug, r_debug);
+                (
+                    NodeRef::new_internal(left, right, layer, left_layer, right_layer),
+                    layer,
+                )
+            },
         }
     }
 }
@@ -251,7 +311,8 @@ impl<K, V> PendingBuild<'_, K, V> {
 #[must_use = "Must finalize()"]
 enum BuiltSubTree<K, V> {
     InOrAtFootOfPeak,
-    BelowPeak(NodeRef<K, V>),
+    // Node and its layer. The node might be a dangling pointer, in which case the layer is None.
+    BelowPeak((NodeRef<K, V>, u32)),
 }
 
 impl<K, V> BuiltSubTree<K, V> {
@@ -267,13 +328,15 @@ impl<K, V> BuiltSubTree<K, V> {
 
 struct SubTreeBuilder<'a, K, V> {
     /// the layer being built
-    layer: u64,
+    layer: u32,
     /// anything at this layer or earlier is assumed invisible
-    base_layer: u64,
+    base_layer: u32,
     depth: usize,
     position_info: PositionInfo<'a, K, V>,
     output_position_info: OutputPositionInfo<'a, K, V>,
     items: &'a [Item<'a, K, V>],
+    /// as title.
+    old_root_layer: u32,
 }
 
 impl<K, V> SubTreeBuilder<'_, K, V>
@@ -303,8 +366,10 @@ where
             self.branch_further()
         } else if self.items.is_empty() {
             // No new leaves to add in this branch, return weak ref to the current node.
-            let node = self.position_info.expect_peak_foot_or_below().weak_ref();
-            self.terminate_with_node(node)
+            let node = self.position_info.expect_peak_foot_or_below();
+            let node = NodeRef::from_raw(node);
+            let node_layer = self.position_info.subtree_root_layer();
+            self.terminate_with_node(node, node_layer)
         } else {
             match self.all_items_same_key_hash() {
                 None => {
@@ -314,20 +379,23 @@ where
                 Some(key_hash) => {
                     // All new items belong to the same new leaf node.
                     match self.position_info.expect_peak_foot_or_below() {
-                        NodeStrongRef::Empty => {
+                        NodeRawPtr::Empty => {
                             let node = self.new_leaf(key_hash, self.items);
-                            self.terminate_with_node(node)
+                            let node_layer = self.layer;
+                            self.terminate_with_node(node, node_layer)
                         },
-                        NodeStrongRef::Leaf(leaf) => {
+                        NodeRawPtr::Leaf(leaf) => {
+                            let leaf = unsafe { leaf.as_ref() };
                             if leaf.key_hash == key_hash {
                                 let node =
                                     self.new_leaf_overwriting_old(key_hash, &leaf, self.items);
-                                self.terminate_with_node(node)
+                                let node_layer = self.layer;
+                                self.terminate_with_node(node, node_layer)
                             } else {
                                 self.branch_further()
                             }
                         },
-                        NodeStrongRef::Internal(_) => self.branch_further(),
+                        NodeRawPtr::Internal(_) => self.branch_further(),
                     }
                 }, // end Some(key_hash) == all_items_same_key_hash()
             } // end match
@@ -342,6 +410,7 @@ where
             position_info,
             output_position_info,
             items,
+            ..
         } = self;
 
         let (mut pending_build, out_left, out_right) = output_position_info.into_pending_build();
@@ -357,6 +426,7 @@ where
             position_info: pos_left,
             output_position_info: out_left,
             items: items_left,
+            old_root_layer: 0, // FIXME!!!!!
         };
         let right = Self {
             layer,
@@ -365,15 +435,16 @@ where
             position_info: pos_right,
             output_position_info: out_right,
             items: items_right,
+            old_root_layer: 0, // FIXME!!!!!
         };
         pending_build.seal_with_children(left.build(), right.build(), layer)
     }
 
-    fn terminate_with_node(self, node: NodeRef<K, V>) -> BuiltSubTree<K, V> {
+    fn terminate_with_node(self, node: NodeRef<K, V>, node_layer: u32) -> BuiltSubTree<K, V> {
         let (mut pending_build, left, right) = self.output_position_info.into_pending_build();
         assert!(left.is_below_peak_feet() && right.is_below_peak_feet());
 
-        pending_build.seal_with_node(node)
+        pending_build.seal_with_node(node, node_layer)
     }
 
     fn new_leaf(&self, key_hash: KeyHash, items: &[Item<K, V>]) -> NodeRef<K, V> {
@@ -397,7 +468,7 @@ where
         NodeRef::new_leaf(key_hash, content, self.layer)
     }
 
-    fn to_leaf_content(items: &[Item<K, V>], layer: u64) -> LeafContent<K, V> {
+    fn to_leaf_content(items: &[Item<K, V>], layer: u32) -> LeafContent<K, V> {
         assert!(!items.is_empty());
         if items.len() == 1 {
             let (key, value) = items[0].kv().clone();
