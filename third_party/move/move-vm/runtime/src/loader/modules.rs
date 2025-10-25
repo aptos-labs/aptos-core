@@ -263,6 +263,7 @@ impl Module {
                 &module,
                 signature_table.as_slice(),
                 &struct_names,
+                ty_pool,
             )?;
 
             function_map.insert(function.name.to_owned(), idx);

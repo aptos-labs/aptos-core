@@ -76,6 +76,7 @@ pub(crate) struct MockStructDefinitionLoader {
 }
 
 impl MockStructDefinitionLoader {
+    #[allow(dead_code)]
     pub(crate) fn new_with_config(config: VMConfig) -> Self {
         Self {
             runtime_environment: RuntimeEnvironment::new_with_config(vec![], config),

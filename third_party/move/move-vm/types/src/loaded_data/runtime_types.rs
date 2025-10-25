@@ -363,7 +363,7 @@ pub struct AbilityInfo {
         Ord = "ignore",
         PartialOrd = "ignore"
     )]
-    base_ability_set: AbilitySet,
+    pub base_ability_set: AbilitySet,
 
     #[derivative(
         PartialEq = "ignore",
@@ -371,7 +371,7 @@ pub struct AbilityInfo {
         Ord = "ignore",
         PartialOrd = "ignore"
     )]
-    phantom_ty_args_mask: SmallBitVec,
+    pub phantom_ty_args_mask: SmallBitVec,
 }
 
 impl AbilityInfo {

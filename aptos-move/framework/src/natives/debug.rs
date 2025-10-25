@@ -13,8 +13,8 @@ use aptos_native_interface::{
 use move_vm_runtime::native_functions::NativeFunction;
 #[allow(unused_imports)]
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
+    ty_interner::TypeId,
     values::{Reference, Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -27,7 +27,7 @@ use std::collections::VecDeque;
 #[inline]
 fn native_print(
     _: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
@@ -54,7 +54,7 @@ fn native_print(
 #[inline]
 fn native_stack_trace(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
@@ -73,17 +73,14 @@ fn native_stack_trace(
 #[inline]
 fn native_old_debug_print(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if cfg!(feature = "testing") {
         let x = safely_pop_arg!(args, Reference);
         let val = x.read_ref().map_err(SafeNativeError::InvariantViolation)?;
 
-        println!(
-            "[debug] {}",
-            native_format_debug(context, &ty_args[0], val)?
-        );
+        println!("[debug] {}", native_format_debug(context, ty_args[0], val)?);
     }
     Ok(smallvec![])
 }
@@ -91,7 +88,7 @@ fn native_old_debug_print(
 #[inline]
 fn native_old_print_stacktrace(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());

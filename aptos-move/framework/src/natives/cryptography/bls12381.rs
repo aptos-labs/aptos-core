@@ -20,7 +20,7 @@ use move_core_types::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Struct, Value},
 };
 #[cfg(feature = "testing")]
@@ -202,7 +202,7 @@ fn signature_verify<S: traits::Signature>(
 /// failed.
 pub fn bls12381_verify_signature_helper(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
     check_pk_subgroup: bool,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
@@ -258,7 +258,7 @@ pub fn bls12381_verify_signature_helper(
  **************************************************************************************************/
 fn native_bls12381_aggregate_pubkeys(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -314,7 +314,7 @@ fn native_bls12381_aggregate_pubkeys(
  **************************************************************************************************/
 pub fn native_bls12381_aggregate_signatures(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -361,7 +361,7 @@ pub fn native_bls12381_aggregate_signatures(
  **************************************************************************************************/
 pub fn native_bls12381_signature_subgroup_check(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -391,7 +391,7 @@ pub fn native_bls12381_signature_subgroup_check(
  **************************************************************************************************/
 fn native_bls12381_validate_pubkey(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -442,7 +442,7 @@ fn native_bls12381_validate_pubkey(
 **************************************************************************************************/
 pub fn native_bls12381_verify_aggregate_signature(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -514,7 +514,7 @@ pub fn native_bls12381_verify_aggregate_signature(
  **************************************************************************************************/
 pub fn native_bls12381_verify_multisignature(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let check_pk_subgroup = false;
@@ -535,7 +535,7 @@ pub fn native_bls12381_verify_multisignature(
  **************************************************************************************************/
 pub fn native_bls12381_verify_normal_signature(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // For normal (non-aggregated) signatures, PK's typically don't come with PoPs and the caller
@@ -557,7 +557,7 @@ pub fn native_bls12381_verify_normal_signature(
  **************************************************************************************************/
 fn native_bls12381_verify_proof_of_possession(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -598,7 +598,7 @@ fn native_bls12381_verify_proof_of_possession(
  **************************************************************************************************/
 pub fn native_bls12381_verify_signature_share(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // For signature shares, the caller is REQUIRED to check the PK's PoP, and thus the PK is in the
@@ -610,7 +610,7 @@ pub fn native_bls12381_verify_signature_share(
 #[cfg(feature = "testing")]
 pub fn native_generate_keys(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut _arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let key_pair = KeyPair::<PrivateKey, PublicKey>::generate(&mut OsRng);
@@ -623,7 +623,7 @@ pub fn native_generate_keys(
 #[cfg(feature = "testing")]
 pub fn native_sign(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let msg = safely_pop_arg!(arguments, Vec<u8>);
@@ -636,7 +636,7 @@ pub fn native_sign(
 #[cfg(feature = "testing")]
 pub fn native_generate_proof_of_possession(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let sk_bytes = safely_pop_arg!(arguments, Vec<u8>);

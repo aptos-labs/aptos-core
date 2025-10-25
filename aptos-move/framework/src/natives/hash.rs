@@ -8,7 +8,7 @@ use aptos_native_interface::{
 };
 use move_core_types::gas_algebra::{InternalGas, InternalGasPerByte, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use ripemd::Digest as OtherDigest;
 use sha2::Digest;
 use smallvec::{smallvec, SmallVec};
@@ -23,7 +23,7 @@ use tiny_keccak::{Hasher as KeccakHasher, Keccak};
  **************************************************************************************************/
 fn native_sip_hash(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    mut _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -44,7 +44,7 @@ fn native_sip_hash(
 
 fn native_keccak256(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    mut _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -65,7 +65,7 @@ fn native_keccak256(
 
 fn native_sha2_512(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    mut _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -85,7 +85,7 @@ fn native_sha2_512(
 
 fn native_sha3_512(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    mut _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -111,7 +111,7 @@ pub struct Blake2B256HashGasParameters {
 
 fn native_blake2b_256(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    mut _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     safely_assert_eq!(_ty_args.len(), 0);
@@ -138,7 +138,7 @@ pub struct Ripemd160HashGasParameters {
 
 fn native_ripemd160(
     context: &mut SafeNativeContext,
-    mut _ty_args: Vec<Type>,
+    mut _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());

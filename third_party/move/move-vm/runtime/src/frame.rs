@@ -32,7 +32,7 @@ use move_vm_types::{
         runtime_access_specifier::{AccessSpecifierEnv, AddressSpecifierFunction},
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
-    ty_interner::{InternedTypePool, TypeVecId},
+    ty_interner::{InternedTypePool, TypeId, TypeVecId},
     values::Locals,
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
@@ -46,7 +46,7 @@ pub(crate) enum LocalTys {
     /// Used for non-generic functions to avoid type clones around locals.
     BorrowFromFunction,
     /// Used for generic functions, where types are cached per-instantiation.
-    BorrowFromFunctionGeneric(Rc<[Type]>),
+    BorrowFromFunctionGeneric(Rc<[TypeId]>),
 }
 
 /// Represents the execution context for a function. When calls are made, frames are
@@ -54,6 +54,7 @@ pub(crate) enum LocalTys {
 pub(crate) struct Frame {
     pub(crate) pc: u16,
     ty_builder: TypeBuilder,
+    pub(crate) ty_pool: Arc<InternedTypePool>,
     // Currently being executed function.
     pub(crate) function: Rc<LoadedFunction>,
     // How this frame was established.
@@ -153,6 +154,7 @@ impl Frame {
         gas_meter: &mut impl GasMeter,
         call_type: CallType,
         vm_config: &VMConfig,
+        ty_pool: Arc<InternedTypePool>,
         function: Rc<LoadedFunction>,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
@@ -194,10 +196,11 @@ impl Frame {
                 if let Some(local_tys) = cache_borrow.instantiated_local_tys.as_ref().cloned() {
                     LocalTys::BorrowFromFunctionGeneric(local_tys)
                 } else {
-                    let local_tys: Rc<[Type]> = function
+                    let ty_arg_ids = ty_pool.ty_args_to_ty_ids(ty_args);
+                    let local_tys: Rc<[TypeId]> = function
                         .local_tys()
                         .iter()
-                        .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
+                        .map(|ty| Ok(ty_pool.instantiate_and_intern(ty, &ty_arg_ids)))
                         .collect::<PartialVMResult<Vec<_>>>()
                         .map(Rc::from)?;
                     cache_borrow.instantiated_local_tys = Some(local_tys.clone());
@@ -211,6 +214,7 @@ impl Frame {
         Ok(Frame {
             pc: 0,
             ty_builder,
+            ty_pool,
             locals,
             function,
             call_type,
@@ -219,8 +223,8 @@ impl Frame {
         })
     }
 
-    pub(crate) fn ty_builder(&self) -> &TypeBuilder {
-        &self.ty_builder
+    pub(crate) fn ty_pool(&self) -> &InternedTypePool {
+        &self.ty_pool
     }
 
     pub(crate) fn call_type(&self) -> CallType {
@@ -230,12 +234,12 @@ impl Frame {
     /// Returns a local type at specified index. Used for runtime type checks only, and if called
     /// in non-type checking context will panic!
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub(crate) fn local_ty_at(&self, idx: usize) -> &Type {
+    pub(crate) fn local_ty_at(&self, idx: usize) -> &TypeId {
         match &self.local_tys {
             LocalTys::None => {
                 unreachable!("Local types are not used when there are no runtime type checks")
             },
-            LocalTys::BorrowFromFunction => &self.function.local_tys()[idx],
+            LocalTys::BorrowFromFunction => &self.function.local_type_ids()[idx],
             LocalTys::BorrowFromFunctionGeneric(tys) => &tys[idx],
         }
     }
@@ -244,12 +248,13 @@ impl Frame {
     pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
         let local_tys = match &self.local_tys {
             LocalTys::None => return Ok(()),
-            LocalTys::BorrowFromFunction => self.function.local_tys(),
+            LocalTys::BorrowFromFunction => self.function.local_type_ids(),
             LocalTys::BorrowFromFunctionGeneric(tys) => tys,
         };
         for (idx, ty) in local_tys.iter().enumerate() {
             if !self.locals.is_invalid(idx)? {
-                ty.paranoid_check_has_ability(Ability::Drop)?;
+                self.ty_pool
+                    .paranoid_check_has_ability(*ty, Ability::Drop)?;
             }
         }
         Ok(())
@@ -270,13 +275,14 @@ impl Frame {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub(crate) fn get_struct_ty(&self, idx: StructDefinitionIndex) -> Type {
+    pub(crate) fn get_struct_ty(&self, idx: StructDefinitionIndex) -> TypeId {
         use LoadedFunctionOwner::*;
         let struct_ty = match self.function.owner() {
             Module(module) => module.struct_at(idx),
             Script(_) => unreachable!("Scripts cannot have type instructions"),
         };
-        self.create_struct_ty(struct_ty)
+        let ty = self.create_struct_ty(struct_ty);
+        self.ty_pool.instantiate_and_intern(&ty, &[])
     }
 
     pub(crate) fn get_struct_variant_at(
@@ -304,7 +310,7 @@ impl Frame {
     pub(crate) fn get_generic_struct_ty(
         &self,
         idx: StructDefInstantiationIndex,
-    ) -> PartialVMResult<Type> {
+    ) -> PartialVMResult<TypeId> {
         use LoadedFunctionOwner::*;
         let struct_inst = match self.function.owner() {
             Module(module) => module.struct_instantiation_at(idx.0),
@@ -312,11 +318,13 @@ impl Frame {
         };
 
         let struct_ty = &struct_inst.definition_struct_type;
-        self.ty_builder.create_struct_instantiation_ty(
+        let ty = self.ty_builder.create_struct_instantiation_ty(
             struct_ty,
             &struct_inst.instantiation,
             self.function.ty_args(),
-        )
+        )?;
+        // TODO: Optimize to intern directly during instantiation
+        Ok(self.ty_pool.instantiate_and_intern(&ty, &[]))
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -335,7 +343,7 @@ impl Frame {
     pub(crate) fn get_generic_field_ty(
         &self,
         idx: FieldInstantiationIndex,
-    ) -> PartialVMResult<Type> {
+    ) -> PartialVMResult<TypeId> {
         use LoadedFunctionOwner::*;
         let field_instantiation = match self.function.owner() {
             Module(module) => &module.field_instantiations[idx.0 as usize],
@@ -349,15 +357,20 @@ impl Frame {
         &self,
         ty: &Type,
         instantiation_tys: &[Type],
-    ) -> PartialVMResult<Type> {
-        let instantiation_tys = instantiation_tys
+    ) -> PartialVMResult<TypeId> {
+        // First, intern the function's type arguments
+        let fn_ty_arg_ids = self.ty_pool.ty_args_to_ty_ids(self.function.ty_args());
+
+        // Then instantiate each instantiation type with the function's type arguments
+        let instantiation_ty_ids: Vec<TypeId> = instantiation_tys
             .iter()
-            .map(|inst_ty| {
-                self.ty_builder
-                    .create_ty_with_subst(inst_ty, self.function.ty_args())
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        self.ty_builder.create_ty_with_subst(ty, &instantiation_tys)
+            .map(|inst_ty| Ok(self.ty_pool.instantiate_and_intern(inst_ty, &fn_ty_arg_ids)))
+            .collect::<PartialVMResult<_>>()?;
+
+        // Finally, instantiate the target type with the instantiation type IDs
+        Ok(self
+            .ty_pool
+            .instantiate_and_intern(ty, &instantiation_ty_ids))
     }
 
     pub(crate) fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo {
@@ -391,7 +404,7 @@ impl Frame {
     pub(crate) fn instantiate_generic_struct_fields(
         &self,
         idx: StructDefInstantiationIndex,
-    ) -> PartialVMResult<Vec<Type>> {
+    ) -> PartialVMResult<Vec<TypeId>> {
         use LoadedFunctionOwner::*;
         let struct_inst = match self.function.owner() {
             Module(module) => module.struct_instantiation_at(idx.0),
@@ -404,7 +417,7 @@ impl Frame {
     pub(crate) fn instantiate_generic_struct_variant_fields(
         &self,
         idx: StructVariantInstantiationIndex,
-    ) -> PartialVMResult<Vec<Type>> {
+    ) -> PartialVMResult<Vec<TypeId>> {
         use LoadedFunctionOwner::*;
         let struct_inst = match self.function.owner() {
             Module(module) => module.struct_variant_instantiation_at(idx),
@@ -423,21 +436,24 @@ impl Frame {
         struct_ty: &Arc<StructType>,
         variant: Option<VariantIndex>,
         instantiation: &[Type],
-    ) -> PartialVMResult<Vec<Type>> {
-        let instantiation_tys = instantiation
-            .iter()
-            .map(|inst_ty| {
-                self.ty_builder
-                    .create_ty_with_subst(inst_ty, self.function.ty_args())
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
+    ) -> PartialVMResult<Vec<TypeId>> {
+        // First, intern the function's type arguments
+        let fn_ty_arg_ids = self.ty_pool.ty_args_to_ty_ids(self.function.ty_args());
 
+        // Then instantiate each instantiation type with the function's type arguments
+        let instantiation_ty_ids: Vec<TypeId> = instantiation
+            .iter()
+            .map(|inst_ty| Ok(self.ty_pool.instantiate_and_intern(inst_ty, &fn_ty_arg_ids)))
+            .collect::<PartialVMResult<_>>()?;
+
+        // Finally, instantiate each field type with the instantiation type IDs
         struct_ty
             .fields(variant)?
             .iter()
             .map(|(_, inst_ty)| {
-                self.ty_builder
-                    .create_ty_with_subst(inst_ty, &instantiation_tys)
+                Ok(self
+                    .ty_pool
+                    .instantiate_and_intern(inst_ty, &instantiation_ty_ids))
             })
             .collect::<PartialVMResult<Vec<_>>>()
     }
@@ -450,13 +466,14 @@ impl Frame {
         }
     }
 
-    pub(crate) fn instantiate_single_type(&self, idx: SignatureIndex) -> PartialVMResult<Type> {
+    pub(crate) fn instantiate_single_type(&self, idx: SignatureIndex) -> PartialVMResult<TypeId> {
         let ty = self.single_type_at(idx);
         let ty_args = self.function.ty_args();
         if !ty_args.is_empty() {
-            self.ty_builder.create_ty_with_subst(ty, ty_args)
+            let ty_arg_ids = self.ty_pool.ty_args_to_ty_ids(ty_args);
+            Ok(self.ty_pool.instantiate_and_intern(ty, &ty_arg_ids))
         } else {
-            Ok(ty.clone())
+            Ok(self.ty_pool.instantiate_and_intern(ty, &[]))
         }
     }
 
@@ -469,12 +486,14 @@ impl Frame {
         &self,
         struct_ty: &Arc<StructType>,
         ty_params: &[Type],
-    ) -> PartialVMResult<Type> {
-        self.ty_builder.create_struct_instantiation_ty(
+    ) -> PartialVMResult<TypeId> {
+        let ty = self.ty_builder.create_struct_instantiation_ty(
             struct_ty,
             ty_params,
             self.function.ty_args(),
-        )
+        )?;
+        // TODO: Optimize to intern directly during instantiation
+        Ok(self.ty_pool.instantiate_and_intern(&ty, &[]))
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -529,7 +548,7 @@ impl Frame {
     pub(crate) fn field_instantiation_to_struct(
         &self,
         idx: FieldInstantiationIndex,
-    ) -> PartialVMResult<Type> {
+    ) -> PartialVMResult<TypeId> {
         use LoadedFunctionOwner::*;
         match self.function.owner() {
             Module(module) => {
