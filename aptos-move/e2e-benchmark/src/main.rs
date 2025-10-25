@@ -165,6 +165,7 @@ fn main() {
             num_objects: 100,
             object_payload_size: 10 * 1024,
         }),
+        (ONLY_CONTINUOUS, EntryPoints::ReadEnumVariants),
         (
             LANDBLOCKING_AND_CONTINUOUS,
             EntryPoints::InitializeVectorPicture { length: 128 },
