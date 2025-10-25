@@ -62,6 +62,8 @@ pub struct LifetimeState {
     locals: Vec<AbstractValue>,
     /// Next available free id for fresh reference ids in the borrow graph.
     next_ref_id: usize,
+    /// When a struct api is called, store the corresponding struct id, used for printing out ref error caused by struct apis.
+    struct_api_borrow_info: BTreeMap<AttrId, String>,
 }
 
 impl Default for LifetimeState {
@@ -70,6 +72,7 @@ impl Default for LifetimeState {
             borrow_graph: BorrowGraph::new(),
             locals: vec![],
             next_ref_id: 0,
+            struct_api_borrow_info: BTreeMap::new(),
         }
     }
 }
@@ -107,6 +110,7 @@ impl LifetimeState {
             locals: vec![AbstractValue::NonReference; num_locals],
             borrow_graph: BorrowGraph::new(),
             next_ref_id: next_id,
+            struct_api_borrow_info: BTreeMap::new(),
         };
         for param in target.get_parameters() {
             let param_ty = target.get_local_type(param);
@@ -171,6 +175,7 @@ impl LifetimeState {
             locals,
             borrow_graph,
             next_ref_id: self.locals.len() + 1,
+            struct_api_borrow_info: self.struct_api_borrow_info.clone(),
         };
         *self = canonical_state
     }
@@ -238,10 +243,13 @@ impl AbstractDomain for LifetimeState {
         // Join the underlying graph.
         let borrow_graph = self_graph.join(&other.borrow_graph);
         let next_id = self.next_ref_id;
+        let mut struct_api_borrow_info = self.struct_api_borrow_info.clone();
+        struct_api_borrow_info.append(&mut other.struct_api_borrow_info);
         let joined = Self {
             locals,
             borrow_graph,
             next_ref_id: next_id,
+            struct_api_borrow_info,
         };
         // Check for diff
         let locals_unchanged = self
@@ -643,15 +651,22 @@ impl LifetimeAnalysisStep<'_, '_> {
                     } else {
                         ""
                     };
+                    let struct_api_borrow_info = self.state.struct_api_borrow_info.get(&code_id);
+                    let caused_by_struct_api: String = if let Some(struct_api_borrow_info) = struct_api_borrow_info {
+                        format!(": field borrow for non-private struct/enum `{}` is converted into a function call", struct_api_borrow_info)
+                    } else {
+                        "".to_string()
+                    };
                     if path.is_empty() && for_label.is_none() {
-                        Some((loc, format!("previously {}borrowed here", mut_str)))
+                        Some((loc, format!("previously {}borrowed here{}", mut_str, caused_by_struct_api)))
                     } else if for_label.is_none() || path.contains(&for_label.unwrap()) {
                         Some((
                             loc,
                             format!(
-                                "{} previously {}borrowed here",
+                                "{} previously {}borrowed here{}",
                                 self.display_path(&path),
-                                mut_str
+                                mut_str,
+                                caused_by_struct_api
                             ),
                         ))
                     } else {
@@ -891,9 +906,33 @@ impl LifetimeAnalysisStep<'_, '_> {
         self.replace(dest, AbstractValue::Reference(new_id))
     }
 
-    fn call_operation(&mut self, oper: Operation, dests: &[TempIndex], srcs: &[TempIndex]) {
+    fn call_operation(
+        &mut self,
+        attr_id: AttrId,
+        oper: Operation,
+        dests: &[TempIndex],
+        srcs: &[TempIndex],
+    ) {
         // If this is a Move function call, check access of resources.
-        if let Operation::Function(mid, fid, inst) = oper {
+        // If this is a struct api, also store the corresponding struct id, which is then used for printing out proper error message.
+        if let Operation::Function(mid, fid, inst) = oper.clone() {
+            let fun_env = self.global_env().get_function(mid.qualified(fid));
+            // If this is a borrow field api, store the corresponding struct name, which is then used for printing out proper error message.
+            if let Some(splited_names) = fun_env.get_and_split_fun_name('$') {
+                if splited_names.len() >= 4 {
+                    let oper = splited_names[0].clone();
+                    let addr = splited_names[1].clone();
+                    let module_name = splited_names[2].clone();
+                    let struct_name = splited_names[3].clone();
+                    if oper.contains("borrow") {
+                        let struct_api_borrow_info =
+                            format!("{}::{}::{}", addr, module_name, struct_name);
+                        self.state
+                            .struct_api_borrow_info
+                            .insert(attr_id, struct_api_borrow_info);
+                    }
+                }
+            }
             self.check_global_access(mid.qualified_inst(fid, inst))
         }
         // Transfer arguments, remembering what we have been borrowed from
@@ -1071,7 +1110,7 @@ impl TransferFunctions for LifeTimeAnalysis<'_> {
             },
             Ret(_, srcs) => step.return_(instr, srcs),
             Branch(_, _, _, src) => step.branch(*src),
-            Call(_, dests, oper, srcs, _) => {
+            Call(attr_id, dests, oper, srcs, _) => {
                 use Operation::*;
                 match oper {
                     BorrowLoc => {
@@ -1101,7 +1140,7 @@ impl TransferFunctions for LifeTimeAnalysis<'_> {
                         step.move_from(dests[0], &mid.qualified_inst(*sid, inst.clone()), srcs[0])
                     },
                     Eq | Neq | Le | Lt | Ge | Gt => step.comparison(dests[0], srcs),
-                    _ => step.call_operation(oper.clone(), dests, srcs),
+                    _ => step.call_operation(*attr_id, oper.clone(), dests, srcs),
                 }
             },
             _ => {},
