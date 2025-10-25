@@ -15,6 +15,7 @@ use move_binary_format::{
     access::ScriptAccess,
     errors::{Location, PartialVMResult, VMResult},
     file_format::CompiledScript,
+    CompiledModule,
 };
 use move_core_types::{
     gas_algebra::NumBytes,
@@ -270,10 +271,10 @@ where
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> PartialVMResult<Arc<CompiledModule>> {
         self.charge_module(gas_meter, traversal_context, module_id)?;
         self.module_storage
-            .unmetered_get_existing_module_metadata(module_id.address(), module_id.name())
+            .unmetered_get_existing_deserialized_module(module_id.address(), module_id.name())
             .map_err(|err| err.to_partial())
     }
 }
