@@ -153,6 +153,11 @@ fn test_hello_blockchain() {
 }
 
 #[test]
+fn test_sigma_protocols() {
+    test_common("sigma_protocols");
+}
+
+#[test]
 fn test_drand_lottery() {
     test_common("drand");
 }
