@@ -88,7 +88,7 @@ module aptos_experimental::order_book {
     public fun place_maker_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: SingleOrderRequest<M>
     ) {
-        self.single_order_book.place_maker_order(
+        self.single_order_book.place_maker_or_pending_order(
             &mut self.price_time_idx,
             &mut self.ascending_id_generator,
             order_req

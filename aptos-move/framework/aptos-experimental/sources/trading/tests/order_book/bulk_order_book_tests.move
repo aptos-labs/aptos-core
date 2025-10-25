@@ -1352,6 +1352,7 @@ module aptos_experimental::bulk_order_book_tests {
         setup_multi_account_scenario(&mut order_book, &mut price_time_index, &mut id_gen, accounts_and_orders);
 
         // Taker bid should match account 2 first (better priority index since placed later)
+
         let matches = place_taker_order_and_get_matches(
             &mut order_book,
             &mut price_time_index,
@@ -1359,14 +1360,15 @@ module aptos_experimental::bulk_order_book_tests {
             SIZE_2, // Match exactly account 2's size
             true // Taker bid
         );
+        assert!(matches.length() == 2);
+        verify_match_basic(matches[0], TEST_ACCOUNT_1, 101, SIZE_1, false);
+        verify_match_basic(matches[1], TEST_ACCOUNT_2, 101, SIZE_2 - SIZE_1, false);
 
-        assert!(matches.length() == 1);
-        verify_match_basic(matches[0], TEST_ACCOUNT_2, 101, SIZE_2, false);
 
-        // Account 1 should still be active
+        // Account 2 should still be active
         assert!(price_time_index.is_taker_order(101, true));
 
-        // Next match should be account 1
+        // Next match should be account 2
         let matches = place_taker_order_and_get_matches(
             &mut order_book,
             &mut price_time_index,
@@ -1376,7 +1378,7 @@ module aptos_experimental::bulk_order_book_tests {
         );
 
         assert!(matches.length() == 1);
-        verify_match_basic(matches[0], TEST_ACCOUNT_1, 101, SIZE_1, false);
+        verify_match_basic(matches[0], TEST_ACCOUNT_2, 101, SIZE_1, false);
 
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
@@ -1620,6 +1622,10 @@ module aptos_experimental::bulk_order_book_tests {
         let previous_seq_num1 = previous_seq_num_option1.destroy_some();
         assert!(previous_seq_num1 == 1);
 
+        let bulk_order = order_book.get_bulk_order(TEST_ACCOUNT_1);
+        assert!(bulk_order.get_sequence_number() == 10);
+
+
         // Test that we can place an order with even higher sequence number
         let order_req2 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
@@ -1632,6 +1638,9 @@ module aptos_experimental::bulk_order_book_tests {
         let previous_seq_num2 = previous_seq_num_option2.destroy_some();
         assert!(previous_seq_num2 == 10);
 
+        let bulk_order2 = order_book.get_bulk_order(TEST_ACCOUNT_1);
+        assert!(bulk_order2.get_sequence_number() == 15);
+
         // Test that we cannot place an order with lower sequence number (should return rejection)
         let order_req3 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1, 12, vector[100], vector[10], vector[200], vector[10]
@@ -1640,8 +1649,11 @@ module aptos_experimental::bulk_order_book_tests {
         assert!(!is_bulk_order_success_response(&response3));
         let _rejection_reason = destroy_bulk_order_place_reject_response(response3);
 
+        let bulk_order3 = order_book.get_bulk_order(TEST_ACCOUNT_1);
+        // Sequence number should remain 15
+        assert!(bulk_order3.get_sequence_number() == 15);
+
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
-
 }
