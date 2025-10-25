@@ -203,6 +203,14 @@ impl Interpreter {
     }
 }
 
+macro_rules! ensure_stack_size {
+    ($stack:expr, $min_size:literal) => {
+        if $stack.stack_size() < $min_size {
+            return Err(PartialVMError::new(StatusCode::EMPTY_VALUE_STACK));
+        }
+    };
+}
+
 impl<LoaderImpl> InterpreterImpl<'_, LoaderImpl>
 where
     LoaderImpl: Loader,
@@ -1042,9 +1050,7 @@ where
                 // Put return values on the top of the operand stack, where the caller will find them.
                 // This is one of only two times the operand stack is shared across call stack frames; the other is in handling
                 // the Return instruction for normal calls
-                for value in return_values {
-                    self.operand_stack.push(value)?;
-                }
+                self.operand_stack.push_n(return_values.into_iter())?;
 
                 // If the caller requires checks, push return types of native function to
                 // satisfy runtime check protocol.
@@ -1124,9 +1130,7 @@ where
                         .with_message("Invoking function with incompatible type".to_string()));
                 }
 
-                for value in args {
-                    self.operand_stack.push(value)?;
-                }
+                self.operand_stack.push_n(args.into_iter())?;
 
                 // If the current function requires runtime checks, setup the type stack with the
                 // argument types
@@ -1168,21 +1172,25 @@ where
     where
         F: FnOnce(Value, Value) -> PartialVMResult<Value>,
     {
-        let rhs = self.operand_stack.pop()?;
-        let lhs = self.operand_stack.pop()?;
+        ensure_stack_size!(self.operand_stack, 2);
+        let rhs = self.operand_stack.pop_unchecked();
+        let lhs = self.operand_stack.pop_unchecked();
         let result = f(lhs, rhs)?;
-        self.operand_stack.push(result)
+        self.operand_stack.push_unchecked(result);
+        Ok(())
     }
 
     #[inline(always)]
     fn binop_bool<F>(&mut self, f: F) -> PartialVMResult<()>
     where
-        F: FnOnce(bool, bool) -> PartialVMResult<bool>,
+        F: FnOnce(bool, bool) -> bool,
     {
-        let rhs = self.operand_stack.pop_as::<bool>()?;
-        let lhs = self.operand_stack.pop_as::<bool>()?;
-        let result = f(lhs, rhs)?;
-        self.operand_stack.push(Value::bool(result))
+        ensure_stack_size!(self.operand_stack, 2);
+        let rhs = self.operand_stack.pop_as_unchecked::<bool>()?;
+        let lhs = self.operand_stack.pop_as_unchecked::<bool>()?;
+        let result = f(lhs, rhs);
+        self.operand_stack.push_unchecked(Value::bool(result));
+        Ok(())
     }
 
     #[inline(always)]
@@ -1190,10 +1198,12 @@ where
     where
         F: FnOnce(Value, Value) -> PartialVMResult<bool>,
     {
-        let rhs = self.operand_stack.pop()?;
-        let lhs = self.operand_stack.pop()?;
+        ensure_stack_size!(self.operand_stack, 2);
+        let rhs = self.operand_stack.pop_unchecked();
+        let lhs = self.operand_stack.pop_unchecked();
         let result = f(lhs, rhs)?;
-        self.operand_stack.push(Value::bool(result))
+        self.operand_stack.push_unchecked(Value::bool(result));
+        Ok(())
     }
 
     /// Perform a unary operation to one value at the top of the stack.
@@ -1204,7 +1214,8 @@ where
     {
         let arg = self.operand_stack.pop()?;
         let result = f(arg)?;
-        self.operand_stack.push(result)
+        self.operand_stack.push_unchecked(result);
+        Ok(())
     }
 
     /// Loads a resource from the on-chain storage and returns mutable reference to it.
@@ -1269,7 +1280,7 @@ where
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<()> {
+    ) -> PartialVMResult<Value> {
         let runtime_environment = self.loader.runtime_environment();
         let gv = if is_mut {
             self.load_resource_mut(data_cache, gas_meter, traversal_context, addr, ty)?
@@ -1297,10 +1308,9 @@ where
             ty,
             addr,
         )?;
-        self.operand_stack.push(res.map_err(|err| {
+        res.map_err(|err| {
             err.with_message(format!("Failed to borrow global resource from {:?}", addr))
-        })?)?;
-        Ok(())
+        })
     }
 
     fn check_access(
@@ -1344,7 +1354,7 @@ where
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<()> {
+    ) -> PartialVMResult<bool> {
         let runtime_environment = self.loader.runtime_environment();
         let gv = self.load_resource(data_cache, gas_meter, traversal_context, addr, ty)?;
         let exists = gv.exists();
@@ -1357,8 +1367,7 @@ where
             exists,
         )?;
         self.check_access(runtime_environment, AccessKind::Reads, ty, addr)?;
-        self.operand_stack.push(Value::bool(exists))?;
-        Ok(())
+        Ok(exists)
     }
 
     /// MoveFrom opcode.
@@ -1370,7 +1379,7 @@ where
         traversal_context: &mut TraversalContext,
         addr: AccountAddress,
         ty: &Type,
-    ) -> PartialVMResult<()> {
+    ) -> PartialVMResult<Value> {
         let runtime_environment = self.loader.runtime_environment();
         let resource = match self
             .load_resource_mut(data_cache, gas_meter, traversal_context, addr, ty)?
@@ -1401,8 +1410,7 @@ where
                 return Err(err.with_message(format!("Failed to move resource from {:?}", addr)));
             },
         };
-        self.operand_stack.push(resource)?;
-        Ok(())
+        Ok(resource)
     }
 
     /// MoveTo opcode.
@@ -1694,6 +1702,11 @@ impl Stack {
         }
     }
 
+    #[inline]
+    fn stack_size(&self) -> usize {
+        self.value.len()
+    }
+
     /// Push a `Value` on the stack if the max stack size has not been reached. Abort execution
     /// otherwise.
     // note(inline): increases function size 25%, DOES NOT improve performance, do not inline.
@@ -1706,12 +1719,31 @@ impl Stack {
         }
     }
 
+    #[inline]
+    fn push_n(&mut self, n_values: impl ExactSizeIterator<Item = Value>) -> PartialVMResult<()> {
+        if self.value.len() + n_values.len() > OPERAND_STACK_SIZE_LIMIT {
+            return Err(PartialVMError::new(StatusCode::EXECUTION_STACK_OVERFLOW));
+        }
+        self.value.extend(n_values);
+        Ok(())
+    }
+
+    #[inline]
+    fn push_unchecked(&mut self, value: Value) {
+        self.value.push(value);
+    }
+
     /// Pop a `Value` off the stack or abort execution if the stack is empty.
     #[inline]
     fn pop(&mut self) -> PartialVMResult<Value> {
         self.value
             .pop()
             .ok_or_else(|| PartialVMError::new(StatusCode::EMPTY_VALUE_STACK))
+    }
+
+    #[inline]
+    fn pop_unchecked(&mut self) -> Value {
+        self.value.pop().unwrap()
     }
 
     /// Pop a `Value` of a given type off the stack. Abort if the value is not of the given
@@ -1723,6 +1755,14 @@ impl Stack {
         Value: VMValueCast<T>,
     {
         self.pop()?.value_as()
+    }
+
+    #[inline]
+    fn pop_as_unchecked<T>(&mut self) -> PartialVMResult<T>
+    where
+        Value: VMValueCast<T>,
+    {
+        self.pop_unchecked().value_as()
     }
 
     /// Pop n values off the stack.
@@ -2105,7 +2145,7 @@ impl Frame {
 
                         let offset = self.field_offset(*fh_idx);
                         let field_ref = reference.borrow_field(offset)?;
-                        interpreter.operand_stack.push(field_ref)?;
+                        interpreter.operand_stack.push_unchecked(field_ref);
                     },
                     Bytecode::ImmBorrowFieldGeneric(fi_idx)
                     | Bytecode::MutBorrowFieldGeneric(fi_idx) => {
@@ -2130,7 +2170,7 @@ impl Frame {
 
                         let offset = self.field_instantiation_offset(*fi_idx);
                         let field_ref = reference.borrow_field(offset)?;
-                        interpreter.operand_stack.push(field_ref)?;
+                        interpreter.operand_stack.push_unchecked(field_ref);
                     },
                     Bytecode::ImmBorrowVariantField(idx) | Bytecode::MutBorrowVariantField(idx) => {
                         let instr = if matches!(instruction, Bytecode::MutBorrowVariantField(_)) {
@@ -2151,7 +2191,7 @@ impl Frame {
                                     .variant_name_for_message(v)
                             },
                         )?;
-                        interpreter.operand_stack.push(field_ref)?;
+                        interpreter.operand_stack.push_unchecked(field_ref);
                     },
                     Bytecode::ImmBorrowVariantFieldGeneric(fi_idx)
                     | Bytecode::MutBorrowVariantFieldGeneric(fi_idx) => {
@@ -2184,7 +2224,7 @@ impl Frame {
                                     .variant_name_for_message(v)
                             },
                         )?;
-                        interpreter.operand_stack.push(field_ref)?;
+                        interpreter.operand_stack.push_unchecked(field_ref);
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = self.field_count(*sd_idx);
@@ -2200,6 +2240,7 @@ impl Frame {
                             interpreter.operand_stack.last_n(field_count as usize)?,
                         )?;
                         let args = interpreter.operand_stack.popn(field_count)?;
+                        // todo: can it has zero field count?
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
@@ -2285,9 +2326,7 @@ impl Frame {
 
                         gas_meter.charge_unpack(false, struct_value.field_views())?;
 
-                        for value in struct_value.unpack()? {
-                            interpreter.operand_stack.push(value)?;
-                        }
+                        interpreter.operand_stack.push_n(struct_value.unpack()?)?;
                     },
                     Bytecode::UnpackVariant(sd_idx) => {
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
@@ -2295,11 +2334,11 @@ impl Frame {
                         gas_meter.charge_unpack_variant(false, struct_value.field_views())?;
 
                         let info = self.get_struct_variant_at(*sd_idx);
-                        for value in struct_value.unpack_variant(info.variant, &|v| {
-                            info.definition_struct_type.variant_name_for_message(v)
-                        })? {
-                            interpreter.operand_stack.push(value)?;
-                        }
+                        interpreter.operand_stack.push_n(
+                            struct_value.unpack_variant(info.variant, &|v| {
+                                info.definition_struct_type.variant_name_for_message(v)
+                            })?,
+                        )?;
                     },
                     Bytecode::UnpackGeneric(si_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
@@ -2322,9 +2361,7 @@ impl Frame {
                         // TODO: Whether or not we want this gas metering in the loop is
                         // questionable.  However, if we don't have it in the loop we could wind up
                         // doing a fair bit of work before charging for it.
-                        for value in struct_.unpack()? {
-                            interpreter.operand_stack.push(value)?;
-                        }
+                        interpreter.operand_stack.push_n(struct_.unpack()?)?;
                     },
                     Bytecode::UnpackVariantGeneric(si_idx) => {
                         let ty_and_field_counts =
@@ -2340,11 +2377,11 @@ impl Frame {
                         gas_meter.charge_unpack_variant(true, struct_.field_views())?;
 
                         let info = self.get_struct_variant_instantiation_at(*si_idx);
-                        for value in struct_.unpack_variant(info.variant, &|v| {
-                            info.definition_struct_type.variant_name_for_message(v)
-                        })? {
-                            interpreter.operand_stack.push(value)?;
-                        }
+                        interpreter.operand_stack.push_n(
+                            struct_.unpack_variant(info.variant, &|v| {
+                                info.definition_struct_type.variant_name_for_message(v)
+                            })?,
+                        )?;
                     },
                     Bytecode::TestVariant(sd_idx) => {
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
@@ -2352,7 +2389,7 @@ impl Frame {
                         let info = self.get_struct_variant_at(*sd_idx);
                         interpreter
                             .operand_stack
-                            .push(reference.test_variant(info.variant)?)?;
+                            .push_unchecked(reference.test_variant(info.variant)?);
                     },
                     Bytecode::TestVariantGeneric(sd_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
@@ -2369,7 +2406,7 @@ impl Frame {
                         let info = self.get_struct_variant_instantiation_at(*sd_idx);
                         interpreter
                             .operand_stack
-                            .push(reference.test_variant(info.variant)?)?;
+                            .push_unchecked(reference.test_variant(info.variant)?);
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
                         gas_meter.charge_pack_closure(
@@ -2461,7 +2498,7 @@ impl Frame {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         gas_meter.charge_read_ref(reference.value_view())?;
                         let value = reference.read_ref()?;
-                        interpreter.operand_stack.push(value)?;
+                        interpreter.operand_stack.push_unchecked(value);
                     },
                     Bytecode::WriteRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
@@ -2474,84 +2511,84 @@ impl Frame {
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u8(integer_value.cast_u8()?))?;
+                            .push_unchecked(Value::u8(integer_value.cast_u8()?));
                     },
                     Bytecode::CastU16 => {
                         gas_meter.charge_simple_instr(S::CastU16)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u16(integer_value.cast_u16()?))?;
+                            .push_unchecked(Value::u16(integer_value.cast_u16()?));
                     },
                     Bytecode::CastU32 => {
                         gas_meter.charge_simple_instr(S::CastU32)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u32(integer_value.cast_u32()?))?;
+                            .push_unchecked(Value::u32(integer_value.cast_u32()?));
                     },
                     Bytecode::CastU64 => {
                         gas_meter.charge_simple_instr(S::CastU64)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u64(integer_value.cast_u64()?))?;
+                            .push_unchecked(Value::u64(integer_value.cast_u64()?));
                     },
                     Bytecode::CastU128 => {
                         gas_meter.charge_simple_instr(S::CastU128)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u128(integer_value.cast_u128()?))?;
+                            .push_unchecked(Value::u128(integer_value.cast_u128()?));
                     },
                     Bytecode::CastU256 => {
                         gas_meter.charge_simple_instr(S::CastU256)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::u256(integer_value.cast_u256()?))?;
+                            .push_unchecked(Value::u256(integer_value.cast_u256()?));
                     },
                     Bytecode::CastI8 => {
                         gas_meter.charge_simple_instr(S::CastI8)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i8(integer_value.cast_i8()?))?;
+                            .push_unchecked(Value::i8(integer_value.cast_i8()?));
                     },
                     Bytecode::CastI16 => {
                         gas_meter.charge_simple_instr(S::CastI16)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i16(integer_value.cast_i16()?))?;
+                            .push_unchecked(Value::i16(integer_value.cast_i16()?));
                     },
                     Bytecode::CastI32 => {
                         gas_meter.charge_simple_instr(S::CastI32)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i32(integer_value.cast_i32()?))?;
+                            .push_unchecked(Value::i32(integer_value.cast_i32()?));
                     },
                     Bytecode::CastI64 => {
                         gas_meter.charge_simple_instr(S::CastI64)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i64(integer_value.cast_i64()?))?;
+                            .push_unchecked(Value::i64(integer_value.cast_i64()?));
                     },
                     Bytecode::CastI128 => {
                         gas_meter.charge_simple_instr(S::CastI128)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i128(integer_value.cast_i128()?))?;
+                            .push_unchecked(Value::i128(integer_value.cast_i128()?));
                     },
                     Bytecode::CastI256 => {
                         gas_meter.charge_simple_instr(S::CastI256)?;
                         let integer_value = interpreter.operand_stack.pop()?;
                         interpreter
                             .operand_stack
-                            .push(Value::i256(integer_value.cast_i256()?))?;
+                            .push_unchecked(Value::i256(integer_value.cast_i256()?));
                     },
 
                     // Arithmetic Operations
@@ -2595,37 +2632,37 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Shl)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
                         let lhs = interpreter.operand_stack.pop()?;
-                        interpreter.operand_stack.push(lhs.shl_checked(rhs)?)?;
+                        interpreter.operand_stack.push_unchecked(lhs.shl_checked(rhs)?);
                     },
                     Bytecode::Shr => {
                         gas_meter.charge_simple_instr(S::Shr)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
                         let lhs = interpreter.operand_stack.pop()?;
-                        interpreter.operand_stack.push(lhs.shr_checked(rhs)?)?;
+                        interpreter.operand_stack.push_unchecked(lhs.shr_checked(rhs)?);
                     },
                     Bytecode::Or => {
                         gas_meter.charge_simple_instr(S::Or)?;
-                        interpreter.binop_bool(|l, r| Ok(l || r))?
+                        interpreter.binop_bool(|l, r| l || r)?;
                     },
                     Bytecode::And => {
                         gas_meter.charge_simple_instr(S::And)?;
-                        interpreter.binop_bool(|l, r| Ok(l && r))?
+                        interpreter.binop_bool(|l, r| l && r)?;
                     },
                     Bytecode::Lt => {
                         gas_meter.charge_simple_instr(S::Lt)?;
-                        interpreter.binop_rel(Value::lt)?
+                        interpreter.binop_rel(Value::lt)?;
                     },
                     Bytecode::Gt => {
                         gas_meter.charge_simple_instr(S::Gt)?;
-                        interpreter.binop_rel(Value::gt)?
+                        interpreter.binop_rel(Value::gt)?;
                     },
                     Bytecode::Le => {
                         gas_meter.charge_simple_instr(S::Le)?;
-                        interpreter.binop_rel(Value::le)?
+                        interpreter.binop_rel(Value::le)?;
                     },
                     Bytecode::Ge => {
                         gas_meter.charge_simple_instr(S::Ge)?;
-                        interpreter.binop_rel(Value::ge)?
+                        interpreter.binop_rel(Value::ge)?;
                     },
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
@@ -2648,26 +2685,28 @@ impl Frame {
                         return Err(error);
                     },
                     Bytecode::Eq => {
-                        let lhs = interpreter.operand_stack.pop()?;
-                        let rhs = interpreter.operand_stack.pop()?;
+                        ensure_stack_size!(interpreter.operand_stack, 2);
+                        let lhs = interpreter.operand_stack.pop_unchecked();
+                        let rhs = interpreter.operand_stack.pop_unchecked();
                         gas_meter.charge_eq(&lhs, &rhs)?;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(lhs.equals(&rhs)?))?;
+                            .push_unchecked(Value::bool(lhs.equals(&rhs)?));
                     },
                     Bytecode::Neq => {
-                        let lhs = interpreter.operand_stack.pop()?;
-                        let rhs = interpreter.operand_stack.pop()?;
+                        ensure_stack_size!(interpreter.operand_stack, 2);
+                        let lhs = interpreter.operand_stack.pop_unchecked();
+                        let rhs = interpreter.operand_stack.pop_unchecked();
                         gas_meter.charge_neq(&lhs, &rhs)?;
                         interpreter
                             .operand_stack
-                            .push(Value::bool(!lhs.equals(&rhs)?))?;
+                            .push_unchecked(Value::bool(!lhs.equals(&rhs)?));
                     },
                     Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
-                        interpreter.borrow_global(
+                        let resource = interpreter.borrow_global(
                             is_mut,
                             false,
                             data_cache,
@@ -2676,6 +2715,7 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
+                        interpreter.operand_stack.push_unchecked(resource);
                     },
                     Bytecode::MutBorrowGlobalGeneric(si_idx)
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
@@ -2683,7 +2723,7 @@ impl Frame {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.borrow_global(
+                        let resource = interpreter.borrow_global(
                             is_mut,
                             true,
                             data_cache,
@@ -2692,11 +2732,12 @@ impl Frame {
                             addr,
                             ty,
                         )?;
+                        interpreter.operand_stack.push_unchecked(resource);
                     },
                     Bytecode::Exists(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
-                        interpreter.exists(
+                        let is_exists = interpreter.exists(
                             false,
                             data_cache,
                             gas_meter,
@@ -2704,12 +2745,15 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
+                        interpreter
+                            .operand_stack
+                            .push_unchecked(Value::bool(is_exists));
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.exists(
+                        let is_exists = interpreter.exists(
                             true,
                             data_cache,
                             gas_meter,
@@ -2717,11 +2761,14 @@ impl Frame {
                             addr,
                             ty,
                         )?;
+                        interpreter
+                            .operand_stack
+                            .push_unchecked(Value::bool(is_exists));
                     },
                     Bytecode::MoveFrom(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let ty = self.get_struct_ty(*sd_idx);
-                        interpreter.move_from(
+                        let resource = interpreter.move_from(
                             false,
                             data_cache,
                             gas_meter,
@@ -2729,12 +2776,13 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
+                        interpreter.operand_stack.push_unchecked(resource);
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
                         let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
-                        interpreter.move_from(
+                        let resource = interpreter.move_from(
                             true,
                             data_cache,
                             gas_meter,
@@ -2742,10 +2790,13 @@ impl Frame {
                             addr,
                             ty,
                         )?;
+                        interpreter.operand_stack.push_unchecked(resource);
                     },
                     Bytecode::MoveTo(sd_idx) => {
-                        let resource = interpreter.operand_stack.pop()?;
-                        let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
+                        ensure_stack_size!(interpreter.operand_stack, 2);
+                        let resource = interpreter.operand_stack.pop_unchecked();
+                        let signer_reference =
+                            interpreter.operand_stack.pop_as_unchecked::<SignerRef>()?;
                         let addr = signer_reference
                             .borrow_signer()?
                             .value_as::<Reference>()?
@@ -2763,8 +2814,10 @@ impl Frame {
                         )?;
                     },
                     Bytecode::MoveToGeneric(si_idx) => {
-                        let resource = interpreter.operand_stack.pop()?;
-                        let signer_reference = interpreter.operand_stack.pop_as::<SignerRef>()?;
+                        ensure_stack_size!(interpreter.operand_stack, 2);
+                        let resource = interpreter.operand_stack.pop_unchecked();
+                        let signer_reference =
+                            interpreter.operand_stack.pop_as_unchecked::<SignerRef>()?;
                         let addr = signer_reference
                             .borrow_signer()?
                             .value_as::<Reference>()?
@@ -2790,7 +2843,7 @@ impl Frame {
                     Bytecode::Not => {
                         gas_meter.charge_simple_instr(S::Not)?;
                         let value = !interpreter.operand_stack.pop_as::<bool>()?;
-                        interpreter.operand_stack.push(Value::bool(value))?;
+                        interpreter.operand_stack.push_unchecked(Value::bool(value));
                     },
                     Bytecode::Nop => {
                         gas_meter.charge_simple_instr(S::Nop)?;
@@ -2807,6 +2860,7 @@ impl Frame {
                             .charge_vec_pack(interpreter.operand_stack.last_n(*num as usize)?)?;
                         let elements = interpreter.operand_stack.popn(*num as u16)?;
                         let value = Vector::pack(ty, elements)?;
+                        // todo: can num be zero here?
                         interpreter.operand_stack.push(value)?;
                     },
                     Bytecode::VecLen(si) => {
@@ -2815,29 +2869,32 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_len()?;
                         let value = vec_ref.len()?;
-                        interpreter.operand_stack.push(value)?;
+                        interpreter.operand_stack.push_unchecked(value);
                     },
                     Bytecode::VecImmBorrow(si) => {
-                        let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
-                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        ensure_stack_size!(interpreter.operand_stack, 2);
+                        let idx = interpreter.operand_stack.pop_as_unchecked::<u64>()? as usize;
+                        let vec_ref = interpreter.operand_stack.pop_as_unchecked::<VectorRef>()?;
                         let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(false)?;
                         let elem = vec_ref.borrow_elem(idx)?;
-                        interpreter.operand_stack.push(elem)?;
+                        interpreter.operand_stack.push_unchecked(elem);
                     },
                     Bytecode::VecMutBorrow(si) => {
-                        let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
-                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        ensure_stack_size!(interpreter.operand_stack, 2);
+                        let idx = interpreter.operand_stack.pop_as_unchecked::<u64>()? as usize;
+                        let vec_ref = interpreter.operand_stack.pop_as_unchecked::<VectorRef>()?;
                         let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_borrow(true)?;
                         let elem = vec_ref.borrow_elem(idx)?;
-                        interpreter.operand_stack.push(elem)?;
+                        interpreter.operand_stack.push_unchecked(elem);
                     },
                     Bytecode::VecPushBack(si) => {
-                        let elem = interpreter.operand_stack.pop()?;
-                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        ensure_stack_size!(interpreter.operand_stack, 2);
+                        let elem = interpreter.operand_stack.pop_unchecked();
+                        let vec_ref = interpreter.operand_stack.pop_as_unchecked::<VectorRef>()?;
                         let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(&elem)?;
@@ -2849,7 +2906,7 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         let res = vec_ref.pop();
                         gas_meter.charge_vec_pop_back(res.as_ref().ok())?;
-                        interpreter.operand_stack.push(res?)?;
+                        interpreter.operand_stack.push_unchecked(res?);
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
@@ -2857,14 +2914,13 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_unpack(NumArgs::new(*num), vec_val.elem_views())?;
                         let elements = vec_val.unpack(*num)?;
-                        for value in elements {
-                            interpreter.operand_stack.push(value)?;
-                        }
+                        interpreter.operand_stack.push_n(elements.into_iter())?;
                     },
                     Bytecode::VecSwap(si) => {
-                        let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
-                        let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
-                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        ensure_stack_size!(interpreter.operand_stack, 3);
+                        let idx2 = interpreter.operand_stack.pop_as_unchecked::<u64>()? as usize;
+                        let idx1 = interpreter.operand_stack.pop_as_unchecked::<u64>()? as usize;
+                        let vec_ref = interpreter.operand_stack.pop_as_unchecked::<VectorRef>()?;
                         let (_, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap()?;

@@ -3974,7 +3974,7 @@ impl Struct {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub fn unpack(self) -> PartialVMResult<impl Iterator<Item = Value>> {
+    pub fn unpack(self) -> PartialVMResult<impl ExactSizeIterator<Item = Value>> {
         Ok(self.fields.into_iter())
     }
 
@@ -3988,7 +3988,7 @@ impl Struct {
         self,
         variant: VariantIndex,
         variant_to_str: impl Fn(VariantIndex) -> String,
-    ) -> PartialVMResult<impl Iterator<Item = Value>> {
+    ) -> PartialVMResult<impl ExactSizeIterator<Item = Value>> {
         let (tag, values) = self.unpack_with_tag()?;
         if tag == variant {
             Ok(values)
@@ -4003,7 +4003,9 @@ impl Struct {
         }
     }
 
-    pub fn unpack_with_tag(self) -> PartialVMResult<(VariantIndex, impl Iterator<Item = Value>)> {
+    pub fn unpack_with_tag(
+        self,
+    ) -> PartialVMResult<(VariantIndex, impl ExactSizeIterator<Item = Value>)> {
         let Self { fields } = self;
         if fields.is_empty() {
             return Err(
