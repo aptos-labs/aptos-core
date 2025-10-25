@@ -1,9 +1,9 @@
 #!/bin/bash
 
-export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable"
+export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable -C target-cpu=native"
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 # Nightly version control
-NIGHTLY_VERSION="nightly-2025-04-03"
+NIGHTLY_VERSION="nightly-2025-08-07"
 
 # GDRIVE format https://docs.google.com/uc?export=download&id=DOCID
 # "https://storage.googleapis.com/aptos-core-corpora/move_aptosvm_publish_seed_corpus.zip"
@@ -301,7 +301,7 @@ function coverage() {
         PERM="+111"
     fi
 
-    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm $PERM)
+    fuzz_target_bin=$(find ./target/*/coverage -name $fuzz_target -type f -perm $PERM | head -n 1)
     echo "Found fuzz target binary: $fuzz_target_bin"
     # Generate the coverage report
     cargo +$NIGHTLY_VERSION cov -- show $fuzz_target_bin \
@@ -340,7 +340,7 @@ function debug() {
     fi
     info "Debugging $fuzz_target with $testcase"
     # find the binary
-    binary=$(find ./target/*/release/ -name $fuzz_target -type f -perm /111)
+    binary=$(find_release_binary "$fuzz_target")
     if [ -z "$binary" ]; then
         error "Could not find binary for $fuzz_target. Run `./fuzz.sh build $fuzz_target` first"
     fi
@@ -371,6 +371,10 @@ function run() {
         usage run
     fi
     fuzz_target=$1
+    # TODO: switch to name args
+    # INFO: forkin with more then 8 cores degradate performances
+    fork_count=${3:-4}
+    ignore_crashes=${4:-0}
     testcase=$2
     if [ ! -z "$testcase" ]; then
         if [ -f "$testcase" ]; then
@@ -382,9 +386,9 @@ function run() {
     info "Running $fuzz_target"
     features=$(get_features_for_target $fuzz_target)
     if [[ "$OSTYPE" == "darwin"* ]]; then
-        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=4 #-ignore_crashes=1
+        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=4 -ignore_crashes=$ignore_crashes
     else
-        cargo_fuzz run $features --sanitizer none -O $fuzz_target $testcase -- -rss_limit_mb=4096 -fork=4 -ignore_crashes=1
+        cargo_fuzz run $features --sanitizer none -O $fuzz_target $testcase -- -rss_limit_mb=4096 -fork=$fork_count -ignore_crashes=$ignore_crashes
     fi
 }
 
@@ -408,14 +412,14 @@ function add() {
     fuzz_target=$1
     fuzz_target_path="$fuzz_target.rs"
 
-    mkdir -p fuzz/fuzz_targets/$(dirname $fuzz_target_path) && touch fuzz/fuzz_targets/$fuzz_target_path
+    mkdir -p fuzz/fuzz_targets/"$(dirname "$fuzz_target_path")" && touch fuzz/fuzz_targets/"$fuzz_target_path"
 
     if [ $? -eq 0 ]; then
         {
             echo ""
             echo "[[bin]]"
             echo "name = \"$fuzz_target\""
-            echo "path = \"$fuzz_target_path\""
+            echo "path = \"fuzz_targets/$fuzz_target_path\""
             echo "test = false"
             echo "doc = false"
         } >> fuzz/Cargo.toml
@@ -435,6 +439,23 @@ function get_latest_mtime() {
   # Find all files, get their mtime (Unix timestamp), sort numerically, take the last one (latest)
   # Handle empty dir case with default 0. Use awk to ensure numeric output.
   find "$dir" -type f -exec stat -f %m {} \; | sort -n | tail -n 1 | awk '{print $1+0}' || echo 0
+}
+
+# Helper to get the correct -perm pattern across platforms
+function get_exec_perm_pattern() {
+    if [[ $OSTYPE == 'darwin'* ]]; then
+        echo "+111"
+    else
+        echo "/111"
+    fi
+}
+
+# Helper to find the built release binary for a fuzz target
+function find_release_binary() {
+    local fuzz_target="$1"
+    local perm_pattern
+    perm_pattern=$(get_exec_perm_pattern)
+    find ./target/*/release/ -name "$fuzz_target" -type f -perm $perm_pattern | head -n 1
 }
 
 function monitor-coverage() {
@@ -512,10 +533,17 @@ function samply() {
         error "$testcase does not exist"
     fi
     # find the binary
-    binary=$(find ./target/*/release/ -name $fuzz_target -type f -perm /111)
+    binary=$(find_release_binary "$fuzz_target")
+
+    # Rebuild if missing or older than one day (1440 minutes)
     if [ -z "$binary" ]; then
         info "Building $fuzz_target"
         build "$fuzz_target"
+        binary=$(find_release_binary "$fuzz_target")
+    elif [ -n "$(find "$binary" -mmin +1440 -print -quit 2>/dev/null)" ]; then
+        info "Existing binary is older than one day. Rebuilding $fuzz_target"
+        build "$fuzz_target"
+        # No need to re-discover path; file is rebuilt in place
     fi
     info "Sampling $fuzz_target with $testcase"
     command samply record "$binary" "$testcase"
