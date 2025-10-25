@@ -60,12 +60,6 @@ pub const TYPE_NAME_GET_SPEC: &str = "type_name::$get";
 /// The well-known name of the first parameter of a method.
 pub const RECEIVER_PARAM_NAME: &str = "self";
 
-/// The prefix of the error codes.
-pub const ERROR_PREFIX: &str = "E";
-
-/// The mask to extract the lower 3 bytes of a u64.
-pub const LOWER_3_BYTES_MASK: u64 = 0xFFFFFFFF;
-
 /// The well-known abort codes used by the compiler. These conform
 /// to the error category standard as defined in
 /// `../move-stdlib/sources/error.move` in the standard library. The lowest

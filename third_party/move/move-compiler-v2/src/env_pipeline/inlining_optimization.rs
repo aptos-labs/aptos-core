@@ -232,7 +232,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
     def: &Exp,
     caller_function_size: FunctionSize,
     across_package: bool,
-    _caller_func_env: &FunctionEnv,
+    caller_func_env: &FunctionEnv,
 ) -> (BTreeSet<NodeId>, FunctionSize) {
     let caller_mid = caller_module.get_id();
     let callees = def.called_funs_with_callsites_and_loop_depth();
@@ -246,11 +246,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 || callee_env.is_native()
                 || callee_size.code_size > *MAX_CALLEE_CODE_SIZE
                 || has_explicit_return(&callee_env)
-                || has_abort(&callee_env)
-                // || has_abort_with_non_const_or_conflicting_error_code(
-                //     &callee_env,
-                //     &caller_func_env.module_env,
-                // )
+                || has_abort(&callee_env, caller_func_env)
                 || has_privileged_operations(caller_mid, &callee_env)
                 || has_invisible_calls(caller_module, &callee_env, across_package)
                 || has_module_lock_attribute(&callee_env)
@@ -267,7 +263,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 // - callee has calls to functions that are not visible from the caller module
                 // - callee has the `#[module_lock]` attribute
                 // - callee has runtime access control checks
-                // - callee has an abort(code) expression where code is not a constant or conflicting with any constants defined in the caller module
+                // - callee has an abort expression
                 None
             } else {
                 let function_size = get_function_size_estimate(env, &callee);
@@ -538,10 +534,13 @@ fn has_explicit_return(function: &FunctionEnv) -> bool {
 }
 
 /// Does `function` have an abort expression in its body?
-fn has_abort(function: &FunctionEnv) -> bool {
+fn has_abort(function: &FunctionEnv, caller: &FunctionEnv) -> bool {
     let Some(exp) = function.get_def() else {
         return false;
     };
+    if function.module_env.get_id() == caller.module_env.get_id() {
+        return false;
+    }
     let mut found = false;
     exp.visit_pre_order(&mut |e: &ExpData| {
         if let ExpData::Call(_, Operation::Abort, _) = e {
@@ -550,69 +549,6 @@ fn has_abort(function: &FunctionEnv) -> bool {
         // Keep going if not yet found
         !found
     });
-    found
-}
-
-/// Does `function` have an abort expression with non-constant or conflicting error code with the caller module?
-fn _has_abort_with_non_const_or_conflicting_error_code(
-    function: &FunctionEnv,
-    caller_module_env: &ModuleEnv,
-) -> bool {
-    let Some(exp) = function.get_def() else {
-        return false;
-    };
-
-    // Only check when caller and callee are in the same module.
-    if caller_module_env.get_id() != function.module_env.get_id() {
-        return false;
-    }
-
-    // Helper: does an abort *argument* count as non-const or conflicting?
-    let is_nonconst_or_conflicting = |arg_exp: &Exp, f: &FunctionEnv, caller: &ModuleEnv| -> bool {
-        match arg_exp.as_ref() {
-            // Constant code: only "bad" if it conflicts with caller's codes.
-            ExpData::Value(_, v) => caller.has_error_code_with_value(v),
-
-            // Function call as the abort argument.
-            ExpData::Call(_, Operation::MoveFunction(mid, fid), call_args) => {
-                // Special-case std::error::<func>(code) and std::error::canonical(category, code)
-                if f.env().get_module(*mid).is_std_error() {
-                    let called_fun = f.env().get_function(mid.qualified(*fid));
-                    let chosen_arg = if call_args.len() == 1 {
-                        Some(call_args[0].as_ref())
-                    } else if called_fun.get_name_str() == "canonical" {
-                        Some(call_args[1].as_ref())
-                    } else {
-                        None
-                    };
-                    match chosen_arg {
-                        // If the chosen arg is a constant, check for conflict; otherwise it's non-const.
-                        Some(ExpData::Value(_, v)) => caller.has_error_code_with_value(v),
-                        Some(_) | None => true,
-                    }
-                } else {
-                    // Any other function call as an abort code is non-const.
-                    true
-                }
-            },
-
-            // Anything else as an abort code is non-const.
-            _ => true,
-        }
-    };
-
-    let mut found = false;
-    exp.visit_pre_order(&mut |e: &ExpData| {
-        if let ExpData::Call(_, Operation::Abort, args) = e {
-            debug_assert_eq!(args.len(), 1);
-            if is_nonconst_or_conflicting(&args[0], function, caller_module_env) {
-                found = true;
-                return false; // stop visiting
-            }
-        }
-        true // keep visiting
-    });
-
     found
 }
 
