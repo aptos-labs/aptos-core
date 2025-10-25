@@ -149,6 +149,7 @@ fn inline_call_sites(
                 def,
                 caller_size,
                 across_package,
+                &function_env,
             );
             let mut rewriter = CallerRewriter { env, call_sites };
             // Rewrite the caller's body with inlined call sites.
@@ -231,6 +232,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
     def: &Exp,
     caller_function_size: FunctionSize,
     across_package: bool,
+    caller_func_env: &FunctionEnv,
 ) -> (BTreeSet<NodeId>, FunctionSize) {
     let caller_mid = caller_module.get_id();
     let callees = def.called_funs_with_callsites_and_loop_depth();
@@ -244,6 +246,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 || callee_env.is_native()
                 || callee_size.code_size > *MAX_CALLEE_CODE_SIZE
                 || has_explicit_return(&callee_env)
+                || has_abort(&callee_env, caller_func_env)
                 || has_privileged_operations(caller_mid, &callee_env)
                 || has_invisible_calls(caller_module, &callee_env, across_package)
                 || has_module_lock_attribute(&callee_env)
@@ -260,6 +263,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 // - callee has calls to functions that are not visible from the caller module
                 // - callee has the `#[module_lock]` attribute
                 // - callee has runtime access control checks
+                // - callee has an abort expression
                 None
             } else {
                 let function_size = get_function_size_estimate(env, &callee);
@@ -521,6 +525,25 @@ fn has_explicit_return(function: &FunctionEnv) -> bool {
     let mut found = false;
     exp.visit_pre_order(&mut |e: &ExpData| {
         if let ExpData::Return(..) = e {
+            found = true;
+        }
+        // Keep going if not yet found
+        !found
+    });
+    found
+}
+
+/// Does `function` have an abort expression in its body?
+fn has_abort(function: &FunctionEnv, caller: &FunctionEnv) -> bool {
+    let Some(exp) = function.get_def() else {
+        return false;
+    };
+    if function.module_env.get_id() == caller.module_env.get_id() {
+        return false;
+    }
+    let mut found = false;
+    exp.visit_pre_order(&mut |e: &ExpData| {
+        if let ExpData::Call(_, Operation::Abort, _) = e {
             found = true;
         }
         // Keep going if not yet found
