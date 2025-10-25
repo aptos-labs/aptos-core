@@ -8,12 +8,12 @@ use crate::{
     dedicated_handlers::handlers::{
         HandlerTrait, V0DelegatedFetchHandler, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
     },
+    deployment_information::DeploymentInformation,
     error::PepperServiceError,
     external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
     utils,
     vuf_keypair::VUFKeypair,
 };
-use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
 use aptos_logger::{error, info, warn};
 use hyper::{
@@ -172,21 +172,25 @@ fn create_response_builder(origin: String, status_code: StatusCode) -> response:
 }
 
 /// Generates a response for the about endpoint
-fn generate_about_response(origin: String) -> Result<Response<Body>, Infallible> {
-    // Get the build information
-    let build_information = build_information!();
-
-    // Serialize the build information
-    let build_info_json = match serde_json::to_string_pretty(&build_information) {
-        Ok(json) => json,
-        Err(error) => {
-            error!("Failed to serialize build information to JSON: {}", error);
-            return generate_internal_server_error_response(origin);
-        },
-    };
+fn generate_about_response(
+    origin: String,
+    deployment_information: DeploymentInformation,
+) -> Result<Response<Body>, Infallible> {
+    // Serialize the deployment information
+    let deployment_info_json =
+        match serde_json::to_string_pretty(&deployment_information.get_deployment_information()) {
+            Ok(json) => json,
+            Err(error) => {
+                error!(
+                    "Failed to serialize deployment information to JSON: {}",
+                    error
+                );
+                return generate_internal_server_error_response(origin);
+            },
+        };
 
     // Generate the response
-    generate_json_response(origin, StatusCode::OK, build_info_json)
+    generate_json_response(origin, StatusCode::OK, deployment_info_json)
 }
 
 /// Generates a 400 response for bad requests
@@ -310,6 +314,7 @@ pub async fn handle_request(
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
+    deployment_information: DeploymentInformation,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
     let origin = utils::get_request_origin(&request);
@@ -324,7 +329,7 @@ pub async fn handle_request(
     let request_path = request.uri().path();
     if request_method == Method::GET {
         match request_path {
-            ABOUT_PATH => return generate_about_response(origin),
+            ABOUT_PATH => return generate_about_response(origin, deployment_information.clone()),
             GROTH16_VK_PATH => {
                 let groth16_vk = cached_resources.read_on_chain_groth16_vk();
                 return generate_cached_resource_response(

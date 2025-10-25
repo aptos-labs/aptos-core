@@ -3,6 +3,7 @@
 
 pub mod accounts;
 pub mod dedicated_handlers;
+pub mod deployment_information;
 pub mod error;
 pub mod external_resources;
 pub mod metrics;

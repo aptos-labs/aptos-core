@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    deployment_information::DeploymentInformation,
     external_resources::{
         groth16_vk::OnChainGroth16VerificationKey, jwk_fetcher::JWKCache,
         keyless_config::OnChainKeylessConfiguration, resource_fetcher::CachedResources,
@@ -34,7 +35,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 async fn test_options_request() {
     // Send an options request to the root path
     let response =
-        send_request_to_path(Method::OPTIONS, "/", Body::empty(), None, None, None).await;
+        send_request_to_path(Method::OPTIONS, "/", Body::empty(), None, None, None, None).await;
 
     // Assert that the response status is OK
     assert_eq!(response.status(), StatusCode::OK);
@@ -55,9 +56,25 @@ async fn test_options_request() {
 
 #[tokio::test]
 async fn test_get_about_request() {
+    // Create a new deployment information object
+    let mut deployment_information = DeploymentInformation::new();
+
+    // Insert a test entry into the deployment information
+    let test_key = "test_key".to_string();
+    let test_value = "test_value".to_string();
+    deployment_information.extend_deployment_information(test_key.clone(), test_value.clone());
+
     // Send a GET request to the about endpoint
-    let response =
-        send_request_to_path(Method::GET, ABOUT_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::GET,
+        ABOUT_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        Some(deployment_information),
+    )
+    .await;
 
     // Assert that the response status is OK
     assert_eq!(response.status(), StatusCode::OK);
@@ -71,6 +88,9 @@ async fn test_get_about_request() {
     assert!(json_map.contains_key("build_cargo_version"));
     assert!(json_map.contains_key("build_commit_hash"));
     assert!(json_map.contains_key("build_is_release_build"));
+
+    // Verify the test entry is present in the response body
+    assert_eq!(json_map.get(&test_key).unwrap(), test_value.as_str());
 }
 
 #[tokio::test]
@@ -86,6 +106,7 @@ async fn test_get_groth16_vk_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -104,6 +125,7 @@ async fn test_get_groth16_vk_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -128,6 +150,7 @@ async fn test_get_groth16_vk_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -153,6 +176,7 @@ async fn test_get_jwk_request() {
         Body::empty(),
         None,
         Some(jwk_cache.clone()),
+        None,
         None,
     )
     .await;
@@ -188,6 +212,7 @@ async fn test_get_jwk_request() {
         Body::empty(),
         None,
         Some(jwk_cache.clone()),
+        None,
         None,
     )
     .await;
@@ -227,6 +252,7 @@ async fn test_get_keyless_config_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -245,6 +271,7 @@ async fn test_get_keyless_config_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -269,6 +296,7 @@ async fn test_get_keyless_config_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -293,6 +321,7 @@ async fn test_get_vuf_pub_key_request() {
         VUF_PUB_KEY_PATH,
         Body::empty(),
         Some(vuf_keypair.clone()),
+        None,
         None,
         None,
     )
@@ -322,18 +351,35 @@ async fn test_get_invalid_path_or_method_request() {
         None,
         None,
         None,
+        None,
     )
     .await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     // Send a GET request to an endpoint that only supports POST requests, and verify that it returns 405
-    let response =
-        send_request_to_path(Method::GET, VERIFY_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::GET,
+        VERIFY_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 
     // Send a POST request to an endpoint that only supports GET requests, and verify that it returns 405
-    let response =
-        send_request_to_path(Method::POST, ABOUT_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::POST,
+        ABOUT_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
 
@@ -344,6 +390,7 @@ async fn test_post_delegated_fetch_request_bad_request() {
         Method::POST,
         DELEGATED_FETCH_PATH,
         Body::empty(),
+        None,
         None,
         None,
         None,
@@ -390,6 +437,7 @@ async fn test_post_delegated_fetch_request_invalid_jwt() {
         None,
         None,
         Some(cached_resources),
+        None,
     )
     .await;
 
@@ -404,8 +452,16 @@ async fn test_post_delegated_fetch_request_invalid_jwt() {
 #[tokio::test]
 async fn test_post_fetch_request_bad_request() {
     // Send a POST request to the fetch endpoint
-    let response =
-        send_request_to_path(Method::POST, FETCH_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::POST,
+        FETCH_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
 
     // Assert that the response is a 400 (bad request, since no body was provided)
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -443,6 +499,7 @@ async fn test_post_fetch_request_invalid_jwt() {
         None,
         None,
         Some(cached_resources),
+        None,
     )
     .await;
 
@@ -464,6 +521,7 @@ async fn test_post_signature_request_bad_request() {
         None,
         None,
         None,
+        None,
     )
     .await;
 
@@ -474,8 +532,16 @@ async fn test_post_signature_request_bad_request() {
 #[tokio::test]
 async fn test_post_verify_request_bad_request() {
     // Send a POST request to the verify endpoint
-    let response =
-        send_request_to_path(Method::POST, VERIFY_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::POST,
+        VERIFY_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
 
     // Assert that the response is a 400 (bad request, since no body was provided)
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -511,6 +577,7 @@ async fn send_request_to_path(
     vuf_keypair: Option<Arc<VUFKeypair>>,
     jwk_cache: Option<JWKCache>,
     cached_resources: Option<CachedResources>,
+    deployment_information: Option<DeploymentInformation>,
 ) -> Response<Body> {
     // Build the URI
     let uri = format!(
@@ -540,6 +607,9 @@ async fn send_request_to_path(
     // Create the mock account recovery DB
     let account_recovery_db = utils::get_mock_account_recovery_db();
 
+    // Get or create deployment information
+    let deployment_information = deployment_information.unwrap_or_default();
+
     // Serve the request
     handle_request(
         request,
@@ -548,6 +618,7 @@ async fn send_request_to_path(
         cached_resources,
         account_recovery_managers,
         account_recovery_db,
+        deployment_information,
     )
     .await
     .unwrap()
