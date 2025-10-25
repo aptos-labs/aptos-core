@@ -22,7 +22,7 @@ use aptos_types::{
 };
 use aptos_vm_logging::log_schema::AdapterLogSchema;
 use fail::fail_point;
-use move_binary_format::errors::VMResult;
+use move_binary_format::errors::{VMResult, PartialVMError, Location};
 use move_core_types::{
     account_address::AccountAddress,
     ident_str,
@@ -36,6 +36,8 @@ use move_vm_runtime::{
 };
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
+use aptos_logger::warn;
+
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -102,6 +104,34 @@ impl TransactionValidation {
                     ident_str!("transaction_validation").to_owned(),
                 ))
     }
+
+    /// Safely check if the transaction validation module is available
+    /// This handles cases where the node might still be syncing
+    pub fn is_module_available(
+        &self,
+        module_storage: &impl ModuleStorage,
+    ) -> bool {
+        module_storage
+            .unmetered_check_module_exists(&self.module_addr, &self.module_name)
+            .unwrap_or(false)
+    }
+
+    /// Check if we should defer execution due to potential sync issues
+    pub fn should_defer_execution(
+        &self,
+        module_storage: &impl ModuleStorage,
+        log_context: &AdapterLogSchema,
+    ) -> bool {
+        if !self.is_module_available(module_storage) {
+            warn!(
+                *log_context,
+                "Transaction validation module not available, node may still be syncing: {:?}",
+                self.module_id()
+            );
+            return true;
+        }
+        false
+    }
 }
 
 pub(crate) fn run_script_prologue(
@@ -114,6 +144,16 @@ pub(crate) fn run_script_prologue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> Result<(), VMStatus> {
+    // Check if the transaction validation module is available
+    // If not, it might indicate the node is still syncing
+    if APTOS_TRANSACTION_VALIDATION.should_defer_execution(module_storage, log_context) {
+        // Return a more specific error that indicates sync state rather than function resolution
+        return Err(VMStatus::error(
+            StatusCode::STORAGE_ERROR,
+            Some("Transaction validation module not available - node may be syncing".to_string()),
+        ));
+    }
+
     let txn_replay_protector = txn_data.replay_protector();
     let txn_authentication_key = txn_data.authentication_proof().optional_auth_key();
     let txn_gas_price = txn_data.gas_unit_price();
@@ -241,6 +281,17 @@ pub(crate) fn run_script_prologue(
                 module_storage,
             )
             .map(|_return_vals| ())
+            .map_err(|err| {
+                // Log detailed error information for debugging
+                warn!(
+                    *log_context,
+                    "Function execution failed: function={}, module={:?}, error={:?}",
+                    prologue_function_name,
+                    APTOS_TRANSACTION_VALIDATION.module_id(),
+                    err
+                );
+                err
+            })
             .map_err(expect_no_verification_errors)
             .or_else(|err| convert_prologue_error(err, log_context))
     } else {
@@ -264,13 +315,27 @@ pub(crate) fn run_script_prologue(
             .iter()
             .map(|auth_key| MoveValue::vector_u8(auth_key.optional_auth_key().unwrap_or_default()))
             .collect();
-        let (prologue_function_name, args) = if let (Some(fee_payer), Some(fee_payer_auth_key)) = (
+        let has_fee_payer = if let (Some(_), Some(_)) = (
             txn_data.fee_payer(),
             txn_data
                 .fee_payer_authentication_proof
                 .as_ref()
                 .map(|proof| proof.optional_auth_key()),
         ) {
+            features.is_enabled(aptos_types::on_chain_config::FeatureFlag::GAS_PAYER_ENABLED)
+        } else {
+            false
+        };
+
+        let (prologue_function_name, args) = if has_fee_payer {
+            let fee_payer = txn_data.fee_payer().unwrap();
+            let fee_payer_auth_key = txn_data
+                .fee_payer_authentication_proof
+                .as_ref()
+                .unwrap()
+                .optional_auth_key()
+                .unwrap();
+
             if features.is_transaction_simulation_enhancement_enabled() {
                 let args = vec![
                     MoveValue::Signer(txn_data.sender),
@@ -279,7 +344,7 @@ pub(crate) fn run_script_prologue(
                     MoveValue::vector_address(txn_data.secondary_signers()),
                     MoveValue::Vector(secondary_auth_keys),
                     MoveValue::Address(fee_payer),
-                    MoveValue::vector_u8(fee_payer_auth_key.unwrap_or_default()),
+                    MoveValue::vector_u8(fee_payer_auth_key),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(txn_expiration_timestamp_secs),
@@ -298,7 +363,7 @@ pub(crate) fn run_script_prologue(
                     MoveValue::vector_address(txn_data.secondary_signers()),
                     MoveValue::Vector(secondary_auth_keys),
                     MoveValue::Address(fee_payer),
-                    MoveValue::vector_u8(fee_payer_auth_key.unwrap_or_default()),
+                    MoveValue::vector_u8(fee_payer_auth_key),
                     MoveValue::U64(txn_gas_price.into()),
                     MoveValue::U64(txn_max_gas_units.into()),
                     MoveValue::U64(txn_expiration_timestamp_secs),
@@ -385,6 +450,17 @@ pub(crate) fn run_script_prologue(
                 module_storage,
             )
             .map(|_return_vals| ())
+            .map_err(|err| {
+                // Log detailed error information for debugging
+                warn!(
+                    *log_context,
+                    "Function execution failed: function={}, module={:?}, error={:?}",
+                    prologue_function_name,
+                    APTOS_TRANSACTION_VALIDATION.module_id(),
+                    err
+                );
+                err
+            })
             .map_err(expect_no_verification_errors)
             .or_else(|err| convert_prologue_error(err, log_context))
     }
@@ -405,6 +481,14 @@ pub(crate) fn run_multisig_prologue(
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
+    // Check if the transaction validation module is available
+    if APTOS_TRANSACTION_VALIDATION.should_defer_execution(module_storage, log_context) {
+        return Err(VMStatus::error(
+            StatusCode::STORAGE_ERROR,
+            Some("Transaction validation module not available - node may be syncing".to_string()),
+        ));
+    }
+
     let unreachable_error = VMStatus::error(StatusCode::UNREACHABLE, None);
     // Note[Orderless]: Earlier the `provided_payload` was being calculated as bcs::to_bytes(MultisigTransactionPayload::EntryFunction(entry_function)).
     // So, converting the executable to this format.
@@ -458,6 +542,16 @@ fn run_epilogue(
     traversal_context: &mut TraversalContext,
     is_simulation: bool,
 ) -> VMResult<()> {
+    // Check if the transaction validation module is available
+    if APTOS_TRANSACTION_VALIDATION.should_defer_execution(
+        module_storage,
+        &AdapterLogSchema::new(aptos_types::state_store::StateViewId::Miscellaneous, 0)
+    ) {
+        return Err(PartialVMError::new(StatusCode::STORAGE_ERROR)
+            .with_message("Transaction validation module not available - node may be syncing".to_string())
+            .finish(Location::Undefined));
+    }
+
     let txn_gas_price = txn_data.gas_unit_price();
     let txn_max_gas_units = txn_data.max_gas_amount();
     let is_orderless_txn = txn_data.is_orderless();
@@ -504,6 +598,13 @@ fn run_epilogue(
             traversal_context,
             module_storage,
         )
+        .map_err(|err| {
+            warn!(
+                "Unified epilogue execution failed: error={:?}",
+                err
+            );
+            err
+        })
     } else {
         // We can unconditionally do this as this condition can only be true if the prologue
         // accepted it, in which case the gas payer feature is enabled.
@@ -547,6 +648,13 @@ fn run_epilogue(
                 traversal_context,
                 module_storage,
             )
+            .map_err(|err| {
+                warn!(
+                    "Fee payer epilogue execution failed: function={}, error={:?}",
+                    func_name, err
+                );
+                err
+            })
         } else {
             // Regular tx, run the normal epilogue
             let (func_name, args) = {
@@ -583,6 +691,13 @@ fn run_epilogue(
                 traversal_context,
                 module_storage,
             )
+            .map_err(|err| {
+                warn!(
+                    "Regular epilogue execution failed: function={}, error={:?}",
+                    func_name, err
+                );
+                err
+            })
         }
     }
     .map_err(expect_no_verification_errors)?;
