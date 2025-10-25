@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Loaded representation for runtime types.
 
-use crate::limit::Limiter;
+use crate::{limit::Limiter, print_if};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
     ability::AbilitySet,
@@ -14,7 +14,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::convert::TryInto;
+use std::{convert::TryInto, sync::Arc, time::Instant};
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct WrappedAbilitySet(pub AbilitySet);
@@ -72,17 +72,17 @@ pub(crate) enum FatType {
     U128,
     Address,
     Signer,
-    Vector(Box<FatType>),
-    Struct(Box<FatStructType>),
-    Reference(Box<FatType>),
-    MutableReference(Box<FatType>),
+    Vector(Arc<FatType>),
+    Struct(Arc<FatStructType>),
+    Reference(Arc<FatType>),
+    MutableReference(Arc<FatType>),
     TyParam(usize),
     // NOTE: Added in bytecode version v6, do not reorder!
     U16,
     U32,
     U256,
     // NOTE: Added in bytecode version v8, do not reorder!
-    Function(Box<FatFunctionType>),
+    Function(Arc<FatFunctionType>),
     // `Runtime` and `RuntimeVariants` are used for typing
     // captured structures in closures, for which we only know
     // the raw layout (no struct name, no field names).
@@ -98,6 +98,61 @@ pub(crate) enum FatType {
 }
 
 impl FatStructType {
+    /// Check if this struct type contains any type parameters that need substitution.
+    fn contains_ty_param(&self) -> bool {
+        self.ty_args.iter().any(|ty| ty.contains_ty_param())
+            || match &self.layout {
+                FatStructLayout::Singleton(fields) => {
+                    fields.iter().any(|ty| ty.contains_ty_param())
+                },
+                FatStructLayout::Variants(variants) => variants
+                    .iter()
+                    .any(|fields| fields.iter().any(|ty| ty.contains_ty_param())),
+            }
+    }
+
+    /// Mutate this struct type in place, substituting type parameters.
+    /// Returns true if any mutations were made.
+    fn subst_in_place(
+        &mut self,
+        ty_args: &[FatType],
+        limiter: &mut Limiter,
+    ) -> PartialVMResult<bool> {
+        let mut changed = false;
+
+        // Mutate ty_args in place
+        for ty in &mut self.ty_args {
+            if ty.contains_ty_param() {
+                *ty = ty.subst(ty_args, limiter)?;
+                changed = true;
+            }
+        }
+
+        // Mutate layout in place
+        match &mut self.layout {
+            FatStructLayout::Singleton(fields) => {
+                for ty in fields.iter_mut() {
+                    if ty.contains_ty_param() {
+                        *ty = ty.subst(ty_args, limiter)?;
+                        changed = true;
+                    }
+                }
+            },
+            FatStructLayout::Variants(variants) => {
+                for fields in variants.iter_mut() {
+                    for ty in fields.iter_mut() {
+                        if ty.contains_ty_param() {
+                            *ty = ty.subst(ty_args, limiter)?;
+                            changed = true;
+                        }
+                    }
+                }
+            },
+        }
+
+        Ok(changed)
+    }
+
     fn clone_with_limit(&self, limit: &mut Limiter) -> PartialVMResult<Self> {
         limit.charge(std::mem::size_of::<AccountAddress>())?;
         limit.charge(self.module.as_bytes().len())?;
@@ -140,39 +195,40 @@ impl FatStructType {
         ty_args: &[FatType],
         limiter: &mut Limiter,
     ) -> PartialVMResult<FatStructType> {
+        // Optimization: Early exit if no type parameters are present
+        if !self.contains_ty_param() {
+            // Still charge for the metadata, but avoid recursive substitution
+            limiter.charge(std::mem::size_of::<AccountAddress>())?;
+            limiter.charge(self.module.as_bytes().len())?;
+            limiter.charge(self.name.as_bytes().len())?;
+            return Ok(Self {
+                address: self.address,
+                module: self.module.clone(),
+                name: self.name.clone(),
+                abilities: self.abilities,
+                ty_args: self.ty_args.clone(),
+                layout: self.layout.clone(),
+            });
+        }
+
         limiter.charge(std::mem::size_of::<AccountAddress>())?;
         limiter.charge(self.module.as_bytes().len())?;
         limiter.charge(self.name.as_bytes().len())?;
-        Ok(Self {
+
+        // Clone and mutate in place to avoid creating new Vec allocations unnecessarily
+        let mut result = Self {
             address: self.address,
             module: self.module.clone(),
             name: self.name.clone(),
             abilities: self.abilities,
-            ty_args: self
-                .ty_args
-                .iter()
-                .map(|ty| ty.subst(ty_args, limiter))
-                .collect::<PartialVMResult<_>>()?,
-            layout: match &self.layout {
-                FatStructLayout::Singleton(fields) => FatStructLayout::Singleton(
-                    fields
-                        .iter()
-                        .map(|ty| ty.subst(ty_args, limiter))
-                        .collect::<PartialVMResult<_>>()?,
-                ),
-                FatStructLayout::Variants(variants) => FatStructLayout::Variants(
-                    variants
-                        .iter()
-                        .map(|fields| {
-                            fields
-                                .iter()
-                                .map(|ty| ty.subst(ty_args, limiter))
-                                .collect::<PartialVMResult<_>>()
-                        })
-                        .collect::<PartialVMResult<_>>()?,
-                ),
-            },
-        })
+            ty_args: self.ty_args.clone(),
+            layout: self.layout.clone(),
+        };
+
+        // Mutate in place
+        result.subst_in_place(ty_args, limiter)?;
+
+        Ok(result)
     }
 
     pub fn struct_tag(&self, limiter: &mut Limiter) -> PartialVMResult<StructTag> {
@@ -196,6 +252,40 @@ impl FatStructType {
 }
 
 impl FatFunctionType {
+    /// Check if this function type contains any type parameters that need substitution.
+    fn contains_ty_param(&self) -> bool {
+        self.args.iter().any(|ty| ty.contains_ty_param())
+            || self.results.iter().any(|ty| ty.contains_ty_param())
+    }
+
+    /// Mutate this function type in place, substituting type parameters.
+    /// Returns true if any mutations were made.
+    fn subst_in_place(
+        &mut self,
+        ty_args: &[FatType],
+        limiter: &mut Limiter,
+    ) -> PartialVMResult<bool> {
+        let mut changed = false;
+
+        // Mutate args in place
+        for ty in &mut self.args {
+            if ty.contains_ty_param() {
+                *ty = ty.subst(ty_args, limiter)?;
+                changed = true;
+            }
+        }
+
+        // Mutate results in place
+        for ty in &mut self.results {
+            if ty.contains_ty_param() {
+                *ty = ty.subst(ty_args, limiter)?;
+                changed = true;
+            }
+        }
+
+        Ok(changed)
+    }
+
     fn clone_with_limit(&self, limiter: &mut Limiter) -> PartialVMResult<Self> {
         let clone_slice = |limiter: &mut Limiter, tys: &[FatType]| {
             tys.iter()
@@ -210,16 +300,26 @@ impl FatFunctionType {
     }
 
     pub fn subst(&self, ty_args: &[FatType], limiter: &mut Limiter) -> PartialVMResult<Self> {
-        let subst_slice = |limiter: &mut Limiter, tys: &[FatType]| {
-            tys.iter()
-                .map(|ty| ty.subst(ty_args, limiter))
-                .collect::<PartialVMResult<Vec<_>>>()
-        };
-        Ok(FatFunctionType {
-            args: subst_slice(limiter, &self.args)?,
-            results: subst_slice(limiter, &self.results)?,
+        // Optimization: Early exit if no type parameters are present
+        if !self.contains_ty_param() {
+            return Ok(FatFunctionType {
+                args: self.args.clone(),
+                results: self.results.clone(),
+                abilities: self.abilities,
+            });
+        }
+
+        // Clone and mutate in place to avoid creating new Vec allocations unnecessarily
+        let mut result = Self {
+            args: self.args.clone(),
+            results: self.results.clone(),
             abilities: self.abilities,
-        })
+        };
+
+        // Mutate in place
+        result.subst_in_place(ty_args, limiter)?;
+
+        Ok(result)
     }
 
     pub fn fun_tag(&self, limiter: &mut Limiter) -> PartialVMResult<FunctionTag> {
@@ -247,8 +347,28 @@ impl FatFunctionType {
 }
 
 impl FatType {
-    fn clone_with_limit(&self, limit: &mut Limiter) -> PartialVMResult<Self> {
+    /// Check if this type contains any type parameters that need substitution.
+    /// This allows early-exit optimizations in substitution operations.
+    pub(crate) fn contains_ty_param(&self) -> bool {
         use FatType::*;
+        match self {
+            TyParam(_) => true,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address | Signer => false,
+            Vector(ty) | Reference(ty) | MutableReference(ty) => ty.contains_ty_param(),
+            Struct(struct_ty) => struct_ty.contains_ty_param(),
+            Function(fun_ty) => fun_ty.contains_ty_param(),
+            Runtime(tys) => tys.iter().any(|ty| ty.contains_ty_param()),
+            RuntimeVariants(vars) => vars
+                .iter()
+                .any(|tys| tys.iter().any(|ty| ty.contains_ty_param())),
+        }
+    }
+
+    fn clone_with_limit(&self, _limit: &mut Limiter) -> PartialVMResult<Self> {
+        use FatType::*;
+        // Note: limit is not charged here as Arc cloning is cheap, but it's part of the signature
+        // for consistency with other clone_with_limit methods
         Ok(match self {
             TyParam(idx) => TyParam(*idx),
             Bool => Bool,
@@ -266,17 +386,13 @@ impl FatType {
             I256 => I256,
             Address => Address,
             Signer => Signer,
-            Vector(ty) => Vector(Box::new(ty.clone_with_limit(limit)?)),
-            Reference(ty) => Reference(Box::new(ty.clone_with_limit(limit)?)),
-            MutableReference(ty) => MutableReference(Box::new(ty.clone_with_limit(limit)?)),
-            Struct(struct_ty) => Struct(Box::new(struct_ty.clone_with_limit(limit)?)),
-            Function(fun_ty) => Function(Box::new(fun_ty.clone_with_limit(limit)?)),
-            Runtime(tys) => Runtime(Self::clone_with_limit_slice(tys, limit)?),
-            RuntimeVariants(vars) => RuntimeVariants(
-                vars.iter()
-                    .map(|tys| Self::clone_with_limit_slice(tys, limit))
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
+            Vector(ty) => Vector(ty.clone()),
+            Reference(ty) => Reference(ty.clone()),
+            MutableReference(ty) => MutableReference(ty.clone()),
+            Struct(struct_ty) => Struct(struct_ty.clone()),
+            Function(fun_ty) => Function(fun_ty.clone()),
+            Runtime(tys) => Runtime(tys.clone()),
+            RuntimeVariants(vars) => RuntimeVariants(vars.clone()),
         })
     }
 
@@ -289,7 +405,15 @@ impl FatType {
 
         let res = match self {
             TyParam(idx) => match ty_args.get(*idx) {
-                Some(ty) => ty.clone_with_limit(limit)?,
+                Some(ty) => {
+                    // Optimization: If the replacement type contains no TyParam, we can return it directly
+                    // without cloning, avoiding unnecessary allocations
+                    if !ty.contains_ty_param() {
+                        return Ok(ty.clone());
+                    }
+                    // Otherwise, clone and continue (clone is needed to maintain ownership)
+                    ty.clone_with_limit(limit)?
+                },
                 None => {
                     return Err(
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -317,27 +441,92 @@ impl FatType {
             I256 => I256,
             Address => Address,
             Signer => Signer,
-            Vector(ty) => Vector(Box::new(ty.subst(ty_args, limit)?)),
-            Reference(ty) => Reference(Box::new(ty.subst(ty_args, limit)?)),
-            MutableReference(ty) => MutableReference(Box::new(ty.subst(ty_args, limit)?)),
+            // Optimization: Reuse Arc when no substitution needed
+            Vector(ty) => {
+                if ty.contains_ty_param() {
+                    Vector(Arc::new(ty.subst(ty_args, limit)?))
+                } else {
+                    // No substitution needed, reuse the existing Arc
+                    Vector(ty.clone())
+                }
+            },
+            Reference(ty) => {
+                if ty.contains_ty_param() {
+                    Reference(Arc::new(ty.subst(ty_args, limit)?))
+                } else {
+                    Reference(ty.clone())
+                }
+            },
+            MutableReference(ty) => {
+                if ty.contains_ty_param() {
+                    MutableReference(Arc::new(ty.subst(ty_args, limit)?))
+                } else {
+                    MutableReference(ty.clone())
+                }
+            },
 
-            Struct(struct_ty) => Struct(Box::new(struct_ty.subst(ty_args, limit)?)),
+            Struct(struct_ty) => {
+                if struct_ty.contains_ty_param() {
+                    // Clone the inner type once and mutate in place to avoid intermediate allocations
+                    let mut cloned = struct_ty.as_ref().clone();
+                    cloned.subst_in_place(ty_args, limit)?;
+                    Struct(Arc::new(cloned))
+                } else {
+                    // No substitution needed, reuse the existing Arc
+                    Struct(struct_ty.clone())
+                }
+            },
 
-            Function(fun_ty) => Function(Box::new(fun_ty.subst(ty_args, limit)?)),
-            Runtime(tys) => Runtime(
-                tys.iter()
-                    .map(|ty| ty.subst(ty_args, limit))
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            RuntimeVariants(vars) => RuntimeVariants(
-                vars.iter()
-                    .map(|tys| {
-                        tys.iter()
-                            .map(|ty| ty.subst(ty_args, limit))
-                            .collect::<PartialVMResult<Vec<_>>>()
-                    })
-                    .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
-            ),
+            Function(fun_ty) => {
+                if fun_ty.contains_ty_param() {
+                    // Clone the inner type once and mutate in place to avoid intermediate allocations
+                    let mut cloned = fun_ty.as_ref().clone();
+                    cloned.subst_in_place(ty_args, limit)?;
+                    Function(Arc::new(cloned))
+                } else {
+                    Function(fun_ty.clone())
+                }
+            },
+            Runtime(tys) => {
+                // Check if any type needs substitution
+                if tys.iter().any(|ty| ty.contains_ty_param()) {
+                    // Try to mutate in place if we own the Vec (by cloning and unwrapping)
+                    // Since Runtime contains Vec directly (not Arc), we need to clone it first
+                    // but we can mutate the cloned Vec in place
+                    let mut result = tys.clone();
+                    // Mutate elements in place
+                    for ty in result.iter_mut() {
+                        if ty.contains_ty_param() {
+                            *ty = ty.subst(ty_args, limit)?;
+                        }
+                    }
+                    Runtime(result)
+                } else {
+                    // No substitution needed, reuse the existing vector
+                    Runtime(tys.clone())
+                }
+            },
+            RuntimeVariants(vars) => {
+                // Check if any variant needs substitution
+                let needs_subst = vars
+                    .iter()
+                    .any(|tys| tys.iter().any(|ty| ty.contains_ty_param()));
+                if needs_subst {
+                    // Clone and mutate in place
+                    let mut result = vars.clone();
+                    for tys in result.iter_mut() {
+                        for ty in tys.iter_mut() {
+                            if ty.contains_ty_param() {
+                                *ty = ty.subst(ty_args, limit)?;
+                            }
+                        }
+                    }
+                    RuntimeVariants(result)
+                } else {
+                    // No substitution needed, reuse the existing vector
+                    RuntimeVariants(vars.clone())
+                }
+            },
         };
 
         Ok(res)
@@ -398,7 +587,7 @@ impl FatType {
             I256 => FatType::I256,
             Address => FatType::Address,
             Signer => FatType::Signer,
-            Vector(ty) => FatType::Vector(Box::new(Self::from_runtime_layout(ty, limit)?)),
+            Vector(ty) => FatType::Vector(Arc::new(Self::from_runtime_layout(ty, limit)?)),
             Struct(MoveStructLayout::Runtime(tys)) => {
                 FatType::Runtime(Self::from_layout_slice(tys, limit)?)
             },
@@ -413,7 +602,7 @@ impl FatType {
                 // actually on their type, but only their (hidden) captured arguments.
                 // Currently, `from_runtime_layout` is only used to annotate captured arguments
                 // of closures.
-                FatType::Function(Box::new(FatFunctionType {
+                FatType::Function(Arc::new(FatFunctionType {
                     args: vec![],
                     results: vec![],
                     abilities: AbilitySet::EMPTY,
@@ -457,9 +646,9 @@ impl From<&TypeTag> for FatType {
             TypeTag::I256 => I256,
             TypeTag::Address => Address,
             TypeTag::Signer => Signer,
-            TypeTag::Vector(inner) => Vector(Box::new(inner.as_ref().into())),
-            TypeTag::Struct(inner) => Struct(Box::new(inner.as_ref().into())),
-            TypeTag::Function(inner) => Function(Box::new(inner.as_ref().into())),
+            TypeTag::Vector(inner) => Vector(Arc::new(inner.as_ref().into())),
+            TypeTag::Struct(inner) => Struct(Arc::new(inner.as_ref().into())),
+            TypeTag::Function(inner) => Function(Arc::new(inner.as_ref().into())),
             TypeTag::U256 => U256,
         }
     }
@@ -486,9 +675,9 @@ impl From<&FunctionParamOrReturnTag> for FatType {
     fn from(tag: &FunctionParamOrReturnTag) -> FatType {
         use FatType::*;
         match tag {
-            FunctionParamOrReturnTag::Reference(tag) => Reference(Box::new(tag.into())),
+            FunctionParamOrReturnTag::Reference(tag) => Reference(Arc::new(tag.into())),
             FunctionParamOrReturnTag::MutableReference(tag) => {
-                MutableReference(Box::new(tag.into()))
+                MutableReference(Arc::new(tag.into()))
             },
             FunctionParamOrReturnTag::Value(tag) => tag.into(),
         }

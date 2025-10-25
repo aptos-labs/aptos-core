@@ -13,9 +13,17 @@ use aptos_indexer_grpc_fullnode::stream_coordinator::{
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
+use aptos_resource_viewer::module_view::CachedModuleView;
+use aptos_storage_interface::state_store::state_view::db_state_view::{
+    DbStateView, DbStateViewAtVersion,
+};
 use aptos_types::write_set::WriteSet;
 use itertools::Itertools;
-use std::{cmp::Ordering, sync::Arc, time::Duration};
+use std::{
+    cmp::Ordering,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 type EndVersion = u64;
 const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
@@ -33,6 +41,7 @@ pub struct TableInfoService {
 
     // Backup and restore service. If not enabled, this will be None.
     pub backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
+    pub module_viewer: Arc<Mutex<CachedModuleView<DbStateView>>>,
 }
 
 impl TableInfoService {
@@ -44,6 +53,7 @@ impl TableInfoService {
         backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Self {
+        let db = context.db.clone();
         Self {
             current_version: request_start_version,
             parser_task_count,
@@ -51,6 +61,10 @@ impl TableInfoService {
             context,
             backup_restore_operator,
             indexer_async_v2,
+            module_viewer: Arc::new(Mutex::new(CachedModuleView::new(
+                db.state_view_at_version(Some(request_start_version))
+                    .expect("Get db view cannot fail"),
+            ))),
         }
     }
 
@@ -231,10 +245,16 @@ impl TableInfoService {
             .chunks(self.parser_batch_size as usize)
             .map(|chunk| chunk.to_vec())
             .collect();
+        self.module_viewer.lock().unwrap().reset_state_view(
+            context
+                .db
+                .state_view_at_version(Some(last_version))
+                .expect("Get db view cannot fail"),
+        );
 
         for batch in batches {
             let task = tokio::spawn(Self::process_transactions(
-                context.clone(),
+                self.module_viewer.clone(),
                 indexer_async_v2.clone(),
                 batch,
             ));
@@ -254,7 +274,7 @@ impl TableInfoService {
                 if !self.indexer_async_v2.is_indexer_async_v2_pending_on_empty() {
                     self.indexer_async_v2.clear_pending_on();
                     Self::process_transactions(
-                        context.clone(),
+                        self.module_viewer.clone(),
                         indexer_async_v2.clone(),
                         transactions,
                     )
@@ -285,7 +305,7 @@ impl TableInfoService {
     /// and it's used in the second loop to process transactions sequentially
     /// if pending on items are not empty
     async fn process_transactions(
-        context: Arc<ApiContext>,
+        module_view: Arc<Mutex<CachedModuleView<DbStateView>>>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
         raw_txns: Vec<TransactionOnChainData>,
     ) -> EndVersion {
@@ -297,11 +317,7 @@ impl TableInfoService {
         loop {
             // NOTE: The retry is unlikely to be helpful. Put a loop here just to avoid panic and
             // allow the rest of FN functionality continue to work.
-            match Self::parse_table_info(
-                context.clone(),
-                raw_txns.clone(),
-                indexer_async_v2.clone(),
-            ) {
+            match Self::parse_table_info(&module_view, raw_txns.clone(), indexer_async_v2.clone()) {
                 Ok(_) => break,
                 Err(e) => {
                     error!(error = ?e, "Error during parse_table_info.");
@@ -363,7 +379,7 @@ impl TableInfoService {
 
     /// Parse table info from write sets,
     fn parse_table_info(
-        context: Arc<ApiContext>,
+        module_view: &Arc<Mutex<CachedModuleView<DbStateView>>>,
         raw_txns: Vec<TransactionOnChainData>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Result<(), Error> {
@@ -376,7 +392,7 @@ impl TableInfoService {
         let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
         let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
         indexer_async_v2
-            .index_table_info(context.db.clone(), first_version, &write_sets_slice)
+            .index_table_info(module_view, first_version, &write_sets_slice)
             .map_err(|err| anyhow!("[Table Info] Failed to process write sets and index to the table info rocksdb: {}", err))?;
 
         info!(

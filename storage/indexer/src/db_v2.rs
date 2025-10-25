@@ -9,12 +9,14 @@ use aptos_db_indexer_schemas::{
     metadata::{MetadataKey, MetadataValue},
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
-use aptos_logger::{info, sample, sample::SampleRate};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_logger::{info, sample, sample::SampleRate, warn};
+use aptos_resource_viewer::{
+    module_view::CachedModuleView, AnnotatedMoveValue, AptosValueAnnotator,
+};
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
-    db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
-    AptosDbError, DbReader, Result,
+    db_other_bail as bail, state_store::state_view::db_state_view::DbStateView, AptosDbError,
+    Result,
 };
 use aptos_types::{
     access_path::Path,
@@ -22,24 +24,26 @@ use aptos_types::{
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
-        StateView,
     },
     transaction::Version,
     write_set::{WriteOp, WriteSet},
 };
 use bytes::Bytes;
 use dashmap::{DashMap, DashSet};
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag},
 };
+use move_resource_viewer::MoveValueAnnotator;
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
+    ops::Deref,
     path::PathBuf,
     sync::{
         atomic::{AtomicU64, Ordering},
-        Arc,
+        Arc, Mutex,
     },
     time::Duration,
 };
@@ -76,29 +80,42 @@ impl IndexerAsyncV2 {
 
     pub fn index_table_info(
         &self,
-        db_reader: Arc<dyn DbReader>,
+        module_view: &Arc<Mutex<CachedModuleView<DbStateView>>>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
-        let last_version = first_version + write_sets.len() as Version;
-        let state_view = db_reader.state_view_at_version(Some(last_version))?;
-        let annotator = AptosValueAnnotator::new(&state_view);
+        let module_view_guard = module_view.lock().unwrap();
+        let annotator = MoveValueAnnotator::new(module_view_guard.deref());
         self.index_with_annotator(&annotator, first_version, write_sets)
     }
 
     /// Index write sets with the move annotator to parse obscure table handle and key value types
     /// After the current batch's parsed, write the mapping to the rocksdb, also update the next version to be processed
-    pub fn index_with_annotator<R: StateView>(
+    pub fn index_with_annotator(
         &self,
-        annotator: &AptosValueAnnotator<R>,
+        annotator: &MoveValueAnnotator<&CachedModuleView<DbStateView>>,
         first_version: Version,
         write_sets: &[&WriteSet],
     ) -> Result<()> {
+        info!(
+            "[Table Info] index_with_annotator, first_version {first_version}, {} txns.",
+            write_sets.len()
+        );
         let end_version = first_version + write_sets.len() as Version;
         let mut table_info_parser = TableInfoParser::new(self, annotator, &self.pending_on);
         for write_set in write_sets {
+            info!("[Table Info] index_with_annotator for 1 txn.");
             for (state_key, write_op) in write_set.write_op_iter() {
+                info!("[Table Info] index_with_annotator for 1 write_op.");
+                let now = std::time::Instant::now();
                 table_info_parser.parse_write_op(state_key, write_op)?;
+                let time_spent = std::time::Instant::now() - now;
+                if time_spent > std::time::Duration::from_millis(300) {
+                    warn!(
+                        "[Table Info] index_with_annotator slow write_op, took {} ms. StateKey: {:?}, WriteOp: {:?}",
+                        time_spent.as_millis(), state_key, write_op
+                    );
+                }
             }
         }
         let mut batch = SchemaBatch::new();
@@ -209,17 +226,17 @@ fn log_table_info_failure(handle: TableHandle, retried: u64) {
     )
 }
 
-struct TableInfoParser<'a, R> {
+struct TableInfoParser<'a, V> {
     indexer_async_v2: &'a IndexerAsyncV2,
-    annotator: &'a AptosValueAnnotator<'a, R>,
+    annotator: &'a MoveValueAnnotator<V>,
     result: HashMap<TableHandle, TableInfo>,
     pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
 }
 
-impl<'a, R: StateView> TableInfoParser<'a, R> {
+impl<'a, V: CompiledModuleView> TableInfoParser<'a, V> {
     pub fn new(
         indexer_async_v2: &'a IndexerAsyncV2,
-        annotator: &'a AptosValueAnnotator<R>,
+        annotator: &'a MoveValueAnnotator<V>,
         pending_on: &'a DashMap<TableHandle, DashSet<Bytes>>,
     ) -> Self {
         Self {
@@ -250,11 +267,11 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
     }
 
     fn parse_struct(&mut self, struct_tag: StructTag, bytes: &Bytes) -> Result<()> {
-        self.parse_move_value(
-            &self
-                .annotator
-                .view_value(&TypeTag::Struct(Box::new(struct_tag)), bytes)?,
-        )
+        self.parse_move_value(&self.annotator.view_value(
+            &TypeTag::Struct(Box::new(struct_tag)),
+            bytes,
+            std::time::Instant::now(),
+        )?)
     }
 
     fn parse_resource_group(&mut self, bytes: &Bytes) -> Result<()> {
@@ -267,9 +284,14 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
     }
 
     fn parse_table_item(&mut self, handle: TableHandle, bytes: &Bytes) -> Result<()> {
+        let start = std::time::Instant::now();
         match self.get_table_info(handle)? {
             Some(table_info) => {
-                self.parse_move_value(&self.annotator.view_value(&table_info.value_type, bytes)?)?;
+                self.parse_move_value(&self.annotator.view_value(
+                    &table_info.value_type,
+                    bytes,
+                    start,
+                )?)?;
             },
             None => {
                 self.pending_on

@@ -10,6 +10,7 @@ publish = false
 edition = { workspace = true }
 
 [dependencies]
+pprof = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-core-types = { workspace = true }

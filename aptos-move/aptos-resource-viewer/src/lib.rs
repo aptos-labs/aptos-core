@@ -12,6 +12,7 @@ use crate::module_view::ModuleView;
 use aptos_types::state_store::StateView;
 use aptos_vm::data_cache::get_resource_group_member_from_metadata;
 use move_binary_format::CompiledModule;
+use move_bytecode_utils::compiled_module_viewer::CompiledModuleView;
 use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
@@ -33,7 +34,7 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
     }
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
-        self.0.view_value(ty_tag, blob)
+        self.0.view_value(ty_tag, blob, std::time::Instant::now())
     }
 
     pub fn view_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Arc<CompiledModule>>> {

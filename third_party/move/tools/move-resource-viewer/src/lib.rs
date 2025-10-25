@@ -35,10 +35,20 @@ use std::{
     borrow::Borrow,
     convert::{TryFrom, TryInto},
     fmt::{Display, Formatter},
+    sync::Arc,
+    time::{Duration, Instant},
 };
 
 mod fat_type;
 mod limit;
+
+pub fn print_if(s: &str, t: Duration) -> bool {
+    if t > Duration::from_millis(300) {
+        println!("step {s}: {t:?}");
+        return true;
+    }
+    false
+}
 
 #[derive(Clone, Debug)]
 pub struct AnnotatedMoveStruct {
@@ -228,7 +238,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             .map(|(i, ty)| {
                 ty.subst(&ty_args, limit)
                     .map_err(anyhow::Error::from)
-                    .and_then(|fat_type| self.view_value_by_fat_type(&fat_type, &args[i], limit))
+                    .and_then(|fat_type| {
+                        self.view_value_by_fat_type(&fat_type, &args[i], limit, Instant::now())
+                    })
             })
             .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
     }
@@ -336,20 +348,45 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         struct_tag: &StructTag,
         limit: &mut Limiter,
     ) -> anyhow::Result<FatStructType> {
+        let start = Instant::now();
         let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
+        print_if("0.1", Instant::now() - start);
         let module = self.view_existing_module(&module_id)?;
+        print_if("0.2", Instant::now() - start);
         let module = module.borrow();
 
         let struct_def = find_struct_def_in_module(module, struct_tag.name.as_ident_str())?;
+        print_if("0.3", Instant::now() - start);
         let ty_args = struct_tag
             .type_args
             .iter()
             .map(|ty| self.resolve_type_impl(ty, limit))
             .collect::<anyhow::Result<Vec<_>>>()?;
+        print_if("0.4", Instant::now() - start);
         let ty_body = self.resolve_struct_definition(module, struct_def, limit)?;
-        ty_body.subst(&ty_args, limit).map_err(|e: PartialVMError| {
+        print_if("0.5", Instant::now() - start);
+        let ret = ty_body.subst(&ty_args, limit).map_err(|e: PartialVMError| {
             anyhow!("StructTag {:?} cannot be resolved: {:?}", struct_tag, e)
-        })
+        });
+        let used = Instant::now() - start;
+        if used > Duration::from_millis(1000) {
+            println!("subst used: {used:?}");
+            let guard = pprof::ProfilerGuardBuilder::default()
+                .frequency(1000)
+                .blocklist(&["libc", "libgcc", "pthread", "vdso"])
+                .build()
+                .unwrap();
+            let ret = ty_body.subst(&ty_args, limit).map_err(|e: PartialVMError| {
+                anyhow!("StructTag {:?} cannot be resolved: {:?}", struct_tag, e)
+            });
+            if let Ok(report) = guard.report().build() {
+                let file = std::fs::File::create("/home/grao/work/etna.svg").unwrap();
+                report.flamegraph(file).unwrap();
+                panic!("");
+            };
+        }
+        print_if("0.6", Instant::now() - start);
+        ret
     }
 
     fn resolve_struct_definition(
@@ -435,7 +472,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::Address => FatType::Address,
             SignatureToken::Signer => FatType::Signer,
             SignatureToken::Vector(ty) => {
-                FatType::Vector(Box::new(self.resolve_signature(module, ty, limit)?))
+                FatType::Vector(Arc::new(self.resolve_signature(module, ty, limit)?))
             },
             SignatureToken::Function(args, results, abilities) => {
                 let resolve_slice = |toks: &[SignatureToken], limit: &mut Limiter| {
@@ -444,11 +481,11 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             // Function type can have references as immediate argument or return
                             // types.
                             Ok(match tok {
-                                SignatureToken::Reference(t) => FatType::Reference(Box::new(
+                                SignatureToken::Reference(t) => FatType::Reference(Arc::new(
                                     self.resolve_signature(module, t, limit)?,
                                 )),
                                 SignatureToken::MutableReference(t) => FatType::MutableReference(
-                                    Box::new(self.resolve_signature(module, t, limit)?),
+                                    Arc::new(self.resolve_signature(module, t, limit)?),
                                 ),
                                 SignatureToken::Bool
                                 | SignatureToken::U8
@@ -477,14 +514,14 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                         .collect::<anyhow::Result<Vec<_>>>()
                 };
 
-                FatType::Function(Box::new(FatFunctionType {
+                FatType::Function(Arc::new(FatFunctionType {
                     args: resolve_slice(args, limit)?,
                     results: resolve_slice(results, limit)?,
                     abilities: *abilities,
                 }))
             },
             SignatureToken::Struct(idx) => {
-                FatType::Struct(Box::new(self.resolve_struct_handle(module, *idx, limit)?))
+                FatType::Struct(Arc::new(self.resolve_struct_handle(module, *idx, limit)?))
             },
             SignatureToken::StructInstantiation(idx, toks) => {
                 let struct_ty = self.resolve_struct_handle(module, *idx, limit)?;
@@ -492,7 +529,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                     .iter()
                     .map(|tok| self.resolve_signature(module, tok, limit))
                     .collect::<anyhow::Result<Vec<_>>>()?;
-                FatType::Struct(Box::new(
+                FatType::Struct(Arc::new(
                     struct_ty
                         .subst(&args, limit)
                         .map_err(|status| anyhow!("Substitution failure: {:?}", status))?,
@@ -501,7 +538,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::TypeParameter(idx) => FatType::TyParam(*idx as usize),
             SignatureToken::MutableReference(_) => return Err(anyhow!("Unexpected Reference")),
             SignatureToken::Reference(inner) => match **inner {
-                SignatureToken::Signer => FatType::Reference(Box::new(FatType::Signer)),
+                SignatureToken::Signer => FatType::Reference(Arc::new(FatType::Signer)),
                 _ => return Err(anyhow!("Unexpected Reference")),
             },
         })
@@ -533,11 +570,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         type_tag: &TypeTag,
         limit: &mut Limiter,
     ) -> anyhow::Result<FatType> {
+        println!("{type_tag:?}");
         Ok(match type_tag {
             TypeTag::Address => FatType::Address,
             TypeTag::Signer => FatType::Signer,
             TypeTag::Bool => FatType::Bool,
-            TypeTag::Struct(st) => FatType::Struct(Box::new(self.resolve_struct_impl(st, limit)?)),
+            TypeTag::Struct(st) => FatType::Struct(Arc::new(self.resolve_struct_impl(st, limit)?)),
             TypeTag::U8 => FatType::U8,
             TypeTag::U16 => FatType::U16,
             TypeTag::U32 => FatType::U32,
@@ -550,7 +588,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::I64 => FatType::I64,
             TypeTag::I128 => FatType::I128,
             TypeTag::I256 => FatType::I256,
-            TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
+            TypeTag::Vector(ty) => FatType::Vector(Arc::new(self.resolve_type_impl(ty, limit)?)),
             TypeTag::Function(function_tag) => {
                 let mut convert_tags = |tags: &[FunctionParamOrReturnTag]| {
                     tags.iter()
@@ -558,9 +596,9 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                             use FunctionParamOrReturnTag::*;
                             Ok(match t {
                                 Reference(t) => {
-                                    FatType::Reference(Box::new(self.resolve_type_impl(t, limit)?))
+                                    FatType::Reference(Arc::new(self.resolve_type_impl(t, limit)?))
                                 },
-                                MutableReference(t) => FatType::MutableReference(Box::new(
+                                MutableReference(t) => FatType::MutableReference(Arc::new(
                                     self.resolve_type_impl(t, limit)?,
                                 )),
                                 Value(t) => self.resolve_type_impl(t, limit)?,
@@ -568,7 +606,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                         })
                         .collect::<anyhow::Result<Vec<_>>>()
                 };
-                FatType::Function(Box::new(FatFunctionType {
+                FatType::Function(Arc::new(FatFunctionType {
                     args: convert_tags(&function_tag.args)?,
                     results: convert_tags(&function_tag.results)?,
                     abilities: function_tag.abilities,
@@ -577,10 +615,19 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         })
     }
 
-    pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {
+    pub fn view_value(
+        &self,
+        ty_tag: &TypeTag,
+        blob: &[u8],
+        start: std::time::Instant,
+    ) -> anyhow::Result<AnnotatedMoveValue> {
         let mut limit = Limiter::default();
+        print_if("0", Instant::now() - start);
         let ty = self.resolve_type_impl(ty_tag, &mut limit)?;
-        self.view_value_by_fat_type(&ty, blob, &mut limit)
+        print_if("1", Instant::now() - start);
+        let ret = self.view_value_by_fat_type(&ty, blob, &mut limit, start);
+        print_if("2", Instant::now() - start);
+        ret
     }
 
     fn view_value_by_fat_type(
@@ -588,10 +635,16 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         ty: &FatType,
         blob: &[u8],
         limit: &mut Limiter,
+        start: Instant,
     ) -> anyhow::Result<AnnotatedMoveValue> {
+        print_if("1.0", Instant::now() - start);
         let layout = ty.try_into().map_err(into_vm_status)?;
+        print_if("1.1", Instant::now() - start);
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        self.annotate_value(&move_value, ty, limit)
+        print_if("1.2", Instant::now() - start);
+        let ret = self.annotate_value(&move_value, ty, limit);
+        print_if("1.3", Instant::now() - start);
+        ret
     }
 
     fn annotate_struct(

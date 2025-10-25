@@ -213,7 +213,9 @@ impl IndexerStreamCoordinator {
     /// Fetches transactions from storage with each transaction's size.
     /// Results are transactions sorted by version.
     async fn fetch_transactions_from_storage(&mut self) -> Vec<(TransactionOnChainData, usize)> {
+        info!("get_batches");
         let batches = self.get_batches().await;
+        info!("get_batches_done");
         let mut storage_fetch_tasks = vec![];
         let ledger_version = self.highest_known_version;
         for batch in batches {
@@ -232,6 +234,7 @@ impl IndexerStreamCoordinator {
                     err
                 ),
             };
+        info!("fetch_done");
 
         transactions_from_storage
             .into_iter()
