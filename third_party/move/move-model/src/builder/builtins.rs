@@ -7,7 +7,10 @@
 use crate::{
     ast::{Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
-    metadata::{lang_feature_versions::SINT_LANGUAGE_VERSION_VALUE, LanguageVersion},
+    metadata::{
+        lang_feature_versions::{COMPILE_FOR_TESTING_VALUE, SINT_LANGUAGE_VERSION_VALUE},
+        LanguageVersion,
+    },
     model::{Parameter, TypeParameter, TypeParameterKind},
     options::ModelBuilderOptions,
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
@@ -63,7 +66,10 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     };
 
     {
-        if options.language_version.is_at_least(LanguageVersion::V2_3) {
+        if options
+            .language_version
+            .is_at_least(COMPILE_FOR_TESTING_VALUE)
+        {
             use EntryVisibility::SpecAndImpl;
             // Compiler builtin constants.
             trans.define_const(

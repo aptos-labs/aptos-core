@@ -27,6 +27,7 @@ pub static COMPILATION_METADATA_KEY: &[u8] = "compilation_metadata".as_bytes();
 // Language versions enabling specific features
 pub mod lang_feature_versions {
     use crate::LanguageVersion;
+    pub const COMPILE_FOR_TESTING_VALUE: LanguageVersion = LanguageVersion::V2_2;
     pub const SINT_LANGUAGE_VERSION_VALUE: LanguageVersion = LanguageVersion::V2_3;
 }
 
