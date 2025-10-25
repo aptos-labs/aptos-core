@@ -757,36 +757,38 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         let mut sym_param_map: BTreeMap<Symbol, usize> = BTreeMap::new();
         let mut function_value_spec_map = BTreeMap::new();
 
-        if lift_inline_funs && let Some(target_qualified_fun_id) = target_qualified_fun_id_opt {
-            let mut lifted_lambda_funs: BTreeMap<usize, move_model::model::FunctionData> =
-                BTreeMap::new();
-            let options = LambdaLiftingOptions {
-                include_inline_functions: true,
-            };
-            let fun_env = env.get_function(target_qualified_fun_id);
-            for (para, lambda) in lambda_args_matched.iter().copied() {
-                let mut lifter = LambdaLifter::new(
-                    &options,
-                    &fun_env,
-                    Some(format!(
-                        "_inline_{}_{}",
-                        para.0,
-                        env.get_node_loc(lambda.node_id()).span().start()
-                    )),
+        if lift_inline_funs {
+            if let Some(target_qualified_fun_id) = target_qualified_fun_id_opt {
+                let mut lifted_lambda_funs: BTreeMap<usize, move_model::model::FunctionData> =
+                    BTreeMap::new();
+                let options = LambdaLiftingOptions {
+                    include_inline_functions: true,
+                };
+                let fun_env = env.get_function(target_qualified_fun_id);
+                for (para, lambda) in lambda_args_matched.iter().copied() {
+                    let mut lifter = LambdaLifter::new(
+                        &options,
+                        &fun_env,
+                        Some(format!(
+                            "_inline_{}_{}",
+                            para.0,
+                            env.get_node_loc(lambda.node_id()).span().start()
+                        )),
+                    );
+                    let closure_exp = lifter.rewrite_exp(lambda.clone().clone());
+                    // Only one lift function should be generated.
+                    assert_eq!(lifter.lifted_len(), 1);
+                    let func_data = lifter.get_lifted_at(0).unwrap().generate_function_data(env);
+                    sym_param_map.insert(para.1 .0, para.0);
+                    function_value_map.insert(para.0, closure_exp.clone());
+                    lifted_lambda_funs.insert(para.0, func_data);
+                }
+                function_value_spec_map = run_spec_rewriter_inline(
+                    env,
+                    target_qualified_fun_id.module_id,
+                    lifted_lambda_funs,
                 );
-                let closure_exp = lifter.rewrite_exp(lambda.clone().clone());
-                // Only one lift function should be generated.
-                assert_eq!(lifter.lifted_len(), 1);
-                let func_data = lifter.get_lifted_at(0).unwrap().generate_function_data(env);
-                sym_param_map.insert(para.1 .0, para.0);
-                function_value_map.insert(para.0, closure_exp.clone());
-                lifted_lambda_funs.insert(para.0, func_data);
             }
-            function_value_spec_map = run_spec_rewriter_inline(
-                env,
-                target_qualified_fun_id.module_id,
-                lifted_lambda_funs,
-            );
         }
 
         (function_value_map, sym_param_map, function_value_spec_map)

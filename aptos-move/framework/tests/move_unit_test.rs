@@ -39,6 +39,7 @@ fn run_tests_for_pkg(path_to_pkg: impl Into<String>, use_latest_language: bool) 
         full_model_generation: true, // Run extended checks also on test code
         ..Default::default()
     };
+
     if use_latest_language {
         let latest_build_options = BuildOptions::default().set_latest_language();
         build_config.compiler_config.bytecode_version = latest_build_options.bytecode_version;
