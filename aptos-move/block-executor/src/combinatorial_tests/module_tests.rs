@@ -19,6 +19,7 @@ use crate::{
 use aptos_types::{state_store::MockStateView, transaction::AuxiliaryInfo};
 use fail::FailScenario;
 use move_core_types::language_storage::ModuleId;
+use move_vm_types::module_id_interner::InternedModuleIdPool;
 use proptest::{collection::vec, prelude::*, strategy::ValueTree, test_runner::TestRunner};
 use test_case::test_matrix;
 
@@ -50,6 +51,8 @@ fn execute_module_tests(
 
     let executor_thread_pool = create_executor_thread_pool();
     let mut runner = TestRunner::default();
+
+    let module_id_pool = InternedModuleIdPool::new();
 
     let gas_limits = get_gas_limit_variants(use_gas_limit, transaction_count);
     for gen_idx in 0..num_random_generations {
@@ -93,7 +96,7 @@ fn execute_module_tests(
                         ModuleTestType::MixedTransactionsMixedAccesses
                     )
                 {
-                    txn_gen.materialize_modules(&universe)
+                    txn_gen.materialize_modules(&module_id_pool, &universe)
                 } else {
                     txn_gen.materialize(&universe)
                 }

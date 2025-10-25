@@ -24,7 +24,7 @@ use aptos_types::{
 };
 use move_core_types::language_storage::ModuleId;
 use move_vm_runtime::Module;
-use move_vm_types::code::ModuleCode;
+use move_vm_types::{code::ModuleCode, module_id_interner::InternedModuleIdPool};
 use proptest::{
     collection::vec,
     prelude::*,
@@ -70,11 +70,12 @@ pub(crate) fn create_executor_thread_pool() -> Arc<rayon::ThreadPool> {
 /// The number of modules successfully added to the cache
 pub(crate) fn populate_guard_with_modules(
     guard: &mut AptosModuleCacheManagerGuard<'_>,
+    module_id_pool: &InternedModuleIdPool,
     module_ids: &[ModuleId],
 ) {
     for module_id in module_ids {
         // Create an empty module for testing with Module::new_for_test
-        let module = Module::new_for_test(module_id.clone());
+        let module = Module::new_for_test(module_id_pool, module_id.clone());
 
         // Serialize the module
         let mut serialized_bytes = Vec::new();
@@ -113,9 +114,11 @@ where
 {
     let mut guard = AptosModuleCacheManagerGuard::none();
 
+    let module_id_pool = InternedModuleIdPool::new();
+
     // If all_module_ids is provided, populate the guard with empty modules
     if let Some(module_ids) = all_module_ids {
-        populate_guard_with_modules(&mut guard, module_ids);
+        populate_guard_with_modules(&mut guard, &module_id_pool, module_ids);
     }
 
     let config = BlockExecutorConfig::new_maybe_block_limit(num_cpus::get(), block_gas_limit);
