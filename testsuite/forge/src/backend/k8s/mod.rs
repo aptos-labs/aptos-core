@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version,
-    INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
+    Factory, GenesisConfig, GenesisConfigFn, IndexerDeployConfig, NodeConfigFn, Result, Swarm,
+    Version, INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
 };
 use anyhow::bail;
 use futures::{future, FutureExt};
@@ -116,6 +116,7 @@ impl Factory for K8sFactory {
         genesis_config_fn: Option<GenesisConfigFn>,
         node_config_fn: Option<NodeConfigFn>,
         existing_db_tag: Option<String>,
+        indexer_deploy_config: Option<IndexerDeployConfig>,
     ) -> Result<Box<dyn Swarm>> {
         let genesis_modules_path = match genesis_config {
             Some(config) => match config {
@@ -196,28 +197,55 @@ impl Factory for K8sFactory {
             .boxed();
 
             let deploy_indexer_fut = async {
-            if self.enable_indexer {
-                // NOTE: by default, use a deploy profile and no additional configuration values
-                let config = serde_json::from_value(json!({
-                    "profile": self.deployer_profile.clone(),
-                    "era": new_era.clone(),
-                    "namespace": self.kube_namespace.clone(),
-                    "indexer-grpc-values": {
+                if let Some(deploy_config) = indexer_deploy_config {
+                    let mut config_json = json!({
+                        "profile":  deploy_config.deployer_profile.clone(),
+                        "era": new_era.clone(),
+                        "namespace": self.kube_namespace.clone(), 
+                    });
+                    let indexer_grpc_key = if deploy_config.use_indexer_v2 {
+                        "indexer-grpc-v2-values"
+                    } else {
+                        "indexer-grpc-values"
+                    };
+                    config_json[indexer_grpc_key] = json!({
                         "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
                         "fullnodeConfig": {
                             "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, init_version),
                         }
-                    },
-                }))?;
+                    });
+                    json_patch::merge(&mut config_json, &deploy_config.values);
+                    let indexer_deployer = ForgeDeployerManager::new(
+                        kube_client.clone(),
+                        self.kube_namespace.clone(),
+                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        None,
+                    );
+                    indexer_deployer.start(config_json).await?;
+                    indexer_deployer.wait_completed().await?;
+                    Ok(())
+                } else if self.enable_indexer {
+                    // NOTE: by default, use a deploy profile and no additional configuration values
+                    let config = serde_json::from_value(json!({
+                        "profile": self.deployer_profile.clone(),
+                        "era": new_era.clone(),
+                        "namespace": self.kube_namespace.clone(),
+                        "indexer-grpc-values": {
+                            "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
+                            "fullnodeConfig": {
+                                "image": format!("{}:{}", VALIDATOR_DOCKER_IMAGE_REPO, init_version),
+                            }
+                        },
+                    }))?;
 
-                let indexer_deployer = ForgeDeployerManager::new(
-                    kube_client.clone(),
-                    self.kube_namespace.clone(),
-                    FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
-                    None,
-                );
-                indexer_deployer.start(config).await?;
-                indexer_deployer.wait_completed().await
+                    let indexer_deployer = ForgeDeployerManager::new(
+                        kube_client.clone(),
+                        self.kube_namespace.clone(),
+                        FORGE_INDEXER_DEPLOYER_DOCKER_IMAGE_REPO.to_string(),
+                        None,
+                    );
+                    indexer_deployer.start(config).await?;
+                    indexer_deployer.wait_completed().await
                 } else {
                     Ok(())
                 }

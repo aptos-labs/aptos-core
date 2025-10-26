@@ -19,6 +19,22 @@ use kube::{
 use log::info;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
+#[derive(Clone)]
+pub struct IndexerDeployConfig {
+    pub deployer_profile: String,
+    pub use_indexer_v2: bool,
+    pub values: serde_json::Value,
+}
+
+impl IndexerDeployConfig {
+    pub fn new(profile: String, use_indexer_v2: bool, values: serde_json::Value) -> Self {
+        Self {
+            deployer_profile: profile,
+            use_indexer_v2,
+            values,
+        }
+    }
+}
 /// The ForgeDeployerManager is responsible for managing the lifecycle of forge deployers, which deploy the
 /// forge components to the k8s cluster.
 pub struct ForgeDeployerManager {
