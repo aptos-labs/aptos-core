@@ -168,7 +168,7 @@ jobs:
               { TEST_NAME: 'changing-working-quorum-test-high-load', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'changing_working_quorum_test_high_load', FORGE_ENABLE_FAILPOINTS: true },
               { TEST_NAME: 'pfn-const-tps-realistic-env', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'pfn_const_tps_with_realistic_env' },
               { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' },
-              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 5400, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust' }
+              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 5400, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust', FORGE_ENABLE_INDEXER: true }
             ];
 
             const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
@@ -284,6 +284,7 @@ jobs:
       FORGE_ENABLE_PERFORMANCE: ${{ matrix.FORGE_ENABLE_PERFORMANCE || false }}
       FORGE_ENABLE_FAILPOINTS: ${{ matrix.FORGE_ENABLE_FAILPOINTS || false }}
       FORGE_IMAGE_NAME: ${{ matrix.FORGE_IMAGE_NAME }}
+      FORGE_ENABLE_INDEXER: ${{ matrix.FORGE_ENABLE_INDEXER || false }}
       POST_TO_SLACK: true
       SEND_RESULTS_TO_TRUNK: true
       FORGE_CONTINUOUS_TEST_MODE: true
