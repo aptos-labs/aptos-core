@@ -381,10 +381,10 @@ where
             return Err(self.set_location(out_of_bounds_error));
         }
 
-        let mut local_values = Locals::init_values(num_locals);
-        for (i, value) in args.into_iter().enumerate() {
-            local_values[i] = value;
-        }
+        let mut local_values = Vec::with_capacity(num_locals);
+        local_values.extend(args);
+        // args.len() <= num_locals here, so `local_values` never truncated
+        local_values.resize_with(num_locals, || Value::Invalid);
 
         self.reentrancy_checker
             .enter_function(None, &function, CallType::Regular)
