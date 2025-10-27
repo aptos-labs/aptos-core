@@ -319,7 +319,7 @@ dependencies = [
  "toml 0.7.8",
  "tonic",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
  "url",
  "version-compare",
 ]
@@ -2165,7 +2165,7 @@ dependencies = [
  "tokio",
  "toml 0.7.8",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
  "warp",
 ]
 
@@ -2556,7 +2556,7 @@ dependencies = [
  "strum_macros 0.24.3",
  "tokio",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -4438,7 +4438,6 @@ dependencies = [
  "blake2",
  "derivative",
  "digest 0.10.7",
- "rayon",
  "sha2 0.10.8",
 ]
 
@@ -4456,7 +4455,6 @@ dependencies = [
  "hashbrown 0.13.2",
  "itertools 0.10.5",
  "num-traits",
- "rayon",
  "zeroize",
 ]
 
@@ -4476,7 +4474,6 @@ dependencies = [
  "num-bigint 0.4.4",
  "num-traits",
  "paste",
- "rayon",
  "rustc_version",
  "zeroize",
 ]
@@ -4517,7 +4514,6 @@ dependencies = [
  "ark-relations",
  "ark-serialize",
  "ark-std",
- "rayon",
 ]
 
 [[package]]
@@ -4531,7 +4527,6 @@ dependencies = [
  "ark-std",
  "derivative",
  "hashbrown 0.13.2",
- "rayon",
 ]
 
 [[package]]
@@ -4543,7 +4538,6 @@ dependencies = [
  "ark-ff",
  "ark-std",
  "tracing",
- "tracing-subscriber 0.2.25",
 ]
 
 [[package]]
@@ -4589,7 +4583,6 @@ checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
 dependencies = [
  "num-traits",
  "rand 0.8.5",
- "rayon",
 ]
 
 [[package]]
@@ -6191,7 +6184,7 @@ dependencies = [
  "tonic",
  "tracing",
  "tracing-core",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -15180,7 +15173,7 @@ dependencies = [
  "once_cell",
  "rand 0.8.5",
  "tracing",
- "tracing-subscriber 0.3.18",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -15792,15 +15785,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bc6b213177105856957181934e4920de57730fc69bf42c37ee5bb664d406d9e1"
 dependencies = [
  "serde",
- "tracing-core",
-]
-
-[[package]]
-name = "tracing-subscriber"
-version = "0.2.25"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0e0d2eaa99c3c2e41547cfa109e910a68ea03823cccad4a0525dcbc9b01e8c71"
-dependencies = [
  "tracing-core",
 ]
 
