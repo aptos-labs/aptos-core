@@ -450,7 +450,7 @@ error: cannot transfer mutable value since it is borrowed
    ┌─ tests/checking-lang-v2.3/cross_module_borrow_field_err.move:19:19
    │
 18 │         let x_0 = &mut x.0;
-   │                   -------- previously mutably borrowed here: field borrow for non-private struct/enum `0xc0ffee::m::Wrapper` is converted into a function call
+   │                   -------- previously mutably borrowed here
 19 │         let x_1 = &mut x.1;
    │                   ^^^^^^^^ transfer attempted here
 20 │         foo(x_0, x_1);
@@ -460,7 +460,7 @@ error: cannot transfer mutable value since it is borrowed
    ┌─ tests/checking-lang-v2.3/cross_module_borrow_field_err.move:30:19
    │
 29 │         let x_0 = &mut x.0;
-   │                   -------- previously mutably borrowed here: field borrow for non-private struct/enum `0xc0ffee::m::Wrapper` is converted into a function call
+   │                   -------- previously mutably borrowed here
 30 │         let x_1 = &mut x.1;
    │                   ^^^^^^^^ transfer attempted here
 31 │         *x_0 = 23;
