@@ -16,11 +16,8 @@ use move_binary_format::{
     file_format::{CompiledModule, CompiledScript},
 };
 use once_cell::sync::Lazy;
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-};
-use utils::vm::{publish_group, sort_by_deps};
+use std::{collections::HashSet, sync::Arc};
+use utils::vm::{group_modules_by_address_topo, publish_group};
 
 // genesis write set generated once for each fuzzing session
 static VM: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
@@ -71,37 +68,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         return Err(Corpus::Keep);
     }
 
-    // topologically order modules {
-    let all_modules = input.dep_modules.clone();
-    let mut map = all_modules
-        .into_iter()
-        .map(|m| (m.self_id(), m))
-        .collect::<BTreeMap<_, _>>();
-    let mut order = vec![];
-    for id in map.keys() {
-        let mut visited = HashSet::new();
-        sort_by_deps(&map, &mut order, id.clone(), &mut visited)?;
-    }
-    // }
-
-    // group same address modules in packages. keep local ordering.
-    let mut packages = vec![];
-    for cur_package_id in order.iter() {
-        let mut cur = vec![];
-        if !map.contains_key(cur_package_id) {
-            continue;
-        }
-        // this makes sure we keep the order in packages
-        for id in order.iter() {
-            // check if part of current package
-            if id.address() == cur_package_id.address() {
-                if let Some(module) = map.remove(id) {
-                    cur.push(module);
-                }
-            }
-        }
-        packages.push(cur)
-    }
+    // group packages using shared topo helper
+    let packages = group_modules_by_address_topo(input.dep_modules.clone())?;
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(

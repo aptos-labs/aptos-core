@@ -21,8 +21,7 @@ use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
     access::ModuleAccess,
     deserializer::DeserializerConfig,
-    errors::VMError,
-    file_format::{CompiledModule, CompiledScript, SignatureToken},
+    file_format::{CompiledModule, SignatureToken},
 };
 use move_core_types::{
     account_address::AccountAddress,
@@ -31,12 +30,15 @@ use move_core_types::{
 use move_transactional_test_runner::transactional_ops::TransactionalOperation;
 use once_cell::sync::Lazy;
 use std::{
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{HashMap, HashSet},
     sync::Arc,
 };
 mod utils;
 use fuzzer::RunnableStateWithOperations;
-use utils::vm::{check_for_invariant_violation, publish_group, sort_by_deps, BYTECODE_VERSION};
+use utils::vm::{
+    execute_block_or_keep, group_modules_by_address_topo, publish_group,
+    select_or_create_block_index, verify_module_fast, verify_script_fast, BYTECODE_VERSION,
+};
 
 // genesis write set generated once for each fuzzing session
 static VM_WRITE_SET: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
@@ -53,32 +55,8 @@ static TP: Lazy<Arc<rayon::ThreadPool>> = Lazy::new(|| {
 
 const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-bytecode-verifier/src/signature_v2.rs#L1306-L1312
 
-// List of known false positive messages for invariant violations
-// If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
-const KNOWN_FALSE_POSITIVES: &[&str] = &["too many type parameters/arguments in the program"];
-
-fn check_for_invariant_violation_vmerror(e: VMError) {
-    tdbg!("check_for_invariant_violation_vmerror: {:?}", e.clone());
-    if e.status_type() == StatusType::InvariantViolation {
-        let is_known_false_positive = e.message().is_some_and(|msg| {
-            KNOWN_FALSE_POSITIVES
-                .iter()
-                .any(|known| msg.starts_with(known))
-        });
-
-        if !is_known_false_positive && e.status_type() == StatusType::InvariantViolation {
-            panic!(
-                "invariant violation {:?}\n{}{:?} {}",
-                e,
-                "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
-                e.major_status(),
-                "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
-            );
-        }
-    }
-}
-
 // filter modules
+#[inline(always)]
 fn filter_modules(input: &RunnableStateWithOperations) -> Result<(), Corpus> {
     // reject any TypeParameter exceeds the maximum allowed value (Avoid known Ivariant Violation)
     for operation in input.operations.iter() {
@@ -134,40 +112,13 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     tdbg!("verifying scripts");
     for operation in input.operations.iter() {
         if let TransactionalOperation::RunScript { _script, .. } = operation {
-            // reject bad scripts fast
-            let mut script_code: Vec<u8> = vec![];
-            tdbg!("serializing script");
-            _script
-                .serialize_for_version(Some(BYTECODE_VERSION), &mut script_code)
-                .map_err(|_| Corpus::Reject)?;
-            tdbg!("deserializing script");
-            let s_de = CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
-                .map_err(|_| Corpus::Reject)?;
-            tdbg!("verifying script");
-            move_bytecode_verifier::verify_script_with_config(&verifier_config, &s_de).map_err(
-                |e| {
-                    check_for_invariant_violation_vmerror(e);
-                    Corpus::Reject
-                },
-            )?;
+            verify_script_fast(_script, &verifier_config, &deserializer_config)?;
         }
     }
 
     tdbg!("verifying modules");
     for m in dep_modules.iter_mut() {
-        // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
-        // m.version = VERSION_MAX;
-
-        // reject bad modules fast
-        let mut module_code: Vec<u8> = vec![];
-        m.serialize_for_version(Some(BYTECODE_VERSION), &mut module_code)
-            .map_err(|_| Corpus::Reject)?;
-        let m_de = CompiledModule::deserialize_with_config(&module_code, &deserializer_config)
-            .map_err(|_| Corpus::Reject)?;
-        move_bytecode_verifier::verify_module_with_config(&verifier_config, &m_de).map_err(|e| {
-            check_for_invariant_violation_vmerror(e);
-            Corpus::Reject
-        })?
+        verify_module_fast(m, &verifier_config, &deserializer_config)?;
     }
 
     tdbg!("checking no duplicates");
@@ -177,53 +128,8 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         return Err(Corpus::Reject);
     }
 
-    tdbg!("topologically ordering modules");
-    // topologically order modules
-    let all_modules = dep_modules.clone();
-    let map = all_modules
-        .into_iter()
-        .map(|m| (m.self_id(), m))
-        .collect::<BTreeMap<_, _>>();
-    let mut order = vec![];
-    for id in map.keys() {
-        let mut visited = HashSet::new();
-        sort_by_deps(&map, &mut order, id.clone(), &mut visited)?;
-    }
-
-    tdbg!("grouping same address modules in packages");
-    // group same address modules in packages. keep local ordering.
-    let mut packages: Vec<Vec<CompiledModule>> = Vec::new();
-    let mut remaining_modules_map = map.clone(); // Clone the map as we'll be removing items
-
-    for module_id_to_start_package in &order {
-        // `order` is the globally sorted Vec<ModuleId>
-        // If the module that could start a new package isn't in our remaining set,
-        // it means its entire package has likely been processed already via an earlier module_id in `order`.
-        if !remaining_modules_map.contains_key(module_id_to_start_package) {
-            continue;
-        }
-
-        let package_address = module_id_to_start_package.address();
-        let mut current_package_for_address: Vec<CompiledModule> = Vec::new();
-
-        // Iterate through the globally sorted `order` list again.
-        // This ensures that modules for `package_address` are added to `current_package_for_address`
-        // in their correct topological sub-order.
-        for module_id_in_global_order in &order {
-            if module_id_in_global_order.address() == package_address {
-                // If this module belongs to the current package_address,
-                // try to remove it from `remaining_modules_map`.
-                // If successful, it means it hasn't been added to any package yet.
-                if let Some(module) = remaining_modules_map.remove(module_id_in_global_order) {
-                    current_package_for_address.push(module);
-                }
-            }
-        }
-
-        if !current_package_for_address.is_empty() {
-            packages.push(current_package_for_address);
-        }
-    }
+    tdbg!("topologically ordering and grouping modules");
+    let packages = group_modules_by_address_topo(dep_modules.clone())?;
 
     let module_cache_manager = AptosModuleCacheManager::new();
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
@@ -265,17 +171,11 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                 _exec_group,
             } => {
                 // Determine block index for this operation
-                let block_index = if *_exec_group == 0 {
-                    blocks.push(Vec::new());
-                    blocks.len() - 1
-                } else if let Some(idx) = group_to_block_index.get(_exec_group).cloned() {
-                    idx
-                } else {
-                    let idx = blocks.len();
-                    blocks.push(Vec::new());
-                    group_to_block_index.insert(*_exec_group, idx);
-                    idx
-                };
+                let block_index = select_or_create_block_index(
+                    *_exec_group,
+                    &mut blocks,
+                    &mut group_to_block_index,
+                );
 
                 // Build raw transaction
                 let mut script_bytes = vec![];
@@ -327,26 +227,12 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                 let raw_tx = tx_builder.raw();
 
                 // Sign transaction: single or multi-agent
-                let signed_tx = if secondary_addrs.is_empty() {
-                    raw_tx
-                        .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
-                        .map_err(|_| Corpus::Reject)?
-                        .into_inner()
-                } else {
-                    let secondary_accounts: Vec<_> = secondary_addrs
-                        .iter()
-                        .map(|a| accounts_by_addr.get(a).unwrap())
-                        .collect();
-                    let secondary_privs = secondary_accounts.iter().map(|a| &a.privkey).collect();
-                    raw_tx
-                        .sign_multi_agent(
-                            &sender_acc.privkey,
-                            secondary_addrs.clone(),
-                            secondary_privs,
-                        )
-                        .map_err(|_| Corpus::Reject)?
-                        .into_inner()
-                };
+                let signed_tx = utils::vm::sign_single_or_multi(
+                    raw_tx,
+                    sender_acc,
+                    &secondary_addrs,
+                    &accounts_by_addr,
+                )?;
 
                 // Increment sender sequence
                 next_seq_by_addr.insert(sender_addr, sequence_number + 1);
@@ -362,17 +248,11 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                 _exec_group,
             } => {
                 // Determine block index for this operation
-                let block_index = if *_exec_group == 0 {
-                    blocks.push(Vec::new());
-                    blocks.len() - 1
-                } else if let Some(idx) = group_to_block_index.get(_exec_group).cloned() {
-                    idx
-                } else {
-                    let idx = blocks.len();
-                    blocks.push(Vec::new());
-                    group_to_block_index.insert(*_exec_group, idx);
-                    idx
-                };
+                let block_index = select_or_create_block_index(
+                    *_exec_group,
+                    &mut blocks,
+                    &mut group_to_block_index,
+                );
 
                 // Resolve function name from index
                 let cm = dep_modules
@@ -436,26 +316,12 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
                 let raw_tx = tx_builder.raw();
 
                 // Sign transaction: single or multi-agent
-                let signed_tx = if secondary_addrs.is_empty() {
-                    raw_tx
-                        .sign(&sender_acc.privkey, sender_acc.pubkey.as_ed25519().unwrap())
-                        .map_err(|_| Corpus::Reject)?
-                        .into_inner()
-                } else {
-                    let secondary_accounts: Vec<_> = secondary_addrs
-                        .iter()
-                        .map(|a| accounts_by_addr.get(a).unwrap())
-                        .collect();
-                    let secondary_privs = secondary_accounts.iter().map(|a| &a.privkey).collect();
-                    raw_tx
-                        .sign_multi_agent(
-                            &sender_acc.privkey,
-                            secondary_addrs.clone(),
-                            secondary_privs,
-                        )
-                        .map_err(|_| Corpus::Reject)?
-                        .into_inner()
-                };
+                let signed_tx = utils::vm::sign_single_or_multi(
+                    raw_tx,
+                    sender_acc,
+                    &secondary_addrs,
+                    &accounts_by_addr,
+                )?;
 
                 // Increment sender sequence
                 next_seq_by_addr.insert(sender_addr, sequence_number + 1);
@@ -471,10 +337,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
         if block.is_empty() {
             continue;
         }
-        let outputs = vm.execute_block(block).map_err(|e| {
-            check_for_invariant_violation(e);
-            Corpus::Keep
-        })?;
+        let outputs = execute_block_or_keep(&vm, block)?;
 
         // Check all transaction outputs and apply write sets on success
         for res in outputs.into_iter() {

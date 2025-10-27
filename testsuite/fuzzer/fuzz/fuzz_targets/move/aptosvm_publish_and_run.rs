@@ -18,22 +18,18 @@ use aptos_vm::AptosVM;
 use aptos_vm_environment::{prod_configs, prod_configs::LATEST_GAS_FEATURE_VERSION};
 use libfuzzer_sys::{fuzz_target, Corpus};
 use move_binary_format::{
-    access::ModuleAccess,
-    deserializer::DeserializerConfig,
-    errors::VMError,
-    file_format::{CompiledModule, CompiledScript, SignatureToken},
+    access::ModuleAccess, deserializer::DeserializerConfig, file_format::SignatureToken,
 };
 use move_core_types::vm_status::{StatusCode, StatusType};
 use once_cell::sync::Lazy;
-use std::{
-    collections::{BTreeMap, HashSet},
-    sync::Arc,
-    time::Instant,
-};
+use std::{collections::HashSet, sync::Arc, time::Instant};
 mod utils;
 use fuzzer::{Authenticator, ExecVariant, RunnableState};
 use move_vm_runtime::RuntimeEnvironment;
-use utils::vm::{check_for_invariant_violation, publish_group, sort_by_deps, BYTECODE_VERSION};
+use utils::vm::{
+    check_for_invariant_violation, group_modules_by_address_topo, publish_group,
+    resolve_function_name, verify_module_fast, verify_script_fast, BYTECODE_VERSION,
+};
 
 // genesis write set generated once for each fuzzing session
 static VM_WRITE_SET: Lazy<WriteSet> = Lazy::new(|| GENESIS_CHANGE_SET_HEAD.write_set().clone());
@@ -52,36 +48,15 @@ const MAX_TYPE_PARAMETER_VALUE: u16 = 64 / 4 * 16; // third_party/move/move-byte
 
 const EXECUTION_TIME_GAS_RATIO: u8 = 100;
 
-// List of known false positive messages for invariant violations
-// If some invariant violation do not come with a message, we need to attach a message to it at throwing site.
-const KNOWN_FALSE_POSITIVES: &[&str] = &["too many type parameters/arguments in the program"];
-
 #[inline(always)]
 fn is_coverage_enabled() -> bool {
     cfg!(coverage_enabled) || std::env::var("LLVM_PROFILE_FILE").is_ok()
 }
 
-fn check_for_invariant_violation_vmerror(e: VMError) {
-    if e.status_type() == StatusType::InvariantViolation {
-        let is_known_false_positive = e.message().is_some_and(|msg| {
-            KNOWN_FALSE_POSITIVES
-                .iter()
-                .any(|known| msg.starts_with(known))
-        });
-
-        if !is_known_false_positive && e.status_type() == StatusType::InvariantViolation {
-            panic!(
-                "invariant violation {:?}\n{}{:?} {}",
-                e,
-                "RUST_BACKTRACE=1 DEBUG_VM_STATUS=",
-                e.major_status(),
-                "./fuzz.sh run move_aptosvm_publish_and_run <ARTIFACT>"
-            );
-        }
-    }
-}
+// moved to utils::vm::check_for_invariant_violation_vmerror
 
 // filter modules
+#[inline(always)]
 fn filter_modules(input: &RunnableState) -> Result<(), Corpus> {
     // reject any TypeParameter exceeds the maximum allowed value (Avoid known Ivariant Violation)
     if let ExecVariant::Script { _script, .. } = input.exec_variant.clone() {
@@ -116,37 +91,11 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let deserializer_config = DeserializerConfig::new(BYTECODE_VERSION, 255);
 
     for m in input.dep_modules.iter_mut() {
-        // m.metadata = vec![]; // we could optimize metadata to only contain aptos metadata
-        // m.version = VERSION_MAX;
-
-        // reject bad modules fast
-        let mut module_code: Vec<u8> = vec![];
-        m.serialize_for_version(Some(BYTECODE_VERSION), &mut module_code)
-            .map_err(|_| Corpus::Reject)?;
-        let m_de = CompiledModule::deserialize_with_config(&module_code, &deserializer_config)
-            .map_err(|_| Corpus::Reject)?;
-        move_bytecode_verifier::verify_module_with_config(&verifier_config, &m_de).map_err(|e| {
-            check_for_invariant_violation_vmerror(e);
-            Corpus::Reject
-        })?
+        verify_module_fast(m, &verifier_config, &deserializer_config)?;
     }
 
-    if let ExecVariant::Script {
-        _script: s,
-        _type_args: _,
-        _args: _,
-    } = &input.exec_variant
-    {
-        // reject bad scripts fast
-        let mut script_code: Vec<u8> = vec![];
-        s.serialize_for_version(Some(BYTECODE_VERSION), &mut script_code)
-            .map_err(|_| Corpus::Reject)?;
-        let s_de = CompiledScript::deserialize_with_config(&script_code, &deserializer_config)
-            .map_err(|_| Corpus::Reject)?;
-        move_bytecode_verifier::verify_script_with_config(&verifier_config, &s_de).map_err(|e| {
-            check_for_invariant_violation_vmerror(e);
-            Corpus::Reject
-        })?
+    if let ExecVariant::Script { _script: s, .. } = &input.exec_variant {
+        verify_script_fast(s, &verifier_config, &deserializer_config)?
     }
 
     // check no duplicates
@@ -155,37 +104,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
         return Err(Corpus::Reject);
     }
 
-    // topologically order modules {
-    let all_modules = input.dep_modules.clone();
-    let mut map = all_modules
-        .into_iter()
-        .map(|m| (m.self_id(), m))
-        .collect::<BTreeMap<_, _>>();
-    let mut order = vec![];
-    for id in map.keys() {
-        let mut visited = HashSet::new();
-        sort_by_deps(&map, &mut order, id.clone(), &mut visited)?;
-    }
-    // }
-
-    // group same address modules in packages. keep local ordering.
-    let mut packages = vec![];
-    for cur_package_id in order.iter() {
-        let mut cur = vec![];
-        if !map.contains_key(cur_package_id) {
-            continue;
-        }
-        // this makes sure we keep the order in packages
-        for id in order.iter() {
-            // check if part of current package
-            if id.address() == cur_package_id.address() {
-                if let Some(module) = map.remove(id) {
-                    cur.push(module);
-                }
-            }
-        }
-        packages.push(cur)
-    }
+    let packages = group_modules_by_address_topo(input.dep_modules.clone())?;
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
@@ -243,28 +162,13 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
             _type_args: type_args,
             _args: args,
         } => {
-            // convert FunctionDefinitionIndex to function name... {
+            // convert FunctionDefinitionIndex to function name
             let cm = input
                 .dep_modules
                 .iter()
                 .find(|m| m.self_id() == module)
                 .ok_or(Corpus::Reject)?;
-            let fhi = cm
-                .function_defs
-                .get(function.0 as usize)
-                .ok_or(Corpus::Reject)?
-                .function;
-            let function_identifier_index = cm
-                .function_handles
-                .get(fhi.0 as usize)
-                .ok_or(Corpus::Reject)?
-                .name;
-            let function_name = cm
-                .identifiers
-                .get(function_identifier_index.0 as usize)
-                .ok_or(Corpus::Reject)?
-                .clone();
-            // }
+            let function_name = resolve_function_name(cm, function)?;
             sender_acc
                 .transaction()
                 .gas_unit_price(100)
