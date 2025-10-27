@@ -29,6 +29,7 @@ aptos-framework = { workspace = true }
 [features]
 default = []
 fuzzing = ["proptest", "proptest-derive"]
+test_framework = ["aptos-framework/build_test_framework"]
 
 [package.metadata.cargo-machete]
 ignored = ["proptest"]

@@ -1,0 +1,8 @@
+[package]
+name = "TestFramework"
+version = "0.1.0"
+
+[addresses]
+supra_framework = "0x1"
+
+[dependencies]
