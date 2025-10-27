@@ -63,47 +63,66 @@ pub(crate) fn validate_view_function(
     let pool = loader.runtime_environment().ty_pool();
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let result = if loader.is_lazy_loading_enabled() {
-        transaction_arg_validation::construct_args(
-            session,
-            loader,
-            gas_meter,
-            traversal_context,
-            if func.ty_args().is_empty() {
-                func.param_ty_ids()
-            } else {
-                let param_tys = func
-                    .param_tys()
-                    .iter()
-                    .map(|ty| pool.instantiate_and_intern(ty, func.ty_args()))
-                    .collect::<Vec<_>>();
-                &param_tys
-            },
-            args,
-            allowed_structs,
-            true,
-        )
+        if func.ty_args().is_empty() {
+            transaction_arg_validation::construct_args(
+                session,
+                loader,
+                gas_meter,
+                traversal_context,
+                func.param_ty_ids(),
+                args,
+                allowed_structs,
+                true,
+            )
+        } else {
+            let param_tys = func
+                .param_tys()
+                .iter()
+                .map(|ty| pool.instantiate_and_intern(ty, func.ty_args()))
+                .collect::<Vec<_>>();
+            transaction_arg_validation::construct_args(
+                session,
+                loader,
+                gas_meter,
+                traversal_context,
+                &param_tys,
+                args,
+                allowed_structs,
+                true,
+            )
+        }
     } else {
         let traversal_storage = TraversalStorage::new();
-        transaction_arg_validation::construct_args(
-            session,
-            loader,
-            // No metering with eager loading.
-            &mut UnmeteredGasMeter,
-            &mut TraversalContext::new(&traversal_storage),
-            if func.ty_args().is_empty() {
-                func.param_ty_ids()
-            } else {
-                let param_tys = func
-                    .param_tys()
-                    .iter()
-                    .map(|ty| pool.instantiate_and_intern(ty, func.ty_args()))
-                    .collect::<Vec<_>>();
-                &param_tys
-            },
-            args,
-            allowed_structs,
-            true,
-        )
+        if func.ty_args().is_empty() {
+            transaction_arg_validation::construct_args(
+                session,
+                loader,
+                // No metering with eager loading.
+                &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
+                func.param_ty_ids(),
+                args,
+                allowed_structs,
+                true,
+            )
+        } else {
+            let param_tys = func
+                .param_tys()
+                .iter()
+                .map(|ty| pool.instantiate_and_intern(ty, func.ty_args()))
+                .collect::<Vec<_>>();
+            transaction_arg_validation::construct_args(
+                session,
+                loader,
+                // No metering with eager loading.
+                &mut UnmeteredGasMeter,
+                &mut TraversalContext::new(&traversal_storage),
+                &param_tys,
+                args,
+                allowed_structs,
+                true,
+            )
+        }
     };
     result.map_err(|e| PartialVMError::new(e.status_code()))
 }
