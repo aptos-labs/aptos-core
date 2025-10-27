@@ -9,6 +9,15 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:18:9
+   │
+18 │         *&mut r.x = 5;
+   │         ^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Needless pair of `*` and `&` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:27:9
    │
@@ -26,6 +35,15 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+   ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:44:9
+   │
+44 │         *&mut *x = 4;
+   │         ^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:60:9
@@ -126,6 +144,15 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
 
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:148:9
+    │
+148 │         *&mut x = 42;
+    │         ^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
+
 warning: [lint] Needless pair of `*` and `&mut` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:153:9
     │
@@ -134,6 +161,15 @@ warning: [lint] Needless pair of `*` and `&mut` operators: consider removing the
     │
     = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_deref_ref)]`.
     = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_deref_ref.
+
+warning: [lint] This assignment has no effect besides possibly aborting due to arithmetic errors and can be refactored or removed
+    ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:153:9
+    │
+153 │         *&mut x = 5;
+    │         ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(no_op)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#no_op.
 
 warning: [lint] Needless pair of `*` and `&` operators: consider removing them
     ┌─ tests/model_ast_lints/needless_deref_ref_warn.move:170:26
