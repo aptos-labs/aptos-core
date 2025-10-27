@@ -171,7 +171,7 @@ impl traits::Transcript for Transcript {
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         // TODO: benchmark this
         let (f, extra) =
-            fiat_shamir::fiat_shamir_das(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
+            fiat_shamir_das(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();
@@ -340,4 +340,37 @@ impl Transcript {
         })
         .expect("signing of PVSS contribution should have succeeded")
     }
+}
+
+/// Securely derives a Fiat-Shamir challenge via Merlin.
+/// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).
+/// Additionally returns `num_scalars` random scalars for some linear combinations.
+pub(crate) fn fiat_shamir_das<T: traits::Transcript, A: Serialize>(
+    trx: &T,
+    sc: &ThresholdConfig,
+    pp: &T::PublicParameters,
+    spks: &Vec<T::SigningPubKey>,
+    eks: &Vec<T::EncryptPubKey>,
+    auxs: &Vec<A>,
+    dst: &[u8],
+    num_scalars: usize,
+) -> (Vec<blstrs::Scalar>, Vec<blstrs::Scalar>) 
+{
+    let mut fs_t = fiat_shamir::initialize_pvss_transcript::<T>(sc, pp, eks, dst);
+
+    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_signing_pub_keys(&mut fs_t, spks); // Slightly altered the order here!
+    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_auxs(&mut fs_t, auxs);
+    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_transcript(&mut fs_t, trx);
+
+    (
+        <merlin::Transcript as fiat_shamir::PVSS<T>>::challenge_dual_code_word_polynomial(
+            &mut fs_t,
+            sc.t,
+            sc.n + 1,
+        ),
+        <merlin::Transcript as fiat_shamir::PVSS<T>>::challenge_linear_combination_scalars(
+            &mut fs_t,
+            num_scalars,
+        ),
+    )
 }

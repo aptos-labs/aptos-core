@@ -14,7 +14,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 use ark_ec::AdditiveGroup;
 
-#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct HkzgElgamalWitness<E: Pairing> {
     pub hkzg_randomness: Scalar<E>,
     pub chunked_plaintexts: Vec<Vec<Scalar<E>>>,

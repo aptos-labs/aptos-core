@@ -15,6 +15,7 @@ use sha3::Digest;
 use std::ops::{Mul, MulAssign};
 
 pub(crate) mod biguint;
+pub(crate) mod hashing;
 pub mod parallel_multi_pairing;
 pub mod random;
 pub mod serialization;
@@ -215,4 +216,17 @@ where
     }
 
     powers
+}
+
+use ark_ec::CurveGroup;
+
+/// Commit to scalars by multiplying a base group element with each scalar.
+///
+/// Equivalent to `[base * s for s in scalars]`.
+pub fn commit_to_scalars<G, F>(commitment_base: &G, scalars: &[F]) -> Vec<G>
+where
+    G: CurveGroup<ScalarField = F>,
+    F: PrimeField,
+{
+    scalars.iter().map(|s| *commitment_base * s.into_bigint()).collect()
 }

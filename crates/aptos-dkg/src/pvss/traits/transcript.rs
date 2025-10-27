@@ -63,6 +63,7 @@ use std::{fmt::Debug, ops::AddAssign};
 ///    reconstruct the secret (but no fewer can)
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
+/// TODO: make ThresholdConfig an associated type?
 pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type SecretSharingConfig: SecretSharingConfig
         + DeserializeOwned

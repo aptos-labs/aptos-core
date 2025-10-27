@@ -20,6 +20,7 @@ bcs = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
+derive_more.workspace = true
 ff = { workspace = true }
 group = { workspace = true }
 hex = { workspace = true }
@@ -35,6 +36,7 @@ rand_core = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_bytes = { workspace = true }
+sha2 = { version = "0.10.8", features = ["asm", "asm-aarch64", "sha2-asm"] }
 sha3 = "0.10.0"
 static_assertions = { workspace = true }
 

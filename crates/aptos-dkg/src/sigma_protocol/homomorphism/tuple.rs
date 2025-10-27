@@ -12,6 +12,8 @@ use crate::{
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
 pub use ark_std::io::Write;
+use std::fmt::Debug;
+use ark_serialize::{Read, Valid};
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
 /// into a single homomorphism that outputs a tuple of codomains.
@@ -25,6 +27,7 @@ pub use ark_std::io::Write;
 ///
 /// In category-theoretic terms, this is the composition of the diagonal map
 /// `Δ: Domain -> Domain × Domain` with the product map `h1 × h2`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait,
@@ -91,8 +94,6 @@ where
     }
 }
 
-use ark_serialize::{Read, Valid};
-
 impl<A, B> CanonicalDeserialize for TupleCodomainShape<A, B>
 where
     A: CanonicalDeserialize,
@@ -139,13 +140,13 @@ where
     A: EntrywiseMap<T>,
     B: EntrywiseMap<T>,
 {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> =
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         TupleCodomainShape(self.0.map(&f), self.1.map(f))
     }
@@ -175,7 +176,7 @@ where
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;

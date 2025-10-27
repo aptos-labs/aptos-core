@@ -25,3 +25,4 @@ pub use low_degree_test::LowDegreeTest;
 pub use player::Player;
 pub use threshold_config::ThresholdConfig;
 pub use weighted::{GenericWeighting, WeightedConfig};
+pub use traits::Transcript;

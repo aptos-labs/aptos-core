@@ -662,3 +662,27 @@ pub fn shamir_secret_share<
     f_evals.truncate(sc.n);
     (f, f_evals)
 }
+
+pub fn shamir_secret_share_ark<F: ark_ff::Field, R: ark_std::rand::Rng + ark_std::rand::RngCore>(
+    sc: &ThresholdConfig,
+    s: F,
+    rng: &mut R,
+) -> (Vec<F>, Vec<F>) { // polynomial coefficients, and shares
+    debug_assert!(sc.t <= sc.n, "Threshold t must be <= n");
+    debug_assert!(sc.t >= 1, "Threshold must be at least 1");
+
+    // 1. Sample random coefficients for degree-(t-1) polynomial
+    let mut coeffs: Vec<F> = (0..sc.t).map(|_| F::rand(rng)).collect();
+    coeffs[0] = s; // set constant term to secret
+
+    // 2. Retrieve a suitable FFT evaluation domain (size ≥ n)
+    let domain = sc.get_evaluation_domain(); // Radix2EvaluationDomain::<F>::new(n).expect("Failed to construct evaluation domain");
+
+    // 3. Evaluate the polynomial at all domain points
+    let mut evals = domain.fft(&coeffs);
+
+    // 4. Truncate to the first n points (the actual shares)
+    evals.truncate(sc.n);
+
+    (coeffs, evals)
+}

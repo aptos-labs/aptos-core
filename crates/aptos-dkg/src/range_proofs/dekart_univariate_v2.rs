@@ -19,11 +19,14 @@ use ark_std::{
     UniformRand,
 };
 use std::io::Write;
+use std::fmt::Debug;
+use ark_serialize::{Validate, Read, Valid};
+
 
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
 
 #[allow(non_snake_case)]
-#[derive(CanonicalSerialize, Clone, CanonicalDeserialize)]
+#[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
@@ -36,15 +39,15 @@ pub struct Proof<E: Pairing> {
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(E::G1);
+pub struct Commitment<E: Pairing>(pub(crate) E::G1);
 
 #[allow(non_snake_case)]
-#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
     vk: VerificationKey<E>,
-    ck_S: univariate_hiding_kzg::CommitmentKey<E>,
+    pub(crate) ck_S: univariate_hiding_kzg::CommitmentKey<E>,
     max_n: usize,
-    prover_precomputed: ProverPrecomputed<E>,
+    pub(crate) prover_precomputed: ProverPrecomputed<E>,
 }
 
 #[derive(CanonicalSerialize)]
@@ -54,50 +57,211 @@ pub struct PublicStatement<E: Pairing> {
     comm: Commitment<E>,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     xi_1: E::G1Affine,
     lagr_0: E::G1Affine,
     vk_hkzg: univariate_hiding_kzg::VerificationKey<E>,
-    roots_of_unity: Vec<E::ScalarField>,
     verifier_precomputed: VerifierPrecomputed<E>,
 }
 
-// Custom `CanonicalSerialize` for `VerificationKey` because `verifier_precomputed` and most of `roots_of_unity` do not have to be serialised
-impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProverPrecomputed<E: Pairing> {
+    pub(crate) powers_of_two: Vec<E::ScalarField>,
+    h_denom_eval: Vec<E::ScalarField>, // TODO: for the moment we are storing all of h_denom_eval, which is not very efficient
+}
+
+// Custom `CanonicalSerialize/CanonicalDeserialize` for `VerifierPrecomputed` because most of it can be recomputed
+impl<E: Pairing> CanonicalSerialize for ProverPrecomputed<E> {
     fn serialize_with_mode<W: Write>(
         &self,
         mut writer: W,
         compress: Compress,
     ) -> Result<(), SerializationError> {
-        self.xi_1.serialize_with_mode(&mut writer, compress)?;
-        self.lagr_0.serialize_with_mode(&mut writer, compress)?;
-        self.vk_hkzg.serialize_with_mode(&mut writer, compress)?;
-        self.roots_of_unity[0].serialize_with_mode(&mut writer, compress)?;
+        // Only store powers_of_two metadata (length)
+        self.powers_of_two.len().serialize_with_mode(&mut writer, compress)?;
 
         Ok(())
     }
 
     fn serialized_size(&self, compress: Compress) -> usize {
         let mut size = 0;
-        size += self.xi_1.serialized_size(compress);
-        size += self.lagr_0.serialized_size(compress);
-        size += self.vk_hkzg.serialized_size(compress);
-        size += self.roots_of_unity[0].serialized_size(compress);
+        size += self.powers_of_two.len().serialized_size(compress);
+        size += self.powers_of_two[0].serialized_size(compress);
+        size
+    }
+}
+
+impl<E: Pairing> Valid for ProverPrecomputed<E> {
+    fn check(&self) -> Result<(), SerializationError> {
+        if self.powers_of_two.is_empty() || self.h_denom_eval.is_empty() {
+            return Err(SerializationError::InvalidData);
+        }
+
+        let one = E::ScalarField::ONE;
+
+        let powers_of_two_ones = self
+            .powers_of_two
+            .iter()
+            .filter(|&&x| x == one)
+            .count();
+        if powers_of_two_ones != 1 {
+            return Err(SerializationError::InvalidData);
+        }
+
+        Ok(())
+    }
+}
+
+impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
+    fn deserialize_with_mode<R: Read>(
+        mut reader: R,
+        compress: Compress,
+        validate: Validate,
+    ) -> Result<Self, SerializationError> {
+        let powers_len = usize::deserialize_with_mode(&mut reader, compress, validate)?;
+        let first_power = E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?;
+
+        // Recompute powers_of_two
+        let powers_of_two = compute_powers_of_two::<E>(powers_len);
+
+        // Recompute h_denom_eval (you would use your earlier function here)
+        let h_denom_eval = compute_h_denom_eval_from_powers::<E>(&powers_of_two);
+
+        Ok(Self {
+            powers_of_two,
+            h_denom_eval,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct VerifierPrecomputed<E: Pairing> {
+    powers_of_two: Vec<E::ScalarField>,
+    roots_of_unity: Vec<E::ScalarField>,
+}
+
+// Custom `CanonicalSerialize/CanonicalDeserialize` for `VerifierPrecomputed` because most of it can be recomputed
+impl<E: Pairing> CanonicalSerialize for VerifierPrecomputed<E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.roots_of_unity.len().serialize_with_mode(&mut writer, compress)?;
+        self.roots_of_unity[0].serialize_with_mode(&mut writer, compress)?; // roots_of_unity[0] would be 1
+        self.powers_of_two.len().serialize_with_mode(&mut writer, compress)?;
+
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        let mut size = 0;
+        size += self.roots_of_unity.len().serialized_size(compress);
+        size += self.roots_of_unity[1].serialized_size(compress);
+        size += self.powers_of_two.len().serialized_size(compress);
 
         size
     }
 }
 
-#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-pub struct ProverPrecomputed<E: Pairing> {
-    powers_of_two: Vec<E::ScalarField>,
-    h_denom_eval: Vec<E::ScalarField>,
+impl<E: Pairing> Valid for VerifierPrecomputed<E> {
+    fn check(&self) -> Result<(), SerializationError> {
+        if self.powers_of_two.is_empty() || self.roots_of_unity.is_empty() {
+            return Err(SerializationError::InvalidData);
+        }
+
+        // Validate that E::ScalarField::ONE occurs exactly once in each
+        let one = E::ScalarField::ONE;
+
+        let roots_of_unity_ones = self
+            .roots_of_unity
+            .iter()
+            .filter(|&&x| x == one)
+            .count();
+        if roots_of_unity_ones != 1 {
+            return Err(SerializationError::InvalidData);
+        }
+
+        let powers_of_two_ones = self
+            .powers_of_two
+            .iter()
+            .filter(|&&x| x == one)
+            .count();
+        if powers_of_two_ones != 1 {
+            return Err(SerializationError::InvalidData);
+        }
+
+        Ok(())
+    }
 }
 
-#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
-pub struct VerifierPrecomputed<E: Pairing> {
-    powers_of_two: Vec<E::ScalarField>,
+impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
+    fn deserialize_with_mode<R: Read>(
+        mut reader: R,
+        compress: Compress,
+        validate: Validate,
+    ) -> Result<Self, SerializationError> {
+        // Deserialize metadata for roots_of_unity
+        let roots_len = usize::deserialize_with_mode(&mut reader, compress, validate)?;
+        let first_root = E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?;
+
+        // Deserialize metadata for powers_of_two
+        let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
+
+        let roots_of_unity = recompute_roots_of_unity::<E>(first_root, roots_len);
+        let powers_of_two = compute_powers_of_two::<E>(max_ell);
+
+        // Reconstruct the VerificationKey
+        Ok(Self { roots_of_unity, powers_of_two })
+    }
+}
+
+fn recompute_roots_of_unity<E: Pairing>(first_root: E::ScalarField, len: usize) -> Vec<E::ScalarField> {
+    let mut roots = Vec::with_capacity(len);
+    roots.push(E::ScalarField::ONE);
+    let mut current = first_root;
+    for _ in 1..len {
+        roots.push(current);
+        current *= first_root; // naive exponentiation
+    }
+    debug_assert_eq!(current, E::ScalarField::ONE);
+    roots
+}
+
+fn compute_powers_of_two<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
+    (0..ell)
+        .map(|j| E::ScalarField::from(1u64 << j))
+        .collect()
+}
+
+#[allow(non_snake_case)]
+fn compute_h_denom_eval<E: Pairing>(
+    max_n: usize,
+    roots_of_unity_in_eval_dom: Vec<E::ScalarField>
+) -> Vec<E::ScalarField> {
+    let num_omegas = max_n + 1;
+    let mut h_denom_eval = Vec::with_capacity(num_omegas);
+
+    // First element: inverse of (max_n * (max_n + 1) / 2)
+    h_denom_eval.push(
+        E::ScalarField::from((max_n * (max_n + 1) / 2) as u64)
+            .inverse()
+            .expect("Value should be invertible"),
+    );
+
+    // Remaining elements
+    h_denom_eval.extend(
+        roots_of_unity_in_eval_dom
+            .iter()
+            .skip(1)
+            .map(|&root| {
+                (root * (root - E::ScalarField::ONE))
+                    / E::ScalarField::from(num_omegas as u64)
+            }),
+    );
+
+    h_denom_eval
 }
 
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
@@ -132,42 +296,21 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let (vk_hkzg, ck_S) =
             univariate_hiding_kzg::setup(max_n + 1, group_generators.clone(), trapdoor, rng);
 
-        let powers_of_two: Vec<_> = (0..max_ell)
-            .map(|j| E::ScalarField::from(1u64 << j))
-            .collect();
+        let h_denom_eval = compute_h_denom_eval(max_n, &ck_S.roots_of_unity_in_eval_dom);
 
-        let h_denom_eval = {
-            let mut h_denom_eval = Vec::with_capacity(num_omegas);
-            h_denom_eval.push(
-                E::ScalarField::from((max_n * (max_n + 1) / 2) as u64)
-                    .inverse()
-                    .expect("Value should be invertible"),
-            );
-            h_denom_eval.extend(
-                ck_S.roots_of_unity_in_eval_dom
-                    .iter()
-                    .skip(1)
-                    .take(max_n)
-                    .map(|&root| {
-                        (root * (root - E::ScalarField::ONE))
-                            / E::ScalarField::from(num_omegas as u64)
-                    }),
-            );
-            h_denom_eval
-        };
+        let powers_of_two = compute_powers_of_two::<E>(max_ell);
 
         let prover_precomputed = ProverPrecomputed {
             powers_of_two: powers_of_two.clone(),
             h_denom_eval,
         };
 
-        let verifier_precomputed = VerifierPrecomputed { powers_of_two };
+        let verifier_precomputed = VerifierPrecomputed { powers_of_two, roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone() };
 
         let vk = VerificationKey {
             xi_1: xi_1_proj.into_affine(),
             lagr_0: ck_S.lagr_g1[0],
             vk_hkzg,
-            roots_of_unity: ck_S.roots_of_unity_in_eval_dom.clone(),
             verifier_precomputed,
         };
         let prk = ProverKey {
@@ -523,7 +666,6 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             xi_1,
             lagr_0,
             vk_hkzg,
-            roots_of_unity,
             verifier_precomputed,
         } = vk;
 
@@ -597,7 +739,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let U = E::G1::msm(&U_bases, &U_scalars).expect("Failed to compute MSM in DeKARTv2");
 
         // Step 9
-        let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_t, &roots_of_unity);
+        let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_t, &verifier_precomputed.roots_of_unity);
 
         // Step 10
         let a_u = *a * mu
@@ -617,7 +759,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         )?;
 
         // Step 11
-        let num_omegas = roots_of_unity.len();
+        let num_omegas = verifier_precomputed.roots_of_unity.len();
 
         let LHS = {
             // First compute V_SS^*(gamma), where V_SS^*(X) is the polynomial (X^{max_n + 1} - 1) / (X - 1)
@@ -771,7 +913,7 @@ pub mod two_term_msm {
         pub base_2: E::G1Affine,
     }
 
-    #[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone)]
+    #[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
     pub struct Witness<E: Pairing> {
         pub poly_randomness: Scalar<E>,
         pub hiding_kzg_randomness: Scalar<E>,
@@ -796,7 +938,7 @@ pub mod two_term_msm {
         type CodomainShape<T>
             = CodomainShape<T>
         where
-            T: CanonicalSerialize + CanonicalDeserialize + Clone;
+            T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
         type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;

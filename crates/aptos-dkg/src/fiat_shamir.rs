@@ -141,6 +141,21 @@ pub trait PVSS<T: Transcript>: ScalarProtocol<blstrs::Scalar> {
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar>;
 }
 
+pub fn initialize_pvss_transcript<T: Transcript>(
+    sc: &ThresholdConfig,
+    pp: &T::PublicParameters,
+    eks: &[T::EncryptPubKey],
+    dst: &[u8],
+) -> merlin::Transcript {
+    let mut fs_t = merlin::Transcript::new(dst);
+
+    <merlin::Transcript as PVSS<T>>::pvss_domain_sep(&mut fs_t, sc);
+    <merlin::Transcript as PVSS<T>>::append_public_parameters(&mut fs_t, pp);
+    <merlin::Transcript as PVSS<T>>::append_encryption_keys(&mut fs_t, eks);
+
+    fs_t
+}
+
 pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
     fn append_sep(&mut self, dst: &[u8]);
 
@@ -379,38 +394,38 @@ where
     }
 }
 
-/// Securely derives a Fiat-Shamir challenge via Merlin.
-/// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).
-/// Additionally returns `num_scalars` random scalars for some linear combinations.
-pub(crate) fn fiat_shamir_das<T: Transcript, A: Serialize>(
-    // TODO: only used for das so might as well specify T
-    trx: &T,
-    sc: &ThresholdConfig,
-    pp: &T::PublicParameters,
-    spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
-    auxs: &Vec<A>,
-    dst: &[u8],
-    num_scalars: usize,
-) -> (Vec<blstrs::Scalar>, Vec<blstrs::Scalar>) {
-    let mut fs_t = merlin::Transcript::new(dst);
+// /// Securely derives a Fiat-Shamir challenge via Merlin.
+// /// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).
+// /// Additionally returns `num_scalars` random scalars for some linear combinations.
+// pub(crate) fn fiat_shamir_das<T: Transcript, A: Serialize>(
+//     // TODO: only used for das so might as well specify T
+//     trx: &T,
+//     sc: &ThresholdConfig,
+//     pp: &T::PublicParameters,
+//     spks: &Vec<T::SigningPubKey>,
+//     eks: &Vec<T::EncryptPubKey>,
+//     auxs: &Vec<A>,
+//     dst: &[u8],
+//     num_scalars: usize,
+// ) -> (Vec<blstrs::Scalar>, Vec<blstrs::Scalar>) {
+//     let mut fs_t = merlin::Transcript::new(dst);
 
-    <merlin::Transcript as PVSS<T>>::pvss_domain_sep(&mut fs_t, sc);
-    <merlin::Transcript as PVSS<T>>::append_public_parameters(&mut fs_t, pp);
-    <merlin::Transcript as PVSS<T>>::append_signing_pub_keys(&mut fs_t, spks);
-    <merlin::Transcript as PVSS<T>>::append_encryption_keys(&mut fs_t, eks);
-    <merlin::Transcript as PVSS<T>>::append_auxs(&mut fs_t, auxs);
-    <merlin::Transcript as PVSS<T>>::append_transcript(&mut fs_t, trx);
+//     <merlin::Transcript as PVSS<T>>::pvss_domain_sep(&mut fs_t, sc);
+//     <merlin::Transcript as PVSS<T>>::append_public_parameters(&mut fs_t, pp);
+//     <merlin::Transcript as PVSS<T>>::append_signing_pub_keys(&mut fs_t, spks);
+//     <merlin::Transcript as PVSS<T>>::append_encryption_keys(&mut fs_t, eks);
+//     <merlin::Transcript as PVSS<T>>::append_auxs(&mut fs_t, auxs);
+//     <merlin::Transcript as PVSS<T>>::append_transcript(&mut fs_t, trx);
 
-    (
-        <merlin::Transcript as PVSS<T>>::challenge_dual_code_word_polynomial(
-            &mut fs_t,
-            sc.t,
-            sc.n + 1,
-        ),
-        <merlin::Transcript as PVSS<T>>::challenge_linear_combination_scalars(
-            &mut fs_t,
-            num_scalars,
-        ),
-    )
-}
+//     (
+//         <merlin::Transcript as PVSS<T>>::challenge_dual_code_word_polynomial(
+//             &mut fs_t,
+//             sc.t,
+//             sc.n + 1,
+//         ),
+//         <merlin::Transcript as PVSS<T>>::challenge_linear_combination_scalars(
+//             &mut fs_t,
+//             num_scalars,
+//         ),
+//     )
+// }

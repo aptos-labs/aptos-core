@@ -4,13 +4,22 @@
 //! This submodule implements the *public parameters* for this "chunked_elgamal_field" PVSS scheme.
 
 use crate::{
-    algebra::GroupGenerators, pvss::{chunked_elgamal_field::chunked_elgamal::PublicParameters as PublicParametersElgamal, traits}, range_proofs::dekart_univariate_v2, utils
+    algebra::GroupGenerators, pvss::{chunked_elgamal_field::chunked_elgamal::PublicParameters as PublicParametersElgamal, traits}, range_proofs::dekart_univariate_v2, utils::{self, hashing::hash_to_g2affine}
 };
 use ark_serialize::CanonicalSerialize;
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
 use blstrs::{G2Projective, Scalar};
 use ark_ec::pairing::Pairing;
 // use traits::transcript::WithMaxNumShares;
+
+use crate::utils::serialization::ark_se;
+use crate::utils::serialization::ark_de;
+
+
+use serde::Serialize;
+use serde::Deserialize;
+use ark_serialize::{CanonicalDeserialize, Compress, Validate};
+use crate::pvss::chunked_elgamal_field::chunked_elgamal;
 
 impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
     type EncryptionPublicParameters = PublicParametersElgamal<E>;
@@ -22,26 +31,42 @@ impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
 
 // use crate::constants::build_constants;
 
+
 // #[cfg(feature = "kangaroo")]
 // use kangaroo_dlog::{Kangaroo, ActiveCurve, presets::Presets};
 
-#[derive(CanonicalSerialize, Clone, Debug, PartialEq, Eq)]
+use crate::pvss::chunked_elgamal_field::chunked_elgamal::{EncryptPubKey, DecryptPrivKey}; // TODO: maybe those structs belong here?
+
+impl<E: Pairing> traits::Convert<EncryptPubKey<E>, PublicParameters<E>> for chunked_elgamal::DecryptPrivKey<E> {
+    /// Given a decryption key $dk$, computes its associated encryption key $g_1^{dk}$
+    fn to(&self, pp: &PublicParameters<E>) -> EncryptPubKey<E> {
+        EncryptPubKey::<E> {
+            ek: pp.pubkey_base().mul(self.dk),
+        }
+    }
+}
+
+#[derive(CanonicalSerialize, Serialize, CanonicalDeserialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
-    pub pp_elgamal: PublicParametersElgamal<E>,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub pp_elgamal: PublicParametersElgamal<E>, // TODO: make this <E::G1Affine> instead?
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub pk_range_proof: dekart_univariate_v2::ProverKey<E>,
     /// Base for the commitments to the polynomial evaluations (and for the dealt public key [shares])
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     g_2: E::G2Affine,
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub powers_of_radix: Vec<E::ScalarField>,
 }
 
-// impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
-//     type Error = CryptoMaterialError;
+impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
+    type Error = CryptoMaterialError;
 
-//     fn try_from(_bytes: &[u8]) -> Result<PublicParameters, Self::Error> {
-//         todo!("Deserialization of PublicParameters from bytes not yet implemented");
-//     }
-// }
+    fn try_from(_bytes: &[u8]) -> Result<PublicParameters<E>, Self::Error> {
+        todo!("Deserialization of PublicParameters from bytes not yet implemented");
+    }
+}
 
 //use sha3::{Digest, Sha3_256};
 //use crate::pvss::traits::transcript::Hashed;
@@ -63,30 +88,30 @@ use ark_ff::field_hashers::DefaultFieldHasher;
 use ark_ec::hashing::map_to_curve_hasher::MapToCurve;
 use ark_ec::hashing::curve_maps::wb::WBConfig;
 use sha3::Sha3_256;
+use ark_std::rand::thread_rng;
+use ark_std::error::Error;
+use sha2::{digest::{consts::{B0, B1, U16}, generic_array::{functional::FunctionalSequence as _, sequence::Split, GenericArray}, typenum::{UInt, UTerm}, OutputSizeUser}, Sha256};
+// TODO: why not use sha3?
+use ark_ff::field_hashers::HashToField;
+use ark_ec::short_weierstrass::Affine;
+use ark_ec::AffineRepr;
+use ark_ec::short_weierstrass::SWCurveConfig;
 
 impl<E: Pairing> PublicParameters<E> 
-where
-    E::G2: WBConfig,
-    WBMap<E::G2>: MapToCurve<E::G2>,
 {
     /// Verifiably creates Aptos-specific public parameters.
-    pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, radix_exponent: usize, rng: &mut R) -> Self {
+    pub fn new(max_num_shares: usize, radix_exponent: usize) -> Self { // TODO: add &mut rng here? <R: RngCore + CryptoRng>
         // existing initialization
         let num_chunks = max_num_shares * 255usize.div_ceil(radix_exponent);
         let num_chunks_padded = (num_chunks + 1).next_power_of_two() - 1;
         let base = E::ScalarField::from(1u64 << radix_exponent);
-        let group_generators = GroupGenerators::sample(rng); // hmm at one of these should come from a powers of tau ceremony
-
-        let hasher = MapToCurveBasedHasher::<
-            E::G2,                     
-            DefaultFieldHasher<Sha3_256, 128>,  // hash-to-field
-            WBMap<E::G2>               // TODO: map-to-curve. might be overkill...
-        >::new(build_constants::DST_PVSS_PUBLIC_PARAMS).unwrap();
+        let mut rng = thread_rng();
+        let group_generators = GroupGenerators::sample(&mut rng); // hmm at one of these should come from a powers of tau ceremony
 
         let mut pp = Self {
             pp_elgamal: PublicParametersElgamal::default(),
-            pk_range_proof: dekart_univariate_v2::Proof::setup(radix_exponent, num_chunks_padded, group_generators, rng).0,
-            g_2: hasher.hash(&[&build_constants::SEED_PVSS_PUBLIC_PARAMS[..], b"g_2"].concat()).expect("failed to hash to curve").into(), // TODO: Eh should do this elsewhere
+            pk_range_proof: dekart_univariate_v2::Proof::setup(radix_exponent, num_chunks_padded, group_generators, &mut rng).0,
+            g_2: hash_to_g2affine::<E>(b"g_2", &build_constants::SEED_PVSS_PUBLIC_PARAMS[..]),
             powers_of_radix: utils::powers(base, num_chunks_padded + 1), // TODO: why the +1?
             #[cfg(feature = "kangaroo")]
             table: Some(Kangaroo::<ActiveCurve>::from_preset(
@@ -134,19 +159,20 @@ where
 }
 
 // TODO: is this actually meaningful?
-// impl ValidCryptoMaterial for PublicParameters {
-//     const AIP_80_PREFIX: &'static str = "";
+impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
+    const AIP_80_PREFIX: &'static str = "";
 
-//     fn to_bytes(&self) -> Vec<u8> {
-//         self.to_bytes()
-//     }
-// }
+    fn to_bytes(&self) -> Vec<u8> {
+        self.to_bytes()
+    }
+}
 
-// impl Default for PublicParameters {
-//     fn default() -> Self {
-//         Self::new(1, build_constants::CHUNK_SIZE as usize)
-//     }
-// }
+impl<E: Pairing> Default for PublicParameters<E>
+    {
+    fn default() -> Self {
+        Self::new(1, build_constants::CHUNK_SIZE as usize)
+    }
+}
 
 // impl WithMaxNumShares for PublicParameters {
 //     fn with_max_num_shares(n: usize) -> Self {

@@ -55,7 +55,7 @@ impl<E: Pairing> Scalar<E> {
     /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]` without copying.
     ///
     /// # Safety
-    /// This function is safe because `Scalar<E>` is `#[repr(transparent)]`
+    /// These functions is safe because `Scalar<E>` is `#[repr(transparent)]`
     /// over `E::ScalarField`, so the memory layouts are guaranteed to match.
     pub fn slice_as_inner(slice: &[Self]) -> &[E::ScalarField] {
         unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const E::ScalarField, slice.len()) }
@@ -64,5 +64,61 @@ impl<E: Pairing> Scalar<E> {
     pub fn vec_into_inner(v: Vec<Self>) -> Vec<E::ScalarField> {
         let v = std::mem::ManuallyDrop::new(v);
         unsafe { Vec::from_raw_parts(v.as_ptr() as *mut E::ScalarField, v.len(), v.capacity()) }
+    }
+
+    pub fn vec_from_inner(v: Vec<E::ScalarField>) -> Vec<Self> {
+        let v = std::mem::ManuallyDrop::new(v);
+        unsafe { Vec::from_raw_parts(v.as_ptr() as *mut Self, v.len(), v.capacity()) }
+    }
+
+    pub fn vecvec_from_inner(vv: Vec<Vec<E::ScalarField>>) -> Vec<Vec<Self>> {
+        vv.into_iter()
+            .map(Self::vec_from_inner)
+            .collect()
+    }
+}
+
+use ark_std::rand::Rng;
+use ark_std::UniformRand;
+
+impl<E: Pairing> Scalar<E> {
+    pub fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
+        Scalar(E::ScalarField::rand(rng))
+    }
+} // I don't know if this overwrites SigmaProtocolWitness?
+
+use crate::pvss::traits::Reconstructable;
+use crate::pvss::ThresholdConfig;
+use crate::pvss::Player;
+use crate::algebra::lagrange::lagrange_coefficients;
+use more_asserts::assert_ge;
+use more_asserts::assert_le;
+use crate::pvss::traits::SecretSharingConfig;
+
+impl<E: Pairing> Reconstructable<ThresholdConfig> for Scalar<E> {
+    type Share = Scalar<E>;
+
+    fn reconstruct(sc: &ThresholdConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
+        assert_ge!(shares.len(), sc.get_threshold());
+        assert_le!(shares.len(), sc.get_total_num_players());
+
+        let ids = shares.iter().map(|(p, _)| p.id).collect::<Vec<usize>>();
+        let lagr = lagrange_coefficients(
+            sc.get_batch_evaluation_domain(),
+            ids.as_slice(),
+            &Scalar::ZERO,
+        );
+        let shares = shares
+            .iter()
+            .map(|(_, share)| *share)
+            .collect::<Vec<Scalar<E>>>();
+
+        assert_eq!(lagr.len(), shares.len());
+
+        shares
+            .iter()
+            .zip(lagr.iter())
+            .map(|(&share, &lagr)| share * lagr)
+            .sum::<Scalar>()
     }
 }

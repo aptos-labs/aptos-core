@@ -1367,6 +1367,7 @@ dependencies = [
  "blst",
  "blstrs",
  "criterion",
+ "derive_more 0.99.17",
  "ff",
  "group",
  "hex",
@@ -1383,6 +1384,7 @@ dependencies = [
  "rayon",
  "serde",
  "serde_bytes",
+ "sha2 0.10.8",
  "sha3 0.10.8",
  "static_assertions",
 ]
@@ -16870,6 +16872,16 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest 0.10.7",
+ "sha2-asm",
+]
+
+[[package]]
+name = "sha2-asm"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

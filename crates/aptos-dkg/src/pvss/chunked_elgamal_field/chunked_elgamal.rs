@@ -10,6 +10,7 @@ use crate::{
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_ec::AffineRepr;
+use ark_std::fmt::Debug;
 // use crate::sigma_protocol;
 // use aptos_crypto_derive::SigmaProtocolWitness;
 // use ark_std::rand::{RngCore, CryptoRng};
@@ -17,6 +18,7 @@ use ark_ec::AffineRepr;
 
 type Base<E> = <E as Pairing>::G1Affine;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct Homomorphism<'a, E: Pairing> {
     pub g_1: &'a Base<E>,
@@ -24,7 +26,7 @@ pub struct Homomorphism<'a, E: Pairing> {
     pub ek: &'a [Base<E>],
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
     pub chunks: Vec<Vec<T>>, // Depending on T, these can be chunked plaintexts, chunked ciphertexts, their MSM representations, etc
     pub randomness: Vec<T>,  // Same story, depending on T
@@ -43,13 +45,13 @@ impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
 }
 
 // TODO: Can problably do EntrywiseMap with another derive macro
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> EntrywiseMap<T> for CodomainShape<T> {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = CodomainShape<U>;
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T> for CodomainShape<T> {
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> = CodomainShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         let chunks = self
             .chunks
@@ -81,7 +83,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = Scalar<E>;
@@ -123,13 +125,42 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 }
 
 // TODO: this should be identical for ElGamal public parameters, so move elsewhere?
-#[derive(CanonicalSerialize, PartialEq, Clone, Eq, Debug)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
 pub struct PublicParameters<E: Pairing> {
     /// A group element $g \in G$, where $G$ is $G_1$, $G_2$ or $G_T$ used to exponentiate
     /// both the (1) ciphertext randomness and the (2) the DSK when computing its EK.
-    g: E::G1Affine,
+    pub g: E::G1Affine,
     /// A group element $h \in G$ that is raised to the encrypted message
-    h: E::G1Affine,
+    pub h: E::G1Affine,
+}
+
+/// The *encryption (public)* key used to encrypt shares of the dealt secret for each PVSS player.
+#[derive(Clone, PartialEq, Eq)]
+pub struct EncryptPubKey<E: Pairing> {
+    /// A group element $h^{dk^{-1}} \in G_1$.
+    pub(crate) ek: E::G1Affine,
+}
+
+use aptos_crypto_derive::SilentDisplay;
+use aptos_crypto_derive::SilentDebug;
+use ark_std::UniformRand;
+
+impl<E: Pairing> Uniform for DecryptPrivKey<E> {
+    fn generate<R>(rng: &mut R) -> Self
+    where
+        R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    {
+        DecryptPrivKey<E> {
+            dk: E::ScalarField::rand(rng),
+        }
+    }
+}
+
+/// The *decryption (secret) key* used by each PVSS player do decrypt their share of the dealt secret.
+#[derive(SilentDisplay, SilentDebug)]
+pub struct DecryptPrivKey<E: Pairing> {
+    /// A scalar $dk \in F$.
+    pub(crate) dk: E::ScalarField,
 }
 
 impl<E: Pairing> PublicParameters<E> {
