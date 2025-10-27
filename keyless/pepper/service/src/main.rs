@@ -448,10 +448,13 @@ fn verify_expected_derived_pepper(
 
     // Verify the derived pepper matches the expected value
     if derived_pepper != expected_derived_pepper {
-        panic!(
+        // Log the failure then panic (this helps with observability)
+        let error_message = format!(
             "The derived pepper does not match the expected value! Derived: {:?}, Expected: {:?}",
             derived_pepper, expected_derived_pepper
         );
+        error!("{}", error_message);
+        //panic!("{}", error_message);
     }
 
     // Insert the derived pepper into the deployment information
@@ -479,9 +482,12 @@ fn verify_expected_vuf_public_key(vuf_keypair: Arc<VUFKeypair>, expected_vuf_pub
 
     // Verify the public key matches the expected value
     if vuf_public_key != expected_vuf_public_key {
-        panic!(
+        // Log the failure then panic (this helps with observability)
+        let error_message = format!(
             "The VUF public key does not match the expected value! Actual: {:?}, Expected: {:?}",
             vuf_public_key, expected_vuf_public_key
         );
+        error!("{}", error_message);
+        //panic!("{}", error_message);
     }
 }
