@@ -1,7 +1,0 @@
-processed 6 tasks
-task 0 lines 1-8:  publish [module 0xc0ffee::m {]
-task 1 lines 10-115:  publish [module 0xc0ffee::m_closures_in_enums {]
-task 2 lines 117-117:  run 0xc0ffee::m_closures_in_enums::test_1
-task 3 lines 119-119:  run 0xc0ffee::m_closures_in_enums::test_2
-task 4 lines 121-121:  run 0xc0ffee::m_closures_in_enums::test_3
-task 5 lines 123-123:  run 0xc0ffee::m_closures_in_enums::test_4

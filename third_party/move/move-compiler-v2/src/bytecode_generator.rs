@@ -14,15 +14,11 @@ use move_model::{
     metadata::LanguageVersion,
     model::{
         FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
-        QualifiedInstId, StructEnv, StructId,
+        QualifiedInstId, StructId,
     },
     symbol::Symbol,
     ty::{PrimitiveType, ReferenceKind, Type},
     well_known,
-    well_known::{
-        BORROW_MUT_NAME, BORROW_NAME, PACK, PUBLIC_STRUCT_DELIMITER, TEST_VARIANT, UNPACK,
-        UNPACK_MUT_REF,
-    },
 };
 use move_stackless_bytecode::{
     function_target::FunctionData,
@@ -332,98 +328,11 @@ impl<'env> Generator<'env> {
         );
     }
 
-    /// Report an (internal) error when struct api cannot be found
-    fn check_and_generate_internal_struct_api_error(
-        &self,
-        id: NodeId,
-        mid: &ModuleId,
-        operation: &str,
-        fun_name: Symbol,
-        struct_name: Symbol,
-    ) {
-        if self
-            .env()
-            .get_module(*mid)
-            .find_function(fun_name)
-            .is_none()
-        {
-            self.internal_error(
-                id,
-                format!(
-                    "cannot perform {} operation for `{}`",
-                    operation,
-                    struct_name.display(self.env().symbol_pool())
-                ),
-            );
-        }
-    }
-
-    /// Check if the current module is accessing a struct from another module.
-    fn check_cross_module_access(&self, other_mid: &ModuleId) -> bool {
-        self.check_version_for_cross_module_access()
-            && self.func_env.module_env.get_id() != *other_mid
-    }
-
     /// Check if the current module is at least version 2.4.
     fn check_version_for_cross_module_access(&self) -> bool {
         self.env()
             .language_version()
             .language_version_for_public_struct()
-    }
-
-    /// Build the api name for cross-module access.
-    fn build_cross_module_access_api_name(
-        &self,
-        oper: &str,
-        struct_name: String,
-        variant: Option<Symbol>,
-    ) -> Symbol {
-        let mut fun_name = self.env().symbol_pool().make(&format!(
-            "{}{}{}",
-            oper, PUBLIC_STRUCT_DELIMITER, struct_name
-        ));
-        if let Some(variant) = variant {
-            fun_name = self.env().symbol_pool().make(&format!(
-                "{}{}{}",
-                fun_name.display(self.env().symbol_pool()),
-                PUBLIC_STRUCT_DELIMITER,
-                variant.display(self.env().symbol_pool())
-            ));
-        }
-        fun_name
-    }
-
-    /// Build the api name for borrow field operation cross-module access.
-    fn build_cross_module_access_borrow_field_api_name(
-        &self,
-        mutable: bool,
-        struct_name: String,
-        field_name: Symbol,
-        variant_with_offset: Option<(Symbol, usize)>,
-    ) -> Symbol {
-        let mut fun_name = self.env().symbol_pool().make(&format!(
-            "{}{}{}{}{}",
-            if mutable {
-                BORROW_MUT_NAME
-            } else {
-                BORROW_NAME
-            },
-            PUBLIC_STRUCT_DELIMITER,
-            struct_name,
-            PUBLIC_STRUCT_DELIMITER,
-            field_name.display(self.env().symbol_pool())
-        ));
-        if let Some((variant_name, offset)) = variant_with_offset {
-            fun_name = self.env().symbol_pool().make(&format!(
-                "{}{}{}{}{}",
-                fun_name.display(self.env().symbol_pool()),
-                PUBLIC_STRUCT_DELIMITER,
-                variant_name.display(self.env().symbol_pool()),
-                PUBLIC_STRUCT_DELIMITER,
-                offset
-            ));
-        }
-        fun_name
     }
 
     fn diag(&self, id: NodeId, severity: Severity, msg: impl AsRef<str>) {
@@ -747,7 +656,7 @@ impl Generator<'_> {
     ) {
         let temp_ty = self.temp_type(temp).clone();
         let target_ty = self.temp_type(target).clone();
-        if let Some((new_temp, oper)) = self.get_conversion(&target_ty, &temp_ty, true) {
+        if let Some((new_temp, oper)) = self.get_conversion(&target_ty, &temp_ty) {
             self.emit_call(id, vec![new_temp], oper, vec![temp]);
             temp = new_temp
         }
@@ -758,15 +667,9 @@ impl Generator<'_> {
         &mut self,
         expected_type: &Type,
         actual_type: &Type,
-        use_actual_type: bool,
     ) -> Option<(TempIndex, BytecodeOperation)> {
         if actual_type.is_mutable_reference() && expected_type.is_immutable_reference() {
-            let ty = if use_actual_type {
-                actual_type.clone()
-            } else {
-                expected_type.clone()
-            };
-            let new_temp = self.new_temp(ty);
+            let new_temp = self.new_temp(actual_type.clone());
             Some((new_temp, BytecodeOperation::FreezeRef(false)))
         } else {
             None
@@ -790,9 +693,9 @@ impl Generator<'_> {
             let raw_fun_temp = self.new_temp(raw_fun_ty);
             // This here should be well-defined because only structs can be wrappers.
             let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
-            let inst = inst.to_vec();
+            let inst: Vec<Type> = inst.to_vec();
             let struct_id = wrapper_struct.get_qualified_id();
-            let has_err_msg = self.check_pack_unpack_wrapper(
+            self.check_pack_unpack_wrapper(
                 id,
                 self.func_env.module_env.get_id(),
                 fun_ty,
@@ -801,27 +704,14 @@ impl Generator<'_> {
                 "unpack",
                 " and invoke the wrapped function value",
             );
-            let oper = if self.check_cross_module_access(&struct_id.module_id) {
-                let struct_env = self.func_env.env().get_struct(struct_id);
-                let struct_full_name = struct_env.get_full_name_for_public_api();
-                let fun_name = self.check_and_generate_name(
-                    id,
-                    &struct_id.module_id,
-                    struct_full_name,
-                    UNPACK,
-                    "unpack",
-                    None,
-                    &struct_env,
-                    true,
-                    has_err_msg,
-                );
-                let fun_id = FunId::new(fun_name);
-                BytecodeOperation::Function(struct_id.module_id, fun_id, inst.clone())
-            } else {
-                BytecodeOperation::Unpack(struct_id.module_id, struct_id.id, inst.clone())
-            };
             self.emit_with(id, |attr| {
-                Bytecode::Call(attr, vec![raw_fun_temp], oper, vec![fun_temp], None)
+                Bytecode::Call(
+                    attr,
+                    vec![raw_fun_temp],
+                    BytecodeOperation::Unpack(struct_id.module_id, struct_id.id, inst),
+                    vec![fun_temp],
+                    None,
+                )
             });
             arg_temps.push(raw_fun_temp)
         } else {
@@ -856,27 +746,10 @@ impl Generator<'_> {
             },
             Operation::Pack(mid, sid, variant) => {
                 let inst = self.env().get_node_instantiation(id);
-                let is_cross_module = self.check_cross_module_access(mid);
-                let struct_env = self.func_env.env().get_struct(mid.qualified(*sid));
-                let struct_full_name = struct_env.get_full_name_for_public_api();
-                let fun_name = self.check_and_generate_name(
-                    id,
-                    mid,
-                    struct_full_name,
-                    PACK,
-                    "pack",
-                    *variant,
-                    &struct_env,
-                    is_cross_module,
-                    false,
-                );
-                let fun_id = FunId::new(fun_name);
-                let oper = match (variant, is_cross_module) {
-                    (_, true) => BytecodeOperation::Function(*mid, fun_id, inst),
-                    (Some(variant), _) => {
-                        BytecodeOperation::PackVariant(*mid, *sid, *variant, inst)
-                    },
-                    (None, _) => BytecodeOperation::Pack(*mid, *sid, inst),
+                let oper = if let Some(variant) = variant {
+                    BytecodeOperation::PackVariant(*mid, *sid, *variant, inst)
+                } else {
+                    BytecodeOperation::Pack(*mid, *sid, inst)
                 };
                 self.gen_op_call(targets, id, oper, args)
             },
@@ -1028,7 +901,7 @@ impl Generator<'_> {
                 );
                 let target_ty = self.temp_type(targets[0]).clone();
                 if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty.clone() {
-                    let has_err_msg = self.check_pack_unpack_wrapper(
+                    self.check_pack_unpack_wrapper(
                         id,
                         *mid,
                         target_ty,
@@ -1050,30 +923,14 @@ impl Generator<'_> {
                         BytecodeOperation::Closure(*mid, *fid, inst, *mask),
                         args,
                     );
-                    let struct_env = self
-                        .func_env
-                        .env()
-                        .get_struct(wrapper_mid.qualified(wrapper_sid));
-                    let struct_full_name = struct_env.get_full_name_for_public_api();
-                    let oper = if self.check_cross_module_access(&wrapper_mid) {
-                        let fun_name = self.check_and_generate_name(
-                            id,
-                            &wrapper_mid,
-                            struct_full_name,
-                            PACK,
-                            "pack",
-                            None,
-                            &struct_env,
-                            true,
-                            has_err_msg,
-                        );
-                        let fun_id = FunId::new(fun_name);
-                        BytecodeOperation::Function(wrapper_mid, fun_id, wrapper_inst.clone())
-                    } else {
-                        BytecodeOperation::Pack(wrapper_mid, wrapper_sid, wrapper_inst)
-                    };
                     self.emit_with(id, |attr| {
-                        Bytecode::Call(attr, targets, oper, vec![temp], None)
+                        Bytecode::Call(
+                            attr,
+                            targets,
+                            BytecodeOperation::Pack(wrapper_mid, wrapper_sid, wrapper_inst),
+                            vec![temp],
+                            None,
+                        )
                     })
                 } else {
                     self.gen_op_call(
@@ -1177,11 +1034,10 @@ impl Generator<'_> {
         wrapper_sid: StructId,
         oper: &str,
         extra_msg: &str,
-    ) -> bool {
+    ) {
         let wrapper_struct = self.env().get_struct(wrapper_mid.qualified(wrapper_sid));
         let different_module = wrapper_mid != mid;
         let lang_pub_api = self.check_version_for_cross_module_access();
-        let mut has_err_msg = false;
         if different_module {
             let wrapper_name = wrapper_struct.get_full_name_str();
             let module_name = self
@@ -1215,11 +1071,9 @@ impl Generator<'_> {
                 None
             };
             if let Some(msg) = err_msg {
-                has_err_msg = true;
                 self.error(id, msg);
             }
         }
-        has_err_msg
     }
 
     fn gen_test_variants(
@@ -1406,7 +1260,7 @@ impl Generator<'_> {
         let mut conversion_ops = vec![];
         for (target, actual_type) in targets.iter().zip(fun_env.get_result_type().flatten()) {
             let target_ty = self.temp_type(*target).clone();
-            if let Some((new_target, oper)) = self.get_conversion(&target_ty, &actual_type, true) {
+            if let Some((new_target, oper)) = self.get_conversion(&target_ty, &actual_type) {
                 // Conversion required
                 actual_targets.push(new_target);
                 conversion_ops.push((*target, oper, new_target))
@@ -1640,23 +1494,13 @@ impl Generator<'_> {
             .skip_reference()
             .get_struct(self.env())
         {
-            if self.check_cross_module_access(&struct_id.module_id) {
-                self.gen_borrow_field_operation_for_cross_module_access(
-                    id,
-                    target,
-                    struct_id.instantiate(inst.to_vec()),
-                    fields,
-                    temp,
-                )
-            } else {
-                self.gen_borrow_field_operation(
-                    id,
-                    target,
-                    struct_id.instantiate(inst.to_vec()),
-                    fields,
-                    temp,
-                )
-            }
+            self.gen_borrow_field_operation(
+                id,
+                target,
+                struct_id.instantiate(inst.to_vec()),
+                fields,
+                temp,
+            )
         } else {
             self.internal_error(id, "inconsistent type in select expression")
         }
@@ -1715,72 +1559,12 @@ impl Generator<'_> {
         } else {
             target
         };
-        if self.check_cross_module_access(&str.module_id) {
-            self.gen_borrow_field_operation_for_cross_module_access(
-                id,
-                borrow_dest,
-                str,
-                fields,
-                oper_temp,
-            );
-        } else {
-            self.gen_borrow_field_operation(id, borrow_dest, str, fields, oper_temp);
-        }
+        self.gen_borrow_field_operation(id, borrow_dest, str, fields, oper_temp);
         if need_read_ref {
             self.emit_call(id, vec![target], BytecodeOperation::ReadRef, vec![
                 borrow_dest,
             ])
         }
-    }
-
-    /// Generate a borrow field operation for cross-module access.
-    fn gen_borrow_field_operation_for_cross_module_access(
-        &mut self,
-        id: NodeId,
-        dest: TempIndex,
-        str: QualifiedInstId<StructId>,
-        fields: &[FieldId],
-        src: TempIndex,
-    ) {
-        let dest_type = self.temp_type(dest).clone();
-        let arg_type = self.temp_type(src).clone();
-        let mut src = src;
-        if arg_type.is_mutable_reference() && dest_type.is_immutable_reference() {
-            let target_ty = Type::Reference(
-                ReferenceKind::Immutable,
-                Box::new(Type::Struct(str.module_id, str.id, str.inst.clone())),
-            );
-            src = if let Some((new_temp, oper)) =
-                self.get_conversion(&target_ty, &arg_type.clone(), false)
-            {
-                self.emit_call(id, vec![new_temp], oper, vec![src]);
-                new_temp
-            } else {
-                src
-            }
-        }
-
-        let struct_env = self.env().get_struct(str.to_qualified_id());
-        let struct_name_symbol = struct_env.get_name();
-        let mid = str.module_id;
-        let struct_env_full_name = struct_env.get_full_name_for_public_api();
-        let field_name = struct_env.get_field(fields[0]).get_name();
-        let fun_name = self.build_cross_module_access_borrow_field_api_name(
-            dest_type.is_mutable_reference(),
-            struct_env_full_name.clone(),
-            field_name,
-            None,
-        );
-        if self.env().get_module(mid).find_function(fun_name).is_none() {
-            self.error(id, format!("cannot perform borrow operation for field `{}` of struct `{}` since it has different types in variants", field_name.display(self.env().symbol_pool()), struct_name_symbol.display(self.env().symbol_pool())));
-        }
-        let fun_id = FunId::new(fun_name);
-        self.emit_call(
-            id,
-            vec![dest],
-            BytecodeOperation::Function(mid, fun_id, str.inst.to_owned()),
-            vec![src],
-        );
     }
 
     /// Generate a borrow field operation, possibly for a variant struct, which may require
@@ -1886,47 +1670,13 @@ impl Generator<'_> {
     ) {
         let bool_temp =
             *bool_temp.get_or_insert_with(|| self.new_temp(Type::new_prim(PrimitiveType::Bool)));
-        let struct_env = self.env().get_struct(str.to_qualified_id());
-        let struct_full_name = struct_env.get_full_name_for_public_api();
-        let mut variant_operations = Vec::new();
-        let src_ty = self.temp_type(src).clone();
-        let cross_module = self.check_cross_module_access(&str.module_id);
         for variant in variants {
-            let oper = if cross_module {
-                let fun_name = self.check_and_generate_name(
-                    id,
-                    &str.module_id,
-                    struct_full_name.clone(),
-                    TEST_VARIANT,
-                    "test variant",
-                    Some(variant),
-                    &struct_env,
-                    true,
-                    false,
-                );
-                let fun_id = FunId::new(fun_name);
-                BytecodeOperation::Function(str.module_id, fun_id, str.inst.to_owned())
-            } else {
-                BytecodeOperation::TestVariant(str.module_id, str.id, variant, str.inst.clone())
-            };
-            variant_operations.push((variant, oper));
-        }
-        let mut src = src;
-        if src_ty.is_mutable_reference() && cross_module {
-            let target_ty = Type::Reference(
-                ReferenceKind::Immutable,
-                Box::new(Type::Struct(str.module_id, str.id, str.inst.clone())),
+            self.emit_call(
+                id,
+                vec![bool_temp],
+                BytecodeOperation::TestVariant(str.module_id, str.id, variant, str.inst.clone()),
+                vec![src],
             );
-            src = if let Some((new_temp, oper)) = self.get_conversion(&target_ty, &src_ty, false) {
-                self.emit_call(id, vec![new_temp], oper, vec![src]);
-                new_temp
-            } else {
-                src
-            }
-        }
-
-        for (_, oper) in variant_operations {
-            self.emit_call(id, vec![bool_temp], oper, vec![src]);
             self.branch_to_exit_if_true(id, bool_temp, success_label)
         }
     }
@@ -2274,32 +2024,6 @@ impl Generator<'_> {
         }
     }
 
-    fn check_and_generate_name(
-        &self,
-        id: NodeId,
-        mid: &ModuleId,
-        struct_full_name: String,
-        oper_in_api_name: &str,
-        operation: &str,
-        variant: Option<Symbol>,
-        struct_env: &StructEnv,
-        across_module: bool,
-        has_err_msg: bool,
-    ) -> Symbol {
-        let fun_name =
-            self.build_cross_module_access_api_name(oper_in_api_name, struct_full_name, variant);
-        if across_module && !has_err_msg {
-            self.check_and_generate_internal_struct_api_error(
-                id,
-                mid,
-                operation,
-                fun_name,
-                struct_env.get_name(),
-            );
-        }
-        fun_name
-    }
-
     /// Generate match of values against pattern.
     fn gen_match_from_temp(
         &mut self,
@@ -2328,8 +2052,6 @@ impl Generator<'_> {
                 }
             },
             Pattern::Struct(id, str, variant, args) => {
-                let mid = str.module_id;
-                let cross_module = self.check_cross_module_access(&mid);
                 // If this is a variant, and we are doing a refutable match,
                 // insert a test and exit if it fails.
                 let value = values[0];
@@ -2342,130 +2064,57 @@ impl Generator<'_> {
                     },
                 ) = (variant, match_mode)
                 {
-                    let struct_env = self.env().get_struct(str.to_qualified_id());
-                    let struct_full_name = struct_env.get_full_name_for_public_api();
-                    let oper = if cross_module {
-                        let fun_name = self.check_and_generate_name(
-                            *id,
-                            &mid,
-                            struct_full_name,
-                            TEST_VARIANT,
-                            "test variant",
-                            Some(*variant),
-                            &struct_env,
-                            true,
-                            false,
-                        );
-                        let fun_id = FunId::new(fun_name);
-                        BytecodeOperation::Function(mid, fun_id, str.inst.to_owned())
-                    } else {
+                    self.emit_call(
+                        *id,
+                        vec![*bool_temp],
                         BytecodeOperation::TestVariant(
                             str.module_id,
                             str.id,
                             *variant,
                             str.inst.clone(),
-                        )
-                    };
-                    let src_ty = self.temp_type(value).clone();
-                    // test variant function take immutable reference as input, thus we need to freeze first
-                    let conversion_flag = src_ty.is_mutable_reference();
-                    let mut test_value = value;
-                    if conversion_flag && cross_module {
-                        let target_ty = Type::Reference(
-                            ReferenceKind::Immutable,
-                            Box::new(Type::Struct(str.module_id, str.id, str.inst.clone())),
-                        );
-                        if let Some((new_temp, oper)) =
-                            self.get_conversion(&target_ty, &src_ty, false)
-                        {
-                            self.emit_call(*id, vec![new_temp], oper, vec![test_value]);
-                            test_value = new_temp;
-                        }
-                    }
-                    self.emit_call(*id, vec![*bool_temp], oper, vec![test_value]);
+                        ),
+                        vec![value],
+                    );
                     self.branch_to_exit_if_false(*id, *bool_temp, *exit_path);
                 }
                 let ref_kind = self.temp_type(value).ref_kind();
                 let uses_unpack = ref_kind.is_none();
                 let sub_matches = self.collect_sub_matches(
-                    uses_unpack
-                        || (ref_kind.is_some_and(|r| r == ReferenceKind::Mutable) && cross_module), // need all sub-patterns if unpack is used or unpack is mutable and cross-module
+                    uses_unpack, // need all sub-patterns if unpack is used
                     args,
                     match_mode,
                     next_scope,
                 );
                 if !uses_unpack {
-                    if cross_module {
-                        self.gen_borrow_field_for_unpack_ref_for_cross_module_access(
-                            id,
-                            str,
-                            *variant,
-                            value,
-                            &sub_matches,
-                            ref_kind.expect("type is reference"),
-                        )
-                    } else {
-                        self.gen_borrow_field_for_unpack_ref(
-                            id,
-                            str,
-                            *variant,
-                            value,
-                            &sub_matches,
-                            ref_kind.expect("type is reference"),
-                        )
-                    }
+                    self.gen_borrow_field_for_unpack_ref(
+                        id,
+                        str,
+                        *variant,
+                        value,
+                        &sub_matches,
+                        ref_kind.expect("type is reference"),
+                    )
                 } else {
                     assert_eq!(
                         args.len(),
                         sub_matches.len(),
                         "contiguous allocation of temps for unpack"
                     );
-                    let args = sub_matches.values().map(|(temp, ..)| *temp).collect();
-                    let sid = str.id;
-                    let inst = str.inst.to_owned();
-                    let oper = {
-                        let struct_env = self.func_env.env().get_struct(mid.qualified(sid));
-                        let struct_full_name = struct_env.get_full_name_for_public_api();
-                        let get_function = |variant: Option<Symbol>| {
-                            let fun_name = self.check_and_generate_name(
-                                *id,
-                                &mid,
-                                struct_full_name,
-                                UNPACK,
-                                "unpack",
-                                variant,
-                                &struct_env,
-                                cross_module,
-                                false,
-                            );
-                            let fun_id = FunId::new(fun_name);
-                            BytecodeOperation::Function(mid, fun_id, inst.clone())
-                        };
-
-                        match variant {
-                            Some(variant_id) => {
-                                if cross_module {
-                                    get_function(Some(*variant_id))
-                                } else {
-                                    BytecodeOperation::UnpackVariant(
-                                        mid,
-                                        sid,
-                                        *variant_id,
-                                        inst.clone(),
-                                    )
-                                }
-                            },
-                            None => {
-                                if cross_module {
-                                    get_function(None)
-                                } else {
-                                    BytecodeOperation::Unpack(mid, sid, inst.clone())
-                                }
-                            },
-                        }
-                    };
-
-                    self.emit_call(*id, args, oper, vec![values[0]]);
+                    self.emit_call(
+                        *id,
+                        sub_matches.values().map(|(temp, ..)| *temp).collect(),
+                        if let Some(variant) = variant {
+                            BytecodeOperation::UnpackVariant(
+                                str.module_id,
+                                str.id,
+                                *variant,
+                                str.inst.to_owned(),
+                            )
+                        } else {
+                            BytecodeOperation::Unpack(str.module_id, str.id, str.inst.to_owned())
+                        },
+                        vec![values[0]],
+                    );
                 }
                 for (_, (temp, cont_opt)) in sub_matches.into_iter() {
                     if let Some(cont_pat) = cont_opt {
@@ -2495,120 +2144,6 @@ impl Generator<'_> {
                 }
             },
             Pattern::Error(_) => self.internal_error(id, "unexpected error pattern"),
-        }
-    }
-
-    /// Generate borrow_field for match when unpacking a reference to a struct
-    /// when the operation is from another module.
-    /// for a mutable borrow to all fields of struct,  just call the unpack_mut_ref function, e,g let (&mut x, &mut y) = unpack_mut_ref(s);
-    /// where x and y are fields of s.
-    /// Otherwise, borrow field one by one from `sub_matches`.
-    fn gen_borrow_field_for_unpack_ref_for_cross_module_access(
-        &mut self,
-        id: &NodeId,
-        str: &QualifiedInstId<StructId>,
-        variant: Option<Symbol>,
-        arg: TempIndex,
-        sub_matches: &BTreeMap<usize, (TempIndex, Option<Pattern>)>,
-        ref_kind: ReferenceKind,
-    ) {
-        let struct_env = self.env().get_struct(str.to_qualified_id());
-        let fields: Vec<(usize, Symbol)> = struct_env
-            .get_fields_optional_variant(variant)
-            .map(|f| (f.get_offset(), f.get_name()))
-            .collect();
-        let mid = str.module_id;
-        let struct_name_symbol = struct_env.get_name();
-        let struct_name_full = struct_env.get_full_name_for_public_api();
-        // If unpack is mutable, use `unpack_mut_ref` to return reference of all fields for `variant`
-        if ref_kind == ReferenceKind::Mutable
-            && self.temp_type(arg).is_mutable_reference()
-            && !fields.is_empty()
-        {
-            let mut res_temp = vec![];
-            if sub_matches.len() == fields.len() {
-                let fun_name = self.check_and_generate_name(
-                    *id,
-                    &mid,
-                    struct_name_full.clone(),
-                    UNPACK_MUT_REF,
-                    "borrow",
-                    variant,
-                    &struct_env,
-                    true,
-                    false,
-                );
-                for (temp, _) in sub_matches.values() {
-                    res_temp.push(*temp);
-                }
-                let fun_id = FunId::new(fun_name);
-                let oper = BytecodeOperation::Function(mid, fun_id, str.inst.clone());
-                self.emit_call(*id, res_temp, oper, vec![arg]);
-                return;
-            }
-        }
-        for (pos, (temp, _)) in sub_matches {
-            let (offset, field_name) = &fields[*pos];
-            let dest_type = self.temp_type(*temp);
-            let src_type = self.temp_type(arg);
-            let mut fun_name = self.build_cross_module_access_borrow_field_api_name(
-                dest_type.is_mutable_reference(),
-                struct_name_full.clone(),
-                *field_name,
-                None,
-            );
-            if let Some(variant) = variant {
-                if self.env().get_module(mid).find_function(fun_name).is_none() {
-                    fun_name = self.build_cross_module_access_borrow_field_api_name(
-                        dest_type.is_mutable_reference(),
-                        struct_name_full.clone(),
-                        *field_name,
-                        Some((variant, *offset)),
-                    );
-                }
-            }
-            self.check_and_generate_internal_struct_api_error(
-                *id,
-                &mid,
-                "borrow",
-                fun_name,
-                struct_name_symbol,
-            );
-            let fun_id = FunId::new(fun_name);
-            let mut arg = arg;
-            if src_type.is_mutable_reference() && dest_type.is_immutable_reference() {
-                let target_ty = Type::Reference(
-                    ReferenceKind::Immutable,
-                    Box::new(Type::Struct(str.module_id, str.id, str.inst.clone())),
-                );
-                arg = if let Some((new_temp, oper)) =
-                    self.get_conversion(&target_ty, &src_type.clone(), false)
-                {
-                    self.emit_call(*id, vec![new_temp], oper, vec![arg]);
-                    new_temp
-                } else {
-                    arg
-                }
-            }
-
-            self.with_reference_mode(|rgen, entering| {
-                if entering {
-                    rgen.reference_mode_kind = ref_kind
-                }
-                if !rgen.temp_type(*temp).is_reference() {
-                    rgen.env().diag(
-                        Severity::Bug,
-                        &rgen.env().get_node_loc(*id),
-                        "Unpacking a reference to a struct must return the references of fields",
-                    );
-                }
-                rgen.emit_call(
-                    *id,
-                    vec![*temp],
-                    BytecodeOperation::Function(mid, fun_id, str.inst.clone()),
-                    vec![arg],
-                );
-            });
         }
     }
 

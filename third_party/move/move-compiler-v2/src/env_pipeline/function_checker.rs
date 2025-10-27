@@ -424,7 +424,11 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                                 caller_is_inline_non_private,
                             );
                         },
-                        _ => {},
+                        _ => {
+                            // all the other operations are either:
+                            // - not related to structs
+                            // - spec-only
+                        },
                     },
                     ExpData::Assign(_, pat, _)
                     | ExpData::Block(_, pat, _, _)
@@ -488,7 +492,6 @@ fn check_privileged_operations_on_structs(env: &GlobalEnv, fun_env: &FunctionEnv
                     | ExpData::Loop(..)
                     | ExpData::LoopCont(..)
                     | ExpData::Mutate(..) => {},
-                    // access in specs is not restricted
                     ExpData::SpecBlock(_, _) => {
                         unreachable!("we have already checked for spec blocks");
                     },

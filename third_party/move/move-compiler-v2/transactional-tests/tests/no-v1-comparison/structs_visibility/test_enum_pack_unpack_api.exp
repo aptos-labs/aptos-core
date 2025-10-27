@@ -1,7 +1,0 @@
-processed 6 tasks
-task 0 lines 1-22:  publish [module 0x42::m1 {]
-task 1 lines 24-72:  publish [module 0x42::m2 {]
-task 2 lines 74-74:  run 0x42::m2::test_pack_unpack_result_ok
-task 3 lines 76-76:  run 0x42::m2::test_pack_unpack_result_err
-task 4 lines 78-78:  run 0x42::m2::test_unpack_enum_e
-task 5 lines 80-80:  run 0x42::m2::test_unpack_inner

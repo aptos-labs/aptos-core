@@ -1,4 +1,0 @@
-processed 3 tasks
-task 0 lines 1-4:  publish [module 0x42::test {]
-task 1 lines 6-18:  publish [module 0x42::test_positional_fields {]
-task 2 lines 20-20:  run --verbose -- 0x42::test_positional_fields::test_ok

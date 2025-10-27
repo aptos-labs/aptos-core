@@ -1,9 +1,0 @@
-processed 8 tasks
-task 0 lines 1-10:  publish [module 0x42::m1 {]
-task 1 lines 12-69:  publish [module 0x42::m2 {]
-task 2 lines 71-71:  run 0x42::m2::try_pack_unpack_pair
-task 3 lines 73-73:  run 0x42::m2::try_pack_unpack_wrapper
-task 4 lines 75-75:  run 0x42::m2::try_nested_pair_unpack
-task 5 lines 77-77:  run 0x42::m2::try_vecwrap_unpack
-task 6 lines 79-79:  run 0x42::m2::try_unpack_from_return
-task 7 lines 81-81:  run 0x42::m2::try_pass_as_arg

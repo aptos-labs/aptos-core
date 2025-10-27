@@ -1,5 +1,0 @@
-processed 3 tasks
-task 0 lines 1-4:  publish [module 0x42::m {]
-task 1 lines 6-25:  publish [module 0x42::m_calls_with_freeze {]
-task 2 lines 27-27:  run 0x42::m_calls_with_freeze::test
-return values: 16
