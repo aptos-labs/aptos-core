@@ -2114,11 +2114,21 @@ impl SignerRef {
  *
  **************************************************************************************/
 impl Locals {
+    #[inline]
+    pub fn init_values(n: usize) -> Vec<Value> {
+        iter::repeat_with(|| Value::Invalid).take(n).collect()
+    }
+
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
             iter::repeat_with(|| Value::Invalid).take(n).collect(),
         )))
+    }
+
+    #[cfg_attr(feature = "inline-locals", inline(always))]
+    pub fn from_values(values: Vec<Value>) -> Self {
+        Self(Rc::new(RefCell::new(values)))
     }
 
     #[cfg_attr(feature = "inline-locals", inline(always))]
@@ -2192,7 +2202,7 @@ impl Locals {
     }
 
     #[cold]
-    fn local_index_out_of_bounds(idx: usize, num_locals: usize) -> PartialVMError {
+    pub fn local_index_out_of_bounds(idx: usize, num_locals: usize) -> PartialVMError {
         PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(format!(
             "local index out of bounds: got {}, len: {}",
             idx, num_locals

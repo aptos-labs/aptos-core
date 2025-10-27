@@ -374,11 +374,16 @@ where
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
         let num_locals = function.local_tys().len();
-        let mut locals = Locals::new(num_locals);
+        if args.len() > num_locals {
+            let first_out_of_bounds_index = num_locals;
+            let out_of_bounds_error =
+                Locals::local_index_out_of_bounds(first_out_of_bounds_index, num_locals);
+            return Err(self.set_location(out_of_bounds_error));
+        }
+
+        let mut local_values = Locals::init_values(num_locals);
         for (i, value) in args.into_iter().enumerate() {
-            locals
-                .store_loc(i, value)
-                .map_err(|e| self.set_location(e))?;
+            local_values[i] = value;
         }
 
         self.reentrancy_checker
@@ -398,7 +403,7 @@ where
             CallType::Regular,
             self.vm_config,
             function,
-            locals,
+            local_values,
             frame_cache,
         )
         .map_err(|err| self.set_location(err))?;
@@ -877,8 +882,11 @@ where
         mut captured: Vec<Value>,
     ) -> PartialVMResult<Frame> {
         let num_locals = function.local_tys().len();
-        let mut locals = Locals::new(num_locals);
         let num_param_tys = function.param_tys().len();
+        if num_param_tys > num_locals {
+            return Err(Locals::local_index_out_of_bounds(num_param_tys, num_locals));
+        }
+        let mut local_values = Locals::init_values(num_locals);
         // Whether the function making this frame performs checks.
         let should_check = RTTCheck::should_perform_checks(&current_frame.function.function);
         for i in (0..num_param_tys).rev() {
@@ -891,7 +899,8 @@ where
             } else {
                 self.operand_stack.pop()?
             };
-            locals.store_loc(i, value)?;
+
+            local_values[i] = value;
 
             if should_check && !is_captured {
                 // Only perform paranoid type check for actual operands on the stack.
@@ -918,7 +927,7 @@ where
             call_type,
             self.vm_config,
             function,
-            locals,
+            local_values,
             frame_cache,
         )
     }
