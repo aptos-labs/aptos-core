@@ -60,6 +60,7 @@ pub(crate) fn validate_view_function(
         );
     }
 
+    let pool = loader.runtime_environment().ty_pool();
     let allowed_structs = get_allowed_structs(struct_constructors_feature);
     let result = if loader.is_lazy_loading_enabled() {
         transaction_arg_validation::construct_args(
@@ -67,9 +68,17 @@ pub(crate) fn validate_view_function(
             loader,
             gas_meter,
             traversal_context,
-            func.param_tys(),
+            if func.ty_args().is_empty() {
+                func.param_ty_ids()
+            } else {
+                let param_tys = func
+                    .param_tys()
+                    .iter()
+                    .map(|ty| pool.instantiate_and_intern(ty, func.ty_args()))
+                    .collect::<Vec<_>>();
+                &param_tys
+            },
             args,
-            &[], // todo: func.ty_args(),
             allowed_structs,
             true,
         )
@@ -81,9 +90,17 @@ pub(crate) fn validate_view_function(
             // No metering with eager loading.
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
-            func.param_tys(),
+            if func.ty_args().is_empty() {
+                func.param_ty_ids()
+            } else {
+                let param_tys = func
+                    .param_tys()
+                    .iter()
+                    .map(|ty| pool.instantiate_and_intern(ty, func.ty_args()))
+                    .collect::<Vec<_>>();
+                &param_tys
+            },
             args,
-            &[], // todo: func.ty_args(),
             allowed_structs,
             true,
         )

@@ -31,6 +31,7 @@ use move_vm_runtime::{
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::{Type, TypeParamMap},
+    ty_interner::{TypeId, TypeRepr},
 };
 use once_cell::sync::Lazy;
 use std::{
@@ -133,13 +134,12 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     }
 
     let allowed_structs = get_allowed_structs(are_struct_constructors_enabled);
-    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
+    let pool = loader.runtime_environment().ty_pool();
 
     // Need to keep this here to ensure we return the historic correct error code for replay
     for ty in func.param_tys()[signer_param_cnt..].iter() {
-        let subst_res = ty_builder.create_ty_with_subst(ty, &[] /*todo*/);
-        let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
-        let valid = is_valid_txn_arg(loader.runtime_environment(), &ty, allowed_structs);
+        let ty = pool.instantiate_and_intern(ty, func.ty_args());
+        let valid = is_valid_txn_arg(loader.runtime_environment(), ty, allowed_structs);
         if !valid {
             return Err(VMStatus::error(
                 StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE,
@@ -175,9 +175,18 @@ pub(crate) fn validate_combine_signer_and_txn_args(
         loader,
         gas_meter,
         traversal_context,
-        &func.param_tys()[signer_param_cnt..],
+        if func.ty_args().is_empty() {
+            &func.param_ty_ids()[signer_param_cnt..]
+        } else {
+            let param_tys = func
+                .param_tys()
+                .iter()
+                .skip(signer_param_cnt)
+                .map(|ty| pool.instantiate_and_intern(ty, func.ty_args()))
+                .collect::<Vec<_>>();
+            &param_tys
+        },
         args,
-        &[], // todo func.ty_args(),
         allowed_structs,
         false,
     )?;
@@ -197,31 +206,50 @@ pub(crate) fn validate_combine_signer_and_txn_args(
 /// its name cannot be queried for some reason.
 pub(crate) fn is_valid_txn_arg(
     runtime_environment: &RuntimeEnvironment,
-    ty: &Type,
+    ty: TypeId,
     allowed_structs: &ConstructorMap,
 ) -> bool {
-    use move_vm_types::loaded_data::runtime_types::Type::*;
-
     match ty {
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
-        | Address => true,
-        Vector(inner) => is_valid_txn_arg(runtime_environment, inner, allowed_structs),
-        Struct { .. } | StructInstantiation { .. } => {
-            // Note: Original behavior was to return false even if the module loading fails (e.g.,
-            //       if struct does not exist. This preserves it.
-            runtime_environment
-                .get_struct_name(ty)
-                .ok()
-                .flatten()
-                .is_some_and(|(module_id, identifier)| {
-                    allowed_structs.contains_key(&format!(
-                        "{}::{}",
-                        module_id.short_str_lossless(),
-                        identifier
-                    ))
-                })
+        TypeId::BOOL
+        | TypeId::U8
+        | TypeId::U16
+        | TypeId::U32
+        | TypeId::U64
+        | TypeId::U128
+        | TypeId::U256
+        | TypeId::I8
+        | TypeId::I16
+        | TypeId::I32
+        | TypeId::I64
+        | TypeId::I128
+        | TypeId::I256
+        | TypeId::ADDRESS => true,
+        TypeId::SIGNER => false,
+        ty => {
+            if ty.is_any_ref() {
+                return false;
+            }
+
+            let pool = runtime_environment.ty_pool();
+            match pool.type_repr(ty) {
+                TypeRepr::Vector(elem) => {
+                    is_valid_txn_arg(runtime_environment, elem, allowed_structs)
+                },
+                TypeRepr::Struct { idx, .. } => runtime_environment
+                    .struct_name_index_map()
+                    .idx_to_struct_name(*idx)
+                    .ok()
+                    .is_some_and(|id| {
+                        allowed_structs.contains_key(&format!(
+                            "{}::{}",
+                            id.module.short_str_lossless(),
+                            id.name
+                        ))
+                    }),
+                TypeRepr::Function { .. } => false,
+                _ => unreachable!(),
+            }
         },
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => false,
     }
 }
 
@@ -233,9 +261,8 @@ pub(crate) fn construct_args(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    types: &[Type],
+    types: &[TypeId],
     args: Vec<Vec<u8>>,
-    ty_args: &[Type],
     allowed_structs: &ConstructorMap,
     is_view: bool,
 ) -> Result<Vec<Vec<u8>>, VMStatus> {
@@ -245,16 +272,13 @@ pub(crate) fn construct_args(
         return Err(invalid_signature());
     }
 
-    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
     for (ty, arg) in types.iter().zip(args) {
-        let subst_res = ty_builder.create_ty_with_subst(ty, ty_args);
-        let ty = subst_res.map_err(|e| e.finish(Location::Undefined).into_vm_status())?;
         let arg = construct_arg(
             session,
             loader,
             gas_meter,
             traversal_context,
-            &ty,
+            *ty,
             allowed_structs,
             arg,
             is_view,
@@ -273,32 +297,67 @@ fn construct_arg(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    ty: &Type,
+    ty: TypeId,
     allowed_structs: &ConstructorMap,
     arg: Vec<u8>,
     is_view: bool,
 ) -> Result<Vec<u8>, VMStatus> {
     use move_vm_types::loaded_data::runtime_types::Type::*;
     match ty {
-        Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
-        | Address => Ok(arg),
-        Vector(_) | Struct { .. } | StructInstantiation { .. } => {
+        TypeId::BOOL
+        | TypeId::U8
+        | TypeId::U16
+        | TypeId::U32
+        | TypeId::U64
+        | TypeId::U128
+        | TypeId::U256
+        | TypeId::I8
+        | TypeId::I16
+        | TypeId::I32
+        | TypeId::I64
+        | TypeId::I128
+        | TypeId::I256
+        | TypeId::ADDRESS => Ok(arg),
+        TypeId::SIGNER => {
+            if is_view {
+                Ok(arg)
+            } else {
+                Err(invalid_signature())
+            }
+        },
+        ty => {
+            if ty.is_any_ref() {
+                return Err(invalid_signature());
+            }
+
             let initial_cursor_len = arg.len();
             let mut cursor = Cursor::new(&arg[..]);
             let mut new_arg = vec![];
             let mut max_invocations = 10; // Read from config in the future
-            recursively_construct_arg(
-                session,
-                loader,
-                gas_meter,
-                traversal_context,
-                ty,
-                allowed_structs,
-                &mut cursor,
-                initial_cursor_len,
-                &mut max_invocations,
-                &mut new_arg,
-            )?;
+
+            let pool = loader.runtime_environment().ty_pool();
+            let repr = pool.type_repr(ty);
+            match repr {
+                TypeRepr::Function { .. } => {
+                    return Err(invalid_signature());
+                },
+                TypeRepr::Vector(_) | TypeRepr::Struct { .. } => {
+                    recursively_construct_arg(
+                        session,
+                        loader,
+                        gas_meter,
+                        traversal_context,
+                        &repr,
+                        allowed_structs,
+                        &mut cursor,
+                        initial_cursor_len,
+                        &mut max_invocations,
+                        &mut new_arg,
+                    )?;
+                },
+                _ => unreachable!(),
+            }
+
             // Check cursor has parsed everything
             // Unfortunately, is_empty is only enabled in nightly, so we check this way.
             if cursor.position() != initial_cursor_len as u64 {
@@ -311,16 +370,6 @@ fn construct_arg(
             }
             Ok(new_arg)
         },
-        Signer => {
-            if is_view {
-                Ok(arg)
-            } else {
-                Err(invalid_signature())
-            }
-        },
-        Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => {
-            Err(invalid_signature())
-        },
     }
 }
 
@@ -332,17 +381,16 @@ pub(crate) fn recursively_construct_arg(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    ty: &Type,
+    ty: &TypeRepr,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
     initial_cursor_len: usize,
     max_invocations: &mut u64,
     arg: &mut Vec<u8>,
 ) -> Result<(), VMStatus> {
-    use move_vm_types::loaded_data::runtime_types::Type::*;
-
+    let pool = loader.runtime_environment().ty_pool();
     match ty {
-        Vector(inner) => {
+        TypeRepr::Vector(inner) => {
             // get the vector length and iterate over each element
             let mut len = get_len(cursor)?;
             serialize_uleb128(len, arg);
@@ -352,7 +400,7 @@ pub(crate) fn recursively_construct_arg(
                     loader,
                     gas_meter,
                     traversal_context,
-                    inner,
+                    &pool.type_repr(*inner),
                     allowed_structs,
                     cursor,
                     initial_cursor_len,
@@ -362,16 +410,17 @@ pub(crate) fn recursively_construct_arg(
                 len -= 1;
             }
         },
-        Struct { .. } | StructInstantiation { .. } => {
+        TypeRepr::Struct { idx, .. } => {
             let (module_id, identifier) = loader
                 .runtime_environment()
-                .get_struct_name(ty)
+                .struct_name_index_map()
+                .idx_to_struct_name(*idx)
+                .map(|id| (id.module, id.name))
                 .map_err(|_| {
                     // Note: The original behaviour was to map all errors to an invalid signature
                     //       error, here we want to preserve it for now.
                     invalid_signature()
-                })?
-                .ok_or_else(invalid_signature)?;
+                })?;
             let full_name = format!("{}::{}", module_id.short_str_lossless(), identifier);
             let constructor = allowed_structs
                 .get(&full_name)
@@ -391,15 +440,16 @@ pub(crate) fn recursively_construct_arg(
                 max_invocations,
             )?);
         },
-        Bool | U8 | I8 => read_n_bytes(1, cursor, arg)?,
-        U16 | I16 => read_n_bytes(2, cursor, arg)?,
-        U32 | I32 => read_n_bytes(4, cursor, arg)?,
-        U64 | I64 => read_n_bytes(8, cursor, arg)?,
-        U128 | I128 => read_n_bytes(16, cursor, arg)?,
-        U256 | I256 | Address => read_n_bytes(32, cursor, arg)?,
-        Signer | Reference(_) | MutableReference(_) | TyParam(_) | Function { .. } => {
-            return Err(invalid_signature())
-        },
+        TypeRepr::Bool | TypeRepr::U8 | TypeRepr::I8 => read_n_bytes(1, cursor, arg)?,
+        TypeRepr::U16 | TypeRepr::I16 => read_n_bytes(2, cursor, arg)?,
+        TypeRepr::U32 | TypeRepr::I32 => read_n_bytes(4, cursor, arg)?,
+        TypeRepr::U64 | TypeRepr::I64 => read_n_bytes(8, cursor, arg)?,
+        TypeRepr::U128 | TypeRepr::I128 => read_n_bytes(16, cursor, arg)?,
+        TypeRepr::U256 | TypeRepr::I256 | Address => read_n_bytes(32, cursor, arg)?,
+        TypeRepr::Signer
+        | TypeRepr::Reference(_)
+        | TypeRepr::MutableReference(_)
+        | TypeRepr::Function { .. } => return Err(invalid_signature()),
     };
     Ok(())
 }
@@ -413,7 +463,7 @@ fn validate_and_construct(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    expected_type: &Type,
+    expected_type: &TypeRepr, // note: seems like this must be a struct
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
@@ -479,19 +529,16 @@ fn validate_and_construct(
         expected_type,
     )?;
     let mut args = vec![];
-    let ty_builder = &loader.runtime_environment().vm_config().ty_builder;
+    let pool = loader.runtime_environment().ty_pool();
     for param_ty in function.param_tys() {
         let mut arg = vec![];
-        let arg_ty = ty_builder
-            .create_ty_with_subst(param_ty, &[] /*todo function.ty_args()*/)
-            .unwrap();
-
+        let arg_ty = pool.instantiate_and_intern(param_ty, function.ty_args());
         recursively_construct_arg(
             session,
             loader,
             gas_meter,
             traversal_context,
-            &arg_ty,
+            &pool.type_repr(arg_ty),
             allowed_structs,
             cursor,
             initial_cursor_len,
@@ -569,7 +616,7 @@ fn load_constructor_function(
     traversal_context: &mut TraversalContext,
     module_id: &ModuleId,
     function_name: &IdentStr,
-    expected_return_ty: &Type,
+    expected_return_ty: &TypeRepr,
 ) -> VMResult<LoadedFunction> {
     if !module_id.address().is_special() {
         let msg = format!(
@@ -592,13 +639,28 @@ fn load_constructor_function(
         return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
     }
 
+    let pool = loader.runtime_environment().ty_pool();
     let mut map = TypeParamMap::default();
-    if !map.match_ty(&function.return_tys()[0], expected_return_ty) {
-        // For functions that are marked constructor this should not happen.
-        return Err(
-            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .finish(Location::Undefined),
-        );
+    match (&function.return_tys()[0], expected_return_ty) {
+        (Type::Struct { .. }, TypeRepr::Struct { .. }) => {
+            // todo: assert ==
+        },
+        (Type::StructInstantiation { ty_args, .. }, TypeRepr::Struct { idx, ty_args: ids }) => {
+            // need to infer type arguments.
+            let ids = pool.get_type_vec(*ids);
+            if !ty_args
+                .iter()
+                .zip(ids.iter())
+                .all(|(t, e)| map.match_ty(pool, t, *e))
+            {
+                // For functions that are marked constructor this should not happen.
+                return Err(
+                    PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
+                        .finish(Location::Undefined),
+                );
+            }
+        },
+        _ => unreachable!(),
     }
 
     // Construct the type arguments from the match.
@@ -614,7 +676,6 @@ fn load_constructor_function(
     Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
         .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
 
-    let pool = loader.runtime_environment().ty_pool();
     let ty_args_id = pool.intern_ty_args(&ty_args);
     let ty_args = pool.get_type_vec(ty_args_id).to_vec();
 
