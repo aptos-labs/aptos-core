@@ -318,8 +318,8 @@ module aptos_std::big_ordered_map {
     /// This is an expensive function, as it goes through all the leaves to compute it.
     public fun compute_length<K: store, V: store>(self: &BigOrderedMap<K, V>): u64 {
         let size = 0;
-        self.for_each_leaf_node_ref(|node| {
-            size += node.children.length();
+        self.for_each_leaf_node_children_ref(|children| {
+            size += children.length();
         });
         size
     }
@@ -695,18 +695,66 @@ module aptos_std::big_ordered_map {
 
     /// Apply the function to a reference of each element in the vector.
     public inline fun for_each_ref<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, f: |&K, &V|) {
-        let iter = self.internal_new_begin_iter();
-        while (!iter.iter_is_end(self)) {
-            f(iter.iter_borrow_key(), iter.iter_borrow(self));
-            iter = iter.iter_next(self);
-        };
+        self.for_each_leaf_node_children_ref(|children| {
+            children.for_each_ref(|k: &K, v: &Child<V>| {
+                f(k, v.internal_leaf_borrow_value());
+            });
+        })
+    }
 
-        // TODO use this more efficient implementation when function values are enabled.
-        // self.for_each_leaf_node_ref(|node| {
-        //     node.children.for_each_ref(|k: &K, v: &Child<V>| {
-        //         f(k, &v.value);
-        //     });
-        // })
+    /// Calls given function on a tuple (key, self[key], other[key]) for all keys present in both maps.
+    public inline fun intersection_zip_for_each_ref<K: drop + copy + store, V1: store, V2: store>(self: &BigOrderedMap<K, V1>, other: &BigOrderedMap<K, V2>, f: |&K, &V1, &V2|) {
+        // only roots can have empty children, if maps are not empty, we
+        // never need to check on child_iter.iter_is_end on a new iterator.
+        if (!self.is_empty() && !other.is_empty()) {
+            let iter1 = self.internal_leaf_new_begin_iter();
+            let iter2 = other.internal_leaf_new_begin_iter();
+            let (children1, iter1) = iter1.internal_leaf_iter_borrow_entries_and_next_leaf_index(self);
+            let (children2, iter2) = iter2.internal_leaf_iter_borrow_entries_and_next_leaf_index(other);
+
+            let child_iter1 = children1.internal_new_begin_iter();
+            let child_iter2 = children2.internal_new_begin_iter();
+
+            loop {
+                let key1 = child_iter1.iter_borrow_key(children1);
+                let key2 = child_iter2.iter_borrow_key(children2);
+                let inc1 = false;
+                let inc2 = false;
+                if (key1 < key2) {
+                    inc1 = true;
+                } else if (key1 > key2) {
+                    inc2 = true;
+                } else {
+                    f(key1, child_iter1.iter_borrow(children1).internal_leaf_borrow_value(), child_iter2.iter_borrow(children2).internal_leaf_borrow_value());
+                    inc1 = true;
+                    inc2 = true;
+                };
+                if (inc1) {
+                    child_iter1 = child_iter1.iter_next(children1);
+                    if (child_iter1.iter_is_end(children1)) {
+                        if (iter1.internal_leaf_iter_is_end()) {
+                            break;
+                        };
+                        let (new_children, new_iter) = iter1.internal_leaf_iter_borrow_entries_and_next_leaf_index(self);
+                        iter1 = new_iter;
+                        children1 = new_children;
+                        child_iter1 = children1.internal_new_begin_iter();
+                    };
+                };
+                if (inc2) {
+                    child_iter2 = child_iter2.iter_next(children2);
+                    if (child_iter2.iter_is_end(children2)) {
+                        if (iter2.internal_leaf_iter_is_end()) {
+                            break;
+                        };
+                        let (new_children, new_iter) = iter2.internal_leaf_iter_borrow_entries_and_next_leaf_index(other);
+                        iter2 = new_iter;
+                        children2 = new_children;
+                        child_iter2 = children2.internal_new_begin_iter();
+                    };
+                };
+            }
+        }
     }
 
     /// Apply the function to a mutable reference of each key-value pair in the map.
@@ -906,13 +954,42 @@ module aptos_std::big_ordered_map {
 
     // ====================== Internal Implementations ========================
 
-    inline fun for_each_leaf_node_ref<K: store, V: store>(self: &BigOrderedMap<K, V>, f: |&Node<K, V>|) {
-        let cur_node_index = self.min_leaf_index;
+    enum LeafNodeIteratorPtr has copy, drop {
+        NodeIndex {
+            /// The node index of the iterator pointing to.
+            /// NULL_INDEX if end iterator
+            node_index: u64,
+        },
+    }
 
-        while (cur_node_index != NULL_INDEX) {
-            let node = self.borrow_node(cur_node_index);
+    public fun internal_leaf_new_begin_iter<K: store, V: store>(self: &BigOrderedMap<K, V>): LeafNodeIteratorPtr {
+        LeafNodeIteratorPtr::NodeIndex { node_index: self.min_leaf_index }
+    }
+
+    public fun internal_leaf_iter_is_end(self: &LeafNodeIteratorPtr): bool {
+        self.node_index == NULL_INDEX
+    }
+
+    public fun internal_leaf_borrow_value<V: store>(self: &Child<V>): &V {
+        &self.value
+    }
+
+    public fun internal_leaf_iter_borrow_entries_and_next_leaf_index<K: store, V: store>(self: LeafNodeIteratorPtr, map: &BigOrderedMap<K, V>): (&OrderedMap<K, Child<V>>, LeafNodeIteratorPtr) {
+        assert!(self.node_index != NULL_INDEX, EITER_OUT_OF_BOUNDS);
+
+        let node = map.borrow_node(self.node_index);
+        assert!(node.is_leaf, EINTERNAL_INVARIANT_BROKEN);
+        self.node_index = node.next;
+        (&node.children, self)
+    }
+
+    inline fun for_each_leaf_node_children_ref<K: store, V: store>(self: &BigOrderedMap<K, V>, f: |&OrderedMap<K, Child<V>>|) {
+        let iter = self.internal_leaf_new_begin_iter();
+
+        while (!iter.internal_leaf_iter_is_end()) {
+            let (node, next_iter) = iter.internal_leaf_iter_borrow_entries_and_next_leaf_index(self);
             f(node);
-            cur_node_index = node.next;
+            iter = next_iter;
         }
     }
 
@@ -1762,6 +1839,41 @@ module aptos_std::big_ordered_map {
             assert!(values[index] + 1 == v);
             index += 1;
         });
+    }
+
+    #[test]
+    fun test_zip_for_each_ref() {
+        let map1 = new_with_config<u64, u64>(4, 3, false);
+        map1.add_all(vector[1, 2, 4, 8, 9], vector[1, 2, 4, 8, 9]);
+
+        let map2 = new_with_config<u64, u64>(4, 3, false);
+        map2.add_all(vector[2, 3, 4, 6, 8, 10, 12, 14], vector[2, 3, 4, 6, 8, 10, 12, 14]);
+
+        let result = new();
+        map1.intersection_zip_for_each_ref(&map2, |k, v1, v2| {
+            assert!(v1 == v2);
+            result.upsert(*k, *v1);
+        });
+
+        let result_ordered = result.to_ordered_map();
+        let expected_ordered = ordered_map::new_from(vector[2, 4, 8], vector[2, 4, 8]);
+        result_ordered.print_map();
+        expected_ordered.print_map();
+        assert!(expected_ordered == result_ordered);
+
+        let map_empty = new_with_config<u64, u64>(4, 3, false);
+        map1.intersection_zip_for_each_ref(&map_empty, |_k, _v1, _v2| {
+            abort 1;
+        });
+
+        map_empty.intersection_zip_for_each_ref(&map2, |_k, _v1, _v2| {
+            abort 1;
+        });
+
+        map1.destroy(|_v| {});
+        map2.destroy(|_v| {});
+        result.destroy(|_v| {});
+        map_empty.destroy_empty();
     }
 
     #[test]

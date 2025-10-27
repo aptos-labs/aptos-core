@@ -713,7 +713,7 @@ module aptos_std::ordered_map {
     // ================= Section for tests =====================
 
     #[test_only]
-    fun print_map<K, V>(self: &OrderedMap<K, V>) {
+    public fun print_map<K, V>(self: &OrderedMap<K, V>) {
         aptos_std::debug::print(&self.entries);
     }
 
