@@ -14,7 +14,8 @@ use move_binary_format::{
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
+        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, SignatureToken,
+        StructFieldInformation, Visibility,
     },
 };
 use move_core_types::{
@@ -55,6 +56,7 @@ pub struct Function {
     pub(crate) access_specifier: AccessSpecifier,
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
+    pub(crate) is_fast_callable: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -499,6 +501,187 @@ impl Debug for Function {
     }
 }
 
+fn is_fast_callable(module: &CompiledModule, code: &[Bytecode]) -> bool {
+    use Bytecode::*;
+
+    // Check if the function only contains allowed instructions
+    for instruction in code {
+        match instruction {
+            // Disallowed instructions
+            CallClosure(_)
+            | PackVariant(_)
+            | PackVariantGeneric(_)
+            | PackClosure(_, _)
+            | PackClosureGeneric(_, _)
+            | MutBorrowGlobal(_)
+            | ImmBorrowGlobal(_)
+            | MutBorrowGlobalGeneric(_)
+            | ImmBorrowGlobalGeneric(_)
+            | Exists(_)
+            | ExistsGeneric(_)
+            | MoveFrom(_)
+            | MoveFromGeneric(_)
+            | MoveTo(_)
+            | MoveToGeneric(_) => {
+                return false;
+            },
+
+            // Disallowed for now, but may be allowed in the future
+            Call(_) | CallGeneric(_) => {
+                return false;
+            },
+
+            // Allowed instructions
+            Pop
+            | Ret
+            | BrTrue(_)
+            | BrFalse(_)
+            | Branch(_)
+            | LdU8(_)
+            | LdU16(_)
+            | LdU32(_)
+            | LdU64(_)
+            | LdU128(_)
+            | LdU256(_)
+            | LdConst(_)
+            | CastU8
+            | CastU16
+            | CastU32
+            | CastU64
+            | CastU128
+            | CastU256
+            | LdTrue
+            | LdFalse
+            | CopyLoc(_)
+            | MoveLoc(_)
+            | StLoc(_)
+            | Unpack(_)
+            | UnpackGeneric(_)
+            | ReadRef
+            | WriteRef
+            | FreezeRef
+            | MutBorrowLoc(_)
+            | ImmBorrowLoc(_)
+            | ImmBorrowField(_)
+            | ImmBorrowFieldGeneric(_)
+            | MutBorrowField(_)
+            | MutBorrowFieldGeneric(_)
+            | MutBorrowVariantField(_)
+            | MutBorrowVariantFieldGeneric(_)
+            | ImmBorrowVariantField(_)
+            | ImmBorrowVariantFieldGeneric(_)
+            | UnpackVariant(_)
+            | UnpackVariantGeneric(_)
+            | TestVariant(_)
+            | TestVariantGeneric(_)
+            | Add
+            | Sub
+            | Mul
+            | Mod
+            | Div
+            | BitOr
+            | BitAnd
+            | Xor
+            | Or
+            | And
+            | Not
+            | Eq
+            | Neq
+            | Lt
+            | Gt
+            | Le
+            | Ge
+            | Abort
+            | Nop
+            | Shl
+            | Shr
+            | VecLen(_)
+            | VecImmBorrow(_)
+            | VecMutBorrow(_)
+            | VecPushBack(_)
+            | VecPopBack(_)
+            | VecUnpack(_, _)
+            | VecSwap(_) => {
+                continue;
+            },
+
+            // Partially allowed instructions -- only simple cases can be handled
+            Pack(idx) => {
+                use SignatureToken::*;
+
+                let struct_def = module.struct_def_at(*idx);
+                let fields = match &struct_def.field_information {
+                    StructFieldInformation::Declared(fields) => fields,
+                    _ => unreachable!(),
+                };
+                for field in fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
+            PackGeneric(idx) => {
+                use SignatureToken::*;
+
+                let struct_inst = module.struct_instantiation_at(*idx);
+                let struct_def = module.struct_def_at(struct_inst.def);
+                let fields = match &struct_def.field_information {
+                    StructFieldInformation::Declared(fields) => fields,
+                    _ => unreachable!(),
+                };
+                for field in fields {
+                    match &field.signature.0 {
+                        Bool | Address | Signer => continue,
+                        U8 | U16 | U32 | U64 | U128 | U256 => continue,
+
+                        Vector(inner) => match &**inner {
+                            Bool | Address | Signer => continue,
+                            U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                            _ => return false,
+                        },
+
+                        Function(_, _, _)
+                        | Struct(_)
+                        | StructInstantiation(_, _)
+                        | TypeParameter(_) => return false,
+
+                        Reference(_) | MutableReference(_) => unreachable!(),
+                    }
+                }
+            },
+            VecPack(idx, _) => {
+                use SignatureToken::*;
+
+                let sig = module.signature_at(*idx);
+                assert!(sig.0.len() == 1);
+
+                // TODO: consider allowing all concrete types
+                match &sig.0[0] {
+                    Bool | Address | Signer => continue,
+                    U8 | U16 | U32 | U64 | U128 | U256 => continue,
+                    _ => return false,
+                }
+            },
+        }
+    }
+
+    true
+}
+
 impl Function {
     pub(crate) fn new(
         natives: &NativeFunctions,
@@ -545,6 +728,8 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
+        let is_fast_callable = !is_native && is_fast_callable(module, &code);
+
         Ok(Self {
             file_format_version: module.version(),
             index,
@@ -561,6 +746,7 @@ impl Function {
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
+            is_fast_callable,
         })
     }
 
