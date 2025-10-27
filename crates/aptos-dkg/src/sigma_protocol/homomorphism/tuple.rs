@@ -10,8 +10,11 @@ use crate::{
     },
 };
 use ark_ec::pairing::Pairing;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
+};
 pub use ark_std::io::Write;
+use std::fmt::Debug;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
 /// into a single homomorphism that outputs a tuple of codomains.
@@ -25,6 +28,7 @@ pub use ark_std::io::Write;
 ///
 /// In category-theoretic terms, this is the composition of the diagonal map
 /// `Δ: Domain -> Domain × Domain` with the product map `h1 × h2`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait,
@@ -32,9 +36,16 @@ where
 {
     pub hom1: H1,
     pub hom2: H2,
-    pub dst: Vec<u8>,
-    pub dst_verifier: Vec<u8>,
+    pub dst: Vec<u8>, // Included here to allow implementing `sigma_protocol::Trait` automatically, avoiding Rust’s orphan rule restrictions
+    pub dst_verifier: Vec<u8>, // Same
 }
+// One method to leave out the dst would be to later define in this file:
+// struct TupleHomomorphismWithDsts<'a, H1, H2> {
+//     hom: &'a TupleHomomorphism<H1, H2>,
+//     dst: Vec<u8>,
+//     dst_verifier: Vec<u8>,
+// }
+// and then defining the sigma protocol trait there. Probably not worth it
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
 /// component homomorphisms to the same input and returning their results
@@ -84,8 +95,6 @@ where
     }
 }
 
-use ark_serialize::{Read, Valid};
-
 impl<A, B> CanonicalDeserialize for TupleCodomainShape<A, B>
 where
     A: CanonicalDeserialize,
@@ -132,13 +141,13 @@ where
     A: EntrywiseMap<T>,
     B: EntrywiseMap<T>,
 {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> =
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         TupleCodomainShape(self.0.map(&f), self.1.map(f))
     }
@@ -148,7 +157,9 @@ where
 ///
 /// This allows combining two homomorphisms that share the same `Domain`.
 /// For simplicity, we currently require that the MSM types (`MsmInput` and `MsmOutput`) match;
-/// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future. Similarly, we **implicitly** that the two msm_eval methods are identical.
+/// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future.
+/// For the moment, we **implicitly** assume that the two msm_eval methods are identical, but is probably
+/// not necessary through enums.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
 impl<H1, H2> Trait for TupleHomomorphism<H1, H2>
@@ -166,7 +177,7 @@ where
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;

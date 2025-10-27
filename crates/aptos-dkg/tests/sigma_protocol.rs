@@ -14,6 +14,7 @@ use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::thread_rng;
+use std::fmt::Debug;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Domain)
@@ -66,7 +67,7 @@ mod schnorr {
         type CodomainShape<T>
             = CodomainShape<T>
         where
-            T: CanonicalSerialize + CanonicalDeserialize + Clone;
+            T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
         type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;

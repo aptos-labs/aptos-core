@@ -4,11 +4,12 @@
 use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
-use ark_ec::{pairing::Pairing, AffineRepr};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
-use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
+use blstrs::{pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt};
 use group::{Curve, Group};
 use num_traits::{One, Zero};
+use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
 use std::ops::{Mul, MulAssign};
@@ -87,6 +88,24 @@ pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[blstrs::Scalar]) -> G2Pro
     }
 }
 
+pub fn multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
+where
+    I1: Iterator<Item = &'a G1Projective>,
+    I2: Iterator<Item = &'a G2Projective>,
+{
+    let res = <Bls12 as MultiMillerLoop>::multi_miller_loop(
+        lhs.zip(rhs)
+            .map(|(g1, g2)| (g1.to_affine(), G2Prepared::from(g2.to_affine())))
+            .collect::<Vec<(G1Affine, G2Prepared)>>()
+            .iter()
+            .map(|(g1, g2)| (g1, g2))
+            .collect::<Vec<(&G1Affine, &G2Prepared)>>()
+            .as_slice(),
+    );
+
+    res.final_exponentiation()
+}
+
 pub fn parallel_multi_pairing<'a, I1, I2>(
     lhs: I1,
     rhs: I2,
@@ -116,7 +135,7 @@ where
     I1: Iterator<Item = &'a G1Projective>,
     I2: Iterator<Item = &'a G2Projective>,
 {
-    aptos_crypto::blstrs::multi_pairing(lhs, rhs)
+    multi_pairing(lhs, rhs)
 }
 
 /// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
@@ -125,7 +144,7 @@ where
     I1: Iterator<Item = &'a G2Projective>,
     I2: Iterator<Item = &'a G1Projective>,
 {
-    aptos_crypto::blstrs::multi_pairing(rhs, lhs)
+    multi_pairing(rhs, lhs)
 }
 
 /// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
@@ -194,4 +213,35 @@ where
     }
 
     powers
+}
+
+/// Commit to scalars by multiplying a base group element with each scalar.
+///
+/// Equivalent to `[base * s for s in scalars]`.
+pub fn commit_to_scalars<G, F>(commitment_base: &G, scalars: &[F]) -> Vec<G>
+where
+    G: CurveGroup<ScalarField = F>,
+    F: PrimeField,
+{
+    scalars.iter().map(|s| *commitment_base * s).collect()
+}
+
+#[allow(dead_code)]
+fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
+    let mut buf = Vec::with_capacity(msg.len() + dst.len() + 1);
+    buf.extend_from_slice(msg);
+    buf.extend_from_slice(dst);
+    buf.push(0); // placeholder for counter
+
+    for ctr in 0..=u8::MAX {
+        *buf.last_mut().unwrap() = ctr;
+
+        let hashed = sha3::Sha3_512::digest(&buf);
+
+        if let Some(p) = A::from_random_bytes(&hashed) {
+            return p;
+        }
+    }
+
+    panic!("Failed to hash to affine group element");
 }

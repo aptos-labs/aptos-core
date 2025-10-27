@@ -20,7 +20,7 @@ use ark_std::{
     rand::{CryptoRng, RngCore},
     UniformRand,
 };
-use std::io::Write;
+use std::{fmt::Debug, io::Write};
 
 pub trait Trait<E: Pairing>:
     FixedBaseMsmsTrait<
@@ -105,14 +105,14 @@ impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
 }
 
 // Standard workaround because type aliases are experimental in Rust
-pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone {}
-impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone {}
+pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
+impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 
 /// The “first item” recorded in a Σ-proof, which is one of:
 /// - The first message of the protocol, which is the commitment from the prover. This leads to a more compact proof.
 /// - The second message of the protocol, which is the challenge from the verifier. This leads to a proof which is amenable to batch verification.
 /// TODO: Better name? In https://github.com/sigma-rs/sigma-proofs these would be called "compact" and "batchable" proofs
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FirstProofItem<E: Pairing, H: homomorphism::Trait>
 where
     H::Domain: Witness<E>,
@@ -122,6 +122,8 @@ where
     Challenge(E::ScalarField),
 }
 
+// The natural CanonicalSerialize/Deserialize implementations for `FirstProofItem`; we follow the usual approach for enums.
+// CanonicalDeserialize needs Valid.
 impl<E: Pairing, H: homomorphism::Trait> Valid for FirstProofItem<E, H>
 where
     H::Domain: Witness<E>,
@@ -202,7 +204,7 @@ where
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+#[derive(CanonicalSerialize, Debug, PartialEq, Eq, CanonicalDeserialize, Clone)]
 pub struct Proof<E: Pairing, H: homomorphism::Trait>
 where
     H::Domain: Witness<E>,
@@ -264,7 +266,11 @@ where
     H::Codomain: Statement,
     R: RngCore + CryptoRng,
 {
-    // Step 1: Sample randomness
+    // It may seem natural to use `fiat_shamir::append_sigma_protocol_public_statement()` for Step 0, but in some protocols this
+    // would be unnecessary, e.g. in DeKARTv2 the public statement is the difference between two commitments,
+    // both of which are already appended
+
+    // Step 1: Sample randomness. Here the `witness` is used to make sure that `r` has the right dimension
     let r = witness.rand(rng);
 
     // Step 2: Compute commitment A = Ψ(r)
