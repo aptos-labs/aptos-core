@@ -9,7 +9,7 @@ use crate::{
         },
         runtime_types::{StructIdentifier, Type, TypeBuilder},
     },
-    module_id_interner::InternedModuleId,
+    module_id_interner::test_util::TEST_MODULE_ID_POOL,
 };
 use move_binary_format::file_format::AccessKind;
 use move_core_types::{
@@ -116,11 +116,8 @@ fn type_args_strategy() -> impl Strategy<Value = Vec<Type>> {
 }
 
 fn struct_id_strategy() -> impl Strategy<Value = StructIdentifier> {
-    (module_id_strategy(), identifier_strategy()).prop_map(|(module, name)| StructIdentifier {
-        module: module.clone(),
-        name,
-        interned_module_id: InternedModuleId::from_module_id_for_test(module.clone()),
-    })
+    (module_id_strategy(), identifier_strategy())
+        .prop_map(|(module, name)| StructIdentifier::new(&TEST_MODULE_ID_POOL, module, name))
 }
 
 fn module_id_strategy() -> impl Strategy<Value = ModuleId> {
@@ -166,8 +163,8 @@ fn resource_to_matching_specifier(
     resources.prop_flat_map(|(s, ts)| {
         prop_oneof![
             Just(ResourceSpecifier::Any),
-            Just(ResourceSpecifier::DeclaredAtAddress(s.module.address)),
-            Just(ResourceSpecifier::DeclaredInModule(s.module.clone())),
+            Just(ResourceSpecifier::DeclaredAtAddress(s.module().address)),
+            Just(ResourceSpecifier::DeclaredInModule(s.module().clone())),
             Just(ResourceSpecifier::Resource(s.clone())),
             Just(ResourceSpecifier::ResourceInstantiation(s, ts))
         ]

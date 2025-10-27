@@ -169,7 +169,7 @@ impl ReentrancyChecker {
     pub fn check_resource_access(&self, struct_id: &StructIdentifier) -> PartialVMResult<()> {
         if self
             .active_modules
-            .get(&struct_id.interned_module_id)
+            .get(&struct_id.interned_module_id())
             .copied()
             .unwrap_or_default()
             > 1

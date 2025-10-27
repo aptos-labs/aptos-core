@@ -410,16 +410,13 @@ mod test {
         let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
 
         let module_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap());
-        let interned_module_id = runtime_environment
-            .module_id_pool()
-            .intern_by_ref(&module_id);
 
         assert_ok!(
-            runtime_environment.struct_name_to_idx_for_test(StructIdentifier {
-                module: module_id,
-                interned_module_id,
-                name: Identifier::new(name).unwrap()
-            })
+            runtime_environment.struct_name_to_idx_for_test(StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new(name).unwrap()
+            ))
         );
     }
 

@@ -327,7 +327,8 @@ impl RuntimeEnvironment {
         Ok(match ty {
             Struct { idx, .. } | StructInstantiation { idx, .. } => {
                 let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
-                Some((struct_identifier.module, struct_identifier.name))
+                let (module, name) = struct_identifier.into_module_and_name();
+                Some((module, name))
             },
             Bool
             | U8

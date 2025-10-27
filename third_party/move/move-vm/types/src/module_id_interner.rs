@@ -50,11 +50,12 @@ impl Default for InternedModuleIdPool {
 ///
 /// This is done by allocating module ids from a global pool, which is only present in tests.
 #[cfg(test)]
-mod test_util {
+pub mod test_util {
     use super::*;
     use once_cell::sync::Lazy;
 
-    static TEST_MODULE_ID_POOL: Lazy<InternedModuleIdPool> = Lazy::new(InternedModuleIdPool::new);
+    pub static TEST_MODULE_ID_POOL: Lazy<InternedModuleIdPool> =
+        Lazy::new(InternedModuleIdPool::new);
 
     impl InternedModuleId {
         pub fn from_module_id_for_test(module_id: ModuleId) -> Self {

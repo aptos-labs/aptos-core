@@ -76,7 +76,7 @@ where
     /// guaranteeing no reallocations. This allows us to store the reference to the value in other
     /// data structures safely.
     ///
-    /// Note that this function is still UNSAFE, because the returned reference does not really have
+    /// SAFETY: this function is still UNSAFE, because the returned reference does not really have
     /// a static lifetime -- it cannot outlive the interner itself. If you need to give the reference
     /// out to an external caller, you need to shorten its lifetime to that of the interner.
     unsafe fn alloc(&mut self, val: T) -> &'static T {

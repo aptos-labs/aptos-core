@@ -5,7 +5,8 @@
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
 use crate::{
-    loaded_data::struct_name_indexing::StructNameIndex, module_id_interner::InternedModuleId,
+    loaded_data::struct_name_indexing::StructNameIndex,
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
 };
 use derivative::Derivative;
 use itertools::Itertools;
@@ -260,9 +261,36 @@ impl StructType {
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
-    pub module: ModuleId,
-    pub interned_module_id: InternedModuleId,
-    pub name: Identifier,
+    module: ModuleId,
+    interned_module_id: InternedModuleId,
+    name: Identifier,
+}
+
+impl StructIdentifier {
+    pub fn new(module_id_pool: &InternedModuleIdPool, module: ModuleId, name: Identifier) -> Self {
+        let interned_module_id = module_id_pool.intern_by_ref(&module);
+        Self {
+            module,
+            interned_module_id,
+            name,
+        }
+    }
+
+    pub fn module(&self) -> &ModuleId {
+        &self.module
+    }
+
+    pub fn interned_module_id(&self) -> InternedModuleId {
+        self.interned_module_id
+    }
+
+    pub fn name(&self) -> &Identifier {
+        &self.name
+    }
+
+    pub fn into_module_and_name(self) -> (ModuleId, Identifier) {
+        (self.module, self.name)
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]

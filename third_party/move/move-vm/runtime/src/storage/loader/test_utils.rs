@@ -86,16 +86,11 @@ impl MockStructDefinitionLoader {
     /// Returns an index for a struct name. The struct name is added to the environment.
     pub(crate) fn get_struct_identifier(&self, struct_name: &str) -> StructNameIndex {
         let module_id = ModuleId::from_str("0x1::foo").unwrap();
-        let interned_module_id = self
-            .runtime_environment
-            .module_id_pool()
-            .intern_by_ref(&module_id);
-
-        let struct_identifier = StructIdentifier {
-            module: module_id,
-            interned_module_id,
-            name: Identifier::from_str(struct_name).unwrap(),
-        };
+        let struct_identifier = StructIdentifier::new(
+            self.runtime_environment.module_id_pool(),
+            module_id,
+            Identifier::from_str(struct_name).unwrap(),
+        );
         self.runtime_environment
             .struct_name_to_idx_for_test(struct_identifier)
             .unwrap()
