@@ -21,7 +21,7 @@ use ark_std::{
 use std::io::Write;
 use std::fmt::Debug;
 use ark_serialize::{Validate, Read, Valid};
-
+use num_integer::Roots; // for integer sqrt
 
 pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
 
@@ -80,6 +80,7 @@ impl<E: Pairing> CanonicalSerialize for ProverPrecomputed<E> {
     ) -> Result<(), SerializationError> {
         // Only store powers_of_two metadata (length)
         self.powers_of_two.len().serialize_with_mode(&mut writer, compress)?;
+        self.h_denom_eval[0].serialize_with_mode(&mut writer, compress)?;
 
         Ok(())
     }
@@ -113,6 +114,21 @@ impl<E: Pairing> Valid for ProverPrecomputed<E> {
     }
 }
 
+fn scalar_to_u64<F: Field>(scalar: &F) -> Option<u64> {
+    let bytes = scalar.into_bigint().to_bytes_le();
+
+    if bytes.len() > 8 {
+        // More than 8 bytes → cannot fit in u64
+        return None;
+    }
+
+    // Pad bytes to 8 bytes for u64 conversion
+    let mut padded = [0u8; 8];
+    padded[..bytes.len()].copy_from_slice(&bytes);
+
+    Some(u64::from_le_bytes(padded))
+}
+
 impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -120,13 +136,15 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
         validate: Validate,
     ) -> Result<Self, SerializationError> {
         let powers_len = usize::deserialize_with_mode(&mut reader, compress, validate)?;
-        let first_power = E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?;
+        let first_h_denom_eval = scalar_to_u64(E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?).expect("Scalar did not fit in u64!");
 
         // Recompute powers_of_two
         let powers_of_two = compute_powers_of_two::<E>(powers_len);
 
         // Recompute h_denom_eval (you would use your earlier function here)
-        let h_denom_eval = compute_h_denom_eval_from_powers::<E>(&powers_of_two);
+        let max_n = invert_triangular_number(first_h_denom_eval);
+        let roots_of_unity = recompute_roots_of_unity(max_n + 1);
+        let h_denom_eval = compute_h_denom_eval::<E>(roots_of_unity);
 
         Ok(Self {
             powers_of_two,
@@ -149,7 +167,6 @@ impl<E: Pairing> CanonicalSerialize for VerifierPrecomputed<E> {
         compress: Compress,
     ) -> Result<(), SerializationError> {
         self.roots_of_unity.len().serialize_with_mode(&mut writer, compress)?;
-        self.roots_of_unity[0].serialize_with_mode(&mut writer, compress)?; // roots_of_unity[0] would be 1
         self.powers_of_two.len().serialize_with_mode(&mut writer, compress)?;
 
         Ok(())
@@ -203,13 +220,12 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
         validate: Validate,
     ) -> Result<Self, SerializationError> {
         // Deserialize metadata for roots_of_unity
-        let roots_len = usize::deserialize_with_mode(&mut reader, compress, validate)?;
-        let first_root = E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?;
+        let num_omegas = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
         // Deserialize metadata for powers_of_two
         let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
-        let roots_of_unity = recompute_roots_of_unity::<E>(first_root, roots_len);
+        let roots_of_unity = recompute_roots_of_unity::<E>(num_omegas);
         let powers_of_two = compute_powers_of_two::<E>(max_ell);
 
         // Reconstruct the VerificationKey
@@ -217,16 +233,18 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
     }
 }
 
-fn recompute_roots_of_unity<E: Pairing>(first_root: E::ScalarField, len: usize) -> Vec<E::ScalarField> {
-    let mut roots = Vec::with_capacity(len);
-    roots.push(E::ScalarField::ONE);
-    let mut current = first_root;
-    for _ in 1..len {
-        roots.push(current);
-        current *= first_root; // naive exponentiation
-    }
-    debug_assert_eq!(current, E::ScalarField::ONE);
-    roots
+/// Computes the maximum `n` such that 1 + 2 + ... + n <= `a`
+/// using integer arithmetic and num_integer crate.
+fn invert_triangular_number(a: u64) -> u64 {
+    // Solve n*(n+1)/2 <= a => n^2 + n - 2a <= 0
+    let discriminant = 1 + 8 * a;
+    let sqrt_disc = discriminant.sqrt(); // integer sqrt
+    (sqrt_disc - 1) / 2
+}
+
+fn recompute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarField> {
+    let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
+        .expect("Could not reconstruct evaluation domain").elements().collect();
 }
 
 fn compute_powers_of_two<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
@@ -237,15 +255,14 @@ fn compute_powers_of_two<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
 
 #[allow(non_snake_case)]
 fn compute_h_denom_eval<E: Pairing>(
-    max_n: usize,
     roots_of_unity_in_eval_dom: Vec<E::ScalarField>
 ) -> Vec<E::ScalarField> {
-    let num_omegas = max_n + 1;
+    let num_omegas = roots_of_unity_in_eval_dom.len();
     let mut h_denom_eval = Vec::with_capacity(num_omegas);
 
     // First element: inverse of (max_n * (max_n + 1) / 2)
     h_denom_eval.push(
-        E::ScalarField::from((max_n * (max_n + 1) / 2) as u64)
+        E::ScalarField::from(((num_omegas - 1) * num_omegas / 2) as u64)
             .inverse()
             .expect("Value should be invertible"),
     );
@@ -296,7 +313,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let (vk_hkzg, ck_S) =
             univariate_hiding_kzg::setup(max_n + 1, group_generators.clone(), trapdoor, rng);
 
-        let h_denom_eval = compute_h_denom_eval(max_n, &ck_S.roots_of_unity_in_eval_dom);
+        let h_denom_eval = compute_h_denom_eval(&ck_S.roots_of_unity_in_eval_dom);
 
         let powers_of_two = compute_powers_of_two::<E>(max_ell);
 
