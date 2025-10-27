@@ -6,10 +6,10 @@ use crate::utils::{
 };
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
-use blstrs::{pairing, Bls12, G1Affine, G1Projective, G2Affine, G2Prepared, G2Projective, Gt};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
 use group::{Curve, Group};
 use num_traits::{One, Zero};
-use pairing::{MillerLoopResult, MultiMillerLoop};
 use rayon::ThreadPool;
 use sha3::Digest;
 use std::ops::{Mul, MulAssign};
@@ -88,24 +88,6 @@ pub fn g2_multi_exp(bases: &[G2Projective], scalars: &[blstrs::Scalar]) -> G2Pro
     }
 }
 
-pub fn multi_pairing<'a, I1, I2>(lhs: I1, rhs: I2) -> Gt
-where
-    I1: Iterator<Item = &'a G1Projective>,
-    I2: Iterator<Item = &'a G2Projective>,
-{
-    let res = <Bls12 as MultiMillerLoop>::multi_miller_loop(
-        lhs.zip(rhs)
-            .map(|(g1, g2)| (g1.to_affine(), G2Prepared::from(g2.to_affine())))
-            .collect::<Vec<(G1Affine, G2Prepared)>>()
-            .iter()
-            .map(|(g1, g2)| (g1, g2))
-            .collect::<Vec<(&G1Affine, &G2Prepared)>>()
-            .as_slice(),
-    );
-
-    res.final_exponentiation()
-}
-
 pub fn parallel_multi_pairing<'a, I1, I2>(
     lhs: I1,
     rhs: I2,
@@ -135,7 +117,7 @@ where
     I1: Iterator<Item = &'a G1Projective>,
     I2: Iterator<Item = &'a G2Projective>,
 {
-    multi_pairing(lhs, rhs)
+    aptos_crypto::blstrs::multi_pairing(lhs, rhs)
 }
 
 /// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
@@ -144,7 +126,7 @@ where
     I1: Iterator<Item = &'a G2Projective>,
     I2: Iterator<Item = &'a G1Projective>,
 {
-    multi_pairing(rhs, lhs)
+    aptos_crypto::blstrs::multi_pairing(rhs, lhs)
 }
 
 /// Useful for macro'd WVUF code (because blstrs was not written with generics in mind...).
@@ -215,10 +197,15 @@ where
     powers
 }
 
+pub(crate) fn powers_of_two<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
+    (0..ell).map(|j| E::ScalarField::from(1u64 << j)).collect()
+}
+
 /// Commit to scalars by multiplying a base group element with each scalar.
 ///
 /// Equivalent to `[base * s for s in scalars]`.
-pub fn commit_to_scalars<G, F>(commitment_base: &G, scalars: &[F]) -> Vec<G>
+#[allow(dead_code)]
+pub(crate) fn commit_to_scalars<G, F>(commitment_base: &G, scalars: &[F]) -> Vec<G>
 where
     G: CurveGroup<ScalarField = F>,
     F: PrimeField,
@@ -227,7 +214,7 @@ where
 }
 
 #[allow(dead_code)]
-fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
+pub(crate) fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
     let mut buf = Vec::with_capacity(msg.len() + dst.len() + 1);
     buf.extend_from_slice(msg);
     buf.extend_from_slice(dst);
@@ -244,4 +231,23 @@ fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
     }
 
     panic!("Failed to hash to affine group element");
+}
+
+pub fn ark_se<S, A: CanonicalSerialize>(a: &A, s: S) -> Result<S::Ok, S::Error>
+where
+    S: serde::Serializer,
+{
+    let mut bytes = vec![];
+    a.serialize_with_mode(&mut bytes, Compress::No)
+        .map_err(serde::ser::Error::custom)?;
+    s.serialize_bytes(&bytes)
+}
+
+pub fn ark_de<'de, D, A: CanonicalDeserialize>(data: D) -> Result<A, D::Error>
+where
+    D: serde::de::Deserializer<'de>,
+{
+    let s: Vec<u8> = serde::de::Deserialize::deserialize(data)?;
+    let a = A::deserialize_with_mode(s.as_slice(), Compress::No, Validate::No);
+    a.map_err(serde::de::Error::custom)
 }

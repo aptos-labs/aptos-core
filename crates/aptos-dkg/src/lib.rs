@@ -20,6 +20,7 @@
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::{rand::Rng, UniformRand};
 pub use utils::random::DST_RAND_CORE_HELL;
 
 pub mod algebra;
@@ -53,7 +54,7 @@ impl<E: Pairing> Scalar<E> {
     /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]` without copying.
     ///
     /// # Safety
-    /// This function is safe because `Scalar<E>` is `#[repr(transparent)]`
+    /// These functions are safe because `Scalar<E>` is `#[repr(transparent)]`
     /// over `E::ScalarField`, so the memory layouts are guaranteed to match.
     pub fn slice_as_inner(slice: &[Self]) -> &[E::ScalarField] {
         unsafe { std::slice::from_raw_parts(slice.as_ptr() as *const E::ScalarField, slice.len()) }
@@ -62,5 +63,20 @@ impl<E: Pairing> Scalar<E> {
     pub fn vec_into_inner(v: Vec<Self>) -> Vec<E::ScalarField> {
         let v = std::mem::ManuallyDrop::new(v);
         unsafe { Vec::from_raw_parts(v.as_ptr() as *mut E::ScalarField, v.len(), v.capacity()) }
+    }
+
+    pub fn vec_from_inner(v: Vec<E::ScalarField>) -> Vec<Self> {
+        let v = std::mem::ManuallyDrop::new(v);
+        unsafe { Vec::from_raw_parts(v.as_ptr() as *mut Self, v.len(), v.capacity()) }
+    }
+
+    pub fn vecvec_from_inner(vv: Vec<Vec<E::ScalarField>>) -> Vec<Vec<Self>> {
+        vv.into_iter().map(Self::vec_from_inner).collect()
+    }
+}
+
+impl<E: Pairing> Scalar<E> {
+    pub fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
+        Scalar(E::ScalarField::rand(rng))
     }
 }

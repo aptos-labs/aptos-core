@@ -359,7 +359,7 @@ pub(crate) fn fiat_shamir_das<T: traits::Transcript, A: Serialize>(
 ) -> (Vec<blstrs::Scalar>, Vec<blstrs::Scalar>) {
     let mut fs_t = fiat_shamir::initialize_pvss_transcript::<T>(sc, pp, eks, dst);
 
-    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_signing_pub_keys(&mut fs_t, spks); // Slightly altered the order here!
+    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_signing_pub_keys(&mut fs_t, spks);
     <merlin::Transcript as fiat_shamir::PVSS<T>>::append_auxs(&mut fs_t, auxs);
     <merlin::Transcript as fiat_shamir::PVSS<T>>::append_transcript(&mut fs_t, trx);
 

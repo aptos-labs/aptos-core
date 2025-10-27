@@ -95,38 +95,6 @@ impl<E: Pairing> CanonicalSerialize for ProverPrecomputed<E> {
     }
 }
 
-impl<E: Pairing> Valid for ProverPrecomputed<E> {
-    fn check(&self) -> Result<(), SerializationError> {
-        if self.powers_of_two.is_empty() || self.h_denom_eval.is_empty() {
-            return Err(SerializationError::InvalidData);
-        }
-
-        let one = E::ScalarField::ONE;
-
-        let powers_of_two_ones = self.powers_of_two.iter().filter(|&&x| x == one).count();
-        if powers_of_two_ones != 1 {
-            return Err(SerializationError::InvalidData);
-        }
-
-        Ok(())
-    }
-}
-
-fn scalar_to_u32<F: ark_ff::PrimeField>(scalar: &F) -> Option<u32> {
-    let bytes = scalar.into_bigint().to_bytes_le();
-
-    if bytes.len() > 4 {
-        // More than 4 bytes → cannot fit in u32
-        return None;
-    }
-
-    // Pad bytes to 4 bytes for u32 conversion
-    let mut padded = [0u8; 4];
-    padded[..bytes.len()].copy_from_slice(&bytes);
-
-    Some(u32::from_le_bytes(padded))
-}
-
 impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -137,20 +105,28 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
         let first_h_denom_eval =
             E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?;
         let first_h_denom_eval_as_u32 =
-            scalar_to_u32(&first_h_denom_eval).expect("Scalar did not fit in u64!");
+            scalar_to_u32(&first_h_denom_eval).expect("first_h_denom_eval did not fit in u32!");
 
         // Recompute powers_of_two
-        let powers_of_two = compute_powers_of_two::<E>(powers_len);
+        let powers_of_two = utils::powers_of_two::<E>(powers_len);
 
         // Recompute h_denom_eval (you would use your earlier function here)
         let max_n = invert_triangular_number(first_h_denom_eval_as_u32 as usize);
-        let roots_of_unity = recompute_roots_of_unity::<E>(max_n);
+        let roots_of_unity = compute_roots_of_unity::<E>(max_n);
         let h_denom_eval = compute_h_denom_eval::<E>(&roots_of_unity);
 
         Ok(Self {
             powers_of_two,
             h_denom_eval,
         })
+    }
+}
+
+// Required by CanonicalDeserialize
+impl<E: Pairing> Valid for ProverPrecomputed<E> {
+    #[inline]
+    fn check(&self) -> Result<(), SerializationError> {
+        Ok(())
     }
 }
 
@@ -187,29 +163,6 @@ impl<E: Pairing> CanonicalSerialize for VerifierPrecomputed<E> {
     }
 }
 
-impl<E: Pairing> Valid for VerifierPrecomputed<E> {
-    fn check(&self) -> Result<(), SerializationError> {
-        if self.powers_of_two.is_empty() || self.roots_of_unity.is_empty() {
-            return Err(SerializationError::InvalidData);
-        }
-
-        // Validate that E::ScalarField::ONE occurs exactly once in each
-        let one = E::ScalarField::ONE;
-
-        let roots_of_unity_ones = self.roots_of_unity.iter().filter(|&&x| x == one).count();
-        if roots_of_unity_ones != 1 {
-            return Err(SerializationError::InvalidData);
-        }
-
-        let powers_of_two_ones = self.powers_of_two.iter().filter(|&&x| x == one).count();
-        if powers_of_two_ones != 1 {
-            return Err(SerializationError::InvalidData);
-        }
-
-        Ok(())
-    }
-}
-
 impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
     fn deserialize_with_mode<R: Read>(
         mut reader: R,
@@ -222,8 +175,8 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
         // Deserialize metadata for powers_of_two
         let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
-        let roots_of_unity = recompute_roots_of_unity::<E>(num_omegas);
-        let powers_of_two = compute_powers_of_two::<E>(max_ell);
+        let roots_of_unity = compute_roots_of_unity::<E>(num_omegas);
+        let powers_of_two = utils::powers_of_two::<E>(max_ell);
 
         // Reconstruct the VerificationKey
         Ok(Self {
@@ -233,23 +186,18 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
     }
 }
 
-/// Computes the maximum `n` such that 1 + 2 + ... + n <= `a`
-/// using integer arithmetic and num_integer crate.
-fn invert_triangular_number(a: usize) -> usize {
-    // Solve n*(n+1)/2 <= a => n^2 + n - 2a <= 0
-    let discriminant = 1 + 8 * a;
-    let sqrt_disc = discriminant.sqrt(); // integer sqrt
-    (sqrt_disc - 1) / 2
+// Required by CanonicalDeserialize
+impl<E: Pairing> Valid for VerifierPrecomputed<E> {
+    #[inline]
+    fn check(&self) -> Result<(), SerializationError> {
+        Ok(())
+    }
 }
 
-fn recompute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarField> {
+fn compute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarField> {
     let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
         .expect("Could not reconstruct evaluation domain");
     eval_dom.elements().collect()
-}
-
-fn compute_powers_of_two<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
-    (0..ell).map(|j| E::ScalarField::from(1u64 << j)).collect()
 }
 
 #[allow(non_snake_case)]
@@ -308,7 +256,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
-        let powers_of_two = compute_powers_of_two::<E>(max_ell);
+        let powers_of_two = utils::powers_of_two::<E>(max_ell);
 
         let prover_precomputed = ProverPrecomputed {
             powers_of_two: powers_of_two.clone(),
@@ -983,6 +931,59 @@ pub mod two_term_msm {
 
         fn dst_verifier(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER".to_vec()
+        }
+    }
+}
+
+/// Computes the maximum `n` such that 1 + 2 + ... + n <= `a`
+/// using integer arithmetic and num_integer crate.
+fn invert_triangular_number(a: usize) -> usize {
+    // Solve n*(n+1)/2 <= a => n^2 + n - 2a <= 0
+    let discriminant = 1 + 8 * a;
+    let sqrt_disc = discriminant.sqrt(); // integer sqrt
+    (sqrt_disc - 1) / 2
+}
+
+// TODO: There's probably a better way to do this?
+fn scalar_to_u32<F: ark_ff::PrimeField>(scalar: &F) -> Option<u32> {
+    let mut bytes = scalar.into_bigint().to_bytes_le();
+
+    while bytes.last() == Some(&0) {
+        bytes.pop();
+    }
+
+    if bytes.len() > 4 {
+        // More than 4 bytes → cannot fit in u32
+        return None;
+    }
+
+    // Pad bytes to 4 bytes for u32 conversion
+    let mut padded = [0u8; 4];
+    padded[..bytes.len()].copy_from_slice(&bytes);
+
+    Some(u32::from_le_bytes(padded))
+}
+
+#[cfg(test)]
+mod test_invert_triangular_number {
+    use super::{invert_triangular_number, scalar_to_u32};
+    use ark_bn254::Fr;
+
+    #[test]
+    fn test_invert_triangular_number_small_values() {
+        assert_eq!(invert_triangular_number(0), 0);
+        assert_eq!(invert_triangular_number(1), 1); // 1 <= 1
+        assert_eq!(invert_triangular_number(2), 1); // 1+2 > 2
+        assert_eq!(invert_triangular_number(3), 2); // 1+2=3 <= 3
+        assert_eq!(invert_triangular_number(5), 2); // 1+2+3=6 > 5
+        assert_eq!(invert_triangular_number(6), 3);
+    }
+
+    #[test]
+    fn test_round_trip_for_valid_values() {
+        for i in [0, 1, 42, 255, 65_535, 1_000_000, u32::MAX] {
+            let scalar = Fr::from(i as u64);
+            assert_eq!(scalar_to_u32(&scalar), Some(i));
         }
     }
 }
