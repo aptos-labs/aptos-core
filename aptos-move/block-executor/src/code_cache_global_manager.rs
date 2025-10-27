@@ -672,6 +672,7 @@ mod test {
     #[cfg(fuzzing)]
     #[test]
     fn test_snapshot_and_rollback_hot_cache() {
+        use std::sync::Arc;
         // Use a real state with framework so we can populate the hot cache with verified modules
         let state_view = InMemoryStateStore::from_head_genesis();
         let mut guard = AptosModuleCacheManagerGuard::none_for_state_view(&state_view);
@@ -690,15 +691,25 @@ mod test {
             Identifier::new("transaction_validation").unwrap(),
         );
         // Ensure it's present before mutation
-        assert!(guard.module_cache().contains_not_overridden(&tx_val_id));
-        guard.module_cache().mark_overridden(&tx_val_id);
-        assert!(!guard.module_cache().contains_not_overridden(&tx_val_id));
+        let module = guard
+            .module_cache()
+            .get(&tx_val_id)
+            .expect("module present");
+        guard.module_cache_mut().flush();
+        assert!(guard.module_cache().get(&tx_val_id).is_none());
+
+        assert_ne!(guard.module_cache().size_in_bytes(), size_before);
+        assert_ne!(guard.module_cache().num_modules(), count_before);
 
         // Rollback and verify restored state
         guard.rollback_hot_cache(snapshot);
 
         assert_eq!(guard.module_cache().size_in_bytes(), size_before);
         assert_eq!(guard.module_cache().num_modules(), count_before);
-        assert!(guard.module_cache().contains_not_overridden(&tx_val_id));
+        let got = guard
+            .module_cache()
+            .get(&tx_val_id)
+            .expect("module present");
+        assert!(Arc::ptr_eq(&got, &module));
     }
 }
