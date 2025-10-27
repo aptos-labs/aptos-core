@@ -1,0 +1,13 @@
+remote_endpoint: ~
+name: "v1.37-disable-enum-option"
+proposals:
+  - name: disable_enum_option
+    metadata:
+      title: "Proposal to disable enum-based option"
+      description: "See https://github.com/aptos-foundation/AIPs/pull/633"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          disabled:
+            - enable_enum_option
+
