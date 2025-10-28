@@ -304,11 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-<<<<<<< HEAD
-version = "7.10.0"
-=======
 version = "7.10.2"
->>>>>>> ecf0022ca1 ([Aptos CLI] update Cargo.toml for new version)
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -1099,7 +1095,9 @@ dependencies = [
  "bitvec",
  "blake2",
  "blake2-rfc",
+ "bls12_381",
  "blst",
+ "blstrs",
  "bulletproofs",
  "byteorder",
  "bytes",
@@ -1107,8 +1105,10 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "curve25519-dalek-ng",
  "digest 0.9.0",
+ "dudect-bencher",
  "ed25519-dalek 1.0.1",
  "ff",
+ "group",
  "hex",
  "hkdf 0.10.0",
  "libsecp256k1",
@@ -1117,8 +1117,10 @@ dependencies = [
  "neptune",
  "num-bigint 0.3.3",
  "num-integer",
+ "num-traits",
  "once_cell",
  "p256",
+ "pairing",
  "proptest",
  "proptest-derive",
  "rand 0.7.3",
@@ -1380,7 +1382,6 @@ dependencies = [
  "num-integer",
  "num-traits",
  "num_cpus",
- "once_cell",
  "pairing",
  "rand 0.7.3",
  "rand_core 0.5.1",
@@ -2793,17 +2794,12 @@ dependencies = [
  "anyhow",
  "aptos-crypto",
  "aptos-crypto-derive",
- "aptos-dkg",
  "aptos-types",
- "ark-bls12-381 0.5.0",
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
- "ark-serialize 0.5.0",
- "ark-std 0.5.0",
  "bcs 0.1.4",
  "blstrs",
  "derivation-path",
  "ed25519-dalek 1.0.1",
+ "group",
  "hex",
  "hmac 0.12.1",
  "jsonwebtoken 8.3.0",
@@ -2823,9 +2819,8 @@ dependencies = [
  "aptos-infallible",
  "aptos-keyless-pepper-common",
  "aptos-types",
- "ark-bls12-381 0.5.0",
- "ark-serialize 0.5.0",
  "bcs 0.1.4",
+ "blstrs",
  "clap 4.5.21",
  "firestore",
  "hex",
@@ -2850,20 +2845,21 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-time-service",
  "aptos-types",
- "ark-bls12-381 0.5.0",
  "ark-bn254",
- "ark-ec 0.5.0",
- "ark-ff 0.5.0",
  "ark-groth16",
  "ark-serialize 0.5.0",
  "async-trait",
  "bcs 0.1.4",
+ "blstrs",
  "clap 4.5.21",
+ "dudect-bencher",
  "firestore",
  "hex",
  "hyper 0.14.28",
  "jsonwebtoken 8.3.0",
  "jwt",
+ "more-asserts",
+ "num-traits",
  "once_cell",
  "rand 0.7.3",
  "regex",
@@ -6275,7 +6271,7 @@ checksum = "23285ad32269793932e830392f2fe2f83e26488fd3ec778883a93c8323735780"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.4",
- "constant_time_eq 0.3.0",
+ "constant_time_eq 0.3.1",
 ]
 
 [[package]]
@@ -6286,7 +6282,7 @@ checksum = "94230421e395b9920d23df13ea5d77a20e1725331f90fbbf6df6040b33f756ae"
 dependencies = [
  "arrayref",
  "arrayvec 0.7.4",
- "constant_time_eq 0.3.0",
+ "constant_time_eq 0.3.1",
 ]
 
 [[package]]
@@ -6328,6 +6324,19 @@ dependencies = [
  "futures-lite 2.2.0",
  "piper",
  "tracing",
+]
+
+[[package]]
+name = "bls12_381"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d7bc6d6292be3a19e6379786dac800f551e5865a5bb51ebbe3064ab80433f403"
+dependencies = [
+ "ff",
+ "group",
+ "pairing",
+ "rand_core 0.6.4",
+ "subtle",
 ]
 
 [[package]]
@@ -7264,9 +7273,9 @@ checksum = "245097e9a4535ee1e3e3931fcfcd55a796a44c643e8596ff6566d68f09b87bbc"
 
 [[package]]
 name = "constant_time_eq"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7144d30dcf0fafbce74250a3963025d8d52177934239851c917d29f1df280c2"
+checksum = "7c74b8349d32d297c9134b8c88677813a227df8f779daa29bfc29c183fe3dca6"
 
 [[package]]
 name = "convert_case"
@@ -8298,6 +8307,17 @@ name = "dtoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6add3b8cff394282be81f3fc1a0605db594ed69890078ca6e2cab1c408bcf04"
+
+[[package]]
+name = "dudect-bencher"
+version = "0.6.0"
+source = "git+https://github.com/aptos-labs/dudect-bencher?rev=9515677c83c58884c1a8c764251753269d46fc0e#9515677c83c58884c1a8c764251753269d46fc0e"
+dependencies = [
+ "clap 2.34.0",
+ "ctrlc",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+]
 
 [[package]]
 name = "dunce"
@@ -13029,6 +13049,7 @@ dependencies = [
  "mockall 0.11.4",
  "move-binary-format",
  "move-core-types",
+ "once_cell",
  "parking_lot 0.12.1",
  "proptest",
  "rand 0.7.3",
