@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.10.2]
+- Fix backward compatibility issue of enum-based option module
+
 ## [7.10.1]
 - Add support into Move 2.2 for builtin constant `__COMPILE_FOR_TESTING__` 
 - Update the default version of move formatter to 1.3.7
