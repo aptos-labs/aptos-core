@@ -182,10 +182,44 @@ fn native_monotonically_increasing_counter_internal(
         monotonically_increasing_counter |= local_counter;
         Ok(smallvec![Value::u128(monotonically_increasing_counter)])
     } else {
+        // When transaction context is not available, return an error
         Err(SafeNativeError::Abort {
             abort_code: error::invalid_state(abort_codes::ETRANSACTION_CONTEXT_NOT_AVAILABLE),
         })
     }
+}
+
+/***************************************************************************************************
+ * native fun monotonically_increasing_counter_internal_for_test_only
+ *
+ *   gas cost: base_cost
+ *
+ *   This is a test-only version that returns increasing counter values without requiring
+ *   a user transaction context. Used when COMPILE_FOR_TESTING flag is enabled.
+ *
+ **************************************************************************************************/
+fn native_monotonically_increasing_counter_internal_for_test_only(
+    context: &mut SafeNativeContext,
+    _ty_args: Vec<Type>,
+    _args: VecDeque<Value>,
+) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    context.charge(TRANSACTION_CONTEXT_MONOTONICALLY_INCREASING_COUNTER_BASE)?;
+
+    let transaction_context = context
+        .extensions_mut()
+        .get_mut::<NativeTransactionContext>();
+    if transaction_context.local_counter == u16::MAX {
+        return Err(SafeNativeError::Abort {
+            abort_code: error::invalid_state(
+                abort_codes::EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW,
+            ),
+        });
+    }
+    transaction_context.local_counter += 1;
+    let local_counter = transaction_context.local_counter as u128;
+
+    // For testing, return just the local counter value to verify monotonically increasing behavior
+    Ok(smallvec![Value::u128(local_counter)])
 }
 
 /***************************************************************************************************
@@ -470,6 +504,10 @@ pub fn make_all(
         (
             "monotonically_increasing_counter_internal",
             native_monotonically_increasing_counter_internal,
+        ),
+        (
+            "monotonically_increasing_counter_internal_for_test_only",
+            native_monotonically_increasing_counter_internal_for_test_only,
         ),
         ("get_txn_hash", native_get_txn_hash),
         ("sender_internal", native_sender_internal),

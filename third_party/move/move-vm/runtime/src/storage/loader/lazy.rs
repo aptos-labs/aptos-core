@@ -195,8 +195,8 @@ where
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
 
-        self.metered_load_module(gas_meter, traversal_context, &struct_name.module)
-            .and_then(|module| module.get_struct(&struct_name.name))
+        self.metered_load_module(gas_meter, traversal_context, struct_name.module())
+            .and_then(|module| module.get_struct(struct_name.name()))
             .map_err(|err| err.to_partial())
     }
 
