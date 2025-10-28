@@ -22,15 +22,6 @@ use ark_std::{
 };
 use std::{fmt::Debug, io::Write};
 
-// impl FixedBaseMsmsTrait<
-//         Domain: Witness<E>,
-//         Scalar = E::ScalarField,
-//         Base = E::G1Affine,
-//         MsmOutput = E::G1,
-//     > + Sized {
-//         ...
-//     }
-
 pub trait Trait<E: Pairing>:
     FixedBaseMsmsTrait<
         Domain: Witness<E>,
