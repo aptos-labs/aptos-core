@@ -4,6 +4,17 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+<<<<<<< HEAD
+=======
+## [7.10.2]
+- Fix backward compatibility issue of enum-based option module
+
+## [7.10.1]
+- Add support into Move 2.2 for builtin constant `__COMPILE_FOR_TESTING__` 
+- Update the default version of move formatter to 1.3.7
+- Update the default version of move mutation test tool to 2.0.0
+
+>>>>>>> 2dc388fae2 ([Aptos CLI] release 7.10.2)
 ## [7.10.0]
 - Add support into Move 2.3 for signed integer types and builtin constants (`MAX_U8`, ..., `MIN_U8`, ..., `__COMPILE_FOR_TESTING__`). Move 2.3 is not yet supported on testnet or mainnet, but can be used for local development by providing `--language-version 2.3` to the CLI.
 

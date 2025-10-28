@@ -75,7 +75,7 @@ impl Default for VMConfig {
             enable_enum_option: true,
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
-            enable_framework_for_option: true,
+            enable_framework_for_option: false,
         }
     }
 }
