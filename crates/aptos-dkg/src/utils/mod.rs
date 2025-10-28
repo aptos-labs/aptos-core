@@ -4,9 +4,8 @@
 use crate::utils::{
     parallel_multi_pairing::parallel_multi_pairing_slice, random::random_scalar_from_uniform_bytes,
 };
-use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
+use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
 use group::{Curve, Group};
 use num_traits::{One, Zero};
@@ -195,59 +194,4 @@ where
     }
 
     powers
-}
-
-pub(crate) fn powers_of_two<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
-    (0..ell).map(|j| E::ScalarField::from(1u64 << j)).collect()
-}
-
-/// Commit to scalars by multiplying a base group element with each scalar.
-///
-/// Equivalent to `[base * s for s in scalars]`.
-#[allow(dead_code)]
-pub(crate) fn commit_to_scalars<G, F>(commitment_base: &G, scalars: &[F]) -> Vec<G>
-where
-    G: CurveGroup<ScalarField = F>,
-    F: PrimeField,
-{
-    scalars.iter().map(|s| *commitment_base * s).collect()
-}
-
-#[allow(dead_code)]
-pub(crate) fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
-    let mut buf = Vec::with_capacity(msg.len() + dst.len() + 1);
-    buf.extend_from_slice(msg);
-    buf.extend_from_slice(dst);
-    buf.push(0); // placeholder for counter
-
-    for ctr in 0..=u8::MAX {
-        *buf.last_mut().unwrap() = ctr;
-
-        let hashed = sha3::Sha3_512::digest(&buf);
-
-        if let Some(p) = A::from_random_bytes(&hashed) {
-            return p;
-        }
-    }
-
-    panic!("Failed to hash to affine group element");
-}
-
-pub fn ark_se<S, A: CanonicalSerialize>(a: &A, s: S) -> Result<S::Ok, S::Error>
-where
-    S: serde::Serializer,
-{
-    let mut bytes = vec![];
-    a.serialize_with_mode(&mut bytes, Compress::No)
-        .map_err(serde::ser::Error::custom)?;
-    s.serialize_bytes(&bytes)
-}
-
-pub fn ark_de<'de, D, A: CanonicalDeserialize>(data: D) -> Result<A, D::Error>
-where
-    D: serde::de::Deserializer<'de>,
-{
-    let s: Vec<u8> = serde::de::Deserialize::deserialize(data)?;
-    let a = A::deserialize_with_mode(s.as_slice(), Compress::No, Validate::No);
-    a.map_err(serde::de::Error::custom)
 }

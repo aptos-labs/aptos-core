@@ -10,8 +10,9 @@ use crate::{
     sigma_protocol::{self, homomorphism, homomorphism::Trait as HomomorphismTrait, Trait},
     utils, Scalar,
 };
+use aptos_crypto::arkworks;
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
-use ark_ff::{AdditiveGroup, BigInteger, Field};
+use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
@@ -78,7 +79,6 @@ impl<E: Pairing> CanonicalSerialize for ProverPrecomputed<E> {
         mut writer: W,
         compress: Compress,
     ) -> Result<(), SerializationError> {
-        // Only store powers_of_two metadata (length)
         self.powers_of_two
             .len()
             .serialize_with_mode(&mut writer, compress)?;
@@ -104,14 +104,14 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
         let powers_len = usize::deserialize_with_mode(&mut reader, compress, validate)?;
         let first_h_denom_eval =
             E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?;
-        let first_h_denom_eval_as_u32 =
-            scalar_to_u32(&first_h_denom_eval).expect("first_h_denom_eval did not fit in u32!");
+        let first_h_denom_eval_as_u32 = arkworks::scalar_to_u32(&first_h_denom_eval)
+            .expect("first_h_denom_eval did not fit in u32!");
 
         // Recompute powers_of_two
-        let powers_of_two = utils::powers_of_two::<E>(powers_len);
+        let powers_of_two = arkworks::powers_of_two::<E>(powers_len);
 
         // Recompute h_denom_eval (you would use your earlier function here)
-        let max_n = invert_triangular_number(first_h_denom_eval_as_u32 as usize);
+        let max_n = floored_triangular_root(first_h_denom_eval_as_u32 as usize);
         let roots_of_unity = compute_roots_of_unity::<E>(max_n);
         let h_denom_eval = compute_h_denom_eval::<E>(&roots_of_unity);
 
@@ -176,7 +176,7 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
         let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
         let roots_of_unity = compute_roots_of_unity::<E>(num_omegas);
-        let powers_of_two = utils::powers_of_two::<E>(max_ell);
+        let powers_of_two = arkworks::powers_of_two::<E>(max_ell);
 
         // Reconstruct the VerificationKey
         Ok(Self {
@@ -214,7 +214,7 @@ fn compute_h_denom_eval<E: Pairing>(
             .expect("Value should be invertible"),
     );
 
-    // Remaining elements
+    // Remaining elements: h_denom_eval[i] is the inverse of (max_n + 1) / (ω^i (ω^i - 1) )
     h_denom_eval.extend(roots_of_unity_in_eval_dom.iter().skip(1).map(|&root| {
         (root * (root - E::ScalarField::ONE)) / E::ScalarField::from(num_omegas as u64)
     }));
@@ -256,7 +256,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
-        let powers_of_two = utils::powers_of_two::<E>(max_ell);
+        let powers_of_two = arkworks::powers_of_two::<E>(max_ell);
 
         let prover_precomputed = ProverPrecomputed {
             powers_of_two: powers_of_two.clone(),
@@ -381,6 +381,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 poly_randomness: Scalar(r),
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
+            &two_term_msm::CodomainShape(hatC - comm.0),
             fs_t,
             rng,
         );
@@ -738,16 +739,15 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             let sum1: E::ScalarField = verifier_precomputed
                 .powers_of_two
                 .iter()
-                .copied()
                 .zip(a_js.iter())
-                .map(|(power_of_two, aj)| power_of_two * aj)
+                .map(|(&power_of_two, aj)| power_of_two * aj)
                 .sum();
 
             // Compute sum_j beta_j a_j (a_j - 1)
             let sum2: E::ScalarField = beta_js
                 .iter()
-                .zip(a_js.iter().copied())
-                .map(|(beta, a)| a * (a - E::ScalarField::ONE) * beta) // TODO: submit PR to change arkworks so beta can be on the left...
+                .zip(a_js.iter())
+                .map(|(beta, &a)| a * (a - E::ScalarField::ONE) * beta) // TODO: submit PR to change arkworks so beta can be on the left...
                 .sum();
 
             beta * (*a - sum1) + sum2
@@ -928,62 +928,30 @@ pub mod two_term_msm {
         fn dst(&self) -> Vec<u8> {
             b"DEKART_V2_SIGMA_PROTOCOL".to_vec()
         }
-
-        fn dst_verifier(&self) -> Vec<u8> {
-            b"DEKART_V2_SIGMA_PROTOCOL_VERIFIER".to_vec()
-        }
     }
 }
 
-/// Computes the maximum `n` such that 1 + 2 + ... + n <= `a`
+/// The `n`th triangular number is the sum of the `n` natural numbers from 1 to `n`.
+/// Here we computes the maximum `n` such that `1 + 2 + ... + n <= a`,
 /// using integer arithmetic and num_integer crate.
-fn invert_triangular_number(a: usize) -> usize {
-    // Solve n*(n+1)/2 <= a => n^2 + n - 2a <= 0
+fn floored_triangular_root(a: usize) -> usize {
+    // Solve `n*(n+1)/2 <= a`, or equivalently `n^2 + n - 2a <= 0`
     let discriminant = 1 + 8 * a;
     let sqrt_disc = discriminant.sqrt(); // integer sqrt
     (sqrt_disc - 1) / 2
 }
 
-// TODO: There's probably a better way to do this?
-fn scalar_to_u32<F: ark_ff::PrimeField>(scalar: &F) -> Option<u32> {
-    let mut bytes = scalar.into_bigint().to_bytes_le();
-
-    while bytes.last() == Some(&0) {
-        bytes.pop();
-    }
-
-    if bytes.len() > 4 {
-        // More than 4 bytes → cannot fit in u32
-        return None;
-    }
-
-    // Pad bytes to 4 bytes for u32 conversion
-    let mut padded = [0u8; 4];
-    padded[..bytes.len()].copy_from_slice(&bytes);
-
-    Some(u32::from_le_bytes(padded))
-}
-
 #[cfg(test)]
 mod test_invert_triangular_number {
-    use super::{invert_triangular_number, scalar_to_u32};
-    use ark_bn254::Fr;
+    use super::floored_triangular_root;
 
     #[test]
     fn test_invert_triangular_number_small_values() {
-        assert_eq!(invert_triangular_number(0), 0);
-        assert_eq!(invert_triangular_number(1), 1); // 1 <= 1
-        assert_eq!(invert_triangular_number(2), 1); // 1+2 > 2
-        assert_eq!(invert_triangular_number(3), 2); // 1+2=3 <= 3
-        assert_eq!(invert_triangular_number(5), 2); // 1+2+3=6 > 5
-        assert_eq!(invert_triangular_number(6), 3);
-    }
-
-    #[test]
-    fn test_round_trip_for_valid_values() {
-        for i in [0, 1, 42, 255, 65_535, 1_000_000, u32::MAX] {
-            let scalar = Fr::from(i as u64);
-            assert_eq!(scalar_to_u32(&scalar), Some(i));
-        }
+        assert_eq!(floored_triangular_root(0), 0);
+        assert_eq!(floored_triangular_root(1), 1); // 1 <= 1
+        assert_eq!(floored_triangular_root(2), 1); // 1+2 > 2
+        assert_eq!(floored_triangular_root(3), 2); // 1+2=3 <= 3
+        assert_eq!(floored_triangular_root(5), 2); // 1+2+3=6 > 5
+        assert_eq!(floored_triangular_root(6), 3);
     }
 }

@@ -6,7 +6,7 @@ use crate::{
     pvss::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das::{self, unweighted_protocol},
+        das::{self, fiat_shamir},
         encryption_dlog, schnorr,
         traits::{
             self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
@@ -200,7 +200,7 @@ impl traits::Transcript for Transcript {
         let W = sc.get_total_weight();
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        let (f, extra) = unweighted_protocol::fiat_shamir_das(
+        let (f, extra) = fiat_shamir::derive_challenge_scalars(
             self,
             sc.get_threshold_config(),
             pp,

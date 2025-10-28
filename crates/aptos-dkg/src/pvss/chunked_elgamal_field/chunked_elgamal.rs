@@ -11,12 +11,28 @@ use ark_std::fmt::Debug;
 
 type Base<E> = <E as Pairing>::G1Affine;
 
+/// Formally, given:
+/// - `g_1, h_1` ∈ G₁ (group generators)
+/// - `ek_i` ∈ G₁ (encryption keys)
+/// - `z_ij` ∈ Scalar<E> (input plaintext chunk)
+/// - `r_j` ∈ Scalar<E> (randomness for each `column` of chunks z_ij)
+///
+/// The homomorphism maps input `Z = [z_ij]` and randomness `R = [r_j]` to
+/// codomain elements:
+///
+/// ```text
+/// C_ij = g_1 * z_ij + ek_i * r_j
+/// R_j  = h_1 * r_j
+/// ```
+///
+/// The `C_ij` represent "chunked" homomorphic encryptions of the plaintexts,
+/// and `R_j` carry the corresponding randomness contributions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct Homomorphism<'a, E: Pairing> {
     pub g_1: &'a Base<E>,
     pub h_1: &'a Base<E>,
-    pub ek: &'a [Base<E>],
+    pub eks: &'a [Base<E>],
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -94,7 +110,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
                 row.iter()
                     .zip(input.randomness.iter())
                     .map(|(&z_ij, &r_j)| fixed_base_msms::MsmInput {
-                        bases: vec![*self.g_1, self.ek[i]],
+                        bases: vec![*self.g_1, self.eks[i]],
                         scalars: vec![z_ij, r_j],
                     })
                     .collect()
@@ -118,6 +134,6 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, Scalar::slice_as_inner(scalars)).expect("MSM failed in ChunkedElGamal")
+        E::G1::msm(bases, &Scalar::slice_as_inner(scalars)).expect("MSM failed in ChunkedElGamal")
     }
 }

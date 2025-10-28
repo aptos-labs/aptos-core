@@ -27,7 +27,7 @@ where
     let statement = instance.apply(&witness);
 
     let mut prover_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    let proof = instance.prove(&witness, &mut prover_transcript, &mut rng);
+    let proof = instance.prove(&witness, &statement, &mut prover_transcript, &mut rng);
 
     let mut verifier_transcript = merlin::Transcript::new(b"sigma-protocol-test");
     instance
@@ -88,10 +88,6 @@ mod schnorr {
         fn dst(&self) -> Vec<u8> {
             b"Schnorr".to_vec()
         }
-
-        fn dst_verifier(&self) -> Vec<u8> {
-            b"Schnorr-verifier".to_vec()
-        }
     }
 }
 
@@ -112,7 +108,6 @@ mod chaum_pedersen {
             hom1: schnorr1,
             hom2: schnorr2,
             dst: b"Chaum-Pedersen DST".to_vec(),
-            dst_verifier: b"Chaum-Pedersen verifier DST".to_vec(),
         }
     }
 }

@@ -174,6 +174,7 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scal
     fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain);
 
     /// Append the last message (the masked witness) in a sigma protocol.
+    #[allow(dead_code)] // We ought to be using this, but are serializing the entire sigma proof bc our security proofs like using fresh transcripts...
     fn append_sigma_protocol_last_message(&mut self, prover_last_message: &H::Domain);
 
     // Returns a single scalar `r` for use in a Sigma protocol
@@ -359,7 +360,7 @@ where
         let mut public_statement_bytes = Vec::new();
         public_statement
             .serialize_compressed(&mut public_statement_bytes)
-            .expect("public_statement0 serialization should succeed");
+            .expect("public_statement serialization should succeed");
         self.append_message(b"sigma-protocol-claim", public_statement_bytes.as_slice());
     }
 
@@ -367,7 +368,7 @@ where
         let mut prover_first_message_bytes = Vec::new();
         prover_first_message
             .serialize_compressed(&mut prover_first_message_bytes)
-            .expect("public_statement0 serialization should succeed");
+            .expect("sigma protocol first message  serialization should succeed");
         self.append_message(
             b"sigma-protocol-first-message",
             prover_first_message_bytes.as_slice(),
@@ -378,7 +379,7 @@ where
         let mut prover_last_message_bytes = Vec::new();
         prover_last_message
             .serialize_compressed(&mut prover_last_message_bytes)
-            .expect("public_statement0 serialization should succeed");
+            .expect("sigma protocol last message serialization should succeed");
         self.append_message(
             b"sigma-protocol-last-message",
             prover_last_message_bytes.as_slice(),

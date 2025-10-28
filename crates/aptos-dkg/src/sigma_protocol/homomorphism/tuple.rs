@@ -37,7 +37,6 @@ where
     pub hom1: H1,
     pub hom2: H2,
     pub dst: Vec<u8>, // Included here to allow implementing `sigma_protocol::Trait` automatically, avoiding Rust’s orphan rule restrictions
-    pub dst_verifier: Vec<u8>, // Same
 }
 // One method to leave out the dst would be to later define in this file:
 // struct TupleHomomorphismWithDsts<'a, H1, H2> {
@@ -208,9 +207,5 @@ where
 {
     fn dst(&self) -> Vec<u8> {
         self.dst.clone()
-    }
-
-    fn dst_verifier(&self) -> Vec<u8> {
-        self.dst_verifier.clone()
     }
 }
