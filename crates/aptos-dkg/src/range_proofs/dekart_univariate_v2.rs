@@ -24,8 +24,6 @@ use ark_std::{
 use num_integer::Roots;
 use std::{fmt::Debug, io::Write};
 
-pub const DST: &[u8; 42] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
-
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
@@ -112,7 +110,7 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
 
         // Recompute h_denom_eval (you would use your earlier function here)
         let max_n = floored_triangular_root(first_h_denom_eval_as_u32 as usize);
-        let roots_of_unity = compute_roots_of_unity::<E>(max_n);
+        let roots_of_unity = arkworks::compute_roots_of_unity::<E>(max_n);
         let h_denom_eval = compute_h_denom_eval::<E>(&roots_of_unity);
 
         Ok(Self {
@@ -175,7 +173,7 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
         // Deserialize metadata for powers_of_two
         let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
-        let roots_of_unity = compute_roots_of_unity::<E>(num_omegas);
+        let roots_of_unity = arkworks::compute_roots_of_unity::<E>(num_omegas);
         let powers_of_two = arkworks::powers_of_two::<E>(max_ell);
 
         // Reconstruct the VerificationKey
@@ -192,12 +190,6 @@ impl<E: Pairing> Valid for VerifierPrecomputed<E> {
     fn check(&self) -> Result<(), SerializationError> {
         Ok(())
     }
-}
-
-fn compute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarField> {
-    let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
-        .expect("Could not reconstruct evaluation domain");
-    eval_dom.elements().collect()
 }
 
 #[allow(non_snake_case)]
@@ -231,7 +223,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type PublicStatement = PublicStatement<E>;
     type VerificationKey = VerificationKey<E>;
 
-    const DST: &[u8] = DST;
+    const DST: &[u8] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
 
     fn commitment_key_from_prover_key(pk: &Self::ProverKey) -> Self::CommitmentKey {
         pk.ck_S.clone()
@@ -357,7 +349,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 1b
-        fiat_shamir::append_initial_data(fs_t, DST, vk, PublicStatement {
+        fiat_shamir::append_initial_data(fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
             comm: comm.clone(),
@@ -650,7 +642,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = self;
 
         // Step 2a
-        fiat_shamir::append_initial_data(fs_t, DST, vk, PublicStatement {
+        fiat_shamir::append_initial_data(fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
             comm: comm.clone(),
@@ -932,7 +924,7 @@ pub mod two_term_msm {
 }
 
 /// The `n`th triangular number is the sum of the `n` natural numbers from 1 to `n`.
-/// Here we computes the maximum `n` such that `1 + 2 + ... + n <= a`,
+/// Here we compute the maximum `n` such that `1 + 2 + ... + n <= a`,
 /// using integer arithmetic and num_integer crate.
 fn floored_triangular_root(a: usize) -> usize {
     // Solve `n*(n+1)/2 <= a`, or equivalently `n^2 + n - 2a <= 0`

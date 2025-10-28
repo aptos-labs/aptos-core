@@ -3,10 +3,11 @@
 
 //! This module provides some helper functions for arkworks.
 
+pub mod serialization;
+
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
-
-pub mod serialization;
+use ark_poly::EvaluationDomain;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]
@@ -26,7 +27,7 @@ where
 }
 
 // TODO: There's probably a better way to do this?
-/// Converts a finite field scalar into a `u32`, if possible.
+/// Converts a prime field scalar into a `u32`, if possible.
 pub fn scalar_to_u32<F: ark_ff::PrimeField>(scalar: &F) -> Option<u32> {
     let mut bytes = scalar.into_bigint().to_bytes_le();
 
@@ -44,6 +45,13 @@ pub fn scalar_to_u32<F: ark_ff::PrimeField>(scalar: &F) -> Option<u32> {
     padded[..bytes.len()].copy_from_slice(&bytes);
 
     Some(u32::from_le_bytes(padded))
+}
+
+/// Computes all `num_omegas`-th roots of unity in the scalar field, where `num_omegas` must be a power of two.
+pub fn compute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarField> {
+    let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
+        .expect("Could not reconstruct evaluation domain");
+    eval_dom.elements().collect()
 }
 
 #[cfg(test)]
