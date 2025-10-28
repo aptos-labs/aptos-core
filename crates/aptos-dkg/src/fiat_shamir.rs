@@ -8,7 +8,7 @@
 //! define all the things that are appended to the transcript.
 
 use crate::{
-    pvss::{traits::Transcript, ThresholdConfig},
+    pvss::{traits::Transcript, ThresholdConfigBlstrs},
     range_proofs::traits::BatchedRangeProof,
     sigma_protocol,
     sigma_protocol::homomorphism,
@@ -115,7 +115,7 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
 pub trait PVSS<T: Transcript>: ScalarProtocol<blstrs::Scalar> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
-    fn pvss_domain_sep(&mut self, sc: &ThresholdConfig);
+    fn pvss_domain_sep(&mut self, sc: &ThresholdConfigBlstrs);
 
     /// Append the public parameters `pp`.
     fn append_public_parameters(&mut self, pp: &T::PublicParameters);
@@ -183,7 +183,7 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scal
 
 #[allow(non_snake_case)]
 impl<T: Transcript> PVSS<T> for merlin::Transcript {
-    fn pvss_domain_sep(&mut self, sc: &ThresholdConfig) {
+    fn pvss_domain_sep(&mut self, sc: &ThresholdConfigBlstrs) {
         self.append_message(b"dom-sep", PVSS_DOM_SEP);
         self.append_message(b"scheme-name", T::scheme_name().as_bytes());
         self.append_u64(b"t", sc.t as u64);
@@ -249,7 +249,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
 }
 
 pub fn initialize_pvss_transcript<T: Transcript>(
-    sc: &ThresholdConfig,
+    sc: &ThresholdConfigBlstrs,
     pp: &T::PublicParameters,
     eks: &[T::EncryptPubKey],
     dst: &[u8],

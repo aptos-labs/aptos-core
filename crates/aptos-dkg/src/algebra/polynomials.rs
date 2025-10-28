@@ -6,7 +6,7 @@ use crate::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         fft,
     },
-    pvss::{input_secret::InputSecret, ThresholdConfig},
+    pvss::{input_secret::InputSecret, ThresholdConfigBlstrs},
     utils::{is_power_of_two, random::random_scalars},
 };
 use ark_ff::Field;
@@ -649,7 +649,7 @@ fn accumulator_poly_scheduled_inner(
 pub fn shamir_secret_share<
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
 >(
-    sc: &ThresholdConfig,
+    sc: &ThresholdConfigBlstrs,
     s: &InputSecret,
     rng: &mut R,
 ) -> (Vec<Scalar>, Vec<Scalar>) {

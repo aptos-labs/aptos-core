@@ -3,7 +3,7 @@
 
 use crate::{
     fiat_shamir,
-    pvss::{traits, ThresholdConfig},
+    pvss::{traits, ThresholdConfigBlstrs},
 };
 use serde::Serialize;
 
@@ -12,7 +12,7 @@ use serde::Serialize;
 /// Additionally returns `num_scalars` random scalars for some linear combinations.
 pub(crate) fn derive_challenge_scalars<T: traits::Transcript, A: Serialize>(
     trx: &T,
-    sc: &ThresholdConfig,
+    sc: &ThresholdConfigBlstrs,
     pp: &T::PublicParameters,
     spks: &Vec<T::SigningPubKey>,
     eks: &Vec<T::EncryptPubKey>,

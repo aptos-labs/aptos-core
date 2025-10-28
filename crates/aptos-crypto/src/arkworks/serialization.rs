@@ -23,7 +23,7 @@ where
 /// Deserializes a type implementing `CanonicalDeserialize` from bytes produced by [`ark_se`].
 ///
 /// This function allows Arkworks types to be deserialized from Serde-compatible data sources.
-/// It assumes the data was serialized without compression and without validation. // !!!!!!!!!!!!!!!!!!!
+/// It assumes the data was serialized without compression and without validation.
 pub fn ark_de<'de, D, A: CanonicalDeserialize>(data: D) -> Result<A, D::Error>
 where
     D: serde::de::Deserializer<'de>,

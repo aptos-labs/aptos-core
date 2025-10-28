@@ -10,7 +10,7 @@ use crate::{
         das::fiat_shamir,
         encryption_dlog, schnorr, traits,
         traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
-        LowDegreeTest, Player, ThresholdConfig,
+        LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
     utils::{
         g1_multi_exp, g2_multi_exp,
@@ -84,7 +84,7 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = ThresholdConfig;
+    type SecretSharingConfig = ThresholdConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
