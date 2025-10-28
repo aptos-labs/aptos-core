@@ -14,7 +14,10 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::AccountResource,
-    state_store::{state_key::StateKey, MoveResourceExt, StateView, StateViewId, TStateView},
+    state_store::{
+        state_key::StateKey, state_value::StateValue, MoveResourceExt, StateView, StateViewId,
+        TStateView,
+    },
     transaction::{SignedTransaction, VMValidatorResult},
     vm::modules::AptosModuleExtension,
 };
@@ -26,7 +29,7 @@ use move_binary_format::{
     errors::{Location, PartialVMError, VMResult},
     CompiledModule,
 };
-use move_core_types::{language_storage::ModuleId, vm_status::StatusCode};
+use move_core_types::{identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode};
 use move_vm_runtime::{Module, NoOpLayoutCache, RuntimeEnvironment, WithRuntimeEnvironment};
 use move_vm_types::{
     code::{ModuleCache, ModuleCode, ModuleCodeBuilder, UnsyncModuleCache},
@@ -99,6 +102,27 @@ impl<S: StateView> ValidationState<S> {
         self.state_view = state_view;
         self.environment = AptosEnvironment::new(&self.state_view);
         self.module_cache = UnsyncModuleCache::empty();
+    }
+
+    fn try_override_bytes_and_deserialized_into_compiled_module_with_ext(
+        &self,
+        mut state_value: StateValue,
+        address: &AccountAddress,
+        name: &IdentStr,
+    ) -> VMResult<(CompiledModule, Arc<AptosModuleExtension>)> {
+        // TODO: remove this once framework on mainnet is using the new option module
+        if let Some(bytes) = self
+            .runtime_environment()
+            .get_module_bytes_override(address, name)
+        {
+            state_value.set_bytes(bytes);
+        }
+        let compiled_module = self
+            .environment
+            .runtime_environment()
+            .deserialize_into_compiled_module(state_value.bytes())?;
+        let extension = Arc::new(AptosModuleExtension::new(state_value));
+        Ok((compiled_module, extension))
     }
 }
 
@@ -187,11 +211,12 @@ impl<S: StateView> ModuleCache for ValidationState<S> {
         Ok(if version == value_version {
             Some((module, version))
         } else {
-            let compiled_module = self
-                .environment
-                .runtime_environment()
-                .deserialize_into_compiled_module(state_value.bytes())?;
-            let extension = Arc::new(AptosModuleExtension::new(state_value));
+            let (compiled_module, extension) = self
+                .try_override_bytes_and_deserialized_into_compiled_module_with_ext(
+                    state_value,
+                    key.address(),
+                    key.name(),
+                )?;
 
             let new_version = value_version;
             let new_module_code = self.module_cache.insert_deserialized_module(
@@ -219,25 +244,20 @@ impl<S: StateView> ModuleCodeBuilder for ValidationState<S> {
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let mut state_value = match self
+        let state_value = match self
             .state_view
             .get_state_value(&StateKey::module_id(key))
             .map_err(|err| module_storage_error!(key.address(), key.name(), err))?
         {
-            Some(bytes) => bytes,
+            Some(state_value) => state_value,
             None => return Ok(None),
         };
-        // TODO: remove this once framework on mainnet is using the new option module
-        if let Some(bytes) = self
-            .runtime_environment()
-            .get_module_bytes_override(key.address(), key.name())
-        {
-            state_value.set_bytes(bytes);
-        }
-        let compiled_module = self
-            .runtime_environment()
-            .deserialize_into_compiled_module(state_value.bytes())?;
-        let extension = Arc::new(AptosModuleExtension::new(state_value));
+        let (compiled_module, extension) = self
+            .try_override_bytes_and_deserialized_into_compiled_module_with_ext(
+                state_value,
+                key.address(),
+                key.name(),
+            )?;
         let module = ModuleCode::from_deserialized(compiled_module, extension);
         Ok(Some(module))
     }
