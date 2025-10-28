@@ -468,10 +468,8 @@ pub fn bcs_crypto_hash_dispatch(input: TokenStream) -> TokenStream {
 /// Derive macro for structs acting as witnesses in Sigma protocols.
 ///
 /// The generated implementation requires the following imports:
-/// ```rust
-/// use aptos_crypto_derive::SigmaProtocolWitness;
-/// use ark_std::rand::{RngCore, CryptoRng};
-/// ```
+/// - aptos_crypto_derive::SigmaProtocolWitness;
+/// - ark_std::rand::{RngCore, CryptoRng};
 ///
 /// Applies to structs with named fields only.
 #[proc_macro_derive(SigmaProtocolWitness)]
