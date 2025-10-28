@@ -8,6 +8,7 @@ mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
 mod collapsible_if;
+mod collapsible_if;
 mod cyclomatic_complexity;
 mod empty_if;
 mod equal_operands_in_bin_op;
