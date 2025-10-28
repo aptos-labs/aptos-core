@@ -36,13 +36,6 @@ where
     pub hom1: H1,
     pub hom2: H2,
 }
-// One method to leave out the dst would be to later define in this file:
-// struct TupleHomomorphismWithDsts<'a, H1, H2> {
-//     hom: &'a TupleHomomorphism<H1, H2>,
-//     dst: Vec<u8>,
-//     dst_verifier: Vec<u8>,
-// }
-// and then defining the sigma protocol trait there. Probably not worth it
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
 /// component homomorphisms to the same input and returning their results
