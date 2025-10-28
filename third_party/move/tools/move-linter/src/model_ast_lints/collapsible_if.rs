@@ -50,8 +50,7 @@ impl ExpChecker for CollapsibleIf {
         }
 
         // Check if the outer if has no else branch (or empty else branch)
-        if !matches!(outer_else.as_ref(), ExpData::Call(_, Operation::Tuple, args) if args.is_empty())
-        {
+        if !outer_else.is_unit_exp() {
             return;
         }
 
@@ -61,8 +60,7 @@ impl ExpChecker for CollapsibleIf {
         };
 
         // Check if the inner if also has no else branch (or empty else branch)
-        if !matches!(inner_else.as_ref(), ExpData::Call(_, Operation::Tuple, args) if args.is_empty())
-        {
+        if !inner_else.is_unit_exp() {
             return;
         }
 
