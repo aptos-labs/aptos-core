@@ -435,3 +435,11 @@ pub static NUM_INTERNED_TYPE_VECS: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static NUM_INTERNED_MODULE_IDS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "num_interned_module_ids",
+        "Number of interned module IDs cached in execution environment"
+    )
+    .unwrap()
+});
