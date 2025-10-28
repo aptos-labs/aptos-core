@@ -11,7 +11,7 @@ use aptos_native_interface::{
 use aptos_types::error;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Reference, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -28,7 +28,7 @@ pub const EFEATURE_NOT_ENABLED: u64 = 1;
  **************************************************************************************************/
 fn native_swap(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if !context

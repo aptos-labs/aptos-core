@@ -90,7 +90,7 @@ use move_core_types::{
     function::ClosureMask,
     vm_status::{sub_status::unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE, StatusCode},
 };
-use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::{loaded_data::runtime_types::Type, ty_interner::TypeId};
 use std::{collections::BTreeSet, slice};
 
 /// A deterministic hash map (used in the Rust compiler), expected to perform well.
@@ -163,7 +163,7 @@ enum AccessPathTreeRoot {
     /// Root representing a local (non-ref) value
     Local { index: usize },
     /// Root representing a global type
-    Global { type_: Type },
+    Global { id: TypeId },
     /// Special node representing the value behind a reference parameter
     ReferenceParameter { param_index: usize },
 }
@@ -173,7 +173,7 @@ struct AccessPathTreeRootsInfo {
     /// Mapping from local index to the corresponding access path tree
     locals: UnorderedMap<usize, AccessPathTree>,
     /// Mapping from global type to the corresponding access path tree
-    globals: UnorderedMap<Type, AccessPathTree>,
+    globals: UnorderedMap<TypeId, AccessPathTree>,
     /// Mapping from reference parameter index to the corresponding access path tree
     reference_params: UnorderedMap<usize, AccessPathTree>,
 }
@@ -582,7 +582,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             MutBorrowGlobalGeneric(index) => {
                 let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
-                ref_state.borrow_global::<true>(struct_ty.clone())?;
+                ref_state.borrow_global::<true>(struct_ty)?;
             },
             ImmBorrowGlobal(index) => {
                 let struct_ty = frame.get_struct_ty(*index);
@@ -590,7 +590,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             ImmBorrowGlobalGeneric(index) => {
                 let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
-                ref_state.borrow_global::<false>(struct_ty.clone())?;
+                ref_state.borrow_global::<false>(struct_ty)?;
             },
             Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Or | And | Lt | Gt | Le | Ge
             | Shl | Shr => {
@@ -620,7 +620,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             MoveFromGeneric(index) => {
                 let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
-                ref_state.move_from(struct_ty.clone())?;
+                ref_state.move_from(struct_ty)?;
             },
             MoveTo(_) => {
                 ref_state.move_to()?;
@@ -870,7 +870,7 @@ impl AccessPathTreeRootsInfo {
     fn get_access_path_tree(&self, root: &AccessPathTreeRoot) -> PartialVMResult<&AccessPathTree> {
         match root {
             AccessPathTreeRoot::Local { index } => Ok(safe_unwrap!(self.locals.get(index))),
-            AccessPathTreeRoot::Global { type_ } => Ok(safe_unwrap!(self.globals.get(type_))),
+            AccessPathTreeRoot::Global { id } => Ok(safe_unwrap!(self.globals.get(id))),
             AccessPathTreeRoot::ReferenceParameter { param_index } => {
                 Ok(safe_unwrap!(self.reference_params.get(param_index)))
             },
@@ -893,7 +893,7 @@ impl AccessPathTreeRootsInfo {
     ) -> Option<&mut AccessPathTree> {
         match root {
             AccessPathTreeRoot::Local { index } => self.locals.get_mut(index),
-            AccessPathTreeRoot::Global { type_ } => self.globals.get_mut(type_),
+            AccessPathTreeRoot::Global { id } => self.globals.get_mut(id),
             AccessPathTreeRoot::ReferenceParameter { param_index } => {
                 self.reference_params.get_mut(param_index)
             },
@@ -920,9 +920,9 @@ impl QualifiedNodeID {
     }
 
     /// A root node corresponding to a global type.
-    fn global_root(type_: Type) -> Self {
+    fn global_root(id: TypeId) -> Self {
         Self {
-            root: AccessPathTreeRoot::Global { type_ },
+            root: AccessPathTreeRoot::Global { id },
             node_id: 0, // root is always at 0
         }
     }
@@ -1139,10 +1139,10 @@ impl FrameRefState {
     }
 
     /// Ensure that the global root exists for the given type.
-    fn ensure_global_root_exists(&mut self, type_: Type) {
+    fn ensure_global_root_exists(&mut self, id: TypeId) {
         self.access_path_tree_roots
             .globals
-            .entry(type_)
+            .entry(id)
             .or_insert_with(AccessPathTree::new);
     }
 
@@ -1530,13 +1530,13 @@ impl RefCheckState {
 
     /// Transition for borrow global family of instructions.
     /// We currently abstract over all addresses and only use types.
-    fn borrow_global<const MUTABLE: bool>(&mut self, type_: Type) -> PartialVMResult<()> {
+    fn borrow_global<const MUTABLE: bool>(&mut self, id: TypeId) -> PartialVMResult<()> {
         let _ = self.pop_from_shadow_stack()?;
 
         let frame_state = self.get_mut_latest_frame_state()?;
-        frame_state.ensure_global_root_exists(type_.clone());
+        frame_state.ensure_global_root_exists(id);
 
-        let node_id = QualifiedNodeID::global_root(type_);
+        let node_id = QualifiedNodeID::global_root(id);
         // Unlike references to locals (where borrowing itself does not lead to violations, but use of
         // poisoned refs does), we perform a stricter check here (similar to bytecode verifier).
         if MUTABLE && frame_state.subtree_has_references(&node_id, ReferenceFilter::All)? {
@@ -1556,13 +1556,13 @@ impl RefCheckState {
     }
 
     /// Transition for `MoveFrom` and `MoveFromGeneric` instruction.
-    fn move_from(&mut self, type_: Type) -> PartialVMResult<()> {
+    fn move_from(&mut self, id: TypeId) -> PartialVMResult<()> {
         let _ = self.pop_from_shadow_stack()?;
 
         let frame_state = self.get_mut_latest_frame_state()?;
-        frame_state.ensure_global_root_exists(type_.clone());
+        frame_state.ensure_global_root_exists(id);
 
-        let node_id = QualifiedNodeID::global_root(type_);
+        let node_id = QualifiedNodeID::global_root(id);
         // Poison all references to the global type's subtree.
         frame_state.poison_refs_of_node(&node_id, VisitKind::SelfOnly, ReferenceFilter::All)?;
         frame_state.poison_refs_of_node(

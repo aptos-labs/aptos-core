@@ -22,7 +22,7 @@ use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::{CurveGroup, PrimeGroup};
 use ark_ff::Field;
 use move_core_types::gas_algebra::NumArgs;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
 
@@ -90,12 +90,12 @@ macro_rules! ark_msm_bigint_wnaf_cost {
 
 pub fn scalar_mul_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let group_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let scalar_field_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let group_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let scalar_field_opt = structure_from_ty_arg!(context, ty_args[1]);
     abort_unless_group_scalar_mul_enabled!(context, group_opt, scalar_field_opt);
     match (group_opt, scalar_field_opt) {
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) => {
@@ -234,12 +234,12 @@ macro_rules! ark_msm_internal {
 
 pub fn multi_scalar_mul_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let scalar_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let structure_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let scalar_opt = structure_from_ty_arg!(context, ty_args[1]);
     abort_unless_group_scalar_mul_enabled!(context, structure_opt, scalar_opt);
     match (structure_opt, scalar_opt) {
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381Fr)) => {

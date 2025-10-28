@@ -1271,6 +1271,12 @@ impl SignatureToken {
         self.preorder_traversal().count()
     }
 
+    /// Returns true if the signature is not fully instantiated.
+    pub fn is_not_instantiated(&self) -> bool {
+        self.preorder_traversal()
+            .any(|t| matches!(t, SignatureToken::TypeParameter(..)))
+    }
+
     pub fn instantiate(&self, subst_mapping: &[SignatureToken]) -> SignatureToken {
         use SignatureToken::*;
         let inst_vec = |v: &[SignatureToken]| -> Vec<SignatureToken> {
