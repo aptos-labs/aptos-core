@@ -81,11 +81,15 @@ impl EmptyRange {
             return None;
         }
 
-        let ExpData::Block(_, pat3, p_final, _) = child_2.as_ref() else {
+        let ExpData::Block(_, pat3, p_final, loop_expr) = child_2.as_ref() else {
             return None;
         };
 
         if pat3.to_string(fenv) != FOR_LOOP_UPPER_BOUND_VALUE {
+            return None;
+        }
+
+        if !matches!(loop_expr.as_ref(), ExpData::Loop(..)) {
             return None;
         }
 
@@ -112,7 +116,8 @@ impl EmptyRange {
             env,
             &env.get_node_loc(nid),
             &format!(
-                "This range is empty, as the start value ({from}) is {g_o_e} the end value ({to})"
+                "The range used in this loop is empty, as the start value ({from}) is {g_o_e} the \
+                 end value ({to}). The loop will not be executed."
             ),
         );
     }
