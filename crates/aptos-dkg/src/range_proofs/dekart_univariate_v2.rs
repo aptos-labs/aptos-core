@@ -105,10 +105,8 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
         let first_h_denom_eval_as_u32 = arkworks::scalar_to_u32(&first_h_denom_eval)
             .expect("first_h_denom_eval did not fit in u32!");
 
-        // Recompute powers_of_two
         let powers_of_two = arkworks::powers_of_two::<E>(powers_len);
 
-        // Recompute h_denom_eval (you would use your earlier function here)
         let max_n = floored_triangular_root(first_h_denom_eval_as_u32 as usize);
         let roots_of_unity = arkworks::compute_roots_of_unity::<E>(max_n);
         let h_denom_eval = compute_h_denom_eval::<E>(&roots_of_unity);
@@ -167,10 +165,7 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
         compress: Compress,
         validate: Validate,
     ) -> Result<Self, SerializationError> {
-        // Deserialize metadata for roots_of_unity
         let num_omegas = usize::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        // Deserialize metadata for powers_of_two
         let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
         let roots_of_unity = arkworks::compute_roots_of_unity::<E>(num_omegas);
@@ -924,8 +919,8 @@ pub mod two_term_msm {
 }
 
 /// The `n`th triangular number is the sum of the `n` natural numbers from 1 to `n`.
-/// Here we compute the maximum `n` such that `1 + 2 + ... + n <= a`,
-/// using integer arithmetic and num_integer crate.
+/// Here we compute the maximum `n` such that `1 + 2 + ... + n <= a`, using integer
+/// arithmetic and the num_integer crate.
 fn floored_triangular_root(a: usize) -> usize {
     // Solve `n*(n+1)/2 <= a`, or equivalently `n^2 + n - 2a <= 0`
     let discriminant = 1 + 8 * a;
