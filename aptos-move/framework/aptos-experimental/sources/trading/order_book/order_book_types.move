@@ -39,9 +39,9 @@ module aptos_experimental::order_book_types {
         idx: u128
     }
 
-    enum OrderBookType has store, drop, copy {
-        SingleOrderBook,
-        BulkOrderBook
+    enum OrderType has store, drop, copy {
+        SingleOrder,
+        BulkOrder
     }
 
     // Struct providing ascending ids, to be able to be used as tie-breaker to respect FIFO order of trades.
@@ -53,12 +53,19 @@ module aptos_experimental::order_book_types {
         // TODO: add stateless (and with that fully parallel) support for id creation via native function
     }
 
-    public fun single_order_book_type(): OrderBookType {
-        OrderBookType::SingleOrderBook
+    public fun single_order_type(): OrderType {
+        OrderType::SingleOrder
     }
 
-    public fun bulk_order_book_type(): OrderBookType {
-        OrderBookType::BulkOrderBook
+    public fun bulk_order_type(): OrderType {
+        OrderType::BulkOrder
+    }
+
+    public fun is_single_order_type(order_type: &OrderType): bool {
+        match (order_type) {
+            OrderType::SingleOrder => true,
+            OrderType::BulkOrder => false,
+        }
     }
 
     public(friend) fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
@@ -359,11 +366,11 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_book_type_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): OrderBookType {
+    ): OrderType {
         if (self is OrderMatchDetails::SingleOrder) {
-            single_order_book_type()
+            single_order_type()
         } else {
-            bulk_order_book_type()
+            bulk_order_type()
         }
     }
 
@@ -524,18 +531,18 @@ module aptos_experimental::order_book_types {
         matched_size: u64,
         /// Remaining size of the maker order
         remaining_size: u64,
-        order_book_type: OrderBookType,
+        order_book_type: OrderType,
     }
 
     public(friend) fun new_active_matched_order(
-        order_id: OrderIdType, matched_size: u64, remaining_size: u64, order_book_type: OrderBookType
+        order_id: OrderIdType, matched_size: u64, remaining_size: u64, order_book_type: OrderType
     ): ActiveMatchedOrder {
         ActiveMatchedOrder { order_id, matched_size, remaining_size, order_book_type }
     }
 
     public(friend) fun destroy_active_matched_order(
         self: ActiveMatchedOrder
-    ): (OrderIdType, u64, u64, OrderBookType) {
+    ): (OrderIdType, u64, u64, OrderType) {
         (self.order_id, self.matched_size, self.remaining_size, self.order_book_type)
     }
 
@@ -545,7 +552,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_active_matched_book_type(
         self: &ActiveMatchedOrder
-    ): OrderBookType {
+    ): OrderType {
         self.order_book_type
     }
 

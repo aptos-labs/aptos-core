@@ -37,7 +37,7 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
@@ -459,12 +459,11 @@ impl SimpleVMTestAdapter<'_> {
             MoveVM::execute_loaded_function(
                 function,
                 args,
-                &mut data_cache,
+                &mut MoveVmDataCacheAdapter::new(&mut data_cache, &self.storage, &loader),
                 &mut gas_meter,
                 &mut traversal_context,
                 &mut extensions,
                 &loader,
-                &self.storage,
             )?
         });
 

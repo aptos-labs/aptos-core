@@ -24,7 +24,10 @@ use move_core_types::{
     value::MoveTypeLayout, vm_status::StatusCode,
 };
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
-use move_vm_runtime::native_functions::{LoaderContext, NativeFunctionTable};
+use move_vm_runtime::{
+    native_extensions::SessionListener,
+    native_functions::{LoaderContext, NativeFunctionTable},
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -48,7 +51,7 @@ use triomphe::Arc as TriompheArc;
 #[derive(Tid)]
 pub struct NativeTableContext<'a> {
     resolver: &'a dyn TableResolver,
-    txn_hash: [u8; 32],
+    session_hash: [u8; 32],
     table_data: RefCell<TableData>,
 }
 
@@ -107,13 +110,28 @@ pub struct TableChange {
 // =========================================================================================
 // Implementation of Native Table Context
 
+impl<'a> SessionListener for NativeTableContext<'a> {
+    fn start(&mut self, session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.session_hash = *session_hash;
+        // TODO(sessions): implement
+    }
+
+    fn finish(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn abort(&mut self) {
+        // TODO(sessions): implement
+    }
+}
+
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
     /// extension into VM session functions.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(session_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
         Self {
             resolver,
-            txn_hash,
+            session_hash,
             table_data: Default::default(),
         }
     }
@@ -345,7 +363,7 @@ fn native_new_table_handle(
     // is unique, this should create a unique and deterministic global id.
     let mut digest = Sha3_256::new();
     let table_len = table_data.new_tables.len() as u32; // cast usize to u32 to ensure same length
-    Digest::update(&mut digest, table_context.txn_hash);
+    Digest::update(&mut digest, table_context.session_hash);
     Digest::update(&mut digest, table_len.to_be_bytes());
     let bytes = digest.finalize().to_vec();
     let handle = AccountAddress::from_bytes(&bytes[0..AccountAddress::LENGTH])
@@ -521,7 +539,7 @@ fn native_contains_box(
     } else {
         None
     };
-    let exists = Value::bool(gv.exists()?);
+    let exists = Value::bool(gv.exists());
 
     drop(table_data);
 

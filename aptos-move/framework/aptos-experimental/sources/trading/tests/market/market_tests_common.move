@@ -566,7 +566,7 @@ module aptos_experimental::market_tests_common {
             false, // is_bid
             immediate_or_cancel(), // order_type
             &mut event_store,
-            false, // Despite it being a "taker", this order will not cross
+            true, // Despite it being a "taker", this order will not cross
             true,
             new_test_order_metadata(1),
             option::none(),

@@ -9,14 +9,14 @@ macro_rules! dealt_secret_key_impl {
         $GTProjective:ident,
         $gt:ident
     ) => {
+        use aptos_crypto::blstrs::{$GT_PROJ_NUM_BYTES, $gt_proj_from_bytes};
         use crate::{
             algebra::lagrange::lagrange_coefficients,
-            constants::$GT_PROJ_NUM_BYTES,
             pvss::{
                 dealt_secret_key_share::$gt::DealtSecretKeyShare, player::Player,
                 threshold_config::ThresholdConfig, traits, traits::SecretSharingConfig,
             },
-            utils::{serialization::$gt_proj_from_bytes, $gt_multi_exp},
+            utils::{$gt_multi_exp},
         };
         use aptos_crypto::CryptoMaterialError;
         use aptos_crypto_derive::{SilentDebug, SilentDisplay};

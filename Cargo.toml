@@ -526,6 +526,7 @@ version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
+bls12_381 = "0.8.0"
 blst = "0.3.15"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
@@ -591,6 +592,7 @@ digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "5.0.1"
 dirs-next = "2.0.0"
+dudect-bencher = "0.6"
 dunce = "1.0.4"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
@@ -934,6 +936,8 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
+# version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
+dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }

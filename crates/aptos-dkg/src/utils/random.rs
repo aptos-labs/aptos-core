@@ -1,6 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::blstrs::{
+    biguint_to_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_FIELD_ORDER, SCALAR_NUM_BYTES,
+};
 /// TODO(Security): This file is a workaround for the `rand_core_hell` issue, briefly described below.
 ///
 /// Ideally, we would write the following sane code:
@@ -14,60 +17,27 @@
 ///
 /// But we can't due to `aptos-crypto`'s dependency on an older version of `rand` and `rand_core`
 /// compared to `blstrs`'s dependency.
-use crate::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_FIELD_ORDER, SCALAR_NUM_BYTES};
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use group::Group;
-use num_bigint::{BigUint, RandBigInt};
+use num_bigint::BigUint;
 use num_integer::Integer;
-use num_traits::Zero;
 use std::ops::Mul;
 
 /// Domain-separator for hash-based randomness generation that works around `rand_core_hell`.
 pub const DST_RAND_CORE_HELL: &[u8; 24] = b"APTOS_RAND_CORE_HELL_DST";
 
-/// Returns a random `blstrs::Scalar` given an older RNG as input.
-///
-/// Pretty fast: 623 nanosecond / call.
-pub fn random_scalar<R>(rng: &mut R) -> Scalar
-where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
-{
-    random_scalar_internal(rng, false)
-}
-
 pub fn random_nonzero_scalar<R>(rng: &mut R) -> Scalar
 where
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
 {
-    random_scalar_internal(rng, true)
-}
-
-pub fn random_scalar_internal<R>(rng: &mut R, exclude_zero: bool) -> Scalar
-where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
-{
-    let mut big_uint;
-
-    loop {
-        // NOTE(Alin): This uses rejection-sampling (e.g., https://cs.stackexchange.com/a/2578/54866)
-        // An alternative would be to sample twice the size of the scalar field and use
-        // `random_scalar_from_uniform_bytes`, but that is actually slower (950ns vs 623ns)
-        big_uint = rng.gen_biguint_below(&SCALAR_FIELD_ORDER);
-
-        // Some key material cannot be zero since it needs to have an inverse in the scalar field.
-        if !exclude_zero || !big_uint.is_zero() {
-            break;
-        }
-    }
-
-    crate::utils::biguint::biguint_to_scalar(&big_uint)
+    aptos_crypto::blstrs::random_scalar_internal(rng, true)
 }
 
 pub fn random_scalar_from_uniform_bytes(bytes: &[u8; 2 * SCALAR_NUM_BYTES]) -> Scalar {
     let bignum = BigUint::from_bytes_le(&bytes[..]);
     let remainder = bignum.mod_floor(&SCALAR_FIELD_ORDER);
 
-    crate::utils::biguint::biguint_to_scalar(&remainder)
+    biguint_to_scalar(&remainder)
 }
 
 pub fn random_128bit_scalar<R>(rng: &mut R) -> Scalar
@@ -122,7 +92,7 @@ pub fn insecure_random_gt_point<R>(rng: &mut R) -> Gt
 where
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
 {
-    let s = random_scalar(rng);
+    let s = aptos_crypto::blstrs::random_scalar(rng);
 
     // TODO(TestingPerf): Cannot sample more efficiently than this because `fp12::Fp12` is not exposed.
     Gt::generator().mul(s)
@@ -136,7 +106,7 @@ where
     let mut v = Vec::with_capacity(n);
 
     for _ in 0..n {
-        v.push(random_scalar(rng));
+        v.push(aptos_crypto::blstrs::random_scalar(rng));
     }
 
     debug_assert_eq!(v.len(), n);

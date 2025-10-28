@@ -10,7 +10,7 @@ module aptos_experimental::price_time_index {
     use aptos_experimental::order_book_types::{
         OrderIdType,
         UniqueIdxType,
-        new_default_big_ordered_map, OrderBookType
+        new_default_big_ordered_map, OrderType
     };
     use aptos_experimental::single_order_types::{
         get_slippage_pct_precision
@@ -22,7 +22,7 @@ module aptos_experimental::price_time_index {
     #[test_only]
     use std::vector;
     #[test_only]
-    use aptos_experimental::order_book_types::{new_order_id_type, new_unique_idx_type, single_order_book_type};
+    use aptos_experimental::order_book_types::{new_order_id_type, new_unique_idx_type, single_order_type};
 
     const EINVALID_MAKER_ORDER: u64 = 1;
     /// There is a code bug that breaks internal invariant
@@ -51,7 +51,7 @@ module aptos_experimental::price_time_index {
     struct OrderData has store, copy, drop {
         order_id: OrderIdType,
         // Used to track either the order is a single order or a bulk order
-        order_book_type: OrderBookType,
+        order_book_type: OrderType,
         size: u64
     }
 
@@ -375,7 +375,7 @@ module aptos_experimental::price_time_index {
     public(friend) fun place_maker_order(
         self: &mut PriceTimeIndex,
         order_id: OrderIdType,
-        order_book_type: OrderBookType,
+        order_book_type: OrderType,
         price: u64,
         unique_priority_idx: UniqueIdxType,
         size: u64,
@@ -418,7 +418,7 @@ module aptos_experimental::price_time_index {
         while (remaining_size > 0) {
             if (!self.is_taker_order(order.price, order.is_bid)) {
                 self.place_maker_order(
-                    order.order_id, single_order_book_type(), order.price, order.unique_idx, order.size, order.is_bid
+                    order.order_id, single_order_type(), order.price, order.unique_idx, order.size, order.is_bid
                 );
                 return result;
             };
@@ -539,7 +539,7 @@ module aptos_experimental::price_time_index {
                         new_order_id_type(2),
                         50, // matched size
                         50, // remaining size
-                        single_order_book_type()
+                        single_order_type()
                     )
                 ],
             7

@@ -6,21 +6,20 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
-use aptos_crypto::hash::CryptoHash;
-use aptos_dkg::{
-    constants::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
-    pvss::{
-        das,
-        das::unweighted_protocol,
-        insecure_field, test_utils,
-        test_utils::{
-            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
-            reconstruct_dealt_secret_key_randomly, NoAux,
-        },
-        traits::{transcript::Transcript, SecretSharingConfig},
-        GenericWeighting, ThresholdConfig,
+use aptos_crypto::{
+    blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
+    hash::CryptoHash,
+};
+use aptos_dkg::pvss::{
+    das,
+    das::unweighted_protocol,
+    insecure_field, test_utils,
+    test_utils::{
+        get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+        reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    utils::random::random_scalar,
+    traits::{transcript::Transcript, SecretSharingConfig},
+    GenericWeighting, ThresholdConfig,
 };
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;

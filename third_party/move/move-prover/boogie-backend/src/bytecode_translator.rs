@@ -576,9 +576,13 @@ impl<'env> BoogieTranslator<'env> {
             panic!("expected function type")
         };
         let params = params.clone().flatten();
-        for (pos, ty) in params.iter().enumerate() {
+        for (pos, mut ty) in params.iter().enumerate() {
             if pos > 0 {
                 emit!(self.writer, ", ")
+            }
+            if ty.is_immutable_reference() {
+                // Immutable references are eliminated in the compilation scheme, so skip
+                ty = ty.skip_reference();
             }
             emit!(self.writer, "p{}: {}", pos, boogie_type(self.env, ty))
         }
@@ -588,11 +592,22 @@ impl<'env> BoogieTranslator<'env> {
         emit!(self.writer, "fun: {}", fun_ty_boogie_name);
         emit!(self.writer, ") returns (");
         let mut result_locals = vec![];
-        for (pos, ty) in results.clone().flatten().iter().enumerate() {
+        for (pos, mut ty) in results
+            .clone()
+            .flatten()
+            .iter()
+            // Mutable input parameters become output, so append them
+            .chain(params.iter().filter(|p| p.is_mutable_reference()))
+            .enumerate()
+        {
             if pos > 0 {
                 emit!(self.writer, ",")
             }
             let local_name = format!("r{}", pos);
+            if ty.is_immutable_reference() {
+                // Immutable references are eliminated in the compilation scheme, so skip
+                ty = ty.skip_reference();
+            }
             emit!(self.writer, "{}: {}", local_name, boogie_type(self.env, ty));
             result_locals.push(local_name)
         }
@@ -3382,30 +3397,34 @@ impl FunctionTranslator<'_> {
                         format!("ReadVec({}->p, LenVec($t{}->p) + {})", src_str, idx, offset)
                     }
                 };
-                let update = if let BorrowEdge::Hyper(edges) = edge {
-                    self.translate_write_back_update(
-                        &mut || dst_value.clone(),
-                        &get_path_index,
-                        src_value,
-                        edges,
-                        0,
-                    )
+                if matches!(edge, BorrowEdge::Invoke) {
+                    emitln!(writer, "call $t{} := $HavocMutation($t{});", idx, idx);
                 } else {
-                    self.translate_write_back_update(
-                        &mut || dst_value.clone(),
-                        &get_path_index,
-                        src_value,
-                        &[edge.to_owned()],
-                        0,
-                    )
-                };
-                emitln!(
-                    writer,
-                    "$t{} := $UpdateMutation($t{}, {});",
-                    idx,
-                    idx,
-                    update
-                );
+                    let update = if let BorrowEdge::Hyper(edges) = edge {
+                        self.translate_write_back_update(
+                            &mut || dst_value.clone(),
+                            &get_path_index,
+                            src_value,
+                            edges,
+                            0,
+                        )
+                    } else {
+                        self.translate_write_back_update(
+                            &mut || dst_value.clone(),
+                            &get_path_index,
+                            src_value,
+                            &[edge.to_owned()],
+                            0,
+                        )
+                    };
+                    emitln!(
+                        writer,
+                        "$t{} := $UpdateMutation($t{}, {});",
+                        idx,
+                        idx,
+                        update
+                    );
+                }
             },
         }
     }
@@ -3556,7 +3575,7 @@ impl FunctionTranslator<'_> {
                         )
                     }
                 },
-                BorrowEdge::Hyper(_) => unreachable!("unexpected borrow edge"),
+                BorrowEdge::Hyper(_) | BorrowEdge::Invoke => unreachable!("unexpected borrow edge"),
             }
         }
     }

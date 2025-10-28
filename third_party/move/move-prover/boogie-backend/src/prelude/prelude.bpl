@@ -476,6 +476,13 @@ function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
     $Mutation(m->l, m->p, v)
 }
 
+// Havoc the content of the mutation, preserving location and path.
+procedure {:inline 1} $HavocMutation<T>(m: $Mutation T) returns (r: $Mutation T) {
+    r->l := m->l;
+    r->p := m->p;
+    // r->v stays uninitialized, thus havoced
+}
+
 function {:inline} $ChildMutation<T1, T2>(m: $Mutation T1, offset: int, v: T2): $Mutation T2 {
     $Mutation(m->l, ExtendVec(m->p, offset), v)
 }
