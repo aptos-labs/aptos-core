@@ -24,11 +24,12 @@ use std::{
 use tempfile::TempDir;
 
 mod data_collection;
-mod data_state_view;
+pub mod data_state_view;
 mod execution;
 mod online_execution;
 
 pub use data_collection::*;
+pub use data_state_view::*;
 pub use execution::*;
 use legacy_move_compiler::compiled_unit::CompiledUnitEnum;
 use move_core_types::language_storage::ModuleId;

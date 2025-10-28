@@ -3083,11 +3083,13 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-block-executor",
+ "aptos-comparison-testing",
  "aptos-consensus",
  "aptos-crypto",
  "aptos-gas-profiling",
  "aptos-logger",
  "aptos-rest-client",
+ "aptos-transaction-simulation",
  "aptos-types",
  "aptos-validator-interface",
  "aptos-vm",

@@ -31,7 +31,12 @@ use aptos_vm_logging::log_schema::AdapterLogSchema;
 use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, output::VMOutput};
 use itertools::Itertools;
 use std::{path::Path, sync::Arc, time::Instant};
-
+use aptos_comparison_testing::DataStateView;
+use aptos_transaction_simulation::InMemoryStateStore;
+use aptos_types::on_chain_config::FeatureFlag;
+use aptos_types::on_chain_config::Features;
+use aptos_types::on_chain_config::OnChainConfig;
+use aptos_transaction_simulation::SimulationStateStore;
 pub struct AptosDebugger {
     debugger: Arc<dyn AptosValidatorInterface + Send>,
 }
@@ -82,6 +87,17 @@ impl AptosDebugger {
 
         let txn_provider = DefaultTxnProvider::new(sig_verified_txns, auxiliary_infos);
         let state_view = DebuggerStateView::new(self.debugger.clone(), version);
+        let mut features = Features::fetch_config(&state_view).unwrap_or_default();
+        println!("reach here: {}", features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION));
+        features.enable(FeatureFlag::ENABLE_ENUM_OPTION);
+        let mut state = InMemoryStateStore::new();
+        state
+        .set_features(features)
+        .expect("failed to set features, this should not happen");
+        //state.set_features(Features::new(FeatureFlag::ENABLE_ENUM_OPTION));
+        let data_view = DataStateView::new(self.debugger.clone(), version, state);
+        let features = Features::fetch_config(&data_view).unwrap_or_default();
+        println!("reach here2: {}", features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION));
 
         print_transaction_stats(txn_provider.get_txns(), version);
 
@@ -94,7 +110,7 @@ impl AptosDebugger {
             for i in 0..repeat_execution_times {
                 let start_time = Instant::now();
                 let cur_result =
-                    execute_block_no_limit(&txn_provider, &state_view, *concurrency_level)
+                execute_block_no_limit_alternative(&txn_provider, &data_view, *concurrency_level)
                         .map_err(|err| format_err!("Unexpected VM Error: {:?}", err))?;
 
                 println!(
@@ -474,6 +490,25 @@ fn is_reconfiguration(vm_output: &TransactionOutput) -> bool {
 fn execute_block_no_limit(
     txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
     state_view: &DebuggerStateView,
+    concurrency_level: usize,
+) -> Result<Vec<TransactionOutput>, VMStatus> {
+    let executor = AptosVMBlockExecutor::new();
+    executor
+        .execute_block_with_config(
+            txn_provider,
+            state_view,
+            BlockExecutorConfig {
+                local: BlockExecutorLocalConfig::default_with_concurrency_level(concurrency_level),
+                onchain: BlockExecutorConfigFromOnchain::new_no_block_limit(),
+            },
+            TransactionSliceMetadata::unknown(),
+        )
+        .map(BlockOutput::into_transaction_outputs_forced)
+}
+
+fn execute_block_no_limit_alternative(
+    txn_provider: &DefaultTxnProvider<SignatureVerifiedTransaction, AuxiliaryInfo>,
+    state_view: &DataStateView,
     concurrency_level: usize,
 ) -> Result<Vec<TransactionOutput>, VMStatus> {
     let executor = AptosVMBlockExecutor::new();

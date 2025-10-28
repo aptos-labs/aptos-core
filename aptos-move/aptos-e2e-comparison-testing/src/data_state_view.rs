@@ -64,6 +64,7 @@ impl TStateView for DataStateView {
     fn get_state_value(&self, state_key: &StateKey) -> StateViewResult<Option<StateValue>> {
         if let Some(code) = &self.code_data {
             if code.contains_state_value(state_key)? {
+                println!("reach here: key:{:?} value:{:?}", state_key, code.get_state_value(state_key)?);
                 return code.get_state_value(state_key);
             }
         }
