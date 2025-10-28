@@ -33,7 +33,7 @@ use move_vm_types::{
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
     ty_interner::{InternedTypePool, TypeVecId},
-    values::Locals,
+    values::{Locals, Value},
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
@@ -154,7 +154,7 @@ impl Frame {
         call_type: CallType,
         vm_config: &VMConfig,
         function: Rc<LoadedFunction>,
-        locals: Locals,
+        local_values: Vec<Value>,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
@@ -211,7 +211,7 @@ impl Frame {
         Ok(Frame {
             pc: 0,
             ty_builder,
-            locals,
+            locals: Locals::from_values(local_values),
             function,
             call_type,
             local_tys,
