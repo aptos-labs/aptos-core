@@ -4,7 +4,8 @@
 
 use crate::{
     Factory, GenesisConfig, GenesisConfigFn, IndexerDeployConfig, NodeConfigFn, Result, Swarm,
-    Version, INDEXER_GRPC_DOCKER_IMAGE_REPO, VALIDATOR_DOCKER_IMAGE_REPO,
+    Version, INDEXER_GRPC_CONFIG_KEY, INDEXER_GRPC_DOCKER_IMAGE_REPO, INDEXER_GRPC_V2_CONFIG_KEY,
+    VALIDATOR_DOCKER_IMAGE_REPO,
 };
 use anyhow::bail;
 use futures::{future, FutureExt};
@@ -204,9 +205,9 @@ impl Factory for K8sFactory {
                         "namespace": self.kube_namespace.clone(), 
                     });
                     let indexer_grpc_key = if deploy_config.use_indexer_v2 {
-                        "indexer-grpc-v2-values"
+                        INDEXER_GRPC_V2_CONFIG_KEY
                     } else {
-                        "indexer-grpc-values"
+                        INDEXER_GRPC_CONFIG_KEY
                     };
                     config_json[indexer_grpc_key] = json!({
                         "indexerGrpcImage": format!("{}:{}", INDEXER_GRPC_DOCKER_IMAGE_REPO, init_version),
