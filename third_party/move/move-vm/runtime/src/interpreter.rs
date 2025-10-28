@@ -2114,10 +2114,9 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
+                        let (_, _, ty_count) =
                             frame_cache.get_field_type_and_struct_type(*fi_idx, self)?;
-                        gas_meter.charge_create_ty(struct_ty_count)?;
-                        gas_meter.charge_create_ty(field_ty_count)?;
+                        gas_meter.charge_create_ty(ty_count)?;
 
                         let instr = if matches!(instruction, Bytecode::MutBorrowFieldGeneric(_)) {
                             S::MutBorrowFieldGeneric
@@ -2160,10 +2159,9 @@ impl Frame {
                         //
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
-                        let ((_, field_ty_count), (_, struct_ty_count)) =
+                        let (_, _, ty_count) =
                             frame_cache.get_variant_field_type_and_struct_type(*fi_idx, self)?;
-                        gas_meter.charge_create_ty(struct_ty_count)?;
-                        gas_meter.charge_create_ty(field_ty_count)?;
+                        gas_meter.charge_create_ty(ty_count)?;
 
                         let instr = match instruction {
                             Bytecode::MutBorrowVariantFieldGeneric(_) => {
@@ -2230,12 +2228,15 @@ impl Frame {
                         //       This is a bit wasteful since the newly created types are
                         //       dropped immediately.
                         let field_tys = frame_cache.get_struct_fields_types(*si_idx, self)?;
-                        for (_, ty_count) in field_tys {
-                            gas_meter.charge_create_ty(*ty_count)?;
+                        let mut ty_count = NumTypeNodes::zero();
+                        for (_, field_ty_count) in field_tys {
+                            ty_count += *field_ty_count;
                         }
 
-                        let (ty, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        let (ty, struct_ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
+                        ty_count += struct_ty_count;
                         gas_meter.charge_create_ty(ty_count)?;
+
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
                             traversal_context,
@@ -2256,12 +2257,15 @@ impl Frame {
                         let field_tys =
                             frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
 
+                        let mut total_ty_count = NumTypeNodes::zero();
                         for (_, ty_count) in field_tys {
-                            gas_meter.charge_create_ty(*ty_count)?;
+                            total_ty_count += *ty_count;
                         }
 
                         let (ty, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        total_ty_count += ty_count;
+                        gas_meter.charge_create_ty(total_ty_count)?;
+
                         interpreter.ty_depth_checker.check_depth_of_type(
                             gas_meter,
                             traversal_context,
@@ -2309,12 +2313,14 @@ impl Frame {
                         //       dropped immediately.
                         let ty_and_field_counts =
                             frame_cache.get_struct_fields_types(*si_idx, self)?;
+                        let mut total_ty_count = NumTypeNodes::zero();
                         for (_, ty_count) in ty_and_field_counts {
-                            gas_meter.charge_create_ty(*ty_count)?;
+                            total_ty_count += *ty_count;
                         }
 
                         let (_, ty_count) = frame_cache.get_struct_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        total_ty_count += ty_count;
+                        gas_meter.charge_create_ty(total_ty_count)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack(true, struct_.field_views())?;
@@ -2329,12 +2335,14 @@ impl Frame {
                     Bytecode::UnpackVariantGeneric(si_idx) => {
                         let ty_and_field_counts =
                             frame_cache.get_struct_variant_fields_types(*si_idx, self)?;
+                        let mut total_ty_count = NumTypeNodes::zero();
                         for (_, ty_count) in ty_and_field_counts {
-                            gas_meter.charge_create_ty(*ty_count)?;
+                            total_ty_count += *ty_count;
                         }
 
                         let (_, ty_count) = frame_cache.get_struct_variant_type(*si_idx, self)?;
-                        gas_meter.charge_create_ty(ty_count)?;
+                        total_ty_count += ty_count;
+                        gas_meter.charge_create_ty(total_ty_count)?;
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack_variant(true, struct_.field_views())?;

@@ -162,9 +162,11 @@ impl Frame {
         let ty_builder = vm_config.ty_builder.clone();
         let local_tys = if ty_args.is_empty() {
             // Function is not generic - avoid cloning types.
+            let mut ty_count = NumTypeNodes::zero();
             for ty in function.local_tys() {
-                gas_meter.charge_create_ty(NumTypeNodes::new(ty.num_nodes() as u64))?;
+                ty_count += NumTypeNodes::new(ty.num_nodes() as u64);
             }
+            gas_meter.charge_create_ty(ty_count)?;
 
             if RTTCheck::should_perform_checks(&function.function) {
                 LocalTys::BorrowFromFunction
@@ -176,18 +178,16 @@ impl Frame {
             // usage of the function.
             let mut cache_borrow = frame_cache.borrow_mut();
             if let Some(local_ty_counts) = cache_borrow.instantiated_local_ty_counts.as_ref() {
-                for cnt in local_ty_counts.iter() {
-                    gas_meter.charge_create_ty(*cnt)?;
-                }
+                gas_meter.charge_create_ty(*local_ty_counts)?;
             } else {
                 let local_tys = function.local_tys();
-                let mut local_ty_counts = Vec::with_capacity(local_tys.len());
+                let mut local_ty_counts = NumTypeNodes::zero();
                 for ty in local_tys {
                     let cnt = NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64);
-                    gas_meter.charge_create_ty(cnt)?;
-                    local_ty_counts.push(cnt);
+                    local_ty_counts += cnt;
                 }
-                cache_borrow.instantiated_local_ty_counts = Some(Rc::from(local_ty_counts));
+                gas_meter.charge_create_ty(local_ty_counts)?;
+                cache_borrow.instantiated_local_ty_counts = Some(local_ty_counts);
             }
 
             if RTTCheck::should_perform_checks(&function.function) {
@@ -557,10 +557,11 @@ impl Frame {
 
         let ty_args = self.function.ty_args();
         if let Some(gas_meter) = gas_meter {
+            let mut num_nodes = NumTypeNodes::zero();
             for ty in instantiation {
-                gas_meter
-                    .charge_create_ty(NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64))?;
+                num_nodes += NumTypeNodes::new(ty.num_nodes_in_subst(ty_args)? as u64);
             }
+            gas_meter.charge_create_ty(num_nodes)?;
         }
 
         let instantiation = instantiation

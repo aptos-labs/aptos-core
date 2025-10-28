@@ -544,7 +544,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::ImmBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
-                let ((field_ty, _), (expected_struct_ty, _)) =
+                let (field_ty, expected_struct_ty, _) =
                     ty_cache.get_field_type_and_struct_type(*idx, frame)?;
                 struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
 
@@ -553,7 +553,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::MutBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
-                let ((field_ty, _), (expected_struct_ty, _)) =
+                let (field_ty, expected_struct_ty, _) =
                     ty_cache.get_field_type_and_struct_type(*idx, frame)?;
                 struct_ty.paranoid_check_ref_eq(expected_struct_ty, true)?;
 
@@ -574,7 +574,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::MutBorrowVariantFieldGeneric(idx) => {
                 let is_mut = matches!(instruction, Bytecode::MutBorrowVariantFieldGeneric(..));
                 let struct_ty = operand_stack.pop_ty()?;
-                let ((field_ty, _), (expected_struct_ty, _)) =
+                let (field_ty, expected_struct_ty, _) =
                     ty_cache.get_variant_field_type_and_struct_type(*idx, frame)?;
                 struct_ty.paranoid_check_ref_eq(expected_struct_ty, is_mut)?;
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;

@@ -40,11 +40,10 @@ pub(crate) struct FrameTypeCache {
     /// For a given field instantiation, the:
     ///    ((Type of the field, size of the field type) and (Type of its defining struct,
     ///    size of its defining struct)
-    field_instantiation:
-        BTreeMap<FieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
+    field_instantiation: BTreeMap<FieldInstantiationIndex, (Type, Type, NumTypeNodes)>,
     /// Same as above, bot for variant field instantiations
     variant_field_instantiation:
-        BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
+        BTreeMap<VariantFieldInstantiationIndex, (Type, Type, NumTypeNodes)>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
@@ -66,7 +65,7 @@ pub(crate) struct FrameTypeCache {
     /// Cached instantiated local types for generic functions.
     pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
     /// Cached number of type nodes per instantiated local type for gas charging re-use.
-    pub(crate) instantiated_local_ty_counts: Option<Rc<[NumTypeNodes]>>,
+    pub(crate) instantiated_local_ty_counts: Option<NumTypeNodes>,
 }
 
 macro_rules! get_or_insert {
@@ -87,16 +86,16 @@ impl FrameTypeCache {
         &mut self,
         idx: FieldInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
-        let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
+    ) -> PartialVMResult<(&Type, &Type, NumTypeNodes)> {
+        let (field_ty, struct_ty, combined_ty_count) =
             get_or_insert!(&mut self.field_instantiation, idx, {
-                let struct_type = frame.field_instantiation_to_struct(idx)?;
-                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let struct_ty = frame.field_instantiation_to_struct(idx)?;
+                let struct_ty_count = NumTypeNodes::new(struct_ty.num_nodes() as u64);
                 let field_ty = frame.get_generic_field_ty(idx)?;
                 let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
-                ((field_ty, field_ty_count), (struct_type, struct_ty_count))
+                (field_ty, struct_ty, field_ty_count + struct_ty_count)
             });
-        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
+        Ok((field_ty, struct_ty, *combined_ty_count))
     }
 
     // note(inline): do not inline, increases size a lot, might even decrease the performance
@@ -104,21 +103,21 @@ impl FrameTypeCache {
         &mut self,
         idx: VariantFieldInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
-        let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
+    ) -> PartialVMResult<(&Type, &Type, NumTypeNodes)> {
+        let (field_ty, struct_ty, ty_count) =
             get_or_insert!(&mut self.variant_field_instantiation, idx, {
                 let info = frame.variant_field_instantiation_info_at(idx);
-                let struct_type = frame.create_struct_instantiation_ty(
+                let struct_ty = frame.create_struct_instantiation_ty(
                     &info.definition_struct_type,
                     &info.instantiation,
                 )?;
-                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                let struct_ty_count = NumTypeNodes::new(struct_ty.num_nodes() as u64);
                 let field_ty =
                     frame.instantiate_ty(&info.uninstantiated_field_ty, &info.instantiation)?;
                 let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
-                ((field_ty, field_ty_count), (struct_type, struct_ty_count))
+                (field_ty, struct_ty, struct_ty_count + field_ty_count)
             });
-        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
+        Ok((field_ty, struct_ty, *ty_count))
     }
 
     // note(inline): do not inline, increases size a lot, might even decrease the performance
