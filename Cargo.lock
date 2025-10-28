@@ -304,7 +304,11 @@ dependencies = [
 
 [[package]]
 name = "aptos"
+<<<<<<< HEAD
 version = "7.10.0"
+=======
+version = "7.10.2"
+>>>>>>> ecf0022ca1 ([Aptos CLI] update Cargo.toml for new version)
 dependencies = [
  "anyhow",
  "aptos-api-types",
