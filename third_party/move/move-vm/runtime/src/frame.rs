@@ -4,6 +4,7 @@
 use crate::{
     config::VMConfig,
     frame_type_cache::FrameTypeCache,
+    interpreter::Stack,
     loader::{FunctionHandle, LoadedFunctionOwner, StructVariantInfo, VariantFieldInfo},
     module_traversal::TraversalContext,
     reentrancy_checker::CallType,
@@ -33,7 +34,7 @@ use move_vm_types::{
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
     ty_interner::{InternedTypePool, TypeVecId},
-    values::Locals,
+    values::{Locals, Value},
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
@@ -49,6 +50,25 @@ pub(crate) enum LocalTys {
     BorrowFromFunctionGeneric(Rc<[Type]>),
 }
 
+pub(crate) struct FrameLocals {
+    /// Locals that are borrowed -- need to move them into a Locals container to allow borrwing.
+    pub(crate) promoted: Option<Locals>,
+    /// Bitmask indicating which locals have been promoted.
+    pub(crate) mask: [u64; 4],
+
+    /// Base pointer to the beginning of locals belonging this frame on the operand stack.
+    pub(crate) bp: usize,
+    /// Number of locals, incl. both parameters and locals.
+    pub(crate) num_locals: usize,
+    /// Number of return values.
+    pub(crate) num_rets: usize,
+}
+
+pub(crate) struct FrameWithStack<'a> {
+    pub(crate) frame: &'a Frame,
+    pub(crate) stack: &'a Stack,
+}
+
 /// Represents the execution context for a function. When calls are made, frames are
 /// pushed and then popped to/from the call stack.
 pub(crate) struct Frame {
@@ -58,21 +78,22 @@ pub(crate) struct Frame {
     pub(crate) function: Rc<LoadedFunction>,
     // How this frame was established.
     call_type: CallType,
-    // Locals for this execution context and their instantiated types.
-    pub(crate) locals: Locals,
+
+    pub(crate) locals: FrameLocals,
+
     pub(crate) local_tys: LocalTys,
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
 }
 
-impl AccessSpecifierEnv for Frame {
+impl<'a> AccessSpecifierEnv for FrameWithStack<'a> {
     fn eval_address_specifier_function(
         &self,
         fun: AddressSpecifierFunction,
         local: LocalIndex,
     ) -> PartialVMResult<AccountAddress> {
-        fun.eval(self.locals.copy_loc(local as usize)?)
+        fun.eval(self.frame.locals.copy_loc(&self.stack, local as usize)?)
     }
 }
 
@@ -154,7 +175,7 @@ impl Frame {
         call_type: CallType,
         vm_config: &VMConfig,
         function: Rc<LoadedFunction>,
-        locals: Locals,
+        bp: usize,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
@@ -211,7 +232,13 @@ impl Frame {
         Ok(Frame {
             pc: 0,
             ty_builder,
-            locals,
+            locals: FrameLocals {
+                promoted: None,
+                mask: [0; 4],
+                bp,
+                num_locals: function.local_tys().len(),
+                num_rets: function.return_tys().len(),
+            },
             function,
             call_type,
             local_tys,
@@ -241,14 +268,17 @@ impl Frame {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub(crate) fn check_local_tys_have_drop_ability(&self) -> PartialVMResult<()> {
+    pub(crate) fn check_local_tys_have_drop_ability(
+        &self,
+        operand_stack: &Stack,
+    ) -> PartialVMResult<()> {
         let local_tys = match &self.local_tys {
             LocalTys::None => return Ok(()),
             LocalTys::BorrowFromFunction => self.function.local_tys(),
             LocalTys::BorrowFromFunctionGeneric(tys) => tys,
         };
         for (idx, ty) in local_tys.iter().enumerate() {
-            if !self.locals.is_invalid(idx)? {
+            if !self.locals.is_invalid(operand_stack, idx)? {
                 ty.paranoid_check_has_ability(Ability::Drop)?;
             }
         }
@@ -595,5 +625,142 @@ impl Frame {
             ty_args_id,
             function,
         })
+    }
+}
+
+impl FrameLocals {
+    fn has_promoted_local(&self, idx: usize) -> bool {
+        assert!(idx < 256);
+        self.mask[idx / 64] & (1 << (idx % 64)) != 0
+    }
+
+    pub(crate) fn copy_loc(&self, operand_stack: &Stack, idx: usize) -> PartialVMResult<Value> {
+        if self.has_promoted_local(idx) {
+            self.promoted
+                .as_ref()
+                .expect("locals should be set")
+                .copy_loc(idx)
+        } else {
+            let val_ref_opt = operand_stack.value.get(self.bp + idx);
+
+            match val_ref_opt {
+                Some(val) => Ok(val.copy_value_with_default_limits()?),
+                None => Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                )),
+            }
+        }
+    }
+
+    pub(crate) fn move_loc(
+        &mut self,
+        operand_stack: &mut Stack,
+        idx: usize,
+    ) -> PartialVMResult<Value> {
+        if self.has_promoted_local(idx) {
+            self.promoted
+                .as_mut()
+                .expect("locals should be set")
+                .move_loc(idx)
+        } else {
+            let val_ref_opt = operand_stack.value.get_mut(self.bp + idx);
+
+            match val_ref_opt {
+                Some(val) => Ok(std::mem::replace(val, Value::Invalid)),
+                None => {
+                    return Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    ))
+                },
+            }
+        }
+    }
+
+    pub(crate) fn store_loc(
+        &mut self,
+        operand_stack: &mut Stack,
+        idx: usize,
+        value_to_store: Value,
+    ) -> PartialVMResult<()> {
+        if self.has_promoted_local(idx) {
+            self.promoted
+                .as_mut()
+                .expect("locals should be set")
+                .store_loc(idx, value_to_store)?
+        } else {
+            let val_ref_opt = operand_stack.value.get_mut(self.bp + idx);
+
+            match val_ref_opt {
+                Some(val) => {
+                    _ = std::mem::replace(val, value_to_store);
+                },
+                None => {
+                    return Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    ))
+                },
+            }
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn borrow_loc(
+        &mut self,
+        operand_stack: &mut Stack,
+        idx: usize,
+    ) -> PartialVMResult<Value> {
+        if self.has_promoted_local(idx) {
+            self.promoted.as_mut().unwrap().borrow_loc(idx)
+        } else {
+            let val_ref_opt = operand_stack.value.get_mut(self.bp + idx);
+
+            let val = match val_ref_opt {
+                Some(val) => std::mem::replace(val, Value::Invalid),
+                None => {
+                    return Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    ))
+                },
+            };
+
+            let locals = self
+                .promoted
+                .get_or_insert_with(|| Locals::new(self.num_locals));
+
+            self.mask[idx / 64] |= 1 << (idx % 64);
+            locals.store_loc(idx, val)?;
+            Ok(locals.borrow_loc(idx)?)
+        }
+    }
+
+    pub(crate) fn is_invalid(&self, operand_stack: &Stack, idx: usize) -> PartialVMResult<bool> {
+        if self.has_promoted_local(idx) {
+            self.promoted
+                .as_ref()
+                .expect("locals should be set")
+                .is_invalid(idx)
+        } else {
+            let val_ref_opt = operand_stack.value.get(self.bp + idx);
+            match val_ref_opt {
+                Some(Value::Invalid) => Ok(true),
+                Some(_) => Ok(false),
+                None => Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                )),
+            }
+        }
+    }
+
+    pub(crate) fn regular_values<'a>(
+        &self,
+        operand_stack: &'a Stack,
+    ) -> impl Iterator<Item = &'a Value> + Clone {
+        operand_stack
+            .value
+            .iter()
+            .skip(self.bp)
+            .take(self.num_locals)
+            .filter(|val| !val.is_invalid())
     }
 }
