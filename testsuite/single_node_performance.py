@@ -275,6 +275,10 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("order-book-balanced-size-skewed80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("monotonic-counter-single"), included_in=Flow.CONTINUOUS, waived=True),
 
+    RunGroupConfig(key=RunGroupKey("fibonacci-recursive-10"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("fibonacci-tail-recursive-20"), included_in=Flow.CONTINUOUS),
+    RunGroupConfig(key=RunGroupKey("fibonacci-iterative-30"), included_in=Flow.CONTINUOUS),
+
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
 
