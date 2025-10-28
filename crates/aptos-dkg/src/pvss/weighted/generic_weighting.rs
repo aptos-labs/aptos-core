@@ -90,7 +90,9 @@ impl<T: Transcript> GenericWeighting<T> {
     }
 }
 
-impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript for GenericWeighting<T> {
+impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
+    for GenericWeighting<T>
+{
     type DealtPubKey = T::DealtPubKey;
     type DealtPubKeyShare = Vec<T::DealtPubKeyShare>;
     type DealtSecretKey = T::DealtSecretKey;
