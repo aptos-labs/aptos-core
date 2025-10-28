@@ -14,11 +14,11 @@ type Base<E> = <E as Pairing>::G1Affine;
 /// Formally, given:
 /// - `g_1, h_1` ∈ G₁ (group generators)
 /// - `ek_i` ∈ G₁ (encryption keys)
-/// - `z_ij` ∈ Scalar<E> (input plaintext chunk)
+/// - `z_ij` ∈ Scalar<E> (plaintext scalars z_i, chunked into z_ij)
 /// - `r_j` ∈ Scalar<E> (randomness for each `column` of chunks z_ij)
 ///
-/// The homomorphism maps input `Z = [z_ij]` and randomness `R = [r_j]` to
-/// codomain elements:
+/// The homomorphism maps input `[z_ij]` and randomness `[r_j]` to
+/// the following codomain elements:
 ///
 /// ```text
 /// C_ij = g_1 * z_ij + ek_i * r_j

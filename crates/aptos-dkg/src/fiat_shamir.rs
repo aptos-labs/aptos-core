@@ -174,7 +174,8 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scal
     fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain);
 
     /// Append the last message (the masked witness) in a sigma protocol.
-    #[allow(dead_code)] // We ought to be using this, but are serializing the entire sigma proof bc our security proofs like using fresh transcripts...
+    #[allow(dead_code)] // We ought to be using this, but are serializing the entire sigma proof
+                        // because our security proofs like using fresh transcripts...
     fn append_sigma_protocol_last_message(&mut self, prover_last_message: &H::Domain);
 
     // Returns a single scalar `r` for use in a Sigma protocol
