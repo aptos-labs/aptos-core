@@ -21,7 +21,7 @@
 
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
-    ast::{ExpData, Operation},
+    ast::ExpData,
     model::{FunctionEnv, NodeId},
 };
 use std::collections::HashSet;
