@@ -86,7 +86,7 @@ mod schnorr {
 
     impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
         fn dst(&self) -> Vec<u8> {
-            b"Schnorr".to_vec()
+            b"SCHNORR_SIGMA_PROTOCOL_DST".to_vec()
         }
     }
 }
@@ -107,7 +107,6 @@ mod chaum_pedersen {
         TupleHomomorphism {
             hom1: schnorr1,
             hom2: schnorr2,
-            dst: b"Chaum-Pedersen DST".to_vec(),
         }
     }
 }

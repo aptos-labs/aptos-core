@@ -6,7 +6,6 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms::Trait, EntrywiseMap},
-        Witness,
     },
 };
 use ark_ec::pairing::Pairing;
@@ -36,7 +35,6 @@ where
 {
     pub hom1: H1,
     pub hom2: H2,
-    pub dst: Vec<u8>, // Included here to allow implementing `sigma_protocol::Trait` automatically, avoiding Rust’s orphan rule restrictions
 }
 // One method to leave out the dst would be to later define in this file:
 // struct TupleHomomorphismWithDsts<'a, H1, H2> {
@@ -195,17 +193,25 @@ where
 
 impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
 where
-    H1: Trait<MsmOutput = E::G1, Base = E::G1Affine, Scalar = E::ScalarField>,
-    H2: Trait<
-        Domain = H1::Domain,
-        Scalar = H1::Scalar,
-        Base = H1::Base,
-        MsmInput = H1::MsmInput,
-        MsmOutput = H1::MsmOutput,
-    >,
-    H1::Domain: Witness<E>,
+    H1: sigma_protocol::Trait<E>,
+    H2: sigma_protocol::Trait<E>,
+    H2: Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
 {
     fn dst(&self) -> Vec<u8> {
-        self.dst.clone()
+        let mut dst = Vec::new();
+
+        let dst1 = self.hom1.dst();
+        let dst2 = self.hom2.dst();
+
+        // Domain-separate them properly so concatenation is unambiguous.
+        // Prefix with their lengths so [a|b] and [ab|] don't collide.
+        dst.extend_from_slice(b"TupleHomomorphism(");
+        dst.extend_from_slice(&(dst1.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst1);
+        dst.extend_from_slice(&(dst2.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst2);
+        dst.extend_from_slice(b")");
+
+        dst
     }
 }
