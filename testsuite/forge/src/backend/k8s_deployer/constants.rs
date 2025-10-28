@@ -10,7 +10,7 @@ pub const INDEXER_GRPC_DOCKER_IMAGE_REPO: &str =
     "us-docker.pkg.dev/aptos-registry/docker/indexer-grpc";
 
 /// The version of the forge deployer image to use.
-pub const DEFAULT_FORGE_DEPLOYER_IMAGE_TAG: &str = "975f6b154ff65c5d1597d60cf964d089d1ca952c"; // default to the latest stable build from the main branch (2025-08-02)
+pub const DEFAULT_FORGE_DEPLOYER_IMAGE_TAG: &str = "84562c2931bac69ff12ad1154d7b3686efee4c60"; // default to the latest stable build from the main branch (2025-08-02)
 
 /// This is the service account name that the deployer will use to deploy the forge components. It may require extra permissions and additonal setup
 pub const FORGE_DEPLOYER_SERVICE_ACCOUNT_NAME: &str = "forge";
