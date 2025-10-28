@@ -28,6 +28,12 @@ module aptos_experimental::order_book_types {
         order_id: u128
     }
 
+    /// A type that reverses the bits of OrderIdType to improve parallelism
+    /// by distributing orders more evenly across the data structure
+    struct ReverseBitsOrderIdType has store, copy, drop {
+        reversed_order_id: u128
+    }
+
     struct AccountClientOrderId has store, copy, drop {
         account: address,
         client_order_id: String
@@ -86,6 +92,49 @@ module aptos_experimental::order_book_types {
 
     public fun get_order_id_value(self: &OrderIdType): u128 {
         self.order_id
+    }
+
+    /// Convert OrderIdType to ReverseBitsOrderIdType by reversing bits
+    public(friend) fun to_reverse_bits_order_id(order_id: OrderIdType): ReverseBitsOrderIdType {
+        ReverseBitsOrderIdType {
+            reversed_order_id: reverse_bits(order_id.order_id)
+        }
+    }
+
+    /// Convert ReverseBitsOrderIdType back to OrderIdType by reversing bits
+    public(friend) fun from_reverse_bits_order_id(reversed_order_id: ReverseBitsOrderIdType): OrderIdType {
+        OrderIdType {
+            order_id: reverse_bits(reversed_order_id.reversed_order_id)
+        }
+    }
+
+    /// Reverse the bits in a u128 value using divide and conquer approach
+    /// This is more efficient than the bit-by-bit approach, reducing from O(n) to O(log n)
+    fun reverse_bits(value: u128): u128 {
+        let v = value;
+
+        // Swap odd and even bits
+        v = ((v & 0x55555555555555555555555555555555) << 1) | ((v >> 1) & 0x55555555555555555555555555555555);
+
+        // Swap consecutive pairs
+        v = ((v & 0x33333333333333333333333333333333) << 2) | ((v >> 2) & 0x33333333333333333333333333333333);
+
+        // Swap nibbles
+        v = ((v & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f) << 4) | ((v >> 4) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+
+        // Swap bytes
+        v = ((v & 0x00ff00ff00ff00ff00ff00ff00ff00ff) << 8) | ((v >> 8) & 0x00ff00ff00ff00ff00ff00ff00ff00ff);
+
+        // Swap 2-byte chunks
+        v = ((v & 0x0000ffff0000ffff0000ffff0000ffff) << 16) | ((v >> 16) & 0x0000ffff0000ffff0000ffff0000ffff);
+
+        // Swap 4-byte chunks
+        v = ((v & 0x00000000ffffffff00000000ffffffff) << 32) | ((v >> 32) & 0x00000000ffffffff00000000ffffffff);
+
+        // Swap 8-byte chunks
+        v = (v << 64) | (v >> 64);
+
+        v
     }
 
     const EINVALID_TIME_IN_FORCE: u64 = 5;
@@ -536,5 +585,75 @@ module aptos_experimental::order_book_types {
         self: &ActiveMatchedOrder
     ): OrderType {
         self.order_book_type
+    }
+
+    // ============================= Tests ====================================
+
+    #[test]
+    fun test_reverse_bits_order_id_type() {
+        // Test basic bit reversal functionality
+        let order_id_1 = new_order_id_type(1);
+        let order_id_2 = new_order_id_type(2);
+        let order_id_3 = new_order_id_type(0x12345678);
+        let order_id_4 = new_order_id_type(0x87654321ABCDEF00);
+
+        let reversed_1 = to_reverse_bits_order_id(order_id_1);
+        let reversed_2 = to_reverse_bits_order_id(order_id_2);
+        let reversed_3 = to_reverse_bits_order_id(order_id_3);
+        let reversed_4 = to_reverse_bits_order_id(order_id_4);
+
+        // Test that conversion back gives original value
+        let recovered_1 = from_reverse_bits_order_id(reversed_1);
+        let recovered_2 = from_reverse_bits_order_id(reversed_2);
+        let recovered_3 = from_reverse_bits_order_id(reversed_3);
+        let recovered_4 = from_reverse_bits_order_id(reversed_4);
+
+        assert!(order_id_1.get_order_id_value() == recovered_1.get_order_id_value());
+        assert!(order_id_2.get_order_id_value() == recovered_2.get_order_id_value());
+        assert!(order_id_3.get_order_id_value() == recovered_3.get_order_id_value());
+        assert!(order_id_4.get_order_id_value() == recovered_4.get_order_id_value());
+
+        // Test that reversed values are different from originals (for non-palindromic bit patterns)
+        // Now we can access the internal field since we're in the same module
+        assert!(reversed_1.reversed_order_id != order_id_1.get_order_id_value());
+        assert!(reversed_2.reversed_order_id != order_id_2.get_order_id_value());
+        assert!(reversed_3.reversed_order_id != order_id_3.get_order_id_value());
+        assert!(reversed_4.reversed_order_id != order_id_4.get_order_id_value());
+
+        // Test specific bit reversal cases
+        // 1 in binary: 0...0001, reversed should be 1000...0000 (high bit set)
+        assert!(reversed_1.reversed_order_id == (1u128 << 127));
+
+        // 2 in binary: 0...0010, reversed should be 0100...0000
+        assert!(reversed_2.reversed_order_id == (1u128 << 126));
+
+        // Test edge cases
+        let order_id_zero = new_order_id_type(0);
+        let reversed_zero = to_reverse_bits_order_id(order_id_zero);
+        let recovered_zero = from_reverse_bits_order_id(reversed_zero);
+        assert!(order_id_zero.get_order_id_value() == recovered_zero.get_order_id_value());
+        assert!(reversed_zero.reversed_order_id == 0); // 0 reversed is still 0
+
+        // Test maximum value
+        let order_id_max = new_order_id_type(0xffffffffffffffffffffffffffffffff);
+        let reversed_max = to_reverse_bits_order_id(order_id_max);
+        let recovered_max = from_reverse_bits_order_id(reversed_max);
+        assert!(order_id_max.get_order_id_value() == recovered_max.get_order_id_value());
+        assert!(reversed_max.reversed_order_id == 0xffffffffffffffffffffffffffffffff); // All 1s reversed is still all 1s
+
+        // Test alternating pattern
+        let order_id_alt = new_order_id_type(0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa);
+        let reversed_alt = to_reverse_bits_order_id(order_id_alt);
+        let recovered_alt = from_reverse_bits_order_id(reversed_alt);
+        assert!(order_id_alt.get_order_id_value() == recovered_alt.get_order_id_value());
+        // 0xaaaa... in binary is 10101010..., reversed should be 01010101... = 0x5555...
+        assert!(reversed_alt.reversed_order_id == 0x55555555555555555555555555555555);
+
+
+        let order_id_alt = new_order_id_type(0x64328946124712951320956108326756);
+        let reversed_alt = to_reverse_bits_order_id(order_id_alt);
+        let recovered_alt = from_reverse_bits_order_id(reversed_alt);
+        assert!(order_id_alt.get_order_id_value() == recovered_alt.get_order_id_value());
+
     }
 }

@@ -21,6 +21,8 @@ module aptos_experimental::single_order_book {
     use aptos_framework::transaction_context;
     use aptos_experimental::order_book_types::{
         OrderIdType,
+        ReverseBitsOrderIdType,
+        to_reverse_bits_order_id,
         AccountClientOrderId,
         new_unique_idx_type,
         new_account_client_order_id,
@@ -77,7 +79,7 @@ module aptos_experimental::single_order_book {
 
     enum SingleOrderBook<M: store + copy + drop> has store {
         V1 {
-            orders: BigOrderedMap<OrderIdType, OrderWithState<M>>,
+            orders: BigOrderedMap<ReverseBitsOrderIdType, OrderWithState<M>>,
             client_order_ids: BigOrderedMap<AccountClientOrderId, OrderIdType>,
             pending_orders: PendingOrderBookIndex
         }
@@ -158,7 +160,8 @@ module aptos_experimental::single_order_book {
     public(friend) fun cancel_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, order_id: OrderIdType
     ): SingleOrder<M> {
-        let order_with_state_option = self.orders.remove_or_none(&order_id);
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        let order_with_state_option = self.orders.remove_or_none(&reversed_order_id);
         assert!(order_with_state_option.is_some(), EORDER_NOT_FOUND);
         let order_with_state = order_with_state_option.destroy_some();
         let (order, is_active) = order_with_state.destroy_order_from_state();
@@ -226,8 +229,9 @@ module aptos_experimental::single_order_book {
     public(friend) fun try_cancel_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_creator: address, order_id: OrderIdType
     ): Option<SingleOrder<M>> {
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
         let is_creator = self.orders.get_and_map(
-            &order_id,
+            &reversed_order_id,
             |order| order.get_order_from_state().get_account() == order_creator
         );
 
@@ -279,8 +283,9 @@ module aptos_experimental::single_order_book {
                 order_req.time_in_force,
                 order_req.metadata
             );
+        let reversed_order_id = to_reverse_bits_order_id(order_req.order_id);
         assert!(
-            self.orders.upsert(order_req.order_id, new_order_with_state(order, true)).is_none(),
+            self.orders.upsert(reversed_order_id, new_order_with_state(order, true)).is_none(),
             error::invalid_argument(EORDER_ALREADY_EXISTS)
         );
         if (order_req.client_order_id.is_some()) {
@@ -313,10 +318,11 @@ module aptos_experimental::single_order_book {
     ) {
         assert!(reinsert_order.validate_single_order_reinsertion_request(original_order), E_REINSERT_ORDER_MISMATCH);
         let order_id = reinsert_order.get_order_id_from_match_details();
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
         let unique_idx = reinsert_order.get_unique_priority_idx_from_match_details();
 
         let reinsert_remaining_size = reinsert_order.get_remaining_size_from_match_details();
-        let present = self.orders.modify_if_present(&order_id, |order_with_state| {
+        let present = self.orders.modify_if_present(&reversed_order_id, |order_with_state| {
             order_with_state.increase_remaining_size(reinsert_remaining_size);
         });
         if (!present) {
@@ -352,7 +358,8 @@ module aptos_experimental::single_order_book {
                 order_req.metadata
             );
 
-        self.orders.add(order_id, new_order_with_state(order, false));
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        self.orders.add(reversed_order_id, new_order_with_state(order, false));
 
         if (order_req.client_order_id.is_some()) {
             self.client_order_ids.add(
@@ -380,12 +387,13 @@ module aptos_experimental::single_order_book {
             active_matched_order.destroy_active_matched_order();
         assert!(order_book_type == single_order_type(), ENOT_SINGLE_ORDER_BOOK);
 
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
         let order_with_state = if (remaining_size == 0) {
-            let order = self.orders.remove(&order_id);
+            let order = self.orders.remove(&reversed_order_id);
             order.set_remaining_size(0);
             order
         } else {
-            self.orders.modify_and_return(&order_id, |order_with_state| {
+            self.orders.modify_and_return(&reversed_order_id, |order_with_state| {
                 aptos_experimental::single_order_types::set_remaining_size(order_with_state, remaining_size);
                 // order_with_state.set_remaining_size(remaining_size);
                 *order_with_state
@@ -430,8 +438,9 @@ module aptos_experimental::single_order_book {
         order_id: OrderIdType,
         size_delta: u64
     ) {
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
         let order_opt = self.orders.modify_if_present_and_return(
-            &order_id,
+            &reversed_order_id,
             |order_with_state| {
                 assert!(
                     order_creator == order_with_state.get_order_from_state().get_account(),
@@ -470,13 +479,15 @@ module aptos_experimental::single_order_book {
     public(friend) fun get_order_metadata<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<M> {
-        self.orders.get_and_map(&order_id, |order| order.get_metadata_from_state())
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        self.orders.get_and_map(&reversed_order_id, |order| order.get_metadata_from_state())
     }
 
     public(friend) fun set_order_metadata<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, order_id: OrderIdType, metadata: M
     ) {
-        let present = self.orders.modify_if_present(&order_id, |order_with_state| {
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        let present = self.orders.modify_if_present(&reversed_order_id, |order_with_state| {
             order_with_state.set_metadata_in_state(metadata);
         });
         assert!(present, EORDER_NOT_FOUND);
@@ -485,19 +496,22 @@ module aptos_experimental::single_order_book {
     public(friend) fun is_active_order<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): bool {
-        self.orders.get_and_map(&order_id, |order| order.is_active_order()).destroy_with_default(false)
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        self.orders.get_and_map(&reversed_order_id, |order| order.is_active_order()).destroy_with_default(false)
     }
 
     public(friend) fun get_order<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<OrderWithState<M>> {
-        self.orders.get(&order_id)
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        self.orders.get(&reversed_order_id)
     }
 
     public(friend) fun get_remaining_size<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): u64 {
-        self.orders.get_and_map(&order_id, |order| order.get_remaining_size_from_state()).destroy_with_default(0)
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        self.orders.get_and_map(&reversed_order_id, |order| order.get_remaining_size_from_state()).destroy_with_default(0)
     }
 
     /// Removes and returns the orders that are ready to be executed based on the current price.
@@ -510,7 +524,8 @@ module aptos_experimental::single_order_book {
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
-            let order_with_state = self_orders.remove(&order_id);
+            let reversed_order_id = to_reverse_bits_order_id(order_id);
+            let order_with_state = self_orders.remove(&reversed_order_id);
             let (order, _) = order_with_state.destroy_order_from_state();
             if (order.get_client_order_id().is_some()) {
                 self_client_order_ids.remove(
@@ -533,7 +548,8 @@ module aptos_experimental::single_order_book {
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
-            let order_with_state = self_orders.remove(&order_id);
+            let reversed_order_id = to_reverse_bits_order_id(order_id);
+            let order_with_state = self_orders.remove(&reversed_order_id);
             let (order, _) = order_with_state.destroy_order_from_state();
             orders.push_back(order);
         });
@@ -558,7 +574,8 @@ module aptos_experimental::single_order_book {
     public(friend) fun get_unique_priority_idx<M: store + copy + drop>(
         self: &SingleOrderBook<M>, order_id: OrderIdType
     ): Option<UniqueIdxType> {
-        self.orders.get_and_map(&order_id, |order| order.get_unique_priority_idx_from_state())
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        self.orders.get_and_map(&reversed_order_id, |order| order.get_unique_priority_idx_from_state())
     }
 
     #[test_only]
@@ -792,7 +809,8 @@ module aptos_experimental::single_order_book {
         expected_is_bid: bool,
         expected_client_order_id: Option<String>
     ) {
-        let order_state = *order_book.orders.borrow(&order_id);
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        let order_state = *order_book.orders.borrow(&reversed_order_id);
         let (order, is_active) = order_state.destroy_order_from_state();
         let (account, _order_id, client_order_id, _, price, orig_size, size, is_bid,_, _, _) =
             order.destroy_single_order();
@@ -1225,7 +1243,8 @@ module aptos_experimental::single_order_book {
 
         // Verify original sell order no longer exists (fully filled)
         let order_id = new_order_id_type(1);
-        assert!(!order_book.orders.contains(&order_id));
+        let reversed_order_id = to_reverse_bits_order_id(order_id);
+        assert!(!order_book.orders.contains(&reversed_order_id));
 
         // Verify buy order still exists with remaining size
         verify_order_state(
