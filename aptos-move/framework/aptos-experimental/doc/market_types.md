@@ -83,6 +83,7 @@
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
+<b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info">0x7::market_clearinghouse_order_info</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
@@ -540,12 +541,6 @@
 </dt>
 <dd>
  Address of the market object of this market.
-</dd>
-<dt>
-<code>order_id_generator: <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a></code>
-</dt>
-<dd>
-
 </dd>
 <dt>
 <code>next_fill_id: u64</code>
@@ -2056,7 +2051,6 @@
     Market::V1 {
         parent: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(parent),
         market: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(market),
-        order_id_generator: new_ascending_id_generator(),
         next_fill_id: 0,
         config,
         <a href="order_book.md#0x7_order_book">order_book</a>: new_order_book(),
@@ -2085,7 +2079,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_next_order_id">next_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): OrderIdType {
-    new_order_id_type(self.order_id_generator.next_ascending_id())
+    new_order_id_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>())
 }
 </code></pre>
 
