@@ -70,7 +70,7 @@ pub(crate) struct FrameTypeCache {
 }
 
 macro_rules! get_or_insert {
-    ($map: expr, $idx: expr, $ty_func: tt) => {
+    ($map:expr, $idx:expr, $ty_func:tt) => {
         match $map.entry($idx) {
             std::collections::btree_map::Entry::Occupied(entry) => entry.into_mut(),
             std::collections::btree_map::Entry::Vacant(entry) => {
