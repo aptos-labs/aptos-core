@@ -300,7 +300,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::Branch(_) => (),
             Bytecode::Ret => {
-                frame.check_local_tys_have_drop_ability()?;
+                frame.check_local_tys_have_drop_ability(&operand_stack)?;
             },
             Bytecode::Abort => {
                 operand_stack.pop_ty()?;
@@ -311,7 +311,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let val_ty = operand_stack.pop_ty()?;
                 // For store, use assignability
                 val_ty.paranoid_check_assignable(expected_ty)?;
-                if !frame.locals.is_invalid(*idx as usize)? {
+                if !frame.locals.is_invalid(&operand_stack, *idx as usize)? {
                     expected_ty.paranoid_check_has_ability(Ability::Drop)?;
                 }
             },

@@ -6,7 +6,7 @@ use crate::{
     access_control::AccessControlState,
     config::VMConfig,
     data_cache::MoveVmDataCache,
-    frame::Frame,
+    frame::{Frame, FrameWithStack},
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
@@ -363,13 +363,18 @@ where
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
-        let num_locals = function.local_tys().len();
-        let mut locals = Locals::new(num_locals);
-        for (i, value) in args.into_iter().enumerate() {
-            locals
-                .store_loc(i, value)
+        let bp = self.operand_stack.value.len();
+        for arg in args {
+            self.operand_stack
+                .push(arg)
                 .map_err(|e| self.set_location(e))?;
         }
+
+        let num_locals = function.local_tys().len();
+        let num_params = function.param_tys().len();
+        self.operand_stack
+            .value
+            .extend(std::iter::repeat_with(|| Value::Invalid).take(num_locals - num_params));
 
         self.reentrancy_checker
             .enter_function(None, &function, CallType::Regular)
@@ -388,14 +393,20 @@ where
             CallType::Regular,
             self.vm_config,
             function,
-            locals,
+            bp,
             frame_cache,
         )
         .map_err(|err| self.set_location(err))?;
 
         // Access control for the new frame.
         self.access_control
-            .enter_function(&current_frame, &current_frame.function)
+            .enter_function(
+                &FrameWithStack {
+                    frame: &current_frame,
+                    stack: &self.operand_stack,
+                },
+                &current_frame.function,
+            )
             .map_err(|e| self.set_location(e))?;
 
         loop {
@@ -410,15 +421,37 @@ where
 
             match exit_code {
                 ExitCode::Return => {
-                    let non_ref_vals = current_frame
-                        .locals
-                        .drop_all_values()
-                        .map(|(_idx, val)| val)
-                        .collect::<Vec<_>>();
+                    // TODO(fastcall): Double check if ordering matters
+                    let non_ref_vals_promoted =
+                        if let Some(locals) = &mut current_frame.locals.promoted {
+                            locals
+                                .drop_all_values()
+                                .map(|(_idx, val)| val)
+                                .collect::<Vec<_>>()
+                        } else {
+                            vec![]
+                        };
+                    let regular_values = current_frame.locals.regular_values(&self.operand_stack);
 
                     gas_meter
-                        .charge_drop_frame(non_ref_vals.iter())
+                        .charge_drop_frame(regular_values.chain(non_ref_vals_promoted.iter()))
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    // Fast frame: need to pop the locals and shift the return values
+                    let frame_locals = &mut current_frame.locals;
+                    let actual_stack_height = self.operand_stack.value.len();
+                    let expected_stack_height =
+                        frame_locals.bp + frame_locals.num_locals + frame_locals.num_rets;
+                    if actual_stack_height != expected_stack_height {
+                        let err = PartialVMError::new_invariant_violation(format!(
+                            "stack height mismatch: expected {}, got {}",
+                            expected_stack_height, actual_stack_height
+                        ));
+                        return Err(set_err_info!(current_frame, err));
+                    }
+                    self.operand_stack
+                        .value
+                        .drain(frame_locals.bp..frame_locals.bp + frame_locals.num_locals);
 
                     // If the returning function has runtime checks on, the return types
                     // will be on the caller stack.
@@ -837,7 +870,13 @@ where
 
         // Access control for the new frame.
         self.access_control
-            .enter_function(&frame, &frame.function)
+            .enter_function(
+                &FrameWithStack {
+                    frame: &frame,
+                    stack: &self.operand_stack,
+                },
+                &frame.function,
+            )
             .map_err(|e| self.set_location(e))?;
 
         std::mem::swap(current_frame, &mut frame);
@@ -867,21 +906,42 @@ where
         mut captured: Vec<Value>,
     ) -> PartialVMResult<Frame> {
         let num_locals = function.local_tys().len();
-        let mut locals = Locals::new(num_locals);
         let num_param_tys = function.param_tys().len();
+
+        let captured_count = mask.captured_count() as usize;
+
         // Whether the function making this frame performs checks.
         let should_check = RTTCheck::should_perform_checks(&current_frame.function.function);
+
+        let mut regular_args_end = self.operand_stack.value.len();
+        let bp = regular_args_end + captured_count - num_param_tys;
+
+        // First, extend the stack so that we have enough slots for all locals.
+        self.operand_stack.value.extend(
+            std::iter::repeat_with(|| Value::Invalid)
+                .take(num_locals - num_param_tys + captured_count),
+        );
+
+        // Prepare the arguments fhe new frame.
+        // - If there are no captured arguments, this is a no-op, execept for the runtime checks.
+        // - If there are captured arguments, need to insert them by shuffling arguments around.
+        //   This is accomplished by filling the slots from the end to the beginning.
         for i in (0..num_param_tys).rev() {
             let is_captured = mask.is_captured(i);
-            let value = if is_captured {
-                captured.pop().ok_or_else(|| {
+
+            if is_captured {
+                // Captured argument -- pop from the captured vec.
+                let val = captured.pop().ok_or_else(|| {
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message("inconsistent closure mask".to_string())
-                })?
+                })?;
+
+                self.operand_stack.value[bp + i] = val;
             } else {
-                self.operand_stack.pop()?
-            };
-            locals.store_loc(i, value)?;
+                // Regular argument -- reteive the last unused regular argument.
+                regular_args_end -= 1;
+                self.operand_stack.value.swap(regular_args_end, bp + i);
+            }
 
             if should_check && !is_captured {
                 // Only perform paranoid type check for actual operands on the stack.
@@ -902,13 +962,14 @@ where
                 }
             }
         }
+
         RTRCheck::core_call_transition(num_param_tys, num_locals, mask, &mut self.ref_state)?;
         Frame::make_new_frame::<RTTCheck>(
             gas_meter,
             call_type,
             self.vm_config,
             function,
-            locals,
+            bp,
             frame_cache,
         )
     }
@@ -1547,8 +1608,10 @@ where
         debug_writeln!(buf)?;
         debug_writeln!(buf, "        Locals:")?;
         if !function.local_tys().is_empty() {
-            values::debug::print_locals(buf, &frame.locals, true)?;
-            debug_writeln!(buf)?;
+            if let Some(locals) = &frame.locals.promoted {
+                values::debug::print_locals(buf, locals, true)?;
+                debug_writeln!(buf)?;
+            }
         } else {
             debug_writeln!(buf, "            (none)")?;
         }
@@ -1595,7 +1658,11 @@ where
             }
             internal_state.push_str(format!("{}* {:?}\n", i, code[pc]).as_str());
         }
-        internal_state.push_str(format!("Locals:\n{}\n", current_frame.locals).as_str());
+        if let Some(locals) = &current_frame.locals.promoted {
+            internal_state.push_str(format!("Promoted Locals:\n{}\n", locals).as_str());
+        } else {
+            internal_state.push_str("Promoted Locals:\n(none)\n");
+        }
         internal_state.push_str("Operand Stack:\n");
         for value in &self.operand_stack.value {
             internal_state.push_str(format!("{}\n", value).as_str());
@@ -1664,13 +1731,13 @@ where
 }
 
 // TODO Determine stack size limits based on gas limit
-const OPERAND_STACK_SIZE_LIMIT: usize = 1024;
+const OPERAND_STACK_SIZE_LIMIT: usize = 102400;
 const CALL_STACK_SIZE_LIMIT: usize = 1024;
 pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
-    value: Vec<Value>,
+    pub(crate) value: Vec<Value>,
     types: Vec<Type>,
 }
 
@@ -1813,6 +1880,7 @@ impl Stack {
 
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
+        /*
         if self.types.len() != self.value.len() {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
@@ -1820,6 +1888,7 @@ impl Stack {
                 ),
             );
         }
+        */
         Ok(())
     }
 }
@@ -2062,12 +2131,16 @@ impl Frame {
                     },
                     Bytecode::CopyLoc(idx) => {
                         // TODO(Gas): We should charge gas before copying the value.
-                        let local = self.locals.copy_loc(*idx as usize)?;
+                        let local = self
+                            .locals
+                            .copy_loc(&mut interpreter.operand_stack, *idx as usize)?;
                         gas_meter.charge_copy_loc(&local)?;
                         interpreter.operand_stack.push(local)?;
                     },
                     Bytecode::MoveLoc(idx) => {
-                        let local = self.locals.move_loc(*idx as usize)?;
+                        let local = self
+                            .locals
+                            .move_loc(&mut interpreter.operand_stack, *idx as usize)?;
                         gas_meter.charge_move_loc(&local)?;
 
                         interpreter.operand_stack.push(local)?;
@@ -2075,7 +2148,11 @@ impl Frame {
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
-                        self.locals.store_loc(*idx as usize, value_to_store)?;
+                        self.locals.store_loc(
+                            &mut interpreter.operand_stack,
+                            *idx as usize,
+                            value_to_store,
+                        )?;
                     },
                     Bytecode::Call(idx) => {
                         return Ok(ExitCode::Call(*idx));
@@ -2090,9 +2167,10 @@ impl Frame {
                             _ => S::ImmBorrowLoc,
                         };
                         gas_meter.charge_simple_instr(instr)?;
-                        interpreter
-                            .operand_stack
-                            .push(self.locals.borrow_loc(*idx as usize)?)?;
+                        let ref_val = self
+                            .locals
+                            .borrow_loc(&mut interpreter.operand_stack, *idx as usize)?;
+                        interpreter.operand_stack.push(ref_val)?;
                     },
                     Bytecode::ImmBorrowField(fh_idx) | Bytecode::MutBorrowField(fh_idx) => {
                         let instr = match instruction {

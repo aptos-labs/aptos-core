@@ -566,6 +566,10 @@ impl Value {
             },
         })
     }
+
+    pub fn copy_value_with_default_limits(&self) -> PartialVMResult<Self> {
+        self.copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+    }
 }
 
 impl Container {
