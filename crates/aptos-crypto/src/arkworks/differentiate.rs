@@ -5,7 +5,7 @@
 //! and provides an implementation for `DensePolynomial` from the arkworks library.
 
 use ark_ff::FftField;
-use ark_poly::{univariate::DensePolynomial};
+use ark_poly::univariate::DensePolynomial;
 
 /// A trait for functions that can be differentiated.
 pub trait DifferentiableFn {
@@ -43,8 +43,8 @@ mod tests {
     use super::*;
     use ark_bn254::Fr;
     use ark_ff::UniformRand;
-    use ark_std::{rand::thread_rng, Zero};
     use ark_poly::DenseUVPolynomial;
+    use ark_std::{rand::thread_rng, Zero};
 
     #[test]
     fn test_zero() {
