@@ -315,7 +315,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_order_with_state">new_order_with_state</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, is_active: bool): <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_order_with_state">new_order_with_state</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, is_active: bool): <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;
 </code></pre>
 
 
@@ -324,7 +324,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_order_with_state">new_order_with_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_new_order_with_state">new_order_with_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;, is_active: bool
 ): <a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt; {
     OrderWithState::V1 { order, is_active }
@@ -341,7 +341,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_from_state">get_order_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_from_state">get_order_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -350,7 +350,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_from_state">get_order_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_from_state">get_order_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt; {
     &self.order
@@ -367,7 +367,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_state">get_metadata_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): M
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_state">get_metadata_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): M
 </code></pre>
 
 
@@ -376,7 +376,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_state">get_metadata_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_state">get_metadata_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): M {
     self.order.metadata
@@ -393,7 +393,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, metadata: M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, metadata: M)
 </code></pre>
 
 
@@ -402,7 +402,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_metadata_in_state">set_metadata_in_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;, metadata: M
 ) {
     self.order.metadata = metadata;
@@ -419,7 +419,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_id">get_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_id">get_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
 </code></pre>
 
 
@@ -428,7 +428,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_id">get_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): OrderIdType {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_order_id">get_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): OrderIdType {
     self.order_id
 }
 </code></pre>
@@ -443,7 +443,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_account">get_account</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <b>address</b>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_account">get_account</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <b>address</b>
 </code></pre>
 
 
@@ -452,7 +452,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_account">get_account</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): <b>address</b> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_account">get_account</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): <b>address</b> {
     self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>
 }
 </code></pre>
@@ -493,7 +493,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_order">get_metadata_from_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): M
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_order">get_metadata_from_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): M
 </code></pre>
 
 
@@ -502,7 +502,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_order">get_metadata_from_order</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): M {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_metadata_from_order">get_metadata_from_order</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): M {
     self.metadata
 }
 </code></pre>
@@ -517,7 +517,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_time_in_force">get_time_in_force</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_time_in_force">get_time_in_force</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>
 </code></pre>
 
 
@@ -526,7 +526,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_time_in_force">get_time_in_force</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_time_in_force">get_time_in_force</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;
 ): TimeInForce {
     self.time_in_force
@@ -543,7 +543,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_trigger_condition_from_order">get_trigger_condition_from_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_trigger_condition_from_order">get_trigger_condition_from_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;
 </code></pre>
 
 
@@ -552,7 +552,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_trigger_condition_from_order">get_trigger_condition_from_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_trigger_condition_from_order">get_trigger_condition_from_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;
 ): Option&lt;TriggerCondition&gt; {
     self.trigger_condition
@@ -569,7 +569,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_increase_remaining_size">increase_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, size: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_increase_remaining_size">increase_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, size: u64)
 </code></pre>
 
 
@@ -578,7 +578,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_increase_remaining_size">increase_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_increase_remaining_size">increase_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;, size: u64
 ) {
     self.order.remaining_size += size;
@@ -595,7 +595,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_decrease_remaining_size">decrease_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, size: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_decrease_remaining_size">decrease_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, size: u64)
 </code></pre>
 
 
@@ -604,7 +604,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_decrease_remaining_size">decrease_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_decrease_remaining_size">decrease_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;, size: u64
 ) {
     <b>assert</b>!(self.order.remaining_size &gt; size, <a href="single_order_types.md#0x7_single_order_types_EINVALID_ORDER_SIZE_DECREASE">EINVALID_ORDER_SIZE_DECREASE</a>);
@@ -622,7 +622,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_remaining_size">set_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, remaining_size: u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_remaining_size">set_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;, remaining_size: u64)
 </code></pre>
 
 
@@ -631,7 +631,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_remaining_size">set_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_set_remaining_size">set_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;, remaining_size: u64
 ) {
     self.order.remaining_size = remaining_size;
@@ -648,7 +648,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size_from_state">get_remaining_size_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size_from_state">get_remaining_size_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -657,7 +657,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size_from_state">get_remaining_size_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size_from_state">get_remaining_size_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): u64 {
     self.order.remaining_size
@@ -674,7 +674,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx_from_state">get_unique_priority_idx_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx_from_state">get_unique_priority_idx_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
 </code></pre>
 
 
@@ -683,7 +683,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx_from_state">get_unique_priority_idx_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_unique_priority_idx_from_state">get_unique_priority_idx_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): UniqueIdxType {
     self.order.unique_priority_idx
@@ -700,7 +700,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size">get_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size">get_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -709,7 +709,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): u64 {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): u64 {
     self.remaining_size
 }
 </code></pre>
@@ -724,7 +724,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_orig_size">get_orig_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_orig_size">get_orig_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -733,7 +733,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_orig_size">get_orig_size</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): u64 {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_orig_size">get_orig_size</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): u64 {
     self.orig_size
 }
 </code></pre>
@@ -748,7 +748,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_client_order_id">get_client_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_client_order_id">get_client_order_id</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;
 </code></pre>
 
 
@@ -757,7 +757,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_client_order_id">get_client_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): Option&lt;String&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_client_order_id">get_client_order_id</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): Option&lt;String&gt; {
     self.client_order_id
 }
 </code></pre>
@@ -772,7 +772,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_order_from_state">destroy_order_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): (<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_order_from_state">destroy_order_from_state</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): (<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, bool)
 </code></pre>
 
 
@@ -781,7 +781,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_order_from_state">destroy_order_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_order_from_state">destroy_order_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): (<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;, bool) {
     (self.order, self.is_active)
@@ -798,7 +798,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
 </code></pre>
 
 
@@ -807,7 +807,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;
 ): (
     <b>address</b>, OrderIdType, Option&lt;String&gt;, UniqueIdxType, u64, u64, u64, bool, Option&lt;TriggerCondition&gt;, TimeInForce, M
@@ -851,7 +851,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_active_order">is_active_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_active_order">is_active_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">single_order_types::OrderWithState</a>&lt;M&gt;): bool
 </code></pre>
 
 
@@ -860,7 +860,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_active_order">is_active_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_active_order">is_active_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): bool {
     self.is_active
@@ -877,7 +877,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_price">get_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_price">get_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): u64
 </code></pre>
 
 
@@ -886,7 +886,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_price">get_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): u64 {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_get_price">get_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): u64 {
     self.price
 }
 </code></pre>
@@ -901,7 +901,7 @@
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_bid">is_bid</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_bid">is_bid</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): bool
 </code></pre>
 
 
@@ -910,7 +910,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_bid">is_bid</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): bool {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_is_bid">is_bid</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;): bool {
     self.is_bid
 }
 </code></pre>

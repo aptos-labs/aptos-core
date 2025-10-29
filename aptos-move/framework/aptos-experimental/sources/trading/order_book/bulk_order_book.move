@@ -43,6 +43,9 @@
 /// - `EPRICE_CROSSING`: Price crossing is not allowed in bulk orders
 ///
 module aptos_experimental::bulk_order_book {
+    friend aptos_experimental::order_book;
+    #[test_only] friend aptos_experimental::bulk_order_book_tests;
+
     use aptos_framework::big_ordered_map::BigOrderedMap;
     use aptos_experimental::order_book_types::ActiveMatchedOrder;
     use aptos_experimental::order_book_types;
@@ -89,7 +92,7 @@ module aptos_experimental::bulk_order_book {
     ///
     /// # Returns:
     /// A new `BulkOrderBook` instance with empty order collections.
-    public(package) fun new_bulk_order_book<M: store + copy + drop>(): BulkOrderBook<M> {
+    public(friend) fun new_bulk_order_book<M: store + copy + drop>(): BulkOrderBook<M> {
         BulkOrderBook::V1 {
             orders:  order_book_types::new_default_big_ordered_map(),
             order_id_to_address:  order_book_types::new_default_big_ordered_map()
@@ -115,7 +118,7 @@ module aptos_experimental::bulk_order_book {
     /// - Updates the matched order's remaining sizes
     /// - Activates the next price level if the current level is fully consumed
     /// - Updates the active order book
-    public(package) fun get_single_match_for_taker<M: store + copy + drop>(
+    public(friend) fun get_single_match_for_taker<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         active_matched_order: ActiveMatchedOrder,
@@ -235,7 +238,7 @@ module aptos_experimental::bulk_order_book {
     /// # Aborts:
     /// - If the order account doesn't exist in the order book
     /// - If the reinsertion validation fails
-    public(package) fun reinsert_order<M: store + copy + drop>(
+    public(friend) fun reinsert_order<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         reinsert_order: OrderMatchDetails<M>,
@@ -265,7 +268,7 @@ module aptos_experimental::bulk_order_book {
     ///
     /// # Aborts:
     /// - If no order exists for the specified account
-    public(package) fun cancel_bulk_order<M: store + copy + drop>(
+    public(friend) fun cancel_bulk_order<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         account: address
@@ -282,7 +285,7 @@ module aptos_experimental::bulk_order_book {
         order_copy
     }
 
-    public(package) fun get_bulk_order<M: store + copy + drop>(
+    public(friend) fun get_bulk_order<M: store + copy + drop>(
         self: &BulkOrderBook<M>,
         account: address
     ): BulkOrder<M> {
@@ -293,7 +296,7 @@ module aptos_experimental::bulk_order_book {
         self.orders.get(&account).destroy_some()
     }
 
-    public(package) fun get_remaining_size<M: store + copy + drop>(
+    public(friend) fun get_remaining_size<M: store + copy + drop>(
         self: &BulkOrderBook<M>,
         account: address,
         is_bid: bool
@@ -303,7 +306,7 @@ module aptos_experimental::bulk_order_book {
         result_option.destroy_some()
     }
 
-    public(package) fun get_prices<M: store + copy + drop>(
+    public(friend) fun get_prices<M: store + copy + drop>(
         self: &BulkOrderBook<M>,
         account: address,
         is_bid: bool
@@ -313,7 +316,7 @@ module aptos_experimental::bulk_order_book {
         result_option.destroy_some()
     }
 
-    public(package) fun get_sizes<M: store + copy + drop>(
+    public(friend) fun get_sizes<M: store + copy + drop>(
         self: &BulkOrderBook<M>,
         account: address,
         is_bid: bool
@@ -336,7 +339,7 @@ module aptos_experimental::bulk_order_book {
     ///
     /// # Aborts:
     /// - If the order request validation fails
-    public(package) fun place_bulk_order<M: store + copy + drop>(
+    public(friend) fun place_bulk_order<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
         ascending_id_generator: &mut AscendingIdGenerator,

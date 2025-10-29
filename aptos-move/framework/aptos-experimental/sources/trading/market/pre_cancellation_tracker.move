@@ -6,6 +6,10 @@
 /// which means specify that this order with a client order id is cancelled even before the order is placed.
 /// This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 module aptos_experimental::pre_cancellation_tracker {
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::order_operations;
+    friend aptos_experimental::market_types;
+
     use std::string::String;
     use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
@@ -48,7 +52,7 @@ module aptos_experimental::pre_cancellation_tracker {
         )
     }
 
-    public(package) fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
+    public(friend) fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
         PreCancellationTracker {
             pre_cancellation_window_secs: expiration_time_secs,
             expiration_with_order_ids: new_default_big_ordered_map(),
@@ -56,7 +60,7 @@ module aptos_experimental::pre_cancellation_tracker {
         }
     }
 
-    public(package) fun pre_cancel_order_for_tracker(
+    public(friend) fun pre_cancel_order_for_tracker(
         tracker: &mut PreCancellationTracker,
         account: address,
         client_order_id: String
@@ -86,7 +90,7 @@ module aptos_experimental::pre_cancellation_tracker {
         tracker.expiration_with_order_ids.add(order_id_with_expiration, true);
     }
 
-    public(package) fun is_pre_cancelled(
+    public(friend) fun is_pre_cancelled(
         tracker: &mut PreCancellationTracker,
         account: address,
         client_order_id: String
@@ -111,7 +115,7 @@ module aptos_experimental::pre_cancellation_tracker {
         return false
     }
 
-    public(package) fun garbage_collect(tracker: &mut PreCancellationTracker) {
+    public(friend) fun garbage_collect(tracker: &mut PreCancellationTracker) {
         let i = 0;
         let current_time = aptos_std::timestamp::now_seconds();
         while (i < MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL

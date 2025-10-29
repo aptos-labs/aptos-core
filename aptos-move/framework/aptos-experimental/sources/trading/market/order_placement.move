@@ -54,6 +54,8 @@
 /// TimeBased(time): The order is triggered when the current time is greater than or equal to the time.
 ///
 module aptos_experimental::order_placement {
+    friend aptos_experimental::order_operations;
+
     use std::option;
     use std::option::Option;
     use std::signer;
@@ -539,7 +541,7 @@ module aptos_experimental::order_placement {
         }
     }
 
-    public(package) fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
+    public(friend) fun cleanup_order_internal<M: store + copy + drop, R: store + copy + drop>(
         user_addr: address,
         order_id: OrderIdType,
         client_order_id: Option<String>,

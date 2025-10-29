@@ -187,7 +187,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_pre_cancellation_tracker">new_pre_cancellation_tracker</a>(expiration_time_secs: u64): <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_pre_cancellation_tracker">new_pre_cancellation_tracker</a>(expiration_time_secs: u64): <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
     <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a> {
         pre_cancellation_window_secs: expiration_time_secs,
         expiration_with_order_ids: <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_new_default_big_ordered_map">new_default_big_ordered_map</a>(),
@@ -215,7 +215,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_pre_cancel_order_for_tracker">pre_cancel_order_for_tracker</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_pre_cancel_order_for_tracker">pre_cancel_order_for_tracker</a>(
     tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     client_order_id: String
@@ -265,7 +265,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_is_pre_cancelled">is_pre_cancelled</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_is_pre_cancelled">is_pre_cancelled</a>(
     tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     client_order_id: String
@@ -310,7 +310,7 @@ This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_garbage_collect">garbage_collect</a>(tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a>) {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_garbage_collect">garbage_collect</a>(tracker: &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">PreCancellationTracker</a>) {
     <b>let</b> i = 0;
     <b>let</b> current_time = aptos_std::timestamp::now_seconds();
     <b>while</b> (i &lt; <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL">MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL</a>

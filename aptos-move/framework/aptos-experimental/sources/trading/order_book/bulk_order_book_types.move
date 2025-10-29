@@ -36,6 +36,13 @@
 /// ```
 /// (work in progress)
 module aptos_experimental::bulk_order_book_types {
+    friend aptos_experimental::order_book;
+    friend aptos_experimental::bulk_order_book;
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::market_bulk_order;
+    #[test_only]
+    friend aptos_experimental::bulk_order_book_tests;
+
     use std::option;
     use std::option::Option;
     use std::vector;
@@ -126,7 +133,7 @@ module aptos_experimental::bulk_order_book_types {
     /// - `vector<u64>`: Cancelled bid sizes corresponding to cancelled prices
     /// - `vector<u64>`: Cancelled ask prices (levels that crossed the spread)
     /// - `vector<u64>`: Cancelled ask sizes corresponding to cancelled prices
-    public(package) fun new_bulk_order<M: store + copy + drop>(
+    public(friend) fun new_bulk_order<M: store + copy + drop>(
         order_id: OrderIdType,
         unique_priority_idx: UniqueIdxType,
         order_req: BulkOrderRequest<M>,
@@ -182,7 +189,7 @@ module aptos_experimental::bulk_order_book_types {
     /// # Aborts:
     /// - If bid_prices and bid_sizes have different lengths
     /// - If ask_prices and ask_sizes have different lengths
-    public(package) fun new_bulk_order_request<M: store + copy + drop>(
+    public(friend) fun new_bulk_order_request<M: store + copy + drop>(
         account: address,
         sequence_number: u64,
         bid_prices: vector<u64>,
@@ -262,14 +269,14 @@ module aptos_experimental::bulk_order_book_types {
         *account
     }
 
-    public(package) fun get_sequence_number_from_order_request<M: store + copy + drop>(
+    public(friend) fun get_sequence_number_from_order_request<M: store + copy + drop>(
         order_req: &BulkOrderRequest<M>
     ): u64 {
         let BulkOrderRequest::V1 { order_sequence_number: sequence_number, .. } = order_req;
         *sequence_number
     }
 
-    public(package) fun get_sequence_number_from_bulk_order<M: store + copy + drop>(
+    public(friend) fun get_sequence_number_from_bulk_order<M: store + copy + drop>(
         order: &BulkOrder<M>
     ): u64 {
         let BulkOrder::V1 { order_sequence_number: sequence_number, .. } = order;
@@ -295,7 +302,7 @@ module aptos_experimental::bulk_order_book_types {
         rejection_reason: option::Option<std::string::String>,
     }
 
-    public(package) fun new_bulk_order_place_response_success<M: store + copy + drop>(
+    public(friend) fun new_bulk_order_place_response_success<M: store + copy + drop>(
         order: BulkOrder<M>,
         cancelled_bid_prices: vector<u64>,
         cancelled_bid_sizes: vector<u64>,
@@ -313,7 +320,7 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun new_bulk_order_place_response_rejection<M: store + copy + drop>(
+    public(friend) fun new_bulk_order_place_response_rejection<M: store + copy + drop>(
         rejection_reason: std::string::String
     ): BulkOrderPlaceResponse<M> {
         BulkOrderPlaceResponse::Rejection {
@@ -321,7 +328,7 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun is_success<M: store + copy + drop>(
+    public(friend) fun is_success<M: store + copy + drop>(
         response: &BulkOrderPlaceResponse<M>
     ): bool {
         if (response is BulkOrderPlaceResponse::Success) {
@@ -331,7 +338,7 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun is_rejection<M: store + copy + drop>(
+    public(friend) fun is_rejection<M: store + copy + drop>(
         response: &BulkOrderPlaceResponse<M>
     ): bool {
         if (response is BulkOrderPlaceResponse::Rejection) {
@@ -341,27 +348,27 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun is_bulk_order_success_response<M: store + copy + drop>(
+    public(friend) fun is_bulk_order_success_response<M: store + copy + drop>(
         response: &BulkOrderPlaceResponse<M>
     ): bool {
         response is BulkOrderPlaceResponse::Success
     }
 
-    public(package) fun destroy_bulk_order_place_success_response<M: store + copy + drop>(
+    public(friend) fun destroy_bulk_order_place_success_response<M: store + copy + drop>(
         response: BulkOrderPlaceResponse<M>
     ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, option::Option<u64>) {
         let BulkOrderPlaceResponse::Success { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
         (order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
     }
 
-    public(package) fun destroy_bulk_order_place_reject_response<M: store + copy + drop>(
+    public(friend) fun destroy_bulk_order_place_reject_response<M: store + copy + drop>(
         response: BulkOrderPlaceResponse<M>
     ): std::string::String {
         let BulkOrderPlaceResponse::Rejection { reason } = response;
         reason
     }
 
-    public(package) fun new_bulk_order_request_response_success<M: store + copy + drop>(
+    public(friend) fun new_bulk_order_request_response_success<M: store + copy + drop>(
         request: BulkOrderRequest<M>
     ): BulkOrderRequestResponse<M> {
         BulkOrderRequestResponse {
@@ -370,7 +377,7 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun new_bulk_order_request_response_rejection<M: store + copy + drop>(
+    public(friend) fun new_bulk_order_request_response_rejection<M: store + copy + drop>(
         rejection_reason: std::string::String
     ): BulkOrderRequestResponse<M> {
         BulkOrderRequestResponse {
@@ -379,7 +386,7 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun destroy_bulk_order_request_response<M: store + copy + drop>(
+    public(friend) fun destroy_bulk_order_request_response<M: store + copy + drop>(
         response: BulkOrderRequestResponse<M>
     ): (option::Option<BulkOrderRequest<M>>, option::Option<std::string::String>) {
         let BulkOrderRequestResponse { request, rejection_reason } = response;
@@ -483,7 +490,7 @@ module aptos_experimental::bulk_order_book_types {
     //
     // Returns:
     // A `SingleBulkOrderMatch` containing the match details.
-    public(package) fun new_bulk_order_match<M: store + copy + drop>(
+    public(friend) fun new_bulk_order_match<M: store + copy + drop>(
         order: &mut BulkOrder<M>,
         is_bid: bool,
         matched_size: u64
@@ -508,7 +515,7 @@ module aptos_experimental::bulk_order_book_types {
         )
     }
 
-    public(package)  fun get_total_remaining_size<M: store + copy + drop>(
+    public(friend)  fun get_total_remaining_size<M: store + copy + drop>(
         self: &BulkOrder<M>,
         is_bid: bool,
     ): u64 {
@@ -526,7 +533,7 @@ module aptos_experimental::bulk_order_book_types {
     ///
     /// # Returns:
     /// The unique priority index for time-based ordering.
-    public(package) fun get_unique_priority_idx<M: store + copy + drop>(
+    public(friend) fun get_unique_priority_idx<M: store + copy + drop>(
         self: &BulkOrder<M>,
     ): UniqueIdxType {
         self.unique_priority_idx
@@ -539,7 +546,7 @@ module aptos_experimental::bulk_order_book_types {
     ///
     /// # Returns:
     /// The unique order identifier.
-    public(package) fun get_order_id<M: store + copy + drop>(
+    public(friend) fun get_order_id<M: store + copy + drop>(
         self: &BulkOrder<M>,
     ): OrderIdType {
         self.order_id
@@ -552,13 +559,13 @@ module aptos_experimental::bulk_order_book_types {
     ///
     /// # Returns:
     /// The account that placed the order.
-    public(package) fun get_account<M: store + copy + drop>(
+    public(friend) fun get_account<M: store + copy + drop>(
         self: &BulkOrder<M>,
     ): address {
         self.account
     }
 
-    public(package) fun get_sequence_number<M: store + copy + drop>(
+    public(friend) fun get_sequence_number<M: store + copy + drop>(
         self: &BulkOrder<M>,
     ): u64 {
         self.order_sequence_number
@@ -572,7 +579,7 @@ module aptos_experimental::bulk_order_book_types {
     ///
     /// # Returns:
     /// An option containing the active price if available, none otherwise.
-    public(package) fun get_active_price<M: store + copy + drop>(
+    public(friend) fun get_active_price<M: store + copy + drop>(
         self: &BulkOrder<M>,
         is_bid: bool,
     ): Option<u64> {
@@ -584,7 +591,7 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun get_all_prices<M: store + copy + drop>(
+    public(friend) fun get_all_prices<M: store + copy + drop>(
         self: &BulkOrder<M>,
         is_bid: bool,
     ): vector<u64> {
@@ -595,7 +602,7 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
-    public(package) fun get_all_sizes<M: store + copy + drop>(
+    public(friend) fun get_all_sizes<M: store + copy + drop>(
         self: &BulkOrder<M>,
         is_bid: bool,
     ): vector<u64> {
@@ -614,7 +621,7 @@ module aptos_experimental::bulk_order_book_types {
     ///
     /// # Returns:
     /// An option containing the active size if available, none otherwise.
-    public(package) fun get_active_size<M: store + copy + drop>(
+    public(friend) fun get_active_size<M: store + copy + drop>(
         self: &BulkOrder<M>,
         is_bid: bool,
     ): Option<u64> {
@@ -645,7 +652,7 @@ module aptos_experimental::bulk_order_book_types {
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order
     /// - `other`: Reference to the order result to reinsert
-    public(package) fun reinsert_order<M: store + copy + drop>(
+    public(friend) fun reinsert_order<M: store + copy + drop>(
         self: &mut BulkOrder<M>,
         other: &OrderMatchDetails<M>,
     ) {
@@ -681,7 +688,7 @@ module aptos_experimental::bulk_order_book_types {
     ///
     /// # Aborts:
     /// - If the matched size exceeds the available size at the first level
-    public(package) fun match_order_and_get_next<M: store + copy + drop>(
+    public(friend) fun match_order_and_get_next<M: store + copy + drop>(
         self: &mut BulkOrder<M>,
         is_bid: bool,
         matched_size: u64,
@@ -709,7 +716,7 @@ module aptos_experimental::bulk_order_book_types {
     ///
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order
-    public(package) fun set_empty<M: store + copy + drop>(
+    public(friend) fun set_empty<M: store + copy + drop>(
         self: &mut BulkOrder<M>
     ) {
         self.bid_sizes = vector::empty();
@@ -718,7 +725,7 @@ module aptos_experimental::bulk_order_book_types {
         self.ask_prices = vector::empty();
     }
 
-    public(package) fun destroy_bulk_order<M: store + copy + drop>(
+    public(friend) fun destroy_bulk_order<M: store + copy + drop>(
         self: BulkOrder<M>
     ): (
         OrderIdType,
