@@ -75,11 +75,10 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     for i in 0..n {
         let xi = xs_vec[i];
         let mut denom = F::one();
-        for j in 0..n {
+        for (j, xj) in xs_vec.iter().enumerate() {
             if i == j {
                 continue;
             }
-            let xj = xs_vec[j];
             denom *= xi - xj;
         }
         denominators.push(denom);
@@ -94,11 +93,11 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     for i in 0..n {
         let xi = xs_vec[i];
         let mut num = F::one();
-        for j in 0..n {
+        for (j, &xj) in xs_vec.iter().enumerate() {
             if i == j {
                 continue;
             }
-            num *= -xs_vec[j];
+            num *= -xj;
         }
 
         let li = num * denom_invs[i];
@@ -126,7 +125,7 @@ impl<'de, F: PrimeField> ThresholdConfig<F> {
         // coeffs_vec.into_iter().collect()
 
         // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
-        let vanishing_poly = vanishing_poly(&xs.into_iter().cloned().collect::<Vec<F>>());
+        let vanishing_poly = vanishing_poly(&xs.iter().cloned().collect::<Vec<F>>());
         let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
 
         // Step 2 (numerators): for each x in xs, divide poly eval from step 1 by (-x)
@@ -183,7 +182,7 @@ impl<'de, F: PrimeField> ThresholdConfig<F> {
     /// polynomial. The interpolation coefficients are computed over the field `F`.
     pub fn reconstruct(&self, shares: &[ShamirShare<F>]) -> Result<F> {
         if shares.len() != self.t {
-            return Err(anyhow!("Incorrect number of shares provided"));
+            Err(anyhow!("Incorrect number of shares provided"))
         } else {
             let mut sum = F::zero();
 

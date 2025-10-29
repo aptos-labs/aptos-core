@@ -17,7 +17,7 @@ impl<F: FftField> DifferentiableFn for DensePolynomial<F> {
     fn differentiate(&self) -> Self {
         let result_coeffs: Vec<F> = self
             .coeffs()
-            .into_iter()
+            .iter()
             .skip(1)
             .enumerate()
             .map(|(i, x)| *x * F::from(i as u64 + 1))

@@ -20,7 +20,7 @@ pub fn vanishing_poly<F: FftField>(xs: &[F]) -> DensePolynomial<F> {
 fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
     // Convert each root `u` into a linear polynomial (x - u)
     let mut bases: Vec<DensePolynomial<F>> = roots
-        .into_iter()
+        .iter()
         .cloned()
         .map(|u| DenseUVPolynomial::from_coefficients_vec(vec![-u, F::one()]))
         .collect();
@@ -39,7 +39,7 @@ fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
     // Iteratively build upper levels of the tree
     for i in 1..=(num_leaves.ilog2() as usize) {
         // Number of nodes at the current level
-        let len_at_i = 2usize.pow(depth as u32 - i as u32);
+        let len_at_i = 2usize.pow(depth - (i as u32));
 
         // Compute the polynomials at this level in parallel:
         let result_at_i = (0..len_at_i)
@@ -55,11 +55,11 @@ fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
 /// Given a multiplication tree `mult_tree` (as produced by `compute_mult_tree()`), this function
 /// returns the product of all leaf polynomials **except** the one at `divisor_index`.
 pub fn quotient<F: FftField>(
-    mult_tree: &Vec<Vec<DensePolynomial<F>>>,
+    mult_tree: &[Vec<DensePolynomial<F>>],
     divisor_index: usize,
 ) -> DensePolynomial<F> {
     // Clone the tree so we can modify it without affecting the original
-    let mut mult_tree = mult_tree.clone();
+    let mut mult_tree = mult_tree.to_owned();
 
     // Replace the polynomial at the given leaf index with the constant "1"
     mult_tree[0][divisor_index] = DenseUVPolynomial::from_coefficients_vec(vec![F::one()]);
