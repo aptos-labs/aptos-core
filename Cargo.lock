@@ -1288,7 +1288,9 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "dashmap 7.0.0-rc2",
+ "move-bytecode-utils",
  "move-core-types",
+ "move-resource-viewer",
  "once_cell",
  "rand 0.7.3",
 ]
@@ -2487,6 +2489,7 @@ dependencies = [
  "aptos-logger",
  "aptos-mempool",
  "aptos-metrics-core",
+ "aptos-resource-viewer",
  "aptos-runtimes",
  "aptos-storage-interface",
  "aptos-types",

@@ -266,7 +266,7 @@ impl<S: StateView> ModuleCache for CachedModuleView<S> {
         self.module_cache.num_modules()
     }
 }
-impl<S: StateView> CompiledModuleView for CachedModuleView<S> {
+impl<'a, S: StateView> CompiledModuleView for &'a CachedModuleView<S> {
     type Item = Arc<CompiledModule>;
 
     fn view_compiled_module(&self, module_id: &ModuleId) -> anyhow::Result<Option<Self::Item>> {
