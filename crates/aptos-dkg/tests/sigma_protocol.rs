@@ -30,8 +30,7 @@ where
     let proof = hom.prove(&witness, &statement, &mut prover_transcript, &mut rng);
 
     let mut verifier_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    hom
-        .verify(&statement, &proof, &mut verifier_transcript)
+    hom.verify(&statement, &proof, &mut verifier_transcript)
         .expect("Sigma protocol proof failed verification");
 }
 
@@ -40,7 +39,7 @@ mod schnorr {
     use ark_ec::VariableBaseMSM;
     use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
-    #[derive(Clone, Debug)]
+    #[derive(CanonicalSerialize, Clone, Debug)]
     pub(crate) struct Schnorr<E: Pairing> {
         pub g: E::G1Affine,
     }

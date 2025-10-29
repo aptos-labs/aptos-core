@@ -37,6 +37,26 @@ where
     pub hom2: H2,
 }
 
+impl<H1, H2> CanonicalSerialize for TupleHomomorphism<H1, H2>
+where
+    H1: homomorphism::Trait + CanonicalSerialize,
+    H2: homomorphism::Trait<Domain = H1::Domain> + CanonicalSerialize,
+{
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.hom1.serialize_with_mode(&mut writer, compress)?;
+        self.hom2.serialize_with_mode(&mut writer, compress)?;
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        self.hom1.serialized_size(compress) + self.hom2.serialized_size(compress)
+    }
+}
+
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
 /// component homomorphisms to the same input and returning their results
 /// as a tuple.
@@ -186,8 +206,8 @@ where
 
 impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
 where
-    H1: sigma_protocol::Trait<E>,
-    H2: sigma_protocol::Trait<E>,
+    H1: sigma_protocol::Trait<E> + CanonicalSerialize,
+    H2: sigma_protocol::Trait<E> + CanonicalSerialize,
     H2: Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
 {
     fn dst(&self) -> Vec<u8> {

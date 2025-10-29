@@ -4,9 +4,7 @@
 //! Auxiliary function for lagrange interpolation
 
 use ark_ff::FftField;
-use ark_poly::{
-    univariate::DensePolynomial, DenseUVPolynomial,
-};
+use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 /// This function constructs a binary tree of polynomials where:
@@ -20,7 +18,7 @@ pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>
         .collect();
 
     bases.resize(
-        bases.len().next_power_of_two(), 
+        bases.len().next_power_of_two(),
         DenseUVPolynomial::from_coefficients_vec(vec![F::one()]),
     );
 
@@ -64,23 +62,17 @@ pub fn quotient<F: FftField>(
 
 #[cfg(test)]
 mod tests {
-    use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
-
-    use super::*;
-    use ark_std::{rand::thread_rng, UniformRand};
-    use ark_std::One;
-
+    use super::{compute_mult_tree, *};
     use ark_bn254::Fr;
-
-    use super::compute_mult_tree;
+    use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+    use ark_std::{rand::thread_rng, One, UniformRand};
 
     #[test]
     fn test_mult_tree() {
-
         let mut rng = thread_rng();
 
         for num_roots in 1..=16 {
-            let frs : Vec<Fr> = (0..num_roots).map(|_| Fr::rand(&mut rng)).collect();
+            let frs: Vec<Fr> = (0..num_roots).map(|_| Fr::rand(&mut rng)).collect();
             let mult_tree = compute_mult_tree(&frs);
 
             // naive computation of root of tree
@@ -99,7 +91,11 @@ mod tests {
         let mut rng = thread_rng();
 
         for num_roots in 2..=16 {
-            let mult_tree = compute_mult_tree(&(0..num_roots).map(|_| Fr::rand(&mut rng)).collect::<Vec<Fr>>());
+            let mult_tree = compute_mult_tree(
+                &(0..num_roots)
+                    .map(|_| Fr::rand(&mut rng))
+                    .collect::<Vec<Fr>>(),
+            );
 
             let vanishing_poly = &mult_tree[mult_tree.len() - 1][0];
 

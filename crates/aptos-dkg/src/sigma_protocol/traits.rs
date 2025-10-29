@@ -29,6 +29,7 @@ pub trait Trait<E: Pairing>:
         Base = E::G1Affine,
         MsmOutput = E::G1,
     > + Sized
+    + CanonicalSerialize
 {
     fn dst(&self) -> Vec<u8>;
 
@@ -224,8 +225,12 @@ where
 ///
 /// # Returns
 /// The Fiat-Shamir challenge scalar, after appending the DST and the first message to the Fiat-Shamir transcript.
-pub fn fiat_shamir_challenge_for_sigma_protocol<E: Pairing, H: homomorphism::Trait>(
+pub fn fiat_shamir_challenge_for_sigma_protocol<
+    E: Pairing,
+    H: homomorphism::Trait + CanonicalSerialize,
+>(
     fs_transcript: &mut merlin::Transcript,
+    hom: &H,
     statement: &H::Codomain,
     prover_first_message: &H::Codomain,
     dst: &[u8],
@@ -238,6 +243,12 @@ where
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
         fs_transcript,
         dst,
+    );
+
+    // Append the MSM bases to the transcript
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_msm_bases(
+        fs_transcript,
+        hom,
     );
 
     // Append the public statement (the image of the witness) to the transcript
@@ -259,7 +270,7 @@ where
 }
 
 #[allow(non_snake_case)]
-pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait, R>(
+pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait + CanonicalSerialize, R>(
     homomorphism: &H,
     witness: &H::Domain,
     statement: &H::Codomain,
@@ -282,6 +293,7 @@ where
     // Step 3: Obtain Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
         fiat_shamir_transcript,
+        homomorphism,
         statement,
         &A,
         dst,
@@ -379,12 +391,14 @@ pub fn verify_msm_hom<E: Pairing, H>(
     dst: &[u8],
 ) -> anyhow::Result<()>
 where
-    H: FixedBaseMsmsTrait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>,
+    H: FixedBaseMsmsTrait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>
+        + CanonicalSerialize,
     H::Domain: Witness<E>,
 {
     // Step 1: Reproduce the prover's Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
         fs_transcript,
+        homomorphism,
         statement,
         &prover_first_message,
         dst,

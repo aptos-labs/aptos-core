@@ -3,14 +3,13 @@
 
 //! This module provides some helper functions for arkworks.
 
+pub mod mult_tree;
 pub mod serialization;
 pub mod shamir;
-pub mod mult_tree;
 
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
 use ark_poly::EvaluationDomain;
-use ark_ec::AffineRepr;
 use digest::Digest;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
@@ -59,25 +58,25 @@ pub fn compute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarFie
 }
 
 /// Iteration behavior and failure probability:
-/// 
-/// By Hasse's theorem, the order of the elliptic curve is approximately equal 
-/// to the order of the underlying field Fq. Each x-coordinate either corresponds 
-/// to exactly two curve points, (x, y) and (x, -y), or to zero points. 
-/// 
-/// As a result, each iteration of this algorithm has roughly a 50% chance 
-/// of producing a valid point when given a uniformly random input 
-/// (assuming the hash function behaves as a random oracle). Consequently, 
-/// the probability that this function fails on a random input is 
+///
+/// By Hasse's theorem, the order of the elliptic curve is approximately equal
+/// to the order of the underlying field Fq. Each x-coordinate either corresponds
+/// to exactly two curve points, (x, y) and (x, -y), or to zero points.
+///
+/// As a result, each iteration of this algorithm has roughly a 50% chance
+/// of producing a valid point when given a uniformly random input
+/// (assuming the hash function behaves as a random oracle). Consequently,
+/// the probability that this function fails on a random input is
 /// approximately 1/2^256.  
-/// 
-/// Note: This algorithm is probabilistic and may be vulnerable to 
+///
+/// Note: This algorithm is probabilistic and may be vulnerable to
 /// side-channel attacks. For more details, see `MapToGroup` in:
-/// Boneh, D., Lynn, B., & Shacham, H. (2004). "Short Signatures from the Weil Pairing." 
-/// Journal of Cryptology, 17, 297–319. DOI: 10.1007/s00145-004-0314-9. 
+/// Boneh, D., Lynn, B., & Shacham, H. (2004). "Short Signatures from the Weil Pairing."
+/// Journal of Cryptology, 17, 297–319. DOI: 10.1007/s00145-004-0314-9.
 /// <https://doi.org/10.1007/s00145-004-0314-9>
 pub fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
-    let dst_len = u8::try_from(dst.len())
-        .expect("DST is too long; must fit in one byte, as in RFC 9380");
+    let dst_len =
+        u8::try_from(dst.len()).expect("DST is too long; must fit in one byte, as in RFC 9380");
 
     let mut buf = Vec::with_capacity(msg.len() + dst.len() + 1);
     buf.extend_from_slice(msg);
@@ -86,7 +85,8 @@ pub fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
     buf.push(0); // placeholder for counter
 
     for ctr in 0..=u8::MAX {
-        *buf.last_mut().expect("Could not access last byte of buffer") = ctr;
+        *buf.last_mut()
+            .expect("Could not access last byte of buffer") = ctr;
 
         let hashed = sha3::Sha3_512::digest(&buf);
 

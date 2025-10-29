@@ -3,24 +3,20 @@
 
 //! Contains a version of shamir secret sharing and `ThresholdConfig` for arkworks
 
-use serde::{Serialize, Deserialize, Deserializer};
-use ark_poly::Radix2EvaluationDomain;
-use ark_ff::PrimeField;
-use ark_std::rand::{Rng, RngCore};
-use ark_poly::EvaluationDomain;
-use crate::arkworks::serialization::ark_se;
-use crate::arkworks::serialization::ark_de;
-use ark_ec::pairing::Pairing;
-use anyhow::{Result, anyhow};
-use ark_std::Zero;
+use crate::arkworks::serialization::{ark_de, ark_se};
+use anyhow::{anyhow, Result};
+use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ff::{batch_inversion, Field, PrimeField};
+use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
+use ark_std::{
+    marker::PhantomData,
+    rand::{Rng, RngCore},
+    One, Zero,
+};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
-use ark_std::One;
-use ark_ff::batch_inversion;
-use ark_ff::Field;
-use ark_ec::CurveGroup;
-use ark_std::marker::PhantomData;
 
-/// Represents a single share in Shamir's Secret Sharing scheme. Each 
+/// Represents a single share in Shamir's Secret Sharing scheme. Each
 /// `ShamirShare` consists of an `(x, y)` point on the secret sharing polynomial.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShamirShare<F: PrimeField> {
@@ -29,7 +25,7 @@ pub struct ShamirShare<F: PrimeField> {
     pub x: F,
     /// The evaluation of the polynomial at `x`.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub y: F
+    pub y: F,
 }
 
 // /// Deals a secret `s` in a `t`-out-of-`n` fashion (as per `sc`) returning (1) the degree `t-1`
@@ -61,8 +57,6 @@ pub struct ShamirShare<F: PrimeField> {
 //     (coeffs, evals)
 // }
 
-
-
 /// Configuration for a threshold cryptography scheme.
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct ThresholdConfig<F: PrimeField, G: CurveGroup<ScalarField = F>> {
@@ -77,7 +71,9 @@ pub struct ThresholdConfig<F: PrimeField, G: CurveGroup<ScalarField = F>> {
     _marker: PhantomData<G>,
 }
 
-impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> Deserialize<'de> for ThresholdConfig<F, G> {
+impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> Deserialize<'de>
+    for ThresholdConfig<F, G>
+{
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -89,18 +85,21 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> Deserialize<'de> for Th
         }
 
         let BasicFields { n, t } = BasicFields::deserialize(deserializer)?;
-        
+
         let domain = Radix2EvaluationDomain::new(n) // `new()` does `n.next_power_of_two()`
             .ok_or_else(|| serde::de::Error::custom(format!("Invalid domain size: {}", n)))?;
 
-        Ok(ThresholdConfig { n, t, domain, _marker: PhantomData::<G> })
+        Ok(ThresholdConfig {
+            n,
+            t,
+            domain,
+            _marker: PhantomData::<G>,
+        })
     }
 }
 
 // TODO: move this function to tests? or keep it for benchmarks?
-fn naive_all_lagrange_coefficients<F: Field>(
-    xs: &HashSet<F>,
-) -> Vec<(F, F)> {
+fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     let xs_vec: Vec<F> = xs.iter().cloned().collect();
     let n = xs_vec.len();
 
@@ -110,7 +109,9 @@ fn naive_all_lagrange_coefficients<F: Field>(
         let xi = xs_vec[i];
         let mut denom = F::one();
         for j in 0..n {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             let xj = xs_vec[j];
             denom *= xi - xj;
         }
@@ -127,7 +128,9 @@ fn naive_all_lagrange_coefficients<F: Field>(
         let xi = xs_vec[i];
         let mut num = F::one();
         for j in 0..n {
-            if i == j { continue; }
+            if i == j {
+                continue;
+            }
             num *= -xs_vec[j];
         }
 
@@ -144,7 +147,12 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
     /// of size `n` for use in FFT-based polynomial operations.
     pub fn new(n: usize, t: usize) -> Self {
         let domain = Radix2EvaluationDomain::new(n).unwrap();
-        ThresholdConfig { n, t, domain, _marker: PhantomData::<G> }
+        ThresholdConfig {
+            n,
+            t,
+            domain,
+            _marker: PhantomData::<G>,
+        }
     }
 
     /// Fast lagrange coefficient computation algorithm, taken from the paper
@@ -162,13 +170,12 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
     //     coeffs_vec.into_iter().collect()
     // }
 
-
     //     // step 1: compute poly w/ roots at all x in xs, compute eval at 0
     //     let vanishing_poly = vanishing_poly(&xs.into_iter().cloned().collect::<Vec<E::ScalarField>>());
     //     let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
-                                                            
+
     //     // step 2  (numerators): for each x in xs, divide poly eval from step 1 by (-x)
-    //     let numerators = 
+    //     let numerators =
     //         self.domain
     //         .elements()
     //         .collect::<Vec<F>>()
@@ -181,7 +188,7 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
 
     //     // step 3b (denominators): FFT of poly in 3a, keep evals that correspond to the points in
     //     // question
-    //     let denominators_indexed_by_x  = 
+    //     let denominators_indexed_by_x  =
     //         derivative.evaluate_over_domain(self.domain)
     //         .evals
     //         .into_par_iter()
@@ -208,9 +215,10 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
         coeffs.extend((0..(self.t - 1)).map(|_| F::rand(rng)));
         let y_pts = self.domain.fft(&coeffs);
 
-        self.domain.elements()
+        self.domain
+            .elements()
             .zip(y_pts.iter())
-            .map( |(x, &y)| ShamirShare { x, y } )
+            .map(|(x, &y)| ShamirShare { x, y })
             .take(self.n)
             .collect()
     }
@@ -235,7 +243,6 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
         }
     }
 }
-
 
 #[cfg(test)]
 mod shamir_tests {
