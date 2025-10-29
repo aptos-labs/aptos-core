@@ -2,28 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::error::PepperServiceError;
+use aptos_crypto::blstrs::scalar_from_uniform_be_bytes;
 use aptos_keyless_pepper_common::{
     vuf::{bls12381_g1_bls::Bls12381G1Bls, VUF},
     PepperV0VufPubKey,
 };
 use aptos_logger::{info, warn};
-use ark_bls12_381::G2Projective;
-use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use blstrs::{G2Projective, Scalar};
 use sha3::Digest;
 
 /// A simple struct that holds a VUF public and private keypair,
 /// including the VUF public key in JSON format.
 pub struct VUFKeypair {
-    vuf_private_key: ark_bls12_381::Fr,
+    vuf_private_key: Scalar,
     vuf_public_key: G2Projective,
     vuf_public_key_json: String,
 }
 
 impl VUFKeypair {
     pub fn new(
-        vuf_private_key: ark_bls12_381::Fr,
+        vuf_private_key: Scalar,
         vuf_public_key: G2Projective,
         vuf_public_key_json: String,
     ) -> Self {
@@ -35,7 +33,7 @@ impl VUFKeypair {
     }
 
     /// Returns a reference to the VUF private key
-    pub fn vuf_private_key(&self) -> &ark_bls12_381::Fr {
+    pub fn vuf_private_key(&self) -> &Scalar {
         &self.vuf_private_key
     }
 
@@ -53,7 +51,7 @@ impl VUFKeypair {
 /// Derive the VUF private key from the given hex-encoded seed
 fn derive_vuf_private_key_from_seed(
     vuf_private_key_seed_hex: String,
-) -> Result<ark_bls12_381::Fr, PepperServiceError> {
+) -> Result<Scalar, PepperServiceError> {
     // Decode the hex-encoded seed
     let vuf_private_key_seed = hex::decode(vuf_private_key_seed_hex).map_err(|error| {
         PepperServiceError::UnexpectedError(format!(
@@ -74,39 +72,32 @@ fn derive_vuf_private_key_from_seed(
     // Hash the seed to derive the private key
     let mut sha3_hasher = sha3::Sha3_512::new();
     sha3_hasher.update(vuf_private_key_seed);
-    let vuf_private_key =
-        ark_bls12_381::Fr::from_be_bytes_mod_order(sha3_hasher.finalize().as_slice());
+    let vuf_private_key = scalar_from_uniform_be_bytes(sha3_hasher.finalize().as_slice());
 
     Ok(vuf_private_key)
 }
 
 /// Deserialize the VUF private key directly from the given hex-encoded string
-fn deserialize_vuf_private_key(
-    vuf_private_key_hex: String,
-) -> Result<ark_bls12_381::Fr, PepperServiceError> {
+fn deserialize_vuf_private_key(vuf_private_key_hex: String) -> Result<Scalar, PepperServiceError> {
     // Decode the hex-encoded private key
-    let mut vuf_private_key_bytes = hex::decode(vuf_private_key_hex).map_err(|e| {
+    let vuf_private_key_bytes = hex::decode(vuf_private_key_hex).map_err(|e| {
         PepperServiceError::UnexpectedError(format!(
             "Failed to decode VUF private key hex! Error: {}",
             e
         ))
     })?;
 
-    // Reverse the bytes (TODO: why do we need to do this?)
-    vuf_private_key_bytes.reverse();
-
     // Deserialize the private key bytes
-    let vuf_private_key = ark_bls12_381::Fr::deserialize_compressed(
-        vuf_private_key_bytes.as_slice(),
-    )
-    .map_err(|error| {
-        PepperServiceError::UnexpectedError(format!(
-            "Failed to deserialize VUF private key! Error: {}",
-            error
-        ))
-    })?;
+    let vuf_private_key_opt =
+        Scalar::from_bytes_le(<&[u8; 32]>::try_from(vuf_private_key_bytes.as_slice()).unwrap());
 
-    Ok(vuf_private_key)
+    if vuf_private_key_opt.is_none().unwrap_u8() == 1 {
+        return Err(PepperServiceError::UnexpectedError(
+            "Failed to deserialize VUF private key!".to_string(),
+        ));
+    }
+
+    Ok(vuf_private_key_opt.unwrap())
 }
 
 /// Fetches the VUF private key for the pepper service. Note: this function
@@ -114,7 +105,7 @@ fn deserialize_vuf_private_key(
 fn get_pepper_service_vuf_private_key(
     vuf_private_key_hex: Option<String>,
     vuf_private_key_seed_hex: Option<String>,
-) -> ark_bls12_381::Fr {
+) -> Scalar {
     info!("Loading the VUF private key for the pepper service...");
 
     // Attempt to derive the private key from the seed
@@ -158,7 +149,7 @@ fn get_pepper_service_vuf_private_key(
 
 /// Returns the VUF public key of the pepper service (both the G2Projective and JSON)
 pub fn get_pepper_service_vuf_public_key_and_json(
-    vuf_private_key: &ark_bls12_381::Fr,
+    vuf_private_key: &Scalar,
 ) -> (G2Projective, String) {
     info!("Deriving the VUF public key for the pepper service...");
 
@@ -171,12 +162,8 @@ pub fn get_pepper_service_vuf_public_key_and_json(
         ),
     };
 
-    // Create the pepper public key object
-    let mut public_key_buf = vec![];
-    vuf_public_key
-        .into_affine()
-        .serialize_compressed(&mut public_key_buf)
-        .expect("Failed to serialize the public key!");
+    // Create the public key object
+    let public_key_buf = vuf_public_key.to_compressed().to_vec();
     let pepper_vuf_public_key = PepperV0VufPubKey::new(public_key_buf);
     info!(
         "Successfully derived the VUF public key for the pepper service: {:?}",

@@ -64,17 +64,85 @@ fun c_u256(): u256
     ret
 
 // Function definition at index 12
+fun c_i8(): i8
+    ld_const<i8> 127
+    ret
+
+// Function definition at index 13
+fun c_i16(): i16
+    ld_const<i16> 32767
+    ret
+
+// Function definition at index 14
+fun c_i32(): i32
+    ld_const<i32> 2147483647
+    ret
+
+// Function definition at index 15
+fun c_i64(): i64
+    ld_const<i64> 9223372036854775807
+    ret
+
+// Function definition at index 16
+fun c_i128(): i128
+    ld_const<i128> 170141183460469231731687303715884105727
+    ret
+
+// Function definition at index 17
+fun c_i256(): i256
+    ld_const<i256> 57896044618658097711785492504343953926634992332820282019728792003956564819967
+    ret
+
+// Function definition at index 18
 fun c_vec_u8(): vector<u8>
     ld_const<vector<u8>> [255, 0]
     ret
 
-// Function definition at index 13
+// Function definition at index 19
+fun c_vec_i8(): vector<i8>
+    ld_const<vector<i8>> [127, 0]
+    ret
+
+// Function definition at index 20
 fun c_vec_address(): vector<address>
     ld_const<vector<address>> [102, 51966]
     ret
 
-// Function definition at index 14
+// Function definition at index 21
 fun c_vec_vec_address(): vector<vector<address>>
     ld_const<vector<vector<address>>> [[102], [51966], []]
     ret
 
+
+
+//# run 0x66::test::c_u8 --verbose
+
+//# run 0x66::test::c_u16 --verbose
+
+//# run 0x66::test::c_u32 --verbose
+
+//# run 0x66::test::c_u64 --verbose
+
+//# run 0x66::test::c_u128 --verbose
+
+//# run 0x66::test::c_u256 --verbose
+
+//# run 0x66::test::c_i8 --verbose
+
+//# run 0x66::test::c_i16 --verbose
+
+//# run 0x66::test::c_i32 --verbose
+
+//# run 0x66::test::c_i64 --verbose
+
+//# run 0x66::test::c_i128 --verbose
+
+//# run 0x66::test::c_i256 --verbose
+
+//# run 0x66::test::c_vec_u8 --verbose
+
+//# run 0x66::test::c_vec_i8 --verbose
+
+//# run 0x66::test::c_vec_address --verbose
+
+//# run 0x66::test::c_vec_vec_address --verbose

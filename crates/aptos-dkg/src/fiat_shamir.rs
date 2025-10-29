@@ -8,7 +8,7 @@
 //! define all the things that are appended to the transcript.
 
 use crate::{
-    pvss::{traits::Transcript, ThresholdConfig},
+    pvss::{traits::Transcript, ThresholdConfigBlstrs},
     range_proofs::traits::BatchedRangeProof,
     sigma_protocol,
     sigma_protocol::homomorphism,
@@ -115,7 +115,7 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
 pub trait PVSS<T: Transcript>: ScalarProtocol<blstrs::Scalar> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
-    fn pvss_domain_sep(&mut self, sc: &ThresholdConfig);
+    fn pvss_domain_sep(&mut self, sc: &ThresholdConfigBlstrs);
 
     /// Append the public parameters `pp`.
     fn append_public_parameters(&mut self, pp: &T::PublicParameters);
@@ -148,23 +148,18 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 
     fn append_public_statement(&mut self, public_statement: B::PublicStatement);
 
-    #[allow(dead_code)]
     fn append_hat_f_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
-    #[allow(dead_code)]
     fn append_sigma_proof<A: CanonicalSerialize>(&mut self, sigma_proof: &A);
 
     fn append_f_j_commitments<A: CanonicalSerialize>(&mut self, f_j_commitments: &A);
 
-    #[allow(dead_code)]
     fn append_h_commitment<A: CanonicalSerialize>(&mut self, commitment: &A);
 
-    #[allow(dead_code)]
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
     fn challenges_for_linear_combination(&mut self, ell: usize) -> Vec<E::ScalarField>;
 
-    #[allow(dead_code)]
     fn challenge_from_verifier(&mut self) -> E::ScalarField;
 }
 
@@ -179,6 +174,8 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scal
     fn append_sigma_protocol_first_prover_message(&mut self, prover_first_message: &H::Codomain);
 
     /// Append the last message (the masked witness) in a sigma protocol.
+    #[allow(dead_code)] // We ought to be using this, but are serializing the entire sigma proof
+                        // because our security proofs like using fresh transcripts...
     fn append_sigma_protocol_last_message(&mut self, prover_last_message: &H::Domain);
 
     // Returns a single scalar `r` for use in a Sigma protocol
@@ -187,7 +184,7 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scal
 
 #[allow(non_snake_case)]
 impl<T: Transcript> PVSS<T> for merlin::Transcript {
-    fn pvss_domain_sep(&mut self, sc: &ThresholdConfig) {
+    fn pvss_domain_sep(&mut self, sc: &ThresholdConfigBlstrs) {
         self.append_message(b"dom-sep", PVSS_DOM_SEP);
         self.append_message(b"scheme-name", T::scheme_name().as_bytes());
         self.append_u64(b"t", sc.t as u64);
@@ -250,6 +247,21 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
             num_scalars,
         )
     }
+}
+
+pub fn initialize_pvss_transcript<T: Transcript>(
+    sc: &ThresholdConfigBlstrs,
+    pp: &T::PublicParameters,
+    eks: &[T::EncryptPubKey],
+    dst: &[u8],
+) -> merlin::Transcript {
+    let mut fs_t = merlin::Transcript::new(dst);
+
+    <merlin::Transcript as PVSS<T>>::pvss_domain_sep(&mut fs_t, sc);
+    <merlin::Transcript as PVSS<T>>::append_public_parameters(&mut fs_t, pp);
+    <merlin::Transcript as PVSS<T>>::append_encryption_keys(&mut fs_t, eks);
+
+    fs_t
 }
 
 #[allow(non_snake_case)]
@@ -349,7 +361,7 @@ where
         let mut public_statement_bytes = Vec::new();
         public_statement
             .serialize_compressed(&mut public_statement_bytes)
-            .expect("public_statement0 serialization should succeed");
+            .expect("public_statement serialization should succeed");
         self.append_message(b"sigma-protocol-claim", public_statement_bytes.as_slice());
     }
 
@@ -357,7 +369,7 @@ where
         let mut prover_first_message_bytes = Vec::new();
         prover_first_message
             .serialize_compressed(&mut prover_first_message_bytes)
-            .expect("public_statement0 serialization should succeed");
+            .expect("sigma protocol first message  serialization should succeed");
         self.append_message(
             b"sigma-protocol-first-message",
             prover_first_message_bytes.as_slice(),
@@ -368,7 +380,7 @@ where
         let mut prover_last_message_bytes = Vec::new();
         prover_last_message
             .serialize_compressed(&mut prover_last_message_bytes)
-            .expect("public_statement0 serialization should succeed");
+            .expect("sigma protocol last message serialization should succeed");
         self.append_message(
             b"sigma-protocol-last-message",
             prover_last_message_bytes.as_slice(),
@@ -382,40 +394,4 @@ where
         )
         .0
     }
-}
-
-/// Securely derives a Fiat-Shamir challenge via Merlin.
-/// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).
-/// Additionally returns `num_scalars` random scalars for some linear combinations.
-pub(crate) fn fiat_shamir_das<T: Transcript, A: Serialize>(
-    // TODO: only used for das so might as well specify T
-    trx: &T,
-    sc: &ThresholdConfig,
-    pp: &T::PublicParameters,
-    spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
-    auxs: &Vec<A>,
-    dst: &[u8],
-    num_scalars: usize,
-) -> (Vec<blstrs::Scalar>, Vec<blstrs::Scalar>) {
-    let mut fs_t = merlin::Transcript::new(dst);
-
-    <merlin::Transcript as PVSS<T>>::pvss_domain_sep(&mut fs_t, sc);
-    <merlin::Transcript as PVSS<T>>::append_public_parameters(&mut fs_t, pp);
-    <merlin::Transcript as PVSS<T>>::append_signing_pub_keys(&mut fs_t, spks);
-    <merlin::Transcript as PVSS<T>>::append_encryption_keys(&mut fs_t, eks);
-    <merlin::Transcript as PVSS<T>>::append_auxs(&mut fs_t, auxs);
-    <merlin::Transcript as PVSS<T>>::append_transcript(&mut fs_t, trx);
-
-    (
-        <merlin::Transcript as PVSS<T>>::challenge_dual_code_word_polynomial(
-            &mut fs_t,
-            sc.t,
-            sc.n + 1,
-        ),
-        <merlin::Transcript as PVSS<T>>::challenge_linear_combination_scalars(
-            &mut fs_t,
-            num_scalars,
-        ),
-    )
 }

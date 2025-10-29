@@ -17,29 +17,33 @@ use ark_ec::{
 use ark_ff::Field;
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::{CryptoRng, RngCore};
+use ark_std::{
+    rand::{CryptoRng, RngCore},
+    UniformRand,
+};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
+use std::fmt::Debug;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment<E: Pairing>(pub E::G1);
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
     pi_1: Commitment<E>,
     pi_2: E::G1,
 }
 
-#[derive(CanonicalSerialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     pub xi_2: E::G2Affine,
     pub tau_2: E::G2Affine,
     pub group_generators: GroupGenerators<E>,
 }
 
-#[derive(CanonicalSerialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CommitmentKey<E: Pairing> {
     pub xi_1: E::G1Affine,
     pub tau_1: E::G1Affine,
@@ -52,8 +56,18 @@ pub struct CommitmentKey<E: Pairing> {
 
 #[derive(CanonicalSerialize, Debug, Clone)]
 pub struct Trapdoor<E: Pairing> {
+    // Not sure this is the ideal location for tau...
     pub xi: E::ScalarField,
     pub tau: E::ScalarField,
+}
+
+impl<E: Pairing> Trapdoor<E> {
+    pub fn rand<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
+        Self {
+            xi: E::ScalarField::rand(rng),
+            tau: E::ScalarField::rand(rng),
+        }
+    }
 }
 
 pub fn lagrange_basis<E: Pairing>(
@@ -124,7 +138,7 @@ fn commit_with_randomness<E: Pairing>(
     values: &[E::ScalarField],
     r: &CommitmentRandomness<E>,
 ) -> Commitment<E> {
-    let commitment_hom: Homomorphism<'_, E> = Homomorphism {
+    let commitment_hom: CommitmentHomomorphism<'_, E> = CommitmentHomomorphism {
         lagr_g1: &ck.lagr_g1,
         xi_1: ck.xi_1,
     };
@@ -134,7 +148,7 @@ fn commit_with_randomness<E: Pairing>(
     Commitment(commitment_hom.apply(&input).0)
 }
 
-impl<'a, E: Pairing> Homomorphism<'a, E> {
+impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
     pub fn open(
         ck: &CommitmentKey<E>,
         f_evals: Vec<E::ScalarField>,
@@ -181,18 +195,64 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             (tau_2 - one_2 * x).into_affine(),
             xi_2,
         ]);
-        ensure!(PairingOutput::<E>::ZERO == check);
+        ensure!(
+            PairingOutput::<E>::ZERO == check,
+            "Hiding KZG verification failed"
+        );
 
         Ok(())
     }
 }
 
-pub struct Homomorphism<'a, E: Pairing> {
+/// A fixed-base homomorphism used for computing commitments in the
+/// *Hiding KZG (HKZG)* commitment scheme.
+///
+/// # Overview
+///
+/// This struct defines a homomorphism used to map scalars
+/// (the polynomial evaluations and blinding factor) into an elliptic curve point,
+/// producing a commitment in the HKZG scheme as (presumably) described in Zeromorph [^KT23e].
+///
+/// The homomorphism implements the following formula:
+///
+/// \\[
+/// C = \rho \cdot \xi_1 + \sum_i f(\theta^i) \cdot \ell_i(\tau)_1
+/// \\]
+///
+/// where:
+/// - `ρ` is the blinding scalar,
+/// - `ξ₁` is the fixed base obtained from a trapdoor `ξ`,
+/// - `f(ωᵢ)` are polynomial evaluations at roots of unity ωᵢ,
+/// - `ℓᵢ(τ)₁` are the Lagrange basis polynomials evaluated at trapdoor `τ`,
+///
+/// This homomorphism can be expressed as a *multi-scalar multiplication (MSM)*
+/// over fixed bases, making it compatible with the `fixed_base_msms` framework.
+///
+///
+/// # Fields
+///
+/// - `lagr_g1`: A slice of precomputed Lagrange basis elements \\(\ell_i(\tau) \cdot g_1\\),
+///   used to commit to polynomial evaluations.
+/// - `xi_1`: The base point corresponding to the blinding term \\(\xi_1 = ξ \cdot g_1\\).
+///
+///
+/// # Implementation Notes
+///
+/// For consistency with `univariate_kzg.rs` and use in future sigma protocols, this implementation uses the
+/// `fixed_base_msms::Trait` to express the homomorphism as a sequence of `(base, scalar)` pairs:
+/// - The first pair encodes the hiding term `(ξ₁, ρ)`.
+/// - The remaining pairs encode the polynomial evaluation commitments `(ℓᵢ(τ)₁, f(ωᵢ))`.
+///
+/// The MSM evaluation is then performed using `E::G1::msm()`.
+///
+/// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
 }
 
-impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
+impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
@@ -201,12 +261,12 @@ impl<'a, E: Pairing> homomorphism::Trait for Homomorphism<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
+impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
@@ -274,10 +334,10 @@ mod tests {
         let comm = super::commit_with_randomness(&ck, &f_evals, &rho);
 
         // Open at x, will fail when x is a root of unity but the odds of that should be negligible
-        let proof = Homomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
+        let proof = CommitmentHomomorphism::<E>::open(&ck, f_evals, rho.0, x, y, &s);
 
         // Verify proof
-        let verification = Homomorphism::<E>::verify(vk, comm, x, y, proof);
+        let verification = CommitmentHomomorphism::<E>::verify(vk, comm, x, y, proof);
 
         assert!(
             verification.is_ok(),

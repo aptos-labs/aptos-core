@@ -3,24 +3,30 @@
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
-    fiat_shamir, pvss,
     pvss::{
+        self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das, encryption_dlog, schnorr, traits,
-        traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
+        das::{self, fiat_shamir},
+        encryption_dlog, schnorr,
+        traits::{
+            self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
+        },
         LowDegreeTest, Player, WeightedConfig,
     },
     utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing,
+        g1_multi_exp, g2_multi_exp,
         random::{
-            insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_scalar,
-            random_scalars,
+            insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_scalars,
         },
         HasMultiExp,
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381,
+    blstrs::{multi_pairing, random_scalar},
+    CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
 use group::{Curve, Group};
@@ -194,7 +200,7 @@ impl traits::Transcript for Transcript {
         let W = sc.get_total_weight();
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::fiat_shamir_das(
+        let (f, extra) = fiat_shamir::derive_challenge_scalars(
             self,
             sc.get_threshold_config(),
             pp,

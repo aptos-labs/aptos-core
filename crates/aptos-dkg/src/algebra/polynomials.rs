@@ -6,7 +6,7 @@ use crate::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         fft,
     },
-    pvss::{input_secret::InputSecret, ThresholdConfig},
+    pvss::{input_secret::InputSecret, ThresholdConfigBlstrs},
     utils::{is_power_of_two, random::random_scalars},
 };
 use ark_ff::Field;
@@ -14,6 +14,17 @@ use blstrs::Scalar;
 use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
+
+pub(crate) fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
+    let degree = coeffs.len().saturating_sub(1);
+    let mut result = Vec::with_capacity(degree);
+
+    for i in 0..degree {
+        result.push(coeffs[i + 1].mul(F::from((i + 1) as u64)));
+    }
+
+    result
+}
 
 pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
@@ -83,6 +94,7 @@ pub fn barycentric_eval<F: Field>(
 ) -> F {
     let n = evals.len();
     assert_eq!(n, roots_of_unity_in_eval_dom.len());
+    debug_assert_eq!(n_inv, F::from(n as u64).inverse().unwrap());
 
     let mut denoms = Vec::with_capacity(roots_of_unity_in_eval_dom.len());
 
@@ -637,7 +649,7 @@ fn accumulator_poly_scheduled_inner(
 pub fn shamir_secret_share<
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
 >(
-    sc: &ThresholdConfig,
+    sc: &ThresholdConfigBlstrs,
     s: &InputSecret,
     rng: &mut R,
 ) -> (Vec<Scalar>, Vec<Scalar>) {

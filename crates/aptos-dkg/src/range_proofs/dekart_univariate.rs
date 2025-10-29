@@ -2,8 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::polynomials, fiat_shamir, pcs::univariate_kzg, range_proofs::traits,
-    sigma_protocol::homomorphism::Trait, utils,
+    algebra::{polynomials, GroupGenerators},
+    fiat_shamir,
+    pcs::univariate_kzg,
+    range_proofs::traits,
+    sigma_protocol::homomorphism::Trait,
+    utils,
 };
 use anyhow::ensure;
 use ark_ec::{
@@ -39,18 +43,20 @@ pub struct Proof<E: Pairing> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PowersOfTau<E: Pairing> {
     t1: Vec<E::G1>, // g_1, g_1^{tau}, g_1^{tau^2}, ..., g_1^{tau^max_n}, where `max_n` is the maximum batch size
-    t2: Vec<E::G2>,
+    t2: Vec<E::G2>, // TODO: Should probably use E::G1Affine instead?
 }
 
-pub fn powers_of_tau<E: Pairing, R>(rng: &mut R, n: usize) -> PowersOfTau<E>
+pub fn powers_of_tau<E: Pairing, R>(
+    group_generators: GroupGenerators<E>,
+    rng: &mut R,
+    n: usize,
+) -> PowersOfTau<E>
 where
     R: RngCore + CryptoRng,
 {
-    let g1 = E::G1::rand(rng);
-    let g2 = E::G2::rand(rng);
     let tau = E::ScalarField::rand(rng);
-    let mut t1 = vec![g1];
-    let mut t2 = vec![g2];
+    let mut t1 = vec![group_generators.g1.into()];
+    let mut t2 = vec![group_generators.g2.into()];
     for i in 0..n {
         t1.push(t1[i] * tau);
         t2.push(t2[i] * tau);
@@ -134,13 +140,14 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
         max_ell: usize,
+        group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (ProverKey<E>, VerificationKey<E>) {
         let max_n = (max_n + 1).next_power_of_two() - 1;
         let num_omegas = max_n + 1;
         debug_assert!(num_omegas.is_power_of_two());
 
-        let taus = powers_of_tau(rng, max_n); // The taus have length `max_n+1`
+        let taus = powers_of_tau(group_generators, rng, max_n); // The taus have length `max_n+1`
 
         let eval_dom = Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
             .expect("Could not construct evaluation domain");

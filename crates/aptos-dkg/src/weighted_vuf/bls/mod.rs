@@ -5,10 +5,11 @@ use crate::{
     algebra::{lagrange::lagrange_coefficients, polynomials::get_powers_of_tau},
     pvss,
     pvss::{Player, WeightedConfig},
-    utils::{g1_multi_exp, multi_pairing, random::random_scalar, HasMultiExp},
+    utils::{g1_multi_exp, HasMultiExp},
     weighted_vuf::traits::WeightedVUF,
 };
 use anyhow::bail;
+use aptos_crypto::blstrs::{multi_pairing, random_scalar};
 use blstrs::{G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::Group;

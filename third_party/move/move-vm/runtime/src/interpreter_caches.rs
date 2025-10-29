@@ -7,7 +7,7 @@
 //! on the first call.
 
 use crate::{
-    frame_type_cache::{FrameTypeCache, RuntimeCacheTraits},
+    frame_type_cache::FrameTypeCache,
     loader::{FunctionPtr, GenericFunctionPtr},
     LoadedFunction,
 };
@@ -27,18 +27,14 @@ impl InterpreterFunctionCaches {
         }
     }
 
-    pub(crate) fn get_or_create_frame_cache<RTCaches: RuntimeCacheTraits>(
+    pub(crate) fn get_or_create_frame_cache(
         &mut self,
         function: &LoadedFunction,
     ) -> Rc<RefCell<FrameTypeCache>> {
-        if RTCaches::caches_enabled() {
-            if function.ty_args.is_empty() {
-                self.get_or_create_frame_cache_non_generic(function)
-            } else {
-                self.get_or_create_frame_cache_generic(function)
-            }
+        if function.ty_args.is_empty() {
+            self.get_or_create_frame_cache_non_generic(function)
         } else {
-            FrameTypeCache::make_rc()
+            self.get_or_create_frame_cache_generic(function)
         }
     }
 

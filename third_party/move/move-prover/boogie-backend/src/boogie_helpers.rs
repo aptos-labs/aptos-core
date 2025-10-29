@@ -20,7 +20,7 @@ use move_model::{
     },
     pragmas::INTRINSIC_TYPE_MAP,
     symbol::Symbol,
-    ty::{PrimitiveType, Type},
+    ty::{PrimitiveType, ReferenceKind, Type},
 };
 use move_prover_bytecode_pipeline::number_operation::{
     GlobalNumberOperationState, NumOperation::Bitwise,
@@ -371,7 +371,7 @@ fn fun_type(env: &GlobalEnv, params: &Type, results: &Type, _abilities: AbilityS
         .iter()
         .map(|t| boogie_type_suffix(env, t))
         .join("_");
-    format!("$fun#{}#{}", params, results)
+    format!("$fun_{}_{}", params, results)
 }
 
 /// Return boogie type for a local with given signature token.
@@ -537,7 +537,13 @@ pub fn boogie_type_suffix_bv(env: &GlobalEnv, ty: &Type, bv_flag: bool) -> Strin
         },
         TypeParameter(idx) => boogie_type_param(env, *idx),
         Fun(params, results, abilities) => fun_type(env, params, results, *abilities),
-        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) | Reference(..) => {
+        Reference(ReferenceKind::Immutable, ty) => {
+            format!("$ref'{}'", boogie_type_suffix_bv(env, ty, bv_flag))
+        },
+        Reference(ReferenceKind::Mutable, ty) => {
+            format!("$mut'{}'", boogie_type_suffix_bv(env, ty, bv_flag))
+        },
+        Tuple(..) | TypeDomain(..) | ResourceDomain(..) | Error | Var(..) => {
             format!("<<unsupported {:?}>>", ty)
         },
     }

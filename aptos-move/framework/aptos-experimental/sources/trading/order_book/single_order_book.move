@@ -25,7 +25,7 @@ module aptos_experimental::single_order_book {
         new_unique_idx_type,
         new_account_client_order_id,
         new_default_big_ordered_map, OrderMatch, new_order_match, new_single_order_match_details, OrderMatchDetails,
-        UniqueIdxType, single_order_book_type
+        UniqueIdxType, single_order_type
     };
     use aptos_experimental::single_order_types::{
         OrderWithState,
@@ -43,7 +43,7 @@ module aptos_experimental::single_order_book {
     #[test_only]
     use aptos_experimental::order_book_types::{
         new_order_id_type,
-        new_ascending_id_generator
+        new_ascending_id_generator, new_time_based_trigger_condition
     };
     #[test_only]
     use aptos_experimental::order_book_types::{good_till_cancelled, price_move_up_condition, price_move_down_condition};
@@ -57,6 +57,7 @@ module aptos_experimental::single_order_book {
     const E_REINSERT_ORDER_MISMATCH: u64 = 8;
     const EORDER_CREATOR_MISMATCH: u64 = 9;
     const ENOT_SINGLE_ORDER_BOOK: u64 = 10;
+    const ETRIGGER_COND_NOT_FOUND: u64 = 11;
 
     enum SingleOrderRequest<M: store + copy + drop> has copy, drop {
         V1 {
@@ -79,12 +80,6 @@ module aptos_experimental::single_order_book {
             client_order_ids: BigOrderedMap<AccountClientOrderId, OrderIdType>,
             pending_orders: PendingOrderBookIndex
         }
-    }
-
-    enum OrderType has store, drop, copy {
-        GoodTilCancelled,
-        PostOnly,
-        FillOrKill
     }
 
     public(friend) fun new_single_order_request<M: store + copy + drop>(
@@ -252,16 +247,15 @@ module aptos_experimental::single_order_book {
 
     /// Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
     /// else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
-    public(friend) fun place_maker_order<M: store + copy + drop>(
+    public(friend) fun place_maker_or_pending_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
     ) {
         let ascending_idx =
             new_unique_idx_type(ascending_id_generator.next_ascending_id());
         if (order_req.trigger_condition.is_some()) {
-            return self.place_pending_maker_order(ascending_id_generator, order_req);
+            return self.place_pending_order_internal(ascending_id_generator, order_req);
         };
         self.place_ready_maker_order_with_unique_idx(price_time_idx, order_req, ascending_idx);
-
     }
 
     fun place_ready_maker_order_with_unique_idx<M: store + copy + drop>(
@@ -298,7 +292,7 @@ module aptos_experimental::single_order_book {
         };
         price_time_idx.place_maker_order(
             order_req.order_id,
-            single_order_book_type(),
+            single_order_type(),
             order_req.price,
             ascending_idx,
             order_req.remaining_size,
@@ -336,7 +330,7 @@ module aptos_experimental::single_order_book {
         );
     }
 
-    fun place_pending_maker_order<M: store + copy + drop>(
+    fun place_pending_order_internal<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
     ) {
         let order_id = order_req.order_id;
@@ -359,7 +353,16 @@ module aptos_experimental::single_order_book {
 
         self.orders.add(order_id, new_order_with_state(order, false));
 
-        self.pending_orders.place_pending_maker_order(
+        if (order_req.client_order_id.is_some()) {
+            self.client_order_ids.add(
+                new_account_client_order_id(
+                    order_req.account, order_req.client_order_id.destroy_some()
+                ),
+                order_req.order_id
+            );
+        };
+
+        self.pending_orders.place_pending_order(
             order_id,
             order_req.trigger_condition.destroy_some(),
             ascending_idx,
@@ -374,7 +377,7 @@ module aptos_experimental::single_order_book {
     ): OrderMatch<M> {
         let (order_id, matched_size, remaining_size, order_book_type) =
             active_matched_order.destroy_active_matched_order();
-        assert!(order_book_type == single_order_book_type(), ENOT_SINGLE_ORDER_BOOK);
+        assert!(order_book_type == single_order_type(), ENOT_SINGLE_ORDER_BOOK);
 
         let order_with_state = if (remaining_size == 0) {
             let order = self.orders.remove(&order_id);
@@ -501,12 +504,20 @@ module aptos_experimental::single_order_book {
         self: &mut SingleOrderBook<M>, current_price: u64, order_limit: u64
     ): vector<SingleOrder<M>> {
         let self_orders = &mut self.orders;
+        let self_client_order_ids = &mut self.client_order_ids;
         let order_ids = self.pending_orders.take_ready_price_based_orders(current_price, order_limit);
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
             let order_with_state = self_orders.remove(&order_id);
             let (order, _) = order_with_state.destroy_order_from_state();
+            if (order.get_client_order_id().is_some()) {
+                self_client_order_ids.remove(
+                    &new_account_client_order_id(
+                        order.get_account(), order.get_client_order_id().destroy_some()
+                    )
+                );
+            };
             orders.push_back(order);
         });
         orders
@@ -572,7 +583,7 @@ module aptos_experimental::single_order_book {
             if (!is_taker_order(
                 price_time_idx, order_req.price, order_req.is_bid, order_req.trigger_condition
             )) {
-                self.place_maker_order(
+                self.place_maker_or_pending_order(
                     price_time_idx,
                     ascending_id_generator,
                     SingleOrderRequest::V1 {
@@ -1309,6 +1320,75 @@ module aptos_experimental::single_order_book {
         cleanup_test(order_book, price_time_idx);
     }
 
+    #[test_only]
+    fun test_price_move_condition_time_priority_helper(is_move_up: bool) {
+        let (order_book, price_time_idx, ascending_id_generator) = set_up_test();
+
+        let trigger_price = if (is_move_up) 110 else 90;
+        let condition = if (is_move_up) {
+            option::some(price_move_up_condition(trigger_price))
+        } else {
+            option::some(price_move_down_condition(trigger_price))
+        };
+
+        order_book.place_order_and_get_matches(
+            &mut price_time_idx,
+            &mut ascending_id_generator,
+            create_test_order_request(
+                @0xAA,
+                new_order_id_type(1),
+                option::none(),
+                100,
+                400,
+                400,
+                !is_move_up, // buy for move_down, sell for move_up
+                condition,
+                TestMetadata {}
+            )
+        );
+        order_book.place_order_and_get_matches(
+            &mut price_time_idx,
+            &mut ascending_id_generator,
+            create_test_order_request(
+                @0xBB,
+                new_order_id_type(2),
+                option::none(),
+                100,
+                400,
+                400,
+                !is_move_up, // buy for move_down, sell for move_up
+                condition, // Same condition but later time
+                TestMetadata {}
+            )
+        );
+
+        let ready_orders = order_book.take_ready_price_based_orders(trigger_price, 1);
+        assert!(ready_orders.length() == 1);
+        let (address, order_id, _, _, _, _, _, _, _, _, _) = ready_orders[0].destroy_single_order();
+        // Verify that the first order placed is the one that gets triggered first (time priority)
+        assert!(address == @0xAA);
+        assert!(order_id == new_order_id_type(1));
+
+        let ready_orders = order_book.take_ready_price_based_orders(trigger_price, 1);
+        assert!(ready_orders.length() == 1);
+        let (address, order_id, _, _, _, _, _, _, _, _, _) = ready_orders[0].destroy_single_order();
+        // Verify that the second order placed is the one that gets triggered second
+        assert!(address == @0xBB);
+        assert!(order_id == new_order_id_type(2));
+
+        cleanup_test(order_book, price_time_idx);
+    }
+
+    #[test]
+    fun test_price_move_down_condition_time_priority() {
+        test_price_move_condition_time_priority_helper(false);
+    }
+
+    #[test]
+    fun test_price_move_up_condition_time_priority() {
+        test_price_move_condition_time_priority_helper(true);
+    }
+
     #[test]
     fun test_price_move_up_condition() {
         let (order_book, price_time_idx, ascending_id_generator) = set_up_test();
@@ -1429,6 +1509,55 @@ module aptos_experimental::single_order_book {
     }
 
     #[test]
+    fun test_duplicate_time_condition() {
+        let (order_book, price_time_idx, ascending_id_generator) = set_up_test();
+
+        let match_result = order_book.place_order_and_get_matches(
+            &mut price_time_idx,
+            &mut ascending_id_generator,
+            create_test_order_request(
+                @0xBB,
+                new_order_id_type(2),
+                option::none(),
+                100,
+                400,
+                400,
+                true,
+                option::some(new_time_based_trigger_condition(10000)),
+                TestMetadata {}
+            )
+        );
+        assert!(match_result.is_empty());
+
+        assert!(
+            order_book.pending_orders.get_time_based_index().keys().length() == 1
+        );
+
+        let match_result = order_book.place_order_and_get_matches(
+            &mut price_time_idx,
+            &mut ascending_id_generator,
+            create_test_order_request(
+                @0xCC,
+                new_order_id_type(3),
+                option::none(),
+                100,
+                300,
+                300,
+                true,
+                option::some(new_time_based_trigger_condition(10000)),
+                TestMetadata {}
+            )
+        );
+        assert!(match_result.is_empty());
+        assert!(
+            order_book.pending_orders.get_time_based_index().keys().length() == 2
+        );
+        cleanup_test(order_book, price_time_idx);
+    }
+
+
+
+    #[test]
     fun test_maker_order_reinsert_already_exists() {
         let (order_book, price_time_idx, ascending_id_generator) = set_up_test();
 
@@ -1442,7 +1571,7 @@ module aptos_experimental::single_order_book {
             false,
             TestMetadata {}
         );
-        order_book.place_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
+        order_book.place_maker_or_pending_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 1000);
 
         assert!(order_book.client_order_id_exists(@0xAA, std::string::utf8(b"1")));
@@ -1486,7 +1615,7 @@ module aptos_experimental::single_order_book {
             false,
             TestMetadata {}
         );
-        order_book.place_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
+        order_book.place_maker_or_pending_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 1000);
 
         // Taker order
@@ -1530,7 +1659,7 @@ module aptos_experimental::single_order_book {
             false,
             TestMetadata {}
         );
-        order_book.place_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
+        order_book.place_maker_or_pending_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(1)) == 1000);
 
         order_book.decrease_order_size(&mut price_time_idx, @0xAA, new_order_id_type(1), 700);
@@ -1548,7 +1677,7 @@ module aptos_experimental::single_order_book {
             option::some(price_move_up_condition(90)),
             TestMetadata {}
         );
-        order_book.place_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
+        order_book.place_maker_or_pending_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
         assert!(order_book.get_remaining_size(new_order_id_type(2)) == 1000);
         order_book.decrease_order_size(&mut price_time_idx, @0xBB, new_order_id_type(2), 600);
         // Verify order was decreased with updated size
@@ -1570,7 +1699,7 @@ module aptos_experimental::single_order_book {
             false,
             1
         );
-        order_book.place_maker_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
+        order_book.place_maker_or_pending_order(&mut price_time_idx, &mut ascending_id_generator, order_req);
         // Verify order was placed with correct metadata
         let metadata = order_book.get_order_metadata(new_order_id_type(1));
         assert!(metadata.is_some());

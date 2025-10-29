@@ -4,9 +4,10 @@
 #[cfg(test)]
 use aptos_dkg::range_proofs::traits::BatchedRangeProof;
 use aptos_dkg::{
+    algebra::GroupGenerators,
     range_proofs::{
         dekart_univariate::Proof as UnivariateDeKART,
-        // dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
     },
     utils::test_utils,
 };
@@ -80,11 +81,6 @@ const TEST_CASES: &[(usize, usize)] = &[
     (16, 7),
     (16, 8),
     (16, 16),
-    // (255, 16),  Commented out to improve test speed
-    // (255, 32),
-    // (512, 32),
-    // (1024, 32),
-    // (2047, 32),
 ];
 
 #[cfg(test)]
@@ -96,49 +92,35 @@ struct RangeProofUniversalSetup<E: Pairing, B: BatchedRangeProof<E>> {
 
 #[cfg(test)]
 /// Generate a fixed setup for a single curve
-fn make_single_curve_setup<B, E>(n: usize, ell: usize) -> RangeProofUniversalSetup<E, B>
+fn make_single_curve_setup<E, B>(n: usize, ell: usize) -> RangeProofUniversalSetup<E, B>
 where
     E: Pairing,
     B: BatchedRangeProof<E>,
 {
     let mut rng = thread_rng();
-    let (pk, vk) = B::setup(n, ell, &mut rng);
+    let group_generators = GroupGenerators::sample(&mut rng);
+    let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
     RangeProofUniversalSetup { pk, vk }
 }
 
 #[cfg(test)]
-/// Generate one setup per curve type
-fn make_all_curve_setups() -> (
-    RangeProofUniversalSetup<ark_bn254::Bn254, UnivariateDeKART<ark_bn254::Bn254>>,
-    RangeProofUniversalSetup<ark_bls12_381::Bls12_381, UnivariateDeKART<ark_bls12_381::Bls12_381>>,
-) {
-    (
-        make_single_curve_setup::<UnivariateDeKART<ark_bn254::Bn254>, ark_bn254::Bn254>(31, 16),
-        make_single_curve_setup::<
-            UnivariateDeKART<ark_bls12_381::Bls12_381>,
-            ark_bls12_381::Bls12_381,
-        >(31, 16),
-    )
-}
-
-#[cfg(test)]
-macro_rules! for_each_curve {
-    ($f:ident, $setups:ident, $n:expr, $ell:expr) => {
-        $f::<Bn254, UnivariateDeKART<Bn254>>(&$setups.0, $n, $ell);
-        $f::<Bls12_381, UnivariateDeKART<Bls12_381>>(&$setups.1, $n, $ell);
-
-        // $f::<Bn254, UnivariateDeKARTv2<Bn254>>($n, $ell);
-        // $f::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>($n, $ell);
-    };
+fn assert_correctness_for_range_proof_and_curve<E, B>()
+where
+    E: Pairing,
+    B: BatchedRangeProof<E>,
+{
+    let setups = make_single_curve_setup::<E, B>(31, 16);
+    for &(n, ell) in TEST_CASES {
+        assert_range_proof_correctness::<E, B>(&setups, n, ell);
+    }
 }
 
 #[cfg(test)]
 #[test]
 fn assert_correctness_of_all_range_proofs() {
-    // Generate setup once per curve
-    let setups = make_all_curve_setups();
+    assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKART<Bn254>>();
+    assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKART<Bls12_381>>();
 
-    for &(n, ell) in TEST_CASES {
-        for_each_curve!(assert_range_proof_correctness, setups, n, ell);
-    }
+    assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKARTv2<Bn254>>();
+    assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>();
 }

@@ -20,7 +20,7 @@ use ark_std::{
     rand::{CryptoRng, RngCore},
     UniformRand,
 };
-use std::io::Write;
+use std::{fmt::Debug, io::Write};
 
 pub trait Trait<E: Pairing>:
     FixedBaseMsmsTrait<
@@ -31,15 +31,15 @@ pub trait Trait<E: Pairing>:
     > + Sized
 {
     fn dst(&self) -> Vec<u8>;
-    fn dst_verifier(&self) -> Vec<u8>;
 
     fn prove<R: RngCore + CryptoRng>(
         &self,
         witness: &Self::Domain,
+        statement: &Self::Codomain,
         transcript: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Proof<E, Self> {
-        prove_homomorphism(self, witness, transcript, true, rng, &self.dst())
+        prove_homomorphism(self, witness, statement, transcript, true, rng, &self.dst())
     }
 
     #[allow(non_snake_case)]
@@ -61,7 +61,6 @@ pub trait Trait<E: Pairing>:
             &proof.z,
             transcript,
             &self.dst(),
-            &self.dst_verifier(),
         )
     }
 }
@@ -105,13 +104,14 @@ impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
 }
 
 // Standard workaround because type aliases are experimental in Rust
-pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone {}
-impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone {}
+pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
+impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 
 /// The “first item” recorded in a Σ-proof, which is one of:
 /// - The first message of the protocol, which is the commitment from the prover. This leads to a more compact proof.
 /// - The second message of the protocol, which is the challenge from the verifier. This leads to a proof which is amenable to batch verification.
-#[derive(Clone, Debug)]
+/// TODO: Better name? In https://github.com/sigma-rs/sigma-proofs these would be called "compact" and "batchable" proofs
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum FirstProofItem<E: Pairing, H: homomorphism::Trait>
 where
     H::Domain: Witness<E>,
@@ -121,6 +121,8 @@ where
     Challenge(E::ScalarField),
 }
 
+// The natural CanonicalSerialize/Deserialize implementations for `FirstProofItem`; we follow the usual approach for enums.
+// CanonicalDeserialize needs Valid.
 impl<E: Pairing, H: homomorphism::Trait> Valid for FirstProofItem<E, H>
 where
     H::Domain: Witness<E>,
@@ -201,7 +203,7 @@ where
     }
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+#[derive(CanonicalSerialize, Debug, PartialEq, Eq, CanonicalDeserialize, Clone)]
 pub struct Proof<E: Pairing, H: homomorphism::Trait>
 where
     H::Domain: Witness<E>,
@@ -224,6 +226,7 @@ where
 /// The Fiat-Shamir challenge scalar, after appending the DST and the first message to the Fiat-Shamir transcript.
 pub fn fiat_shamir_challenge_for_sigma_protocol<E: Pairing, H: homomorphism::Trait>(
     fs_transcript: &mut merlin::Transcript,
+    statement: &H::Codomain,
     prover_first_message: &H::Codomain,
     dst: &[u8],
 ) -> E::ScalarField
@@ -235,6 +238,12 @@ where
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
         fs_transcript,
         dst,
+    );
+
+    // Append the public statement (the image of the witness) to the transcript
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
+        fs_transcript,
+        statement,
     );
 
     // Add the first prover message (the commitment) to the transcript
@@ -253,6 +262,7 @@ where
 pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait, R>(
     homomorphism: &H,
     witness: &H::Domain,
+    statement: &H::Codomain,
     fiat_shamir_transcript: &mut merlin::Transcript,
     store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
     rng: &mut R,
@@ -263,14 +273,19 @@ where
     H::Codomain: Statement,
     R: RngCore + CryptoRng,
 {
-    // Step 1: Sample randomness
+    // Step 1: Sample randomness. Here the `witness` is used to make sure that `r` has the right dimension
     let r = witness.rand(rng);
 
     // Step 2: Compute commitment A = Ψ(r)
     let A = homomorphism.apply(&r);
 
     // Step 3: Obtain Fiat-Shamir challenge
-    let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(fiat_shamir_transcript, &A, dst);
+    let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
+        fiat_shamir_transcript,
+        statement,
+        &A,
+        dst,
+    );
 
     // Step 4: Compute prover response
     let z = r.scaled_add(&witness, c);
@@ -288,39 +303,40 @@ where
     }
 }
 
-pub fn fiat_shamir_challenge_for_msm_verifier<E: Pairing, H: homomorphism::Trait>(
-    fs_transcript: &mut merlin::Transcript,
-    public_statement: &H::Codomain,
-    prover_last_message: &H::Domain,
-    dst: &[u8],
-) -> E::ScalarField
-where
-    H::Domain: Witness<E>,
-    H::Codomain: Statement,
-{
-    // Append the Σ-protocol separator to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
-        fs_transcript,
-        dst,
-    );
+// This function is currently not used, see commends in `fn verify()`
+// pub fn fiat_shamir_challenge_for_msm_verifier<E: Pairing, H: homomorphism::Trait>(
+//     fs_transcript: &mut merlin::Transcript,
+//     public_statement: &H::Codomain,
+//     prover_last_message: &H::Domain,
+//     dst: &[u8],
+// ) -> E::ScalarField
+// where
+//     H::Domain: Witness<E>,
+//     H::Codomain: Statement,
+// {
+//     // Append the Σ-protocol separator to the transcript
+//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
+//         fs_transcript,
+//         dst,
+//     );
 
-    // Add the last prover message (the prover's response) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_last_message(
-        fs_transcript,
-        prover_last_message,
-    );
+//     // Add the last prover message (the prover's response) to the transcript
+//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_last_message(
+//         fs_transcript,
+//         prover_last_message,
+//     );
 
-    // Add the public statment (the image of the prover's witness) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
-        fs_transcript,
-        public_statement,
-    );
+//     // Add the public statment (the image of the prover's witness) to the transcript
+//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
+//         fs_transcript,
+//         public_statement,
+//     );
 
-    // Generate the Fiat-Shamir challenge from the updated transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
-        fs_transcript,
-    )
-}
+//     // Generate the Fiat-Shamir challenge from the updated transcript
+//     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
+//         fs_transcript,
+//     )
+// }
 
 /// Performs a **batch verification** of multiple Sigma protocol MSM (Multi-Scalar Multiplication) relations.
 ///
@@ -356,20 +372,23 @@ where
 #[allow(non_snake_case)]
 pub fn verify_msm_hom<E: Pairing, H>(
     homomorphism: &H,
-    public_statement: &H::Codomain,
+    statement: &H::Codomain,
     prover_first_message: &H::Codomain,
     prover_last_message: &H::Domain,
     fs_transcript: &mut merlin::Transcript,
     dst: &[u8],
-    _dst_verifier: &[u8],
 ) -> anyhow::Result<()>
 where
     H: FixedBaseMsmsTrait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>,
     H::Domain: Witness<E>,
 {
     // Step 1: Reproduce the prover's Fiat-Shamir challenge
-    let c =
-        fiat_shamir_challenge_for_sigma_protocol::<E, H>(fs_transcript, &prover_first_message, dst);
+    let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
+        fs_transcript,
+        statement,
+        &prover_first_message,
+        dst,
+    );
 
     // Step 2: Compute verifier-specific challenge (used for weighted MSM)
 
@@ -387,11 +406,11 @@ where
     let beta = E::ScalarField::rand(&mut rng);
 
     let msm_terms = homomorphism.msm_terms(prover_last_message);
-    let powers_of_beta = utils::powers(beta, public_statement.clone().into_iter().count()); // TODO: Maybe get rid of clone? Is .count() an efficient way to get the length?
+    let powers_of_beta = utils::powers(beta, statement.clone().into_iter().count()); // TODO: Maybe get rid of clone? Is .count() an efficient way to get the length?
 
     let terms_iter = msm_terms.clone().into_iter(); // TODO: get rid of these clones?
     let prover_iter = prover_first_message.clone().into_iter();
-    let statement_iter = public_statement.clone().into_iter();
+    let statement_iter = statement.clone().into_iter();
 
     let mut final_basis = Vec::new();
     let mut final_scalars = Vec::new();

@@ -381,7 +381,7 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
 ): OrderMatch&lt;M&gt; {
     <b>let</b> (order_id, matched_size, remaining_size, order_book_type) =
         active_matched_order.destroy_active_matched_order();
-    <b>assert</b>!(order_book_type == bulk_order_book_type(), <a href="bulk_order_book.md#0x7_bulk_order_book_ENOT_BULK_ORDER">ENOT_BULK_ORDER</a>);
+    <b>assert</b>!(order_book_type == bulk_order_type(), <a href="bulk_order_book.md#0x7_bulk_order_book_ENOT_BULK_ORDER">ENOT_BULK_ORDER</a>);
     <b>let</b> order_address = self.order_id_to_address.get(&order_id).destroy_some();
     <b>let</b> order = self.orders.remove(&order_address);
     <b>let</b> order_match = new_bulk_order_match&lt;M&gt;(
@@ -395,7 +395,7 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
         <b>let</b> size = next_size.destroy_some();
         price_time_idx.place_maker_order(
             order_id,
-            bulk_order_book_type(),
+            bulk_order_type(),
             price,
             order.get_unique_priority_idx(),
             size,
@@ -529,7 +529,7 @@ Activates the first price level for a specific side of a bulk order.
     <b>if</b> (active_price.is_some()) {
         price_time_idx.place_maker_order(
             order_id,
-            bulk_order_book_type(),
+            bulk_order_type(),
             active_price.destroy_some(),
             order.get_unique_priority_idx(),
             active_size.destroy_some(),
@@ -868,6 +868,7 @@ The first price levels of both bid and ask sides will be activated in the active
         <b>let</b> existing_sequence_number = get_sequence_number_from_bulk_order(&old_order);
         <b>if</b> (new_sequence_number &lt;= existing_sequence_number) {
             // Return rejection response for invalid sequence number
+            self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, old_order); // Re-add the <b>old</b> order back since we are rejecting the new one
             <b>return</b> new_bulk_order_place_response_rejection(
                 std::string::utf8(b"Invalid sequence number")
             );

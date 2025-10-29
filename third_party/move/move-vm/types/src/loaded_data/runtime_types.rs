@@ -4,7 +4,10 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use crate::loaded_data::struct_name_indexing::StructNameIndex;
+use crate::{
+    loaded_data::struct_name_indexing::StructNameIndex,
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
+};
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
@@ -258,8 +261,36 @@ impl StructType {
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
-    pub module: ModuleId,
-    pub name: Identifier,
+    module: ModuleId,
+    interned_module_id: InternedModuleId,
+    name: Identifier,
+}
+
+impl StructIdentifier {
+    pub fn new(module_id_pool: &InternedModuleIdPool, module: ModuleId, name: Identifier) -> Self {
+        let interned_module_id = module_id_pool.intern_by_ref(&module);
+        Self {
+            module,
+            interned_module_id,
+            name,
+        }
+    }
+
+    pub fn module(&self) -> &ModuleId {
+        &self.module
+    }
+
+    pub fn interned_module_id(&self) -> InternedModuleId {
+        self.interned_module_id
+    }
+
+    pub fn name(&self) -> &Identifier {
+        &self.name
+    }
+
+    pub fn into_module_and_name(self) -> (ModuleId, Identifier) {
+        (self.module, self.name)
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -306,7 +337,7 @@ pub struct TypePreorderTraversalIter<'a> {
 impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     type Item = &'a Type;
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn next(&mut self) -> Option<Self::Item> {
         use Type::*;
 
@@ -1200,6 +1231,12 @@ impl TypeBuilder {
             S::U64 => U64,
             S::U128 => U128,
             S::U256 => U256,
+            S::I8 => I8,
+            S::I16 => I16,
+            S::I32 => I32,
+            S::I64 => I64,
+            S::I128 => I128,
+            S::I256 => I256,
             S::Address => Address,
             S::Vector(elem_tok) => {
                 let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
@@ -1213,12 +1250,16 @@ impl TypeBuilder {
                 );
             },
 
-            tok => {
+            S::Signer
+            | S::Function(..)
+            | S::Reference(_)
+            | S::MutableReference(_)
+            | S::TypeParameter(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
                             "{:?} is not allowed or is not a meaningful token for a constant",
-                            tok
+                            const_tok
                         )),
                 );
             },
@@ -1906,6 +1947,12 @@ mod unit_tests {
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U64)), U64);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U128)), U128);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U256)), U256);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I8)), I8);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I16)), I16);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I32)), I32);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I64)), I64);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I128)), I128);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I256)), I256);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::Bool)), Bool);
         assert_eq!(
             assert_ok!(ty_builder.create_constant_ty(&S::Address)),

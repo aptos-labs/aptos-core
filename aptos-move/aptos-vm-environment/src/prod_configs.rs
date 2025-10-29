@@ -166,6 +166,7 @@ pub fn aptos_prod_vm_config(
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
     let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
+    let enable_framework_for_option = features.is_enabled(FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION);
 
     let layout_max_size = if gas_feature_version >= RELEASE_V1_30 {
         512
@@ -200,8 +201,7 @@ pub fn aptos_prod_vm_config(
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
-        use_call_tree_and_instruction_cache: features
-            .is_call_tree_and_instruction_vm_cache_enabled(),
+        enable_function_caches: features.is_call_tree_and_instruction_vm_cache_enabled(),
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
         optimize_trusted_code: features.is_trusted_code_enabled(),
@@ -210,6 +210,7 @@ pub fn aptos_prod_vm_config(
         enable_enum_option,
         enable_layout_caches,
         propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
+        enable_framework_for_option,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this
