@@ -15,8 +15,8 @@ const DEFAULT_MAX_NUM_CACHE_ITEMS: usize = 1_000_000;
 ///
 /// ## Example
 ///
-/// A cache that supports out of order insertion and a deterministic eviction policy that evicts
-/// the smallest value.
+/// This in-memory cache can be used as the base for a cache that supports out of order insertion and a deterministic eviction policy that evicts the smallest value.
+/// It would behave as follows:
 ///
 /// 1. Initialize cache with a capacity of 9 and eviction limit of 5
 /// ```text
