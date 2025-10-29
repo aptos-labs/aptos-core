@@ -5,25 +5,36 @@
 //! and provides an implementation for `DensePolynomial` from the arkworks library.
 
 use ark_ff::FftField;
-use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
+use ark_poly::{univariate::DensePolynomial};
 
-/// A trait for functions that can be differentiated. TODO: this is duplicate with functions in aptos-dkg/algebra/polynomials
+/// A trait for functions that can be differentiated.
 pub trait DifferentiableFn {
-    /// Compute the derivative of `self`, returning a new instance of the same type.
-    fn differentiate(&self) -> Self;
+    /// Differentiate `self` in place
+    fn differentiate_in_place(&mut self);
+
+    /// Return a new differentiated instance
+    fn differentiate(&self) -> Self
+    where
+        Self: Clone,
+    {
+        let mut copy = self.clone();
+        copy.differentiate_in_place();
+        copy
+    }
 }
 
 impl<F: FftField> DifferentiableFn for DensePolynomial<F> {
-    fn differentiate(&self) -> Self {
-        let result_coeffs: Vec<F> = self
-            .coeffs()
-            .iter()
-            .skip(1)
-            .enumerate()
-            .map(|(i, x)| *x * F::from(i as u64 + 1))
-            .collect();
+    fn differentiate_in_place(&mut self) {
+        if self.coeffs.len() <= 1 {
+            // Zero or constant polynomial
+            self.coeffs.clear();
+            return;
+        }
 
-        Self::from_coefficients_vec(result_coeffs)
+        for i in 1..self.coeffs.len() {
+            self.coeffs[i - 1] = self.coeffs[i] * F::from(i as u64);
+        }
+        self.coeffs.pop();
     }
 }
 
@@ -33,6 +44,7 @@ mod tests {
     use ark_bn254::Fr;
     use ark_ff::UniformRand;
     use ark_std::{rand::thread_rng, Zero};
+    use ark_poly::DenseUVPolynomial;
 
     #[test]
     fn test_zero() {
