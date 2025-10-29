@@ -107,7 +107,7 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     results
 }
 
-impl<'de, F: PrimeField> ThresholdConfig<F> {
+impl<F: PrimeField> ThresholdConfig<F> {
     /// This initializes a `(t, n)` threshold scheme configuration.
     /// The `domain` is automatically computed as a radix-2 evaluation domain
     /// of size `n.next_power_of_two()` for use in FFT-based polynomial operations.
@@ -121,9 +121,6 @@ impl<'de, F: PrimeField> ThresholdConfig<F> {
     /// Abraham, Benny Pinkas, Guy Golan Gueta and Srinivas Devadas
     /// (which I think takes it from Modern Computer Algebra, by von zur Gathen and Gerhard
     pub fn all_lagrange(&self, xs: &HashSet<F>) -> HashMap<F, F> {
-        // let coeffs_vec = naive_all_lagrange_coefficients(xs);
-        // coeffs_vec.into_iter().collect()
-
         // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
         let vanishing_poly = vanishing_poly(&xs.iter().cloned().collect::<Vec<F>>());
         let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
