@@ -96,6 +96,7 @@ Returns:
             bid_prices,
             ask_sizes,
             ask_prices,
+            get_validation_failed_rejection(),
             std::string::utf8(b"validation failed"),
         );
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
@@ -109,10 +110,10 @@ Returns:
         ask_sizes,
         metadata,
     );
-    <b>let</b> (request_option, request_rejection_reason_option) = destroy_bulk_order_request_response(request_response);
+    <b>let</b> (request_option, request_rejection_reason, rejection_details) = destroy_bulk_order_request_response(request_response);
     <b>if</b> (request_option.is_none()) {
         // Bulk order request creation failed - emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
-        <b>let</b> rejection_reason = request_rejection_reason_option.destroy_some();
+        <b>let</b> rejection_reason = request_rejection_reason.destroy_some();
         market.emit_event_for_bulk_order_rejected(
             sequence_number,
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -121,6 +122,7 @@ Returns:
             ask_sizes,
             ask_prices,
             rejection_reason,
+            rejection_details.destroy_some(),
         );
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
@@ -142,7 +144,7 @@ Returns:
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
     } <b>else</b> {
         // Handle rejection from order book - emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
-        <b>let</b> rejection_reason = destroy_bulk_order_place_reject_response(response);
+        <b>let</b> (rejection_reason, details) = destroy_bulk_order_place_reject_response(response);
         market.emit_event_for_bulk_order_rejected(
             sequence_number,
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -151,6 +153,7 @@ Returns:
             ask_sizes,
             ask_prices,
             rejection_reason,
+            details
         );
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }

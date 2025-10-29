@@ -277,6 +277,32 @@ module aptos_experimental::order_placement {
             );
         };
 
+        if (trigger_condition.is_some()) {
+            // Do not emit an open event for orders with trigger conditions as they are not live in the order book yet
+            market.get_order_book_mut().place_maker_order(
+                new_single_order_request(
+                    user_addr,
+                    order_id,
+                    client_order_id,
+                    limit_price,
+                    orig_size,
+                    remaining_size,
+                    is_bid,
+                    trigger_condition,
+                    time_in_force,
+                    metadata
+                )
+            );
+            return OrderMatchResult {
+                order_id,
+                remaining_size,
+                cancel_reason: option::none(),
+                callback_results,
+                fill_sizes,
+                match_count
+            }
+        };
+
         let result = callbacks.place_maker_order(
             new_clearinghouse_order_info(
                 user_addr,

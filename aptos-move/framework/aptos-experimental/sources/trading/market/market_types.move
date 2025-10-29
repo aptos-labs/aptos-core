@@ -11,6 +11,7 @@ module aptos_experimental::market_types {
     use aptos_std::table::Table;
     use aptos_framework::event;
     use aptos_framework::transaction_context;
+    use aptos_experimental::bulk_order_book_types::BulkOrderRejection;
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
     use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
@@ -431,6 +432,7 @@ module aptos_experimental::market_types {
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        reason: BulkOrderRejection,
         details: std::string::String,
     }
 
@@ -757,6 +759,7 @@ module aptos_experimental::market_types {
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        reason: BulkOrderRejection,
         details: std::string::String,
     ) {
         // Final check whether event sending is enabled
@@ -771,6 +774,7 @@ module aptos_experimental::market_types {
                     bid_prices,
                     ask_sizes,
                     ask_prices,
+                    reason,
                     details,
                 }
             );
