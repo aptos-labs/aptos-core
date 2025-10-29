@@ -868,6 +868,7 @@ The first price levels of both bid and ask sides will be activated in the active
         <b>let</b> existing_sequence_number = get_sequence_number_from_bulk_order(&old_order);
         <b>if</b> (new_sequence_number &lt;= existing_sequence_number) {
             // Return rejection response for invalid sequence number
+            self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, old_order); // Re-add the <b>old</b> order back since we are rejecting the new one
             <b>return</b> new_bulk_order_place_response_rejection(
                 std::string::utf8(b"Invalid sequence number")
             );
