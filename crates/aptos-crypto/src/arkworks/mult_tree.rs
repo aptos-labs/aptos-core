@@ -15,7 +15,9 @@ pub fn vanishing_poly<F: FftField>(xs: &[F]) -> DensePolynomial<F> {
 /// This function constructs a binary tree of polynomials where:
 /// - The leaves are linear polynomials of the form `(x - root)` for each root in `roots`.
 /// - Internal nodes represent the product of their two child polynomials.
-pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
+///
+/// FftField is used because that's needed to multiply a pair of `DenseUVPolynomial` in arkworks
+fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
     // Convert each root `u` into a linear polynomial (x - u)
     let mut bases: Vec<DensePolynomial<F>> = roots
         .into_iter()

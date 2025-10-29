@@ -41,6 +41,7 @@ ff = { workspace = true }
 group = { workspace = true }
 hex = { workspace = true }
 hkdf = { workspace = true }
+itertools.workspace = true
 libsecp256k1 = { workspace = true }
 merlin = { workspace = true }
 more-asserts = { workspace = true }

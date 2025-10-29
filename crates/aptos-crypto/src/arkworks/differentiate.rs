@@ -7,7 +7,7 @@
 use ark_ff::FftField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 
-/// A trait for functions that can be differentiated. TODO: this is duplicate with aptos-dkg/polynomials
+/// A trait for functions that can be differentiated. TODO: this is duplicate with functions in aptos-dkg/algebra/polynomials
 pub trait DifferentiableFn {
     /// Compute the derivative of `self`, returning a new instance of the same type.
     fn differentiate(&self) -> Self;

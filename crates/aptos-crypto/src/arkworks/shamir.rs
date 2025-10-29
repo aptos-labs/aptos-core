@@ -9,13 +9,9 @@ use crate::arkworks::{
     serialization::{ark_de, ark_se},
 };
 use anyhow::{anyhow, Result};
-use ark_ec::CurveGroup;
 use ark_ff::{batch_inversion, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
-use ark_std::{
-    marker::PhantomData,
-    rand::{Rng, RngCore},
-};
+use ark_std::rand::{Rng, RngCore};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -32,23 +28,23 @@ pub struct ShamirShare<F: PrimeField> {
     pub y: F,
 }
 
-/// Configuration for a threshold cryptography scheme.
+/// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
+/// because Shamir shares are usually defined over such a field. For reconstructing to a group (TODO)
+/// we'll use a parameter G: CurveGroup<ScalarField = F>
 #[derive(Debug, Clone, Copy, Serialize)]
-pub struct ThresholdConfig<F: PrimeField, G: CurveGroup<ScalarField = F>> {
+pub struct ThresholdConfig<F: PrimeField> {
     /// Total number of participants (shares)
     pub n: usize,
-    /// Threshold number of shares required to reconstruct the secret. TODO: in the literature this usually denotes the maximal adversary threshold, so `t + 1` shares would be required to reconstruct the secret...
+    /// Threshold number of shares required to reconstruct the secret. Note that in
+    /// MPC literature `t` usually denotes the maximal adversary threshold, so `t + 1`
+    /// shares would be required to reconstruct the secret
     pub t: usize,
     /// Used for FFT-based polynomial operations. Recomputed from `n` on deserialize
     #[serde(skip)]
     pub domain: Radix2EvaluationDomain<F>,
-    #[serde(skip)]
-    _marker: PhantomData<G>,
 }
 
-impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> Deserialize<'de>
-    for ThresholdConfig<F, G>
-{
+impl<'de, F: PrimeField> Deserialize<'de> for ThresholdConfig<F> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -61,19 +57,15 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> Deserialize<'de>
 
         let BasicFields { n, t } = BasicFields::deserialize(deserializer)?;
 
-        let domain = Radix2EvaluationDomain::new(n) // `new()` does `n.next_power_of_two()`
+        let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` does `n.next_power_of_two()`
             .ok_or_else(|| serde::de::Error::custom(format!("Invalid domain size: {}", n)))?;
 
-        Ok(ThresholdConfig {
-            n,
-            t,
-            domain,
-            _marker: PhantomData::<G>,
-        })
+        Ok(ThresholdConfig { n, t, domain })
     }
 }
 
-// TODO: move this function to tests? or keep it for benchmarks?
+// This one will be used for tests and benchmarks only
+#[allow(dead_code)]
 fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     let xs_vec: Vec<F> = xs.iter().cloned().collect();
     let n = xs_vec.len();
@@ -116,18 +108,13 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     results
 }
 
-impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
+impl<'de, F: PrimeField> ThresholdConfig<F> {
     /// This initializes a `(t, n)` threshold scheme configuration.
     /// The `domain` is automatically computed as a radix-2 evaluation domain
-    /// of size `n` for use in FFT-based polynomial operations.
+    /// of size `n.next_power_of_two()` for use in FFT-based polynomial operations.
     pub fn new(n: usize, t: usize) -> Self {
         let domain = Radix2EvaluationDomain::new(n).unwrap();
-        ThresholdConfig {
-            n,
-            t,
-            domain,
-            _marker: PhantomData::<G>,
-        }
+        ThresholdConfig { n, t, domain }
     }
 
     /// Fast lagrange coefficient computation algorithm, taken from the paper
@@ -215,63 +202,65 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
 #[cfg(test)]
 mod shamir_tests {
     use super::*;
-    use ark_bls12_381::{Fr, G1Projective};
-    use ark_ff::{UniformRand, Zero};
+    use ark_bn254::Fr;
+    use ark_ff::{One, UniformRand};
     use ark_std::rand::thread_rng;
-    use std::collections::HashSet;
+    use itertools::Itertools;
 
-    #[test]
-    fn test_shamir_share_and_reconstruct() {
-        let mut rng = thread_rng();
+    fn single_lagrange(x: Fr, xs: &HashSet<Fr>, omegas: Vec<Fr>) -> Fr {
+        let mut prod = Fr::one();
 
-        // Configuration: 3-out-of-5 Shamir scheme
-        let n = 5;
-        let t = 3;
-        let config = ThresholdConfig::<Fr, G1Projective>::new(n, t);
-
-        // Pick a random secret in the field
-        let secret = Fr::rand(&mut rng);
-        println!("Secret: {:?}", secret);
-
-        // Generate shares
-        let shares = config.share(secret, &mut rng);
-        println!("Generated {} shares:", shares.len());
-        for s in &shares {
-            println!("  Share: x = {:?}, y = {:?}", s.x, s.y);
+        for xprime in omegas {
+            if x == xprime {
+                continue;
+            } else if xs.contains(&xprime) {
+                prod *= -xprime;
+                prod /= x - xprime;
+            }
         }
 
-        // Pick any subset of t shares for reconstruction
-        let subset = &shares[0..t];
-        let recovered = config.reconstruct(subset).expect("reconstruction failed");
-        println!("Reconstructed from first {} shares: {:?}", t, recovered);
-        assert_eq!(secret, recovered);
-
-        // Try another random subset
-        let subset2 = vec![shares[1], shares[3], shares[4]];
-        let recovered2 = config.reconstruct(&subset2).expect("reconstruction failed");
-        println!("Reconstructed from shares [1,3,4]: {:?}", recovered2);
-        assert_eq!(secret, recovered2);
+        prod
     }
 
     #[test]
-    fn test_all_lagrange_naive_against_direct_formula() {
-        use ark_poly::domain::Radix2EvaluationDomain;
+    fn test_all_lagrange() {
+        for n in 2..8 {
+            for t in 1..=n {
+                let params = ThresholdConfig::new(n, t);
 
-        let domain = Radix2EvaluationDomain::<Fr>::new(4).unwrap();
-        let xs: HashSet<_> = domain.elements().take(3).collect();
+                let elements: Vec<Fr> = params.domain.elements().collect();
+                let omegas = elements.clone();
+                for all_elements_vec in elements.into_iter().combinations(t) {
+                    let all_elements_iter = all_elements_vec.into_iter();
 
-        let config = ThresholdConfig::<Fr, G1Projective>::new(4, 3);
-        let coeffs_map = config.all_lagrange(&xs);
+                    let all_elements = HashSet::from_iter(all_elements_iter.clone());
+                    let all_lagrange = params.all_lagrange(&all_elements);
 
-        println!("Naive Lagrange coefficients:");
-        for (x, coeff) in &coeffs_map {
-            println!("  x = {:?}, coeff = {:?}", x, coeff);
+                    for (x, lagrange) in all_lagrange.into_iter() {
+                        assert_eq!(lagrange, single_lagrange(x, &all_elements, omegas.clone()));
+                    }
+                }
+            }
         }
+    }
 
-        // Sanity check: sum of Lagrange coefficients at x=0 should equal 1
-        // (i.e., constant term basis property)
-        let sum: Fr = coeffs_map.values().copied().sum();
-        println!("Sum of coefficients: {:?}", sum);
-        assert!(sum != Fr::zero()); // basic non-degenerate check
+    #[test]
+    fn test_reconstruct() {
+        for n in 2..8 {
+            for t in 1..=n {
+                let mut rng = thread_rng();
+                let params = ThresholdConfig::new(n, t);
+
+                let val = Fr::rand(&mut rng);
+                let shares: Vec<ShamirShare<Fr>> = params.share(val, &mut rng);
+
+                for reconstruct_shares in shares.iter().combinations(t) {
+                    let reconstruct_shares_vec: Vec<ShamirShare<Fr>> =
+                        reconstruct_shares.into_iter().cloned().collect();
+
+                    assert_eq!(params.reconstruct(&reconstruct_shares_vec).unwrap(), val);
+                }
+            }
+        }
     }
 }
