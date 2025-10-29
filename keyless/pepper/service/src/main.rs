@@ -182,8 +182,7 @@ async fn main() {
     // Verify the critical service invariants
     info!("Verifying critical service invariants...");
     verify_critical_service_invariants(
-        args.expected_vuf_pubkey_on_startup,
-        args.expected_derived_pepper_on_startup,
+        &args,
         vuf_keypair.clone(),
         deployment_information.clone(),
     );
@@ -394,29 +393,32 @@ fn verify_constant_time_scalar_multiplication() {
 /// this function will panic. This helps to ensure that no critical properties
 /// are violated during development, or after deployment.
 fn verify_critical_service_invariants(
-    expected_vuf_pubkey_on_startup: Option<String>,
-    expected_derived_pepper_on_startup: Option<String>,
+    args: &Args,
     vuf_keypair: Arc<VUFKeypair>,
     deployment_information: DeploymentInformation,
 ) {
-    // Verify constant-time scalar multiplication
-    info!("Verifying constant-time scalar multiplication...");
-    verify_constant_time_scalar_multiplication();
+    // Verify constant-time scalar multiplication if in production.
+    if args.local_development_mode {
+        info!("Constant-time scalar multiplication verification skipped in local development mode.");
+    } else {
+        info!("Verifying constant-time scalar multiplication...");
+        verify_constant_time_scalar_multiplication();
+    }
 
     // Verify the VUF public key
-    if let Some(expected_vuf_pubkey) = expected_vuf_pubkey_on_startup {
+    if let Some(expected_vuf_pubkey) = args.expected_vuf_pubkey_on_startup.as_ref() {
         info!("Verifying expected VUF public key...");
-        verify_expected_vuf_public_key(vuf_keypair.clone(), &expected_vuf_pubkey);
+        verify_expected_vuf_public_key(vuf_keypair.clone(), expected_vuf_pubkey);
     } else {
         warn!("No expected VUF public key provided for startup verification!");
     }
 
     // Verify the expected derived pepper
-    if let Some(expected_derived_pepper) = expected_derived_pepper_on_startup {
+    if let Some(expected_derived_pepper) = args.expected_derived_pepper_on_startup.as_ref() {
         info!("Verifying expected derived pepper...");
         verify_expected_derived_pepper(
             vuf_keypair,
-            &expected_derived_pepper,
+            expected_derived_pepper,
             deployment_information,
         );
     } else {
