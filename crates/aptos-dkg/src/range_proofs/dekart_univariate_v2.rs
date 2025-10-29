@@ -29,7 +29,7 @@ use std::{fmt::Debug, io::Write};
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
-    Cj: Vec<E::G1>,
+    Cs: Vec<E::G1>,
     D: E::G1,
     a: E::ScalarField,
     a_h: E::ScalarField,
@@ -407,7 +407,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             lagr_g1,
             xi_1: *xi_1,
         };
-        let Cj: Vec<_> = f_js_evals
+        let Cs: Vec<_> = f_js_evals
             .iter()
             .zip(rhos.iter())
             .map(|(f_j, rho)| {
@@ -417,7 +417,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cj);
+        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
 
         // Step 6
         let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
@@ -473,7 +473,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 let sum_betas_term: E::ScalarField = betas
                     .iter()
                     .zip(&rs)
-                    .map(|(beta_j, r_j)| *beta_j * r_j * (*r_j - E::ScalarField::ONE))
+                    .map(|(&beta_j, r_j)| beta_j * r_j * (*r_j - E::ScalarField::ONE))
                     .sum();
 
                 let numerator = beta * (r - sum_pow2_rs) + sum_betas_term;
@@ -591,7 +591,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         Proof {
             hatC,
             pi_PoK,
-            Cj,
+            Cs,
             D,
             a,
             a_h,
@@ -627,7 +627,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let Proof {
             hatC,
             pi_PoK,
-            Cj,
+            Cs: Cj,
             D,
             a,
             a_h,
