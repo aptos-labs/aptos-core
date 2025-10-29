@@ -3,6 +3,7 @@
 
 use crate::sigma_protocol::{homomorphism, homomorphism::EntrywiseMap};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use std::fmt::Debug;
 
 /// A `FixedBaseMsms` instance represents a homomorphism whose outputs can be expressed as
 /// one or more **fixed-base multi-scalar multiplications (MSMs)**, sharing consistent base and scalar types.
@@ -32,12 +33,14 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     type MsmInput: CanonicalSerialize
         + CanonicalDeserialize
         + Clone
-        + IsMsmInput<Self::Base, Self::Scalar>;
+        + IsMsmInput<Self::Base, Self::Scalar>
+        + Debug
+        + Eq;
 
     /// The output type of evaluating an MSM. `Codomain` should equal `CodomainShape<MsmOutput>`, in the current version
     /// of the code. In a future version where MsmOutput might be an enum (E::G1 or E::G2), Codomain should probably follow suit.
     /// (TODO: Think this over)
-    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone;
+    type MsmOutput: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
     /// Represents the **shape** of the homomorphism's output, parameterized by an inner type `T`.
     ///
@@ -59,8 +62,10 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
         + CanonicalSerialize
         + CanonicalDeserialize
         + Clone
+        + Debug
+        + Eq
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 
     /// Returns the MSM terms corresponding to a given homomorphism input.
     ///
@@ -99,7 +104,7 @@ pub trait IsMsmInput<B, S> {
 /// Represents the input to a (not necessarily fixed-base) multi-scalar multiplication (MSM):
 /// a collection of bases and corresponding scalars.
 /// TODO: Might not be the right file for this struct, since not necessarily fixed-base
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq, Debug)]
 pub struct MsmInput<
     B: CanonicalSerialize + CanonicalDeserialize,
     S: CanonicalSerialize + CanonicalDeserialize,
@@ -133,7 +138,7 @@ where
     type CodomainShape<T>
         = H::CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H::MsmInput;
     type MsmOutput = H::MsmOutput;
     type Scalar = H::Scalar;

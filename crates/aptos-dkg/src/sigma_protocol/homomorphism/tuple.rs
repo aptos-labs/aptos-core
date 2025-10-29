@@ -6,12 +6,14 @@ use crate::{
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms::Trait, EntrywiseMap},
-        Witness,
     },
 };
 use ark_ec::pairing::Pairing;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid,
+};
 pub use ark_std::io::Write;
+use std::fmt::Debug;
 
 /// `TupleHomomorphism` combines two homomorphisms with the same domain
 /// into a single homomorphism that outputs a tuple of codomains.
@@ -25,6 +27,7 @@ pub use ark_std::io::Write;
 ///
 /// In category-theoretic terms, this is the composition of the diagonal map
 /// `Δ: Domain -> Domain × Domain` with the product map `h1 × h2`.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait,
@@ -32,8 +35,6 @@ where
 {
     pub hom1: H1,
     pub hom2: H2,
-    pub dst: Vec<u8>,
-    pub dst_verifier: Vec<u8>,
 }
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
@@ -84,8 +85,6 @@ where
     }
 }
 
-use ark_serialize::{Read, Valid};
-
 impl<A, B> CanonicalDeserialize for TupleCodomainShape<A, B>
 where
     A: CanonicalDeserialize,
@@ -132,13 +131,13 @@ where
     A: EntrywiseMap<T>,
     B: EntrywiseMap<T>,
 {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> =
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
         TupleCodomainShape<A::Output<U>, B::Output<U>>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         TupleCodomainShape(self.0.map(&f), self.1.map(f))
     }
@@ -148,7 +147,9 @@ where
 ///
 /// This allows combining two homomorphisms that share the same `Domain`.
 /// For simplicity, we currently require that the MSM types (`MsmInput` and `MsmOutput`) match;
-/// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future. Similarly, we **implicitly** that the two msm_eval methods are identical.
+/// this ensures compatibility with batch verification in a Σ-protocol and may be relaxed in the future.
+/// For the moment, we **implicitly** assume that the two msm_eval methods are identical, but is probably
+/// not necessary through enums.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
 impl<H1, H2> Trait for TupleHomomorphism<H1, H2>
@@ -166,7 +167,7 @@ where
     type CodomainShape<T>
         = TupleCodomainShape<H1::CodomainShape<T>, H2::CodomainShape<T>>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = H1::MsmInput;
     type MsmOutput = H1::MsmOutput;
     type Scalar = H1::Scalar;
@@ -185,21 +186,25 @@ where
 
 impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
 where
-    H1: Trait<MsmOutput = E::G1, Base = E::G1Affine, Scalar = E::ScalarField>,
-    H2: Trait<
-        Domain = H1::Domain,
-        Scalar = H1::Scalar,
-        Base = H1::Base,
-        MsmInput = H1::MsmInput,
-        MsmOutput = H1::MsmOutput,
-    >,
-    H1::Domain: Witness<E>,
+    H1: sigma_protocol::Trait<E>,
+    H2: sigma_protocol::Trait<E>,
+    H2: Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
 {
     fn dst(&self) -> Vec<u8> {
-        self.dst.clone()
-    }
+        let mut dst = Vec::new();
 
-    fn dst_verifier(&self) -> Vec<u8> {
-        self.dst_verifier.clone()
+        let dst1 = self.hom1.dst();
+        let dst2 = self.hom2.dst();
+
+        // Domain-separate them properly so concatenation is unambiguous.
+        // Prefix with their lengths so [a|b] and [ab|] don't collide.
+        dst.extend_from_slice(b"TupleHomomorphism(");
+        dst.extend_from_slice(&(dst1.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst1);
+        dst.extend_from_slice(&(dst2.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst2);
+        dst.extend_from_slice(b")");
+
+        dst
     }
 }
