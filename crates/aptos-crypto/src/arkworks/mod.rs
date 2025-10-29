@@ -66,8 +66,8 @@ pub fn compute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarFie
 ///
 /// As a result, each iteration of this algorithm has roughly a 50% chance
 /// of producing a valid point when given a uniformly random input
-/// (assuming the hash function behaves as a random oracle). Consequently,
-/// the probability that this function fails on a random input is approximately 1/2^256.  
+/// (assuming the hash function behaves as a random oracle). Consequently, the
+/// probability that this function fails on a random input is approximately 1/2^256.  
 ///
 /// Note: This algorithm is probabilistic and may be vulnerable to
 /// side-channel attacks. For more details, see `MapToGroup` in:
