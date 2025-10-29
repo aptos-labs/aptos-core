@@ -3,9 +3,9 @@
 
 use crate::{
     fiat_shamir,
-    sigma_protocol::{
-        homomorphism,
-        homomorphism::fixed_base_msms::{IsMsmInput, Trait as FixedBaseMsmsTrait},
+    sigma_protocol::homomorphism::{
+        self,
+        fixed_base_msms::{self, IsMsmInput},
     },
     utils, Scalar,
 };
@@ -23,7 +23,7 @@ use ark_std::{
 use std::{fmt::Debug, io::Write};
 
 pub trait Trait<E: Pairing>:
-    FixedBaseMsmsTrait<
+    fixed_base_msms::Trait<
         Domain: Witness<E>,
         Scalar = E::ScalarField,
         Base = E::G1Affine,
@@ -391,7 +391,7 @@ pub fn verify_msm_hom<E: Pairing, H>(
     dst: &[u8],
 ) -> anyhow::Result<()>
 where
-    H: FixedBaseMsmsTrait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>
+    H: fixed_base_msms::Trait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>
         + CanonicalSerialize,
     H::Domain: Witness<E>,
 {

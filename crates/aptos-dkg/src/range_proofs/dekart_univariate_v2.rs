@@ -928,7 +928,7 @@ fn floored_triangular_root(a: usize) -> usize {
 }
 
 #[cfg(test)]
-mod test_invert_triangular_number {
+mod test_floored_triangular_root {
     use super::floored_triangular_root;
 
     #[test]
