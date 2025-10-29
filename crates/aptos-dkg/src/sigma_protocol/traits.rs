@@ -303,7 +303,7 @@ where
     }
 }
 
-// This function is currently not used, see commends in `fn verify()`
+// This function is currently not used, see comments in `fn verify()`
 // pub fn fiat_shamir_challenge_for_msm_verifier<E: Pairing, H: homomorphism::Trait>(
 //     fs_transcript: &mut merlin::Transcript,
 //     public_statement: &H::Codomain,

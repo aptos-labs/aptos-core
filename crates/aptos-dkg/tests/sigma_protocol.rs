@@ -17,20 +17,20 @@ use ark_std::rand::thread_rng;
 use std::fmt::Debug;
 
 #[cfg(test)]
-pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Domain)
+pub fn test_sigma_protocol<E, H>(hom: H, witness: H::Domain)
 where
     E: Pairing,
-    P: sigma_protocol::Trait<E>,
+    H: sigma_protocol::Trait<E>,
 {
     let mut rng = thread_rng();
 
-    let statement = instance.apply(&witness);
+    let statement = hom.apply(&witness);
 
     let mut prover_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    let proof = instance.prove(&witness, &statement, &mut prover_transcript, &mut rng);
+    let proof = hom.prove(&witness, &statement, &mut prover_transcript, &mut rng);
 
     let mut verifier_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    instance
+    hom
         .verify(&statement, &proof, &mut verifier_transcript)
         .expect("Sigma protocol proof failed verification");
 }

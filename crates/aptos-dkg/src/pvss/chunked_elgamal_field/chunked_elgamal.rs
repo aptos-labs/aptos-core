@@ -12,36 +12,36 @@ use ark_std::fmt::Debug;
 type Base<E> = <E as Pairing>::G1Affine;
 
 /// Formally, given:
-/// - `g_1, h_1` ∈ G₁ (group generators)
+/// - `G_1, H_1` ∈ G₁ (group generators)
 /// - `ek_i` ∈ G₁ (encryption keys)
-/// - `z_ij` ∈ Scalar<E> (plaintext scalars z_i, chunked into z_ij)
-/// - `r_j` ∈ Scalar<E> (randomness for each `column` of chunks z_ij)
+/// - `z_i,j` ∈ Scalar<E> (plaintext scalars z_i, chunked into z_i,j)
+/// - `r_j` ∈ Scalar<E> (randomness for each `column` of chunks z_i,j)
 ///
-/// The homomorphism maps input `[z_ij]` and randomness `[r_j]` to
+/// The homomorphism maps input `[z_i,j]` and randomness `[r_j]` to
 /// the following codomain elements:
 ///
 /// ```text
-/// C_ij = g_1 * z_ij + ek_i * r_j
-/// R_j  = h_1 * r_j
+/// C_i,j = G_1 * z_i,j + ek_i * r_j
+/// R_j  = H_1 * r_j
 /// ```
 ///
-/// The `C_ij` represent "chunked" homomorphic encryptions of the plaintexts,
+/// The `C_i,j` represent "chunked" homomorphic encryptions of the plaintexts,
 /// and `R_j` carry the corresponding randomness contributions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct Homomorphism<'a, E: Pairing> {
-    pub g_1: &'a Base<E>,
-    pub h_1: &'a Base<E>,
+    pub G_1: &'a Base<E>,
+    pub H_1: &'a Base<E>,
     pub eks: &'a [Base<E>],
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
-    pub chunks: Vec<Vec<T>>, // Depending on T, these can be chunked plaintexts, chunked ciphertexts, their MSM representations, etc
+    pub chunks: Vec<Vec<T>>, // Depending on T these can be chunked ciphertexts, their MSM representations, and also chunked plaintexts (see Witness below)
     pub randomness: Vec<T>,  // Same story, depending on T
 }
 
-// Witness shape happens to be identical to CodomainShape, this is mostly coincidental
+// Witness shape happens to be identical to CodomainShape, this is mostly coincidental; hence for brevity:
 pub type Witness<E> = CodomainShape<Scalar<E>>;
 
 impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
@@ -101,28 +101,28 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     type Scalar = Scalar<E>;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-        // C_ij = g_1 * z_ij + ek[i] * r_j
+        // C_i,j = G_1 * z_i,j + ek[i] * r_j
         let Cs = input
             .chunks
             .iter()
             .enumerate()
-            .map(|(i, row)| {
-                row.iter()
+            .map(|(i, z_i)| {
+                z_i.iter()
                     .zip(input.randomness.iter())
                     .map(|(&z_ij, &r_j)| fixed_base_msms::MsmInput {
-                        bases: vec![*self.g_1, self.eks[i]],
+                        bases: vec![*self.G_1, self.eks[i]],
                         scalars: vec![z_ij, r_j],
                     })
                     .collect()
             })
             .collect();
 
-        //  R_j = h_1 * r_j
+        //  R_j = H_1 * r_j
         let Rs = input
             .randomness
             .iter()
             .map(|&r_j| fixed_base_msms::MsmInput {
-                bases: vec![*self.h_1],
+                bases: vec![*self.H_1],
                 scalars: vec![r_j],
             })
             .collect();

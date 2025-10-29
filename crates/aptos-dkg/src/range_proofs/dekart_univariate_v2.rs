@@ -187,7 +187,6 @@ impl<E: Pairing> Valid for VerifierPrecomputed<E> {
     }
 }
 
-#[allow(non_snake_case)]
 fn compute_h_denom_eval<E: Pairing>(
     roots_of_unity_in_eval_dom: &Vec<E::ScalarField>,
 ) -> Vec<E::ScalarField> {
