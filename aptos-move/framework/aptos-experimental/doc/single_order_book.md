@@ -32,10 +32,10 @@ types of pending orders are supported.
 -  [Function `try_cancel_order_with_client_order_id`](#0x7_single_order_book_try_cancel_order_with_client_order_id)
 -  [Function `try_cancel_order`](#0x7_single_order_book_try_cancel_order)
 -  [Function `client_order_id_exists`](#0x7_single_order_book_client_order_id_exists)
--  [Function `place_maker_order`](#0x7_single_order_book_place_maker_order)
+-  [Function `place_maker_or_pending_order`](#0x7_single_order_book_place_maker_or_pending_order)
 -  [Function `place_ready_maker_order_with_unique_idx`](#0x7_single_order_book_place_ready_maker_order_with_unique_idx)
 -  [Function `reinsert_order`](#0x7_single_order_book_reinsert_order)
--  [Function `place_pending_maker_order`](#0x7_single_order_book_place_pending_maker_order)
+-  [Function `place_pending_order_internal`](#0x7_single_order_book_place_pending_order_internal)
 -  [Function `get_single_match_for_taker`](#0x7_single_order_book_get_single_match_for_taker)
 -  [Function `decrease_order_size`](#0x7_single_order_book_decrease_order_size)
 -  [Function `get_order_id_by_client_id`](#0x7_single_order_book_get_order_id_by_client_id)
@@ -314,6 +314,15 @@ types of pending orders are supported.
 
 
 <pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>: u64 = 10;
+</code></pre>
+
+
+
+<a id="0x7_single_order_book_ETRIGGER_COND_NOT_FOUND"></a>
+
+
+
+<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_ETRIGGER_COND_NOT_FOUND">ETRIGGER_COND_NOT_FOUND</a>: u64 = 11;
 </code></pre>
 
 
@@ -729,15 +738,15 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 
 </details>
 
-<a id="0x7_single_order_book_place_maker_order"></a>
+<a id="0x7_single_order_book_place_maker_or_pending_order"></a>
 
-## Function `place_maker_order`
+## Function `place_maker_or_pending_order`
 
 Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
 else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_or_pending_order">place_maker_or_pending_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -746,16 +755,15 @@ else it is added to the active order book. The API aborts if its not a maker ord
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_order">place_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_or_pending_order">place_maker_or_pending_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, ascending_id_generator: &<b>mut</b> AscendingIdGenerator, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
 ) {
     <b>let</b> ascending_idx =
         new_unique_idx_type(ascending_id_generator.next_ascending_id());
     <b>if</b> (order_req.trigger_condition.is_some()) {
-        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>(ascending_id_generator, order_req);
+        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>(ascending_id_generator, order_req);
     };
     self.<a href="single_order_book.md#0x7_single_order_book_place_ready_maker_order_with_unique_idx">place_ready_maker_order_with_unique_idx</a>(price_time_idx, order_req, ascending_idx);
-
 }
 </code></pre>
 
@@ -810,7 +818,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
             order_req.order_id
         );
     };
-    price_time_idx.<a href="single_order_book.md#0x7_single_order_book_place_maker_order">place_maker_order</a>(
+    price_time_idx.place_maker_order(
         order_req.order_id,
         single_order_type(),
         order_req.price,
@@ -874,13 +882,13 @@ it is added to the order book, if it exists, it's size is updated.
 
 </details>
 
-<a id="0x7_single_order_book_place_pending_maker_order"></a>
+<a id="0x7_single_order_book_place_pending_order_internal"></a>
 
-## Function `place_pending_maker_order`
+## Function `place_pending_order_internal`
 
 
 
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -889,7 +897,7 @@ it is added to the order book, if it exists, it's size is updated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, ascending_id_generator: &<b>mut</b> AscendingIdGenerator, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
 ) {
     <b>let</b> order_id = order_req.order_id;
@@ -912,7 +920,16 @@ it is added to the order book, if it exists, it's size is updated.
 
     self.orders.add(order_id, new_order_with_state(order, <b>false</b>));
 
-    self.pending_orders.<a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>(
+    <b>if</b> (order_req.client_order_id.is_some()) {
+        self.client_order_ids.add(
+            new_account_client_order_id(
+                order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_req.client_order_id.destroy_some()
+            ),
+            order_req.order_id
+        );
+    };
+
+    self.pending_orders.place_pending_order(
         order_id,
         order_req.trigger_condition.destroy_some(),
         ascending_idx,
@@ -1234,12 +1251,20 @@ Removes and returns the orders that are ready to be executed based on the curren
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, current_price: u64, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrder&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
+    <b>let</b> self_client_order_ids = &<b>mut</b> self.client_order_ids;
     <b>let</b> order_ids = self.pending_orders.<a href="single_order_book.md#0x7_single_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>(current_price, order_limit);
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
     order_ids.for_each(|order_id| {
         <b>let</b> order_with_state = self_orders.remove(&order_id);
         <b>let</b> (order, _) = order_with_state.destroy_order_from_state();
+        <b>if</b> (order.get_client_order_id().is_some()) {
+            self_client_order_ids.remove(
+                &new_account_client_order_id(
+                    order.get_account(), order.get_client_order_id().destroy_some()
+                )
+            );
+        };
         orders.push_back(order);
     });
     orders
