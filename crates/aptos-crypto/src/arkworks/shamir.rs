@@ -20,7 +20,7 @@ use std::collections::{HashMap, HashSet};
 /// `ShamirShare` consists of an `(x, y)` point on the secret sharing polynomial.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShamirShare<F: PrimeField> {
-    /// The interpolation point of the secret sharing polynomial.  
+    /// The interpolation point of the secret sharing polynomial.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub x: F,
     /// The evaluation of the polynomial at `x`.
@@ -64,7 +64,7 @@ impl<'de, F: PrimeField> Deserialize<'de> for ThresholdConfig<F> {
     }
 }
 
-// This one will be used for tests and benchmarks only
+// This one will be used for benchmarks only (TODO)
 #[allow(dead_code)]
 fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     let xs_vec: Vec<F> = xs.iter().cloned().collect();
