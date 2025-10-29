@@ -3,6 +3,7 @@
 
 //! This module provides some helper functions for arkworks.
 
+pub mod differentiate;
 pub mod mult_tree;
 pub mod serialization;
 pub mod shamir;

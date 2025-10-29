@@ -7,7 +7,7 @@ use crate::{
     algebra::{polynomials, GroupGenerators},
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
-    sigma_protocol::{self, homomorphism, homomorphism::Trait as HomomorphismTrait, Trait},
+    sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
     utils, Scalar,
 };
 use aptos_crypto::arkworks;

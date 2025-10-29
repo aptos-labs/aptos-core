@@ -3,16 +3,20 @@
 
 //! Contains a version of shamir secret sharing and `ThresholdConfig` for arkworks
 
-use crate::arkworks::serialization::{ark_de, ark_se};
+use crate::arkworks::{
+    differentiate::DifferentiableFn,
+    mult_tree::vanishing_poly,
+    serialization::{ark_de, ark_se},
+};
 use anyhow::{anyhow, Result};
-use ark_ec::{pairing::Pairing, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::{batch_inversion, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::{
     marker::PhantomData,
     rand::{Rng, RngCore},
-    One, Zero,
 };
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -27,35 +31,6 @@ pub struct ShamirShare<F: PrimeField> {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub y: F,
 }
-
-// /// Deals a secret `s` in a `t`-out-of-`n` fashion (as per `sc`) returning (1) the degree `t-1`
-// /// polynomial encoding the secret and (2) its evaluations at all the `n` $N$th roots-of-unity where
-// /// $N$ is the smallest power of two $\ge n$.
-// ///
-// /// Any `t` evaluations are sufficient to reconstruct the secret `s`.
-// pub fn shamir_secret_share<F: PrimeField, R: Rng + RngCore>(
-//     sc: &ThresholdConfig<F>,
-//     s: F,
-//     rng: &mut R,
-// ) -> (Vec<F>, Vec<F>) { // polynomial coefficients, and shares
-//     debug_assert!(sc.t <= sc.n, "Threshold t must be <= n");
-//     debug_assert!(sc.t >= 1, "Threshold must be at least 1");
-
-//     // 1. Sample random coefficients for degree-(t-1) polynomial
-//     let mut coeffs: Vec<F> = (0..sc.t).map(|_| F::rand(rng)).collect();
-//     coeffs[0] = s; // set constant term to secret
-
-//     // 2. Retrieve a suitable FFT evaluation domain (size ≥ n)
-//     let domain = sc.get_evaluation_domain();
-
-//     // 3. Evaluate the polynomial at all domain points
-//     let mut evals = domain.fft(&coeffs);
-
-//     // 4. Truncate to the first n points (the actual shares)
-//     evals.truncate(sc.n);
-
-//     (coeffs, evals)
-// }
 
 /// Configuration for a threshold cryptography scheme.
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -158,51 +133,44 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
     /// Fast lagrange coefficient computation algorithm, taken from the paper
     /// "Towards Scalable Threshold Cryptosystems" by Alin Tomescu, Robert Chen, Yiming Zheng, Ittai
     /// Abraham, Benny Pinkas, Guy Golan Gueta and Srinivas Devadas
-    /// (which I think takes it from Modrn Computer Algebra, by von zur Gathen and Gerhard
-    pub fn all_lagrange_naive(&self, xs: &HashSet<F>) -> HashMap<F, F> {
-        let coeffs_vec = naive_all_lagrange_coefficients(xs);
-        coeffs_vec.into_iter().collect()
+    /// (which I think takes it from Modern Computer Algebra, by von zur Gathen and Gerhard
+    pub fn all_lagrange(&self, xs: &HashSet<F>) -> HashMap<F, F> {
+        // let coeffs_vec = naive_all_lagrange_coefficients(xs);
+        // coeffs_vec.into_iter().collect()
+
+        // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
+        let vanishing_poly = vanishing_poly(&xs.into_iter().cloned().collect::<Vec<F>>());
+        let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
+
+        // Step 2 (numerators): for each x in xs, divide poly eval from step 1 by (-x)
+        let numerators = self
+            .domain
+            .elements()
+            .collect::<Vec<F>>()
+            .into_par_iter()
+            .filter_map(|x| xs.contains(&x).then_some(vanishing_poly_eval / -x))
+            .collect::<Vec<F>>();
+
+        // Step 3a (denominators): Compute derivative of poly from step 1
+        let derivative = vanishing_poly.differentiate();
+
+        // Step 3b (denominators): FFT of poly in 3a, keep evals that correspond to the points in
+        // question
+        let denominators_indexed_by_x = derivative
+            .evaluate_over_domain(self.domain)
+            .evals
+            .into_par_iter()
+            .zip(self.domain.elements().collect::<Vec<F>>())
+            .filter_map(|(y, x)| xs.contains(&x).then_some((x, y)))
+            .collect::<Vec<(F, F)>>();
+
+        // step 4: combine
+        numerators
+            .into_par_iter()
+            .zip(denominators_indexed_by_x)
+            .map(|(numerator, (x, denominator))| (x, numerator / denominator))
+            .collect()
     }
-
-    // // using roots of unity instead
-    // pub fn all_lagrange_naive(&self, xs: &HashSet<F>) -> HashMap<F, F> {
-    //     let coeffs_vec = naive_all_lagrange_coefficients(xs);
-    //     coeffs_vec.into_iter().collect()
-    // }
-
-    //     // step 1: compute poly w/ roots at all x in xs, compute eval at 0
-    //     let vanishing_poly = vanishing_poly(&xs.into_iter().cloned().collect::<Vec<E::ScalarField>>());
-    //     let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
-
-    //     // step 2  (numerators): for each x in xs, divide poly eval from step 1 by (-x)
-    //     let numerators =
-    //         self.domain
-    //         .elements()
-    //         .collect::<Vec<F>>()
-    //         .into_par_iter()
-    //         .filter_map(|x| xs.contains(&x).then_some(vanishing_poly_eval / -x))
-    //         .collect::<Vec<F>>();
-
-    //     // step 3a (denominators): Compute derivative of poly from step 1
-    //     let derivative = vanishing_poly.differentiate();
-
-    //     // step 3b (denominators): FFT of poly in 3a, keep evals that correspond to the points in
-    //     // question
-    //     let denominators_indexed_by_x  =
-    //         derivative.evaluate_over_domain(self.domain)
-    //         .evals
-    //         .into_par_iter()
-    //         .zip(self.domain.elements().collect::<Vec<F>>())
-    //         .filter_map(|(y, x)| xs.contains(&x).then_some((x,y)))
-    //         .collect::<Vec<(F, F)>>();
-
-    //     // step 4: combine
-    //     numerators
-    //         .into_par_iter()
-    //         .zip(denominators_indexed_by_x)
-    //         .map(|(numerator, (x, denominator))| (x, numerator / denominator) )
-    //         .collect()
-    // }
 
     /// This method creates `n` shares of the secret `val_to_share` using
     /// a `(t, n)` Shamir Secret Sharing scheme:
@@ -233,7 +201,7 @@ impl<'de, F: PrimeField, G: CurveGroup<ScalarField = F>> ThresholdConfig<F, G> {
             let mut sum = F::zero();
 
             let xs = HashSet::from_iter(shares.iter().map(|s| s.x));
-            let lagrange_coeffs = self.all_lagrange_naive(&xs);
+            let lagrange_coeffs = self.all_lagrange(&xs);
 
             for ShamirShare { x, y } in shares {
                 sum += lagrange_coeffs[x] * y;
@@ -257,8 +225,8 @@ mod shamir_tests {
         let mut rng = thread_rng();
 
         // Configuration: 3-out-of-5 Shamir scheme
-        let n = 8;
-        let t = 4;
+        let n = 5;
+        let t = 3;
         let config = ThresholdConfig::<Fr, G1Projective>::new(n, t);
 
         // Pick a random secret in the field
@@ -278,11 +246,11 @@ mod shamir_tests {
         println!("Reconstructed from first {} shares: {:?}", t, recovered);
         assert_eq!(secret, recovered);
 
-        // // Try another random subset
-        // let subset2 = vec![shares[1], shares[3], shares[4]];
-        // let recovered2 = config.reconstruct(&subset2).expect("reconstruction failed");
-        // println!("Reconstructed from shares [1,3,4]: {:?}", recovered2);
-        // assert_eq!(secret, recovered2);
+        // Try another random subset
+        let subset2 = vec![shares[1], shares[3], shares[4]];
+        let recovered2 = config.reconstruct(&subset2).expect("reconstruction failed");
+        println!("Reconstructed from shares [1,3,4]: {:?}", recovered2);
+        assert_eq!(secret, recovered2);
     }
 
     #[test]
@@ -293,7 +261,7 @@ mod shamir_tests {
         let xs: HashSet<_> = domain.elements().take(3).collect();
 
         let config = ThresholdConfig::<Fr, G1Projective>::new(4, 3);
-        let coeffs_map = config.all_lagrange_naive(&xs);
+        let coeffs_map = config.all_lagrange(&xs);
 
         println!("Naive Lagrange coefficients:");
         for (x, coeff) in &coeffs_map {
