@@ -749,6 +749,32 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         );
     };
 
+    <b>if</b> (trigger_condition.is_some()) {
+        // Do not emit an open <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for orders <b>with</b> trigger conditions <b>as</b> they are not live in the order book yet
+        market.get_order_book_mut().place_maker_order(
+            new_single_order_request(
+                user_addr,
+                order_id,
+                client_order_id,
+                limit_price,
+                orig_size,
+                remaining_size,
+                is_bid,
+                trigger_condition,
+                time_in_force,
+                metadata
+            )
+        );
+        <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+            order_id,
+            remaining_size,
+            cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+            callback_results,
+            fill_sizes,
+            match_count
+        }
+    };
+
     <b>let</b> result = callbacks.place_maker_order(
         new_clearinghouse_order_info(
             user_addr,
@@ -1410,7 +1436,7 @@ is done before calling this function if needed.
             is_bid,
             <b>true</b>, // is_taker
             OrderCancellationReason::PositionUpdateViolation,
-            validation_result.get_validation_cancellation_reason().destroy_some(),
+            validation_result.get_validation_failure_reason().destroy_some(),
             metadata,
             time_in_force,
             <b>true</b>, // emit_order_open

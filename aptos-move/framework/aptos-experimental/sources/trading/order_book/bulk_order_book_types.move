@@ -117,6 +117,59 @@ module aptos_experimental::bulk_order_book_types {
         }
     }
 
+    enum BulkOrderRejection has store, copy, drop {
+        ValidationFailed,
+        BidLengthMismatch,
+        AskLengthMismatch,
+        SequenceNumberOutOfOrder,
+        EmptyOrder,
+        BidSizeZero,
+        AskSizeZero,
+        BidOrderInvalid,
+        AskOrderInvalid,
+        PriceCrossing,
+    }
+
+    public fun get_validation_failed_rejection(): BulkOrderRejection {
+        BulkOrderRejection::ValidationFailed
+    }
+
+    public fun get_bid_length_mismatch_rejection(): BulkOrderRejection {
+        BulkOrderRejection::BidLengthMismatch
+    }
+
+    public fun get_ask_length_mismatch_rejection(): BulkOrderRejection {
+        BulkOrderRejection::AskLengthMismatch
+    }
+
+    public fun get_sequence_number_out_of_order_rejection(): BulkOrderRejection {
+        BulkOrderRejection::SequenceNumberOutOfOrder
+    }
+
+    public fun get_price_crossing_rejection(): BulkOrderRejection {
+        BulkOrderRejection::PriceCrossing
+    }
+
+    public fun get_empty_order_rejection(): BulkOrderRejection {
+        BulkOrderRejection::EmptyOrder
+    }
+
+    public fun get_bid_size_zero_rejection(): BulkOrderRejection {
+        BulkOrderRejection::BidSizeZero
+    }
+
+    public fun get_ask_size_zero_rejection(): BulkOrderRejection {
+        BulkOrderRejection::AskSizeZero
+    }
+
+    public fun get_bid_order_invalid_rejection(): BulkOrderRejection {
+        BulkOrderRejection::BidOrderInvalid
+    }
+
+    public fun get_ask_order_invalid_rejection(): BulkOrderRejection {
+        BulkOrderRejection::AskOrderInvalid
+    }
+
     /// Creates a new bulk order with the specified parameters.
     ///
     /// # Arguments:
@@ -201,11 +254,13 @@ module aptos_experimental::bulk_order_book_types {
         // Basic length validation
         if (bid_prices.length() != bid_sizes.length()) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::BidLengthMismatch,
                 std::string::utf8(b"Bid length mismatch")
             );
         };
         if (ask_prices.length() != ask_sizes.length()) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::AskLengthMismatch,
                 std::string::utf8(b"Ask length mismatch")
             );
         };
@@ -224,6 +279,7 @@ module aptos_experimental::bulk_order_book_types {
         // Check if at least one side has orders
         if (req.bid_sizes.length() == 0 && req.ask_sizes.length() == 0) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::EmptyOrder,
                 std::string::utf8(b"No orders")
             );
         };
@@ -231,11 +287,13 @@ module aptos_experimental::bulk_order_book_types {
         // Check for zero sizes
         if (!validate_not_zero_sizes(&req.bid_sizes)) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::BidSizeZero,
                 std::string::utf8(b"Zero bid size")
             );
         };
         if (!validate_not_zero_sizes(&req.ask_sizes)) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::AskSizeZero,
                 std::string::utf8(b"Zero ask size")
             );
         };
@@ -243,11 +301,13 @@ module aptos_experimental::bulk_order_book_types {
         // Check price ordering
         if (!validate_price_ordering(&req.bid_prices, true)) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::BidOrderInvalid,
                 std::string::utf8(b"Bid order invalid")
             );
         };
         if (!validate_price_ordering(&req.ask_prices, false)) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::AskOrderInvalid,
                 std::string::utf8(b"Ask order invalid")
             );
         };
@@ -255,6 +315,7 @@ module aptos_experimental::bulk_order_book_types {
         // Check for price crossing
         if (!validate_no_price_crossing(&req.bid_prices, &req.ask_prices)) {
             return new_bulk_order_request_response_rejection(
+                BulkOrderRejection::PriceCrossing,
                 std::string::utf8(b"Price crossing")
             );
         };
@@ -293,13 +354,15 @@ module aptos_experimental::bulk_order_book_types {
             previous_seq_num: option::Option<u64>,
         },
         Rejection {
-            reason: std::string::String,
+            reason: BulkOrderRejection,
+            details: std::string::String,
         }
     }
 
     struct BulkOrderRequestResponse<M: store + copy + drop> has copy, drop {
         request: option::Option<BulkOrderRequest<M>>,
-        rejection_reason: option::Option<std::string::String>,
+        rejection_reason: option::Option<BulkOrderRejection>,
+        rejection_details: option::Option<std::string::String>,
     }
 
     public(friend) fun new_bulk_order_place_response_success<M: store + copy + drop>(
@@ -321,10 +384,12 @@ module aptos_experimental::bulk_order_book_types {
     }
 
     public(friend) fun new_bulk_order_place_response_rejection<M: store + copy + drop>(
-        rejection_reason: std::string::String
+        reason: BulkOrderRejection,
+        details: std::string::String
     ): BulkOrderPlaceResponse<M> {
         BulkOrderPlaceResponse::Rejection {
-            reason: rejection_reason,
+            reason,
+            details,
         }
     }
 
@@ -363,9 +428,9 @@ module aptos_experimental::bulk_order_book_types {
 
     public(friend) fun destroy_bulk_order_place_reject_response<M: store + copy + drop>(
         response: BulkOrderPlaceResponse<M>
-    ): std::string::String {
-        let BulkOrderPlaceResponse::Rejection { reason } = response;
-        reason
+    ): (BulkOrderRejection, std::string::String) {
+        let BulkOrderPlaceResponse::Rejection { reason, details } = response;
+        (reason, details)
     }
 
     public(friend) fun new_bulk_order_request_response_success<M: store + copy + drop>(
@@ -374,23 +439,26 @@ module aptos_experimental::bulk_order_book_types {
         BulkOrderRequestResponse {
             request: option::some(request),
             rejection_reason: option::none(),
+            rejection_details: option::none(),
         }
     }
 
     public(friend) fun new_bulk_order_request_response_rejection<M: store + copy + drop>(
-        rejection_reason: std::string::String
+        rejection_reason: BulkOrderRejection,
+        rejection_details: std::string::String
     ): BulkOrderRequestResponse<M> {
         BulkOrderRequestResponse {
             request: option::none(),
             rejection_reason: option::some(rejection_reason),
+            rejection_details: option::some(rejection_details),
         }
     }
 
     public(friend) fun destroy_bulk_order_request_response<M: store + copy + drop>(
         response: BulkOrderRequestResponse<M>
-    ): (option::Option<BulkOrderRequest<M>>, option::Option<std::string::String>) {
-        let BulkOrderRequestResponse { request, rejection_reason } = response;
-        (request, rejection_reason)
+    ): (option::Option<BulkOrderRequest<M>>, option::Option<BulkOrderRejection>, option::Option<std::string::String>) {
+        let BulkOrderRequestResponse { request, rejection_reason, rejection_details } = response;
+        (request, rejection_reason, rejection_details)
     }
 
     /// Validates that all sizes in the vector are greater than 0.

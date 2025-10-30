@@ -11,6 +11,7 @@ module aptos_experimental::market_types {
     use aptos_std::table::Table;
     use aptos_framework::event;
     use aptos_framework::transaction_context;
+    use aptos_experimental::bulk_order_book_types::BulkOrderRejection;
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
     use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
@@ -93,7 +94,7 @@ module aptos_experimental::market_types {
     enum ValidationResult has drop, copy {
         V1 {
             // If valid this is none, else contains the reason for invalidity
-            cancellation_reason: Option<String>,
+            failure_reason: Option<String>,
         }
     }
 
@@ -111,7 +112,7 @@ module aptos_experimental::market_types {
             /// validate_settlement_update_f arguments: order_info, size
             validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
-            validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
+            validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| ValidationResult has drop + copy,
             /// place_maker_order_f arguments: order_info, size
             place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
             /// cleanup_order_f arguments: order_info, cleanup_size, is_taker
@@ -143,7 +144,7 @@ module aptos_experimental::market_types {
         cancellation_reason: Option<String>,
     ): ValidationResult {
         ValidationResult::V1 {
-            cancellation_reason,
+            failure_reason: cancellation_reason,
         }
     }
 
@@ -160,7 +161,7 @@ module aptos_experimental::market_types {
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
         settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
         validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
-        validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
+        validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| ValidationResult has drop + copy,
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
         cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, bool| has drop + copy,
         cleanup_bulk_order_at_price_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
@@ -196,11 +197,11 @@ module aptos_experimental::market_types {
     }
 
     public fun is_validation_result_valid(self: &ValidationResult): bool {
-        self.cancellation_reason.is_none()
+        self.failure_reason.is_none()
     }
 
-    public fun get_validation_cancellation_reason(self: &ValidationResult): Option<String> {
-        self.cancellation_reason
+    public fun get_validation_failure_reason(self: &ValidationResult): Option<String> {
+        self.failure_reason
     }
 
     public fun get_place_maker_order_actions<R: store + copy + drop>(self: &PlaceMakerOrderResult<R>): Option<R> {
@@ -266,7 +267,7 @@ module aptos_experimental::market_types {
         asks_prices: vector<u64>,
         asks_sizes: vector<u64>,
         order_metadata: M
-    ): bool {
+    ): ValidationResult {
         (self.validate_bulk_order_placement_f)(account, bids_prices, bids_sizes, asks_prices, asks_sizes, order_metadata)
     }
 
@@ -431,6 +432,7 @@ module aptos_experimental::market_types {
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        reason: BulkOrderRejection,
         details: std::string::String,
     }
 
@@ -757,6 +759,7 @@ module aptos_experimental::market_types {
         bid_prices: vector<u64>,
         ask_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        reason: BulkOrderRejection,
         details: std::string::String,
     ) {
         // Final check whether event sending is enabled
@@ -771,6 +774,7 @@ module aptos_experimental::market_types {
                     bid_prices,
                     ask_sizes,
                     ask_prices,
+                    reason,
                     details,
                 }
             );

@@ -5,7 +5,14 @@ module aptos_experimental::bulk_order_book_tests {
     use std::vector;
     use aptos_experimental::bulk_order_book_types::{
         BulkOrderRequest, new_bulk_order_request, destroy_bulk_order_request_response,
-        is_bulk_order_success_response, destroy_bulk_order_place_success_response, destroy_bulk_order_place_reject_response, is_success
+        is_bulk_order_success_response, destroy_bulk_order_place_success_response, destroy_bulk_order_place_reject_response, is_success,
+        get_bid_size_zero_rejection,
+        get_bid_order_invalid_rejection,
+        get_ask_order_invalid_rejection,
+        get_ask_size_zero_rejection,
+        get_bid_length_mismatch_rejection,
+        get_ask_length_mismatch_rejection,
+        get_price_crossing_rejection
     };
     use aptos_experimental::price_time_index;
 
@@ -73,7 +80,7 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, _rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, _rejection_reason_option, _) = destroy_bulk_order_request_response(response);
         if (request_option.is_some()) {
             request_option.destroy_some()
         } else {
@@ -99,7 +106,7 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, _rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, _rejection_reason_option, _) = destroy_bulk_order_request_response(response);
         if (request_option.is_some()) {
             request_option.destroy_some()
         } else {
@@ -926,10 +933,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason_option, rejection_details) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details.is_some());
+        let rejection_reason = rejection_details.destroy_some();
+        assert!(rejection_reason_option.destroy_some() == get_bid_order_invalid_rejection());
         // Should be "Bid order invalid" for non-descending prices
         assert!(std::string::utf8(b"Bid order invalid") == rejection_reason);
     }
@@ -952,10 +960,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason_option, rejection_details) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details.is_some());
+        let rejection_reason = rejection_details.destroy_some();
+        assert!(rejection_reason_option.destroy_some() == get_ask_order_invalid_rejection());
         // Should be "Ask order invalid" for non-ascending prices
         assert!(std::string::utf8(b"Ask order invalid") == rejection_reason);
     }
@@ -977,10 +986,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason_option, rejection_details) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details.is_some());
+        let rejection_reason = rejection_details.destroy_some();
+        assert!(rejection_reason_option.destroy_some() == get_bid_size_zero_rejection());
         // Should be "Zero bid size" for zero bid size
         assert!(std::string::utf8(b"Zero bid size") == rejection_reason);
     }
@@ -1002,10 +1012,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason_option, rejection_details) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details.is_some());
+        let rejection_reason = rejection_details.destroy_some();
+        assert!(rejection_reason_option.destroy_some() == get_ask_size_zero_rejection());
         // Should be "Zero ask size" for zero ask size
         assert!(std::string::utf8(b"Zero ask size") == rejection_reason);
     }
@@ -1029,10 +1040,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason_option, rejection_details) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let _rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details.is_some());
+
+        assert!(rejection_reason_option.destroy_some() == get_bid_size_zero_rejection());
 
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
@@ -1056,10 +1068,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason_option, rejection_details) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let _rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details.is_some());
+
+        assert!(rejection_reason_option.destroy_some() == get_bid_length_mismatch_rejection());
 
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
@@ -1084,11 +1097,10 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason_option, _rejection_details) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
         assert!(rejection_reason_option.is_some());
-        let _rejection_reason = rejection_reason_option.destroy_some();
-
+        assert!(rejection_reason_option.destroy_some() == get_ask_length_mismatch_rejection());
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();
     }
@@ -1136,10 +1148,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason, rejection_details_option) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details_option.is_some());
+        assert!(rejection_reason.destroy_some() == get_bid_order_invalid_rejection());
+        let rejection_reason = rejection_details_option.destroy_some();
         // Should be "Bid order invalid" for duplicate prices
         assert!(std::string::utf8(b"Bid order invalid") == rejection_reason);
     }
@@ -1161,10 +1174,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason, rejection_details_option) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details_option.is_some());
+        assert!(rejection_reason.destroy_some() == get_ask_order_invalid_rejection());
+        let rejection_reason = rejection_details_option.destroy_some();
         // Should be "Ask order invalid" for duplicate prices
         assert!(std::string::utf8(b"Ask order invalid") == rejection_reason);
     }
@@ -1189,10 +1203,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason, rejection_details_option) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details_option.is_some());
+        assert!(rejection_reason.destroy_some() == get_price_crossing_rejection());
+        let rejection_reason = rejection_details_option.destroy_some();
         // Should be "Price crossing" for crossing prices
         assert!(std::string::utf8(b"Price crossing") == rejection_reason);
     }
@@ -1215,10 +1230,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason, rejection_details_option) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details_option.is_some());
+        assert!(rejection_reason.destroy_some() == get_price_crossing_rejection());
+        let rejection_reason = rejection_details_option.destroy_some();
         // Should be "Price crossing" for equal prices
         assert!(std::string::utf8(b"Price crossing") == rejection_reason);
     }
@@ -1243,10 +1259,11 @@ module aptos_experimental::bulk_order_book_tests {
             ask_sizes,
             new_test_metadata(1)
         );
-        let (request_option, rejection_reason_option) = destroy_bulk_order_request_response(response);
+        let (request_option, rejection_reason, rejection_details_option) = destroy_bulk_order_request_response(response);
         assert!(request_option.is_none());
-        assert!(rejection_reason_option.is_some());
-        let rejection_reason = rejection_reason_option.destroy_some();
+        assert!(rejection_details_option.is_some());
+        assert!(rejection_reason.destroy_some() == get_price_crossing_rejection());
+        let rejection_reason = rejection_details_option.destroy_some();
         // Should be "Price crossing" for crossing prices
         assert!(std::string::utf8(b"Price crossing") == rejection_reason);
     }
@@ -1641,7 +1658,7 @@ module aptos_experimental::bulk_order_book_tests {
         );
         let response3 = order_book.place_bulk_order(&mut price_time_index, order_req3);
         assert!(!is_bulk_order_success_response(&response3));
-        let _rejection_reason = destroy_bulk_order_place_reject_response(response3);
+        let (_rejection_type, _rejection_reason) = destroy_bulk_order_place_reject_response(response3);
 
         let bulk_order3 = order_book.get_bulk_order(TEST_ACCOUNT_1);
         // Sequence number should remain 15

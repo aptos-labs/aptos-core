@@ -54,7 +54,8 @@ module aptos_experimental::bulk_order_book {
         BulkOrder, BulkOrderPlaceResponse, BulkOrderRequest,
         new_bulk_order_match, new_bulk_order, new_bulk_order_place_response_success,
         new_bulk_order_place_response_rejection, get_account_from_order_request,
-        get_sequence_number_from_order_request, get_sequence_number_from_bulk_order
+        get_sequence_number_from_order_request, get_sequence_number_from_bulk_order,
+        get_sequence_number_out_of_order_rejection
     };
     use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_type};
     use aptos_experimental::order_book_types::{
@@ -355,6 +356,7 @@ module aptos_experimental::bulk_order_book {
                 // Return rejection response for invalid sequence number
                 self.orders.add(account, old_order); // Re-add the old order back since we are rejecting the new one
                 return new_bulk_order_place_response_rejection(
+                    get_sequence_number_out_of_order_rejection(),
                     std::string::utf8(b"Invalid sequence number")
                 );
             };
