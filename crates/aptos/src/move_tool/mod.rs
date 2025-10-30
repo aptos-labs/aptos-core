@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account::derive_resource_account::ResourceAccountSeed,
     common::{
         local_simulation,
         transactions::TxnOptions,
+        resource_account_seed::ResourceAccountSeed,
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
