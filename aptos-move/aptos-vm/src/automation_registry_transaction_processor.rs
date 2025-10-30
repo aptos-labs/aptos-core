@@ -45,10 +45,7 @@ impl<'m> AutomationRegistryTransactionProcessor<'m> {
         action_record: &AutomationRegistryRecord,
         log_context: &AdapterLogSchema,
     ) -> Result<(VMStatus, VMOutput), VMStatus> {
-        if !self
-            .features()
-            .is_enabled(FeatureFlag::SUPRA_AUTOMATION_V2)
-        {
+        if !self.features().is_enabled(FeatureFlag::SUPRA_AUTOMATION_V2) {
             return Ok((
                 VMStatus::Error {
                     status_code: StatusCode::FEATURE_UNDER_GATING,
@@ -93,13 +90,11 @@ impl<'m> AutomationRegistryTransactionProcessor<'m> {
             .map(|_return_vals| ());
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
-        let fee_statement = AptosVM::fee_statement_from_gas_meter_for_gas(max_gas_amount.into(), &gas_meter, 0);
-
         match result {
             Ok(_) => {
                 let output = get_system_transaction_output(
                     session,
-                    fee_statement,
+                    FeeStatement::zero(),
                     ExecutionStatus::Success,
                     &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?
                         .change_set_configs,
@@ -110,7 +105,7 @@ impl<'m> AutomationRegistryTransactionProcessor<'m> {
                 session,
                 &get_or_vm_startup_failure(&self.storage_gas_params, log_context)?
                     .change_set_configs,
-                fee_statement,
+                FeeStatement::zero(),
                 vm_err,
             ),
         }
