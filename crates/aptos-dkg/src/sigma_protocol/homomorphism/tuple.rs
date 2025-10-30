@@ -37,6 +37,8 @@ where
     pub hom2: H2,
 }
 
+// For serde the following impl would take one line: https://serde.rs/container-attrs.html#bound
+// Alternatively, could just add CanonicalSerialize to `homomorphism::Trait`
 impl<H1, H2> CanonicalSerialize for TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait + CanonicalSerialize,
