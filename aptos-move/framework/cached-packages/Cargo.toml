@@ -25,6 +25,7 @@ proptest-derive = { workspace = true, optional = true }
 [build-dependencies]
 anyhow = { workspace = true }
 aptos-framework = { workspace = true }
+build-rs = "0.3.2"
 
 [features]
 default = []
