@@ -282,7 +282,7 @@ module aptos_experimental::order_book_types {
         (order_id, account, unique_priority_idx, price, remaining_size, is_bid, sequence_number, metadata)
     }
 
-    public(friend) fun get_matched_size<M: store + copy + drop>(
+    public fun get_matched_size<M: store + copy + drop>(
         self: &OrderMatch<M>,
     ): u64 {
         self.matched_size
