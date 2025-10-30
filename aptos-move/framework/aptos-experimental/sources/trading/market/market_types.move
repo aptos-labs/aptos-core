@@ -1,4 +1,8 @@
 module aptos_experimental::market_types {
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::order_operations;
+
     use std::option;
     use std::option::Option;
     use std::signer;
@@ -6,25 +10,17 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_framework::transaction_context;
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
-
     use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
     use aptos_experimental::order_book_types::TimeInForce;
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book::{OrderBook, new_order_book};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker};
-    use aptos_experimental::order_book_types::AscendingIdGenerator;
 
-    use aptos_experimental::order_book_types::{
-        new_ascending_id_generator,
-    };
     #[test_only]
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
-
-    friend aptos_experimental::order_placement;
-    friend aptos_experimental::market_bulk_order;
-    friend aptos_experimental::order_operations;
 
     const EINVALID_ADDRESS: u64 = 1;
     const EINVALID_SETTLE_RESULT: u64 = 2;
@@ -322,7 +318,6 @@ module aptos_experimental::market_types {
             parent: address,
             /// Address of the market object of this market.
             market: address,
-            order_id_generator: AscendingIdGenerator,
             // Incremental fill id for matched orders
             next_fill_id: u64,
             config: MarketConfig,
@@ -464,7 +459,6 @@ module aptos_experimental::market_types {
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
-            order_id_generator: new_ascending_id_generator(),
             next_fill_id: 0,
             config,
             order_book: new_order_book(),
@@ -473,7 +467,7 @@ module aptos_experimental::market_types {
     }
 
     public fun next_order_id<M: store + copy + drop>(self: &mut Market<M>): OrderIdType {
-        new_order_id_type(self.order_id_generator.next_ascending_id())
+        new_order_id_type(transaction_context::monotonically_increasing_counter())
     }
 
     public fun next_fill_id<M: store + copy + drop>(self: &mut Market<M>): u64 {
@@ -801,7 +795,6 @@ module aptos_experimental::market_types {
         let Market::V1 {
             parent: _parent,
             market: _market,
-            order_id_generator: _order_id_generator,
             next_fill_id: _next_fill_id,
             config,
             order_book,
