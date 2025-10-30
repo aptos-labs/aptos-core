@@ -5,10 +5,7 @@ use crate::chain_id::ChainId;
 use crate::move_utils::MemberId;
 use crate::on_chain_config::{FeatureFlag, Features};
 use crate::transaction::automated_transaction::{AutomatedTransactionBuilder, BuilderResult};
-use crate::transaction::automation::{
-    AutomationRegistryAction, AutomationRegistryRecordBuilder, AutomationTaskMetaData,
-    AutomationTaskType, RegistrationParams,
-};
+use crate::transaction::automation::{AutomationRegistryAction, AutomationRegistryRecordBuilder, AutomationTaskMetaData, AutomationTaskState, AutomationTaskType, RegistrationParams};
 use crate::transaction::{EntryFunction, TransactionPayload};
 use aptos_crypto::HashValue;
 use move_core_types::account_address::AccountAddress;
@@ -294,7 +291,7 @@ fn automation_task_metadata_type_priority_expansion() {
         automation_fee_cap_for_epoch: 500,
         aux_data: vec![],
         registration_time: 1,
-        is_active: false,
+        state: AutomationTaskState::Pending,
         locked_fee_for_next_epoch: 0,
         task_type: Default::default(),
         priority: Default::default(),
@@ -389,7 +386,7 @@ fn automated_txn_builder_from_task_meta() {
         automation_fee_cap_for_epoch: 300,
         aux_data: vec![],
         registration_time: 1,
-        is_active: false,
+        state: AutomationTaskState::Pending,
         locked_fee_for_next_epoch: 0,
         task_type: Default::default(),
         priority: Default::default(),
@@ -508,7 +505,7 @@ fn automated_txn_build() {
         automation_fee_cap_for_epoch: 500,
         aux_data: vec![],
         registration_time: 1,
-        is_active: false,
+        state: AutomationTaskState::Pending,
         locked_fee_for_next_epoch: 0,
         task_type: Default::default(),
         priority: Default::default(),
@@ -595,7 +592,7 @@ fn automated_transaction_ordering() {
         automation_fee_cap_for_epoch: 500,
         aux_data: vec![],
         registration_time: 1,
-        is_active: false,
+        state: AutomationTaskState::Pending,
         locked_fee_for_next_epoch: 0,
         task_type: Default::default(),
         priority: Default::default(),

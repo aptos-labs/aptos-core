@@ -519,6 +519,29 @@ impl TryFrom<&[u8]> for AutomationTaskType {
 }
 
 
+/// Describes the state of the automation task
+// The order of the entries is important, a new one should be appended at the end.
+#[derive(Clone, Copy, Debug, Hash, Serialize, Deserialize, PartialEq, Eq)]
+#[repr(u8)]
+pub enum AutomationTaskState {
+    Pending = 0,
+    Active,
+    Cancelled,
+}
+
+impl AutomationTaskState {
+    /// Checks whether the task is active of execution.
+    /// The asks in cancelled state are considered active as well till the end of the automation cycle.
+    pub fn is_active(&self) -> bool {
+        match self {
+            AutomationTaskState::Pending => false,
+            AutomationTaskState::Active |
+            AutomationTaskState::Cancelled => true
+        }
+    }
+}
+
+
 /// Rust representation of the Automation task meta information in Move.
 #[derive(Clone, Debug, Serialize, Deserialize, Getters, Constructor)]
 pub struct AutomationTaskMetaData {
@@ -543,8 +566,8 @@ pub struct AutomationTaskMetaData {
     pub(crate) aux_data: Vec<Vec<u8>>,
     /// Registration epoch timestamp
     pub(crate) registration_time: u64,
-    /// Flag indicating whether the task is active.
-    pub(crate) is_active: bool,
+    /// State of the task
+    pub(crate) state: AutomationTaskState,
     /// Fee locked for the task estimated for the next epoch at the start of the current epoch.
     pub(crate) locked_fee_for_next_epoch: u64,
     #[serde(skip)]
@@ -570,7 +593,7 @@ impl AutomationTaskMetaData {
         automation_fee_cap_for_epoch: u64,
         aux_data: Vec<Vec<u8>>,
         registration_time: u64,
-        is_active: bool,
+        state: AutomationTaskState,
     ) -> Self {
         Self {
             id,
@@ -583,7 +606,7 @@ impl AutomationTaskMetaData {
             automation_fee_cap_for_epoch,
             aux_data,
             registration_time,
-            is_active,
+            state,
             locked_fee_for_next_epoch: 0,
             task_type: Default::default(),
             priority: Default::default(),
@@ -602,7 +625,7 @@ impl AutomationTaskMetaData {
         automation_fee_cap_for_epoch: u64,
         aux_data: Vec<Vec<u8>>,
         registration_time: u64,
-        is_active: bool,
+        state: AutomationTaskState,
         locked_fee_for_next_epoch: u64,
     ) -> Self {
         Self {
@@ -616,7 +639,7 @@ impl AutomationTaskMetaData {
             automation_fee_cap_for_epoch,
             aux_data,
             registration_time,
-            is_active,
+            state,
             locked_fee_for_next_epoch,
             task_type: Default::default(),
             priority: Default::default(),
@@ -656,6 +679,9 @@ impl AutomationTaskMetaData {
         })
     }
 
+    /// Consumes the input and returns properties flattened.
+    /// No property is modified.
+    /// To get exact values of the task type and priority corresponding special getter functions should be used.
     pub fn flatten(self) ->
         (u64,
          AccountAddress,
@@ -667,7 +693,7 @@ impl AutomationTaskMetaData {
          u64,
          Vec<Vec<u8>>,
          u64,
-         bool,
+         AutomationTaskState,
          u64,
          ) {
             (
@@ -681,7 +707,7 @@ impl AutomationTaskMetaData {
                 self.automation_fee_cap_for_epoch,
                 self.aux_data,
                 self.registration_time,
-                self.is_active,
+                self.state,
                 self.locked_fee_for_next_epoch,
                 )
         }
