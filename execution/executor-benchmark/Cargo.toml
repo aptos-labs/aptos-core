@@ -15,12 +15,15 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-aggregator = { workspace = true }
+aptos-api = { workspace = true }
 aptos-block-executor = { workspace = true }
 aptos-block-partitioner = { workspace = true }
 aptos-config = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-db = { workspace = true }
+aptos-db-indexer = { workspace = true }
 aptos-executor = { workspace = true }
+aptos-indexer-grpc-table-info = { workspace = true }
 aptos-executor-service = { workspace = true }
 aptos-executor-types = { workspace = true }
 aptos-experimental-ptx-executor = { workspace = true }
@@ -29,6 +32,7 @@ aptos-genesis = { workspace = true, features = ["testing"] }
 aptos-infallible = { workspace = true }
 aptos-jellyfish-merkle = { workspace = true }
 aptos-logger = { workspace = true }
+aptos-mempool = { workspace = true }
 aptos-metrics-core = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-node-resource-metrics = { workspace = true }
@@ -49,6 +53,7 @@ chrono = { workspace = true }
 clap = { workspace = true }
 dashmap = { workspace = true }
 derivative = { workspace = true }
+futures = { workspace = true }
 indicatif = { workspace = true }
 itertools = { workspace = true }
 move-core-types = { workspace = true }
