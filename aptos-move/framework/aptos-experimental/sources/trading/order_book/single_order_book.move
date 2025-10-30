@@ -2,13 +2,13 @@
 /// components
 /// 1. ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
 /// book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
-/// The orders are matched based on time-price priority.
+/// The orders are matched based on price-time priority.
 /// 2. PendingOrderBookIndex: This keeps track of pending orders. The pending orders are those that are not active yet. Three
 /// types of pending orders are supported.
-///  - Price move up - Trigggered when the price moves above a certain price level
+///  - Price move up - Triggered when the price moves above a certain price level
 /// - Price move down - Triggered when the price moves below a certain price level
 /// - Time based - Triggered when a certain time has passed
-/// 3. Orders: This is a BigOrderMap of order id to order details.
+/// 3. Orders: This is a BigOrderedMap of order id to order details.
 ///
 module aptos_experimental::single_order_book {
     friend aptos_experimental::order_book;
@@ -246,7 +246,7 @@ module aptos_experimental::single_order_book {
     }
 
     /// Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
-    /// else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
+    /// else it is added to the active order book. The API aborts if it's not a maker order or if the order already exists
     public(friend) fun place_maker_or_pending_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, ascending_id_generator: &mut AscendingIdGenerator, order_req: SingleOrderRequest<M>
     ) {
@@ -303,7 +303,7 @@ module aptos_experimental::single_order_book {
 
     /// Reinserts a maker order to the order book. This is used when the order is removed from the order book
     /// but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
-    /// it is added to the order book, if it exists, it's size is updated.
+    /// it is added to the order book, if it exists, its size is updated.
     public(friend) fun reinsert_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>,
         price_time_idx: &mut PriceTimeIndex,

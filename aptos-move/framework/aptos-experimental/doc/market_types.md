@@ -55,9 +55,7 @@
 -  [Function `next_order_id`](#0x7_market_types_next_order_id)
 -  [Function `next_fill_id`](#0x7_market_types_next_fill_id)
 -  [Function `get_order_book`](#0x7_market_types_get_order_book)
--  [Function `get_order_book_mut`](#0x7_market_types_get_order_book_mut)
 -  [Function `get_market_address`](#0x7_market_types_get_market_address)
--  [Function `get_pre_cancellation_tracker_mut`](#0x7_market_types_get_pre_cancellation_tracker_mut)
 -  [Function `best_bid_price`](#0x7_market_types_best_bid_price)
 -  [Function `best_ask_price`](#0x7_market_types_best_ask_price)
 -  [Function `is_taker_order`](#0x7_market_types_is_taker_order)
@@ -76,6 +74,8 @@
 -  [Function `emit_event_for_bulk_order_filled`](#0x7_market_types_emit_event_for_bulk_order_filled)
 -  [Function `emit_event_for_bulk_order_modified`](#0x7_market_types_emit_event_for_bulk_order_modified)
 -  [Function `emit_event_for_bulk_order_rejected`](#0x7_market_types_emit_event_for_bulk_order_rejected)
+-  [Function `get_order_book_mut`](#0x7_market_types_get_order_book_mut)
+-  [Function `get_pre_cancellation_tracker_mut`](#0x7_market_types_get_pre_cancellation_tracker_mut)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/event.md#0x1_event">0x1::event</a>;
@@ -2143,32 +2143,6 @@
 
 </details>
 
-<a id="0x7_market_types_get_order_book_mut"></a>
-
-## Function `get_order_book_mut`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_book_mut">get_order_book_mut</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;): &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_book_mut">get_order_book_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
-): &<b>mut</b> OrderBook&lt;M&gt; {
-    &<b>mut</b> self.<a href="order_book.md#0x7_order_book">order_book</a>
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x7_market_types_get_market_address"></a>
 
 ## Function `get_market_address`
@@ -2186,32 +2160,6 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_market_address">get_market_address</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): <b>address</b> {
     self.market
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_market_types_get_pre_cancellation_tracker_mut"></a>
-
-## Function `get_pre_cancellation_tracker_mut`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_pre_cancellation_tracker_mut">get_pre_cancellation_tracker_mut</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;): &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">pre_cancellation_tracker::PreCancellationTracker</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_get_pre_cancellation_tracker_mut">get_pre_cancellation_tracker_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
-): &<b>mut</b> PreCancellationTracker {
-    self.<a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker">pre_cancellation_tracker</a>.borrow_mut(<a href="market_types.md#0x7_market_types_PRE_CANCELLATION_TRACKER_KEY">PRE_CANCELLATION_TRACKER_KEY</a>)
 }
 </code></pre>
 
@@ -2865,6 +2813,56 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
             }
         );
     };
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_get_order_book_mut"></a>
+
+## Function `get_order_book_mut`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_book_mut">get_order_book_mut</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;): &<b>mut</b> <a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_order_book_mut">get_order_book_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;): &<b>mut</b> OrderBook&lt;M&gt; {
+    &<b>mut</b> self.<a href="order_book.md#0x7_order_book">order_book</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_market_types_get_pre_cancellation_tracker_mut"></a>
+
+## Function `get_pre_cancellation_tracker_mut`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_pre_cancellation_tracker_mut">get_pre_cancellation_tracker_mut</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;): &<b>mut</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker_PreCancellationTracker">pre_cancellation_tracker::PreCancellationTracker</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_types.md#0x7_market_types_get_pre_cancellation_tracker_mut">get_pre_cancellation_tracker_mut</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;
+): &<b>mut</b> PreCancellationTracker {
+    self.<a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker">pre_cancellation_tracker</a>.borrow_mut(<a href="market_types.md#0x7_market_types_PRE_CANCELLATION_TRACKER_KEY">PRE_CANCELLATION_TRACKER_KEY</a>)
 }
 </code></pre>
 

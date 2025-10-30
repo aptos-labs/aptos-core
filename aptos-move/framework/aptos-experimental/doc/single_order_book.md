@@ -7,13 +7,13 @@ This module provides a core order book functionality for a trading system. On a 
 components
 1. ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
 book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
-The orders are matched based on time-price priority.
+The orders are matched based on price-time priority.
 2. PendingOrderBookIndex: This keeps track of pending orders. The pending orders are those that are not active yet. Three
 types of pending orders are supported.
-- Price move up - Trigggered when the price moves above a certain price level
+- Price move up - Triggered when the price moves above a certain price level
 - Price move down - Triggered when the price moves below a certain price level
 - Time based - Triggered when a certain time has passed
-3. Orders: This is a BigOrderMap of order id to order details.
+3. Orders: This is a BigOrderedMap of order id to order details.
 
 
 -  [Enum `SingleOrderRequest`](#0x7_single_order_book_SingleOrderRequest)
@@ -743,7 +743,7 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 ## Function `place_maker_or_pending_order`
 
 Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
-else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
+else it is added to the active order book. The API aborts if it's not a maker order or if the order already exists
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_or_pending_order">place_maker_or_pending_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
@@ -839,7 +839,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
 
 Reinserts a maker order to the order book. This is used when the order is removed from the order book
 but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
-it is added to the order book, if it exists, it's size is updated.
+it is added to the order book, if it exists, its size is updated.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_reinsert_order">reinsert_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, reinsert_order: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, original_order: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;)

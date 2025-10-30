@@ -439,6 +439,7 @@ module aptos_experimental::market_types {
         details: std::string::String,
     }
 
+    // ============================= Public APIs ====================================
     public fun new_market_config(
         allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64
     ): MarketConfig {
@@ -471,7 +472,6 @@ module aptos_experimental::market_types {
         }
     }
 
-
     public fun next_order_id<M: store + copy + drop>(self: &mut Market<M>): OrderIdType {
         new_order_id_type(self.order_id_generator.next_ascending_id())
     }
@@ -486,20 +486,8 @@ module aptos_experimental::market_types {
         &self.order_book
     }
 
-    public fun get_order_book_mut<M: store + copy + drop>(
-        self: &mut Market<M>
-    ): &mut OrderBook<M> {
-        &mut self.order_book
-    }
-
     public fun get_market_address<M: store + copy + drop>(self: &Market<M>): address {
         self.market
-    }
-
-    public fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
-        self: &mut Market<M>
-    ): &mut PreCancellationTracker {
-        self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
     }
 
     public fun best_bid_price<M: store + copy + drop>(self: &Market<M>): Option<u64> {
@@ -794,6 +782,18 @@ module aptos_experimental::market_types {
             );
         };
     }
+
+    // ============================= Public Package APIs ====================================
+    public(friend) fun get_order_book_mut<M: store + copy + drop>(self: &mut Market<M>): &mut OrderBook<M> {
+        &mut self.order_book
+    }
+
+    public(friend) fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
+        self: &mut Market<M>
+    ): &mut PreCancellationTracker {
+        self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
+    }
+
 
     // ============================= test_only APIs ====================================
     #[test_only]
