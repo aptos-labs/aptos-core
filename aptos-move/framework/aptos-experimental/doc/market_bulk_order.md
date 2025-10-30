@@ -80,14 +80,15 @@ Returns:
     metadata: M,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;OrderIdType&gt; {
-    <b>if</b> (!callbacks.validate_bulk_order_placement(
+    <b>let</b> validation_result = callbacks.validate_bulk_order_placement(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         bid_prices,
         bid_sizes,
         ask_prices,
         ask_sizes,
         metadata,
-    )) {
+    );
+    <b>if</b> (!validation_result.is_validation_result_valid()) {
         // If the bulk order is not valid, emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> and <b>return</b> without placing the order.
         market.emit_event_for_bulk_order_rejected(
             sequence_number,
@@ -97,7 +98,7 @@ Returns:
             ask_sizes,
             ask_prices,
             get_validation_failed_rejection(),
-            std::string::utf8(b"validation failed"),
+            validation_result.get_validation_failure_reason().destroy_some(),
         );
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };

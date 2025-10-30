@@ -1436,7 +1436,7 @@ is done before calling this function if needed.
             is_bid,
             <b>true</b>, // is_taker
             OrderCancellationReason::PositionUpdateViolation,
-            validation_result.get_validation_cancellation_reason().destroy_some(),
+            validation_result.get_validation_failure_reason().destroy_some(),
             metadata,
             time_in_force,
             <b>true</b>, // emit_order_open
