@@ -604,6 +604,17 @@ pub enum EntryFunctionCall {
         amount: u64,
     },
 
+    /// Deposits from the treasury account. Treasury deposit are recorded.
+    /// @param treasury_account The address of the account that paid the treasury.
+    /// @param amount The amount of treasury to be deposited.
+    GovernedGasPoolDepositTreasury {
+        amount: u64,
+    },
+
+    /// Initializes the governed gas pool extension alone.
+    /// @param aptos_framework The signer of the aptos_framework module.
+    GovernedGasPoolInitializeGovernedGasPoolExtension {},
+
     /// This can be called to install or update a set of JWKs for a federated OIDC provider.  This function should
     /// be invoked to intially install a set of JWKs or to update a set of JWKs when a keypair is rotated.
     ///
@@ -1692,6 +1703,10 @@ impl EntryFunctionCall {
                 pool_address,
                 amount,
             } => delegation_pool_withdraw(pool_address, amount),
+            GovernedGasPoolDepositTreasury { amount } => governed_gas_pool_deposit_treasury(amount),
+            GovernedGasPoolInitializeGovernedGasPoolExtension {} => {
+                governed_gas_pool_initialize_governed_gas_pool_extension()
+            },
             JwksUpdateFederatedJwkSet {
                 iss,
                 kid_vec,
@@ -3720,6 +3735,41 @@ pub fn delegation_pool_withdraw(pool_address: AccountAddress, amount: u64) -> Tr
             bcs::to_bytes(&pool_address).unwrap(),
             bcs::to_bytes(&amount).unwrap(),
         ],
+    ))
+}
+
+/// Deposits from the treasury account. Treasury deposit are recorded.
+/// @param treasury_account The address of the account that paid the treasury.
+/// @param amount The amount of treasury to be deposited.
+pub fn governed_gas_pool_deposit_treasury(amount: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("governed_gas_pool").to_owned(),
+        ),
+        ident_str!("deposit_treasury").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&amount).unwrap()],
+    ))
+}
+
+/// Initializes the governed gas pool extension alone.
+/// @param aptos_framework The signer of the aptos_framework module.
+pub fn governed_gas_pool_initialize_governed_gas_pool_extension() -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("governed_gas_pool").to_owned(),
+        ),
+        ident_str!("initialize_governed_gas_pool_extension").to_owned(),
+        vec![],
+        vec![],
     ))
 }
 
@@ -6819,6 +6869,28 @@ mod decoder {
         }
     }
 
+    pub fn governed_gas_pool_deposit_treasury(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::GovernedGasPoolDepositTreasury {
+                amount: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn governed_gas_pool_initialize_governed_gas_pool_extension(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(_script) = payload {
+            Some(EntryFunctionCall::GovernedGasPoolInitializeGovernedGasPoolExtension {})
+        } else {
+            None
+        }
+    }
+
     pub fn jwks_update_federated_jwk_set(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
@@ -8365,6 +8437,14 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
         map.insert(
             "delegation_pool_withdraw".to_string(),
             Box::new(decoder::delegation_pool_withdraw),
+        );
+        map.insert(
+            "governed_gas_pool_deposit_treasury".to_string(),
+            Box::new(decoder::governed_gas_pool_deposit_treasury),
+        );
+        map.insert(
+            "governed_gas_pool_initialize_governed_gas_pool_extension".to_string(),
+            Box::new(decoder::governed_gas_pool_initialize_governed_gas_pool_extension),
         );
         map.insert(
             "jwks_update_federated_jwk_set".to_string(),

@@ -71,6 +71,7 @@ return true.
 -  [Function `signer_native_format_fix_enabled`](#0x1_features_signer_native_format_fix_enabled)
 -  [Function `get_module_event_feature`](#0x1_features_get_module_event_feature)
 -  [Function `module_event_enabled`](#0x1_features_module_event_enabled)
+-  [Function `storage_deletion_refund_enabled`](#0x1_features_storage_deletion_refund_enabled)
 -  [Function `get_aggregator_v2_api_feature`](#0x1_features_get_aggregator_v2_api_feature)
 -  [Function `aggregator_v2_api_enabled`](#0x1_features_aggregator_v2_api_enabled)
 -  [Function `get_aggregator_snapshots_feature`](#0x1_features_get_aggregator_snapshots_feature)
@@ -163,6 +164,8 @@ return true.
 -  [Function `is_calculate_transaction_fee_for_distribution_enabled`](#0x1_features_is_calculate_transaction_fee_for_distribution_enabled)
 -  [Function `get_distribute_transaction_fee_feature`](#0x1_features_get_distribute_transaction_fee_feature)
 -  [Function `is_distribute_transaction_fee_enabled`](#0x1_features_is_distribute_transaction_fee_enabled)
+-  [Function `get_stake_reward_using_treasury_feature`](#0x1_features_get_stake_reward_using_treasury_feature)
+-  [Function `stake_reward_using_treasury_enabled`](#0x1_features_stake_reward_using_treasury_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -321,7 +324,7 @@ Whether the Atomic bridge is available
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a>: u64 = 224;
+<pre><code><b>const</b> <a href="features.md#0x1_features_ATOMIC_BRIDGE">ATOMIC_BRIDGE</a>: u64 = 71;
 </code></pre>
 
 
@@ -834,7 +837,7 @@ Whether the Atomic bridge is available
 Lifetime: transient
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_NATIVE_BRIDGE">NATIVE_BRIDGE</a>: u64 = 225;
+<pre><code><b>const</b> <a href="features.md#0x1_features_NATIVE_BRIDGE">NATIVE_BRIDGE</a>: u64 = 72;
 </code></pre>
 
 
@@ -1059,6 +1062,30 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_SPONSORED_AUTOMATIC_ACCOUNT_CREATION">SPONSORED_AUTOMATIC_ACCOUNT_CREATION</a>: u64 = 34;
+</code></pre>
+
+
+
+<a id="0x1_features_STAKE_REWARD_USING_TREASURY"></a>
+
+Whether the staking rewards are mint (diseable) or withdraw from the gouverned gas pool treasury (enable).
+
+Lifetime: permanent
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_STAKE_REWARD_USING_TREASURY">STAKE_REWARD_USING_TREASURY</a>: u64 = 224;
+</code></pre>
+
+
+
+<a id="0x1_features_STORAGE_DELETION_REFUND"></a>
+
+Whether we refund storage costs to the user upon deletion
+
+Lifetime: transient
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_STORAGE_DELETION_REFUND">STORAGE_DELETION_REFUND</a>: u64 = 28;
 </code></pre>
 
 
@@ -2039,6 +2066,30 @@ We do not expect use from Move, so for now only for documentation purposes here
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_module_event_enabled">module_event_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MODULE_EVENT">MODULE_EVENT</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_storage_deletion_refund_enabled"></a>
+
+## Function `storage_deletion_refund_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_storage_deletion_refund_enabled">storage_deletion_refund_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_storage_deletion_refund_enabled">storage_deletion_refund_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_STORAGE_DELETION_REFUND">STORAGE_DELETION_REFUND</a>)
 }
 </code></pre>
 
@@ -4182,6 +4233,52 @@ Whether the Governed Gas Pool is enabled.
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_distribute_transaction_fee_enabled">is_distribute_transaction_fee_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_DISTRIBUTE_TRANSACTION_FEE">DISTRIBUTE_TRANSACTION_FEE</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_stake_reward_using_treasury_feature"></a>
+
+## Function `get_stake_reward_using_treasury_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_stake_reward_using_treasury_feature">get_stake_reward_using_treasury_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_stake_reward_using_treasury_feature">get_stake_reward_using_treasury_feature</a>(): u64 { <a href="features.md#0x1_features_STAKE_REWARD_USING_TREASURY">STAKE_REWARD_USING_TREASURY</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_stake_reward_using_treasury_enabled"></a>
+
+## Function `stake_reward_using_treasury_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_stake_reward_using_treasury_enabled">stake_reward_using_treasury_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_stake_reward_using_treasury_enabled">stake_reward_using_treasury_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_STAKE_REWARD_USING_TREASURY">STAKE_REWARD_USING_TREASURY</a>)
 }
 </code></pre>
 

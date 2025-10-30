@@ -16,9 +16,11 @@ script {
             74, // EnumTypes
             80, // NativeMemoryOperation
             223, // new GGP
+            224, // STAKE_REWARD_USING_TREASURY
         ];
 
         let disabled_blob: vector<u64> = vector[
+            28, // STORAGE_DELETION_REFUND
             48, // RemoveDetailedError
             16, // PeriodicalRewardRateReduction
             46, // KeylessAccouns
@@ -26,7 +28,6 @@ script {
             54, // KeylessAccountsWithPasskeys
             71, // AtomicBridge
             72, // NativeBridge
-            73, // Old GGP
         ];
 
         features::change_feature_flags_for_next_epoch(&core_signer, enabled_blob, disabled_blob);

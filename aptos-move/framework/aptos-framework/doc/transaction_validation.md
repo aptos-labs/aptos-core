@@ -1271,20 +1271,28 @@ Called by the Adapter
             );
         };
 
-        <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
-            <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
+        <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_storage_deletion_refund_enabled">features::storage_deletion_refund_enabled</a>()){
+            <b>if</b> (transaction_fee_amount &gt; storage_fee_refunded) {
+                <b>let</b> burn_amount = transaction_fee_amount - storage_fee_refunded;
+                <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_governed_gas_pool_enabled">features::governed_gas_pool_enabled</a>()){
+                    <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee_v2">governed_gas_pool::deposit_gas_fee_v2</a>(gas_payer, burn_amount);
+                } <b>else</b> {
+                    <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
+                }
+            } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
+                <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
+                // TODO: we cannot mint <b>to</b> do storage refund. We need <b>to</b> have a storage refund pool
+                <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_governed_gas_pool_enabled">features::governed_gas_pool_enabled</a>()){
+                    <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount);
+                }
+            };
+        } <b>else</b> {
             <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_governed_gas_pool_enabled">features::governed_gas_pool_enabled</a>()){
-                <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee_v2">governed_gas_pool::deposit_gas_fee_v2</a>(gas_payer, burn_amount);
+                <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_gas_fee_v2">governed_gas_pool::deposit_gas_fee_v2</a>(gas_payer, transaction_fee_amount);
             } <b>else</b> {
-                <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, burn_amount);
+                <a href="transaction_fee.md#0x1_transaction_fee_burn_fee">transaction_fee::burn_fee</a>(gas_payer, transaction_fee_amount);
             }
-        } <b>else</b> <b>if</b> (transaction_fee_amount &lt; storage_fee_refunded) {
-            <b>let</b> mint_amount = storage_fee_refunded - transaction_fee_amount;
-            // TODO: we cannot mint <b>to</b> do storage refund. We need <b>to</b> have a storage refund pool
-            <b>if</b> (!<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_governed_gas_pool_enabled">features::governed_gas_pool_enabled</a>()){
-                <a href="transaction_fee.md#0x1_transaction_fee_mint_and_refund">transaction_fee::mint_and_refund</a>(gas_payer, mint_amount);
-            }
-        };
+        }
     };
 
     // Increment sequence number

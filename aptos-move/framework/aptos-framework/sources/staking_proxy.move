@@ -116,6 +116,9 @@ module aptos_framework::staking_proxy {
         let operator_1_address = signer::address_of(operator_1);
         let operator_2_address = signer::address_of(operator_2);
         let new_operator_address = signer::address_of(new_operator);
+
+        aptos_framework::account::create_account_for_test(@aptos_framework);
+
         vesting::setup(
             aptos_framework, &vector[owner_address, operator_1_address, operator_2_address, new_operator_address]);
         staking_contract::setup_staking_contract(aptos_framework, owner, operator_1, INITIAL_BALANCE, 0);
@@ -161,6 +164,9 @@ module aptos_framework::staking_proxy {
         let operator_1_address = signer::address_of(operator_1);
         let operator_2_address = signer::address_of(operator_2);
         let new_operator_address = signer::address_of(new_operator);
+
+        aptos_framework::account::create_account_for_test(@aptos_framework);
+       
         vesting::setup(
             aptos_framework, &vector[owner_address, operator_1_address, operator_2_address, new_operator_address]);
         staking_contract::setup_staking_contract(aptos_framework, owner, operator_2, INITIAL_BALANCE, 0);

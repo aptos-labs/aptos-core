@@ -1694,6 +1694,15 @@ The function is disabled or hasn't been enabled.
 
 
 
+<a id="0x1_delegation_pool_MODULE_SALT"></a>
+
+
+
+<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_MODULE_SALT">MODULE_SALT</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [97, 112, 116, 111, 115, 95, 102, 114, 97, 109, 101, 119, 111, 114, 107, 58, 58, 100, 101, 108, 101, 103, 97, 116, 105, 111, 110, 95, 112, 111, 111, 108];
+</code></pre>
+
+
+
 <a id="0x1_delegation_pool_ENOT_OPERATOR"></a>
 
 The account is not the operator of the stake pool.
@@ -2008,15 +2017,6 @@ This constraint is not enforced on inactive pools as they only allow redeems
 
 
 <pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_MIN_COINS_ON_SHARES_POOL">MIN_COINS_ON_SHARES_POOL</a>: u64 = 1000000000;
-</code></pre>
-
-
-
-<a id="0x1_delegation_pool_MODULE_SALT"></a>
-
-
-
-<pre><code><b>const</b> <a href="delegation_pool.md#0x1_delegation_pool_MODULE_SALT">MODULE_SALT</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; = [97, 112, 116, 111, 115, 95, 102, 114, 97, 109, 101, 119, 111, 114, 107, 58, 58, 100, 101, 108, 101, 103, 97, 116, 105, 111, 110, 95, 112, 111, 111, 108];
 </code></pre>
 
 

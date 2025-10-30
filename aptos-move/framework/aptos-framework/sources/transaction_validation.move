@@ -619,20 +619,28 @@ module aptos_framework::transaction_validation {
                 );
             };
 
-            if (transaction_fee_amount > storage_fee_refunded) {
-                let burn_amount = transaction_fee_amount - storage_fee_refunded;
+            if (features::storage_deletion_refund_enabled()){
+                if (transaction_fee_amount > storage_fee_refunded) {
+                    let burn_amount = transaction_fee_amount - storage_fee_refunded;
+                    if (features::governed_gas_pool_enabled()){
+                        governed_gas_pool::deposit_gas_fee_v2(gas_payer, burn_amount);
+                    } else {
+                        transaction_fee::burn_fee(gas_payer, burn_amount);
+                    }
+                } else if (transaction_fee_amount < storage_fee_refunded) {
+                    let mint_amount = storage_fee_refunded - transaction_fee_amount;
+                    // TODO: we cannot mint to do storage refund. We need to have a storage refund pool
+                    if (!features::governed_gas_pool_enabled()){
+                        transaction_fee::mint_and_refund(gas_payer, mint_amount);
+                    }
+                };
+            } else {
                 if (features::governed_gas_pool_enabled()){
-                    governed_gas_pool::deposit_gas_fee_v2(gas_payer, burn_amount);
+                    governed_gas_pool::deposit_gas_fee_v2(gas_payer, transaction_fee_amount);
                 } else {
-                    transaction_fee::burn_fee(gas_payer, burn_amount);
+                    transaction_fee::burn_fee(gas_payer, transaction_fee_amount);
                 }
-            } else if (transaction_fee_amount < storage_fee_refunded) {
-                let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                // TODO: we cannot mint to do storage refund. We need to have a storage refund pool
-                if (!features::governed_gas_pool_enabled()){
-                    transaction_fee::mint_and_refund(gas_payer, mint_amount);
-                }
-            };
+            }
         };
 
         // Increment sequence number

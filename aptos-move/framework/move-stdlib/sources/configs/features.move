@@ -266,6 +266,15 @@ module std::features {
         is_enabled(MODULE_EVENT)
     }
 
+    /// Whether we refund storage costs to the user upon deletion
+    /// 
+    /// Lifetime: transient
+    const STORAGE_DELETION_REFUND: u64 = 28;
+
+    public fun storage_deletion_refund_enabled(): bool acquires Features {
+        is_enabled(STORAGE_DELETION_REFUND)
+    }
+
     /// Whether the fix for a counting bug in the script path of the signature checker pass is enabled.
     /// Lifetime: transient
     const SIGNATURE_CHECKER_V2_SCRIPT_FIX: u64 = 29;
@@ -587,7 +596,7 @@ module std::features {
     const TRANSACTION_SIMULATION_ENHANCEMENT: u64 = 78;
     /// Whether the Atomic bridge is available
     /// Lifetime: transient
-    const ATOMIC_BRIDGE: u64 = 224;
+    const ATOMIC_BRIDGE: u64 = 71;
 
     #[deprecated]
     public fun get_atomic_bridge_feature(): u64 { ATOMIC_BRIDGE }
@@ -600,7 +609,7 @@ module std::features {
 
     /// Whether the Atomic bridge is available
     /// Lifetime: transient
-    const NATIVE_BRIDGE: u64 = 225;
+    const NATIVE_BRIDGE: u64 = 72;
 
     #[deprecated]
     public fun get_native_bridge_feature(): u64 { NATIVE_BRIDGE }
@@ -768,6 +777,17 @@ module std::features {
 
     public fun is_distribute_transaction_fee_enabled(): bool acquires Features {
         is_enabled(DISTRIBUTE_TRANSACTION_FEE)
+    }
+
+    /// Whether the staking rewards are mint (diseable) or withdraw from the gouverned gas pool treasury (enable). 
+    ///
+    /// Lifetime: permanent
+    const STAKE_REWARD_USING_TREASURY: u64 = 224;
+
+    public fun get_stake_reward_using_treasury_feature(): u64 { STAKE_REWARD_USING_TREASURY }
+
+    public fun stake_reward_using_treasury_enabled(): bool acquires Features {
+        is_enabled(STAKE_REWARD_USING_TREASURY)
     }
 
     // ============================================================================================
