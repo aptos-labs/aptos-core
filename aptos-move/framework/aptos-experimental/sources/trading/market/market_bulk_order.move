@@ -42,14 +42,15 @@ module aptos_experimental::market_bulk_order {
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): option::Option<OrderIdType> {
-        if (!callbacks.validate_bulk_order_placement(
+        let validation_result = callbacks.validate_bulk_order_placement(
             account,
             bid_prices,
             bid_sizes,
             ask_prices,
             ask_sizes,
             metadata,
-        )) {
+        );
+        if (!validation_result.is_validation_result_valid()) {
             // If the bulk order is not valid, emit rejection event and return without placing the order.
             market.emit_event_for_bulk_order_rejected(
                 sequence_number,
@@ -59,7 +60,7 @@ module aptos_experimental::market_bulk_order {
                 ask_sizes,
                 ask_prices,
                 get_validation_failed_rejection(),
-                std::string::utf8(b"validation failed"),
+                validation_result.get_validation_failure_reason().destroy_some(),
             );
             return option::none();
         };

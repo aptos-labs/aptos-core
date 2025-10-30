@@ -83,7 +83,7 @@ module aptos_experimental::clearinghouse_test {
         return new_validation_result(option::none())
     }
 
-    public(friend) fun validate_bulk_order_placement(account: address): bool acquires GlobalState {
+    public(friend) fun validate_bulk_order_placement(account: address): ValidationResult acquires GlobalState {
         let bulk_open_bids = &mut borrow_global_mut<GlobalState>(@0x1).bulk_open_bids;
         if (!bulk_open_bids.contains(account)) {
             bulk_open_bids.add(account, true);
@@ -92,7 +92,7 @@ module aptos_experimental::clearinghouse_test {
         if (!bulk_open_asks.contains(account)) {
             bulk_open_asks.add(account, true);
         };
-        return true
+        return new_validation_result(option::none())
     }
 
     public(friend) fun get_position_size(user: address): u64 acquires GlobalState {

@@ -844,7 +844,7 @@ module aptos_experimental::order_placement {
                 is_bid,
                 true, // is_taker
                 OrderCancellationReason::PositionUpdateViolation,
-                validation_result.get_validation_cancellation_reason().destroy_some(),
+                validation_result.get_validation_failure_reason().destroy_some(),
                 metadata,
                 time_in_force,
                 true, // emit_order_open
