@@ -3,11 +3,11 @@
 
 use crate::{
     common::{
+        config::{ConfigType, GlobalConfig, PromptResponseType},
         types::{
             CliCommand, CliConfig, CliError, CliResult, CliTypedResult, ConfigSearchMode,
             ProfileSummary,
         },
-        config::{ConfigType, GlobalConfig, PromptResponseType}
     },
     Tool,
 };

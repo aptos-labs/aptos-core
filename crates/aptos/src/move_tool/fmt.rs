@@ -1,12 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::{
-        types::{CliCommand, CliError, CliTypedResult},
-        utils::dir_default_to_current,
-        update::get_movefmt_path,
-    },
+use crate::common::{
+    types::{CliCommand, CliError, CliTypedResult},
+    update::get_movefmt_path,
+    utils::dir_default_to_current,
 };
 use async_trait::async_trait;
 use clap::{Args, Parser};

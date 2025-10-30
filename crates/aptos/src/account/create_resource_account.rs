@@ -1,8 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::types::{CliCommand, CliTypedResult, TransactionOptions, TransactionSummary},
+use crate::common::{
+    resource_account_seed::ResourceAccountSeed,
+    types::{CliCommand, CliTypedResult, TransactionOptions, TransactionSummary},
 };
 use aptos_cached_packages::aptos_stdlib::resource_account_create_resource_account;
 use aptos_rest_client::{
@@ -14,7 +15,6 @@ use async_trait::async_trait;
 use clap::Parser;
 use serde::Serialize;
 use std::str::FromStr;
-use crate::common::resource_account_seed::ResourceAccountSeed;
 
 /// Create a resource account on-chain
 ///

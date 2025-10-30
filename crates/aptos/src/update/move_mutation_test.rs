@@ -3,8 +3,10 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
-    common::types::{CliCommand, CliTypedResult, PromptOptions},
-    common::update::get_path,
+    common::{
+        types::{CliCommand, CliTypedResult, PromptOptions},
+        update::get_path,
+    },
     update::update_helper::build_updater,
 };
 use anyhow::{Context, Result};

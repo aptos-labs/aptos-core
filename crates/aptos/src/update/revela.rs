@@ -3,8 +3,10 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
-    common::types::{CliCommand, CliTypedResult, PromptOptions},
-    common::update::{get_revela_path, REVELA_BINARY_NAME, TARGET_REVELA_VERSION},
+    common::{
+        types::{CliCommand, CliTypedResult, PromptOptions},
+        update::{get_revela_path, REVELA_BINARY_NAME, TARGET_REVELA_VERSION},
+    },
     update::update_helper::build_updater,
 };
 use anyhow::{Context, Result};
@@ -109,4 +111,3 @@ impl CliCommand<String> for RevelaUpdateTool {
         update_binary(self).await
     }
 }
-

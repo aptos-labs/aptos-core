@@ -45,11 +45,7 @@ use move_core_types::{
 };
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{
-    collections::BTreeMap,
-    fmt::Formatter,
-    path::PathBuf,
-};
+use std::{collections::BTreeMap, fmt::Formatter, path::PathBuf};
 
 /// Tool for on-chain governance
 ///
@@ -803,7 +799,7 @@ impl CliCommand<TransactionSummary> for ExecuteProposal {
     }
 }
 
-pub use crate::common::compile_script_function::{CompileScriptFunction, compile_in_temp_dir};
+pub use crate::common::compile_script_function::{compile_in_temp_dir, CompileScriptFunction};
 
 /// Generates a package upgrade proposal script.
 #[derive(Parser)]

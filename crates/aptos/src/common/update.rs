@@ -1,5 +1,8 @@
-use std::path::PathBuf;
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use anyhow::anyhow;
+use std::path::PathBuf;
 
 pub const REVELA_BINARY_NAME: &str = "revela";
 pub const TARGET_REVELA_VERSION: &str = "1.0.0";

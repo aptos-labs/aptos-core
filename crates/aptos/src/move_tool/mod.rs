@@ -3,9 +3,10 @@
 
 use crate::{
     common::{
+        compile_script_function::CompileScriptFunction,
         local_simulation,
-        transactions::TxnOptions,
         resource_account_seed::ResourceAccountSeed,
+        transactions::TxnOptions,
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
             CliTypedResult, ConfigSearchMode, EntryFunctionArguments, EntryFunctionArgumentsJSON,
@@ -17,7 +18,6 @@ use crate::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
             dispatch_transaction, prompt_yes_with_override, write_to_file,
         },
-        compile_script_function::CompileScriptFunction,
     },
     move_tool::{
         bytecode::{Decompile, Disassemble},

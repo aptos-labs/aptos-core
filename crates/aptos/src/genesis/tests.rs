@@ -9,8 +9,7 @@ use crate::{
     },
     genesis::{
         git::{
-            GitOptions, SetupGit, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE,
-            FRAMEWORK_NAME,
+            GitOptions, SetupGit, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE, FRAMEWORK_NAME,
         },
         keys::{GenerateKeys, GenerateLayoutTemplate, SetValidatorConfiguration, PUBLIC_KEYS_FILE},
         GenerateGenesis,

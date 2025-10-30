@@ -1,6 +1,8 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::common::types::CliTypedResult;
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::{de::DeserializeOwned, Serialize};
 
 pub fn to_yaml<T: Serialize + ?Sized>(input: &T) -> CliTypedResult<String> {
     Ok(serde_yaml::to_string(input)?)

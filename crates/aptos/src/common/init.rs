@@ -2,24 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::types::FaucetOptions;
-use crate::{
-    common::{
-        types::{
-            account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
-            CliTypedResult, ConfigSearchMode, EncodingOptions, HardwareWalletOptions,
-            PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions, RngArgs,
-            DEFAULT_PROFILE,
-        },
-        utils::{
-            explorer_account_link, fund_account, prompt_yes_with_override, read_line,
-            strip_private_key_prefix,
-        },
+use crate::common::{
+    types::{
+        account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
+        CliTypedResult, ConfigSearchMode, EncodingOptions, HardwareWalletOptions,
+        PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions, RngArgs,
+        DEFAULT_PROFILE,
+    },
+    utils::{
+        explorer_account_link, fund_account, prompt_yes_with_override, read_line,
+        strip_private_key_prefix,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_ledger;
+use aptos_rest_client::{error::RestError, Client};
 use async_trait::async_trait;
 use clap::Parser;
+use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -27,9 +27,6 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
-use aptos_rest_client::Client;
-use aptos_rest_client::error::RestError;
-use move_core_types::account_address::AccountAddress;
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;

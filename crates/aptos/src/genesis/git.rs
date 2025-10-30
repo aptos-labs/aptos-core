@@ -5,7 +5,7 @@ use crate::{
     common::{
         types::{CliError, CliTypedResult},
         utils::{create_dir_if_not_exist, write_to_file},
-        yaml::{from_base64_encoded_yaml, from_yaml, to_base64_encoded_yaml, to_yaml}
+        yaml::{from_base64_encoded_yaml, from_yaml, to_base64_encoded_yaml, to_yaml},
     },
     CliCommand,
 };

@@ -1,11 +1,17 @@
-use std::fmt::Formatter;
-use std::path::PathBuf;
-use std::str::FromStr;
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::common::{
+    types::{
+        CliError, CliTypedResult, ConfigSearchMode, APTOS_FOLDER_GIT_IGNORE, CONFIG_FOLDER,
+        GIT_IGNORE,
+    },
+    utils::{create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file},
+    yaml::{from_yaml, to_yaml},
+};
 use clap::ValueEnum;
 use serde::{Deserialize, Serialize};
-use crate::common::types::{CliError, CliTypedResult, ConfigSearchMode, APTOS_FOLDER_GIT_IGNORE, CONFIG_FOLDER, GIT_IGNORE};
-use crate::common::utils::{create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file};
-use crate::common::yaml::{from_yaml, to_yaml};
+use std::{fmt::Formatter, path::PathBuf, str::FromStr};
 
 const GLOBAL_CONFIG_FILE: &str = "global_config.yaml";
 
@@ -108,7 +114,6 @@ fn find_workspace_config(
         },
     }
 }
-
 
 const GLOBAL: &str = "global";
 const WORKSPACE: &str = "workspace";

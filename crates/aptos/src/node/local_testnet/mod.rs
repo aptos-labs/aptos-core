@@ -27,9 +27,9 @@ use self::{
 };
 use crate::{
     common::{
+        config::GlobalConfig,
         types::{CliCommand, CliError, CliTypedResult, ConfigSearchMode, PromptOptions},
         utils::prompt_yes_with_override,
-        config::GlobalConfig,
     },
     node::local_testnet::{
         faucet::FaucetManager, indexer_api::IndexerApiManager, node::NodeManager,

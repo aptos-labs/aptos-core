@@ -1,11 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    account_address_from_auth_key, account_address_from_public_key, AuthenticationKeyInputOptions,
-    CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
-    ExtractEd25519PublicKey, HardwareWalletOptions, ParseEd25519PrivateKey, ProfileConfig,
-    ProfileOptions, PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
+use crate::common::{
+    init::lookup_address,
+    types::{
+        account_address_from_auth_key, account_address_from_public_key,
+        AuthenticationKeyInputOptions, CliCommand, CliConfig, CliError, CliTypedResult,
+        ConfigSearchMode, EncodingOptions, ExtractEd25519PublicKey, HardwareWalletOptions,
+        ParseEd25519PrivateKey, ProfileConfig, ProfileOptions, PublicKeyInputOptions, RestOptions,
+        TransactionOptions, TransactionSummary,
+    },
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -24,7 +28,6 @@ use async_trait::async_trait;
 use clap::{Args, Parser};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
-use crate::common::init::lookup_address;
 
 /// Rotate an account's authentication key
 ///

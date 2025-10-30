@@ -3,12 +3,11 @@
 
 use crate::{
     cli_build_information,
-    common::types::{CliCommand, CliError, CliTypedResult, PromptOptions},
-    common::update::get_additional_binaries_dir,
-    update::{
-        prover_dependency_installer::DependencyInstaller,
-        update_binary,
+    common::{
+        types::{CliCommand, CliError, CliTypedResult, PromptOptions},
+        update::get_additional_binaries_dir,
     },
+    update::{prover_dependency_installer::DependencyInstaller, update_binary},
 };
 use anyhow::{Context, Result};
 use aptos_build_info::BUILD_OS;

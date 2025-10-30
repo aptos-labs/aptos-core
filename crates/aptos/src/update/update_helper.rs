@@ -2,10 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cli_build_information,
-    update::UpdateRequiredInfo,
+    cli_build_information, common::update::get_additional_binaries_dir, update::UpdateRequiredInfo,
 };
-use crate::common::update::get_additional_binaries_dir;
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_build_info::BUILD_OS;
 use self_update::{backends::github::Update, update::ReleaseUpdate};

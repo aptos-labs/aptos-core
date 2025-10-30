@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::resource_account_seed::ResourceAccountSeed;
-use crate::common::types::{CliCommand, CliTypedResult};
+use crate::common::{
+    resource_account_seed::ResourceAccountSeed,
+    types::{CliCommand, CliTypedResult},
+};
 use aptos_types::account_address::{create_resource_address, AccountAddress};
 use async_trait::async_trait;
 use clap::Parser;

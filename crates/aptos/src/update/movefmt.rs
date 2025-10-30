@@ -3,8 +3,10 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
-    common::types::{CliCommand, CliTypedResult, PromptOptions},
-    common::update::{get_movefmt_path, FORMATTER_BINARY_NAME, TARGET_FORMATTER_VERSION},
+    common::{
+        types::{CliCommand, CliTypedResult, PromptOptions},
+        update::{get_movefmt_path, FORMATTER_BINARY_NAME, TARGET_FORMATTER_VERSION},
+    },
     update::update_helper::build_updater,
 };
 use anyhow::{Context, Result};

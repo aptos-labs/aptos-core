@@ -1,21 +1,21 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::utils::{explorer_transaction_link, fund_account, strip_private_key_prefix};
 use crate::{
     common::{
+        config::GlobalConfig,
         init::Network,
         local_simulation,
         transactions::ReplayProtectionType,
         utils::{
             check_if_file_exists, create_dir_if_not_exist, deserialize_address_str,
-            deserialize_material_with_prefix, dir_default_to_current, get_account_with_state,
-            get_auth_key, get_sequence_number, parse_json_file, prompt_yes_with_override,
-            read_from_file, serialize_material_with_prefix, start_logger, to_common_result,
-            to_common_success_result, write_to_file, write_to_file_with_opts,
+            deserialize_material_with_prefix, dir_default_to_current, explorer_transaction_link,
+            fund_account, get_account_with_state, get_auth_key, get_sequence_number,
+            parse_json_file, prompt_yes_with_override, read_from_file,
+            serialize_material_with_prefix, start_logger, strip_private_key_prefix,
+            to_common_result, to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
-        config::GlobalConfig,
         yaml::from_yaml,
     },
     move_tool::{ArgWithType, FunctionArgType, MemberId},

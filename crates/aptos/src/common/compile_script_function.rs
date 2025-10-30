@@ -1,5 +1,10 @@
-use crate::common::types::{CliError, CliTypedResult, PromptOptions};
-use crate::move_tool::FrameworkPackageArgs;
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
+use crate::{
+    common::types::{CliError, CliTypedResult, PromptOptions},
+    move_tool::FrameworkPackageArgs,
+};
 use aptos_crypto::HashValue;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use clap::Parser;
@@ -7,9 +12,11 @@ use move_model::metadata::{
     CompilerVersion, LanguageVersion, LATEST_STABLE_COMPILER_VERSION,
     LATEST_STABLE_LANGUAGE_VERSION,
 };
-use std::collections::BTreeMap;
-use std::fs;
-use std::path::{Path, PathBuf};
+use std::{
+    collections::BTreeMap,
+    fs,
+    path::{Path, PathBuf},
+};
 use tempfile::TempDir;
 
 /// Compile a specified script.

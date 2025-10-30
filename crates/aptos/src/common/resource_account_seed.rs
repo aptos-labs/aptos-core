@@ -1,8 +1,10 @@
-use std::fmt::Formatter;
-use std::str::FromStr;
-use clap::Parser;
-use aptos_api_types::HexEncodedBytes;
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::common::types::{CliError, CliTypedResult};
+use aptos_api_types::HexEncodedBytes;
+use clap::Parser;
+use std::{fmt::Formatter, str::FromStr};
 
 /// Encoding for the Resource account seed
 #[derive(Debug, Default, Clone, Copy)]
