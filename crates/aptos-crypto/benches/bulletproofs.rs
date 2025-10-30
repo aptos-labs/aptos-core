@@ -32,8 +32,8 @@ fn bench_group(c: &mut Criterion) {
         range_proof_deserialize(&mut group, num_bits);
     }
 
-    for batch_size in [1, 2] {
-        for num_bits in [32, 64] {
+    for batch_size in [16, 1024, 2048] {
+        for num_bits in [16, 32] {
             range_prove(&mut group, num_bits, batch_size);
             range_verify(&mut group, num_bits, batch_size);
         }
@@ -144,5 +144,9 @@ fn range_verify<M: Measurement>(g: &mut BenchmarkGroup<M>, num_bits: usize, batc
     );
 }
 
-criterion_group!(bulletproofs_benches, bench_group);
+criterion_group!(
+    name = bulletproofs_benches;
+    config = Criterion::default().sample_size(10);
+    targets = bench_group
+);
 criterion_main!(bulletproofs_benches);

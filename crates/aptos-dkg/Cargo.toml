@@ -54,17 +54,17 @@ harness = false
 name = "lagrange"
 harness = false
 
-[[bench]]
-name = "pvss"
-harness = false
+#[[bench]]
+#name = "pvss"
+#harness = false
 
 [[bench]]
 name = "range_proof"
 harness = false
 
-[[bench]]
-name = "weighted_vuf"
-harness = false
+#[[bench]]
+#name = "weighted_vuf"
+#harness = false
 
 [package.metadata.cargo-machete]
 ignored = ["serde_bytes"]
