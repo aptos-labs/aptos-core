@@ -4,7 +4,8 @@
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
     common::types::{CliCommand, CliTypedResult, PromptOptions},
-    update::update_helper::{build_updater, get_path},
+    common::update::get_path,
+    update::update_helper::build_updater,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;

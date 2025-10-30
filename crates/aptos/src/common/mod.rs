@@ -10,5 +10,6 @@ pub mod resource_account_seed;
 pub mod compile_script_function;
 pub mod yaml;
 pub mod config;
+pub mod update;
 
 pub use compile_script_function::CompileScriptFunction;

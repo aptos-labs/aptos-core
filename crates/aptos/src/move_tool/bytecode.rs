@@ -8,8 +8,8 @@ use crate::{
             check_if_file_exists, create_dir_if_not_exist, read_dir_files, read_from_file,
             write_to_user_only_file,
         },
+        update::get_revela_path,
     },
-    update::get_revela_path,
 };
 use anyhow::Context;
 use aptos_types::vm::module_metadata::prelude::*;

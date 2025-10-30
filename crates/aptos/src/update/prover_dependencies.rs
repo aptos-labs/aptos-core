@@ -4,8 +4,9 @@
 use crate::{
     cli_build_information,
     common::types::{CliCommand, CliError, CliTypedResult, PromptOptions},
+    common::update::get_additional_binaries_dir,
     update::{
-        get_additional_binaries_dir, prover_dependency_installer::DependencyInstaller,
+        prover_dependency_installer::DependencyInstaller,
         update_binary,
     },
 };

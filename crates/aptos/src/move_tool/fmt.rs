@@ -5,8 +5,8 @@ use crate::{
     common::{
         types::{CliCommand, CliError, CliTypedResult},
         utils::dir_default_to_current,
+        update::get_movefmt_path,
     },
-    update::get_movefmt_path,
 };
 use async_trait::async_trait;
 use clap::{Args, Parser};

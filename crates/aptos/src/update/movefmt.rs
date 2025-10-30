@@ -4,22 +4,14 @@
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
     common::types::{CliCommand, CliTypedResult, PromptOptions},
-    update::update_helper::{build_updater, get_path},
+    common::update::{get_movefmt_path, FORMATTER_BINARY_NAME, TARGET_FORMATTER_VERSION},
+    update::update_helper::build_updater,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
 use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
-
-const FORMATTER_BINARY_NAME: &str = "movefmt";
-const TARGET_FORMATTER_VERSION: &str = "1.3.7";
-
-const FORMATTER_EXE_ENV: &str = "FORMATTER_EXE";
-#[cfg(target_os = "windows")]
-const FORMATTER_EXE: &str = "movefmt.exe";
-#[cfg(not(target_os = "windows"))]
-const FORMATTER_EXE: &str = "movefmt";
 
 /// Update Movefmt, the tool used for formatting Move code.
 #[derive(Debug, Parser)]
@@ -123,14 +115,4 @@ impl CliCommand<String> for FormatterUpdateTool {
     async fn execute(self) -> CliTypedResult<String> {
         update_binary(self).await
     }
-}
-
-pub fn get_movefmt_path() -> Result<PathBuf> {
-    get_path(
-        FORMATTER_BINARY_NAME,
-        FORMATTER_EXE_ENV,
-        FORMATTER_BINARY_NAME,
-        FORMATTER_EXE,
-        true,
-    )
 }

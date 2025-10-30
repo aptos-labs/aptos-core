@@ -3,8 +3,9 @@
 
 use crate::{
     cli_build_information,
-    update::{get_additional_binaries_dir, UpdateRequiredInfo},
+    update::UpdateRequiredInfo,
 };
+use crate::common::update::get_additional_binaries_dir;
 use anyhow::{anyhow, bail, Context, Result};
 use aptos_build_info::BUILD_OS;
 use self_update::{backends::github::Update, update::ReleaseUpdate};
@@ -75,42 +76,4 @@ pub fn build_updater(
         .no_confirm(assume_yes)
         .build()
         .map_err(|e| anyhow!("Failed to build self-update configuration: {:#}", e))
-}
-
-pub fn get_path(
-    name: &str,
-    exe_env: &str,
-    binary_name: &str,
-    exe: &str,
-    find_in_path: bool,
-) -> Result<PathBuf> {
-    // Look at the environment variable first.
-    if let Ok(path) = std::env::var(exe_env) {
-        return Ok(PathBuf::from(path));
-    }
-
-    // See if it is present in the path where we usually install additional binaries.
-    let path = get_additional_binaries_dir().join(binary_name);
-    if path.exists() && path.is_file() {
-        return Ok(path);
-    }
-
-    if find_in_path {
-        // See if we can find the binary in the PATH.
-        if let Some(path) = pathsearch::find_executable_in_path(exe) {
-            return Ok(path);
-        }
-    }
-
-    Err(anyhow!(
-        "Cannot locate the {} executable. \
-            Environment variable `{}` is not set, and `{}` is not in the PATH. \
-            Try running `aptos update {}` to download it and then \
-            updating the environment variable `{}` or adding the executable to PATH",
-        name,
-        exe_env,
-        exe,
-        exe,
-        exe_env
-    ))
 }
