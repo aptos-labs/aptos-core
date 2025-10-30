@@ -8,8 +8,9 @@ use crate::{
             check_if_file_exists, create_dir_if_not_exist, current_dir, dir_default_to_current,
             read_from_file, write_to_user_only_file,
         },
+        yaml::{from_yaml, to_yaml},
     },
-    genesis::git::{from_yaml, to_yaml, GitOptions, LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE},
+    genesis::git::{GitOptions, LAYOUT_FILE, OPERATOR_FILE, OWNER_FILE},
     governance::CompileScriptFunction,
     CliCommand,
 };

@@ -5,10 +5,11 @@ use crate::{
     common::{
         types::{OptionalPoolAddressArgs, PromptOptions, RngArgs},
         utils::{read_from_file, write_to_file},
+        yaml::from_yaml,
     },
     genesis::{
         git::{
-            from_yaml, GitOptions, SetupGit, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE,
+            GitOptions, SetupGit, BALANCES_FILE, EMPLOYEE_VESTING_ACCOUNTS_FILE,
             FRAMEWORK_NAME,
         },
         keys::{GenerateKeys, GenerateLayoutTemplate, SetValidatorConfiguration, PUBLIC_KEYS_FILE},

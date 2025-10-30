@@ -15,9 +15,9 @@ use crate::{
             to_common_success_result, write_to_file, write_to_file_with_opts,
             write_to_user_only_file,
         },
+        yaml::from_yaml
     },
     config::GlobalConfig,
-    genesis::git::from_yaml,
     move_tool::{ArgWithType, FunctionArgType, MemberId},
 };
 use anyhow::{bail, Context};

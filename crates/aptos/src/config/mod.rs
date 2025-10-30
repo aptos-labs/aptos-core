@@ -8,8 +8,8 @@ use crate::{
             ProfileSummary, APTOS_FOLDER_GIT_IGNORE, CONFIG_FOLDER, GIT_IGNORE,
         },
         utils::{create_dir_if_not_exist, current_dir, read_from_file, write_to_user_only_file},
+        yaml::{from_yaml, to_yaml}
     },
-    genesis::git::{from_yaml, to_yaml},
     Tool,
 };
 use aptos_cli_common::generate_cli_completions;
