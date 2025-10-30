@@ -17,8 +17,8 @@ use crate::{
             check_if_file_exists, create_dir_if_not_exist, dir_default_to_current,
             dispatch_transaction, prompt_yes_with_override, write_to_file,
         },
+        compile_script_function::CompileScriptFunction,
     },
-    governance::CompileScriptFunction,
     move_tool::{
         bytecode::{Decompile, Disassemble},
         coverage::SummaryCoverage,
