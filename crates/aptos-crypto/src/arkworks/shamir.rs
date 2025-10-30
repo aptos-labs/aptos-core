@@ -30,7 +30,7 @@ pub struct ShamirShare<F: PrimeField> {
 
 /// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
 /// because Shamir shares are usually defined over such a field. For reconstructing to a group (TODO)
-/// we'll use a parameter G: CurveGroup<ScalarField = F>
+/// we'll use a generic parameter `G: CurveGroup<ScalarField = F>`
 #[derive(Debug, Clone, Copy, Serialize)]
 pub struct ThresholdConfig<F: PrimeField> {
     /// Total number of participants (shares)

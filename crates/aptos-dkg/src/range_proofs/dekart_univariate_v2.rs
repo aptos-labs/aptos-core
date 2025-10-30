@@ -627,7 +627,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let Proof {
             hatC,
             pi_PoK,
-            Cs: Cj,
+            Cs,
             D,
             a,
             a_h,
@@ -656,7 +656,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_sigma_proof(fs_t, &pi_PoK);
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cj);
+        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
 
         // Step 5
         let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
@@ -669,10 +669,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 8
         let U_bases: Vec<E::G1Affine> = {
-            let mut v = Vec::with_capacity(2 + Cj.len());
+            let mut v = Vec::with_capacity(2 + Cs.len());
             v.push(*hatC);
             v.push(*D);
-            v.extend_from_slice(&Cj);
+            v.extend_from_slice(&Cs);
             E::G1::normalize_batch(&v)
         };
 
@@ -784,9 +784,9 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_f_j_commitments<E: Pairing>(
         fs_transcript: &mut Transcript,
-        Cj: &Vec<E::G1>,
+        Cs: &Vec<E::G1>,
     ) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cj);
+        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cs);
     }
 
     pub(crate) fn get_beta_challenges<E: Pairing>(
