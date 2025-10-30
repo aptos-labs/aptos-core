@@ -19,7 +19,7 @@ use aptos_dkg::pvss::{
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
     traits::{transcript::Transcript, SecretSharingConfig},
-    GenericWeighting, ThresholdConfig,
+    GenericWeighting, ThresholdConfigBlstrs,
 };
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
@@ -153,8 +153,8 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
     actual_size
 }
 
-fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
-    sc: &ThresholdConfig,
+fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>>(
+    sc: &ThresholdConfigBlstrs,
 ) -> usize {
     if T::scheme_name() == unweighted_protocol::DAS_SK_IN_G1 {
         G2_PROJ_NUM_BYTES

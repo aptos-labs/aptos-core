@@ -188,6 +188,11 @@ pub struct RocksdbConfigs {
     pub shared_block_cache_size: usize,
 }
 
+impl RocksdbConfigs {
+    /// Default block cache size is 24GB.
+    pub const DEFAULT_BLOCK_CACHE_SIZE: usize = 24 * (1 << 30);
+}
+
 fn default_to_true() -> bool {
     true
 }
@@ -205,7 +210,7 @@ impl Default for RocksdbConfigs {
             enable_storage_sharding: true,
             high_priority_background_threads: 4,
             low_priority_background_threads: 2,
-            shared_block_cache_size: 24 * (1 << 30),
+            shared_block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
         }
     }
 }

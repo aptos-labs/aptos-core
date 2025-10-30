@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+pub mod chunked_elgamal_field;
 mod contribution;
 pub mod das;
 pub(crate) mod dealt_pub_key;
@@ -22,5 +23,5 @@ pub mod weighted;
 
 pub use low_degree_test::LowDegreeTest;
 pub use player::Player;
-pub use threshold_config::ThresholdConfig;
+pub use threshold_config::ThresholdConfigBlstrs;
 pub use weighted::{GenericWeighting, WeightedConfig};

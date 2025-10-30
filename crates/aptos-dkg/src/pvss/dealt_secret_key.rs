@@ -14,7 +14,7 @@ macro_rules! dealt_secret_key_impl {
             algebra::lagrange::lagrange_coefficients,
             pvss::{
                 dealt_secret_key_share::$gt::DealtSecretKeyShare, player::Player,
-                threshold_config::ThresholdConfig, traits, traits::SecretSharingConfig,
+                threshold_config::ThresholdConfigBlstrs, traits, traits::SecretSharingConfig,
             },
             utils::{$gt_multi_exp},
         };
@@ -79,12 +79,12 @@ macro_rules! dealt_secret_key_impl {
             }
         }
 
-        impl traits::Reconstructable<ThresholdConfig> for DealtSecretKey {
+        impl traits::Reconstructable<ThresholdConfigBlstrs> for DealtSecretKey {
             type Share = DealtSecretKeyShare;
 
             /// Reconstructs the `DealtSecretKey` given a sufficiently-large subset of shares from players.
             /// Mainly used for testing the PVSS transcript dealing and decryption.
-            fn reconstruct(sc: &ThresholdConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
+            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<(Player, Self::Share)>) -> Self {
                 assert_ge!(shares.len(), sc.get_threshold());
                 assert_le!(shares.len(), sc.get_total_num_players());
 

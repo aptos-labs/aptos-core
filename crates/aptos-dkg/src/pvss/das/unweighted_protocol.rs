@@ -3,12 +3,14 @@
 
 use crate::{
     algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},
-    fiat_shamir, pvss,
+    pvss,
     pvss::{
         contribution::{batch_verify_soks, Contribution, SoK},
-        das, encryption_dlog, schnorr, traits,
+        das,
+        das::fiat_shamir,
+        encryption_dlog, schnorr, traits,
         traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
-        LowDegreeTest, Player, ThresholdConfig,
+        LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
     utils::{
         g1_multi_exp, g2_multi_exp,
@@ -82,7 +84,7 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = ThresholdConfig;
+    type SecretSharingConfig = ThresholdConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
@@ -174,7 +176,7 @@ impl traits::Transcript for Transcript {
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         // TODO: benchmark this
         let (f, extra) =
-            fiat_shamir::fiat_shamir_das(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
+            fiat_shamir::derive_challenge_scalars(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();

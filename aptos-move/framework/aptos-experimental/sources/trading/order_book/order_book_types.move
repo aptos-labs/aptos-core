@@ -1,23 +1,22 @@
 /// Order book type definitions
 module aptos_experimental::order_book_types {
+    friend aptos_experimental::order_book;
+    friend aptos_experimental::single_order_book;
+    friend aptos_experimental::bulk_order_book;
+    friend aptos_experimental::price_time_index;
+    friend aptos_experimental::pending_order_book_index;
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::order_operations;
+    friend aptos_experimental::market_types;
+    friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::single_order_types;
+    friend aptos_experimental::bulk_order_book_types;
+    #[test_only] friend aptos_experimental::bulk_order_book_tests;
+    #[test_only] friend aptos_experimental::order_book_client_order_id;
     use std::option;
     use std::option::Option;
     use std::string::String;
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
-
-    friend aptos_experimental::price_time_index;
-    friend aptos_experimental::single_order_book;
-    friend aptos_experimental::pending_order_book_index;
-    friend aptos_experimental::order_placement;
-    friend aptos_experimental::order_book;
-    friend aptos_experimental::single_order_types;
-    friend aptos_experimental::market_types;
-    friend aptos_experimental::bulk_order_book;
-    friend aptos_experimental::bulk_order_book_types;
-    #[test_only]
-    friend aptos_experimental::bulk_order_book_tests;
-    #[test_only]
-    friend aptos_experimental::order_book_client_order_id;
 
     const U128_MAX: u128 = 0xffffffffffffffffffffffffffffffff;
 
@@ -160,8 +159,9 @@ module aptos_experimental::order_book_types {
         TimeBased(u64)
     }
 
-    public fun new_time_based_trigger_condition(time: u64): TriggerCondition {
-        TriggerCondition::TimeBased(time)
+    // The time should be seconds since unix epoch
+    public fun new_time_based_trigger_condition(time_secs: u64): TriggerCondition {
+        TriggerCondition::TimeBased(time_secs)
     }
 
     public fun price_move_up_condition(price: u64): TriggerCondition {
@@ -173,7 +173,7 @@ module aptos_experimental::order_book_types {
     }
 
     // Returns the price move down index and price move up index for a particular trigger condition
-    public fun index(self: &TriggerCondition):
+    public(friend) fun index(self: &TriggerCondition):
         (option::Option<u64>, option::Option<u64>, option::Option<u64>) {
         match(self) {
             TriggerCondition::PriceMoveAbove(price) => {
@@ -433,7 +433,7 @@ module aptos_experimental::order_book_types {
         }
     }
 
-    public fun new_order_match_details_with_modified_size<M: store + copy + drop>(
+    public(friend) fun new_order_match_details_with_modified_size<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
         remaining_size: u64
     ): OrderMatchDetails<M> {
@@ -554,9 +554,5 @@ module aptos_experimental::order_book_types {
         self: &ActiveMatchedOrder
     ): OrderType {
         self.order_book_type
-    }
-
-    public fun destroy_active_match_order(self: ActiveMatchedOrder): (OrderIdType, u64, u64) {
-        (self.order_id, self.matched_size, self.remaining_size)
     }
 }

@@ -6,6 +6,7 @@
 #![deny(missing_docs)]
 
 //! A library supplying various cryptographic primitives
+pub mod arkworks;
 pub mod asymmetric_encryption;
 pub mod bls12381;
 pub mod bulletproofs;
