@@ -4,7 +4,7 @@
 //! This module defines a trait `DifferentiableFn` for differentiable functions (like polynomials),
 //! and provides an implementation for `DensePolynomial` from the arkworks library.
 
-use ark_ff::FftField;
+use ark_ff::Field;
 use ark_poly::univariate::DensePolynomial;
 
 /// A trait for functions that can be differentiated.
@@ -23,7 +23,7 @@ pub trait DifferentiableFn {
     }
 }
 
-impl<F: FftField> DifferentiableFn for DensePolynomial<F> {
+impl<F: Field> DifferentiableFn for DensePolynomial<F> {
     fn differentiate_in_place(&mut self) {
         if self.coeffs.len() <= 1 {
             // Zero or constant polynomial
