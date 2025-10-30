@@ -120,7 +120,7 @@ impl<'m> AutomatedTransactionProcessor<'m> {
             }
         }
 
-        let fee_statement = AptosVM::fee_statement_from_gas_meter(
+        let assessed_fee_statement = AptosVM::fee_statement_from_gas_meter(
             txn_data,
             gas_meter,
             u64::from(epilogue_session.get_storage_fee_refund()),
@@ -129,7 +129,7 @@ impl<'m> AutomatedTransactionProcessor<'m> {
             transaction_validation::run_automated_txn_success_epilogue(
                 session,
                 gas_meter.balance(),
-                fee_statement,
+                assessed_fee_statement,
                 self.features(),
                 txn_data,
                 self.task_type,
@@ -140,7 +140,7 @@ impl<'m> AutomatedTransactionProcessor<'m> {
         let change_set = epilogue_session.finish(change_set_configs)?;
         let output = VMOutput::new(
             change_set,
-            fee_statement,
+            self.get_fee_statement_for_output(assessed_fee_statement),
             TransactionStatus::Keep(ExecutionStatus::Success),
             TransactionAuxiliaryData::default(),
         );
@@ -440,7 +440,7 @@ impl<'m> AutomatedTransactionProcessor<'m> {
                 ) {
                     Ok((change_set, fee_statement, status)) => VMOutput::new(
                         change_set,
-                        fee_statement,
+                        self.get_fee_statement_for_output(fee_statement),
                         TransactionStatus::Keep(status),
                         txn_aux_data,
                     ),
@@ -497,5 +497,21 @@ impl<'m> AutomatedTransactionProcessor<'m> {
         epilogue_session
             .finish(change_set_configs)
             .map(|set| (set, fee_statement, status))
+    }
+
+    /// The actual charged fee statement for executed automated transaction.
+    /// The input [`fee_statement`] is the assessed fee charges based on the gas-meter, but
+    /// the output fee-statement will be based on the task type. As system tasks are not charged at all
+    /// the output will contain `zero` gas information.
+    /// This function is utilized to define fee-statement of VMOutput.
+    fn get_fee_statement_for_output(&self, fee_statement: FeeStatement) -> FeeStatement {
+        match self.task_type {
+            AutomationTaskType::User => {
+                fee_statement
+            }
+            AutomationTaskType::System => {
+                FeeStatement::zero()
+            }
+        }
     }
 }

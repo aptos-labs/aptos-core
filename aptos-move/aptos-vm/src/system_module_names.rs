@@ -69,3 +69,4 @@ pub static TRANSACTION_FEE_MODULE: Lazy<ModuleId> = Lazy::new(|| {
 });
 
 pub const EMIT_FEE_STATEMENT: &IdentStr = ident_str!("emit_fee_statement");
+pub const EMIT_GAS_ASSESSMENT: &IdentStr = ident_str!("emit_gas_assessment");

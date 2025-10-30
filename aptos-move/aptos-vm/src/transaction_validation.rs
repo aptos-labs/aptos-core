@@ -31,6 +31,7 @@ use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use aptos_types::transaction::automation::AutomationTaskType;
+use crate::system_module_names::EMIT_GAS_ASSESSMENT;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -383,7 +384,14 @@ fn run_automated_txn_epilogue(
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
-        emit_fee_statement(session, fee_statement, traversal_context)?;
+        match task_type {
+            AutomationTaskType::User => {
+                emit_fee_statement(session, fee_statement, traversal_context)?;
+            }
+            AutomationTaskType::System => {
+                emit_as_gas_assessment(session, fee_statement, traversal_context)?;
+            }
+        }
     }
 
     maybe_raise_injected_error(InjectedError::EndOfRunEpilogue)?;
@@ -400,6 +408,23 @@ fn emit_fee_statement(
         .execute_function_bypass_visibility(
             &TRANSACTION_FEE_MODULE,
             EMIT_FEE_STATEMENT,
+            vec![],
+            vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
+            &mut UnmeteredGasMeter,
+            traversal_context,
+        )
+        .map(|_return_vals| ())
+}
+
+fn emit_as_gas_assessment(
+    session: &mut SessionExt,
+    fee_statement: FeeStatement,
+    traversal_context: &mut TraversalContext,
+) -> VMResult<()> {
+    session
+        .execute_function_bypass_visibility(
+            &TRANSACTION_FEE_MODULE,
+            EMIT_GAS_ASSESSMENT,
             vec![],
             vec![bcs::to_bytes(&fee_statement).expect("Failed to serialize fee statement")],
             &mut UnmeteredGasMeter,

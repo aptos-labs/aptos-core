@@ -36,6 +36,10 @@ module supra_framework::transaction_validation {
     /// Transaction exceeded its allocated max gas
     const EOUT_OF_GAS: u64 = 6;
 
+    /// Constants representing automation task type. Should match the values in scope of automation_registry module.
+    const UST:u8 = 1;
+    const GST:u8 = 2;
+
     /// Prologue errors. These are separated out from the other errors in this
     /// module since they are mapped separately to major VM statuses, and are
     /// important to the semantics of the system.
@@ -183,8 +187,7 @@ module supra_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     )  {
-        let ust:u8 = 1;
-        automated_transaction_prologue_v2(sender, task_index, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id, ust);
+        automated_transaction_prologue_v2(sender, task_index, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id, UST);
     }
 
     fun automated_transaction_prologue_v2(
@@ -205,18 +208,22 @@ module supra_framework::transaction_validation {
             error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRED),
         );
 
-        let max_transaction_fee = txn_gas_price * txn_max_gas_units;
+        // Task is not gas-less/GST,
+        // gas-less automated transactions are not charged so no need to check eligability to pay the gas-fee.
+        if (task_type != GST) {
+            let max_transaction_fee = txn_gas_price * txn_max_gas_units;
 
-        if (features::operations_default_to_fa_supra_store_enabled()) {
-            assert!(
-                supra_account::is_fungible_balance_at_least(gas_payer, max_transaction_fee),
-                error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
-            );
-        } else {
-            assert!(
-                coin::is_balance_at_least<SupraCoin>(gas_payer, max_transaction_fee),
-                error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
-            );
+            if (features::operations_default_to_fa_supra_store_enabled()) {
+                assert!(
+                    supra_account::is_fungible_balance_at_least(gas_payer, max_transaction_fee),
+                    error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
+                );
+            } else {
+                assert!(
+                    coin::is_balance_at_least<SupraCoin>(gas_payer, max_transaction_fee),
+                    error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
+                );
+            };
         };
         assert!(automation_registry::has_sender_active_task_with_id_and_type(address_of(&sender), task_index, task_type),
             error::invalid_state(PROLOGUE_ENO_ACTIVE_AUTOMATED_TASK))

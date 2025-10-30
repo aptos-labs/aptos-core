@@ -94,6 +94,7 @@ impl<'m> AutomationRegistryTransactionProcessor<'m> {
         SYSTEM_TRANSACTIONS_EXECUTED.inc();
 
         let fee_statement = AptosVM::fee_statement_from_gas_meter_for_gas(max_gas_amount.into(), &gas_meter, 0);
+
         match result {
             Ok(_) => {
                 let output = get_system_transaction_output(

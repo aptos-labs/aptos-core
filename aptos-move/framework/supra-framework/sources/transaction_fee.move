@@ -85,6 +85,23 @@ module supra_framework::transaction_fee {
         storage_fee_refund_quants: u64,
     }
 
+    #[event]
+    /// Breakdown of the gas consumed by gas-fee-less (i.e. gasless) transactions.
+    /// The consumed amounts serve as a record of the workload of the transaction and
+    /// are not charged to the gas payer's account.
+    struct GasAssessment has drop, store {
+        /// Total gas assessed for transaction execution.
+        total_assessed_gas_units: u64,
+        /// Execution gas charge.
+        execution_gas_units: u64,
+        /// IO gas charge.
+        io_gas_units: u64,
+        /// Storage fee charge.
+        storage_fee_quants: u64,
+        /// Storage fee refund.
+        storage_fee_refund_quants: u64,
+    }
+
     /// Initializes the resource storing information about gas fees collection and
     /// distribution. Should be called by on-chain governance.
     public fun initialize_fee_collection_and_distribution(supra_framework: &signer, burn_percentage: u8) {
@@ -282,6 +299,27 @@ module supra_framework::transaction_fee {
     // Called by the VM after epilogue.
     fun emit_fee_statement(fee_statement: FeeStatement) {
         event::emit(fee_statement)
+    }
+
+    // Called by the VM after epilogue for gas-less transactions to report fee assessment
+    fun emit_gas_assessment(fee_statement: FeeStatement) {
+        let FeeStatement {
+            total_charge_gas_units,
+            execution_gas_units,
+            io_gas_units,
+            storage_fee_quants,
+            storage_fee_refund_quants,
+
+        } = fee_statement;
+        let gas_assesment = GasAssessment {
+            total_assessed_gas_units: total_charge_gas_units,
+            execution_gas_units,
+            io_gas_units,
+            storage_fee_quants,
+            storage_fee_refund_quants,
+
+        };
+        event::emit(gas_assesment)
     }
 
     #[test_only]

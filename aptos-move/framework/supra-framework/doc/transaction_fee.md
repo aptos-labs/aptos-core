@@ -11,6 +11,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Resource `SupraCoinMintCapability`](#0x1_transaction_fee_SupraCoinMintCapability)
 -  [Resource `CollectedFeesPerBlock`](#0x1_transaction_fee_CollectedFeesPerBlock)
 -  [Struct `FeeStatement`](#0x1_transaction_fee_FeeStatement)
+-  [Struct `GasAssessment`](#0x1_transaction_fee_GasAssessment)
 -  [Constants](#@Constants_0)
 -  [Function `initialize_fee_collection_and_distribution`](#0x1_transaction_fee_initialize_fee_collection_and_distribution)
 -  [Function `is_fees_collection_enabled`](#0x1_transaction_fee_is_fees_collection_enabled)
@@ -26,6 +27,7 @@ This module provides an interface to burn or collect and redistribute transactio
 -  [Function `store_supra_coin_mint_cap`](#0x1_transaction_fee_store_supra_coin_mint_cap)
 -  [Function `initialize_storage_refund`](#0x1_transaction_fee_initialize_storage_refund)
 -  [Function `emit_fee_statement`](#0x1_transaction_fee_emit_fee_statement)
+-  [Function `emit_gas_assessment`](#0x1_transaction_fee_emit_gas_assessment)
 -  [Specification](#@Specification_1)
     -  [High-level Requirements](#high-level-req)
     -  [Module-level Specification](#module-level-spec)
@@ -225,6 +227,61 @@ This is meant to emitted as a module event.
 </dt>
 <dd>
  Total gas charge.
+</dd>
+<dt>
+<code>execution_gas_units: u64</code>
+</dt>
+<dd>
+ Execution gas charge.
+</dd>
+<dt>
+<code>io_gas_units: u64</code>
+</dt>
+<dd>
+ IO gas charge.
+</dd>
+<dt>
+<code>storage_fee_quants: u64</code>
+</dt>
+<dd>
+ Storage fee charge.
+</dd>
+<dt>
+<code>storage_fee_refund_quants: u64</code>
+</dt>
+<dd>
+ Storage fee refund.
+</dd>
+</dl>
+
+
+</details>
+
+<a id="0x1_transaction_fee_GasAssessment"></a>
+
+## Struct `GasAssessment`
+
+Breakdown of the gas consumed by gas-fee-less (i.e. gasless) transactions.
+The consumed amounts serve as a record of the workload of the transaction and
+are not charged to the gas payer's account.
+
+
+<pre><code>#[<a href="event.md#0x1_event">event</a>]
+<b>struct</b> <a href="transaction_fee.md#0x1_transaction_fee_GasAssessment">GasAssessment</a> <b>has</b> drop, store
+</code></pre>
+
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
+<dt>
+<code>total_assessed_gas_units: u64</code>
+</dt>
+<dd>
+ Total gas assessed for transaction execution.
 </dd>
 <dt>
 <code>execution_gas_units: u64</code>
@@ -771,6 +828,46 @@ Only called during genesis.
 
 <pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_fee_statement">emit_fee_statement</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a>) {
     <a href="event.md#0x1_event_emit">event::emit</a>(fee_statement)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_transaction_fee_emit_gas_assessment"></a>
+
+## Function `emit_gas_assessment`
+
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_gas_assessment">emit_gas_assessment</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">transaction_fee::FeeStatement</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="transaction_fee.md#0x1_transaction_fee_emit_gas_assessment">emit_gas_assessment</a>(fee_statement: <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a>) {
+    <b>let</b> <a href="transaction_fee.md#0x1_transaction_fee_FeeStatement">FeeStatement</a> {
+        total_charge_gas_units,
+        execution_gas_units,
+        io_gas_units,
+        storage_fee_quants,
+        storage_fee_refund_quants,
+
+    } = fee_statement;
+    <b>let</b> gas_assesment = <a href="transaction_fee.md#0x1_transaction_fee_GasAssessment">GasAssessment</a> {
+        total_assessed_gas_units: total_charge_gas_units,
+        execution_gas_units,
+        io_gas_units,
+        storage_fee_quants,
+        storage_fee_refund_quants,
+
+    };
+    <a href="event.md#0x1_event_emit">event::emit</a>(gas_assesment)
 }
 </code></pre>
 
