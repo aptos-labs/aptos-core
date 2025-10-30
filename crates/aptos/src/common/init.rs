@@ -3,7 +3,6 @@
 
 use super::types::FaucetOptions;
 use crate::{
-    account::key_rotation::lookup_address,
     common::{
         types::{
             account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
@@ -28,6 +27,9 @@ use std::{
     fmt::{Display, Formatter},
     str::FromStr,
 };
+use aptos_rest_client::Client;
+use aptos_rest_client::error::RestError;
+use move_core_types::account_address::AccountAddress;
 
 /// 1 APT (might not actually get that much, depending on the faucet)
 const NUM_DEFAULT_OCTAS: u64 = 100000000;
@@ -501,4 +503,15 @@ impl Default for Network {
     fn default() -> Self {
         Self::Devnet
     }
+}
+
+pub async fn lookup_address(
+    rest_client: &Client,
+    address_key: AccountAddress,
+    must_exist: bool,
+) -> Result<AccountAddress, RestError> {
+    Ok(rest_client
+        .lookup_address(address_key, must_exist)
+        .await?
+        .into_inner())
 }

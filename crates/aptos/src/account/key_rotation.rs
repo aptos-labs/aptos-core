@@ -14,7 +14,7 @@ use aptos_crypto::{
     PrivateKey, SigningKey,
 };
 use aptos_ledger;
-use aptos_rest_client::{error::RestError, Client};
+use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{RotationProofChallenge, CORE_CODE_ADDRESS},
@@ -24,6 +24,7 @@ use async_trait::async_trait;
 use clap::{Args, Parser};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, path::PathBuf};
+use crate::common::init::lookup_address;
 
 /// Rotate an account's authentication key
 ///
@@ -380,15 +381,4 @@ impl CliCommand<AccountAddress> for LookupAddress {
         };
         Ok(lookup_address(&rest_client, address, true).await?)
     }
-}
-
-pub async fn lookup_address(
-    rest_client: &Client,
-    address_key: AccountAddress,
-    must_exist: bool,
-) -> Result<AccountAddress, RestError> {
-    Ok(rest_client
-        .lookup_address(address_key, must_exist)
-        .await?
-        .into_inner())
 }
