@@ -1198,6 +1198,420 @@ impl<'de> serde::Deserialize<'de> for AutomationPayload {
         deserializer.deserialize_struct("aptos.transaction.v1.AutomationPayload", FIELDS, GeneratedVisitor)
     }
 }
+impl serde::Serialize for AutomationPayloadExtensions {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.variant.is_some() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AutomationPayloadExtensions", len)?;
+        if let Some(v) = self.variant.as_ref() {
+            match v {
+                automation_payload_extensions::Variant::V1(v) => {
+                    struct_ser.serialize_field("v1", v)?;
+                }
+                automation_payload_extensions::Variant::V2(v) => {
+                    struct_ser.serialize_field("v2", v)?;
+                }
+            }
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for AutomationPayloadExtensions {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "v1",
+            "v2",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            V1,
+            V2,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "v1" => Ok(GeneratedField::V1),
+                            "v2" => Ok(GeneratedField::V2),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = AutomationPayloadExtensions;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.AutomationPayloadExtensions")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<AutomationPayloadExtensions, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut variant__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::V1 => {
+                            if variant__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("v1"));
+                            }
+                            variant__ = map.next_value::<::std::option::Option<_>>()?.map(automation_payload_extensions::Variant::V1)
+;
+                        }
+                        GeneratedField::V2 => {
+                            if variant__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("v2"));
+                            }
+                            variant__ = map.next_value::<::std::option::Option<_>>()?.map(automation_payload_extensions::Variant::V2)
+;
+                        }
+                    }
+                }
+                Ok(AutomationPayloadExtensions {
+                    variant: variant__,
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.AutomationPayloadExtensions", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for AutomationPayloadV2 {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::SerializeStruct;
+        let mut len = 0;
+        if self.automated_function.is_some() {
+            len += 1;
+        }
+        if self.expiration_timestamp_secs != 0 {
+            len += 1;
+        }
+        if self.max_gas_amount != 0 {
+            len += 1;
+        }
+        if self.gas_price_cap != 0 {
+            len += 1;
+        }
+        if self.automation_fee_cap != 0 {
+            len += 1;
+        }
+        if !self.aux_data.is_empty() {
+            len += 1;
+        }
+        if self.task_type != 0 {
+            len += 1;
+        }
+        if self.priority.is_some() {
+            len += 1;
+        }
+        let mut struct_ser = serializer.serialize_struct("aptos.transaction.v1.AutomationPayloadV2", len)?;
+        if let Some(v) = self.automated_function.as_ref() {
+            struct_ser.serialize_field("automatedFunction", v)?;
+        }
+        if self.expiration_timestamp_secs != 0 {
+            struct_ser.serialize_field("expirationTimestampSecs", ToString::to_string(&self.expiration_timestamp_secs).as_str())?;
+        }
+        if self.max_gas_amount != 0 {
+            struct_ser.serialize_field("maxGasAmount", ToString::to_string(&self.max_gas_amount).as_str())?;
+        }
+        if self.gas_price_cap != 0 {
+            struct_ser.serialize_field("gasPriceCap", ToString::to_string(&self.gas_price_cap).as_str())?;
+        }
+        if self.automation_fee_cap != 0 {
+            struct_ser.serialize_field("automationFeeCap", ToString::to_string(&self.automation_fee_cap).as_str())?;
+        }
+        if !self.aux_data.is_empty() {
+            struct_ser.serialize_field("auxData", &self.aux_data.iter().map(pbjson::private::base64::encode).collect::<Vec<_>>())?;
+        }
+        if self.task_type != 0 {
+            let v = AutomationTaskType::from_i32(self.task_type)
+                .ok_or_else(|| serde::ser::Error::custom(format!("Invalid variant {}", self.task_type)))?;
+            struct_ser.serialize_field("taskType", &v)?;
+        }
+        if let Some(v) = self.priority.as_ref() {
+            struct_ser.serialize_field("priority", ToString::to_string(&v).as_str())?;
+        }
+        struct_ser.end()
+    }
+}
+impl<'de> serde::Deserialize<'de> for AutomationPayloadV2 {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "automated_function",
+            "automatedFunction",
+            "expiration_timestamp_secs",
+            "expirationTimestampSecs",
+            "max_gas_amount",
+            "maxGasAmount",
+            "gas_price_cap",
+            "gasPriceCap",
+            "automation_fee_cap",
+            "automationFeeCap",
+            "aux_data",
+            "auxData",
+            "task_type",
+            "taskType",
+            "priority",
+        ];
+
+        #[allow(clippy::enum_variant_names)]
+        enum GeneratedField {
+            AutomatedFunction,
+            ExpirationTimestampSecs,
+            MaxGasAmount,
+            GasPriceCap,
+            AutomationFeeCap,
+            AuxData,
+            TaskType,
+            Priority,
+        }
+        impl<'de> serde::Deserialize<'de> for GeneratedField {
+            fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
+            where
+                D: serde::Deserializer<'de>,
+            {
+                struct GeneratedVisitor;
+
+                impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+                    type Value = GeneratedField;
+
+                    fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                        write!(formatter, "expected one of: {:?}", &FIELDS)
+                    }
+
+                    #[allow(unused_variables)]
+                    fn visit_str<E>(self, value: &str) -> std::result::Result<GeneratedField, E>
+                    where
+                        E: serde::de::Error,
+                    {
+                        match value {
+                            "automatedFunction" | "automated_function" => Ok(GeneratedField::AutomatedFunction),
+                            "expirationTimestampSecs" | "expiration_timestamp_secs" => Ok(GeneratedField::ExpirationTimestampSecs),
+                            "maxGasAmount" | "max_gas_amount" => Ok(GeneratedField::MaxGasAmount),
+                            "gasPriceCap" | "gas_price_cap" => Ok(GeneratedField::GasPriceCap),
+                            "automationFeeCap" | "automation_fee_cap" => Ok(GeneratedField::AutomationFeeCap),
+                            "auxData" | "aux_data" => Ok(GeneratedField::AuxData),
+                            "taskType" | "task_type" => Ok(GeneratedField::TaskType),
+                            "priority" => Ok(GeneratedField::Priority),
+                            _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
+                        }
+                    }
+                }
+                deserializer.deserialize_identifier(GeneratedVisitor)
+            }
+        }
+        struct GeneratedVisitor;
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = AutomationPayloadV2;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                formatter.write_str("struct aptos.transaction.v1.AutomationPayloadV2")
+            }
+
+            fn visit_map<V>(self, mut map: V) -> std::result::Result<AutomationPayloadV2, V::Error>
+                where
+                    V: serde::de::MapAccess<'de>,
+            {
+                let mut automated_function__ = None;
+                let mut expiration_timestamp_secs__ = None;
+                let mut max_gas_amount__ = None;
+                let mut gas_price_cap__ = None;
+                let mut automation_fee_cap__ = None;
+                let mut aux_data__ = None;
+                let mut task_type__ = None;
+                let mut priority__ = None;
+                while let Some(k) = map.next_key()? {
+                    match k {
+                        GeneratedField::AutomatedFunction => {
+                            if automated_function__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("automatedFunction"));
+                            }
+                            automated_function__ = map.next_value()?;
+                        }
+                        GeneratedField::ExpirationTimestampSecs => {
+                            if expiration_timestamp_secs__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("expirationTimestampSecs"));
+                            }
+                            expiration_timestamp_secs__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::MaxGasAmount => {
+                            if max_gas_amount__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("maxGasAmount"));
+                            }
+                            max_gas_amount__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::GasPriceCap => {
+                            if gas_price_cap__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("gasPriceCap"));
+                            }
+                            gas_price_cap__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::AutomationFeeCap => {
+                            if automation_fee_cap__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("automationFeeCap"));
+                            }
+                            automation_fee_cap__ =
+                                Some(map.next_value::<::pbjson::private::NumberDeserialize<_>>()?.0)
+                            ;
+                        }
+                        GeneratedField::AuxData => {
+                            if aux_data__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("auxData"));
+                            }
+                            aux_data__ =
+                                Some(map.next_value::<Vec<::pbjson::private::BytesDeserialize<_>>>()?
+                                    .into_iter().map(|x| x.0).collect())
+                            ;
+                        }
+                        GeneratedField::TaskType => {
+                            if task_type__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("taskType"));
+                            }
+                            task_type__ = Some(map.next_value::<AutomationTaskType>()? as i32);
+                        }
+                        GeneratedField::Priority => {
+                            if priority__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("priority"));
+                            }
+                            priority__ =
+                                map.next_value::<::std::option::Option<::pbjson::private::NumberDeserialize<_>>>()?.map(|x| x.0)
+                            ;
+                        }
+                    }
+                }
+                Ok(AutomationPayloadV2 {
+                    automated_function: automated_function__,
+                    expiration_timestamp_secs: expiration_timestamp_secs__.unwrap_or_default(),
+                    max_gas_amount: max_gas_amount__.unwrap_or_default(),
+                    gas_price_cap: gas_price_cap__.unwrap_or_default(),
+                    automation_fee_cap: automation_fee_cap__.unwrap_or_default(),
+                    aux_data: aux_data__.unwrap_or_default(),
+                    task_type: task_type__.unwrap_or_default(),
+                    priority: priority__,
+                })
+            }
+        }
+        deserializer.deserialize_struct("aptos.transaction.v1.AutomationPayloadV2", FIELDS, GeneratedVisitor)
+    }
+}
+impl serde::Serialize for AutomationTaskType {
+    #[allow(deprecated)]
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let variant = match self {
+            Self::User => "User",
+            Self::System => "System",
+        };
+        serializer.serialize_str(variant)
+    }
+}
+impl<'de> serde::Deserialize<'de> for AutomationTaskType {
+    #[allow(deprecated)]
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        const FIELDS: &[&str] = &[
+            "User",
+            "System",
+        ];
+
+        struct GeneratedVisitor;
+
+        impl<'de> serde::de::Visitor<'de> for GeneratedVisitor {
+            type Value = AutomationTaskType;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(formatter, "expected one of: {:?}", &FIELDS)
+            }
+
+            fn visit_i64<E>(self, v: i64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                use std::convert::TryFrom;
+                i32::try_from(v)
+                    .ok()
+                    .and_then(AutomationTaskType::from_i32)
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Signed(v), &self)
+                    })
+            }
+
+            fn visit_u64<E>(self, v: u64) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                use std::convert::TryFrom;
+                i32::try_from(v)
+                    .ok()
+                    .and_then(AutomationTaskType::from_i32)
+                    .ok_or_else(|| {
+                        serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(v), &self)
+                    })
+            }
+
+            fn visit_str<E>(self, value: &str) -> std::result::Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                match value {
+                    "User" => Ok(AutomationTaskType::User),
+                    "System" => Ok(AutomationTaskType::System),
+                    _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
+                }
+            }
+        }
+        deserializer.deserialize_any(GeneratedVisitor)
+    }
+}
 impl serde::Serialize for Block {
     #[allow(deprecated)]
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -6115,6 +6529,9 @@ impl serde::Serialize for MultisigTransactionPayload {
                 multisig_transaction_payload::Payload::EntryFunctionPayload(v) => {
                     struct_ser.serialize_field("entryFunctionPayload", v)?;
                 }
+                multisig_transaction_payload::Payload::AutomationPayload(v) => {
+                    struct_ser.serialize_field("automationPayload", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -6130,12 +6547,15 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
             "type",
             "entry_function_payload",
             "entryFunctionPayload",
+            "automation_payload",
+            "automationPayload",
         ];
 
         #[allow(clippy::enum_variant_names)]
         enum GeneratedField {
             Type,
             EntryFunctionPayload,
+            AutomationPayload,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -6159,6 +6579,7 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                         match value {
                             "type" => Ok(GeneratedField::Type),
                             "entryFunctionPayload" | "entry_function_payload" => Ok(GeneratedField::EntryFunctionPayload),
+                            "automationPayload" | "automation_payload" => Ok(GeneratedField::AutomationPayload),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -6195,6 +6616,13 @@ impl<'de> serde::Deserialize<'de> for MultisigTransactionPayload {
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::EntryFunctionPayload)
 ;
                         }
+                        GeneratedField::AutomationPayload => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("automationPayload"));
+                            }
+                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(multisig_transaction_payload::Payload::AutomationPayload)
+;
+                        }
                     }
                 }
                 Ok(MultisigTransactionPayload {
@@ -6215,6 +6643,7 @@ impl serde::Serialize for multisig_transaction_payload::Type {
         let variant = match self {
             Self::Unspecified => "TYPE_UNSPECIFIED",
             Self::EntryFunctionPayload => "TYPE_ENTRY_FUNCTION_PAYLOAD",
+            Self::AutomationPayload => "TYPE_AUTOMATION_PAYLOAD",
         };
         serializer.serialize_str(variant)
     }
@@ -6228,6 +6657,7 @@ impl<'de> serde::Deserialize<'de> for multisig_transaction_payload::Type {
         const FIELDS: &[&str] = &[
             "TYPE_UNSPECIFIED",
             "TYPE_ENTRY_FUNCTION_PAYLOAD",
+            "TYPE_AUTOMATION_PAYLOAD",
         ];
 
         struct GeneratedVisitor;
@@ -6272,6 +6702,7 @@ impl<'de> serde::Deserialize<'de> for multisig_transaction_payload::Type {
                 match value {
                     "TYPE_UNSPECIFIED" => Ok(multisig_transaction_payload::Type::Unspecified),
                     "TYPE_ENTRY_FUNCTION_PAYLOAD" => Ok(multisig_transaction_payload::Type::EntryFunctionPayload),
+                    "TYPE_AUTOMATION_PAYLOAD" => Ok(multisig_transaction_payload::Type::AutomationPayload),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }
@@ -7813,6 +8244,9 @@ impl serde::Serialize for TransactionPayload {
                 transaction_payload::Payload::AutomationPayload(v) => {
                     struct_ser.serialize_field("automationPayload", v)?;
                 }
+                transaction_payload::Payload::AutomationPayloads(v) => {
+                    struct_ser.serialize_field("automationPayloads", v)?;
+                }
             }
         }
         struct_ser.end()
@@ -7836,6 +8270,8 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             "multisigPayload",
             "automation_payload",
             "automationPayload",
+            "automation_payloads",
+            "automationPayloads",
         ];
 
         #[allow(clippy::enum_variant_names)]
@@ -7846,6 +8282,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
             WriteSetPayload,
             MultisigPayload,
             AutomationPayload,
+            AutomationPayloads,
         }
         impl<'de> serde::Deserialize<'de> for GeneratedField {
             fn deserialize<D>(deserializer: D) -> std::result::Result<GeneratedField, D::Error>
@@ -7873,6 +8310,7 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             "writeSetPayload" | "write_set_payload" => Ok(GeneratedField::WriteSetPayload),
                             "multisigPayload" | "multisig_payload" => Ok(GeneratedField::MultisigPayload),
                             "automationPayload" | "automation_payload" => Ok(GeneratedField::AutomationPayload),
+                            "automationPayloads" | "automation_payloads" => Ok(GeneratedField::AutomationPayloads),
                             _ => Err(serde::de::Error::unknown_field(value, FIELDS)),
                         }
                     }
@@ -7937,6 +8375,13 @@ impl<'de> serde::Deserialize<'de> for TransactionPayload {
                             payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::AutomationPayload)
 ;
                         }
+                        GeneratedField::AutomationPayloads => {
+                            if payload__.is_some() {
+                                return Err(serde::de::Error::duplicate_field("automationPayloads"));
+                            }
+                            payload__ = map.next_value::<::std::option::Option<_>>()?.map(transaction_payload::Payload::AutomationPayloads)
+;
+                        }
                     }
                 }
                 Ok(TransactionPayload {
@@ -7961,6 +8406,7 @@ impl serde::Serialize for transaction_payload::Type {
             Self::WriteSetPayload => "TYPE_WRITE_SET_PAYLOAD",
             Self::MultisigPayload => "TYPE_MULTISIG_PAYLOAD",
             Self::AutomationPayload => "TYPE_AUTOMATION_PAYLOAD",
+            Self::AutomationPayloadExtension => "TYPE_AUTOMATION_PAYLOAD_EXTENSION",
         };
         serializer.serialize_str(variant)
     }
@@ -7978,6 +8424,7 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
             "TYPE_WRITE_SET_PAYLOAD",
             "TYPE_MULTISIG_PAYLOAD",
             "TYPE_AUTOMATION_PAYLOAD",
+            "TYPE_AUTOMATION_PAYLOAD_EXTENSION",
         ];
 
         struct GeneratedVisitor;
@@ -8026,6 +8473,7 @@ impl<'de> serde::Deserialize<'de> for transaction_payload::Type {
                     "TYPE_WRITE_SET_PAYLOAD" => Ok(transaction_payload::Type::WriteSetPayload),
                     "TYPE_MULTISIG_PAYLOAD" => Ok(transaction_payload::Type::MultisigPayload),
                     "TYPE_AUTOMATION_PAYLOAD" => Ok(transaction_payload::Type::AutomationPayload),
+                    "TYPE_AUTOMATION_PAYLOAD_EXTENSION" => Ok(transaction_payload::Type::AutomationPayloadExtension),
                     _ => Err(serde::de::Error::unknown_variant(value, FIELDS)),
                 }
             }

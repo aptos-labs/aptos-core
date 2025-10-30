@@ -16,6 +16,7 @@
 -  [Function `initialize`](#0x1_genesis_initialize)
 -  [Function `initialize_supra_coin`](#0x1_genesis_initialize_supra_coin)
 -  [Function `initialize_supra_native_automation`](#0x1_genesis_initialize_supra_native_automation)
+-  [Function `initialize_supra_native_automation_v2`](#0x1_genesis_initialize_supra_native_automation_v2)
 -  [Function `initialize_core_resources_and_supra_coin`](#0x1_genesis_initialize_core_resources_and_supra_coin)
 -  [Function `initialize_evm_genesis_config`](#0x1_genesis_initialize_evm_genesis_config)
 -  [Function `create_accounts`](#0x1_genesis_create_accounts)
@@ -680,10 +681,12 @@ Genesis step 2: Initialize Supra coin.
 
 ## Function `initialize_supra_native_automation`
 
-Genesis step 3: Initialize Supra Native Automation.
+DEPRECATED
+
+Deprecated in favoor of initialize_supra_native_automation_v2.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="genesis.md#0x1_genesis_initialize_supra_native_automation">initialize_supra_native_automation</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, task_duration_cap_in_secs: u64, registry_max_gas_cap: u64, automation_base_fee_in_quants_per_sec: u64, flat_registration_fee_in_quants: u64, congestion_threshold_percentage: u8, congestion_base_fee_in_quants_per_sec: u64, congestion_exponent: u8, task_capacity: u16)
+<pre><code><b>public</b> <b>fun</b> <a href="genesis.md#0x1_genesis_initialize_supra_native_automation">initialize_supra_native_automation</a>(_supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _task_duration_cap_in_secs: u64, _registry_max_gas_cap: u64, _automation_base_fee_in_quants_per_sec: u64, _flat_registration_fee_in_quants: u64, _congestion_threshold_percentage: u8, _congestion_base_fee_in_quants_per_sec: u64, _congestion_exponent: u8, _task_capacity: u16)
 </code></pre>
 
 
@@ -693,6 +696,40 @@ Genesis step 3: Initialize Supra Native Automation.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="genesis.md#0x1_genesis_initialize_supra_native_automation">initialize_supra_native_automation</a>(
+    _supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    _task_duration_cap_in_secs: u64,
+    _registry_max_gas_cap: u64,
+    _automation_base_fee_in_quants_per_sec: u64,
+    _flat_registration_fee_in_quants: u64,
+    _congestion_threshold_percentage: u8,
+    _congestion_base_fee_in_quants_per_sec: u64,
+    _congestion_exponent: u8,
+    _task_capacity: u16,
+) {
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_genesis_initialize_supra_native_automation_v2"></a>
+
+## Function `initialize_supra_native_automation_v2`
+
+Genesis step 3: Initialize Supra Native Automation.
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="genesis.md#0x1_genesis_initialize_supra_native_automation_v2">initialize_supra_native_automation_v2</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, task_duration_cap_in_secs: u64, registry_max_gas_cap: u64, automation_base_fee_in_quants_per_sec: u64, flat_registration_fee_in_quants: u64, congestion_threshold_percentage: u8, congestion_base_fee_in_quants_per_sec: u64, congestion_exponent: u8, task_capacity: u16, cycle_duration: u64, sys_task_duration_cap_in_secs: u64, sys_registry_max_gas_cap: u64, sys_task_capacity: u16)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="genesis.md#0x1_genesis_initialize_supra_native_automation_v2">initialize_supra_native_automation_v2</a>(
     supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     task_duration_cap_in_secs: u64,
     registry_max_gas_cap: u64,
@@ -702,11 +739,14 @@ Genesis step 3: Initialize Supra Native Automation.
     congestion_base_fee_in_quants_per_sec: u64,
     congestion_exponent: u8,
     task_capacity: u16,
+    cycle_duration: u64,
+    sys_task_duration_cap_in_secs: u64,
+    sys_registry_max_gas_cap: u64,
+    sys_task_capacity: u16,
 ) {
-    <b>let</b> epoch_interval_secs = <a href="block.md#0x1_block_get_epoch_interval_secs">block::get_epoch_interval_secs</a>();
     <a href="automation_registry.md#0x1_automation_registry_initialize">automation_registry::initialize</a>(
         supra_framework,
-        epoch_interval_secs,
+        cycle_duration,
         task_duration_cap_in_secs,
         registry_max_gas_cap,
         automation_base_fee_in_quants_per_sec,
@@ -715,6 +755,9 @@ Genesis step 3: Initialize Supra Native Automation.
         congestion_base_fee_in_quants_per_sec,
         congestion_exponent,
         task_capacity,
+        sys_task_duration_cap_in_secs,
+        sys_registry_max_gas_cap,
+        sys_task_capacity,
     )
 }
 </code></pre>
@@ -769,8 +812,6 @@ Only called for testnets and e2e tests.
 ## Function `initialize_evm_genesis_config`
 
 Initialize the EVM genesis config.
-Only called for devnet and e2e tests at genesis.
-Testnet/Mainnet should be handled by governance.
 
 
 <pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_initialize_evm_genesis_config">initialize_evm_genesis_config</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, <a href="evm_genesis_config.md#0x1_evm_genesis_config">evm_genesis_config</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
@@ -1071,7 +1112,6 @@ If it exists, it just returns the signer.
 ## Function `create_initialize_validators_with_commission`
 
 DEPRECATED
-
 
 
 <pre><code><b>fun</b> <a href="genesis.md#0x1_genesis_create_initialize_validators_with_commission">create_initialize_validators_with_commission</a>(supra_framework: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, use_staking_contract: bool, validators: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<a href="genesis.md#0x1_genesis_ValidatorConfigurationWithCommission">genesis::ValidatorConfigurationWithCommission</a>&gt;)
@@ -1898,12 +1938,18 @@ The last step of genesis.
 
 
 <pre><code><b>pragma</b> delegate_invariants_to_caller;
+<b>pragma</b> aborts_if_is_partial;
 // This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
 <b>requires</b> len(<b>global</b>&lt;<a href="stake.md#0x1_stake_ValidatorSet">stake::ValidatorSet</a>&gt;(@supra_framework).active_validators) &gt;= 1;
 // This enforces <a id="high-level-req-5" href="#high-level-req">high-level requirement 5</a>:
+<b>include</b> <a href="stake.md#0x1_stake_ResourceRequirement">stake::ResourceRequirement</a>;
+<b>include</b> <a href="reconfiguration_state.md#0x1_reconfiguration_state_StartTimeSecsRequirement">reconfiguration_state::StartTimeSecsRequirement</a>;
+<b>include</b> <a href="supra_coin.md#0x1_supra_coin_ExistsSupraCoin">supra_coin::ExistsSupraCoin</a>;
+<b>include</b> <a href="staking_config.md#0x1_staking_config_StakingRewardsConfigEnabledRequirement">staking_config::StakingRewardsConfigEnabledRequirement</a>;
 <b>let</b> addr = std::signer::address_of(supra_framework);
 <b>aborts_if</b> addr != @supra_framework;
 <b>aborts_if</b> <b>exists</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@supra_framework);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="supra_coin.md#0x1_supra_coin_MintCapStore">supra_coin::MintCapStore</a>&gt;(@supra_framework);
 <b>ensures</b> <b>global</b>&lt;<a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a>&gt;(@supra_framework) == <a href="chain_status.md#0x1_chain_status_GenesisEndMarker">chain_status::GenesisEndMarker</a> {};
 </code></pre>
 

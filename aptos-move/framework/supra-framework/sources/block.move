@@ -135,9 +135,6 @@ module supra_framework::block {
         let old_epoch_interval = block_resource.epoch_interval;
         block_resource.epoch_interval = new_epoch_interval;
 
-        // update epoch interval in registry contract
-        automation_registry::update_epoch_interval_in_registry(new_epoch_interval);
-
         if (std::features::module_event_migration_enabled()) {
             event::emit(
                 UpdateEpochInterval { old_epoch_interval, new_epoch_interval },
@@ -219,6 +216,8 @@ module supra_framework::block {
         // transition is the last block in the previous epoch.
         stake::update_performance_statistics(proposer_index, failed_proposer_indices);
         state_storage::on_new_block(reconfiguration::current_epoch());
+
+        automation_registry::monitor_cycle_end();
 
         block_metadata_ref.epoch_interval
     }

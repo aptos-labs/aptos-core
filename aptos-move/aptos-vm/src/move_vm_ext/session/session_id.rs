@@ -10,6 +10,7 @@ use aptos_types::{
 };
 use move_core_types::account_address::AccountAddress;
 use serde::{Deserialize, Serialize};
+use aptos_types::transaction::automation::AutomationRegistryRecord;
 
 #[derive(BCSCryptoHash, Clone, CryptoHasher, Deserialize, Serialize)]
 pub enum SessionId {
@@ -50,6 +51,9 @@ pub enum SessionId {
     ValidatorTxn {
         script_hash: Vec<u8>,
     },
+    AutomationRegistryTxn {
+        id: HashValue,
+    }
 }
 
 impl SessionId {
@@ -82,6 +86,12 @@ impl SessionId {
             sender: txn_metadata.sender,
             sequence_number: txn_metadata.sequence_number,
             script_hash: txn_metadata.script_hash.clone(),
+        }
+    }
+
+    pub fn automation_registry_action(record: &AutomationRegistryRecord) -> Self {
+        Self::AutomationRegistryTxn {
+            id: record.hash()
         }
     }
 
@@ -140,6 +150,7 @@ impl SessionId {
             | Self::ValidatorTxn { script_hash } => script_hash,
             Self::BlockMeta { id: _ }
             | Self::Genesis { id: _ }
+            | Self::AutomationRegistryTxn { id: _ }
             | Self::Void
             | Self::BlockMetaExt { id: _ } => vec![],
         }

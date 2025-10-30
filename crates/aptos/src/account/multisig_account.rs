@@ -1,7 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use anyhow::anyhow;
 use crate::common::{
     types::{
         CliCommand, CliError, CliTypedResult, EntryFunctionArguments, MultisigAccount,
@@ -9,6 +8,7 @@ use crate::common::{
     },
     utils::view_json_option_str,
 };
+use anyhow::anyhow;
 use aptos_api_types::ViewFunction;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::HashValue;
@@ -16,13 +16,14 @@ use aptos_rest_client::{
     aptos_api_types::{HexEncodedBytes, WriteResource, WriteSetChange},
     Transaction,
 };
+use aptos_types::transaction::automation::RegistrationParams;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{Multisig, MultisigTransactionPayload, TransactionPayload},
 };
 use async_trait::async_trait;
 use bcs::to_bytes;
-use clap::Parser;
+use clap::{Parser, Subcommand};
 use move_core_types::{ident_str, language_storage::ModuleId};
 use serde::Serialize;
 use serde_json::json;
@@ -36,10 +37,10 @@ pub struct Create {
     /// Addresses of additional owners for the new multisig, beside the transaction sender.
     #[clap(long, num_args = 0.., value_parser = crate::common::types::load_account_arg)]
     pub(crate) additional_owners: Vec<AccountAddress>,
-	/// account level timeout_duration in seconds, all created Tx must be approved and
-	/// executed before this timeout (from its creation) otherwise the Tx is marked for rejection
-	#[clap(long)]
-	pub(crate) timeout_duration: u64,
+    /// account level timeout_duration in seconds, all created Tx must be approved and
+    /// executed before this timeout (from its creation) otherwise the Tx is marked for rejection
+    #[clap(long)]
+    pub(crate) timeout_duration: u64,
     /// The number of signatures (approvals or rejections) required to execute or remove a proposed
     /// transaction.
     #[clap(long)]
@@ -108,7 +109,7 @@ impl CliCommand<CreateSummary> for Create {
                 // TODO: Support passing in custom metadata.
                 vec![],
                 vec![],
-				self.timeout_duration,
+                self.timeout_duration,
             ))
             .await
             .map(CreateSummary::from)
@@ -119,13 +120,17 @@ impl CliCommand<CreateSummary> for Create {
 impl SupraCommand for Create {
     async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
         if self.metadata_keys.len() != self.metadata_values.len() {
-            return Err(anyhow!("Not all metadata key has a metadata value."))
+            return Err(anyhow!("Not all metadata key has a metadata value."));
         };
-        let metadata_key = self.metadata_keys.iter()
+        let metadata_key = self
+            .metadata_keys
+            .iter()
             .map(|k| to_bytes(k))
             .collect::<Result<Vec<_>, _>>()?;
 
-        let metadata_value = self.metadata_values.iter()
+        let metadata_value = self
+            .metadata_values
+            .iter()
             .map(|v| to_bytes(v))
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -137,17 +142,116 @@ impl SupraCommand for Create {
             self.timeout_duration,
         );
 
-        Ok(
-            SupraCommandArguments {
-                payload,
-                sender_account: self.txn_options.sender_account,
-                profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
-                rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
-                gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
-            }
-        )
+        Ok(SupraCommandArguments {
+            payload,
+            sender_account: self.txn_options.sender_account,
+            profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
+            rest_options: supra_aptos::RestOptions::from(self.txn_options.rest_options),
+            gas_options: supra_aptos::GasOptions::from(self.txn_options.gas_options),
+        })
     }
 }
+
+#[derive(Debug, Subcommand)]
+pub enum MultisigPayloadVariants {
+    /// Propose a new multisig transaction to register an automation task.
+    AutomationTask(AutomationTaskRegistrationArguments),
+    /// Propose a new multisig transaction with enclosed entry function as inner payload.
+    EntryFunction(EntryFunctionArguments),
+    /// Propose a new multisig transaction to register an automation task that is not charged any gas.
+    /// Only accounts that have been authorised by governance are permitted to register gas-less automation tasks.
+    GaslessAutomationTask(GaslessAutomationTaskRegistrationArguments),
+}
+
+impl TryFrom<MultisigPayloadVariants> for MultisigTransactionPayload {
+    type Error = CliError;
+
+    fn try_from(value: MultisigPayloadVariants) -> Result<Self, Self::Error> {
+        match value {
+            MultisigPayloadVariants::EntryFunction(e) => e.try_into(),
+            MultisigPayloadVariants::GaslessAutomationTask(r) => r.try_into(),
+            MultisigPayloadVariants::AutomationTask(r) => r.try_into()
+        }
+    }
+}
+
+/// Multisig transaction payload arguments to register a gass-less automation task.
+#[derive(Debug, Parser)]
+pub struct GaslessAutomationTaskRegistrationArguments {
+    /// Inner automation payload.
+    #[clap(flatten)]
+    pub(crate) automation_function: EntryFunctionArguments,
+    /// Automation task expiry time in seconds
+    #[clap(long)]
+    pub(crate) task_expiry_time_secs: u64,
+    /// Max gas amount for task execution.
+    #[clap(long)]
+    pub(crate) task_max_gas_amount: u64,
+    /// Task priority assigned by user.
+    #[clap(long)]
+    pub(crate) task_priority: Option<u64>,
+}
+
+impl TryInto<MultisigTransactionPayload> for GaslessAutomationTaskRegistrationArguments {
+    type Error = CliError;
+
+    fn try_into(self) -> Result<MultisigTransactionPayload, Self::Error> {
+        let automation_function = self.automation_function.try_into()?;
+        let registration_params = RegistrationParams::new_system_automation_task(
+            automation_function,
+            self.task_expiry_time_secs,
+            self.task_max_gas_amount,
+            vec![],
+            self.task_priority,
+        );
+        let multisig_payload =
+            MultisigTransactionPayload::AutomationRegistration(registration_params);
+        Ok(multisig_payload)
+    }
+}
+
+/// Multisig transaction payload arguments to register an automation task.
+#[derive(Debug, Parser)]
+pub struct AutomationTaskRegistrationArguments {
+    /// Inner automation payload.
+    #[clap(flatten)]
+    pub(crate) automation_function: EntryFunctionArguments,
+    /// Automation task expiry time in seconds
+    #[clap(long)]
+    pub(crate) task_expiry_time_secs: u64,
+    /// Max gas amount for task execution.
+    #[clap(long)]
+    pub(crate) task_max_gas_amount: u64,
+    /// Gas price capacity for task execution.
+    #[clap(long)]
+    pub(crate) task_gas_price_cap: u64,
+    /// Automation fee capacity for the task.
+    #[clap(long)]
+    pub(crate) task_automation_fee_cap: u64,
+}
+
+impl TryFrom<AutomationTaskRegistrationArguments> for MultisigTransactionPayload {
+    type Error = CliError;
+
+    fn try_from(
+        value: AutomationTaskRegistrationArguments
+    ) -> Result<MultisigTransactionPayload, Self::Error> {
+        let automation_function = value.automation_function.try_into()?;
+        let registration_params = RegistrationParams::new_user_automation_task_v2(
+            automation_function,
+            value.task_expiry_time_secs,
+            value.task_max_gas_amount,
+            value.task_gas_price_cap,
+            value.task_automation_fee_cap,
+            vec![],
+            None,
+        );
+        let multisig_payload =
+            MultisigTransactionPayload::AutomationRegistration(registration_params);
+        Ok(multisig_payload)
+    }
+}
+
 
 /// Propose a new multisig transaction.
 ///
@@ -160,12 +264,13 @@ pub struct CreateTransaction {
     pub(crate) multisig_account: MultisigAccount,
     #[clap(flatten)]
     pub(crate) txn_options: TransactionOptions,
-    #[clap(flatten)]
-    pub(crate) entry_function_args: EntryFunctionArguments,
+    #[clap(subcommand)]
+    pub(crate) payload: MultisigPayloadVariants,
     /// Pass this flag if only storing transaction hash on-chain. Else full payload is stored
     #[clap(long)]
     pub(crate) store_hash_only: bool,
 }
+
 
 #[async_trait]
 impl CliCommand<TransactionSummary> for CreateTransaction {
@@ -175,7 +280,7 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
 
     async fn execute(self) -> CliTypedResult<TransactionSummary> {
         let multisig_transaction_payload_bytes =
-            to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
+            to_bytes::<MultisigTransactionPayload>(&self.payload.try_into()?)?;
         let transaction_payload = if self.store_hash_only {
             aptos_stdlib::multisig_account_create_transaction_with_hash(
                 self.multisig_account.multisig_address,
@@ -198,7 +303,7 @@ impl CliCommand<TransactionSummary> for CreateTransaction {
 impl SupraCommand for CreateTransaction {
     async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
         let multisig_transaction_payload_bytes =
-            to_bytes::<MultisigTransactionPayload>(&self.entry_function_args.try_into()?)?;
+            to_bytes::<MultisigTransactionPayload>(&self.payload.try_into()?)?;
         let payload = if self.store_hash_only {
             aptos_stdlib::multisig_account_create_transaction_with_hash(
                 self.multisig_account.multisig_address,
@@ -210,7 +315,7 @@ impl SupraCommand for CreateTransaction {
                 multisig_transaction_payload_bytes,
             )
         };
-        Ok(SupraCommandArguments{
+        Ok(SupraCommandArguments {
             payload,
             sender_account: self.txn_options.sender_account,
             profile_options: supra_aptos::ProfileOptions::from(self.txn_options.profile_options),
@@ -219,6 +324,8 @@ impl SupraCommand for CreateTransaction {
         })
     }
 }
+
+
 
 /// Verify entry function matches on-chain transaction proposal.
 #[derive(Debug, Parser)]
@@ -448,8 +555,8 @@ impl SupraCommand for Execute {
 pub struct ExecuteWithPayload {
     #[clap(flatten)]
     pub(crate) execute: Execute,
-    #[clap(flatten)]
-    pub(crate) entry_function_args: EntryFunctionArguments,
+    #[clap(subcommand)]
+    pub(crate) payload: MultisigPayloadVariants,
 }
 
 #[async_trait]
@@ -463,7 +570,7 @@ impl CliCommand<TransactionSummary> for ExecuteWithPayload {
             .txn_options
             .submit_transaction(TransactionPayload::Multisig(Multisig {
                 multisig_address: self.execute.multisig_account.multisig_address,
-                transaction_payload: Some(self.entry_function_args.try_into()?),
+                transaction_payload: Some(self.payload.try_into()?),
             }))
             .await
             .map(|inner| inner.into())
@@ -475,12 +582,14 @@ impl SupraCommand for ExecuteWithPayload {
     async fn supra_command_arguments(self) -> anyhow::Result<SupraCommandArguments> {
         let payload = TransactionPayload::Multisig(Multisig {
             multisig_address: self.execute.multisig_account.multisig_address,
-            transaction_payload: Some(self.entry_function_args.try_into()?),
+            transaction_payload: Some(self.payload.try_into()?),
         });
         Ok(SupraCommandArguments {
             payload,
             sender_account: self.execute.txn_options.sender_account,
-            profile_options: supra_aptos::ProfileOptions::from(self.execute.txn_options.profile_options),
+            profile_options: supra_aptos::ProfileOptions::from(
+                self.execute.txn_options.profile_options,
+            ),
             rest_options: supra_aptos::RestOptions::from(self.execute.txn_options.rest_options),
             gas_options: supra_aptos::GasOptions::from(self.execute.txn_options.gas_options),
         })

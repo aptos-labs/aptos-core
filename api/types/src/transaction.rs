@@ -37,6 +37,7 @@ use aptos_types::{
 };
 use once_cell::sync::Lazy;
 use poem_openapi::{Object, Union};
+use poem_openapi_derive::Enum;
 use serde::{Deserialize, Serialize};
 use std::{
     boxed::Box,
@@ -1041,6 +1042,7 @@ impl TryFrom<Script> for ScriptPayload {
 #[oai(one_of, discriminator_name = "type", rename_all = "snake_case")]
 pub enum MultisigTransactionPayload {
     EntryFunctionPayload(EntryFunctionPayload),
+    AutomationRegistrationPayload(AutomationRegistrationParams),
 }
 
 /// A multisig transaction that allows an owner of a multisig account to execute a pre-approved
@@ -1065,6 +1067,9 @@ impl VerifyInput for MultisigPayload {
                         type_arg.verify(0)?;
                     }
                 },
+                MultisigTransactionPayload::AutomationRegistrationPayload(params) => {
+                    params.verify()?;
+                },
             }
         }
 
@@ -1073,14 +1078,23 @@ impl VerifyInput for MultisigPayload {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Union)]
-pub enum  AutomationRegistrationParams {
-    V1(AutomationRegistrationParamsV1)
+pub enum AutomationRegistrationParams {
+    V1(AutomationRegistrationParamsV1),
+    V2(AutomationRegistrationParamsV2),
 }
 
 impl AutomationRegistrationParams {
     pub fn into_v1(self) -> Option<AutomationRegistrationParamsV1> {
-        let AutomationRegistrationParams::V1(params_v1) = self;
+        let AutomationRegistrationParams::V1(params_v1) = self else {
+            return None;
+        };
         Some(params_v1)
+    }
+    pub fn into_v2(self) -> Option<AutomationRegistrationParamsV2> {
+        let AutomationRegistrationParams::V2(params_v2) = self else {
+            return None;
+        };
+        Some(params_v2)
     }
 }
 
@@ -1092,8 +1106,34 @@ impl From<AutomationRegistrationParamsV1> for AutomationRegistrationParams {
 
 impl VerifyInput for AutomationRegistrationParams {
     fn verify(&self) -> anyhow::Result<()> {
-        let AutomationRegistrationParams::V1(params_v1) = self;
-        params_v1.verify()
+        match self {
+            AutomationRegistrationParams::V1(p1) => p1.verify(),
+            AutomationRegistrationParams::V2(p2) => p2.verify(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Enum)]
+#[serde(rename_all = "snake_case")]
+pub enum AutomationTaskType {
+    User,
+    System,
+}
+
+impl From<aptos_types::transaction::automation::AutomationTaskType> for AutomationTaskType {
+    fn from(value: aptos_types::transaction::automation::AutomationTaskType) -> Self {
+        match value {
+            aptos_types::transaction::automation::AutomationTaskType::User => Self::User,
+            aptos_types::transaction::automation::AutomationTaskType::System => Self::System,
+        }
+    }
+}
+impl From<AutomationTaskType> for aptos_types::transaction::automation::AutomationTaskType {
+    fn from(value: AutomationTaskType) -> Self {
+        match value {
+            AutomationTaskType::User => Self::User,
+            AutomationTaskType::System => Self::System,
+        }
     }
 }
 
@@ -1110,10 +1150,38 @@ pub struct AutomationRegistrationParamsV1 {
 impl VerifyInput for AutomationRegistrationParamsV1 {
     fn verify(&self) -> anyhow::Result<()> {
         self.automated_function.function.verify()?;
-        for type_arg in self.automated_function.type_arguments.iter() {
-            type_arg.verify(0)?;
-        }
-        Ok(())
+        self.automated_function
+            .type_arguments
+            .iter()
+            .try_for_each(|type_arg| type_arg.verify(0))
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Object)]
+pub struct AutomationRegistrationParamsV2 {
+    pub automated_function: EntryFunctionPayload,
+    pub expiration_timestamp_secs: u64,
+    pub max_gas_amount: u64,
+    pub gas_price_cap: u64,
+    pub automation_fee_cap: u64,
+    pub aux_data: Vec<Vec<u8>>,
+    pub task_type: AutomationTaskType,
+    pub task_priority: Option<u64>,
+}
+
+impl VerifyInput for AutomationRegistrationParamsV2 {
+    fn verify(&self) -> anyhow::Result<()> {
+        self.automated_function.function.verify()?;
+        self.automated_function
+            .type_arguments
+            .iter()
+            .try_for_each(|type_arg| type_arg.verify(0))
+    }
+}
+
+impl From<AutomationRegistrationParamsV2> for AutomationRegistrationParams {
+    fn from(value: AutomationRegistrationParamsV2) -> Self {
+        Self::V2(value)
     }
 }
 

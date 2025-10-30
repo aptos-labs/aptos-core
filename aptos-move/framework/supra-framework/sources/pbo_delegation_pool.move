@@ -852,12 +852,12 @@ module supra_framework::pbo_delegation_pool {
         )
 
     }
-    
+
     // Create `vector<FixedPoint64>` for schedule fractions from numerators and a denominator
     // Pre-condition: It is assumed that `validate_unlock_schedule_params` is called before this
     // If the denominator is zero, this function would fail in `create_from_rational`
     fun create_schedule_fractions(unlock_numerators: &vector<u64>, unlock_denominator: u64) : vector<FixedPoint64> {
-        
+
     //Create unlock schedule
         let schedule = vector::empty();
         vector::for_each_ref(
@@ -870,7 +870,7 @@ module supra_framework::pbo_delegation_pool {
                 vector::push_back(&mut schedule, fraction);
             }
         );
-        
+
         schedule
 
     }
@@ -910,7 +910,7 @@ module supra_framework::pbo_delegation_pool {
 
         //Create unlock schedule fractions
         let schedule = create_schedule_fractions(&unlock_numerators,unlock_denominator);
-       
+
         pool.principle_unlock_schedule = UnlockSchedule {
             schedule: schedule,
             start_timestamp_secs: unlock_start_time,
@@ -1008,7 +1008,7 @@ module supra_framework::pbo_delegation_pool {
             error::invalid_state(EDELEGATION_POOLS_DISABLED)
         );
 
-        
+
         validate_unlock_schedule_params(
             &unlock_numerators,
             unlock_denominator,
@@ -1069,7 +1069,7 @@ module supra_framework::pbo_delegation_pool {
 
         //Create unlock schedule
         let schedule = create_schedule_fractions(&unlock_numerators,unlock_denominator);
-        
+
         move_to(
             &stake_pool_signer,
             DelegationPool {

@@ -332,5 +332,8 @@ crate::gas_schedule::macros::define_gas_parameters!(
         [object_exists_at_per_item_loaded: InternalGas, { 7.. => "object.exists_at.per_item_loaded" }, 1470],
         [string_utils_base: InternalGas, { 8.. => "string_utils.format.base" }, 1102],
         [string_utils_per_byte: InternalGasPerByte, { 8.. =>"string_utils.format.per_byte" }, 3],
+
+        // Gas for vector utils. Referenced the value of vector_swap_base from instr.rs
+        [vector_utils_per_swap: InternalGasPerByte, { RELEASE_V1_16_SUPRA_V1_7_14.. => "vector_utils.per_swap" }, 1102],
     ]
 );

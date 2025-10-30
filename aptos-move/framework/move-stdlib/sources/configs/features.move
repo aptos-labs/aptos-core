@@ -765,6 +765,25 @@ module std::features {
         // We could update supra_delegation_pool_identity_enabled to always return true after the feature has been rolled out.
     }
 
+    /// Whether Supra cycle based automation is enabled. Once enabled, the native automation feature with detached cycle
+    /// based registry management feature will be activated.
+    ///
+    /// Note: After flag is enabled it CANNOT be disabled anymore and any attempt should be prevented.
+    ///
+    /// Lifetime: transient
+    // TODO: after automation-v2 feature is release make sure that this function call will fail with
+    // error::invalid_argument(EFEATURE_CANNOT_BE_DISABLED) error.
+    const SUPRA_AUTOMATION_V2: u64 = 96;
+
+    public fun get_supra_automation_v2_feature(): u64 {
+        SUPRA_AUTOMATION_V2
+    }
+
+    // TODO: after automation-v2 feature is release make sure that this function call always returns true.
+    public fun supra_automation_v2_enabled(): bool acquires Features {
+        is_enabled(SUPRA_AUTOMATION_V2)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

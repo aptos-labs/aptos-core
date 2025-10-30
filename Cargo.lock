@@ -4083,6 +4083,7 @@ dependencies = [
  "criterion",
  "derivative",
  "derive-getters",
+ "derive_more 2.0.1",
  "fixed",
  "fxhash",
  "hashbrown 0.14.3",
@@ -4215,7 +4216,7 @@ dependencies = [
  "bytes",
  "claims",
  "crossbeam-channel",
- "derive_more",
+ "derive_more 2.0.1",
  "fail",
  "futures",
  "hex",
@@ -6244,6 +6245,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6245d59a3e82a7fc217c5828a6692dbc6dfb63a0c8c90495621f7b9d79704a0e"
 
 [[package]]
+name = "convert_case"
+version = "0.7.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bb402b8d4c85569410425650ce3eddc7d698ed96d39a73f941b08fb63082f1e7"
+dependencies = [
+ "unicode-segmentation",
+]
+
+[[package]]
 name = "cookie"
 version = "0.16.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6973,11 +6983,33 @@ version = "0.99.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4fb810d30a7c1953f91334de7244731fc3f3c10d7fe163338a35b9f640960321"
 dependencies = [
- "convert_case",
+ "convert_case 0.4.0",
  "proc-macro2",
  "quote",
  "rustc_version",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "derive_more"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
+dependencies = [
+ "convert_case 0.7.1",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.48",
+ "unicode-xid",
 ]
 
 [[package]]
@@ -9721,6 +9753,7 @@ dependencies = [
  "move-core-types",
  "move-ir-compiler",
  "proptest",
+ "serde",
 ]
 
 [[package]]
@@ -12401,7 +12434,7 @@ checksum = "e69c569eb0671cc85e65cfb6bd960d0168d24732ff58825227b4d2a10167ba91"
 dependencies = [
  "base64 0.13.1",
  "bytes",
- "derive_more",
+ "derive_more 0.99.17",
  "futures-util",
  "mime",
  "num-traits",
@@ -13872,7 +13905,7 @@ checksum = "5c55b744399c25532d63a0d2789b109df8d46fc93752d46b0782991a931a782f"
 dependencies = [
  "bitvec 0.20.4",
  "cfg-if",
- "derive_more",
+ "derive_more 0.99.17",
  "parity-scale-codec 2.3.1",
  "scale-info-derive",
 ]

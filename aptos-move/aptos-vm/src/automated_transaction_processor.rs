@@ -17,6 +17,7 @@ use aptos_gas_schedule::VMGasParameters;
 use aptos_types::fee_statement::FeeStatement;
 use aptos_types::on_chain_config::FeatureFlag;
 use aptos_types::transaction::automated_transaction::AutomatedTransaction;
+use aptos_types::transaction::automation::AutomationTaskType;
 use aptos_types::transaction::{
     EntryFunction, ExecutionStatus, TransactionAuxiliaryData, TransactionPayload, TransactionStatus,
 };
@@ -33,6 +34,7 @@ use std::ops::Deref;
 
 pub struct AutomatedTransactionProcessor<'m> {
     aptos_vm: &'m AptosVM,
+    task_type: AutomationTaskType,
 }
 
 impl Deref for AutomatedTransactionProcessor<'_> {
@@ -44,8 +46,11 @@ impl Deref for AutomatedTransactionProcessor<'_> {
 }
 
 impl<'m> AutomatedTransactionProcessor<'m> {
-    pub(crate) fn new(aptos_vm: &'m AptosVM) -> Self {
-        Self { aptos_vm }
+    pub(crate) fn new(aptos_vm: &'m AptosVM, task_type: AutomationTaskType) -> Self {
+        Self {
+            aptos_vm,
+            task_type,
+        }
     }
 
     fn validate_automated_transaction(
@@ -70,12 +75,25 @@ impl<'m> AutomatedTransactionProcessor<'m> {
             log_context,
         )?;
 
-        transaction_validation::run_automated_transaction_prologue(
-            session,
-            transaction_data,
-            log_context,
-            traversal_context,
-        )
+        if self
+            .features()
+            .is_enabled(FeatureFlag::SUPRA_AUTOMATION_V2)
+        {
+            transaction_validation::run_automated_transaction_prologue_v2(
+                session,
+                transaction_data,
+                self.task_type,
+                log_context,
+                traversal_context,
+            )
+        } else {
+            transaction_validation::run_automated_transaction_prologue(
+                session,
+                transaction_data,
+                log_context,
+                traversal_context,
+            )
+        }
     }
 
     fn success_transaction_cleanup(
@@ -114,6 +132,7 @@ impl<'m> AutomatedTransactionProcessor<'m> {
                 fee_statement,
                 self.features(),
                 txn_data,
+                self.task_type,
                 log_context,
                 traversal_context,
             )
@@ -470,6 +489,7 @@ impl<'m> AutomatedTransactionProcessor<'m> {
                 fee_statement,
                 self.features(),
                 txn_data,
+                self.task_type,
                 log_context,
                 traversal_context,
             )

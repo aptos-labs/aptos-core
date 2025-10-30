@@ -58,22 +58,22 @@ Represents a zero-knowledge range proof that a value committed inside a Pedersen
 ## Constants
 
 
-<a id="0x1_bls12381_bulletproofs_E_DESERIALIZE_RANGE_PROOF"></a>
-
-There was an error deserializing the range proof.
-
-
-<pre><code><b>const</b> <a href="bls12381_bulletproofs.md#0x1_bls12381_bulletproofs_E_DESERIALIZE_RANGE_PROOF">E_DESERIALIZE_RANGE_PROOF</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x1_bls12381_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE"></a>
 
 The native functions have not been rolled out yet.
 
 
 <pre><code><b>const</b> <a href="bls12381_bulletproofs.md#0x1_bls12381_bulletproofs_E_NATIVE_FUN_NOT_AVAILABLE">E_NATIVE_FUN_NOT_AVAILABLE</a>: u64 = 4;
+</code></pre>
+
+
+
+<a id="0x1_bls12381_bulletproofs_E_DESERIALIZE_RANGE_PROOF"></a>
+
+There was an error deserializing the range proof.
+
+
+<pre><code><b>const</b> <a href="bls12381_bulletproofs.md#0x1_bls12381_bulletproofs_E_DESERIALIZE_RANGE_PROOF">E_DESERIALIZE_RANGE_PROOF</a>: u64 = 1;
 </code></pre>
 
 

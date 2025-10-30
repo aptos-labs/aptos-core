@@ -45,7 +45,7 @@ impl CachedPackageRegistry {
             bytecode,
         }
     }
-    
+
     /// Creates a new registry.
     pub async fn create(
         url: Url,

@@ -23,6 +23,7 @@ use std::{collections::HashMap, fmt, fmt::Debug, sync::Arc};
 mod approved_execution_hashes;
 mod aptos_features;
 mod aptos_version;
+mod automation_registry;
 mod chain_id;
 mod commit_history;
 mod consensus_config;
@@ -36,13 +37,16 @@ mod timed_features;
 mod timestamp;
 mod transaction_fee;
 mod validator_set;
-mod automation_registry;
 
 pub use self::{
     approved_execution_hashes::ApprovedExecutionHashes,
     aptos_features::*,
     aptos_version::{
         AptosVersion, APTOS_MAX_KNOWN_VERSION, APTOS_VERSION_2, APTOS_VERSION_3, APTOS_VERSION_4,
+    },
+    automation_registry::{
+        AutomationCycleDetails, AutomationCycleEvent, AutomationCycleInfo, AutomationCycleState,
+        AutomationRegistryConfig, AutomationRegistryConfigV1, AutomationRegistryConfigV2, AutomationCycleTransitionState
     },
     commit_history::CommitHistoryResource,
     consensus_config::{
@@ -66,7 +70,6 @@ pub use self::{
     transaction_fee::TransactionFeeBurnCap,
     validator_set::{ConsensusScheme, ValidatorSet},
     evm_genesis_config::{OnChainEvmGenesisConfig, GenesisEvmContract, GenesisEvmEOA, EVM_GENESIS_EVENT_MOVE_TYPE_TAG},
-    automation_registry::{AutomationRegistryConfig, AutomationRegistryConfigV1}
 };
 
 /// To register an on-chain config in Rust:

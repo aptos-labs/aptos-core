@@ -2689,7 +2689,6 @@ This address should be deterministic for the same admin and vesting contract cre
 <b>pragma</b> aborts_if_is_partial = <b>true</b>;
 <b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(schedule) == 0;
 <b>aborts_if</b> period_duration &lt;= 0;
-<b>aborts_if</b> start_timestamp_secs &lt; <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
 </code></pre>
 
 
@@ -2757,9 +2756,14 @@ This address should be deterministic for the same admin and vesting contract cre
 <b>let</b> amount = <b>min</b>(vesting_record.left_amount, <a href="../../aptos-stdlib/../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32_spec_multiply_u64">fixed_point32::spec_multiply_u64</a>(vesting_record.init_amount, vesting_fraction));
 <b>ensures</b> vesting_record.left_amount == <b>old</b>(vesting_record.left_amount) - amount;
 <b>let</b> address_from = signer_cap.<a href="account.md#0x1_account">account</a>;
-<b>ensures</b> beneficiary != address_from ==&gt;
-    (<a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(beneficiary) == <b>old</b>(<a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(beneficiary)) + amount
-    && <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(address_from) == <b>old</b>(<a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(address_from)) - amount);
+<b>let</b> coin_store_from = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(address_from);
+<b>let</b> <b>post</b> coin_store_post_from = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(address_from);
+<b>let</b> coin_store_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(beneficiary);
+<b>let</b> <b>post</b> coin_store_post_to = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(beneficiary);
+<b>ensures</b> beneficiary != address_from ==&gt; coin_store_post_from.<a href="coin.md#0x1_coin">coin</a>.value ==
+    coin_store_from.<a href="coin.md#0x1_coin">coin</a>.value - amount;
+<b>ensures</b> beneficiary != address_from ==&gt; coin_store_post_to.<a href="coin.md#0x1_coin">coin</a>.value == coin_store_to.<a href="coin.md#0x1_coin">coin</a>.value + amount;
+<b>ensures</b> beneficiary == address_from ==&gt; coin_store_post_from.<a href="coin.md#0x1_coin">coin</a>.value == coin_store_from.<a href="coin.md#0x1_coin">coin</a>.value;
 </code></pre>
 
 
@@ -2780,8 +2784,8 @@ This address should be deterministic for the same admin and vesting contract cre
 <b>include</b> <a href="vesting_without_staking.md#0x1_vesting_without_staking_AdminAborts">AdminAborts</a>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
 <b>let</b> <b>post</b> vesting_contract_post = <b>global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
-<b>let</b> balance_pre = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(vesting_contract.withdrawal_address);
-<b>let</b> <b>post</b> balance_post = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(vesting_contract_post.withdrawal_address);
+<b>let</b> balance_pre = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(vesting_contract.withdrawal_address).<a href="coin.md#0x1_coin">coin</a>.value;
+<b>let</b> <b>post</b> balance_post = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(vesting_contract.withdrawal_address).<a href="coin.md#0x1_coin">coin</a>.value;
 <b>let</b> shareholder_amount = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(vesting_contract.shareholders, shareholder_address).left_amount;
 <b>ensures</b> vesting_contract_post.withdrawal_address != vesting_contract.signer_cap.<a href="account.md#0x1_account">account</a> ==&gt; balance_post == balance_pre + shareholder_amount;
 <b>ensures</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(vesting_contract_post.shareholders, shareholder_address);
@@ -2804,9 +2808,9 @@ This address should be deterministic for the same admin and vesting contract cre
 <pre><code><b>pragma</b> verify = <b>true</b>;
 <b>pragma</b> aborts_if_is_partial = <b>true</b>;
 <b>let</b> vesting_contract = <b>global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address);
-<b>let</b> balance_pre = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(vesting_contract.withdrawal_address);
-<b>let</b> <b>post</b> balance_post = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(vesting_contract.withdrawal_address);
-<b>let</b> <b>post</b> balance_contract = <a href="coin.md#0x1_coin_balance">coin::balance</a>&lt;SupraCoin&gt;(contract_address);
+<b>let</b> balance_pre = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(vesting_contract.withdrawal_address).<a href="coin.md#0x1_coin">coin</a>.value;
+<b>let</b> <b>post</b> balance_post = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(vesting_contract.withdrawal_address).<a href="coin.md#0x1_coin">coin</a>.value;
+<b>let</b> <b>post</b> balance_contract = <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;SupraCoin&gt;&gt;(contract_address).<a href="coin.md#0x1_coin">coin</a>.value;
 <b>aborts_if</b> !(<b>global</b>&lt;<a href="vesting_without_staking.md#0x1_vesting_without_staking_VestingContract">VestingContract</a>&gt;(contract_address).state == <a href="vesting_without_staking.md#0x1_vesting_without_staking_VESTING_POOL_TERMINATED">VESTING_POOL_TERMINATED</a>);
 </code></pre>
 

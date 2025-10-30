@@ -12,6 +12,11 @@ from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
+class AutomationTaskType(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
+    __slots__ = []
+    User: _ClassVar[AutomationTaskType]
+    System: _ClassVar[AutomationTaskType]
+
 class MoveTypes(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = []
     MOVE_TYPES_UNSPECIFIED: _ClassVar[MoveTypes]
@@ -38,6 +43,8 @@ class MoveAbility(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     MOVE_ABILITY_STORE: _ClassVar[MoveAbility]
     MOVE_ABILITY_KEY: _ClassVar[MoveAbility]
 
+User: AutomationTaskType
+System: AutomationTaskType
 MOVE_TYPES_UNSPECIFIED: MoveTypes
 MOVE_TYPES_BOOL: MoveTypes
 MOVE_TYPES_U8: MoveTypes
@@ -822,6 +829,7 @@ class TransactionPayload(_message.Message):
         "write_set_payload",
         "multisig_payload",
         "automation_payload",
+        "automation_payloads",
     ]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
@@ -832,24 +840,28 @@ class TransactionPayload(_message.Message):
         TYPE_WRITE_SET_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_MULTISIG_PAYLOAD: _ClassVar[TransactionPayload.Type]
         TYPE_AUTOMATION_PAYLOAD: _ClassVar[TransactionPayload.Type]
+        TYPE_AUTOMATION_PAYLOAD_EXTENSION: _ClassVar[TransactionPayload.Type]
     TYPE_UNSPECIFIED: TransactionPayload.Type
     TYPE_ENTRY_FUNCTION_PAYLOAD: TransactionPayload.Type
     TYPE_SCRIPT_PAYLOAD: TransactionPayload.Type
     TYPE_WRITE_SET_PAYLOAD: TransactionPayload.Type
     TYPE_MULTISIG_PAYLOAD: TransactionPayload.Type
     TYPE_AUTOMATION_PAYLOAD: TransactionPayload.Type
+    TYPE_AUTOMATION_PAYLOAD_EXTENSION: TransactionPayload.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ENTRY_FUNCTION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     SCRIPT_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     WRITE_SET_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     MULTISIG_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     AUTOMATION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+    AUTOMATION_PAYLOADS_FIELD_NUMBER: _ClassVar[int]
     type: TransactionPayload.Type
     entry_function_payload: EntryFunctionPayload
     script_payload: ScriptPayload
     write_set_payload: WriteSetPayload
     multisig_payload: MultisigPayload
     automation_payload: AutomationPayload
+    automation_payloads: AutomationPayloadExtensions
     def __init__(
         self,
         type: _Optional[_Union[TransactionPayload.Type, str]] = ...,
@@ -858,6 +870,9 @@ class TransactionPayload(_message.Message):
         write_set_payload: _Optional[_Union[WriteSetPayload, _Mapping]] = ...,
         multisig_payload: _Optional[_Union[MultisigPayload, _Mapping]] = ...,
         automation_payload: _Optional[_Union[AutomationPayload, _Mapping]] = ...,
+        automation_payloads: _Optional[
+            _Union[AutomationPayloadExtensions, _Mapping]
+        ] = ...,
     ) -> None: ...
 
 class EntryFunctionPayload(_message.Message):
@@ -920,22 +935,29 @@ class MultisigPayload(_message.Message):
     ) -> None: ...
 
 class MultisigTransactionPayload(_message.Message):
-    __slots__ = ["type", "entry_function_payload"]
+    __slots__ = ["type", "entry_function_payload", "automation_payload"]
 
     class Type(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
         __slots__ = []
         TYPE_UNSPECIFIED: _ClassVar[MultisigTransactionPayload.Type]
         TYPE_ENTRY_FUNCTION_PAYLOAD: _ClassVar[MultisigTransactionPayload.Type]
+        TYPE_AUTOMATION_PAYLOAD: _ClassVar[MultisigTransactionPayload.Type]
     TYPE_UNSPECIFIED: MultisigTransactionPayload.Type
     TYPE_ENTRY_FUNCTION_PAYLOAD: MultisigTransactionPayload.Type
+    TYPE_AUTOMATION_PAYLOAD: MultisigTransactionPayload.Type
     TYPE_FIELD_NUMBER: _ClassVar[int]
     ENTRY_FUNCTION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
+    AUTOMATION_PAYLOAD_FIELD_NUMBER: _ClassVar[int]
     type: MultisigTransactionPayload.Type
     entry_function_payload: EntryFunctionPayload
+    automation_payload: AutomationPayloadExtensions
     def __init__(
         self,
         type: _Optional[_Union[MultisigTransactionPayload.Type, str]] = ...,
         entry_function_payload: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
+        automation_payload: _Optional[
+            _Union[AutomationPayloadExtensions, _Mapping]
+        ] = ...,
     ) -> None: ...
 
 class AutomationPayload(_message.Message):
@@ -967,6 +989,57 @@ class AutomationPayload(_message.Message):
         gas_price_cap: _Optional[int] = ...,
         automation_fee_cap: _Optional[int] = ...,
         aux_data: _Optional[_Iterable[bytes]] = ...,
+    ) -> None: ...
+
+class AutomationPayloadV2(_message.Message):
+    __slots__ = [
+        "automated_function",
+        "expiration_timestamp_secs",
+        "max_gas_amount",
+        "gas_price_cap",
+        "automation_fee_cap",
+        "aux_data",
+        "task_type",
+        "priority",
+    ]
+    AUTOMATED_FUNCTION_FIELD_NUMBER: _ClassVar[int]
+    EXPIRATION_TIMESTAMP_SECS_FIELD_NUMBER: _ClassVar[int]
+    MAX_GAS_AMOUNT_FIELD_NUMBER: _ClassVar[int]
+    GAS_PRICE_CAP_FIELD_NUMBER: _ClassVar[int]
+    AUTOMATION_FEE_CAP_FIELD_NUMBER: _ClassVar[int]
+    AUX_DATA_FIELD_NUMBER: _ClassVar[int]
+    TASK_TYPE_FIELD_NUMBER: _ClassVar[int]
+    PRIORITY_FIELD_NUMBER: _ClassVar[int]
+    automated_function: EntryFunctionPayload
+    expiration_timestamp_secs: int
+    max_gas_amount: int
+    gas_price_cap: int
+    automation_fee_cap: int
+    aux_data: _containers.RepeatedScalarFieldContainer[bytes]
+    task_type: AutomationTaskType
+    priority: int
+    def __init__(
+        self,
+        automated_function: _Optional[_Union[EntryFunctionPayload, _Mapping]] = ...,
+        expiration_timestamp_secs: _Optional[int] = ...,
+        max_gas_amount: _Optional[int] = ...,
+        gas_price_cap: _Optional[int] = ...,
+        automation_fee_cap: _Optional[int] = ...,
+        aux_data: _Optional[_Iterable[bytes]] = ...,
+        task_type: _Optional[_Union[AutomationTaskType, str]] = ...,
+        priority: _Optional[int] = ...,
+    ) -> None: ...
+
+class AutomationPayloadExtensions(_message.Message):
+    __slots__ = ["v1", "v2"]
+    V1_FIELD_NUMBER: _ClassVar[int]
+    V2_FIELD_NUMBER: _ClassVar[int]
+    v1: AutomationPayload
+    v2: AutomationPayloadV2
+    def __init__(
+        self,
+        v1: _Optional[_Union[AutomationPayload, _Mapping]] = ...,
+        v2: _Optional[_Union[AutomationPayloadV2, _Mapping]] = ...,
     ) -> None: ...
 
 class MoveModuleBytecode(_message.Message):

@@ -67,7 +67,7 @@ impl Command {
             info!("GET {url:?}...");
             let body = reqwest::get(url).await?.bytes().await?;
             bcs::from_bytes(&body)?
-        } 
+        }
         // else if let Some(consensus_db_path) = self.consensus_db_path {
         //     info!(
         //         "Getting block {:?} from {consensus_db_path:?}.",

@@ -114,12 +114,14 @@ impl TransactionAnalysis {
 
         match txn {
             UserTransaction(signed_txn) => signed_txn.raw_txn_bytes_len(),
-            AutomatedTransaction(automated_txn) => automated_txn.raw_txn_bytes_len(),
+            AutomatedTransaction(automated_txn)
+            | SystemAutomatedTransaction(automated_txn) => automated_txn.raw_txn_bytes_len(),
             GenesisTransaction(_)
             | BlockMetadata(_)
             | BlockMetadataExt(_)
             | StateCheckpoint(_)
             | BlockEpilogue(_)
+            | AutomationRegistryTransaction(_)
             | ValidatorTransaction(_) => bcs::serialized_size(txn).expect("Txn should serialize"),
         }
     }

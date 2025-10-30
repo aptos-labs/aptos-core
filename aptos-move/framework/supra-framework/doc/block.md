@@ -510,9 +510,6 @@ Can only be called as part of the Supra governance proposal process established 
     <b>let</b> old_epoch_interval = block_resource.epoch_interval;
     block_resource.epoch_interval = new_epoch_interval;
 
-    // <b>update</b> epoch interval in registry contract
-    <a href="automation_registry.md#0x1_automation_registry_update_epoch_interval_in_registry">automation_registry::update_epoch_interval_in_registry</a>(new_epoch_interval);
-
     <b>if</b> (std::features::module_event_migration_enabled()) {
         <a href="event.md#0x1_event_emit">event::emit</a>(
             <a href="block.md#0x1_block_UpdateEpochInterval">UpdateEpochInterval</a> { old_epoch_interval, new_epoch_interval },
@@ -633,6 +630,8 @@ Return epoch interval in seconds.
     // transition is the last <a href="block.md#0x1_block">block</a> in the previous epoch.
     <a href="stake.md#0x1_stake_update_performance_statistics">stake::update_performance_statistics</a>(proposer_index, failed_proposer_indices);
     <a href="state_storage.md#0x1_state_storage_on_new_block">state_storage::on_new_block</a>(<a href="reconfiguration.md#0x1_reconfiguration_current_epoch">reconfiguration::current_epoch</a>());
+
+    <a href="automation_registry.md#0x1_automation_registry_monitor_cycle_end">automation_registry::monitor_cycle_end</a>();
 
     block_metadata_ref.epoch_interval
 }

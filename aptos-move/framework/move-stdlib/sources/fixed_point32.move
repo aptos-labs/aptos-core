@@ -28,8 +28,8 @@ module std::fixed_point32 {
     const ERATIO_OUT_OF_RANGE: u64 = 0x20005;
     /// Intermediate raw value is too large to be held in a `u64`
     const ERAW_VALUE_TOO_LARGE: u64 = 0x20006;
-    
-    
+
+
     /// Multiply a u64 integer by a fixed-point number, truncating any
     /// fractional part of the product. This will abort if the product
     /// overflows.
@@ -58,7 +58,7 @@ module std::fixed_point32 {
     spec fun spec_multiply_u64(val: num, multiplier: FixedPoint32): num {
         (val * multiplier.value) >> 32
     }
-    
+
     public fun add(val: FixedPoint32, addend: FixedPoint32): FixedPoint32 {
         let sum = (val.value as u128) + (addend.value as u128);
         assert!(sum <= MAX_U64, ERAW_VALUE_TOO_LARGE);

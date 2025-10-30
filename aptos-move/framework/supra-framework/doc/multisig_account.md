@@ -68,6 +68,7 @@ and implement the governance voting logic on top.
 -  [Struct `TimeoutDurationUpdatedEvent`](#0x1_multisig_account_TimeoutDurationUpdatedEvent)
 -  [Struct `MetadataUpdated`](#0x1_multisig_account_MetadataUpdated)
 -  [Constants](#@Constants_0)
+-  [Function `account_exists`](#0x1_multisig_account_account_exists)
 -  [Function `metadata`](#0x1_multisig_account_metadata)
 -  [Function `timeout_duration`](#0x1_multisig_account_timeout_duration)
 -  [Function `num_signatures_required`](#0x1_multisig_account_num_signatures_required)
@@ -1538,6 +1539,32 @@ Define the minimum timeout duration for a transaction.
 </code></pre>
 
 
+
+<a id="0x1_multisig_account_account_exists"></a>
+
+## Function `account_exists`
+
+Checks whether a multisig account with the input address exists.
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_account_exists">account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_account.md#0x1_multisig_account_account_exists">account_exists</a>(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>: <b>address</b>): bool {
+    <b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>)
+}
+</code></pre>
+
+
+
+</details>
 
 <a id="0x1_multisig_account_metadata"></a>
 

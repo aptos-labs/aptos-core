@@ -60,6 +60,32 @@ the resolution process.
 -  [Function `is_multi_step_proposal_in_execution`](#0x1_multisig_voting_is_multi_step_proposal_in_execution)
 -  [Function `is_voting_period_over`](#0x1_multisig_voting_is_voting_period_over)
 -  [Function `get_proposal`](#0x1_multisig_voting_get_proposal)
+-  [Specification](#@Specification_1)
+    -  [High-level Requirements](#high-level-req)
+    -  [Module-level Specification](#module-level-spec)
+    -  [Function `register`](#@Specification_1_register)
+    -  [Function `create_proposal`](#@Specification_1_create_proposal)
+    -  [Function `create_proposal_v2`](#@Specification_1_create_proposal_v2)
+    -  [Function `vote`](#@Specification_1_vote)
+    -  [Function `is_proposal_resolvable`](#@Specification_1_is_proposal_resolvable)
+    -  [Function `resolve`](#@Specification_1_resolve)
+    -  [Function `resolve_proposal_v2`](#@Specification_1_resolve_proposal_v2)
+    -  [Function `next_proposal_id`](#@Specification_1_next_proposal_id)
+    -  [Function `get_proposer`](#@Specification_1_get_proposer)
+    -  [Function `is_voting_closed`](#@Specification_1_is_voting_closed)
+    -  [Function `can_be_resolved_early`](#@Specification_1_can_be_resolved_early)
+    -  [Function `get_proposal_metadata`](#@Specification_1_get_proposal_metadata)
+    -  [Function `get_proposal_metadata_value`](#@Specification_1_get_proposal_metadata_value)
+    -  [Function `get_proposal_state`](#@Specification_1_get_proposal_state)
+    -  [Function `get_proposal_creation_secs`](#@Specification_1_get_proposal_creation_secs)
+    -  [Function `get_proposal_expiration_secs`](#@Specification_1_get_proposal_expiration_secs)
+    -  [Function `get_execution_hash`](#@Specification_1_get_execution_hash)
+    -  [Function `get_min_vote_threshold`](#@Specification_1_get_min_vote_threshold)
+    -  [Function `get_votes`](#@Specification_1_get_votes)
+    -  [Function `is_resolved`](#@Specification_1_is_resolved)
+    -  [Function `get_resolution_time_secs`](#@Specification_1_get_resolution_time_secs)
+    -  [Function `is_multi_step_proposal_in_execution`](#@Specification_1_is_multi_step_proposal_in_execution)
+    -  [Function `is_voting_period_over`](#@Specification_1_is_voting_period_over)
 
 
 <pre><code><b>use</b> <a href="account.md#0x1_account">0x1::account</a>;
@@ -1843,6 +1869,723 @@ Return true if the voting period of the given proposal has already ended.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+
+
+<a id="high-level-req"></a>
+
+### High-level Requirements
+
+<table>
+<tr>
+<th>No.</th><th>Requirement</th><th>Criticality</th><th>Implementation</th><th>Enforcement</th>
+</tr>
+
+<tr>
+<td>1</td>
+<td>The proposal ID in a voting forum is unique and always increases monotonically with each new proposal created for that voting forum.</td>
+<td>High</td>
+<td>The create_proposal and create_proposal_v2 create a new proposal with a unique ID derived from the voting_forum's next_proposal_id incrementally.</td>
+<td>Formally verified via <a href="#high-level-req-1">create_proposal</a>.</td>
+</tr>
+
+<tr>
+<td>2</td>
+<td>While voting, it ensures that only the governance module that defines ProposalType may initiate voting and that the proposal under vote exists in the specified voting forum.</td>
+<td>Critical</td>
+<td>The vote function verifies the eligibility and validity of a proposal before allowing voting. It ensures that only the correct governance module initiates voting. The function checks if the proposal is currently eligible for voting by confirming it has not resolved and the voting period has not ended.</td>
+<td>Formally verified via <a href="#high-level-req-2">vote</a>.</td>
+</tr>
+
+<tr>
+<td>3</td>
+<td>After resolving a single-step proposal, the corresponding proposal is guaranteed to be marked as successfully resolved.</td>
+<td>High</td>
+<td>Upon invoking the resolve function on a proposal, it undergoes a series of checks to ensure its validity. These include verifying if the proposal exists, is a single-step proposal, and meets the criteria for resolution. If the checks pass, the proposal's is_resolved flag becomes true, indicating a successful resolution.</td>
+<td>Formally verified via <a href="#high-level-req-3">resolve</a>.</td>
+</tr>
+
+<tr>
+<td>4</td>
+<td>In the context of v2 proposal resolving, both single-step and multi-step proposals are accurately handled. It ensures that for single-step proposals, the next execution hash is empty and resolves the proposal, while for multi-step proposals, it guarantees that the next execution hash corresponds to the hash of the next step, maintaining the integrity of the proposal execution sequence.</td>
+<td>Medium</td>
+<td>The function resolve_proposal_v2 correctly handles both single-step and multi-step proposals. For single-step proposals, it ensures that the next_execution_hash parameter is empty and resolves the proposal. For multi-step proposals, it ensures that the next_execution_hash parameter contains the hash of the next step.</td>
+<td>Formally verified via <a href="#high-level-req-4">resolve_proposal_v2</a>.</td>
+</tr>
+
+</table>
+
+
+
+<a id="module-level-spec"></a>
+
+### Module-level Specification
+
+
+<pre><code><b>pragma</b> verify = <b>true</b>;
+</code></pre>
+
+
+
+<a id="@Specification_1_register"></a>
+
+### Function `register`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_register">register</a>&lt;ProposalType: store&gt;(<a href="account.md#0x1_account">account</a>: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+
+<pre><code><b>let</b> addr = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(<a href="account.md#0x1_account">account</a>);
+<b>aborts_if</b> <b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>let</b> register_account = <b>global</b>&lt;<a href="account.md#0x1_account_Account">account::Account</a>&gt;(addr);
+<b>aborts_if</b> register_account.guid_creation_num + 4 &gt;= <a href="account.md#0x1_account_MAX_GUID_CREATION_NUM">account::MAX_GUID_CREATION_NUM</a>;
+<b>aborts_if</b> register_account.guid_creation_num + 4 &gt; MAX_U64;
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/type_info.md#0x1_type_info_spec_is_struct">type_info::spec_is_struct</a>&lt;ProposalType&gt;();
+<b>ensures</b> <b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(addr);
+</code></pre>
+
+
+
+<a id="@Specification_1_create_proposal"></a>
+
+### Function `create_proposal`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_create_proposal">create_proposal</a>&lt;ProposalType: store&gt;(proposer: <b>address</b>, voting_forum_address: <b>address</b>, execution_content: ProposalType, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, min_vote_threshold: u64, voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, expiration_secs: u64, metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_CreateProposalAbortsIfAndEnsures">CreateProposalAbortsIfAndEnsures</a>&lt;ProposalType&gt;{is_multi_step_proposal: <b>false</b>};
+// This enforces <a id="high-level-req-1" href="#high-level-req">high-level requirement 1</a>:
+<b>ensures</b> result == <b>old</b>(<b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address)).next_proposal_id;
+</code></pre>
+
+
+
+<a id="@Specification_1_create_proposal_v2"></a>
+
+### Function `create_proposal_v2`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_create_proposal_v2">create_proposal_v2</a>&lt;ProposalType: store&gt;(proposer: <b>address</b>, voting_forum_address: <b>address</b>, execution_content: ProposalType, execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, min_vote_threshold: u64, voters: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;<b>address</b>&gt;, expiration_secs: u64, metadata: <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;, is_multi_step_proposal: bool): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_CreateProposalAbortsIfAndEnsures">CreateProposalAbortsIfAndEnsures</a>&lt;ProposalType&gt;;
+<b>ensures</b> result == <b>old</b>(<b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address)).next_proposal_id;
+</code></pre>
+
+
+
+<a id="@Specification_1_vote"></a>
+
+### Function `vote`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_vote">vote</a>&lt;ProposalType: store&gt;(voter: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, _proof: &ProposalType, voting_forum_address: <b>address</b>, proposal_id: u64, should_pass: bool)
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> aborts_if_is_partial = <b>true</b>;
+// This enforces <a id="high-level-req-2" href="#high-level-req">high-level requirement 2</a>:
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> voter_address = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(voter);
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> <b>post</b> post_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
+<b>aborts_if</b> <a href="multisig_voting.md#0x1_multisig_voting_is_voting_period_over">is_voting_period_over</a>(proposal);
+<b>aborts_if</b> proposal.is_resolved;
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@supra_framework);
+<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>let</b> execution_key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, execution_key) &&
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, execution_key) != std::bcs::serialize(<b>false</b>);
+<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
+<b>let</b> timestamp_secs_bytes = std::bcs::serialize(<a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>());
+<b>let</b> key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
+<b>ensures</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_proposal.metadata, key) == timestamp_secs_bytes;
+<b>ensures</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(proposal.voted_records, voter_address) && should_pass) ==&gt; post_proposal.yes_votes == proposal.yes_votes + 1 && post_proposal.no_votes == proposal.no_votes - 1;
+<b>ensures</b> (<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(proposal.voted_records, voter_address) && !should_pass) ==&gt; post_proposal.no_votes == proposal.no_votes + 1 && post_proposal.yes_votes == proposal.yes_votes - 1;
+<b>ensures</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(proposal.voted_records, voter_address) && should_pass) ==&gt; post_proposal.yes_votes == proposal.yes_votes + 1;
+<b>ensures</b> (!<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(proposal.voted_records, voter_address) && !should_pass) ==&gt; post_proposal.no_votes == proposal.no_votes + 1;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_proposal_resolvable"></a>
+
+### Function `is_proposal_resolvable`
+
+
+<pre><code><b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_is_proposal_resolvable">is_proposal_resolvable</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64)
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_IsProposalResolvableAbortsIf">IsProposalResolvableAbortsIf</a>&lt;ProposalType&gt;;
+</code></pre>
+
+
+
+<a id="@Specification_1_resolve"></a>
+
+### Function `resolve`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_resolve">resolve</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): ProposalType
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_IsProposalResolvableAbortsIf">IsProposalResolvableAbortsIf</a>&lt;ProposalType&gt;;
+<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>let</b> multi_step_key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>let</b> has_multi_step_key = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_key);
+<b>aborts_if</b> has_multi_step_key && !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;bool&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, multi_step_key));
+<b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> <b>post</b> post_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id);
+<b>aborts_if</b> !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@supra_framework);
+// This enforces <a id="high-level-req-3" href="#high-level-req">high-level requirement 3</a>:
+<b>ensures</b> post_proposal.is_resolved == <b>true</b>;
+<b>ensures</b> post_proposal.resolution_time_secs == <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
+<b>aborts_if</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(proposal.execution_content);
+<b>ensures</b> result == <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(proposal.execution_content);
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(post_proposal.execution_content);
+</code></pre>
+
+
+
+<a id="@Specification_1_resolve_proposal_v2"></a>
+
+### Function `resolve_proposal_v2`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_resolve_proposal_v2">resolve_proposal_v2</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64, next_execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify_duration_estimate = 300;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_IsProposalResolvableAbortsIf">IsProposalResolvableAbortsIf</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> <b>post</b> post_proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id);
+<b>let</b> multi_step_in_execution_key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>ensures</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_in_execution_key) && len(next_execution_hash) != 0) ==&gt;
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(<b>true</b>);
+<b>ensures</b> (<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_in_execution_key) &&
+    (len(next_execution_hash) == 0 && !is_multi_step)) ==&gt;
+    <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(<b>true</b>);
+<b>let</b> multi_step_key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+<b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_key) &&
+    !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;bool&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, multi_step_key));
+<b>let</b> is_multi_step = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_key) &&
+    <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, multi_step_key));
+<b>aborts_if</b> !is_multi_step && len(next_execution_hash) != 0;
+<b>aborts_if</b> len(next_execution_hash) == 0 && !<b>exists</b>&lt;<a href="timestamp.md#0x1_timestamp_CurrentTimeMicroseconds">timestamp::CurrentTimeMicroseconds</a>&gt;(@supra_framework);
+<b>aborts_if</b> len(next_execution_hash) == 0 && is_multi_step && !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, multi_step_in_execution_key);
+// This enforces <a id="high-level-req-4" href="#high-level-req">high-level requirement 4</a>:
+<b>ensures</b> len(next_execution_hash) == 0 ==&gt; post_proposal.resolution_time_secs == <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>();
+<b>ensures</b> len(next_execution_hash) == 0 ==&gt; post_proposal.is_resolved == <b>true</b>;
+<b>ensures</b> (len(next_execution_hash) == 0 && is_multi_step) ==&gt; <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_proposal.metadata, multi_step_in_execution_key) == std::bcs::serialize(<b>false</b>);
+<b>ensures</b> len(next_execution_hash) != 0 ==&gt; post_proposal.execution_hash == next_execution_hash;
+</code></pre>
+
+
+
+<a id="@Specification_1_next_proposal_id"></a>
+
+### Function `next_proposal_id`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_next_proposal_id">next_proposal_id</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>): u64
+</code></pre>
+
+
+
+
+<pre><code><b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>ensures</b> result == <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address).next_proposal_id;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_proposer"></a>
+
+### Function `get_proposer`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_proposer">get_proposer</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <b>address</b>
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result == proposal.proposer;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_voting_closed"></a>
+
+### Function `is_voting_closed`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_is_voting_closed">is_voting_closed</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>ensures</b> result == <a href="multisig_voting.md#0x1_multisig_voting_spec_is_voting_closed">spec_is_voting_closed</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
+</code></pre>
+
+
+
+<a id="@Specification_1_can_be_resolved_early"></a>
+
+### Function `can_be_resolved_early`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_can_be_resolved_early">can_be_resolved_early</a>&lt;ProposalType: store&gt;(proposal: &<a href="multisig_voting.md#0x1_multisig_voting_Proposal">multisig_voting::Proposal</a>&lt;ProposalType&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> result == <a href="multisig_voting.md#0x1_multisig_voting_spec_can_be_resolved_early">spec_can_be_resolved_early</a>&lt;ProposalType&gt;(proposal);
+</code></pre>
+
+
+
+<a id="@Specification_1_get_proposal_metadata"></a>
+
+### Function `get_proposal_metadata`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_proposal_metadata">get_proposal_metadata</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_SimpleMap">simple_map::SimpleMap</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result == proposal.metadata;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_proposal_metadata_value"></a>
+
+### Function `get_proposal_metadata_value`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_proposal_metadata_value">get_proposal_metadata_value</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64, metadata_key: <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, metadata_key);
+<b>ensures</b> result == <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, metadata_key);
+</code></pre>
+
+
+
+<a id="@Specification_1_get_proposal_state"></a>
+
+### Function `get_proposal_state`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_proposal_state">get_proposal_state</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> addition_overflow_unchecked;
+<b>requires</b> <a href="chain_status.md#0x1_chain_status_is_operating">chain_status::is_operating</a>();
+<b>pragma</b> aborts_if_is_partial = <b>true</b>;
+<b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>ensures</b> result == <a href="multisig_voting.md#0x1_multisig_voting_spec_get_proposal_state">spec_get_proposal_state</a>(voting_forum_address, proposal_id, voting_forum);
+</code></pre>
+
+
+
+<a id="@Specification_1_get_proposal_creation_secs"></a>
+
+### Function `get_proposal_creation_secs`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_proposal_creation_secs">get_proposal_creation_secs</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result == proposal.creation_time_secs;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_proposal_expiration_secs"></a>
+
+### Function `get_proposal_expiration_secs`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_proposal_expiration_secs">get_proposal_expiration_secs</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>ensures</b> result == <a href="multisig_voting.md#0x1_multisig_voting_spec_get_proposal_expiration_secs">spec_get_proposal_expiration_secs</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
+</code></pre>
+
+
+
+<a id="@Specification_1_get_execution_hash"></a>
+
+### Function `get_execution_hash`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_execution_hash">get_execution_hash</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result == proposal.execution_hash;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_min_vote_threshold"></a>
+
+### Function `get_min_vote_threshold`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_min_vote_threshold">get_min_vote_threshold</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result == proposal.min_vote_threshold;
+</code></pre>
+
+
+
+<a id="@Specification_1_get_votes"></a>
+
+### Function `get_votes`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_votes">get_votes</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): (u64, u64)
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result_1 == proposal.yes_votes;
+<b>ensures</b> result_2 == proposal.no_votes;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_resolved"></a>
+
+### Function `is_resolved`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_is_resolved">is_resolved</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result == proposal.is_resolved;
+</code></pre>
+
+
+
+
+<a id="0x1_multisig_voting_AbortsIfNotContainProposalID"></a>
+
+
+<pre><code><b>schema</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt; {
+    proposal_id: u64;
+    voting_forum_address: <b>address</b>;
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals, proposal_id);
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+}
+</code></pre>
+
+
+
+
+<a id="0x1_multisig_voting_IsProposalResolvableAbortsIf"></a>
+
+
+<pre><code><b>schema</b> <a href="multisig_voting.md#0x1_multisig_voting_IsProposalResolvableAbortsIf">IsProposalResolvableAbortsIf</a>&lt;ProposalType&gt; {
+    voting_forum_address: <b>address</b>;
+    proposal_id: u64;
+    <b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+    <b>let</b> voting_closed = <a href="multisig_voting.md#0x1_multisig_voting_spec_is_voting_closed">spec_is_voting_closed</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
+    <b>aborts_if</b> voting_closed && !(proposal.yes_votes &gt;= proposal.min_vote_threshold);
+    <b>aborts_if</b> !voting_closed;
+    <b>aborts_if</b> proposal.is_resolved;
+    <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>);
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata, std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>));
+    <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;u64&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>)));
+    <b>aborts_if</b> <a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &lt;= <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;u64&gt;(<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata, std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_RESOLVABLE_TIME_METADATA_KEY">RESOLVABLE_TIME_METADATA_KEY</a>)));
+    <b>aborts_if</b> <a href="transaction_context.md#0x1_transaction_context_spec_get_script_hash">transaction_context::spec_get_script_hash</a>() != proposal.execution_hash;
+}
+</code></pre>
+
+
+
+
+<a id="0x1_multisig_voting_CreateProposalAbortsIfAndEnsures"></a>
+
+
+<pre><code><b>schema</b> <a href="multisig_voting.md#0x1_multisig_voting_CreateProposalAbortsIfAndEnsures">CreateProposalAbortsIfAndEnsures</a>&lt;ProposalType&gt; {
+    voting_forum_address: <b>address</b>;
+    execution_hash: <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;;
+    min_vote_threshold: u128;
+    metadata: SimpleMap&lt;String, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;;
+    is_multi_step_proposal: bool;
+    <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> proposal_id = voting_forum.next_proposal_id;
+    <b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(voting_forum.proposals,proposal_id);
+    <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+    <b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+    <b>aborts_if</b> len(execution_hash) == 0;
+    <b>let</b> execution_key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_KEY">IS_MULTI_STEP_PROPOSAL_KEY</a>);
+    <b>aborts_if</b> <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(metadata, execution_key);
+    <b>aborts_if</b> voting_forum.next_proposal_id + 1 &gt; MAX_U64;
+    <b>let</b> is_multi_step_in_execution_key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+    <b>aborts_if</b> is_multi_step_proposal && <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(metadata, is_multi_step_in_execution_key);
+    <b>let</b> <b>post</b> post_voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+    <b>let</b> <b>post</b> post_metadata = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(post_voting_forum.proposals, proposal_id).metadata;
+    <b>ensures</b> post_voting_forum.next_proposal_id == voting_forum.next_proposal_id + 1;
+    <b>ensures</b> <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(post_voting_forum.proposals, proposal_id);
+    <b>ensures</b> <b>if</b> (is_multi_step_proposal) {
+        <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(post_metadata, is_multi_step_in_execution_key) == std::bcs::serialize(<b>false</b>)
+    } <b>else</b> {
+        !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(post_metadata, is_multi_step_in_execution_key)
+    };
+}
+</code></pre>
+
+
+
+<a id="@Specification_1_get_resolution_time_secs"></a>
+
+### Function `get_resolution_time_secs`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_get_resolution_time_secs">get_resolution_time_secs</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): u64
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+<b>ensures</b> result == proposal.resolution_time_secs;
+</code></pre>
+
+
+
+<a id="@Specification_1_is_multi_step_proposal_in_execution"></a>
+
+### Function `is_multi_step_proposal_in_execution`
+
+
+<pre><code>#[view]
+<b>public</b> <b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_is_multi_step_proposal_in_execution">is_multi_step_proposal_in_execution</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool
+</code></pre>
+
+
+
+
+<pre><code><b>include</b> <a href="multisig_voting.md#0x1_multisig_voting_AbortsIfNotContainProposalID">AbortsIfNotContainProposalID</a>&lt;ProposalType&gt;;
+<b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+<b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals,proposal_id);
+<b>aborts_if</b> !std::string::spec_internal_check_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>let</b> execution_key = std::string::spec_utf8(<a href="multisig_voting.md#0x1_multisig_voting_IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY">IS_MULTI_STEP_PROPOSAL_IN_EXECUTION_KEY</a>);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_contains_key">simple_map::spec_contains_key</a>(proposal.metadata,execution_key);
+<b>let</b> is_multi_step_in_execution_key = <a href="../../aptos-stdlib/doc/simple_map.md#0x1_simple_map_spec_get">simple_map::spec_get</a>(proposal.metadata,execution_key);
+<b>aborts_if</b> !<a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserializable">from_bcs::deserializable</a>&lt;bool&gt;(is_multi_step_in_execution_key);
+<b>ensures</b> result == <a href="../../aptos-stdlib/doc/from_bcs.md#0x1_from_bcs_deserialize">from_bcs::deserialize</a>&lt;bool&gt;(is_multi_step_in_execution_key);
+</code></pre>
+
+
+
+<a id="@Specification_1_is_voting_period_over"></a>
+
+### Function `is_voting_period_over`
+
+
+<pre><code><b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_is_voting_period_over">is_voting_period_over</a>&lt;ProposalType: store&gt;(proposal: &<a href="multisig_voting.md#0x1_multisig_voting_Proposal">multisig_voting::Proposal</a>&lt;ProposalType&gt;): bool
+</code></pre>
+
+
+
+
+<pre><code><b>ensures</b> result == (<a href="timestamp.md#0x1_timestamp_spec_now_seconds">timestamp::spec_now_seconds</a>() &gt; proposal.expiration_secs);
+</code></pre>
+
+
+
+
+<a id="0x1_multisig_voting_spec_get_proposal_expiration_secs"></a>
+
+
+<pre><code><b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_spec_get_proposal_expiration_secs">spec_get_proposal_expiration_secs</a>&lt;ProposalType: store&gt;(
+   voting_forum_address: <b>address</b>,
+   proposal_id: u64,
+): u64 {
+   <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+   <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+   proposal.expiration_secs
+}
+</code></pre>
+
+
+
+
+<a id="0x1_multisig_voting_spec_get_proposal_state"></a>
+
+
+<pre><code><b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_spec_get_proposal_state">spec_get_proposal_state</a>&lt;ProposalType&gt;(
+   voting_forum_address: <b>address</b>,
+   proposal_id: u64,
+   voting_forum: <a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;
+): u64 {
+   <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+   <b>let</b> voting_closed = <a href="multisig_voting.md#0x1_multisig_voting_spec_is_voting_closed">spec_is_voting_closed</a>&lt;ProposalType&gt;(voting_forum_address, proposal_id);
+   <b>let</b> proposal_vote_cond = (proposal.yes_votes &gt; proposal.no_votes && proposal.yes_votes + proposal.no_votes &gt;= proposal.min_vote_threshold);
+   <b>if</b> (voting_closed) {
+       <b>if</b> (proposal.yes_votes &gt;= proposal.min_vote_threshold) {
+           <a href="multisig_voting.md#0x1_multisig_voting_PROPOSAL_STATE_SUCCEEDED">PROPOSAL_STATE_SUCCEEDED</a>
+       } <b>else</b> {
+           <a href="multisig_voting.md#0x1_multisig_voting_PROPOSAL_STATE_FAILED">PROPOSAL_STATE_FAILED</a>
+       }
+   } <b>else</b> {
+       <a href="multisig_voting.md#0x1_multisig_voting_PROPOSAL_STATE_PENDING">PROPOSAL_STATE_PENDING</a>
+   }
+}
+</code></pre>
+
+
+
+
+<a id="0x1_multisig_voting_spec_is_voting_closed"></a>
+
+
+<pre><code><b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_spec_is_voting_closed">spec_is_voting_closed</a>&lt;ProposalType: store&gt;(voting_forum_address: <b>address</b>, proposal_id: u64): bool {
+   <b>let</b> voting_forum = <b>global</b>&lt;<a href="multisig_voting.md#0x1_multisig_voting_VotingForum">VotingForum</a>&lt;ProposalType&gt;&gt;(voting_forum_address);
+   <b>let</b> proposal = <a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_get">table::spec_get</a>(voting_forum.proposals, proposal_id);
+   <a href="multisig_voting.md#0x1_multisig_voting_spec_can_be_resolved_early">spec_can_be_resolved_early</a>(proposal)||<a href="multisig_voting.md#0x1_multisig_voting_is_voting_period_over">is_voting_period_over</a>(proposal)
+}
+</code></pre>
+
+
+
+
+<a id="0x1_multisig_voting_spec_can_be_resolved_early"></a>
+
+
+<pre><code><b>fun</b> <a href="multisig_voting.md#0x1_multisig_voting_spec_can_be_resolved_early">spec_can_be_resolved_early</a>&lt;ProposalType: store&gt;(proposal: <a href="multisig_voting.md#0x1_multisig_voting_Proposal">Proposal</a>&lt;ProposalType&gt;): bool {
+   <b>if</b> (proposal.yes_votes &gt;= proposal.min_vote_threshold || proposal.no_votes &gt;= <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(proposal.voters) - proposal.min_vote_threshold + 1) {
+       <b>true</b>
+   } <b>else</b> {
+       <b>false</b>
+   }
+}
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY

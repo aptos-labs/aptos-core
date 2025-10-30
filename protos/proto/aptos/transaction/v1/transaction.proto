@@ -319,6 +319,7 @@ message TransactionPayload {
     TYPE_WRITE_SET_PAYLOAD = 4;
     TYPE_MULTISIG_PAYLOAD = 5;
     TYPE_AUTOMATION_PAYLOAD = 6;
+    TYPE_AUTOMATION_PAYLOAD_EXTENSION = 7;
     reserved 3;
   }
 
@@ -330,6 +331,7 @@ message TransactionPayload {
     WriteSetPayload write_set_payload = 5;
     MultisigPayload multisig_payload = 6;
     AutomationPayload automation_payload = 7;
+    AutomationPayloadExtensions automation_payloads = 8;
   }
   reserved 4;
 }
@@ -361,12 +363,14 @@ message MultisigTransactionPayload {
   enum Type {
     TYPE_UNSPECIFIED = 0;
     TYPE_ENTRY_FUNCTION_PAYLOAD = 1;
+    TYPE_AUTOMATION_PAYLOAD = 2;
   }
 
   Type type = 1;
 
   oneof payload {
     EntryFunctionPayload entry_function_payload = 2;
+    AutomationPayloadExtensions automation_payload = 3;
   }
 }
 
@@ -377,6 +381,29 @@ message AutomationPayload {
     uint64 gas_price_cap = 4;
     uint64 automation_fee_cap = 5;
     repeated bytes aux_data = 6;
+}
+
+enum AutomationTaskType {
+   User = 0;
+   System = 1;
+}
+
+message AutomationPayloadV2 {
+    EntryFunctionPayload automated_function = 1;
+    uint64 expiration_timestamp_secs = 2;
+    uint64 max_gas_amount = 3;
+    uint64 gas_price_cap = 4;
+    uint64 automation_fee_cap = 5;
+    repeated bytes aux_data = 6;
+    AutomationTaskType task_type = 7;
+    optional uint64 priority = 8;
+}
+
+message AutomationPayloadExtensions {
+    oneof variant {
+      AutomationPayload v1 = 1;
+      AutomationPayloadV2 v2 = 2;
+    }
 }
 
 message MoveModuleBytecode {

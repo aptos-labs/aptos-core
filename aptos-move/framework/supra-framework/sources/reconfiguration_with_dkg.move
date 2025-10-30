@@ -2,6 +2,7 @@
 module supra_framework::reconfiguration_with_dkg {
     use std::features;
     use std::option;
+    use supra_framework::automation_registry;
     use supra_framework::consensus_config;
     use supra_framework::dkg;
     use supra_framework::execution_config;
@@ -55,6 +56,7 @@ module supra_framework::reconfiguration_with_dkg {
         gas_schedule::on_new_epoch(framework);
         std::version::on_new_epoch(framework);
         features::on_new_epoch(framework);
+        automation_registry::on_new_epoch();
         jwk_consensus_config::on_new_epoch(framework);
         jwks::on_new_epoch(framework);
         keyless_account::on_new_epoch(framework);

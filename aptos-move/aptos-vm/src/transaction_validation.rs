@@ -30,6 +30,7 @@ use move_core_types::{
 use move_vm_runtime::{logging::expect_no_verification_errors, module_traversal::TraversalContext};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
+use aptos_types::transaction::automation::AutomationTaskType;
 
 pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
     Lazy::new(|| TransactionValidation {
@@ -39,6 +40,7 @@ pub static APTOS_TRANSACTION_VALIDATION: Lazy<TransactionValidation> =
         script_prologue_name: Identifier::new("script_prologue").unwrap(),
         multi_agent_prologue_name: Identifier::new("multi_agent_script_prologue").unwrap(),
         automated_txn_prologue_name: Identifier::new("automated_transaction_prologue").unwrap(),
+        automated_txn_prologue_v2_name: Identifier::new("automated_transaction_prologue_v2").unwrap(),
         user_epilogue_name: Identifier::new("epilogue").unwrap(),
         user_epilogue_gas_payer_name: Identifier::new("epilogue_gas_payer").unwrap(),
         automated_txn_epilogue_name: Identifier::new("automated_transaction_epilogue").unwrap(),
@@ -53,6 +55,7 @@ pub struct TransactionValidation {
     pub script_prologue_name: Identifier,
     pub multi_agent_prologue_name: Identifier,
     pub automated_txn_prologue_name: Identifier,
+    pub automated_txn_prologue_v2_name: Identifier,
     pub user_epilogue_name: Identifier,
     pub user_epilogue_gas_payer_name: Identifier,
     pub automated_txn_epilogue_name: Identifier,
@@ -198,6 +201,8 @@ pub(crate) fn run_multisig_prologue(
 /// Run the prologue for automated transactions where
 /// 1. sender is checked to have enough funds for transaction execution
 /// 2. automated task expiry time is checked.
+/// Deprecated after automation v2 release. Kept for the smooth transitioning from V1 to V2 on
+/// active chains.
 pub(crate) fn run_automated_transaction_prologue(
     session: &mut SessionExt,
     txn_data: &TransactionMetadata,
@@ -222,6 +227,44 @@ pub(crate) fn run_automated_transaction_prologue(
         .execute_function_bypass_visibility(
             &APTOS_TRANSACTION_VALIDATION.module_id(),
             &APTOS_TRANSACTION_VALIDATION.automated_txn_prologue_name,
+            vec![],
+            serialize_values(&args),
+            &mut gas_meter,
+            traversal_context,
+        )
+        .map(|_return_vals| ())
+        .map_err(expect_no_verification_errors)
+        .or_else(|err| convert_prologue_error(err, log_context))
+}
+/// Run the prologue for automated transactions where
+/// 1. sender is checked to have enough funds for transaction execution
+/// 2. automated task expiry time is checked.
+pub(crate) fn run_automated_transaction_prologue_v2(
+    session: &mut SessionExt,
+    txn_data: &TransactionMetadata,
+    task_type: AutomationTaskType,
+    log_context: &AdapterLogSchema,
+    traversal_context: &mut TraversalContext,
+) -> Result<(), VMStatus> {
+    let txn_task_id = txn_data.sequence_number();
+    let txn_gas_price = txn_data.gas_unit_price();
+    let txn_max_gas_units = txn_data.max_gas_amount();
+    let txn_expiration_timestamp_secs = txn_data.expiration_timestamp_secs();
+    let chain_id = txn_data.chain_id();
+    let mut gas_meter = UnmeteredGasMeter;
+    let args = vec![
+        MoveValue::Signer(txn_data.sender),
+        MoveValue::U64(txn_task_id),
+        MoveValue::U64(txn_gas_price.into()),
+        MoveValue::U64(txn_max_gas_units.into()),
+        MoveValue::U64(txn_expiration_timestamp_secs),
+        MoveValue::U8(chain_id.id()),
+        MoveValue::U8(task_type as u8),
+    ];
+    session
+        .execute_function_bypass_visibility(
+            &APTOS_TRANSACTION_VALIDATION.module_id(),
+            &APTOS_TRANSACTION_VALIDATION.automated_txn_prologue_v2_name,
             vec![],
             serialize_values(&args),
             &mut gas_meter,
@@ -307,33 +350,36 @@ fn run_automated_txn_epilogue(
     gas_remaining: Gas,
     fee_statement: FeeStatement,
     txn_data: &TransactionMetadata,
+    task_type: AutomationTaskType,
     features: &Features,
     traversal_context: &mut TraversalContext,
 ) -> VMResult<()> {
-    let txn_gas_price = txn_data.gas_unit_price();
-    let txn_max_gas_units = txn_data.max_gas_amount();
+    // System automated tasks are not charged but fee statement event is emitted to enable historical
+    // analysis
+    if task_type == AutomationTaskType::User {
+        let txn_gas_price = txn_data.gas_unit_price();
+        let txn_max_gas_units = txn_data.max_gas_amount();
 
-    // We can unconditionally do this as this condition can only be true if the prologue
-    // accepted it, in which case the gas payer feature is enabled.
-    // Regular tx, run the normal epilogue
-    let args = vec![
-        MoveValue::Signer(txn_data.sender),
-        MoveValue::U64(fee_statement.storage_fee_refund()),
-        MoveValue::U64(txn_gas_price.into()),
-        MoveValue::U64(txn_max_gas_units.into()),
-        MoveValue::U64(gas_remaining.into()),
-    ];
-    session
-        .execute_function_bypass_visibility(
-            &APTOS_TRANSACTION_VALIDATION.module_id(),
-            &APTOS_TRANSACTION_VALIDATION.automated_txn_epilogue_name,
-            vec![],
-            serialize_values(&args),
-            &mut UnmeteredGasMeter,
-            traversal_context,
-        )
-        .map(|_return_vals| ())
-        .map_err(expect_no_verification_errors)?;
+        let args = vec![
+            MoveValue::Signer(txn_data.sender),
+            MoveValue::U64(fee_statement.storage_fee_refund()),
+            MoveValue::U64(txn_gas_price.into()),
+            MoveValue::U64(txn_max_gas_units.into()),
+            MoveValue::U64(gas_remaining.into()),
+        ];
+
+        session
+            .execute_function_bypass_visibility(
+                &APTOS_TRANSACTION_VALIDATION.module_id(),
+                &APTOS_TRANSACTION_VALIDATION.automated_txn_epilogue_name,
+                vec![],
+                serialize_values(&args),
+                &mut UnmeteredGasMeter,
+                traversal_context,
+            )
+            .map(|_return_vals| ())
+            .map_err(expect_no_verification_errors)?;
+    }
 
     // Emit the FeeStatement event
     if features.is_emit_fee_statement_enabled() {
@@ -399,6 +445,7 @@ pub(crate) fn run_automated_txn_success_epilogue(
     fee_statement: FeeStatement,
     features: &Features,
     txn_data: &TransactionMetadata,
+    task_type: AutomationTaskType,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
@@ -414,6 +461,7 @@ pub(crate) fn run_automated_txn_success_epilogue(
         gas_remaining,
         fee_statement,
         txn_data,
+        task_type,
         features,
         traversal_context,
     )
@@ -456,6 +504,7 @@ pub(crate) fn run_automated_txn_failure_epilogue(
     fee_statement: FeeStatement,
     features: &Features,
     txn_data: &TransactionMetadata,
+    task_type: AutomationTaskType,
     log_context: &AdapterLogSchema,
     traversal_context: &mut TraversalContext,
 ) -> Result<(), VMStatus> {
@@ -464,6 +513,7 @@ pub(crate) fn run_automated_txn_failure_epilogue(
         gas_remaining,
         fee_statement,
         txn_data,
+        task_type,
         features,
         traversal_context,
     )

@@ -146,15 +146,18 @@ impl EntryFunctionPayload {
 pub struct MultisigPayload {
     pub multisig_address: AccountAddress,
     pub entry_function_payload: Option<EntryFunctionPayload>,
+    pub is_automation_registration: Option<bool>,
 }
 impl MultisigPayload {
     pub fn new(
         multisig_address: AccountAddress,
         entry_function_payload: Option<EntryFunctionPayload>,
+        is_automation_registration: Option<bool>,
     ) -> Self {
         Self {
             multisig_address,
             entry_function_payload,
+            is_automation_registration,
         }
     }
 }

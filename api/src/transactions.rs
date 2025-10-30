@@ -1075,6 +1075,13 @@ impl TransactionsApi {
                                         entry_function,
                                     )?;
                                 },
+                                MultisigTransactionPayload::AutomationRegistration(params) => {
+                                    TransactionsApi::validate_entry_function_payload_format(
+                                        ledger_info,
+                                        params.automated_function(),
+                                    )?;
+
+                                }
                             }
                         }
                     },
@@ -1387,10 +1394,12 @@ impl TransactionsApi {
                 format!("Script::{}", txn.committed_hash()).to_string()
             },
             TransactionPayload::ModuleBundle(_) => "ModuleBundle::unknown".to_string(),
-            TransactionPayload::AutomationRegistration(auto_payload) => FunctionStats::function_to_key(
-                auto_payload.module_id(),
-                &auto_payload.function().into(),
-            ),
+            TransactionPayload::AutomationRegistration(auto_payload) => {
+                FunctionStats::function_to_key(
+                    auto_payload.module_id(),
+                    &auto_payload.function().into(),
+                )
+            },
             TransactionPayload::EntryFunction(entry_function) => FunctionStats::function_to_key(
                 entry_function.module(),
                 &entry_function.function().into(),
@@ -1404,6 +1413,12 @@ impl TransactionsApi {
                                 &entry_function.function().into(),
                             )
                         },
+                        MultisigTransactionPayload::AutomationRegistration(auto_payload) => {
+                            FunctionStats::function_to_key(
+                                auto_payload.module_id(),
+                                &auto_payload.function().into(),
+                            )
+                        }
                     }
                 } else {
                     "Multisig::unknown".to_string()

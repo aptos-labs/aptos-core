@@ -591,7 +591,7 @@ module supra_framework::coin {
         AggregatableCoin<CoinType> {
             value: aggregator,
         }
-    }    
+    }
 
     /// Returns true if the value of aggregatable coin is zero.
     public(friend) fun is_aggregatable_coin_zero<CoinType>(coin: &AggregatableCoin<CoinType>): bool {
@@ -1096,7 +1096,7 @@ module supra_framework::coin {
         system_addresses::assert_supra_framework(account);
         initialize_internal(account, name, symbol, decimals, monitor_supply, true)
     }
-    
+
     public(friend) fun initialize_with_parallelizable_supply_with_limit<CoinType>(
         account: &signer,
         name: string::String,

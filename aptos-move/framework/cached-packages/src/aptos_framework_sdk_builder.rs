@@ -147,6 +147,17 @@ pub enum EntryFunctionCall {
         cap_update_table: Vec<u8>,
     },
 
+    /// Cancel System automation task with specified task_index.
+    /// Only existing task, which is PENDING or ACTIVE, can be cancelled and only by task owner.
+    /// If the task is
+    ///   - active, its state is updated to be CANCELLED.
+    ///   - pending, it is removed form the list.
+    ///   - cancelled, an error is reported
+    /// Committed gas-limit is updated by reducing it with the max-gas-amount of the cancelled task.
+    AutomationRegistryCancelSystemTask {
+        task_index: u64,
+    },
+
     /// Cancel Automation task with specified task_index.
     /// Only existing task, which is PENDING or ACTIVE, can be cancelled and only by task owner.
     /// If the task is
@@ -156,6 +167,15 @@ pub enum EntryFunctionCall {
     /// Committed gas-limit is updated by reducing it with the max-gas-amount of the cancelled task.
     AutomationRegistryCancelTask {
         task_index: u64,
+    },
+
+    /// Immediately stops system automation tasks for the specified `task_indexes`.
+    /// Only tasks that exist and are owned by the sender can be stopped.
+    /// If any of the specified tasks are not owned by the sender, the transaction will abort.
+    /// When a task is stopped, the committed gas for the next epoch is reduced
+    /// by the max gas amount of the stopped task.
+    AutomationRegistryStopSystemTasks {
+        task_indexes: Vec<u64>,
     },
 
     /// Immediately stops automation tasks for the specified `task_indexes`.
@@ -1269,8 +1289,14 @@ impl EntryFunctionCall {
                 new_public_key_bytes,
                 cap_update_table,
             ),
+            AutomationRegistryCancelSystemTask { task_index } => {
+                automation_registry_cancel_system_task(task_index)
+            },
             AutomationRegistryCancelTask { task_index } => {
                 automation_registry_cancel_task(task_index)
+            },
+            AutomationRegistryStopSystemTasks { task_indexes } => {
+                automation_registry_stop_system_tasks(task_indexes)
             },
             AutomationRegistryStopTasks { task_indexes } => {
                 automation_registry_stop_tasks(task_indexes)
@@ -2288,6 +2314,28 @@ pub fn account_rotate_authentication_key_with_rotation_capability(
     ))
 }
 
+/// Cancel System automation task with specified task_index.
+/// Only existing task, which is PENDING or ACTIVE, can be cancelled and only by task owner.
+/// If the task is
+///   - active, its state is updated to be CANCELLED.
+///   - pending, it is removed form the list.
+///   - cancelled, an error is reported
+/// Committed gas-limit is updated by reducing it with the max-gas-amount of the cancelled task.
+pub fn automation_registry_cancel_system_task(task_index: u64) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("automation_registry").to_owned(),
+        ),
+        ident_str!("cancel_system_task").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&task_index).unwrap()],
+    ))
+}
+
 /// Cancel Automation task with specified task_index.
 /// Only existing task, which is PENDING or ACTIVE, can be cancelled and only by task owner.
 /// If the task is
@@ -2307,6 +2355,26 @@ pub fn automation_registry_cancel_task(task_index: u64) -> TransactionPayload {
         ident_str!("cancel_task").to_owned(),
         vec![],
         vec![bcs::to_bytes(&task_index).unwrap()],
+    ))
+}
+
+/// Immediately stops system automation tasks for the specified `task_indexes`.
+/// Only tasks that exist and are owned by the sender can be stopped.
+/// If any of the specified tasks are not owned by the sender, the transaction will abort.
+/// When a task is stopped, the committed gas for the next epoch is reduced
+/// by the max gas amount of the stopped task.
+pub fn automation_registry_stop_system_tasks(task_indexes: Vec<u64>) -> TransactionPayload {
+    TransactionPayload::EntryFunction(EntryFunction::new(
+        ModuleId::new(
+            AccountAddress::new([
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 1,
+            ]),
+            ident_str!("automation_registry").to_owned(),
+        ),
+        ident_str!("stop_system_tasks").to_owned(),
+        vec![],
+        vec![bcs::to_bytes(&task_indexes).unwrap()],
     ))
 }
 
@@ -5659,12 +5727,36 @@ mod decoder {
         }
     }
 
+    pub fn automation_registry_cancel_system_task(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AutomationRegistryCancelSystemTask {
+                task_index: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
     pub fn automation_registry_cancel_task(
         payload: &TransactionPayload,
     ) -> Option<EntryFunctionCall> {
         if let TransactionPayload::EntryFunction(script) = payload {
             Some(EntryFunctionCall::AutomationRegistryCancelTask {
                 task_index: bcs::from_bytes(script.args().get(0)?).ok()?,
+            })
+        } else {
+            None
+        }
+    }
+
+    pub fn automation_registry_stop_system_tasks(
+        payload: &TransactionPayload,
+    ) -> Option<EntryFunctionCall> {
+        if let TransactionPayload::EntryFunction(script) = payload {
+            Some(EntryFunctionCall::AutomationRegistryStopSystemTasks {
+                task_indexes: bcs::from_bytes(script.args().get(0)?).ok()?,
             })
         } else {
             None
@@ -7627,8 +7719,16 @@ static SCRIPT_FUNCTION_DECODER_MAP: once_cell::sync::Lazy<EntryFunctionDecoderMa
             Box::new(decoder::account_rotate_authentication_key_with_rotation_capability),
         );
         map.insert(
+            "automation_registry_cancel_system_task".to_string(),
+            Box::new(decoder::automation_registry_cancel_system_task),
+        );
+        map.insert(
             "automation_registry_cancel_task".to_string(),
             Box::new(decoder::automation_registry_cancel_task),
+        );
+        map.insert(
+            "automation_registry_stop_system_tasks".to_string(),
+            Box::new(decoder::automation_registry_stop_system_tasks),
         );
         map.insert(
             "automation_registry_stop_tasks".to_string(),

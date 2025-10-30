@@ -36,6 +36,7 @@
     -  [Function `transfer_coins`](#@Specification_1_transfer_coins)
     -  [Function `deposit_coins`](#@Specification_1_deposit_coins)
     -  [Function `assert_account_exists`](#@Specification_1_assert_account_exists)
+    -  [Function `assert_account_is_registered_for_apt`](#@Specification_1_assert_account_is_registered_for_apt)
     -  [Function `assert_account_is_registered_for_supra`](#@Specification_1_assert_account_is_registered_for_supra)
     -  [Function `set_allow_direct_coin_transfers`](#@Specification_1_set_allow_direct_coin_transfers)
     -  [Function `can_receive_direct_coin_transfers`](#@Specification_1_can_receive_direct_coin_transfers)
@@ -394,7 +395,7 @@ This would create the recipient account first and register it to receive the Coi
     <b>if</b> (!<a href="account.md#0x1_account_exists_at">account::exists_at</a>(<b>to</b>)) {
         <a href="supra_account.md#0x1_supra_account_create_account">create_account</a>(<b>to</b>);
         <b>spec</b> {
-            <b>assert</b> <a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;SupraCoin&gt;(<b>to</b>);
+            <b>assume</b> <a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;SupraCoin&gt;(<b>to</b>);
             <b>assume</b> aptos_std::type_info::type_of&lt;CoinType&gt;() == aptos_std::type_info::type_of&lt;SupraCoin&gt;() ==&gt;
                 <a href="coin.md#0x1_coin_spec_is_account_registered">coin::spec_is_account_registered</a>&lt;CoinType&gt;(<b>to</b>);
         };
@@ -1015,15 +1016,10 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
 <b>let</b> account_addr_source = <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(from);
 <b>requires</b> account_addr_source != <b>to</b>;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_WithdrawAbortsIf">WithdrawAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_TransferEnsures">TransferEnsures</a>&lt;CoinType&gt;;
-<b>aborts_if</b> <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>) && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).frozen;
 <b>ensures</b> <b>exists</b>&lt;supra_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;supra_framework::coin::CoinStore&lt;CoinType&gt;&gt;(<b>to</b>);
 </code></pre>
@@ -1041,12 +1037,9 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 
 
 
-<pre><code><b>pragma</b> verify = <b>false</b>;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_CreateAccountTransferAbortsIf">CreateAccountTransferAbortsIf</a>;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_GuidAbortsIf">GuidAbortsIf</a>&lt;CoinType&gt;;
-<b>include</b> <a href="supra_account.md#0x1_supra_account_RegistCoinAbortsIf">RegistCoinAbortsIf</a>&lt;CoinType&gt;;
+<pre><code><b>pragma</b> verify = <b>true</b>;
+<b>pragma</b> aborts_if_is_partial;
 <b>let</b> if_exist_coin = <b>exists</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>);
-<b>aborts_if</b> if_exist_coin && <b>global</b>&lt;<a href="coin.md#0x1_coin_CoinStore">coin::CoinStore</a>&lt;CoinType&gt;&gt;(<b>to</b>).frozen;
 // This enforces <a id="high-level-spec-6" href="#high-level-req">high-level requirement 6</a>:
 <b>ensures</b> <b>exists</b>&lt;supra_framework::account::Account&gt;(<b>to</b>);
 <b>ensures</b> <b>exists</b>&lt;supra_framework::coin::CoinStore&lt;CoinType&gt;&gt;(<b>to</b>);
@@ -1069,6 +1062,22 @@ Limit the address of auth_key is not @vm_reserved / @supra_framework / @aptos_to
 
 
 <pre><code><b>aborts_if</b> !<a href="account.md#0x1_account_exists_at">account::exists_at</a>(addr);
+</code></pre>
+
+
+
+<a id="@Specification_1_assert_account_is_registered_for_apt"></a>
+
+### Function `assert_account_is_registered_for_apt`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="supra_account.md#0x1_supra_account_assert_account_is_registered_for_apt">assert_account_is_registered_for_apt</a>(addr: <b>address</b>)
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> aborts_if_is_strict = <b>false</b>;
 </code></pre>
 
 

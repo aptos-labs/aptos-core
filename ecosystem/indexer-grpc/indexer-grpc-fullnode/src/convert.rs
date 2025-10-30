@@ -2,7 +2,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_api_types::transaction::AutomationRegistrationParams;
+use aptos_api_types::transaction::{AutomationRegistrationParams, AutomationTaskType};
 use aptos_api_types::{
     transaction::ValidatorTransaction as ApiValidatorTransactionEnum, AccountSignature,
     DeleteModule, DeleteResource, Ed25519Signature, EntryFunctionId, EntryFunctionPayload, Event,
@@ -30,6 +30,8 @@ use aptos_types::jwks::jwk::JWK;
 use hex;
 use move_binary_format::file_format::Ability;
 use std::time::Duration;
+use aptos_protos::transaction::v1::automation_payload_extensions;
+use aptos_protos::transaction::v1::AutomationPayloadExtensions;
 
 pub fn convert_move_module_id(move_module_id: &MoveModuleId) -> transaction::MoveModuleId {
     transaction::MoveModuleId {
@@ -186,7 +188,7 @@ pub fn convert_transaction_payload(
         TransactionPayload::AutomationRegistrationPayload(ap) => transaction::TransactionPayload {
             r#type: transaction::transaction_payload::Type::AutomationPayload as i32,
             payload: Some(
-                transaction::transaction_payload::Payload::AutomationPayload(
+                transaction::transaction_payload::Payload::AutomationPayloads(
                     convert_automation_payload(ap),
                 ),
             ),
@@ -494,6 +496,17 @@ pub fn convert_multisig_payload(
                     ),
                 }
             },
+            MultisigTransactionPayload::AutomationRegistrationPayload(params) => {
+                transaction::MultisigTransactionPayload {
+                    r#type: transaction::multisig_transaction_payload::Type::AutomationPayload
+                        as i32,
+                    payload: Some(
+                        transaction::multisig_transaction_payload::Payload::AutomationPayload(
+                            convert_automation_payload(params),
+                        ),
+                    ),
+                }
+            }
         });
     transaction::MultisigPayload {
         multisig_address: multisig_payload.multisig_address.to_string(),
@@ -501,17 +514,47 @@ pub fn convert_multisig_payload(
     }
 }
 
+pub fn convert_automation_task_type(automation_task_type: &AutomationTaskType) -> transaction::AutomationTaskType {
+    match automation_task_type {
+        AutomationTaskType::User => transaction::AutomationTaskType::User,
+        AutomationTaskType::System => transaction::AutomationTaskType::System
+
+    }
+}
+
 pub fn convert_automation_payload(
     auto_payload: &AutomationRegistrationParams,
-) -> transaction::AutomationPayload {
-    let AutomationRegistrationParams::V1(params_v1) = auto_payload;
-    transaction::AutomationPayload {
-        automated_function: Some(convert_entry_function_payload(&params_v1.automated_function)),
-        expiration_timestamp_secs: params_v1.expiration_timestamp_secs,
-        max_gas_amount: params_v1.max_gas_amount,
-        gas_price_cap: params_v1.gas_price_cap,
-        automation_fee_cap: params_v1.automation_fee_cap,
-        aux_data: params_v1.aux_data.clone(),
+) -> transaction::AutomationPayloadExtensions {
+    match auto_payload {
+        AutomationRegistrationParams::V1(params_v1) => {
+            let v1 = transaction::AutomationPayload {
+                automated_function: Some(convert_entry_function_payload(&params_v1.automated_function)),
+                expiration_timestamp_secs: params_v1.expiration_timestamp_secs,
+                max_gas_amount: params_v1.max_gas_amount,
+                gas_price_cap: params_v1.gas_price_cap,
+                automation_fee_cap: params_v1.automation_fee_cap,
+                aux_data: params_v1.aux_data.clone(),
+            };
+            AutomationPayloadExtensions {
+                variant: Some(automation_payload_extensions::Variant::V1(v1))
+            }
+        }
+        AutomationRegistrationParams::V2(params_v2) => {
+            let v2 = transaction::AutomationPayloadV2 {
+                automated_function: Some(convert_entry_function_payload(&params_v2.automated_function)),
+                expiration_timestamp_secs: params_v2.expiration_timestamp_secs,
+                max_gas_amount: params_v2.max_gas_amount,
+                gas_price_cap: params_v2.gas_price_cap,
+                automation_fee_cap: params_v2.automation_fee_cap,
+                aux_data: params_v2.aux_data.clone(),
+                task_type: convert_automation_task_type(&params_v2.task_type).into(),
+                priority: params_v2.task_priority.clone(),
+            };
+            AutomationPayloadExtensions {
+                variant: Some(automation_payload_extensions::Variant::V2(v2))
+            }
+
+        }
     }
 }
 

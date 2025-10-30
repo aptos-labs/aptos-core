@@ -3,6 +3,39 @@ import Long from "long";
 import _m0 from "protobufjs/minimal";
 import { Timestamp } from "../../util/timestamp/timestamp";
 
+export enum AutomationTaskType {
+  User = 0,
+  System = 1,
+  UNRECOGNIZED = -1,
+}
+
+export function automationTaskTypeFromJSON(object: any): AutomationTaskType {
+  switch (object) {
+    case 0:
+    case "User":
+      return AutomationTaskType.User;
+    case 1:
+    case "System":
+      return AutomationTaskType.System;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return AutomationTaskType.UNRECOGNIZED;
+  }
+}
+
+export function automationTaskTypeToJSON(object: AutomationTaskType): string {
+  switch (object) {
+    case AutomationTaskType.User:
+      return "User";
+    case AutomationTaskType.System:
+      return "System";
+    case AutomationTaskType.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum MoveTypes {
   MOVE_TYPES_UNSPECIFIED = 0,
   MOVE_TYPES_BOOL = 1,
@@ -633,6 +666,7 @@ export interface TransactionPayload {
   writeSetPayload?: WriteSetPayload | undefined;
   multisigPayload?: MultisigPayload | undefined;
   automationPayload?: AutomationPayload | undefined;
+  automationPayloads?: AutomationPayloadExtensions | undefined;
 }
 
 export enum TransactionPayload_Type {
@@ -642,6 +676,7 @@ export enum TransactionPayload_Type {
   TYPE_WRITE_SET_PAYLOAD = 4,
   TYPE_MULTISIG_PAYLOAD = 5,
   TYPE_AUTOMATION_PAYLOAD = 6,
+  TYPE_AUTOMATION_PAYLOAD_EXTENSION = 7,
   UNRECOGNIZED = -1,
 }
 
@@ -665,6 +700,9 @@ export function transactionPayload_TypeFromJSON(object: any): TransactionPayload
     case 6:
     case "TYPE_AUTOMATION_PAYLOAD":
       return TransactionPayload_Type.TYPE_AUTOMATION_PAYLOAD;
+    case 7:
+    case "TYPE_AUTOMATION_PAYLOAD_EXTENSION":
+      return TransactionPayload_Type.TYPE_AUTOMATION_PAYLOAD_EXTENSION;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -686,6 +724,8 @@ export function transactionPayload_TypeToJSON(object: TransactionPayload_Type): 
       return "TYPE_MULTISIG_PAYLOAD";
     case TransactionPayload_Type.TYPE_AUTOMATION_PAYLOAD:
       return "TYPE_AUTOMATION_PAYLOAD";
+    case TransactionPayload_Type.TYPE_AUTOMATION_PAYLOAD_EXTENSION:
+      return "TYPE_AUTOMATION_PAYLOAD_EXTENSION";
     case TransactionPayload_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -718,11 +758,13 @@ export interface MultisigPayload {
 export interface MultisigTransactionPayload {
   type?: MultisigTransactionPayload_Type | undefined;
   entryFunctionPayload?: EntryFunctionPayload | undefined;
+  automationPayload?: AutomationPayloadExtensions | undefined;
 }
 
 export enum MultisigTransactionPayload_Type {
   TYPE_UNSPECIFIED = 0,
   TYPE_ENTRY_FUNCTION_PAYLOAD = 1,
+  TYPE_AUTOMATION_PAYLOAD = 2,
   UNRECOGNIZED = -1,
 }
 
@@ -734,6 +776,9 @@ export function multisigTransactionPayload_TypeFromJSON(object: any): MultisigTr
     case 1:
     case "TYPE_ENTRY_FUNCTION_PAYLOAD":
       return MultisigTransactionPayload_Type.TYPE_ENTRY_FUNCTION_PAYLOAD;
+    case 2:
+    case "TYPE_AUTOMATION_PAYLOAD":
+      return MultisigTransactionPayload_Type.TYPE_AUTOMATION_PAYLOAD;
     case -1:
     case "UNRECOGNIZED":
     default:
@@ -747,6 +792,8 @@ export function multisigTransactionPayload_TypeToJSON(object: MultisigTransactio
       return "TYPE_UNSPECIFIED";
     case MultisigTransactionPayload_Type.TYPE_ENTRY_FUNCTION_PAYLOAD:
       return "TYPE_ENTRY_FUNCTION_PAYLOAD";
+    case MultisigTransactionPayload_Type.TYPE_AUTOMATION_PAYLOAD:
+      return "TYPE_AUTOMATION_PAYLOAD";
     case MultisigTransactionPayload_Type.UNRECOGNIZED:
     default:
       return "UNRECOGNIZED";
@@ -760,6 +807,22 @@ export interface AutomationPayload {
   gasPriceCap?: bigint | undefined;
   automationFeeCap?: bigint | undefined;
   auxData?: Uint8Array[] | undefined;
+}
+
+export interface AutomationPayloadV2 {
+  automatedFunction?: EntryFunctionPayload | undefined;
+  expirationTimestampSecs?: bigint | undefined;
+  maxGasAmount?: bigint | undefined;
+  gasPriceCap?: bigint | undefined;
+  automationFeeCap?: bigint | undefined;
+  auxData?: Uint8Array[] | undefined;
+  taskType?: AutomationTaskType | undefined;
+  priority?: bigint | undefined;
+}
+
+export interface AutomationPayloadExtensions {
+  v1?: AutomationPayload | undefined;
+  v2?: AutomationPayloadV2 | undefined;
 }
 
 export interface MoveModuleBytecode {
@@ -6400,6 +6463,7 @@ function createBaseTransactionPayload(): TransactionPayload {
     writeSetPayload: undefined,
     multisigPayload: undefined,
     automationPayload: undefined,
+    automationPayloads: undefined,
   };
 }
 
@@ -6422,6 +6486,9 @@ export const TransactionPayload = {
     }
     if (message.automationPayload !== undefined) {
       AutomationPayload.encode(message.automationPayload, writer.uint32(58).fork()).ldelim();
+    }
+    if (message.automationPayloads !== undefined) {
+      AutomationPayloadExtensions.encode(message.automationPayloads, writer.uint32(66).fork()).ldelim();
     }
     return writer;
   },
@@ -6474,6 +6541,13 @@ export const TransactionPayload = {
           }
 
           message.automationPayload = AutomationPayload.decode(reader, reader.uint32());
+          continue;
+        case 8:
+          if (tag !== 66) {
+            break;
+          }
+
+          message.automationPayloads = AutomationPayloadExtensions.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -6530,6 +6604,9 @@ export const TransactionPayload = {
       automationPayload: isSet(object.automationPayload)
         ? AutomationPayload.fromJSON(object.automationPayload)
         : undefined,
+      automationPayloads: isSet(object.automationPayloads)
+        ? AutomationPayloadExtensions.fromJSON(object.automationPayloads)
+        : undefined,
     };
   },
 
@@ -6552,6 +6629,9 @@ export const TransactionPayload = {
     }
     if (message.automationPayload !== undefined) {
       obj.automationPayload = AutomationPayload.toJSON(message.automationPayload);
+    }
+    if (message.automationPayloads !== undefined) {
+      obj.automationPayloads = AutomationPayloadExtensions.toJSON(message.automationPayloads);
     }
     return obj;
   },
@@ -6576,6 +6656,9 @@ export const TransactionPayload = {
       : undefined;
     message.automationPayload = (object.automationPayload !== undefined && object.automationPayload !== null)
       ? AutomationPayload.fromPartial(object.automationPayload)
+      : undefined;
+    message.automationPayloads = (object.automationPayloads !== undefined && object.automationPayloads !== null)
+      ? AutomationPayloadExtensions.fromPartial(object.automationPayloads)
       : undefined;
     return message;
   },
@@ -7079,7 +7162,7 @@ export const MultisigPayload = {
 };
 
 function createBaseMultisigTransactionPayload(): MultisigTransactionPayload {
-  return { type: 0, entryFunctionPayload: undefined };
+  return { type: 0, entryFunctionPayload: undefined, automationPayload: undefined };
 }
 
 export const MultisigTransactionPayload = {
@@ -7089,6 +7172,9 @@ export const MultisigTransactionPayload = {
     }
     if (message.entryFunctionPayload !== undefined) {
       EntryFunctionPayload.encode(message.entryFunctionPayload, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.automationPayload !== undefined) {
+      AutomationPayloadExtensions.encode(message.automationPayload, writer.uint32(26).fork()).ldelim();
     }
     return writer;
   },
@@ -7113,6 +7199,13 @@ export const MultisigTransactionPayload = {
           }
 
           message.entryFunctionPayload = EntryFunctionPayload.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.automationPayload = AutomationPayloadExtensions.decode(reader, reader.uint32());
           continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
@@ -7163,6 +7256,9 @@ export const MultisigTransactionPayload = {
       entryFunctionPayload: isSet(object.entryFunctionPayload)
         ? EntryFunctionPayload.fromJSON(object.entryFunctionPayload)
         : undefined,
+      automationPayload: isSet(object.automationPayload)
+        ? AutomationPayloadExtensions.fromJSON(object.automationPayload)
+        : undefined,
     };
   },
 
@@ -7173,6 +7269,9 @@ export const MultisigTransactionPayload = {
     }
     if (message.entryFunctionPayload !== undefined) {
       obj.entryFunctionPayload = EntryFunctionPayload.toJSON(message.entryFunctionPayload);
+    }
+    if (message.automationPayload !== undefined) {
+      obj.automationPayload = AutomationPayloadExtensions.toJSON(message.automationPayload);
     }
     return obj;
   },
@@ -7185,6 +7284,9 @@ export const MultisigTransactionPayload = {
     message.type = object.type ?? 0;
     message.entryFunctionPayload = (object.entryFunctionPayload !== undefined && object.entryFunctionPayload !== null)
       ? EntryFunctionPayload.fromPartial(object.entryFunctionPayload)
+      : undefined;
+    message.automationPayload = (object.automationPayload !== undefined && object.automationPayload !== null)
+      ? AutomationPayloadExtensions.fromPartial(object.automationPayload)
       : undefined;
     return message;
   },
@@ -7379,6 +7481,346 @@ export const AutomationPayload = {
     message.gasPriceCap = object.gasPriceCap ?? BigInt("0");
     message.automationFeeCap = object.automationFeeCap ?? BigInt("0");
     message.auxData = object.auxData?.map((e) => e) || [];
+    return message;
+  },
+};
+
+function createBaseAutomationPayloadV2(): AutomationPayloadV2 {
+  return {
+    automatedFunction: undefined,
+    expirationTimestampSecs: BigInt("0"),
+    maxGasAmount: BigInt("0"),
+    gasPriceCap: BigInt("0"),
+    automationFeeCap: BigInt("0"),
+    auxData: [],
+    taskType: 0,
+    priority: undefined,
+  };
+}
+
+export const AutomationPayloadV2 = {
+  encode(message: AutomationPayloadV2, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.automatedFunction !== undefined) {
+      EntryFunctionPayload.encode(message.automatedFunction, writer.uint32(10).fork()).ldelim();
+    }
+    if (message.expirationTimestampSecs !== undefined && message.expirationTimestampSecs !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.expirationTimestampSecs) !== message.expirationTimestampSecs) {
+        throw new globalThis.Error("value provided for field message.expirationTimestampSecs of type uint64 too large");
+      }
+      writer.uint32(16).uint64(message.expirationTimestampSecs.toString());
+    }
+    if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.maxGasAmount) !== message.maxGasAmount) {
+        throw new globalThis.Error("value provided for field message.maxGasAmount of type uint64 too large");
+      }
+      writer.uint32(24).uint64(message.maxGasAmount.toString());
+    }
+    if (message.gasPriceCap !== undefined && message.gasPriceCap !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.gasPriceCap) !== message.gasPriceCap) {
+        throw new globalThis.Error("value provided for field message.gasPriceCap of type uint64 too large");
+      }
+      writer.uint32(32).uint64(message.gasPriceCap.toString());
+    }
+    if (message.automationFeeCap !== undefined && message.automationFeeCap !== BigInt("0")) {
+      if (BigInt.asUintN(64, message.automationFeeCap) !== message.automationFeeCap) {
+        throw new globalThis.Error("value provided for field message.automationFeeCap of type uint64 too large");
+      }
+      writer.uint32(40).uint64(message.automationFeeCap.toString());
+    }
+    if (message.auxData !== undefined && message.auxData.length !== 0) {
+      for (const v of message.auxData) {
+        writer.uint32(50).bytes(v!);
+      }
+    }
+    if (message.taskType !== undefined && message.taskType !== 0) {
+      writer.uint32(56).int32(message.taskType);
+    }
+    if (message.priority !== undefined) {
+      if (BigInt.asUintN(64, message.priority) !== message.priority) {
+        throw new globalThis.Error("value provided for field message.priority of type uint64 too large");
+      }
+      writer.uint32(64).uint64(message.priority.toString());
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): AutomationPayloadV2 {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAutomationPayloadV2();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.automatedFunction = EntryFunctionPayload.decode(reader, reader.uint32());
+          continue;
+        case 2:
+          if (tag !== 16) {
+            break;
+          }
+
+          message.expirationTimestampSecs = longToBigint(reader.uint64() as Long);
+          continue;
+        case 3:
+          if (tag !== 24) {
+            break;
+          }
+
+          message.maxGasAmount = longToBigint(reader.uint64() as Long);
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.gasPriceCap = longToBigint(reader.uint64() as Long);
+          continue;
+        case 5:
+          if (tag !== 40) {
+            break;
+          }
+
+          message.automationFeeCap = longToBigint(reader.uint64() as Long);
+          continue;
+        case 6:
+          if (tag !== 50) {
+            break;
+          }
+
+          message.auxData!.push(reader.bytes());
+          continue;
+        case 7:
+          if (tag !== 56) {
+            break;
+          }
+
+          message.taskType = reader.int32() as any;
+          continue;
+        case 8:
+          if (tag !== 64) {
+            break;
+          }
+
+          message.priority = longToBigint(reader.uint64() as Long);
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<AutomationPayloadV2, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<AutomationPayloadV2 | AutomationPayloadV2[]>
+      | Iterable<AutomationPayloadV2 | AutomationPayloadV2[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [AutomationPayloadV2.encode(p).finish()];
+        }
+      } else {
+        yield* [AutomationPayloadV2.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, AutomationPayloadV2>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<AutomationPayloadV2> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [AutomationPayloadV2.decode(p)];
+        }
+      } else {
+        yield* [AutomationPayloadV2.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): AutomationPayloadV2 {
+    return {
+      automatedFunction: isSet(object.automatedFunction)
+        ? EntryFunctionPayload.fromJSON(object.automatedFunction)
+        : undefined,
+      expirationTimestampSecs: isSet(object.expirationTimestampSecs)
+        ? BigInt(object.expirationTimestampSecs)
+        : BigInt("0"),
+      maxGasAmount: isSet(object.maxGasAmount) ? BigInt(object.maxGasAmount) : BigInt("0"),
+      gasPriceCap: isSet(object.gasPriceCap) ? BigInt(object.gasPriceCap) : BigInt("0"),
+      automationFeeCap: isSet(object.automationFeeCap) ? BigInt(object.automationFeeCap) : BigInt("0"),
+      auxData: globalThis.Array.isArray(object?.auxData) ? object.auxData.map((e: any) => bytesFromBase64(e)) : [],
+      taskType: isSet(object.taskType) ? automationTaskTypeFromJSON(object.taskType) : 0,
+      priority: isSet(object.priority) ? BigInt(object.priority) : undefined,
+    };
+  },
+
+  toJSON(message: AutomationPayloadV2): unknown {
+    const obj: any = {};
+    if (message.automatedFunction !== undefined) {
+      obj.automatedFunction = EntryFunctionPayload.toJSON(message.automatedFunction);
+    }
+    if (message.expirationTimestampSecs !== undefined && message.expirationTimestampSecs !== BigInt("0")) {
+      obj.expirationTimestampSecs = message.expirationTimestampSecs.toString();
+    }
+    if (message.maxGasAmount !== undefined && message.maxGasAmount !== BigInt("0")) {
+      obj.maxGasAmount = message.maxGasAmount.toString();
+    }
+    if (message.gasPriceCap !== undefined && message.gasPriceCap !== BigInt("0")) {
+      obj.gasPriceCap = message.gasPriceCap.toString();
+    }
+    if (message.automationFeeCap !== undefined && message.automationFeeCap !== BigInt("0")) {
+      obj.automationFeeCap = message.automationFeeCap.toString();
+    }
+    if (message.auxData?.length) {
+      obj.auxData = message.auxData.map((e) => base64FromBytes(e));
+    }
+    if (message.taskType !== undefined && message.taskType !== 0) {
+      obj.taskType = automationTaskTypeToJSON(message.taskType);
+    }
+    if (message.priority !== undefined) {
+      obj.priority = message.priority.toString();
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AutomationPayloadV2>): AutomationPayloadV2 {
+    return AutomationPayloadV2.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AutomationPayloadV2>): AutomationPayloadV2 {
+    const message = createBaseAutomationPayloadV2();
+    message.automatedFunction = (object.automatedFunction !== undefined && object.automatedFunction !== null)
+      ? EntryFunctionPayload.fromPartial(object.automatedFunction)
+      : undefined;
+    message.expirationTimestampSecs = object.expirationTimestampSecs ?? BigInt("0");
+    message.maxGasAmount = object.maxGasAmount ?? BigInt("0");
+    message.gasPriceCap = object.gasPriceCap ?? BigInt("0");
+    message.automationFeeCap = object.automationFeeCap ?? BigInt("0");
+    message.auxData = object.auxData?.map((e) => e) || [];
+    message.taskType = object.taskType ?? 0;
+    message.priority = object.priority ?? undefined;
+    return message;
+  },
+};
+
+function createBaseAutomationPayloadExtensions(): AutomationPayloadExtensions {
+  return { v1: undefined, v2: undefined };
+}
+
+export const AutomationPayloadExtensions = {
+  encode(message: AutomationPayloadExtensions, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.v1 !== undefined) {
+      AutomationPayload.encode(message.v1, writer.uint32(10).fork()).ldelim();
+    }
+    if (message.v2 !== undefined) {
+      AutomationPayloadV2.encode(message.v2, writer.uint32(18).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): AutomationPayloadExtensions {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseAutomationPayloadExtensions();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.v1 = AutomationPayload.decode(reader, reader.uint32());
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.v2 = AutomationPayloadV2.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  // encodeTransform encodes a source of message objects.
+  // Transform<AutomationPayloadExtensions, Uint8Array>
+  async *encodeTransform(
+    source:
+      | AsyncIterable<AutomationPayloadExtensions | AutomationPayloadExtensions[]>
+      | Iterable<AutomationPayloadExtensions | AutomationPayloadExtensions[]>,
+  ): AsyncIterable<Uint8Array> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [AutomationPayloadExtensions.encode(p).finish()];
+        }
+      } else {
+        yield* [AutomationPayloadExtensions.encode(pkt as any).finish()];
+      }
+    }
+  },
+
+  // decodeTransform decodes a source of encoded messages.
+  // Transform<Uint8Array, AutomationPayloadExtensions>
+  async *decodeTransform(
+    source: AsyncIterable<Uint8Array | Uint8Array[]> | Iterable<Uint8Array | Uint8Array[]>,
+  ): AsyncIterable<AutomationPayloadExtensions> {
+    for await (const pkt of source) {
+      if (globalThis.Array.isArray(pkt)) {
+        for (const p of (pkt as any)) {
+          yield* [AutomationPayloadExtensions.decode(p)];
+        }
+      } else {
+        yield* [AutomationPayloadExtensions.decode(pkt as any)];
+      }
+    }
+  },
+
+  fromJSON(object: any): AutomationPayloadExtensions {
+    return {
+      v1: isSet(object.v1) ? AutomationPayload.fromJSON(object.v1) : undefined,
+      v2: isSet(object.v2) ? AutomationPayloadV2.fromJSON(object.v2) : undefined,
+    };
+  },
+
+  toJSON(message: AutomationPayloadExtensions): unknown {
+    const obj: any = {};
+    if (message.v1 !== undefined) {
+      obj.v1 = AutomationPayload.toJSON(message.v1);
+    }
+    if (message.v2 !== undefined) {
+      obj.v2 = AutomationPayloadV2.toJSON(message.v2);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<AutomationPayloadExtensions>): AutomationPayloadExtensions {
+    return AutomationPayloadExtensions.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<AutomationPayloadExtensions>): AutomationPayloadExtensions {
+    const message = createBaseAutomationPayloadExtensions();
+    message.v1 = (object.v1 !== undefined && object.v1 !== null) ? AutomationPayload.fromPartial(object.v1) : undefined;
+    message.v2 = (object.v2 !== undefined && object.v2 !== null)
+      ? AutomationPayloadV2.fromPartial(object.v2)
+      : undefined;
     return message;
   },
 };

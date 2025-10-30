@@ -6,7 +6,6 @@ module supra_framework::reconfiguration {
     use std::signer;
 
     use supra_framework::account;
-    use supra_framework::automation_registry;
     use supra_framework::chain_status;
     use supra_framework::event;
     use supra_framework::reconfiguration_state;
@@ -159,7 +158,6 @@ module supra_framework::reconfiguration {
         spec {
             assume config_ref.epoch + 1 <= MAX_U64;
         };
-        automation_registry::on_new_epoch();
         config_ref.epoch = config_ref.epoch + 1;
 
         if (std::features::module_event_migration_enabled()) {

@@ -171,6 +171,10 @@ module supra_framework::transaction_validation {
         )
     }
 
+    /// Deprecated after Automation V2 release.
+    /// `automated_transaction_prologue_v2` should be favored instead.
+    /// May be removed at any time after Automation V2 release. Kept for smooth transitioning from
+    /// V1 to V2 on active chains
     fun automated_transaction_prologue(
         sender: signer,
         task_index: u64,
@@ -178,6 +182,19 @@ module supra_framework::transaction_validation {
         txn_max_gas_units: u64,
         txn_expiration_time: u64,
         chain_id: u8,
+    )  {
+        let ust:u8 = 1;
+        automated_transaction_prologue_v2(sender, task_index, txn_gas_price, txn_max_gas_units, txn_expiration_time, chain_id, ust);
+    }
+
+    fun automated_transaction_prologue_v2(
+        sender: signer,
+        task_index: u64,
+        txn_gas_price: u64,
+        txn_max_gas_units: u64,
+        txn_expiration_time: u64,
+        chain_id: u8,
+        task_type: u8,
     )  {
         let gas_payer = signer::address_of(&sender);
 
@@ -201,7 +218,7 @@ module supra_framework::transaction_validation {
                 error::invalid_argument(PROLOGUE_ECANT_PAY_GAS_DEPOSIT)
             );
         };
-        assert!(automation_registry::has_sender_active_task_with_id(address_of(&sender), task_index),
+        assert!(automation_registry::has_sender_active_task_with_id_and_type(address_of(&sender), task_index, task_type),
             error::invalid_state(PROLOGUE_ENO_ACTIVE_AUTOMATED_TASK))
     }
 
