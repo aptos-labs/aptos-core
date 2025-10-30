@@ -186,8 +186,8 @@ where
         }
         let struct_name = self.get_struct_name(idx)?;
         Ok(IdentifierMappingKind::from_ident(
-            &struct_name.module,
-            &struct_name.name,
+            struct_name.module(),
+            struct_name.name(),
         ))
     }
 
@@ -386,10 +386,11 @@ where
             .runtime_environment()
             .struct_name_index_map()
             .idx_to_struct_name_ref(*idx)?;
-        modules.insert(&struct_identifier.module);
+        modules.insert(struct_identifier.module());
 
         if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
-            if struct_identifier.module.is_option() && struct_identifier.name == *OPTION_STRUCT_NAME
+            if struct_identifier.module().is_option()
+                && struct_identifier.name() == &*OPTION_STRUCT_NAME
             {
                 return Err(
                     PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_OPTION_TYPE)
@@ -518,9 +519,9 @@ where
                         let struct_name = self.get_struct_name(idx)?;
                         let msg = format!(
                             "Struct {}::{}::{} contains delayed fields, but is also a delayed field",
-                            struct_name.module.address,
-                            struct_name.module.name,
-                            struct_name.name,
+                            struct_name.module().address,
+                            struct_name.module().name,
+                            struct_name.name(),
                         );
                         return Err(PartialVMError::new_invariant_violation(msg));
                     },
@@ -550,9 +551,9 @@ where
                                     let struct_name = self.get_struct_name(idx)?;
                                     let msg = format!(
                                         "Struct {}::{}::{} must contain at least one field",
-                                        struct_name.module.address,
-                                        struct_name.module.name,
-                                        struct_name.name,
+                                        struct_name.module().address,
+                                        struct_name.module().name,
+                                        struct_name.name(),
                                     );
                                     return Err(PartialVMError::new_invariant_violation(msg));
                                 },

@@ -14,6 +14,7 @@ use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::thread_rng;
+use std::fmt::Debug;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Domain)
@@ -26,7 +27,7 @@ where
     let statement = instance.apply(&witness);
 
     let mut prover_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    let proof = instance.prove(&witness, &mut prover_transcript, &mut rng);
+    let proof = instance.prove(&witness, &statement, &mut prover_transcript, &mut rng);
 
     let mut verifier_transcript = merlin::Transcript::new(b"sigma-protocol-test");
     instance
@@ -66,7 +67,7 @@ mod schnorr {
         type CodomainShape<T>
             = CodomainShape<T>
         where
-            T: CanonicalSerialize + CanonicalDeserialize + Clone;
+            T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
         type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
@@ -85,11 +86,7 @@ mod schnorr {
 
     impl<E: Pairing> sigma_protocol::Trait<E> for Schnorr<E> {
         fn dst(&self) -> Vec<u8> {
-            b"Schnorr".to_vec()
-        }
-
-        fn dst_verifier(&self) -> Vec<u8> {
-            b"Schnorr-verifier".to_vec()
+            b"SCHNORR_SIGMA_PROTOCOL_DST".to_vec()
         }
     }
 }
@@ -110,8 +107,6 @@ mod chaum_pedersen {
         TupleHomomorphism {
             hom1: schnorr1,
             hom2: schnorr2,
-            dst: b"Chaum-Pedersen DST".to_vec(),
-            dst_verifier: b"Chaum-Pedersen verifier DST".to_vec(),
         }
     }
 }

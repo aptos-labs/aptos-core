@@ -537,7 +537,7 @@ fn native_contains_box(
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
-    let exists = Value::bool(gv.exists()?);
+    let exists = Value::bool(gv.exists());
 
     Ok(NativeResult::ok(cost, smallvec![exists]))
 }

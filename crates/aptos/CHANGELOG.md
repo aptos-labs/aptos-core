@@ -3,6 +3,12 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [7.10.2]
+- Fix backward compatibility issue of enum-based option module
+
+## [7.10.1]
+- Add support into Move 2.2 for builtin constant `__COMPILE_FOR_TESTING__` 
 - Update the default version of move formatter to 1.3.7
 - Update the default version of move mutation test tool to 2.0.0
 

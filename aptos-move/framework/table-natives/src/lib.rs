@@ -539,7 +539,7 @@ fn native_contains_box(
     } else {
         None
     };
-    let exists = Value::bool(gv.exists()?);
+    let exists = Value::bool(gv.exists());
 
     drop(table_data);
 

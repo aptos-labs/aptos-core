@@ -1,23 +1,22 @@
 /// Order book type definitions
 module aptos_experimental::order_book_types {
+    friend aptos_experimental::order_book;
+    friend aptos_experimental::single_order_book;
+    friend aptos_experimental::bulk_order_book;
+    friend aptos_experimental::price_time_index;
+    friend aptos_experimental::pending_order_book_index;
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::order_operations;
+    friend aptos_experimental::market_types;
+    friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::single_order_types;
+    friend aptos_experimental::bulk_order_book_types;
+    #[test_only] friend aptos_experimental::bulk_order_book_tests;
+    #[test_only] friend aptos_experimental::order_book_client_order_id;
     use std::option;
     use std::option::Option;
     use std::string::String;
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
-
-    friend aptos_experimental::price_time_index;
-    friend aptos_experimental::single_order_book;
-    friend aptos_experimental::pending_order_book_index;
-    friend aptos_experimental::order_placement;
-    friend aptos_experimental::order_book;
-    friend aptos_experimental::single_order_types;
-    friend aptos_experimental::market_types;
-    friend aptos_experimental::bulk_order_book;
-    friend aptos_experimental::bulk_order_book_types;
-    #[test_only]
-    friend aptos_experimental::bulk_order_book_tests;
-    #[test_only]
-    friend aptos_experimental::order_book_client_order_id;
 
     const U128_MAX: u128 = 0xffffffffffffffffffffffffffffffff;
 
@@ -39,9 +38,9 @@ module aptos_experimental::order_book_types {
         idx: u128
     }
 
-    enum OrderBookType has store, drop, copy {
-        SingleOrderBook,
-        BulkOrderBook
+    enum OrderType has store, drop, copy {
+        SingleOrder,
+        BulkOrder
     }
 
     // Struct providing ascending ids, to be able to be used as tie-breaker to respect FIFO order of trades.
@@ -53,12 +52,19 @@ module aptos_experimental::order_book_types {
         // TODO: add stateless (and with that fully parallel) support for id creation via native function
     }
 
-    public fun single_order_book_type(): OrderBookType {
-        OrderBookType::SingleOrderBook
+    public fun single_order_type(): OrderType {
+        OrderType::SingleOrder
     }
 
-    public fun bulk_order_book_type(): OrderBookType {
-        OrderBookType::BulkOrderBook
+    public fun bulk_order_type(): OrderType {
+        OrderType::BulkOrder
+    }
+
+    public fun is_single_order_type(order_type: &OrderType): bool {
+        match (order_type) {
+            OrderType::SingleOrder => true,
+            OrderType::BulkOrder => false,
+        }
     }
 
     public(friend) fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
@@ -153,8 +159,9 @@ module aptos_experimental::order_book_types {
         TimeBased(u64)
     }
 
-    public fun new_time_based_trigger_condition(time: u64): TriggerCondition {
-        TriggerCondition::TimeBased(time)
+    // The time should be seconds since unix epoch
+    public fun new_time_based_trigger_condition(time_secs: u64): TriggerCondition {
+        TriggerCondition::TimeBased(time_secs)
     }
 
     public fun price_move_up_condition(price: u64): TriggerCondition {
@@ -166,7 +173,7 @@ module aptos_experimental::order_book_types {
     }
 
     // Returns the price move down index and price move up index for a particular trigger condition
-    public fun index(self: &TriggerCondition):
+    public(friend) fun index(self: &TriggerCondition):
         (option::Option<u64>, option::Option<u64>, option::Option<u64>) {
         match(self) {
             TriggerCondition::PriceMoveAbove(price) => {
@@ -359,11 +366,11 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_book_type_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): OrderBookType {
+    ): OrderType {
         if (self is OrderMatchDetails::SingleOrder) {
-            single_order_book_type()
+            single_order_type()
         } else {
-            bulk_order_book_type()
+            bulk_order_type()
         }
     }
 
@@ -426,7 +433,7 @@ module aptos_experimental::order_book_types {
         }
     }
 
-    public fun new_order_match_details_with_modified_size<M: store + copy + drop>(
+    public(friend) fun new_order_match_details_with_modified_size<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
         remaining_size: u64
     ): OrderMatchDetails<M> {
@@ -524,18 +531,18 @@ module aptos_experimental::order_book_types {
         matched_size: u64,
         /// Remaining size of the maker order
         remaining_size: u64,
-        order_book_type: OrderBookType,
+        order_book_type: OrderType,
     }
 
     public(friend) fun new_active_matched_order(
-        order_id: OrderIdType, matched_size: u64, remaining_size: u64, order_book_type: OrderBookType
+        order_id: OrderIdType, matched_size: u64, remaining_size: u64, order_book_type: OrderType
     ): ActiveMatchedOrder {
         ActiveMatchedOrder { order_id, matched_size, remaining_size, order_book_type }
     }
 
     public(friend) fun destroy_active_matched_order(
         self: ActiveMatchedOrder
-    ): (OrderIdType, u64, u64, OrderBookType) {
+    ): (OrderIdType, u64, u64, OrderType) {
         (self.order_id, self.matched_size, self.remaining_size, self.order_book_type)
     }
 
@@ -545,11 +552,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_active_matched_book_type(
         self: &ActiveMatchedOrder
-    ): OrderBookType {
+    ): OrderType {
         self.order_book_type
-    }
-
-    public fun destroy_active_match_order(self: ActiveMatchedOrder): (OrderIdType, u64, u64) {
-        (self.order_id, self.matched_size, self.remaining_size)
     }
 }

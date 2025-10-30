@@ -233,7 +233,7 @@ class WorkerPod:
             "--timeout-secs",
             f"{self.config.timeout_secs}",
             "--block-cache-size",
-            "10737418240",
+            f"{36 * 1024 * 1024 * 1024}",
         ]
         # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
         if (

@@ -134,7 +134,7 @@ module aptos_experimental::market_bulk_order {
         cancel_bulk_order_internal(market, account, callbacks);
     }
 
-    public(package) fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
+    public(friend) fun cancel_bulk_order_internal<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: address,
         callbacks: &MarketClearinghouseCallbacks<M, R>

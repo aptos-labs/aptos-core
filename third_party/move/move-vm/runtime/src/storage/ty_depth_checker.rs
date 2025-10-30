@@ -120,7 +120,9 @@ where
                     let struct_name = self.get_struct_name($idx)?;
                     return Err(PartialVMError::new_invariant_violation(format!(
                         "Constructing a formula for {}::{}::{} has non-empty visiting set",
-                        struct_name.module.address, struct_name.module.name, struct_name.name
+                        struct_name.module().address,
+                        struct_name.module().name,
+                        struct_name.name()
                     )));
                 }
                 formula
@@ -219,7 +221,7 @@ where
             let struct_name = self.get_struct_name(idx)?;
             let msg = format!(
                 "Definition of struct {}::{}::{} is recursive: failed to construct its depth formula",
-                struct_name.module.address, struct_name.module.name, struct_name.name
+                struct_name.module().address, struct_name.module().name, struct_name.name()
             );
             return Err(
                 PartialVMError::new(StatusCode::RUNTIME_CYCLIC_MODULE_DEPENDENCY).with_message(msg),
@@ -280,7 +282,9 @@ where
             let struct_name = self.get_struct_name(idx)?;
             let msg = format!(
                 "Depth formula for struct {}::{}::{} is already cached",
-                struct_name.module.address, struct_name.module.name, struct_name.name
+                struct_name.module().address,
+                struct_name.module().name,
+                struct_name.name()
             );
             return Err(PartialVMError::new_invariant_violation(msg));
         }

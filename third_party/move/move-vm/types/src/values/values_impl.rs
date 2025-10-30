@@ -242,22 +242,59 @@ pub struct VectorRef(ContainerRef);
 enum GlobalValueImpl {
     /// No resource resides in this slot or in storage.
     None,
-    /// A resource has been published to this slot and it did not previously exist in storage.
-    Fresh { fields: Rc<RefCell<Vec<Value>>> },
+    /// A resource has been published to this slot and it did not previously exist in storage. The
+    /// invariant is that the value is a struct.
+    Fresh { value: Value },
     /// A resource resides in this slot and also in storage. The status flag indicates whether
     /// it has potentially been altered.
     Cached {
-        fields: Rc<RefCell<Vec<Value>>>,
+        /// A struct value representing this resource (invariant).
+        value: Value,
         status: Rc<RefCell<GlobalDataStatus>>,
     },
     /// A resource used to exist in storage but has been deleted by the current transaction.
     Deleted,
 }
 
-/// A wrapper around `GlobalValueImpl`, representing a "slot" in global storage that can
-/// hold a resource.
+/// Represents a "slot" in global storage that can hold a resource. The resource is always a struct
+/// or an enum.
+///
+/// IMPORTANT: [Clone] is not implemented for a reason, use [Copyable] trait for deep copies.
 #[derive(Debug)]
 pub struct GlobalValue(GlobalValueImpl);
+
+/// Trait to represent copyable values so that [GlobalValue] can support copy-on-write. Note that
+/// we explicitly do not implement [Clone].
+pub trait Copyable: Sized {
+    fn deep_copy(&self) -> PartialVMResult<Self>;
+}
+
+impl<T> Copyable for T
+where
+    T: Clone,
+{
+    fn deep_copy(&self) -> PartialVMResult<Self> {
+        Ok(self.clone())
+    }
+}
+
+impl Copyable for GlobalValue {
+    fn deep_copy(&self) -> PartialVMResult<Self> {
+        Ok(Self(match &self.0 {
+            GlobalValueImpl::None => GlobalValueImpl::None,
+            GlobalValueImpl::Fresh { value } => {
+                let value = value.copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))?;
+                GlobalValueImpl::Fresh { value }
+            },
+            GlobalValueImpl::Cached { value, status } => {
+                let value = value.copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))?;
+                let status = Rc::new(RefCell::new(*status.borrow()));
+                GlobalValueImpl::Cached { value, status }
+            },
+            GlobalValueImpl::Deleted => GlobalValueImpl::Deleted,
+        }))
+    }
+}
 
 /// The locals for a function frame. It allows values to be read, written or taken
 /// reference from.
@@ -2123,94 +2160,80 @@ impl Locals {
 
     #[cfg_attr(feature = "inline-locals", inline(always))]
     pub fn copy_loc(&self, idx: usize) -> PartialVMResult<Value> {
-        self.copy_loc_impl(idx, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
-    }
-
-    // Test-only API to test depth checks.
-    #[cfg(test)]
-    pub fn copy_loc_with_depth(&self, idx: usize, max_depth: u64) -> PartialVMResult<Value> {
-        self.copy_loc_impl(idx, Some(max_depth))
-    }
-
-    #[cfg_attr(feature = "inline-locals", inline(always))]
-    fn copy_loc_impl(&self, idx: usize, max_depth: Option<u64>) -> PartialVMResult<Value> {
-        let v = self.0.borrow();
-        match v.get(idx) {
+        let locals = self.0.borrow();
+        match locals.get(idx) {
             Some(Value::Invalid) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             )
             .with_message(format!("cannot copy invalid value at index {}", idx))),
-            Some(v) => Ok(v.copy_value(1, max_depth)?),
-            None => Err(
-                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
-                    format!("local index out of bounds: got {}, len: {}", idx, v.len()),
-                ),
-            ),
-        }
-    }
-
-    #[cfg_attr(feature = "inline-locals", inline(always))]
-    fn swap_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<Value> {
-        let mut v = self.0.borrow_mut();
-        match v.get_mut(idx) {
-            Some(v) => Ok(std::mem::replace(v, x)),
-            None => Err(
-                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
-                    format!("local index out of bounds: got {}, len: {}", idx, v.len()),
-                ),
-            ),
+            Some(v) => Ok(v.copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))?),
+            None => Err(Self::local_index_out_of_bounds(idx, locals.len())),
         }
     }
 
     #[cfg_attr(feature = "inline-locals", inline(always))]
     pub fn move_loc(&mut self, idx: usize) -> PartialVMResult<Value> {
-        match self.swap_loc(idx, Value::Invalid)? {
-            Value::Invalid => Err(PartialVMError::new(
+        let mut locals = self.0.borrow_mut();
+        match locals.get_mut(idx) {
+            Some(Value::Invalid) => Err(PartialVMError::new(
                 StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
             )
             .with_message(format!("cannot move invalid value at index {}", idx))),
-            v => Ok(v),
+            Some(v) => Ok(std::mem::replace(v, Value::Invalid)),
+            None => Err(Self::local_index_out_of_bounds(idx, locals.len())),
         }
     }
 
     #[cfg_attr(feature = "inline-locals", inline(always))]
     pub fn store_loc(&mut self, idx: usize, x: Value) -> PartialVMResult<()> {
-        self.swap_loc(idx, x)?;
+        let mut locals = self.0.borrow_mut();
+        match locals.get_mut(idx) {
+            Some(v) => {
+                *v = x;
+            },
+            None => {
+                return Err(Self::local_index_out_of_bounds(idx, locals.len()));
+            },
+        }
         Ok(())
     }
 
     /// Drop all Move values onto a different Vec to avoid leaking memory.
     /// References are excluded since they may point to invalid data.
     #[cfg_attr(feature = "inline-locals", inline(always))]
-    pub fn drop_all_values(&mut self) -> impl Iterator<Item = (usize, Value)> + use<> {
+    pub fn drop_all_values(&mut self) -> Vec<Value> {
         let mut locals = self.0.borrow_mut();
-        let mut res = vec![];
+        let mut res = Vec::with_capacity(locals.len());
 
-        for idx in 0..locals.len() {
-            match &locals[idx] {
+        for local in locals.iter_mut() {
+            match &local {
                 Value::Invalid => (),
                 Value::ContainerRef(_) | Value::IndexedRef(_) => {
-                    locals[idx] = Value::Invalid;
+                    *local = Value::Invalid;
                 },
-                _ => res.push((idx, std::mem::replace(&mut locals[idx], Value::Invalid))),
+                _ => res.push(std::mem::replace(local, Value::Invalid)),
             }
         }
 
-        res.into_iter()
+        res
     }
 
     #[cfg_attr(feature = "inline-locals", inline(always))]
     pub fn is_invalid(&self, idx: usize) -> PartialVMResult<bool> {
-        let v = self.0.borrow();
-        match v.get(idx) {
+        let locals = self.0.borrow();
+        match locals.get(idx) {
             Some(Value::Invalid) => Ok(true),
             Some(_) => Ok(false),
-            None => Err(
-                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(
-                    format!("local index out of bounds: got {}, len: {}", idx, v.len()),
-                ),
-            ),
+            None => Err(Self::local_index_out_of_bounds(idx, locals.len())),
         }
+    }
+
+    #[cold]
+    fn local_index_out_of_bounds(idx: usize, num_locals: usize) -> PartialVMError {
+        PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(format!(
+            "local index out of bounds: got {}, len: {}",
+            idx, num_locals
+        ))
     }
 }
 
@@ -2318,7 +2341,7 @@ impl Value {
         ))))
     }
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn vector_u32(it: impl IntoIterator<Item = u32>) -> Self {
         Value::Container(Container::VecU32(Rc::new(RefCell::new(
             it.into_iter().collect(),
@@ -3992,53 +4015,61 @@ impl Struct {
  **************************************************************************************/
 #[allow(clippy::unnecessary_wraps)]
 impl GlobalValueImpl {
-    fn cached(val: Value, status: GlobalDataStatus) -> Result<Self, (PartialVMError, Value)> {
-        match val {
-            Value::Container(Container::Struct(fields)) => {
+    fn expect_struct_fields(value: &Value) -> &Rc<RefCell<Vec<Value>>> {
+        match value {
+            Value::Container(Container::Struct(fields)) => fields,
+            _ => unreachable!("Global values must be structs"),
+        }
+    }
+
+    fn cached(value: Value, status: GlobalDataStatus) -> Result<Self, (PartialVMError, Value)> {
+        match &value {
+            Value::Container(Container::Struct(_)) => {
                 let status = Rc::new(RefCell::new(status));
-                Ok(Self::Cached { fields, status })
+                Ok(Self::Cached { value, status })
             },
-            val => Err((
+            _ => Err((
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("failed to publish cached: not a resource".to_string()),
-                val,
+                value,
             )),
         }
     }
 
-    fn fresh(val: Value) -> Result<Self, (PartialVMError, Value)> {
-        match val {
-            Value::Container(Container::Struct(fields)) => Ok(Self::Fresh { fields }),
-            val => Err((
+    fn fresh(value: Value) -> Result<Self, (PartialVMError, Value)> {
+        match &value {
+            Value::Container(Container::Struct(_)) => Ok(Self::Fresh { value }),
+            _ => Err((
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("failed to publish fresh: not a resource".to_string()),
-                val,
+                value,
             )),
         }
     }
 
     fn move_from(&mut self) -> PartialVMResult<Value> {
-        let fields = match self {
+        let value = match self {
             Self::None | Self::Deleted => {
                 return Err(PartialVMError::new(StatusCode::MISSING_DATA))
             },
-            Self::Fresh { .. } => match std::mem::replace(self, Self::None) {
-                Self::Fresh { fields } => fields,
+            Self::Fresh { .. } => match mem::replace(self, Self::None) {
+                Self::Fresh { value } => value,
                 _ => unreachable!(),
             },
-            Self::Cached { .. } => match std::mem::replace(self, Self::Deleted) {
-                Self::Cached { fields, .. } => fields,
+            Self::Cached { .. } => match mem::replace(self, Self::Deleted) {
+                Self::Cached { value, .. } => value,
                 _ => unreachable!(),
             },
         };
-        if Rc::strong_count(&fields) != 1 {
+        let fields = Self::expect_struct_fields(&value);
+        if Rc::strong_count(fields) != 1 {
             return Err(
                 PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                     .with_message("moving global resource with dangling reference".to_string())
                     .with_sub_status(move_core_types::vm_status::sub_status::unknown_invariant_violation::EREFERENCE_COUNTING_FAILURE),
             );
         }
-        Ok(Value::Container(Container::Struct(fields)))
+        Ok(value)
     }
 
     fn move_to(&mut self, val: Value) -> Result<(), (PartialVMError, Value)> {
@@ -4055,23 +4086,29 @@ impl GlobalValueImpl {
         Ok(())
     }
 
-    fn exists(&self) -> PartialVMResult<bool> {
+    fn exists(&self) -> bool {
         match self {
-            Self::Fresh { .. } | Self::Cached { .. } => Ok(true),
-            Self::None | Self::Deleted => Ok(false),
+            Self::Fresh { .. } | Self::Cached { .. } => true,
+            Self::None | Self::Deleted => false,
         }
     }
 
     fn borrow_global(&self) -> PartialVMResult<Value> {
         match self {
             Self::None | Self::Deleted => Err(PartialVMError::new(StatusCode::MISSING_DATA)),
-            Self::Fresh { fields } => Ok(Value::ContainerRef(ContainerRef::Local(
-                Container::Struct(Rc::clone(fields)),
-            ))),
-            Self::Cached { fields, status } => Ok(Value::ContainerRef(ContainerRef::Global {
-                container: Container::Struct(Rc::clone(fields)),
-                status: Rc::clone(status),
-            })),
+            Self::Fresh { value } => {
+                let fields = Self::expect_struct_fields(value);
+                Ok(Value::ContainerRef(ContainerRef::Local(Container::Struct(
+                    Rc::clone(fields),
+                ))))
+            },
+            Self::Cached { value, status } => {
+                let fields = Self::expect_struct_fields(value);
+                Ok(Value::ContainerRef(ContainerRef::Global {
+                    container: Container::Struct(Rc::clone(fields)),
+                    status: Rc::clone(status),
+                }))
+            },
         }
     }
 
@@ -4079,11 +4116,9 @@ impl GlobalValueImpl {
         match self {
             Self::None => None,
             Self::Deleted => Some(Op::Delete),
-            Self::Fresh { fields } => Some(Op::New(Value::Container(Container::Struct(fields)))),
-            Self::Cached { fields, status } => match &*status.borrow() {
-                GlobalDataStatus::Dirty => {
-                    Some(Op::Modify(Value::Container(Container::Struct(fields))))
-                },
+            Self::Fresh { value } => Some(Op::New(value)),
+            Self::Cached { value, status } => match &*status.borrow() {
+                GlobalDataStatus::Dirty => Some(Op::Modify(value)),
                 GlobalDataStatus::Clean => None,
             },
         }
@@ -4093,8 +4128,8 @@ impl GlobalValueImpl {
         match self {
             Self::None => false,
             Self::Deleted => true,
-            Self::Fresh { fields: _ } => true,
-            Self::Cached { fields: _, status } => match &*status.borrow() {
+            Self::Fresh { .. } => true,
+            Self::Cached { status, .. } => match &*status.borrow() {
                 GlobalDataStatus::Dirty => true,
                 GlobalDataStatus::Clean => false,
             },
@@ -4109,7 +4144,7 @@ impl GlobalValue {
 
     pub fn cached(val: Value) -> PartialVMResult<Self> {
         Ok(Self(
-            GlobalValueImpl::cached(val, GlobalDataStatus::Clean).map_err(|(err, _val)| err)?,
+            GlobalValueImpl::cached(val, GlobalDataStatus::Clean).map_err(|(err, _)| err)?,
         ))
     }
 
@@ -4125,7 +4160,7 @@ impl GlobalValue {
         self.0.borrow_global()
     }
 
-    pub fn exists(&self) -> PartialVMResult<bool> {
+    pub fn exists(&self) -> bool {
         self.0.exists()
     }
 
@@ -4138,6 +4173,18 @@ impl GlobalValue {
         layout: TriompheArc<MoveTypeLayout>,
     ) -> Option<Op<(Value, TriompheArc<MoveTypeLayout>)>> {
         self.0.into_effect().map(|op| op.map(|v| (v, layout)))
+    }
+
+    pub fn effect(&self) -> Option<Op<&Value>> {
+        match &self.0 {
+            GlobalValueImpl::None => None,
+            GlobalValueImpl::Deleted => Some(Op::Delete),
+            GlobalValueImpl::Fresh { value } => Some(Op::New(value)),
+            GlobalValueImpl::Cached { value, status } => match &*status.borrow() {
+                GlobalDataStatus::Dirty => Some(Op::Modify(value)),
+                GlobalDataStatus::Clean => None,
+            },
+        }
     }
 
     pub fn is_mutated(&self) -> bool {
@@ -5198,7 +5245,15 @@ impl Value {
 impl Drop for Locals {
     #[cfg_attr(feature = "inline-locals", inline(always))]
     fn drop(&mut self) {
-        _ = self.drop_all_values();
+        let mut locals = self.0.borrow_mut();
+        for local in locals.iter_mut() {
+            match &local {
+                Value::Invalid => (),
+                _ => {
+                    *local = Value::Invalid;
+                },
+            }
+        }
     }
 }
 
@@ -5465,7 +5520,9 @@ impl GlobalValue {
 
         match &self.0 {
             G::None | G::Deleted => None,
-            G::Cached { fields, .. } | G::Fresh { fields } => Some(Wrapper(fields)),
+            G::Cached { value, .. } | G::Fresh { value } => {
+                Some(Wrapper(GlobalValueImpl::expect_struct_fields(value)))
+            },
         }
     }
 }
