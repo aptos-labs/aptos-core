@@ -90,7 +90,7 @@ pub fn hash_to_affine<A: AffineRepr>(msg: &[u8], dst: &[u8]) -> A {
 
         let hashed = sha3::Sha3_512::digest(&buf);
 
-        // from_random_bytes() first tries to construct an x-coordinate, and then a y-coordinate from that, see e.g.:
+        // `from_random_bytes()` first tries to construct an x-coordinate, and then a y-coordinate from that, see e.g.:
         // https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/short_weierstrass/affine.rs#L264
         if let Some(p) = A::from_random_bytes(&hashed) {
             return p.mul_by_cofactor(); // is needed to ensure `p` lies in the prime order subgroup
