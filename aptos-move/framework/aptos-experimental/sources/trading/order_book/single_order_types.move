@@ -177,7 +177,7 @@ module aptos_experimental::single_order_types {
         (self.order, self.is_active)
     }
 
-    public(friend) fun destroy_single_order<M: store + copy + drop>(
+    public fun destroy_single_order<M: store + copy + drop>(
         self: SingleOrder<M>
     ): (
         address, OrderIdType, Option<String>, UniqueIdxType, u64, u64, u64, bool, Option<TriggerCondition>, TimeInForce, M
