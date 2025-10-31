@@ -12,7 +12,6 @@ use anyhow::{anyhow, Result};
 use ark_ff::{batch_inversion, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::rand::{Rng, RngCore};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -120,38 +119,43 @@ impl<F: PrimeField> ThresholdConfig<F> {
     /// "Towards Scalable Threshold Cryptosystems" by Alin Tomescu, Robert Chen, Yiming Zheng, Ittai
     /// Abraham, Benny Pinkas, Guy Golan Gueta and Srinivas Devadas
     /// (which I think takes it from Modern Computer Algebra, by von zur Gathen and Gerhard
-    pub fn all_lagrange(&self, xs: &HashSet<F>) -> HashMap<F, F> {
+    pub fn lagrange_for_subset(&self, xs: &HashSet<F>) -> HashMap<F, F> {
+        // Step 0: check that subset is large enough
+        assert!(
+            xs.len() >= self.t,
+            "subset size {} is smaller than threshold t={}",
+            xs.len(),
+            self.t
+        );
+
+        let xs_vec: Vec<F> = xs.iter().cloned().collect();
+
         // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
-        let vanishing_poly = vanishing_poly(&xs.iter().cloned().collect::<Vec<F>>());
-        let vanishing_poly_eval = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
+        let vanishing_poly = vanishing_poly(&xs_vec);
+        let vanishing_poly_at_0 = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
 
         // Step 2 (numerators): for each x in xs, divide poly eval from step 1 by (-x)
-        let numerators = self
-            .domain
-            .elements()
-            .collect::<Vec<F>>()
-            .into_par_iter()
-            .filter_map(|x| xs.contains(&x).then_some(vanishing_poly_eval / -x))
-            .collect::<Vec<F>>();
+        let numerators: Vec<F> = xs_vec.iter().map(|&x| vanishing_poly_at_0 / -x).collect();
 
-        // Step 3a (denominators): Compute derivative of poly from step 1
+        // Step 3a (denominators): Compute derivative of poly from step 1, and its evaluations
         let derivative = vanishing_poly.differentiate();
+        let derivative_evals = derivative.evaluate_over_domain(self.domain).evals; // TODO: with a filter perhaps we don't have to store all evals, but then batch inversion becomes a bit more tedious
 
-        // Step 3b (denominators): FFT of poly in 3a, keep evals that correspond to the points in
-        // question
-        let denominators_indexed_by_x = derivative
-            .evaluate_over_domain(self.domain)
-            .evals
-            .into_par_iter()
-            .zip(self.domain.elements().collect::<Vec<F>>())
-            .filter_map(|(y, x)| xs.contains(&x).then_some((x, y)))
-            .collect::<Vec<(F, F)>>();
+        // Step 3b: Only keep the relevant evaluations, then perform a batch inversion
+        let domain_vec: Vec<F> = self.domain.elements().collect();
+        let derivative_map: HashMap<F, F> = domain_vec
+            .into_iter()
+            .zip(derivative_evals.into_iter())
+            .collect();
+        let mut denominators: Vec<F> = xs_vec.iter().map(|x| derivative_map[x]).collect();
+        batch_inversion(&mut denominators);
 
-        // step 4: combine
-        numerators
-            .into_par_iter()
-            .zip(denominators_indexed_by_x)
-            .map(|(numerator, (x, denominator))| (x, numerator / denominator))
+        // Step 4: compute Lagrange coefficients
+        xs_vec
+            .into_iter()
+            .zip(numerators.into_iter())
+            .zip(denominators.into_iter())
+            .map(|((x, numerator), denom_inv)| (x, numerator * denom_inv))
             .collect()
     }
 
@@ -184,7 +188,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
             let mut sum = F::zero();
 
             let xs = HashSet::from_iter(shares.iter().map(|s| s.x));
-            let lagrange_coeffs = self.all_lagrange(&xs);
+            let lagrange_coeffs = self.lagrange_for_subset(&xs);
 
             for ShamirShare { x, y } in shares {
                 sum += lagrange_coeffs[x] * y;
@@ -203,10 +207,10 @@ mod shamir_tests {
     use ark_std::rand::thread_rng;
     use itertools::Itertools;
 
-    fn single_lagrange(x: Fr, xs: &HashSet<Fr>, omegas: Vec<Fr>) -> Fr {
+    fn single_lagrange(x: Fr, xs: &HashSet<Fr>, omegas: &[Fr]) -> Fr {
         let mut prod = Fr::one();
 
-        for xprime in omegas {
+        for &xprime in omegas {
             if x == xprime {
                 continue;
             } else if xs.contains(&xprime) {
@@ -220,20 +224,26 @@ mod shamir_tests {
 
     #[test]
     fn test_all_lagrange() {
+        use itertools::Itertools;
+
         for n in 2..8 {
             for t in 1..=n {
-                let params = ThresholdConfig::new(n, t);
+                let config = ThresholdConfig::new(n, t);
 
-                let elements: Vec<Fr> = params.domain.elements().collect();
-                let omegas = elements.clone();
-                for all_elements_vec in elements.into_iter().combinations(t) {
-                    let all_elements_iter = all_elements_vec.into_iter();
+                let elements: Vec<Fr> = config.domain.elements().collect();
 
-                    let all_elements = HashSet::from_iter(all_elements_iter.clone());
-                    let all_lagrange = params.all_lagrange(&all_elements);
+                for subset_vec in elements.iter().cloned().combinations(t) {
+                    let subset: HashSet<Fr> = subset_vec.iter().cloned().collect();
 
-                    for (x, lagrange) in all_lagrange.into_iter() {
-                        assert_eq!(lagrange, single_lagrange(x, &all_elements, omegas.clone()));
+                    let lagrange_for_subset = config.lagrange_for_subset(&subset);
+
+                    for (x, lagrange) in lagrange_for_subset {
+                        let expected = single_lagrange(x, &subset, &elements);
+                        assert_eq!(
+                            lagrange, expected,
+                            "Mismatch at x={:?}, subset={:?}",
+                            x, subset
+                        );
                     }
                 }
             }

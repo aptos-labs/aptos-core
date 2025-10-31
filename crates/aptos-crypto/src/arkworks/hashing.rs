@@ -22,11 +22,11 @@ use digest::Digest;
 /// Boneh, D., Lynn, B., & Shacham, H. (2004). "Short Signatures from the Weil Pairing."
 /// Journal of Cryptology, 17, 297–319. DOI: 10.1007/s00145-004-0314-9.
 /// <https://doi.org/10.1007/s00145-004-0314-9>
-/// 
+///
 /// For RFC9380 see: https://www.rfc-editor.org/rfc/rfc9380.html
 pub fn unsafe_hash_to_affine<P: AffineRepr>(msg: &[u8], dst: &[u8]) -> P {
-    let dst_len =
-        u8::try_from(dst.len()).expect("DST is too long; its length must be <= 255, as in RFC 9380 (Section 5.3.1)");
+    let dst_len = u8::try_from(dst.len())
+        .expect("DST is too long; its length must be <= 255, as in RFC 9380 (Section 5.3.1)");
 
     let mut buf = Vec::with_capacity(msg.len() + dst.len() + 1);
     buf.extend_from_slice(msg);

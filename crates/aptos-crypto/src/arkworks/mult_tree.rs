@@ -37,7 +37,7 @@ fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
     debug_assert_eq!(2usize.pow(depth), num_leaves);
 
     // Iteratively build upper levels of the tree
-    for i in 1..=(num_leaves.ilog2() as usize) {
+    for i in 1..=(depth as usize) {
         // Number of nodes at the current level
         let len_at_i = 2usize.pow(depth - (i as u32));
 
@@ -50,38 +50,6 @@ fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
     }
 
     result
-}
-
-/// Given a multiplication tree `mult_tree` (as produced by `compute_mult_tree()`), this function
-/// returns the product of all leaf polynomials **except** the one at `divisor_index`. Will be used
-/// for evaluation proofs in the future.
-#[cfg(test)]
-pub fn quotient<F: FftField>(
-    mult_tree: &[Vec<DensePolynomial<F>>],
-    divisor_index: usize,
-) -> DensePolynomial<F> {
-    // Clone the tree so we can modify it without affecting the original
-    let mut mult_tree = mult_tree.to_owned();
-
-    // Replace the polynomial at the given leaf index with the constant "1"
-    mult_tree[0][divisor_index] = DenseUVPolynomial::from_coefficients_vec(vec![F::one()]);
-
-    let depth = mult_tree.len();
-
-    let mut subtree_with_divisor = divisor_index;
-
-    // Recompute the parent nodes along the path to the root
-    for i in 1..depth {
-        // Move to the parent node index
-        subtree_with_divisor /= 2;
-
-        // Recalculate the parent's polynomial as the product of its updated children
-        mult_tree[i][subtree_with_divisor] = mult_tree[i - 1][2 * subtree_with_divisor].clone()
-            * &mult_tree[i - 1][2 * subtree_with_divisor + 1];
-    }
-
-    // The root polynomial now represents the product of all factors except the excluded one
-    mult_tree[depth - 1][0].clone()
 }
 
 #[cfg(test)]
@@ -107,28 +75,6 @@ mod tests {
                 .unwrap();
 
             assert_eq!(result, mult_tree.into_iter().last().unwrap()[0]);
-        }
-    }
-
-    #[test]
-    fn test_quotient() {
-        let mut rng = thread_rng();
-
-        for num_roots in 2..=16 {
-            let mult_tree = compute_mult_tree(
-                &(0..num_roots)
-                    .map(|_| Fr::rand(&mut rng))
-                    .collect::<Vec<Fr>>(),
-            );
-
-            let vanishing_poly = &mult_tree[mult_tree.len() - 1][0];
-
-            for i in 0..num_roots {
-                let divisor = &mult_tree[0][i];
-                let quotient = quotient(&mult_tree, i);
-
-                assert_eq!(quotient * divisor, *vanishing_poly);
-            }
         }
     }
 }
