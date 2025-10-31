@@ -8,12 +8,8 @@
 //! define all the things that are appended to the transcript.
 
 use crate::{
-    pvss::traits::Transcript,
-    range_proofs::traits::BatchedRangeProof,
-    sigma_protocol,
-    sigma_protocol::homomorphism,
-    utils::random::random_scalar_from_uniform_bytes,
-    Scalar,
+    pvss::traits::Transcript, range_proofs::traits::BatchedRangeProof, sigma_protocol,
+    sigma_protocol::homomorphism, utils::random::random_scalar_from_uniform_bytes, Scalar,
 };
 use aptos_crypto::ValidCryptoMaterial;
 use ark_ec::pairing::Pairing;

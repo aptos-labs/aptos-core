@@ -3,21 +3,19 @@
 
 use aptos_crypto::Uniform;
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
-use ff::Field;
+use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_std::rand::{CryptoRng, RngCore};
-use std::ops::{Add, AddAssign};
-use ark_ec::pairing::Pairing;
-use num_traits::Zero;
-
 /// The *input secret* that will be given as input to the PVSS dealing algorithm. This will be of a
 /// different type than the *dealt secret* that will be returned by the PVSS reconstruction algorithm.
 ///
 /// This secret will NOT need to be stored by validators because a validator (1) picks such a secret
 /// and (2) deals it via the PVSS. If the validator crashes during dealing, the entire task will be
 /// restarted with a freshly-generated input secret.
-/// 
+///
 use derive_more::{Add, Display, From, Into};
-use ark_ec::AdditiveGroup;
+use ff::Field;
+use num_traits::Zero;
+use std::ops::{Add, AddAssign};
 
 #[derive(SilentDebug, SilentDisplay, PartialEq, Add)]
 pub struct InputSecret<F: ark_ff::Field> {
@@ -30,8 +28,9 @@ impl<F: ark_ff::Field> Uniform for InputSecret<F> {
     where
         R: rand::RngCore + rand::CryptoRng,
     {
-
-        Self { a: F::rand(&mut ark_std::rand::thread_rng()) } // Workaround because rand versions differ
+        Self {
+            a: F::rand(&mut ark_std::rand::thread_rng()),
+        } // Workaround because rand versions differ
     }
 }
 
@@ -61,8 +60,7 @@ impl<F: ark_ff::Field> InputSecret<F> {
 }
 
 impl<F: ark_ff::Field> ark_std::UniformRand for InputSecret<F> {
-    fn rand<R: RngCore + ?Sized>(rng: &mut R) -> Self
-    {
+    fn rand<R: RngCore + ?Sized>(rng: &mut R) -> Self {
         InputSecret { a: F::rand(rng) }
     }
 }
@@ -81,9 +79,9 @@ impl<F: ark_ff::Field> ark_std::UniformRand for InputSecret<F> {
 //     }
 // }
 
-use crate::Scalar;
-use crate::traits::Convert;
-use crate::pvss::chunked_elgamal_field::public_parameters::PublicParameters;
+use crate::{
+    pvss::chunked_elgamal_field::public_parameters::PublicParameters, traits::Convert, Scalar,
+};
 
 impl<E: Pairing> Convert<Scalar<E>, PublicParameters<E>> for InputSecret<E::ScalarField> {
     fn to(&self, _with: &PublicParameters<E>) -> Scalar<E> {
@@ -91,8 +89,5 @@ impl<E: Pairing> Convert<Scalar<E>, PublicParameters<E>> for InputSecret<E::Scal
     }
 }
 
-
-
 #[cfg(test)]
 mod test {}
-

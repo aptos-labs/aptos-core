@@ -9,12 +9,13 @@ use crate::{
     Scalar,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;
-use ark_ec::pairing::Pairing;
+use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
-use ark_ec::AdditiveGroup;
 
-#[derive(SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(
+    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
+)]
 pub struct HkzgElgamalWitness<E: Pairing> {
     pub hkzg_randomness: Scalar<E>,
     pub chunked_plaintexts: Vec<Vec<Scalar<E>>>,
@@ -26,8 +27,7 @@ type LiftedKZG<'a, E> =
 type LiftedChunkedElGamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
 
-pub type Homomorphism<'a, E> =
-    TupleHomomorphism<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
+pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
 
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> Homomorphism<'a, E> {
@@ -63,7 +63,10 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
                     elgamal_randomness,
                     ..
                 } = dom;
-                chunked_elgamal::Witness{ chunks: chunked_plaintexts.clone(), randomness: elgamal_randomness.clone() }
+                chunked_elgamal::Witness {
+                    chunks: chunked_plaintexts.clone(),
+                    randomness: elgamal_randomness.clone(),
+                }
             },
         };
 

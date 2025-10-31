@@ -16,12 +16,11 @@ use aptos_dkg::{
         },
         traits::{
             transcript::{MalleableTranscript, Transcript},
-            SecretSharingConfig,
+            SecretSharingConfig, ThresholdConfig,
         },
         LowDegreeTest, WeightedConfig,
     },
 };
-use aptos_dkg::pvss::traits::ThresholdConfig;
 use criterion::{
     criterion_group, criterion_main,
     measurement::{Measurement, WallTime},

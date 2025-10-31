@@ -56,7 +56,7 @@ impl ThresholdConfigBlstrs {
             batch_dom,
         })
     }
-    
+
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
         &self.batch_dom
     }

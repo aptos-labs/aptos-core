@@ -4,22 +4,23 @@
 //! This submodule implements the *public parameters* for this "chunked_elgamal_field" PVSS scheme.
 
 use crate::{
-    algebra::GroupGenerators, pvss::{chunked_elgamal_field::chunked_elgamal_pp::PublicParameters as PublicParametersElgamal, traits}, range_proofs::dekart_univariate_v2, utils::{self}
+    algebra::GroupGenerators,
+    pvss::{
+        chunked_elgamal_field::{
+            chunked_elgamal, chunked_elgamal_pp::PublicParameters as PublicParametersElgamal,
+        },
+        traits,
+    },
+    range_proofs::dekart_univariate_v2,
+    utils::{self},
 };
-use ark_serialize::CanonicalSerialize;
-use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
-use blstrs::{G2Projective, Scalar};
-use ark_ec::pairing::Pairing;
 // use traits::transcript::WithMaxNumShares;
-
 use aptos_crypto::arkworks::serialization::ark_se;
-use aptos_crypto::arkworks::serialization::ark_de;
-
-
-use serde::Serialize;
-use serde::Deserialize;
-use ark_serialize::{CanonicalDeserialize, Compress, Validate};
-use crate::pvss::chunked_elgamal_field::chunked_elgamal;
+use aptos_crypto::{arkworks::serialization::ark_de, CryptoMaterialError, ValidCryptoMaterial};
+use ark_ec::pairing::Pairing;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+use blstrs::{G2Projective, Scalar};
+use serde::{Deserialize, Serialize};
 
 impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
     type EncryptionPublicParameters = PublicParametersElgamal<E>;
@@ -31,13 +32,12 @@ impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
 
 // use crate::constants::build_constants;
 
-
 // #[cfg(feature = "kangaroo")]
 // use kangaroo_dlog::{Kangaroo, ActiveCurve, presets::Presets};
 
-use crate::pvss::chunked_elgamal_field::chunked_elgamal_pp::{EncryptPubKey, DecryptPrivKey}; // TODO: maybe those structs belong here?
-use std::ops::Mul;
+use crate::pvss::chunked_elgamal_field::chunked_elgamal_pp::{DecryptPrivKey, EncryptPubKey}; // TODO: maybe those structs belong here?
 use ark_ec::CurveGroup;
+use std::ops::Mul;
 
 impl<E: Pairing> traits::Convert<EncryptPubKey<E>, PublicParameters<E>> for DecryptPrivKey<E> {
     /// Given a decryption key $dk$, computes its associated encryption key $H^{dk}$
@@ -48,9 +48,10 @@ impl<E: Pairing> traits::Convert<EncryptPubKey<E>, PublicParameters<E>> for Decr
     }
 }
 
-
 // TODO: make the G_1 of pp_elgamal and pk_range_proof agree????? hmm no... sigma protocol is used for that
-#[derive(CanonicalSerialize, Serialize, CanonicalDeserialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(
+    CanonicalSerialize, Serialize, CanonicalDeserialize, Deserialize, Clone, Debug, PartialEq, Eq,
+)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -82,30 +83,31 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 // }
 
 use crate::range_proofs::traits::BatchedRangeProof;
-use ark_std::{
-    rand::{CryptoRng, RngCore}};
+use aptos_crypto::arkworks::hashing;
 //use crate::constants::build_constants;
 use ark_ec::hashing::HashToCurve;
-use ark_ec::hashing::curve_maps::wb::WBMap;
-use ark_ec::hashing::map_to_curve_hasher::MapToCurveBasedHasher;
+use ark_ec::{
+    hashing::{
+        curve_maps::wb::{WBConfig, WBMap},
+        map_to_curve_hasher::{MapToCurve, MapToCurveBasedHasher},
+    },
+    short_weierstrass::{Affine, SWCurveConfig},
+    AffineRepr,
+};
 use ark_ff::field_hashers::DefaultFieldHasher;
-use ark_ec::hashing::map_to_curve_hasher::MapToCurve;
-use ark_ec::hashing::curve_maps::wb::WBConfig;
-use sha3::Sha3_256;
-use ark_std::rand::thread_rng;
-use ark_std::error::Error;
 //use sha2::{digest::{consts::{B0, B1, U16}, generic_array::{functional::FunctionalSequence as _, sequence::Split, GenericArray}, typenum::{UInt, UTerm}, OutputSizeUser}, Sha256};
 // TODO: why not use sha3?
 use ark_ff::field_hashers::HashToField;
-use ark_ec::short_weierstrass::Affine;
-use ark_ec::AffineRepr;
-use ark_ec::short_weierstrass::SWCurveConfig;
-use aptos_crypto::arkworks::hashing;
+use ark_std::{
+    error::Error,
+    rand::{thread_rng, CryptoRng, RngCore},
+};
+use sha3::Sha3_256;
 
-impl<E: Pairing> PublicParameters<E> 
-{
+impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
-    pub fn new(max_num_shares: usize, radix_exponent: usize) -> Self { // TODO: add &mut rng here? <R: RngCore + CryptoRng>
+    pub fn new(max_num_shares: usize, radix_exponent: usize) -> Self {
+        // TODO: add &mut rng here? <R: RngCore + CryptoRng>
         // existing initialization
         let num_chunks = max_num_shares * 255usize.div_ceil(radix_exponent);
         let num_chunks_padded = (num_chunks + 1).next_power_of_two() - 1;
@@ -115,18 +117,25 @@ impl<E: Pairing> PublicParameters<E>
 
         let mut pp = Self {
             pp_elgamal: PublicParametersElgamal::default(),
-            pk_range_proof: dekart_univariate_v2::Proof::setup(radix_exponent, num_chunks_padded, group_generators, &mut rng).0,
+            pk_range_proof: dekart_univariate_v2::Proof::setup(
+                radix_exponent,
+                num_chunks_padded,
+                group_generators,
+                &mut rng,
+            )
+            .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", b"APTOS_CHUNKED_ELGAMAL_PVSS_DST"), // TODO: fix DST
             powers_of_radix: utils::powers(base, num_chunks_padded + 1), // TODO: why the +1?
             #[cfg(feature = "kangaroo")]
-            table: Some(Kangaroo::<ActiveCurve>::from_preset(
-                match build_constants::CHUNK_SIZE {
+            table: Some(
+                Kangaroo::<ActiveCurve>::from_preset(match build_constants::CHUNK_SIZE {
                     16 => Presets::Kangaroo16,
                     24 => Presets::Kangaroo24,
                     32 => Presets::Kangaroo32,
                     _ => panic!("Unsupported CHUNK_SIZE: {}", build_constants::CHUNK_SIZE),
-                }
-            ).unwrap()),
+                })
+                .unwrap(),
+            ),
             // #[cfg(not(feature = "kangaroo"))]
             // table: None,
             // hash: [0u8; 32],  // placeholder
@@ -172,8 +181,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
-impl<E: Pairing> Default for PublicParameters<E>
-    {
+impl<E: Pairing> Default for PublicParameters<E> {
     fn default() -> Self {
         Self::new(1, 16) // TODO: REFER TO CONSTANT HERE: build_constants::CHUNK_SIZE as usize
     }

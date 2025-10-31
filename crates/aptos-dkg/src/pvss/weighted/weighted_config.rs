@@ -3,7 +3,10 @@
 
 use crate::{
     algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::{Player, ThresholdConfigBlstrs, traits::{self, SecretSharingConfig, ThresholdConfig}},
+    pvss::{
+        traits::{self, SecretSharingConfig, ThresholdConfig},
+        Player, ThresholdConfigBlstrs,
+    },
 };
 use anyhow::anyhow;
 use more_asserts::assert_lt;

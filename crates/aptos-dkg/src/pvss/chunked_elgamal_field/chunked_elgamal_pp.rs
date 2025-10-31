@@ -1,22 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::{
+    arkworks::{
+        hashing,
+        serialization::{ark_de, ark_se},
+    },
+    CryptoMaterialError, Uniform, ValidCryptoMaterial,
+};
+use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use ark_ec::pairing::Pairing;
-use ark_serialize::CanonicalSerialize;
-use ark_serialize::CanonicalDeserialize;
-use aptos_crypto_derive::SilentDisplay;
-use aptos_crypto_derive::SilentDebug;
-use aptos_crypto::Uniform;
 use ark_ff::UniformRand;
-use aptos_crypto::arkworks::hashing;
-use serde::Deserialize;
-use aptos_crypto::arkworks::serialization::ark_de;
-use serde::Serialize;
-use aptos_crypto::arkworks::serialization::ark_se;
-use aptos_crypto::ValidCryptoMaterial;
-use aptos_crypto::CryptoMaterialError;
-
-
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use serde::{Deserialize, Serialize};
 
 pub const DST_PVSS_PUBLIC_PARAMS: &[u8; 30] = b"APTOS_CHUNKED_ELGAMAL_PVSS_DST";
 
@@ -40,6 +36,7 @@ pub struct EncryptPubKey<E: Pairing> {
 
 impl<E: Pairing> ValidCryptoMaterial for EncryptPubKey<E> {
     const AIP_80_PREFIX: &'static str = "";
+
     fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         self.ek.serialize_compressed(&mut bytes).unwrap();
@@ -66,7 +63,6 @@ impl<E: Pairing> TryFrom<&[u8]> for EncryptPubKey<E> {
 //         bytes
 //     }
 // }
-
 
 impl<E: Pairing> Uniform for DecryptPrivKey<E> {
     fn generate<R>(_rng: &mut R) -> Self
@@ -104,7 +100,6 @@ impl<E: Pairing> PublicParameters<E> {
     //     bytes
     // }
 
-
     pub fn message_base(&self) -> &E::G1Affine {
         &self.G
     }
@@ -117,6 +112,6 @@ impl<E: Pairing> PublicParameters<E> {
         let G = hashing::unsafe_hash_to_affine(b"G", DST_PVSS_PUBLIC_PARAMS);
         let H = hashing::unsafe_hash_to_affine(b"H", DST_PVSS_PUBLIC_PARAMS);
         debug_assert_ne!(G, H);
-        Self { G, H}
+        Self { G, H }
     }
 }

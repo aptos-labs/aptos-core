@@ -11,10 +11,12 @@ use crate::arkworks::{
 use anyhow::{anyhow, Result};
 use ark_ff::{batch_inversion, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
-use ark_std::rand::{Rng, RngCore};
+use ark_std::{
+    fmt,
+    rand::{Rng, RngCore},
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
-use ark_std::fmt;
 
 /// Represents a single share in Shamir's Secret Sharing scheme. Each
 /// `ShamirShare` consists of an `(x, y)` point on the secret sharing polynomial.
@@ -46,11 +48,7 @@ pub struct ThresholdConfig<F: PrimeField> {
 
 impl<F: PrimeField> fmt::Display for ThresholdConfig<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "ThresholdConfig {{ n: {}, t: {} }}",
-            self.n, self.t
-        )
+        write!(f, "ThresholdConfig {{ n: {}, t: {} }}", self.n, self.t)
     }
 }
 
@@ -162,7 +160,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
             .iter()
             .map(|inv_neg_x| vanishing_poly_at_0 * *inv_neg_x)
             .collect();
-        
+
         // Step 3a (denominators): Compute derivative of poly from step 1, and its evaluations
         let derivative = vanishing_poly.differentiate();
         let derivative_evals = derivative.evaluate_over_domain(self.domain).evals; // TODO: with a filter perhaps we don't have to store all evals, but then batch inversion becomes a bit more tedious

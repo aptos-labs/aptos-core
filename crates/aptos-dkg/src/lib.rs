@@ -17,17 +17,14 @@
 #![allow(clippy::to_string_in_format_args)]
 #![allow(clippy::borrow_interior_mutable_const)]
 
+use crate::pvss::{traits, Player};
+use aptos_crypto::arkworks::shamir::{ShamirShare, ThresholdConfig};
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{rand::Rng, UniformRand};
+use more_asserts::{assert_ge, assert_le};
 pub use utils::random::DST_RAND_CORE_HELL;
-use more_asserts::assert_le;
-use more_asserts::assert_ge;
-use crate::pvss::traits;
-use aptos_crypto::arkworks::shamir::ThresholdConfig;
-use crate::pvss::Player;
-use aptos_crypto::arkworks::shamir::ShamirShare;
 
 pub mod algebra;
 pub(crate) mod fiat_shamir;
@@ -92,7 +89,7 @@ impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Sc
 
     fn reconstruct(
         sc: &ThresholdConfig<E::ScalarField>,
-        shares: &Vec<(Player, Self::Share)>
+        shares: &Vec<(Player, Self::Share)>,
     ) -> Self {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());

@@ -9,9 +9,9 @@ pub mod serialization;
 pub mod shamir;
 pub mod vanishing_poly;
 
-use ark_ff::{BigInteger, Field, FftField, PrimeField};
-use ark_poly::EvaluationDomain;
 use ark_ec::AffineRepr;
+use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_poly::EvaluationDomain;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]
@@ -23,8 +23,10 @@ pub fn powers_of_two<F: Field>(ell: usize) -> Vec<F> {
 /// with each scalar.
 ///
 /// Equivalent to `[base * s for s in scalars]`.
-pub fn commit_to_scalars<P: AffineRepr>(commitment_base: &P, scalars: &[P::ScalarField]) -> Vec<P::Group>
-{
+pub fn commit_to_scalars<P: AffineRepr>(
+    commitment_base: &P,
+    scalars: &[P::ScalarField],
+) -> Vec<P::Group> {
     scalars.iter().map(|s| *commitment_base * s).collect()
 }
 

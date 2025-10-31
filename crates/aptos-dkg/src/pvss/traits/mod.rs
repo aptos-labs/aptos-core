@@ -4,12 +4,11 @@
 pub mod transcript;
 
 use crate::pvss::player::Player;
+use aptos_crypto::arkworks;
 use more_asserts::assert_lt;
+use rand::{seq::IteratorRandom, Rng};
 use std::fmt::Display;
 pub use transcript::Transcript;
-use aptos_crypto::arkworks;
-use rand::Rng;
-use rand::seq::IteratorRandom;
 
 /// Converts a type `Self` to `ToType` using auxiliary data from type `AuxType`.
 pub trait Convert<ToType, AuxType> {
@@ -60,7 +59,7 @@ impl<F: ark_ff::PrimeField> SecretSharingConfig for arkworks::shamir::ThresholdC
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where
-        R: rand_core::RngCore + rand_core::CryptoRng
+        R: rand_core::RngCore + rand_core::CryptoRng,
     {
         Player {
             id: rng.gen_range(0, self.n),

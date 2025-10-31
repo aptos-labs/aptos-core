@@ -4,14 +4,13 @@
 use crate::{
     algebra::lagrange::lagrange_coefficients,
     pvss::{
-        traits::{Reconstructable, SecretSharingConfig},
+        traits::{Reconstructable, SecretSharingConfig, ThresholdConfig},
         Player, ThresholdConfigBlstrs,
     },
 };
 use blstrs::Scalar;
 use ff::Field;
 use more_asserts::{assert_ge, assert_le};
-use crate::pvss::traits::ThresholdConfig;
 
 impl Reconstructable<ThresholdConfigBlstrs> for Scalar {
     type Share = Scalar;
