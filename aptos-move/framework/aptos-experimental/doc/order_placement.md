@@ -864,7 +864,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
     // Get the order state before cancellation <b>to</b> track what's being cancelled
     <b>let</b> order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
-    <b>let</b> (_, _, _, sequence_number, cancelled_bid_sizes, cancelled_bid_prices, cancelled_ask_sizes, cancelled_ask_prices, _ ) = order_before_cancel.destroy_bulk_order();
+    <b>let</b> (_, _, _, sequence_number, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _ ) = order_before_cancel.destroy_bulk_order();
 
     <b>if</b> (maker_order.get_remaining_size_from_match_details() != 0) {
             // For bulk orders, we cancel all orders for the user
@@ -876,19 +876,19 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     );
 
     <b>let</b> modified_order = market.get_order_book().get_bulk_order(maker_address);
-    <b>let</b> (_, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = modified_order.destroy_bulk_order();
+    <b>let</b> (_, _, _, _, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = modified_order.destroy_bulk_order();
     market.emit_event_for_bulk_order_modified(
         order_id,
         sequence_number,
         maker_address,
-        bid_sizes,
         bid_prices,
-        ask_sizes,
+        bid_sizes,
         ask_prices,
-        cancelled_bid_sizes,
+        ask_sizes,
         cancelled_bid_prices,
-        cancelled_ask_sizes,
-        cancelled_ask_prices
+        cancelled_bid_sizes,
+        cancelled_ask_prices,
+        cancelled_ask_sizes
     );
 }
 </code></pre>

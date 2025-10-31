@@ -234,10 +234,10 @@ Parameters:
         order_id,
         sequence_number,
         user,
-        bid_sizes,
         bid_prices,
-        ask_sizes,
-        ask_prices
+        bid_sizes,
+        ask_prices,
+        ask_sizes
     );
 }
 </code></pre>
