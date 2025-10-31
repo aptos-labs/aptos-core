@@ -14,6 +14,7 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::rand::{Rng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
+use ark_std::fmt;
 
 /// Represents a single share in Shamir's Secret Sharing scheme. Each
 /// `ShamirShare` consists of an `(x, y)` point on the secret sharing polynomial.
@@ -41,6 +42,16 @@ pub struct ThresholdConfig<F: PrimeField> {
     /// Used for FFT-based polynomial operations. Recomputed from `n` on deserialize
     #[serde(skip)]
     pub domain: Radix2EvaluationDomain<F>,
+}
+
+impl<F: PrimeField> fmt::Display for ThresholdConfig<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "ThresholdConfig {{ n: {}, t: {} }}",
+            self.n, self.t
+        )
+    }
 }
 
 impl<'de, F: PrimeField> Deserialize<'de> for ThresholdConfig<F> {

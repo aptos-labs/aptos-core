@@ -7,6 +7,9 @@ use crate::pvss::player::Player;
 use more_asserts::assert_lt;
 use std::fmt::Display;
 pub use transcript::Transcript;
+use aptos_crypto::arkworks;
+use rand::Rng;
+use rand::seq::IteratorRandom;
 
 /// Converts a type `Self` to `ToType` using auxiliary data from type `AuxType`.
 pub trait Convert<ToType, AuxType> {
@@ -43,6 +46,38 @@ pub trait SecretSharingConfig: Display {
     fn get_total_num_players(&self) -> usize;
 
     fn get_total_num_shares(&self) -> usize;
+}
+
+impl<F: ark_ff::PrimeField> SecretSharingConfig for arkworks::shamir::ThresholdConfig<F> {
+    /// For testing only.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng
+    {
+        Player {
+            id: rng.gen_range(0, self.n),
+        }
+    }
+
+    /// For testing only.
+    fn get_random_eligible_subset_of_players<R>(&self, mut rng: &mut R) -> Vec<Player>
+    where
+        R: rand_core::RngCore,
+    {
+        (0..self.get_total_num_shares())
+            .choose_multiple(&mut rng, self.t)
+            .into_iter()
+            .map(|i| self.get_player(i))
+            .collect::<Vec<Player>>()
+    }
+
+    fn get_total_num_players(&self) -> usize {
+        self.n
+    }
+
+    fn get_total_num_shares(&self) -> usize {
+        self.n
+    }
 }
 
 /// All dealt secret keys should be reconstructable from a subset of \[dealt secret key\] shares.
