@@ -7,7 +7,7 @@ use crate::{
     algebra::{polynomials, GroupGenerators},
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
-    sigma_protocol::{self, homomorphism, homomorphism::Trait as HomomorphismTrait, Trait},
+    sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
     utils, Scalar,
 };
 use aptos_crypto::arkworks;
@@ -29,7 +29,7 @@ use std::{fmt::Debug, io::Write};
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
-    Cj: Vec<E::G1>,
+    Cs: Vec<E::G1>,
     D: E::G1,
     a: E::ScalarField,
     a_h: E::ScalarField,
@@ -187,7 +187,6 @@ impl<E: Pairing> Valid for VerifierPrecomputed<E> {
     }
 }
 
-#[allow(non_snake_case)]
 fn compute_h_denom_eval<E: Pairing>(
     roots_of_unity_in_eval_dom: &Vec<E::ScalarField>,
 ) -> Vec<E::ScalarField> {
@@ -408,7 +407,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             lagr_g1,
             xi_1: *xi_1,
         };
-        let Cj: Vec<_> = f_js_evals
+        let Cs: Vec<_> = f_js_evals
             .iter()
             .zip(rhos.iter())
             .map(|(f_j, rho)| {
@@ -418,7 +417,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cj);
+        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
 
         // Step 6
         let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
@@ -474,7 +473,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 let sum_betas_term: E::ScalarField = betas
                     .iter()
                     .zip(&rs)
-                    .map(|(beta_j, r_j)| *beta_j * r_j * (*r_j - E::ScalarField::ONE))
+                    .map(|(&beta_j, r_j)| beta_j * r_j * (*r_j - E::ScalarField::ONE))
                     .sum();
 
                 let numerator = beta * (r - sum_pow2_rs) + sum_betas_term;
@@ -592,7 +591,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         Proof {
             hatC,
             pi_PoK,
-            Cj,
+            Cs,
             D,
             a,
             a_h,
@@ -628,7 +627,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let Proof {
             hatC,
             pi_PoK,
-            Cj,
+            Cs,
             D,
             a,
             a_h,
@@ -657,7 +656,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_sigma_proof(fs_t, &pi_PoK);
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cj);
+        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
 
         // Step 5
         let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
@@ -670,10 +669,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 8
         let U_bases: Vec<E::G1Affine> = {
-            let mut v = Vec::with_capacity(2 + Cj.len());
+            let mut v = Vec::with_capacity(2 + Cs.len());
             v.push(*hatC);
             v.push(*D);
-            v.extend_from_slice(&Cj);
+            v.extend_from_slice(&Cs);
             E::G1::normalize_batch(&v)
         };
 
@@ -785,9 +784,9 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_f_j_commitments<E: Pairing>(
         fs_transcript: &mut Transcript,
-        Cj: &Vec<E::G1>,
+        Cs: &Vec<E::G1>,
     ) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cj);
+        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cs);
     }
 
     pub(crate) fn get_beta_challenges<E: Pairing>(
@@ -929,7 +928,7 @@ fn floored_triangular_root(a: usize) -> usize {
 }
 
 #[cfg(test)]
-mod test_invert_triangular_number {
+mod test_floored_triangular_root {
     use super::floored_triangular_root;
 
     #[test]

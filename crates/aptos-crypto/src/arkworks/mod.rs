@@ -3,7 +3,11 @@
 
 //! This module provides some helper functions for arkworks.
 
+pub mod differentiate;
+pub mod hashing;
 pub mod serialization;
+pub mod shamir;
+pub mod vanishing_poly;
 
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};
@@ -55,14 +59,13 @@ pub fn compute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarFie
 }
 
 #[cfg(test)]
-mod test_invert_triangular_number {
+mod test_scalar_to_u32 {
     use super::scalar_to_u32;
-    use ark_bn254::Fr;
 
     #[test]
     fn test_round_trip_for_valid_values() {
         for i in [0, 1, 42, 255, 65_535, 1_000_000, u32::MAX] {
-            let scalar = Fr::from(i as u64);
+            let scalar = ark_bn254::Fr::from(i as u64);
             assert_eq!(scalar_to_u32(&scalar), Some(i));
         }
     }

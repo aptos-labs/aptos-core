@@ -6,46 +6,76 @@ use crate::{
     Scalar,
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
+};
 use ark_std::fmt::Debug;
 
 type Base<E> = <E as Pairing>::G1Affine;
 
 /// Formally, given:
-/// - `g_1, h_1` ∈ G₁ (group generators)
+/// - `G_1, H_1` ∈ G₁ (group generators)
 /// - `ek_i` ∈ G₁ (encryption keys)
-/// - `z_ij` ∈ Scalar<E> (plaintext scalars z_i, chunked into z_ij)
-/// - `r_j` ∈ Scalar<E> (randomness for each `column` of chunks z_ij)
+/// - `z_i,j` ∈ Scalar<E> (plaintext scalars z_i, chunked into z_i,j)
+/// - `r_j` ∈ Scalar<E> (randomness for each `column` of chunks z_i,j)
 ///
-/// The homomorphism maps input `[z_ij]` and randomness `[r_j]` to
+/// The homomorphism maps input `[z_i,j]` and randomness `[r_j]` to
 /// the following codomain elements:
 ///
 /// ```text
-/// C_ij = g_1 * z_ij + ek_i * r_j
-/// R_j  = h_1 * r_j
+/// C_i,j = G_1 * z_i,j + ek_i * r_j
+/// R_j  = H_1 * r_j
 /// ```
 ///
-/// The `C_ij` represent "chunked" homomorphic encryptions of the plaintexts,
+/// The `C_i,j` represent "chunked" homomorphic encryptions of the plaintexts,
 /// and `R_j` carry the corresponding randomness contributions.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct Homomorphism<'a, E: Pairing> {
-    pub g_1: &'a Base<E>,
-    pub h_1: &'a Base<E>,
+    pub G_1: &'a Base<E>,
+    pub H_1: &'a Base<E>,
     pub eks: &'a [Base<E>],
 }
 
+// Need to manually implement `CanonicalSerialize` because `Homomorphism` has references instead of owned values
+impl<'a, E: Pairing> CanonicalSerialize for Homomorphism<'a, E> {
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.G_1.serialize_with_mode(&mut writer, compress)?;
+        self.H_1.serialize_with_mode(&mut writer, compress)?;
+        for ek in self.eks {
+            ek.serialize_with_mode(&mut writer, compress)?;
+        }
+        Ok(())
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        self.G_1.serialized_size(compress)
+            + self.H_1.serialized_size(compress)
+            + self
+                .eks
+                .iter()
+                .map(|ek| ek.serialized_size(compress))
+                .sum::<usize>()
+    }
+}
+
+/// This struct is used as `CodomainShape`, but the same layout also applies to the `Witness` type.
+/// Hence, for brevity, we reuse this struct for both purposes.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
-    pub chunks: Vec<Vec<T>>, // Depending on T, these can be chunked plaintexts, chunked ciphertexts, their MSM representations, etc
+pub struct ChunksAndRandomness<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
+    pub chunks: Vec<Vec<T>>, // Depending on T these can be chunked ciphertexts, or their MSM representations, but also chunked plaintexts (see Witness below)
     pub randomness: Vec<T>,  // Same story, depending on T
 }
 
-// Witness shape happens to be identical to CodomainShape, this is mostly coincidental
-pub type Witness<E> = CodomainShape<Scalar<E>>;
+// Witness shape happens to be identical to CodomainShape, this is mostly coincidental; hence for brevity:
+pub type Witness<E> = ChunksAndRandomness<Scalar<E>>;
 
 impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
-    type Codomain = CodomainShape<E::G1>;
+    type Codomain = ChunksAndRandomness<E::G1>;
     type Domain = Witness<E>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
@@ -55,10 +85,10 @@ impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
 
 // TODO: Can problably do EntrywiseMap with another derive macro
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
-    for CodomainShape<T>
+    for ChunksAndRandomness<T>
 {
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
-        CodomainShape<U>;
+        ChunksAndRandomness<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
@@ -73,12 +103,12 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
 
         let randomness = self.randomness.into_iter().map(f).collect();
 
-        CodomainShape { chunks, randomness }
+        ChunksAndRandomness { chunks, randomness }
     }
 }
 
 // TODO: Use a derive macro?
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for ChunksAndRandomness<T> {
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 
@@ -93,7 +123,7 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for Codo
 impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     type Base = Base<E>;
     type CodomainShape<T>
-        = CodomainShape<T>
+        = ChunksAndRandomness<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
@@ -101,33 +131,33 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     type Scalar = Scalar<E>;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-        // C_ij = g_1 * z_ij + ek[i] * r_j
+        // C_i,j = G_1 * z_i,j + ek[i] * r_j
         let Cs = input
             .chunks
             .iter()
             .enumerate()
-            .map(|(i, row)| {
-                row.iter()
+            .map(|(i, z_i)| {
+                z_i.iter()
                     .zip(input.randomness.iter())
                     .map(|(&z_ij, &r_j)| fixed_base_msms::MsmInput {
-                        bases: vec![*self.g_1, self.eks[i]],
+                        bases: vec![*self.G_1, self.eks[i]],
                         scalars: vec![z_ij, r_j],
                     })
                     .collect()
             })
             .collect();
 
-        //  R_j = h_1 * r_j
+        //  R_j = H_1 * r_j
         let Rs = input
             .randomness
             .iter()
             .map(|&r_j| fixed_base_msms::MsmInput {
-                bases: vec![*self.h_1],
+                bases: vec![*self.H_1],
                 scalars: vec![r_j],
             })
             .collect();
 
-        CodomainShape {
+        ChunksAndRandomness {
             chunks: Cs,
             randomness: Rs,
         }

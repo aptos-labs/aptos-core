@@ -3,9 +3,9 @@
 
 use crate::{
     fiat_shamir,
-    sigma_protocol::{
-        homomorphism,
-        homomorphism::fixed_base_msms::{IsMsmInput, Trait as FixedBaseMsmsTrait},
+    sigma_protocol::homomorphism::{
+        self,
+        fixed_base_msms::{self, IsMsmInput},
     },
     utils, Scalar,
 };
@@ -23,12 +23,13 @@ use ark_std::{
 use std::{fmt::Debug, io::Write};
 
 pub trait Trait<E: Pairing>:
-    FixedBaseMsmsTrait<
+    fixed_base_msms::Trait<
         Domain: Witness<E>,
         Scalar = E::ScalarField,
         Base = E::G1Affine,
         MsmOutput = E::G1,
     > + Sized
+    + CanonicalSerialize
 {
     fn dst(&self) -> Vec<u8>;
 
@@ -103,7 +104,7 @@ impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
     }
 }
 
-// Standard workaround because type aliases are experimental in Rust
+// Standard method to get `trait Statement = Canonical Serialize + ...`, because type aliases are experimental in Rust
 pub trait Statement: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq {}
 
@@ -216,16 +217,30 @@ where
     pub z: H::Domain,
 }
 
-/// Computes the Fiat-Shamir challenge for a Σ-protocol.
+/// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
 ///
-/// # Parameters
-/// - `fs_transcript`: the mutable Merlin transcript to update
+/// This function derives a non-interactive challenge scalar by appending
+/// protocol-specific data to a Merlin transcript. In the abstraction used here,
+/// the protocol proves knowledge of a preimage under a homomorphism. Therefore,
+/// all public data relevant to that homomorphism (e.g., its MSM bases) and
+/// the image under consideration are included in the transcript.
+///
+/// # Arguments
+/// - `fs_t`: the mutable Merlin transcript to update.
+/// - `hom`: The homomorphism structure carrying its public data (e.g., MSM bases).
+/// - `statement`: The public statement, i.e. the image of a witness under the homomorphism.
 /// - `prover_first_message`: the first message in the Σ-protocol (the prover's commitment)
+/// - `dst`: A domain separation tag to ensure unique challenges per protocol.
 ///
 /// # Returns
-/// The Fiat-Shamir challenge scalar, after appending the DST and the first message to the Fiat-Shamir transcript.
-pub fn fiat_shamir_challenge_for_sigma_protocol<E: Pairing, H: homomorphism::Trait>(
-    fs_transcript: &mut merlin::Transcript,
+/// The derived Fiat–Shamir challenge scalar, after incorporating the domain
+/// separator, public data, statement, and prover’s first message into the transcript.
+pub fn fiat_shamir_challenge_for_sigma_protocol<
+    E: Pairing,
+    H: homomorphism::Trait + CanonicalSerialize,
+>(
+    fs_t: &mut merlin::Transcript,
+    hom: &H,
     statement: &H::Codomain,
     prover_first_message: &H::Codomain,
     dst: &[u8],
@@ -235,31 +250,31 @@ where
     H::Codomain: Statement,
 {
     // Append the Σ-protocol separator to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(
-        fs_transcript,
-        dst,
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(fs_t, dst);
+
+    // Append the MSM bases to the transcript
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_msm_bases(
+        fs_t, hom,
     );
 
     // Append the public statement (the image of the witness) to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
-        fs_transcript,
+        fs_t,
         statement,
     );
 
     // Add the first prover message (the commitment) to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_first_prover_message(
-        fs_transcript,
+        fs_t,
         prover_first_message,
     );
 
     // Generate the Fiat-Shamir challenge from the updated transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
-        fs_transcript,
-    )
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(fs_t)
 }
 
 #[allow(non_snake_case)]
-pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait, R>(
+pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait + CanonicalSerialize, R>(
     homomorphism: &H,
     witness: &H::Domain,
     statement: &H::Codomain,
@@ -282,6 +297,7 @@ where
     // Step 3: Obtain Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
         fiat_shamir_transcript,
+        homomorphism,
         statement,
         &A,
         dst,
@@ -303,7 +319,7 @@ where
     }
 }
 
-// This function is currently not used, see commends in `fn verify()`
+// This function is currently not used, see comments in `fn verify()`
 // pub fn fiat_shamir_challenge_for_msm_verifier<E: Pairing, H: homomorphism::Trait>(
 //     fs_transcript: &mut merlin::Transcript,
 //     public_statement: &H::Codomain,
@@ -379,12 +395,14 @@ pub fn verify_msm_hom<E: Pairing, H>(
     dst: &[u8],
 ) -> anyhow::Result<()>
 where
-    H: FixedBaseMsmsTrait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>,
+    H: fixed_base_msms::Trait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>
+        + CanonicalSerialize,
     H::Domain: Witness<E>,
 {
     // Step 1: Reproduce the prover's Fiat-Shamir challenge
     let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
         fs_transcript,
+        homomorphism,
         statement,
         &prover_first_message,
         dst,

@@ -1112,6 +1112,7 @@ dependencies = [
  "group",
  "hex",
  "hkdf 0.10.0",
+ "itertools 0.13.0",
  "libsecp256k1",
  "merlin",
  "more-asserts",

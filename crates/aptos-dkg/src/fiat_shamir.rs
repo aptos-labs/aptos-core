@@ -167,6 +167,9 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scalar<E>> {
     fn append_sigma_protocol_sep(&mut self, dst: &[u8]);
 
+    /// Append the MSM bases of a sigma protocol.
+    fn append_sigma_protocol_msm_bases(&mut self, hom: &H);
+
     /// Append the claim of a sigma protocol.
     fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain);
 
@@ -348,13 +351,21 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     }
 }
 
-impl<E: Pairing, H: homomorphism::Trait> SigmaProtocol<E, H> for merlin::Transcript
+impl<E: Pairing, H: homomorphism::Trait + CanonicalSerialize> SigmaProtocol<E, H>
+    for merlin::Transcript
 where
     H::Domain: sigma_protocol::Witness<E>,
     H::Codomain: sigma_protocol::Statement,
 {
     fn append_sigma_protocol_sep(&mut self, dst: &[u8]) {
         self.append_message(b"dom-sep", dst);
+    }
+
+    fn append_sigma_protocol_msm_bases(&mut self, hom: &H) {
+        let mut hom_bytes = Vec::new();
+        hom.serialize_compressed(&mut hom_bytes)
+            .expect("hom MSM bases serialization should succeed");
+        self.append_message(b"hom-msm-bases", hom_bytes.as_slice());
     }
 
     fn append_sigma_protocol_public_statement(&mut self, public_statement: &H::Codomain) {

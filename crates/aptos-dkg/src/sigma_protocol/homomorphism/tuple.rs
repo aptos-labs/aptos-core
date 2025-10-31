@@ -27,7 +27,7 @@ use std::fmt::Debug;
 ///
 /// In category-theoretic terms, this is the composition of the diagonal map
 /// `Δ: Domain -> Domain × Domain` with the product map `h1 × h2`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait,
@@ -61,7 +61,7 @@ where
 /// A wrapper to combine the codomain shapes of two homomorphisms into a single type.
 ///
 /// This is necessary because Rust tuples do **not** inherit traits like `IntoIterator`,
-/// but `FixedBaseMsms::CodomainShape<T>` require them.
+/// but `fixed_base_msms::CodomainShape<T>` requires them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TupleCodomainShape<A, B>(pub A, pub B);
 
