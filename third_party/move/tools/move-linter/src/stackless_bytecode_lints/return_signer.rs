@@ -3,7 +3,9 @@
 
 //! Warn when a function returns a `signer`.
 //!
-//! Returning a signer can leak authority and is usually a security risk.
+//! Returning a signer leaks account authority, allowing the caller to
+//! move funds, modify resources, or perform any privileged action
+//! on behalf of that account.
 
 use move_compiler_v2::external_checks::StacklessBytecodeChecker;
 use move_model::{
@@ -34,7 +36,7 @@ impl StacklessBytecodeChecker for ReturnSigner {
             self.report(
                 env,
                 &loc,
-                "Returning a `signer` leaks authority; avoid returning signer values.",
+                "Returning a `signer` leaks authority; avoid returning signer values from public functions.",
             );
         }
     }
