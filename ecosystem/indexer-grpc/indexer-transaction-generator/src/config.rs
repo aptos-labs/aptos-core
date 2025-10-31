@@ -70,6 +70,11 @@ pub struct IndexerCliArgs {
     /// Leave this blank if want all the networks
     #[clap(long)]
     pub network: Option<String>,
+
+    /// If set, we won't run a localnet and will instead assume one is running. For now
+    /// it is required that the localnet use all the default ports.
+    #[clap(long)]
+    pub existing_localnet: bool,
 }
 
 impl IndexerCliArgs {
@@ -109,6 +114,7 @@ impl IndexerCliArgs {
                 let move_folder_path = testing_folder.join(MOVE_SCRIPTS_FOLDER);
                 // If the move fixtures folder does not exist, skip the script transaction generator.
                 if !move_folder_path.exists() {
+                    println!("Move folder path ({:?}) does not exist, skipping script transaction generator.", move_folder_path.to_string_lossy());
                     return Ok(());
                 }
                 if !script_transactions_output_folder.exists() {
@@ -176,7 +182,11 @@ impl IndexerCliArgs {
                 // Run each config.
                 let account_manager_file_path = testing_folder.join(ACCOUNT_MANAGER_FILE_NAME);
                 let mut account_manager = AccountManager::load(&account_manager_file_path).await?;
-                let mut managed_node = ManagedNode::start(None, None).await?;
+                let managed_node = if !self.existing_localnet {
+                    Some(ManagedNode::start(None, None).await?)
+                } else {
+                    None
+                };
                 for (file_name, script_transactions) in script_transactions_vec {
                     script_transactions
                         .run(
@@ -191,7 +201,9 @@ impl IndexerCliArgs {
                         ))?;
                 }
                 // Stop the localnet.
-                managed_node.stop().await?;
+                if let Some(mut managed_node) = managed_node {
+                    managed_node.stop().await?;
+                }
             },
         }
 
@@ -417,6 +429,7 @@ mod tests {
             output_folder,
             mode: Mode::Script,
             network: None,
+            existing_localnet: false,
         };
         let result = indexer_cli_args.run().await;
         assert!(result.is_err());
