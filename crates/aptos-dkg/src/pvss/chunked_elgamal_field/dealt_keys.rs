@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_crypto::{
-    arkworks::{
-        serialization::{ark_de, ark_se},
-    },
+    arkworks::serialization::{ark_de, ark_se},
     CryptoMaterialError, Uniform, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};

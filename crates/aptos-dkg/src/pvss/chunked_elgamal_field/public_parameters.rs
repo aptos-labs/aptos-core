@@ -8,19 +8,20 @@ use crate::{
     pvss::{
         chunked_elgamal_field::{
             chunked_elgamal,
+            dealt_keys::{DecryptPrivKey, EncryptPubKey},
         },
         traits,
     },
     range_proofs::dekart_univariate_v2,
     utils::{self},
 };
-use aptos_crypto::arkworks::serialization::ark_se;
-use aptos_crypto::{arkworks::serialization::ark_de, CryptoMaterialError, ValidCryptoMaterial};
-use ark_ec::pairing::Pairing;
+use aptos_crypto::{
+    arkworks::serialization::{ark_de, ark_se},
+    CryptoMaterialError, ValidCryptoMaterial,
+};
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
-use crate::pvss::chunked_elgamal_field::dealt_keys::{DecryptPrivKey, EncryptPubKey};
-use ark_ec::CurveGroup;
 use std::ops::Mul;
 
 #[derive(
@@ -66,15 +67,16 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 
 use crate::range_proofs::traits::BatchedRangeProof;
 use aptos_crypto::arkworks::hashing;
-use ark_std::{
-    rand::{thread_rng},
-};
-use ark_std::rand::{RngCore, CryptoRng};
+use ark_std::rand::{thread_rng, CryptoRng, RngCore};
 
 #[allow(dead_code)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
-    pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, radix_exponent: usize, rng: &mut R) -> Self {
+    pub fn new<R: RngCore + CryptoRng>(
+        max_num_shares: usize,
+        radix_exponent: usize,
+        rng: &mut R,
+    ) -> Self {
         // TODO: add &mut rng here? <R: RngCore + CryptoRng>
         // existing initialization
         let num_chunks = max_num_shares * 255usize.div_ceil(radix_exponent);

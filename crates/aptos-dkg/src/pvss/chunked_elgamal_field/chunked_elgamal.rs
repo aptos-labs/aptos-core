@@ -17,7 +17,7 @@ pub const DST_PVSS_PUBLIC_PARAMS: &[u8; 30] = b"APTOS_CHUNKED_ELGAMAL_PVSS_DST";
 #[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
-    /// A group element $G that is raised to the encrypted message
+    /// A group element $G$ that is raised to the encrypted message
     pub G: E::G1Affine,
     /// A group element $H$ that is used to exponentiate both the
     /// (1) ciphertext randomness and the (2) the DSK when computing its EK.

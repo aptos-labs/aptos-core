@@ -1,15 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::Uniform;
-use aptos_crypto_derive::{SilentDebug, SilentDisplay};
-use ark_ec::{pairing::Pairing};
-use derive_more::{Add};
-use num_traits::Zero;
-use std::ops::{AddAssign};
 use crate::{
     pvss::chunked_elgamal_field::public_parameters::PublicParameters, traits::Convert, Scalar,
 };
+use aptos_crypto::Uniform;
+use aptos_crypto_derive::{SilentDebug, SilentDisplay};
+use ark_ec::pairing::Pairing;
+use derive_more::Add;
+use num_traits::Zero;
+use std::ops::AddAssign;
 
 #[derive(SilentDebug, SilentDisplay, PartialEq, Add)]
 pub struct InputSecret<F: ark_ff::Field> {
