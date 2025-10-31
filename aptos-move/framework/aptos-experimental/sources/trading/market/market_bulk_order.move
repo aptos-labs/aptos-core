@@ -58,13 +58,9 @@ module aptos_experimental::market_bulk_order {
                 bid_prices,
                 bid_sizes,
                 ask_prices,
-<<<<<<< HEAD
                 ask_sizes,
-                std::string::utf8(b"validation failed"),
-=======
                 get_validation_failed_rejection(),
                 validation_result.get_validation_failure_reason().destroy_some(),
->>>>>>> main
             );
             return option::none();
         };
