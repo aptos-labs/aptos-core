@@ -5,9 +5,9 @@
 
 pub mod differentiate;
 pub mod hashing;
-pub mod mult_tree;
 pub mod serialization;
 pub mod shamir;
+pub mod vanishing_poly;
 
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::{BigInteger, PrimeField};

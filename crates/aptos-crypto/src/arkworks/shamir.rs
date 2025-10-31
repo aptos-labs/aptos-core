@@ -5,8 +5,8 @@
 
 use crate::arkworks::{
     differentiate::DifferentiableFn,
-    mult_tree::vanishing_poly,
     serialization::{ark_de, ark_se},
+    vanishing_poly::vanishing_poly,
 };
 use anyhow::{anyhow, Result};
 use ark_ff::{batch_inversion, Field, PrimeField};
