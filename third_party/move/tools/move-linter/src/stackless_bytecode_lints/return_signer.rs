@@ -22,7 +22,7 @@ impl StacklessBytecodeChecker for ReturnSigner {
     }
 
     fn check(&self, target: &FunctionTarget) {
-        if target.visibility() != Visibility::Public {
+        if !Visibility::is_public(&target.visibility()) {
             return;
         }
 
