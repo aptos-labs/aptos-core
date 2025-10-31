@@ -13,7 +13,7 @@ pub(crate) fn chunk_field_elt<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec
 
     let bytes = scalar.into_bigint().to_bytes_le();
     let num_bytes = num_bits / 8;
-    let num_chunks = (bytes.len() + num_bytes - 1) / num_bytes;
+    let num_chunks = bytes.len().div_ceil(num_bytes);
 
     let mut chunks = Vec::with_capacity(num_chunks);
 
@@ -38,7 +38,7 @@ pub(crate) fn unchunk_field_elt<F: PrimeField>(num_bits: usize, chunks: &[F]) ->
         "Invalid chunk size"
     );
 
-    let base = F::from((1u128 << num_bits) as u128);
+    let base = F::from(1u128 << num_bits);
     let mut acc = F::zero();
     let mut multiplier = F::one();
 
