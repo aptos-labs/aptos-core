@@ -33,7 +33,7 @@ pub struct SingleRunStats {
 pub enum Workloads {
     TPS(Vec<usize>),
     TRANSACTIONS(Vec<TransactionWorkload>),
-    RawTransactions(Vec<(String, TransactionType)>),
+    RawTransactions(Vec<RawTransactionWorkload>),
 }
 
 impl Workloads {
@@ -74,7 +74,7 @@ impl Workloads {
             },
             Self::TRANSACTIONS(workloads) => format!("TRANSACTIONS({:?})", workloads[index]),
             Self::RawTransactions(workloads) => {
-                format!("RAW TRANSACTIONS({:?})", workloads[index].0)
+                format!("RAW TRANSACTIONS({:?})", workloads[index].name)
             },
         }
     }
@@ -95,7 +95,7 @@ impl Workloads {
                 },
                 workloads[index].phase_name(phase)
             ),
-            Self::RawTransactions(workloads) => format!("{}: {}", index, workloads[index].0),
+            Self::RawTransactions(workloads) => format!("{}: {}", index, workloads[index].name),
         }
     }
 
@@ -104,7 +104,10 @@ impl Workloads {
             Self::TPS(tpss) => request.mode(EmitJobMode::ConstTps { tps: tpss[index] }),
             Self::TRANSACTIONS(workloads) => workloads[index].configure(request),
             Self::RawTransactions(workloads) => {
-                request.transaction_type(workloads[index].1.clone())
+                let workload = &workloads[index];
+                request
+                    .mode(workload.emit_job_mode.clone())
+                    .transaction_type(workload.workload.clone())
             },
         }
     }
@@ -245,6 +248,23 @@ impl TransactionWorkload {
             },
             // ,
         )
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct RawTransactionWorkload {
+    name: String,
+    workload: TransactionType,
+    emit_job_mode: EmitJobMode,
+}
+
+impl RawTransactionWorkload {
+    pub fn new(name: String, workload: TransactionType, emit_job_mode: EmitJobMode) -> Self {
+        Self {
+            name,
+            workload,
+            emit_job_mode,
+        }
     }
 }
 

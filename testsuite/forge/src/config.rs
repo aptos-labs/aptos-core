@@ -58,6 +58,8 @@ pub struct ForgeConfig {
 
     /// Retain debug logs and above for all nodes instead of just the first 5 nodes
     pub retain_debug_logs: bool,
+
+    pub indexer_config: Option<IndexerDeployConfig>,
 }
 
 impl ForgeConfig {
@@ -281,6 +283,11 @@ impl ForgeConfig {
         self
     }
 
+    pub fn with_indexer_config(mut self, indexer_config: IndexerDeployConfig) -> Self {
+        self.indexer_config = Some(indexer_config);
+        self
+    }
+
     pub fn get_emit_job(&self) -> &EmitJobRequest {
         &self.emit_job_request
     }
@@ -357,6 +364,7 @@ impl Default for ForgeConfig {
             validator_resource_override: NodeResourceOverride::default(),
             fullnode_resource_override: NodeResourceOverride::default(),
             retain_debug_logs: false,
+            indexer_config: None,
         }
     }
 }

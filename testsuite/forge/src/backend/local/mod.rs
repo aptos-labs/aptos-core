@@ -2,7 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{Factory, GenesisConfig, GenesisConfigFn, NodeConfigFn, Result, Swarm, Version};
+use crate::{
+    Factory, GenesisConfig, GenesisConfigFn, IndexerDeployConfig, NodeConfigFn, Result, Swarm,
+    Version,
+};
 use anyhow::{bail, Context};
 use aptos_config::config::{NodeConfig, OverrideNodeConfig};
 use aptos_framework::ReleaseBundle;
@@ -184,6 +187,7 @@ impl Factory for LocalFactory {
         _genesis_config_fn: Option<GenesisConfigFn>,
         _node_config_fn: Option<NodeConfigFn>,
         _existing_db_tag: Option<String>,
+        _indexer_config: Option<IndexerDeployConfig>,
     ) -> Result<Box<dyn Swarm>> {
         let framework = match genesis_config {
             Some(config) => match config {
