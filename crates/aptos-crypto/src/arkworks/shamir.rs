@@ -143,18 +143,15 @@ impl<F: PrimeField> ThresholdConfig<F> {
 
         // Step 3b: Only keep the relevant evaluations, then perform a batch inversion
         let domain_vec: Vec<F> = self.domain.elements().collect();
-        let derivative_map: HashMap<F, F> = domain_vec
-            .into_iter()
-            .zip(derivative_evals.into_iter())
-            .collect();
+        let derivative_map: HashMap<F, F> = domain_vec.into_iter().zip(derivative_evals).collect();
         let mut denominators: Vec<F> = xs_vec.iter().map(|x| derivative_map[x]).collect();
         batch_inversion(&mut denominators);
 
         // Step 4: compute Lagrange coefficients
         xs_vec
             .into_iter()
-            .zip(numerators.into_iter())
-            .zip(denominators.into_iter())
+            .zip(numerators)
+            .zip(denominators)
             .map(|((x, numerator), denom_inv)| (x, numerator * denom_inv))
             .collect()
     }
