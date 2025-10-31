@@ -6,7 +6,7 @@ module aptos_experimental::market_single_order_tests {
     use std::string::String;
     use std::vector;
     use aptos_framework::timestamp;
-    use aptos_experimental::order_placement::place_market_order;
+    use aptos_experimental::order_placement::{place_market_order, place_limit_order};
     use aptos_experimental::event_utils::latest_emitted_events;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
@@ -23,7 +23,7 @@ module aptos_experimental::market_single_order_tests {
     use aptos_experimental::event_utils;
     use aptos_experimental::market_types::{order_status_open};
     use aptos_experimental::market_types::{OrderEvent};
-    use aptos_experimental::order_book_types::OrderIdType;
+    use aptos_experimental::order_book_types::{OrderIdType, price_move_up_condition};
     use aptos_experimental::order_book_types::{good_till_cancelled};
 
     // Import common functions from market_tests
@@ -601,4 +601,36 @@ module aptos_experimental::market_single_order_tests {
         market.destroy_market()
     }
 
+
+    #[test(
+        admin = @0x1, market_signer = @0x123, maker = @0x456
+    )]
+    public fun test_place_maker_order_with_trigger_condition(
+        admin: &signer,
+        market_signer: &signer,
+        maker: &signer,
+    ) {
+        let market = setup_market(admin, market_signer);
+        let event_store = event_utils::new_event_store();
+        place_limit_order(
+            &mut market,
+            maker,
+            1001,
+            2000000,
+            true,
+            good_till_cancelled(),
+            option::some(price_move_up_condition(10000)), // trigger_condition
+            new_test_order_metadata(1),
+            option::none(),
+            1000,
+            true,
+        &test_market_callbacks_with_maker_cancellled(),
+        );
+
+        // Ensure no open order event is emitted since the order is not yet active
+        let events = latest_emitted_events<OrderEvent>(&mut event_store, option::none());
+        assert!(events.length() == 0);
+
+        market.destroy_market()
+    }
 }

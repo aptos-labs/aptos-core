@@ -118,6 +118,7 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types">0x7::bulk_order_book_types</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 <b>use</b> <a href="price_time_index.md#0x7_price_time_index">0x7::price_time_index</a>;
@@ -834,7 +835,6 @@ The first price levels of both bid and ask sides will be activated in the active
 
 - <code>self</code>: Mutable reference to the bulk order book
 - <code>price_time_idx</code>: Mutable reference to the price time index
-- <code>ascending_id_generator</code>: Mutable reference to the ascending id generator
 - <code>order_req</code>: The bulk order request to place
 
 
@@ -845,7 +845,7 @@ The first price levels of both bid and ask sides will be activated in the active
 - If the order request validation fails
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_req: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;
 </code></pre>
 
 
@@ -857,7 +857,6 @@ The first price levels of both bid and ask sides will be activated in the active
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
-    ascending_id_generator: &<b>mut</b> AscendingIdGenerator,
     order_req: BulkOrderRequest&lt;M&gt;
 ) : BulkOrderPlaceResponse&lt;M&gt; {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = get_account_from_order_request(&order_req);
@@ -870,19 +869,20 @@ The first price levels of both bid and ask sides will be activated in the active
             // Return rejection response for invalid sequence number
             self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, old_order); // Re-add the <b>old</b> order back since we are rejecting the new one
             <b>return</b> new_bulk_order_place_response_rejection(
+                get_sequence_number_out_of_order_rejection(),
                 std::string::utf8(b"Invalid sequence number")
             );
         };
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
         (old_order.get_order_id(), std::option::some(existing_sequence_number))
     } <b>else</b> {
-        <b>let</b> order_id = new_order_id_type(ascending_id_generator.next_ascending_id());
+        <b>let</b> order_id = new_order_id_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
         self.order_id_to_address.add(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
         (order_id, std::option::none())
     };
     <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = new_bulk_order(
         order_id,
-        new_unique_idx_type(ascending_id_generator.next_ascending_id()),
+        new_unique_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()),
         order_req,
         price_time_idx.best_bid_price(),
         price_time_idx.best_ask_price(),

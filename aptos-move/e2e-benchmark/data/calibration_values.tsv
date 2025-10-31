@@ -40,4 +40,4 @@ MapInsertRemove { len: 100, repeats: 100, map_type: SimpleMap }	9	0.984	1.008	12
 MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 4, leaf_max_degree: 4 } }	9	0.990	1.014	16142
 MapInsertRemove { len: 100, repeats: 100, map_type: BigOrderedMap { inner_max_degree: 1024, leaf_max_degree: 1024 } }	9	0.988	1.005	5039.5
 MapInsertRemove { len: 1000, repeats: 100, map_type: OrderedMap }	9	0.990	1.028	17937.3
-OrderBook { state: OrderBookState { order_idx: 0 }, num_markets: 1, overlap_ratio: 0.0, buy_frequency: 0.5, max_sell_size: 1, max_buy_size: 1 }	9	0.990	1.012	324.9
+OrderBook { state: OrderBookState { order_idx: 0 }, num_markets: 1, overlap_ratio: 0.0, buy_frequency: 0.5, max_sell_size: 1, max_buy_size: 1 }	9	0.900	1.100	177.0

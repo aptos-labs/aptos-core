@@ -80,14 +80,15 @@ Returns:
     metadata: M,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;OrderIdType&gt; {
-    <b>if</b> (!callbacks.validate_bulk_order_placement(
+    <b>let</b> validation_result = callbacks.validate_bulk_order_placement(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         bid_prices,
         bid_sizes,
         ask_prices,
         ask_sizes,
         metadata,
-    )) {
+    );
+    <b>if</b> (!validation_result.is_validation_result_valid()) {
         // If the bulk order is not valid, emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> and <b>return</b> without placing the order.
         market.emit_event_for_bulk_order_rejected(
             sequence_number,
@@ -97,6 +98,8 @@ Returns:
             ask_prices,
             ask_sizes,
             std::string::utf8(b"validation failed"),
+            get_validation_failed_rejection(),
+            validation_result.get_validation_failure_reason().destroy_some(),
         );
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
@@ -109,10 +112,10 @@ Returns:
         ask_sizes,
         metadata,
     );
-    <b>let</b> (request_option, request_rejection_reason_option) = destroy_bulk_order_request_response(request_response);
+    <b>let</b> (request_option, request_rejection_reason, rejection_details) = destroy_bulk_order_request_response(request_response);
     <b>if</b> (request_option.is_none()) {
         // Bulk order request creation failed - emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
-        <b>let</b> rejection_reason = request_rejection_reason_option.destroy_some();
+        <b>let</b> rejection_reason = request_rejection_reason.destroy_some();
         market.emit_event_for_bulk_order_rejected(
             sequence_number,
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -121,6 +124,7 @@ Returns:
             ask_prices,
             ask_sizes,
             rejection_reason,
+            rejection_details.destroy_some(),
         );
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
@@ -142,7 +146,7 @@ Returns:
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
     } <b>else</b> {
         // Handle rejection from order book - emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
-        <b>let</b> rejection_reason = destroy_bulk_order_place_reject_response(response);
+        <b>let</b> (rejection_reason, details) = destroy_bulk_order_place_reject_response(response);
         market.emit_event_for_bulk_order_rejected(
             sequence_number,
             <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -151,6 +155,7 @@ Returns:
             ask_prices,
             ask_sizes,
             rejection_reason,
+            details
         );
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }

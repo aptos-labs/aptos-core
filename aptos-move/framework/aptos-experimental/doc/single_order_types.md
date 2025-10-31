@@ -798,7 +798,7 @@
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
+<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;): (<b>address</b>, <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
 </code></pre>
 
 
@@ -807,7 +807,7 @@
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b> <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_single_order">destroy_single_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;
 ): (
     <b>address</b>, OrderIdType, Option&lt;String&gt;, UniqueIdxType, u64, u64, u64, bool, Option&lt;TriggerCondition&gt;, TimeInForce, M

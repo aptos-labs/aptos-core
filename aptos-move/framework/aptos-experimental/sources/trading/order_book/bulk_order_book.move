@@ -47,19 +47,22 @@ module aptos_experimental::bulk_order_book {
     #[test_only] friend aptos_experimental::bulk_order_book_tests;
 
     use aptos_framework::big_ordered_map::BigOrderedMap;
+    use aptos_framework::transaction_context;
     use aptos_experimental::order_book_types::ActiveMatchedOrder;
     use aptos_experimental::order_book_types;
     use aptos_experimental::bulk_order_book_types::{
         BulkOrder, BulkOrderPlaceResponse, BulkOrderRequest,
         new_bulk_order_match, new_bulk_order, new_bulk_order_place_response_success,
         new_bulk_order_place_response_rejection, get_account_from_order_request,
-        get_sequence_number_from_order_request, get_sequence_number_from_bulk_order
+        get_sequence_number_from_order_request, get_sequence_number_from_bulk_order,
+        get_sequence_number_out_of_order_rejection
     };
     use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_type};
     use aptos_experimental::order_book_types::{
         OrderIdType,
-        AscendingIdGenerator, new_order_id_type, new_unique_idx_type
+        new_order_id_type, new_unique_idx_type
     };
+
     // Error codes for various failure scenarios
     const EORDER_ALREADY_EXISTS: u64 = 1;
     const EPOST_ONLY_FILLED: u64 = 2;
@@ -334,7 +337,6 @@ module aptos_experimental::bulk_order_book {
     /// # Arguments:
     /// - `self`: Mutable reference to the bulk order book
     /// - `price_time_idx`: Mutable reference to the price time index
-    /// - `ascending_id_generator`: Mutable reference to the ascending id generator
     /// - `order_req`: The bulk order request to place
     ///
     /// # Aborts:
@@ -342,7 +344,6 @@ module aptos_experimental::bulk_order_book {
     public(friend) fun place_bulk_order<M: store + copy + drop>(
         self: &mut BulkOrderBook<M>,
         price_time_idx: &mut aptos_experimental::price_time_index::PriceTimeIndex,
-        ascending_id_generator: &mut AscendingIdGenerator,
         order_req: BulkOrderRequest<M>
     ) : BulkOrderPlaceResponse<M> {
         let account = get_account_from_order_request(&order_req);
@@ -355,19 +356,20 @@ module aptos_experimental::bulk_order_book {
                 // Return rejection response for invalid sequence number
                 self.orders.add(account, old_order); // Re-add the old order back since we are rejecting the new one
                 return new_bulk_order_place_response_rejection(
+                    get_sequence_number_out_of_order_rejection(),
                     std::string::utf8(b"Invalid sequence number")
                 );
             };
             cancel_active_orders(price_time_idx, &old_order);
             (old_order.get_order_id(), std::option::some(existing_sequence_number))
         } else {
-            let order_id = new_order_id_type(ascending_id_generator.next_ascending_id());
+            let order_id = new_order_id_type(transaction_context::monotonically_increasing_counter());
             self.order_id_to_address.add(order_id, account);
             (order_id, std::option::none())
         };
         let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = new_bulk_order(
             order_id,
-            new_unique_idx_type(ascending_id_generator.next_ascending_id()),
+            new_unique_idx_type(transaction_context::monotonically_increasing_counter()),
             order_req,
             price_time_idx.best_bid_price(),
             price_time_idx.best_ask_price(),
