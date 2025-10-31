@@ -1,0 +1,9 @@
+processed 3 tasks
+task 0 lines 1-18:  publish [module 0x22::test]
+task 1 lines 20-20:  run --verbose 0x22::test::store --signers 0x22
+task 2 lines 22-22:  run --verbose 0x22::test::move_from_generic_instr --args @0x22 --display-trace
+instructions: 4
+branches: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::move_from_generic_instr
+return values: 42

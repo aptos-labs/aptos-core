@@ -109,7 +109,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768u16;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -117,7 +117,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768u32;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -125,7 +125,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768u64;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -133,7 +133,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768u128;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -141,7 +141,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768u256;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -151,7 +151,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768i32;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -159,7 +159,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768i64;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -167,7 +167,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768i128;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -175,7 +175,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 32768i256;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -185,7 +185,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -32769i32;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -193,7 +193,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -32769i64;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -201,7 +201,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -32769i128;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }
 
@@ -209,6 +209,6 @@ fun main() {
 script {
 fun main() {
    let v0 = -32769i256;
-   let v2 = v0 as i16; // expect to abort
+   let _v2 = v0 as i16; // expect to abort
 }
 }

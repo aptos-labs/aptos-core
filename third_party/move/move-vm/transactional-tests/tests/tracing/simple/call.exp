@@ -1,0 +1,22 @@
+processed 3 tasks
+task 0 lines 1-29:  publish [module 0x22::test]
+task 1 lines 31-31:  run --verbose 0x22::test::call_instr --args 10u64 --display-trace
+instructions: 19
+branches: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::call_instr
+return values: 1100
+task 2 lines 33-33:  run --verbose 0x22::test::call_instr --args 0u64 --display-trace
+instructions: 16
+branches: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::call_instr
+Error: Function execution failed with VMError: {
+    message: Division by zero,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(1), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [(Some(ModuleId { address: 0000000000000000000000000000000000000000000000000000000000000022, name: Identifier("test") }), FunctionDefinitionIndex(3), 5)] }),
+}

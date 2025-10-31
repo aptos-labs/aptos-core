@@ -176,6 +176,17 @@ pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static TRACE_REPLAY_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "user_txn_trace_replay_seconds",
+        // metric description
+        "The time spent when replaying trace for async paranoid checks",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
 pub static DEPENDENCY_WAIT_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     register_histogram!(
         "aptos_execution_dependency_wait",

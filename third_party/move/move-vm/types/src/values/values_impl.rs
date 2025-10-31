@@ -2158,6 +2158,20 @@ impl Locals {
         )))
     }
 
+    /// Constructs values from the specified value vector, extending it to the desired number of
+    /// locals by adding additional invalid variants.
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub fn new_from(mut values: Vec<Value>, n: usize) -> PartialVMResult<Self> {
+        let num_invalid_locals = n.checked_sub(values.len()).ok_or_else(|| {
+            PartialVMError::new_invariant_violation("Cannot create locals: too many values")
+        })?;
+        values.reserve(num_invalid_locals);
+        for _ in 0..num_invalid_locals {
+            values.push(Value::Invalid);
+        }
+        Ok(Self(Rc::new(RefCell::new(values))))
+    }
+
     #[cfg_attr(feature = "inline-locals", inline(always))]
     pub fn copy_loc(&self, idx: usize) -> PartialVMResult<Value> {
         let locals = self.0.borrow();
