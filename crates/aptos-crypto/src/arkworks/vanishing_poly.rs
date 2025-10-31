@@ -21,7 +21,7 @@ fn compute_product<F: FftField>(roots: &[F]) -> DensePolynomial<F> {
             let mid = roots.len() / 2;
             let left = compute_product(&roots[..mid]);
             let right = compute_product(&roots[mid..]);
-            &left * &right
+            &left * &right // This uses FftField
         },
     }
 }

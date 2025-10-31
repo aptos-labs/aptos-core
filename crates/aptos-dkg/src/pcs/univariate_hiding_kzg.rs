@@ -246,7 +246,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 /// The MSM evaluation is then performed using `E::G1::msm()`.
 ///
 /// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,

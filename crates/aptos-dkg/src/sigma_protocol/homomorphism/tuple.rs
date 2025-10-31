@@ -27,7 +27,7 @@ use std::fmt::Debug;
 ///
 /// In category-theoretic terms, this is the composition of the diagonal map
 /// `Δ: Domain -> Domain × Domain` with the product map `h1 × h2`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait,
@@ -35,29 +35,6 @@ where
 {
     pub hom1: H1,
     pub hom2: H2,
-}
-
-// For serde the following impl would take one line: https://serde.rs/container-attrs.html#bound
-// Alternatively, could just add CanonicalSerialize to `homomorphism::Trait` and
-// add #[derive(CanonicalSerialize)] to `TupleHomomorphism`
-impl<H1, H2> CanonicalSerialize for TupleHomomorphism<H1, H2>
-where
-    H1: homomorphism::Trait + CanonicalSerialize,
-    H2: homomorphism::Trait<Domain = H1::Domain> + CanonicalSerialize,
-{
-    fn serialize_with_mode<W: Write>(
-        &self,
-        mut writer: W,
-        compress: Compress,
-    ) -> Result<(), SerializationError> {
-        self.hom1.serialize_with_mode(&mut writer, compress)?;
-        self.hom2.serialize_with_mode(&mut writer, compress)?;
-        Ok(())
-    }
-
-    fn serialized_size(&self, compress: Compress) -> usize {
-        self.hom1.serialized_size(compress) + self.hom2.serialized_size(compress)
-    }
 }
 
 /// Implements `Homomorphism` for `TupleHomomorphism` by applying both
