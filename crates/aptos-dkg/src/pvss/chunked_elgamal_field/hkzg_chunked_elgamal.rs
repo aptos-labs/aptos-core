@@ -34,8 +34,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
-        G_1: &'a E::G1Affine,
-        H_1: &'a E::G1Affine,
+        pp: &'a chunked_elgamal::PublicParameters<E>,
         eks: &'a [E::G1Affine],
     ) -> Self {
         let lifted_kzg = LiftedKZG::<E> {
@@ -56,7 +55,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             },
         };
         let lifted_chunked_elgamal = LiftedChunkedElGamal::<E> {
-            hom: chunked_elgamal::Homomorphism { G_1, H_1, eks },
+            hom: chunked_elgamal::Homomorphism { pp, eks },
             projection: |dom: &HkzgElgamalWitness<E>| {
                 let HkzgElgamalWitness {
                     chunked_plaintexts,
