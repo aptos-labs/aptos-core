@@ -3,18 +3,17 @@
 
 mod model_ast_lints;
 mod stackless_bytecode_lints;
-pub mod temp_equivalence_analyzer;
 mod utils;
-
 use move_compiler_v2::external_checks::{ExpChecker, ExternalChecks, StacklessBytecodeChecker};
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Holds collection of lint checks for Move.
-pub struct MoveLintChecks {
+pub struct SecurityChecks {
     config: BTreeMap<String, String>,
 }
 
-impl ExternalChecks for MoveLintChecks {
+impl ExternalChecks for SecurityChecks {
     fn get_exp_checkers(&self) -> Vec<Box<dyn ExpChecker>> {
         model_ast_lints::get_default_linter_pipeline(&self.config)
     }
@@ -24,7 +23,7 @@ impl ExternalChecks for MoveLintChecks {
     }
 }
 
-impl MoveLintChecks {
+impl SecurityChecks {
     /// Make an instance of lint checks for Move, provided as `ExternalChecks`.
     /// Will panic if the configuration is not valid.
     pub fn make(config: BTreeMap<String, String>) -> Arc<dyn ExternalChecks> {
@@ -40,6 +39,6 @@ impl MoveLintChecks {
         if !matches!(checks_value.as_str(), "default" | "strict" | "experimental") {
             panic!("Invalid value for `checks` key in the config, expected one of: `default`, `strict`, or `experimental`");
         }
-        Arc::new(MoveLintChecks { config })
+        Arc::new(SecurityChecks { config })
     }
 }
