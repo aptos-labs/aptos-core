@@ -336,6 +336,10 @@ impl BufferManager {
         let block_id = vote.commit_info().id();
         let round = vote.commit_info().round();
 
+        // Don't need to store commit vote if we have already committed up to that round
+        if round <= self.highest_committed_round {
+            true
+        } else
         // Store the commit vote only if it is for one of the next 100 rounds.
         if round > self.highest_committed_round
             && self.highest_committed_round + self.max_pending_rounds_in_commit_vote_cache > round
