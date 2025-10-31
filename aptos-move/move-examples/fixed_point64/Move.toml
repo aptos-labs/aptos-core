@@ -8,9 +8,7 @@ fixed_point64 = "0xdeadbeef"
 
 [dev-addresses]
 
-[dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-framework.git"
-rev = "mainnet"
-subdir = "aptos-framework"
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
 
 [dev-dependencies]
