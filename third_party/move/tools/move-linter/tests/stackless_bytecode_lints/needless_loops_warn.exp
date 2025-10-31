@@ -1,0 +1,112 @@
+
+Diagnostics:
+warning: [lint] Use the more explicit `loop` instead.
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:27:9
+   │
+27 │         loop { if (true) { return 1 } else { return 2 } }
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(while_true)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#while_true.
+
+warning: [lint] Use the more explicit `loop` instead.
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:31:9
+   │
+31 │         loop { if (true) { abort 1 } else { abort 2 } }
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(while_true)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#while_true.
+
+warning: This assignment/binding to the left-hand-side variable `x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_x`), or renaming to `_`
+  ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:4:17
+  │
+4 │         let x = 1;
+  │                 ^
+
+warning: [lint] Needless loop: this loop always returns on first iteration, consider removing the loop
+  ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:6:13
+  │
+6 │             break
+  │             ^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always returns on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:12:13
+   │
+12 │             return 42
+   │             ^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always aborts on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:18:13
+   │
+18 │             abort 1
+   │             ^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always breaks on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:23:16
+   │
+23 │         loop { if (cond) { break } else { break } };
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always returns on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:27:16
+   │
+27 │         loop { if (true) { return 1 } else { return 2 } }
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always aborts on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:31:16
+   │
+31 │         loop { if (true) { abort 1 } else { abort 2 } }
+   │                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always returns on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:38:13
+   │
+38 │             break;
+   │             ^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always breaks on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:46:13
+   │
+46 │ ╭             if (cond) {
+47 │ │                 x = x + 1;
+48 │ │                 break;
+49 │ │             } else {
+50 │ │                 x = x + 2;
+51 │ │                 break;
+52 │ │             }
+   │ ╰─────────────^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
+
+warning: [lint] Needless loop: this loop always breaks on first iteration, consider removing the loop
+   ┌─ tests/stackless_bytecode_lints/needless_loops_warn.move:60:13
+   │
+60 │             if (i > 5) break;
+   │             ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(needless_loops)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#needless_loops.
