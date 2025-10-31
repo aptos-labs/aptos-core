@@ -3,7 +3,6 @@
 
 use aptos_crypto::{
     arkworks::{
-        hashing,
         serialization::{ark_de, ark_se},
     },
     CryptoMaterialError, Uniform, ValidCryptoMaterial,
@@ -43,14 +42,13 @@ impl<E: Pairing> TryFrom<&[u8]> for EncryptPubKey<E> {
     }
 }
 
-// impl<E: Pairing> EncryptPubKey<E> {
-//     /// Serializes an encryption key.
-//     pub fn to_bytes(&self) -> Vec<u8> {
-//         let mut bytes = Vec::new();
-//         self.ek.serialize_compressed(&mut bytes).unwrap();
-//         bytes
-//     }
-// }
+/// The *decryption (secret) key* used by each PVSS player to decrypt their share of the dealt secret.
+#[allow(dead_code)]
+#[derive(SilentDisplay, SilentDebug)]
+pub struct DecryptPrivKey<E: Pairing> {
+    /// A scalar $dk \in F$.
+    pub(crate) dk: E::ScalarField,
+}
 
 impl<E: Pairing> Uniform for DecryptPrivKey<E> {
     fn generate<R>(_rng: &mut R) -> Self
@@ -62,11 +60,3 @@ impl<E: Pairing> Uniform for DecryptPrivKey<E> {
         }
     }
 }
-
-/// The *decryption (secret) key* used by each PVSS player to decrypt their share of the dealt secret.
-#[derive(SilentDisplay, SilentDebug)]
-pub struct DecryptPrivKey<E: Pairing> {
-    /// A scalar $dk \in F$.
-    pub(crate) dk: E::ScalarField,
-}
-

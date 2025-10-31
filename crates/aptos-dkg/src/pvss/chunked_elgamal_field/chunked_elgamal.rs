@@ -5,12 +5,12 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
     Scalar,
 };
+use aptos_crypto::arkworks::hashing;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
-use aptos_crypto::arkworks::hashing;
 
 pub const DST_PVSS_PUBLIC_PARAMS: &[u8; 30] = b"APTOS_CHUNKED_ELGAMAL_PVSS_DST";
 
