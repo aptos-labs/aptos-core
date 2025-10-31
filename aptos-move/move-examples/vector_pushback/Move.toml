@@ -7,7 +7,7 @@ authors = []
 
 [dev-addresses]
 
-[dependencies.AptosFramework]
-local = "../../framework/aptos-framework/"
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
 
 [dev-dependencies]
