@@ -97,7 +97,6 @@ Returns:
             bid_sizes,
             ask_prices,
             ask_sizes,
-            std::string::utf8(b"validation failed"),
             get_validation_failed_rejection(),
             validation_result.get_validation_failure_reason().destroy_some(),
         );

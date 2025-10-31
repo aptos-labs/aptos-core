@@ -1098,11 +1098,13 @@
 
 </dd>
 <dt>
-<<<<<<< HEAD
 <code>ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-=======
+</dt>
+<dd>
+
+</dd>
+<dt>
 <code>reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a></code>
->>>>>>> main
 </dt>
 <dd>
 
@@ -2777,11 +2779,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 
 
 
-<<<<<<< HEAD
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_rejected">emit_event_for_bulk_order_rejected</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, sequence_number: u64, user: <b>address</b>, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
-=======
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_rejected">emit_event_for_bulk_order_rejected</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, sequence_number: u64, user: <b>address</b>, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>, details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
->>>>>>> main
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_rejected">emit_event_for_bulk_order_rejected</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, sequence_number: u64, user: <b>address</b>, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>, details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
 </code></pre>
 
 
@@ -2797,11 +2795,8 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-<<<<<<< HEAD
     ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-=======
     reason: BulkOrderRejection,
->>>>>>> main
     details: std::string::String,
 ) {
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
@@ -2815,11 +2810,8 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
                 bid_prices,
                 bid_sizes,
                 ask_prices,
-<<<<<<< HEAD
                 ask_sizes,
-=======
                 reason,
->>>>>>> main
                 details,
             }
         );
