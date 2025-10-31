@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Auxiliary function for lagrange interpolation
+//! Auxiliary function for Lagrange interpolation
 
 use ark_ff::FftField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
@@ -53,7 +53,9 @@ fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
 }
 
 /// Given a multiplication tree `mult_tree` (as produced by `compute_mult_tree()`), this function
-/// returns the product of all leaf polynomials **except** the one at `divisor_index`.
+/// returns the product of all leaf polynomials **except** the one at `divisor_index`. Will be used
+/// for evaluation proofs in the future.
+#[cfg(test)]
 pub fn quotient<F: FftField>(
     mult_tree: &[Vec<DensePolynomial<F>>],
     divisor_index: usize,

@@ -38,7 +38,8 @@ where
 }
 
 // For serde the following impl would take one line: https://serde.rs/container-attrs.html#bound
-// Alternatively, could just add CanonicalSerialize to `homomorphism::Trait`
+// Alternatively, could just add CanonicalSerialize to `homomorphism::Trait` and
+// add #[derive(CanonicalSerialize)] to `TupleHomomorphism`
 impl<H1, H2> CanonicalSerialize for TupleHomomorphism<H1, H2>
 where
     H1: homomorphism::Trait + CanonicalSerialize,
@@ -83,7 +84,7 @@ where
 /// A wrapper to combine the codomain shapes of two homomorphisms into a single type.
 ///
 /// This is necessary because Rust tuples do **not** inherit traits like `IntoIterator`,
-/// but `FixedBaseMsms::CodomainShape<T>` require them.
+/// but `fixed_base_msms::CodomainShape<T>` requires them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TupleCodomainShape<A, B>(pub A, pub B);
 
@@ -208,8 +209,8 @@ where
 
 impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
 where
-    H1: sigma_protocol::Trait<E> + CanonicalSerialize,
-    H2: sigma_protocol::Trait<E> + CanonicalSerialize,
+    H1: sigma_protocol::Trait<E>,
+    H2: sigma_protocol::Trait<E>,
     H2: Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
 {
     fn dst(&self) -> Vec<u8> {
