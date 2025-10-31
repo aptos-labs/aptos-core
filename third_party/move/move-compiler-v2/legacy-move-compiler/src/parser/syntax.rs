@@ -30,7 +30,7 @@ impl<'env, 'lexer, 'input> Context<'env, 'lexer, 'input> {
 
 // Internal complier variables used to represent `for` loops.
 pub const FOR_LOOP_UPDATE_ITER_FLAG: &str = "__update_iter_flag";
-const FOR_LOOP_UPPER_BOUND_VALUE: &str = "__upper_bound_value";
+pub const FOR_LOOP_UPPER_BOUND_VALUE: &str = "__upper_bound_value";
 
 //**************************************************************************************************
 // Error Handling
@@ -1583,10 +1583,10 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
 
     // To create the declaration "let flag = false", first create the variable flag, and then assign it to false
     let flag_symb = Symbol::from(FOR_LOOP_UPDATE_ITER_FLAG);
-    let flag = sp(for_loc, vec![sp(
+    let flag = sp(
         for_loc,
-        Bind_::Var(Var(sp(for_loc, flag_symb))),
-    )]);
+        vec![sp(for_loc, Bind_::Var(Var(sp(for_loc, flag_symb))))],
+    );
     let false_exp = sp(for_loc, Exp_::Value(sp(for_loc, Value_::Bool(false))));
     let decl_flag = sp(
         for_loc,
@@ -1596,10 +1596,10 @@ fn parse_for_loop(context: &mut Context) -> Result<(Exp, bool), Box<Diagnostic>>
     // To create the declaration "let ub_value = upper_bound", first create the variable flag, and
     // then assign it to upper_bound
     let ub_value_symbol = Symbol::from(FOR_LOOP_UPPER_BOUND_VALUE);
-    let ub_value_bindlist = sp(for_loc, vec![sp(
+    let ub_value_bindlist = sp(
         for_loc,
-        Bind_::Var(Var(sp(for_loc, ub_value_symbol))),
-    )]);
+        vec![sp(for_loc, Bind_::Var(Var(sp(for_loc, ub_value_symbol))))],
+    );
     let ub_value_assignment = sp(
         for_loc,
         SequenceItem_::Bind(ub_value_bindlist, None, Box::new(ub)),
