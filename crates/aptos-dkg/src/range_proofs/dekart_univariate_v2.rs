@@ -105,10 +105,10 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
         let first_h_denom_eval_as_u32 = arkworks::scalar_to_u32(&first_h_denom_eval)
             .expect("first_h_denom_eval did not fit in u32!");
 
-        let powers_of_two = arkworks::powers_of_two::<E>(powers_len);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(powers_len);
 
         let max_n = floored_triangular_root(first_h_denom_eval_as_u32 as usize);
-        let roots_of_unity = arkworks::compute_roots_of_unity::<E>(max_n);
+        let roots_of_unity = arkworks::compute_roots_of_unity::<E::ScalarField>(max_n);
         let h_denom_eval = compute_h_denom_eval::<E>(&roots_of_unity);
 
         Ok(Self {
@@ -168,8 +168,8 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
         let num_omegas = usize::deserialize_with_mode(&mut reader, compress, validate)?;
         let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
-        let roots_of_unity = arkworks::compute_roots_of_unity::<E>(num_omegas);
-        let powers_of_two = arkworks::powers_of_two::<E>(max_ell);
+        let roots_of_unity = arkworks::compute_roots_of_unity::<E::ScalarField>(num_omegas);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell);
 
         // Reconstruct the VerificationKey
         Ok(Self {
@@ -242,7 +242,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
-        let powers_of_two = arkworks::powers_of_two::<E>(max_ell);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell);
 
         let prover_precomputed = ProverPrecomputed {
             powers_of_two: powers_of_two.clone(),

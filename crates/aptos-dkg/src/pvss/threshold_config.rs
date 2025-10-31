@@ -56,12 +56,7 @@ impl ThresholdConfigBlstrs {
             batch_dom,
         })
     }
-
-    /// Returns the threshold $t$. Recall that $\ge t$ shares are needed to reconstruct.
-    pub fn get_threshold(&self) -> usize {
-        self.t
-    }
-
+    
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
         &self.batch_dom
     }
@@ -106,6 +101,13 @@ impl traits::SecretSharingConfig for ThresholdConfigBlstrs {
 
     fn get_total_num_shares(&self) -> usize {
         self.n
+    }
+}
+
+impl traits::ThresholdConfig for ThresholdConfigBlstrs {
+    /// Returns the threshold $t$. Recall that $\ge t$ shares are needed to reconstruct.
+    fn get_threshold(&self) -> usize {
+        self.t
     }
 }
 

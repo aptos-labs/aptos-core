@@ -48,7 +48,8 @@ impl<E: Pairing> traits::Convert<EncryptPubKey<E>, PublicParameters<E>> for Decr
     }
 }
 
-// TODO: make the G_1 of pp_elgamal and pk_range_proof agree????? hmm no sigma protocol is used for that
+
+// TODO: make the G_1 of pp_elgamal and pk_range_proof agree????? hmm no... sigma protocol is used for that
 #[derive(CanonicalSerialize, Serialize, CanonicalDeserialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {

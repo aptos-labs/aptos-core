@@ -22,6 +22,12 @@ use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{rand::Rng, UniformRand};
 pub use utils::random::DST_RAND_CORE_HELL;
+use more_asserts::assert_le;
+use more_asserts::assert_ge;
+use crate::pvss::traits;
+use aptos_crypto::arkworks::shamir::ThresholdConfig;
+use crate::pvss::Player;
+use aptos_crypto::arkworks::shamir::ShamirShare;
 
 pub mod algebra;
 pub(crate) mod fiat_shamir;
@@ -47,7 +53,7 @@ pub mod weighted_vuf;
 /// `E::ScalarField`.
 #[repr(transparent)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Scalar<E: Pairing>(pub E::ScalarField);
+pub struct Scalar<E: Pairing>(pub E::ScalarField); // TODO: Maybe this should be  Scalar<F: PrimeField> ??
 
 impl<E: Pairing> Scalar<E> {
     /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]`; could do this without copying
@@ -78,5 +84,28 @@ impl<E: Pairing> Scalar<E> {
 impl<E: Pairing> Scalar<E> {
     pub fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
         Scalar(E::ScalarField::rand(rng))
+    }
+}
+
+impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Scalar<E> {
+    type Share = Scalar<E>;
+
+    fn reconstruct(
+        sc: &ThresholdConfig<E::ScalarField>,
+        shares: &Vec<(Player, Self::Share)>
+    ) -> Self {
+        assert_ge!(shares.len(), sc.get_threshold());
+        assert_le!(shares.len(), sc.get_total_num_players());
+
+        // Convert shares to a Vec of ShamirShare // TODO: get rid of this?
+        let shamir_shares: Vec<ShamirShare<E::ScalarField>> = shares
+            .iter()
+            .map(|(p, share)| ShamirShare {
+                x: E::ScalarField::from(p.id as u64),
+                y: share.0,
+            })
+            .collect();
+
+        Scalar(sc.reconstruct(&shamir_shares).unwrap())
     }
 }

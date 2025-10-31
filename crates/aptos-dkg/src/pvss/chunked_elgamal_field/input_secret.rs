@@ -16,13 +16,29 @@ use num_traits::Zero;
 /// and (2) deals it via the PVSS. If the validator crashes during dealing, the entire task will be
 /// restarted with a freshly-generated input secret.
 /// 
-use derive_more::{Add, AddAssign, Display, From, Into};
+use derive_more::{Add, Display, From, Into};
 use ark_ec::AdditiveGroup;
 
-#[derive(SilentDebug, SilentDisplay, PartialEq, Add, AddAssign)]
+#[derive(SilentDebug, SilentDisplay, PartialEq, Add)]
 pub struct InputSecret<F: ark_ff::Field> {
     /// The actual secret being dealt; a scalar $a \in F$.
     a: F,
+}
+
+impl<F: ark_ff::Field> Uniform for InputSecret<F> {
+    fn generate<R>(rng: &mut R) -> Self
+    where
+        R: rand::RngCore + rand::CryptoRng,
+    {
+
+        Self { a: F::rand(&mut ark_std::rand::thread_rng()) } // Workaround because rand versions differ
+    }
+}
+
+impl<F: ark_ff::Field> AddAssign<&InputSecret<F>> for InputSecret<F> {
+    fn add_assign(&mut self, other: &InputSecret<F>) {
+        self.a += other.a;
+    }
 }
 
 impl<F: ark_ff::Field> Zero for InputSecret<F> {
@@ -65,5 +81,18 @@ impl<F: ark_ff::Field> ark_std::UniformRand for InputSecret<F> {
 //     }
 // }
 
+use crate::Scalar;
+use crate::traits::Convert;
+use crate::pvss::chunked_elgamal_field::public_parameters::PublicParameters;
+
+impl<E: Pairing> Convert<Scalar<E>, PublicParameters<E>> for InputSecret<E::ScalarField> {
+    fn to(&self, _with: &PublicParameters<E>) -> Scalar<E> {
+        Scalar(*self.get_secret_a())
+    }
+}
+
+
+
 #[cfg(test)]
 mod test {}
+

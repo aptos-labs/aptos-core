@@ -9,6 +9,14 @@ use aptos_crypto_derive::SilentDebug;
 use aptos_crypto::Uniform;
 use ark_ff::UniformRand;
 use aptos_crypto::arkworks::hashing;
+use serde::Deserialize;
+use aptos_crypto::arkworks::serialization::ark_de;
+use serde::Serialize;
+use aptos_crypto::arkworks::serialization::ark_se;
+use aptos_crypto::ValidCryptoMaterial;
+use aptos_crypto::CryptoMaterialError;
+
+
 
 pub const DST_PVSS_PUBLIC_PARAMS: &[u8; 30] = b"APTOS_CHUNKED_ELGAMAL_PVSS_DST";
 
@@ -17,17 +25,48 @@ pub const DST_PVSS_PUBLIC_PARAMS: &[u8; 30] = b"APTOS_CHUNKED_ELGAMAL_PVSS_DST";
 pub struct PublicParameters<E: Pairing> {
     /// A group element $G that is raised to the encrypted message
     pub G: E::G1Affine,
-    /// A group element $H$ that is used to exponentiate
-    /// both the (1) ciphertext randomness and the (2) the DSK when computing its EK.
+    /// A group element $H$ that is used to exponentiate both the
+    /// (1) ciphertext randomness and the (2) the DSK when computing its EK.
     pub H: E::G1Affine,
 }
 
 /// The *encryption (public)* key used to encrypt shares of the dealt secret for each PVSS player.
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct EncryptPubKey<E: Pairing> {
     /// A group element $H^{dk^{-1}} \in G_1$.
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub(crate) ek: E::G1Affine,
 }
+
+impl<E: Pairing> ValidCryptoMaterial for EncryptPubKey<E> {
+    const AIP_80_PREFIX: &'static str = "";
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        self.ek.serialize_compressed(&mut bytes).unwrap();
+        bytes
+    }
+}
+
+impl<E: Pairing> TryFrom<&[u8]> for EncryptPubKey<E> {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        let ek = <E::G1Affine as CanonicalDeserialize>::deserialize_compressed(bytes)
+            .map_err(|_| CryptoMaterialError::DeserializationError)?;
+
+        Ok(EncryptPubKey { ek })
+    }
+}
+
+// impl<E: Pairing> EncryptPubKey<E> {
+//     /// Serializes an encryption key.
+//     pub fn to_bytes(&self) -> Vec<u8> {
+//         let mut bytes = Vec::new();
+//         self.ek.serialize_compressed(&mut bytes).unwrap();
+//         bytes
+//     }
+// }
+
 
 impl<E: Pairing> Uniform for DecryptPrivKey<E> {
     fn generate<R>(_rng: &mut R) -> Self

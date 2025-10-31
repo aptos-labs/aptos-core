@@ -21,6 +21,7 @@ use aptos_dkg::{
         LowDegreeTest, WeightedConfig,
     },
 };
+use aptos_dkg::pvss::traits::ThresholdConfig;
 use criterion::{
     criterion_group, criterion_main,
     measurement::{Measurement, WallTime},

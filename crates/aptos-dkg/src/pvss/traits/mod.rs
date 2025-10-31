@@ -48,6 +48,14 @@ pub trait SecretSharingConfig: Display {
     fn get_total_num_shares(&self) -> usize;
 }
 
+/// Trait for secret sharing schemes that expose a threshold `t`.
+///
+/// This trait is required because some operations (such as those in SCRAPE LDT) need access to `t`,
+/// but not all secret sharing schemes are threshold-based.
+pub trait ThresholdConfig: SecretSharingConfig {
+    fn get_threshold(&self) -> usize;
+}
+
 impl<F: ark_ff::PrimeField> SecretSharingConfig for arkworks::shamir::ThresholdConfig<F> {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player

@@ -26,11 +26,11 @@ type LiftedKZG<'a, E> =
 type LiftedChunkedElGamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
 
-pub type HkzgChunkedElgamalHomomorphism<'a, E> =
+pub type Homomorphism<'a, E> =
     TupleHomomorphism<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
 
 #[allow(non_snake_case)]
-impl<'a, E: Pairing> HkzgChunkedElgamalHomomorphism<'a, E> {
+impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
         lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
