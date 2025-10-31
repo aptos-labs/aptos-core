@@ -113,6 +113,8 @@ fn range_batch_verify<M: Measurement>(
                     )
                     .unwrap();
 
+                    // println!("size-{} batch for {}-bits: {} bytes", batch_size, num_bits, proof.to_bytes().len());
+
                     (dst, proof.to_bytes(), comm)
                 },
                 |(dst, proof_bytes, comm)| {
@@ -129,5 +131,9 @@ fn range_batch_verify<M: Measurement>(
     );
 }
 
-criterion_group!(bulletproofs_benches, bench_group);
+criterion_group!(
+    name = bulletproofs_benches;
+    config = Criterion::default().sample_size(10);
+    //config = Criterion::default();
+    targets = bench_group);
 criterion_main!(bulletproofs_benches);
