@@ -1,4 +1,8 @@
 module aptos_experimental::market_types {
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::order_operations;
+
     use std::option;
     use std::option::Option;
     use std::signer;
@@ -6,25 +10,18 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_framework::transaction_context;
+    use aptos_experimental::bulk_order_book_types::BulkOrderRejection;
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
-
     use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
     use aptos_experimental::order_book_types::TimeInForce;
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book::{OrderBook, new_order_book};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker};
-    use aptos_experimental::order_book_types::AscendingIdGenerator;
 
-    use aptos_experimental::order_book_types::{
-        new_ascending_id_generator,
-    };
     #[test_only]
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
-
-    friend aptos_experimental::order_placement;
-    friend aptos_experimental::market_bulk_order;
-    friend aptos_experimental::order_operations;
 
     const EINVALID_ADDRESS: u64 = 1;
     const EINVALID_SETTLE_RESULT: u64 = 2;
@@ -97,7 +94,7 @@ module aptos_experimental::market_types {
     enum ValidationResult has drop, copy {
         V1 {
             // If valid this is none, else contains the reason for invalidity
-            cancellation_reason: Option<String>,
+            failure_reason: Option<String>,
         }
     }
 
@@ -115,7 +112,7 @@ module aptos_experimental::market_types {
             /// validate_settlement_update_f arguments: order_info, size
             validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
-            validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
+            validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| ValidationResult has drop + copy,
             /// place_maker_order_f arguments: order_info, size
             place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
             /// cleanup_order_f arguments: order_info, cleanup_size, is_taker
@@ -147,7 +144,7 @@ module aptos_experimental::market_types {
         cancellation_reason: Option<String>,
     ): ValidationResult {
         ValidationResult::V1 {
-            cancellation_reason,
+            failure_reason: cancellation_reason,
         }
     }
 
@@ -164,7 +161,7 @@ module aptos_experimental::market_types {
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
         settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
         validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
-        validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| bool has drop + copy,
+        validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| ValidationResult has drop + copy,
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
         cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, bool| has drop + copy,
         cleanup_bulk_order_at_price_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
@@ -200,11 +197,11 @@ module aptos_experimental::market_types {
     }
 
     public fun is_validation_result_valid(self: &ValidationResult): bool {
-        self.cancellation_reason.is_none()
+        self.failure_reason.is_none()
     }
 
-    public fun get_validation_cancellation_reason(self: &ValidationResult): Option<String> {
-        self.cancellation_reason
+    public fun get_validation_failure_reason(self: &ValidationResult): Option<String> {
+        self.failure_reason
     }
 
     public fun get_place_maker_order_actions<R: store + copy + drop>(self: &PlaceMakerOrderResult<R>): Option<R> {
@@ -270,7 +267,7 @@ module aptos_experimental::market_types {
         asks_prices: vector<u64>,
         asks_sizes: vector<u64>,
         order_metadata: M
-    ): bool {
+    ): ValidationResult {
         (self.validate_bulk_order_placement_f)(account, bids_prices, bids_sizes, asks_prices, asks_sizes, order_metadata)
     }
 
@@ -322,7 +319,6 @@ module aptos_experimental::market_types {
             parent: address,
             /// Address of the market object of this market.
             market: address,
-            order_id_generator: AscendingIdGenerator,
             // Incremental fill id for matched orders
             next_fill_id: u64,
             config: MarketConfig,
@@ -381,10 +377,10 @@ module aptos_experimental::market_types {
         order_id: u128,
         sequence_number: u64,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
         cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
@@ -402,10 +398,10 @@ module aptos_experimental::market_types {
         order_id: u128,
         sequence_number: u64,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
         cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
@@ -432,13 +428,15 @@ module aptos_experimental::market_types {
         market: address,
         sequence_number: u64,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        reason: BulkOrderRejection,
         details: std::string::String,
     }
 
+    // ============================= Public APIs ====================================
     public fun new_market_config(
         allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64
     ): MarketConfig {
@@ -463,7 +461,6 @@ module aptos_experimental::market_types {
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
-            order_id_generator: new_ascending_id_generator(),
             next_fill_id: 0,
             config,
             order_book: new_order_book(),
@@ -471,9 +468,8 @@ module aptos_experimental::market_types {
         }
     }
 
-
     public fun next_order_id<M: store + copy + drop>(self: &mut Market<M>): OrderIdType {
-        new_order_id_type(self.order_id_generator.next_ascending_id())
+        new_order_id_type(transaction_context::monotonically_increasing_counter())
     }
 
     public fun next_fill_id<M: store + copy + drop>(self: &mut Market<M>): u64 {
@@ -486,20 +482,8 @@ module aptos_experimental::market_types {
         &self.order_book
     }
 
-    public fun get_order_book_mut<M: store + copy + drop>(
-        self: &mut Market<M>
-    ): &mut OrderBook<M> {
-        &mut self.order_book
-    }
-
     public fun get_market_address<M: store + copy + drop>(self: &Market<M>): address {
         self.market
-    }
-
-    public fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
-        self: &mut Market<M>
-    ): &mut PreCancellationTracker {
-        self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
     }
 
     public fun best_bid_price<M: store + copy + drop>(self: &Market<M>): Option<u64> {
@@ -636,10 +620,10 @@ module aptos_experimental::market_types {
         order_id: OrderIdType,
         sequence_number: u64,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
         cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
@@ -655,10 +639,10 @@ module aptos_experimental::market_types {
                     order_id: order_id.get_order_id_value(),
                     sequence_number,
                     user,
-                    bid_sizes,
                     bid_prices,
-                    ask_sizes,
+                    bid_sizes,
                     ask_prices,
+                    ask_sizes,
                     cancelled_bid_prices,
                     cancelled_bid_sizes,
                     cancelled_ask_prices,
@@ -674,10 +658,10 @@ module aptos_experimental::market_types {
         order_id: OrderIdType,
         sequence_number: u64,
         user: address,
-        cancelled_bid_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -688,10 +672,10 @@ module aptos_experimental::market_types {
                     order_id: order_id.get_order_id_value(),
                     sequence_number,
                     user,
-                    bid_sizes: vector[],
                     bid_prices: vector[],
-                    ask_sizes: vector[],
+                    bid_sizes: vector[],
                     ask_prices: vector[],
+                    ask_sizes: vector[],
                     cancelled_bid_prices,
                     cancelled_bid_sizes,
                     cancelled_ask_prices,
@@ -735,10 +719,10 @@ module aptos_experimental::market_types {
         order_id: OrderIdType,
         sequence_number: u64,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
         cancelled_bid_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
         cancelled_ask_sizes: vector<u64>,
@@ -753,10 +737,10 @@ module aptos_experimental::market_types {
                     order_id: order_id.get_order_id_value(),
                     sequence_number,
                     user,
-                    bid_sizes,
                     bid_prices,
-                    ask_sizes,
+                    bid_sizes,
                     ask_prices,
+                    ask_sizes,
                     cancelled_bid_prices,
                     cancelled_bid_sizes,
                     cancelled_ask_prices,
@@ -771,10 +755,11 @@ module aptos_experimental::market_types {
         self: &Market<M>,
         sequence_number: u64,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
+        reason: BulkOrderRejection,
         details: std::string::String,
     ) {
         // Final check whether event sending is enabled
@@ -785,15 +770,28 @@ module aptos_experimental::market_types {
                     market: self.market,
                     sequence_number,
                     user,
-                    bid_sizes,
                     bid_prices,
-                    ask_sizes,
+                    bid_sizes,
                     ask_prices,
+                    ask_sizes,
+                    reason,
                     details,
                 }
             );
         };
     }
+
+    // ============================= Public Package APIs ====================================
+    public(friend) fun get_order_book_mut<M: store + copy + drop>(self: &mut Market<M>): &mut OrderBook<M> {
+        &mut self.order_book
+    }
+
+    public(friend) fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
+        self: &mut Market<M>
+    ): &mut PreCancellationTracker {
+        self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
+    }
+
 
     // ============================= test_only APIs ====================================
     #[test_only]
@@ -801,7 +799,6 @@ module aptos_experimental::market_types {
         let Market::V1 {
             parent: _parent,
             market: _market,
-            order_id_generator: _order_id_generator,
             next_fill_id: _next_fill_id,
             config,
             order_book,
@@ -857,10 +854,10 @@ module aptos_experimental::market_types {
         order_id: OrderIdType,
         market: address,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
+        ask_sizes: vector<u64>,
     ) {
         assert!(self.order_id == order_id.get_order_id_value());
         assert!(self.market == market);
@@ -898,14 +895,14 @@ module aptos_experimental::market_types {
         sequence_number: u64,
         market: address,
         user: address,
-        bid_sizes: vector<u64>,
         bid_prices: vector<u64>,
-        ask_sizes: vector<u64>,
+        bid_sizes: vector<u64>,
         ask_prices: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
+        ask_sizes: vector<u64>,
         cancelled_bid_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
+        cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
+        cancelled_ask_sizes: vector<u64>,
         previous_seq_num: u64,
     ) {
         assert!(self.order_id == order_id.get_order_id_value());

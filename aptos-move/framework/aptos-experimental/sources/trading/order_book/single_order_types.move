@@ -11,8 +11,7 @@ module aptos_experimental::single_order_types {
     friend aptos_experimental::pending_order_book_index;
     friend aptos_experimental::order_placement;
     friend aptos_experimental::order_book;
-    friend aptos_experimental::bulk_order_book;
-    friend aptos_experimental::bulk_order_book_types;
+    friend aptos_experimental::order_operations;
 
     const EORDER_ALREADY_EXISTS: u64 = 1;
     const EINVALID_TRIGGER_CONDITION: u64 = 2;
@@ -75,35 +74,35 @@ module aptos_experimental::single_order_types {
         }
     }
 
-    public fun new_order_with_state<M: store + copy + drop>(
+    public(friend) fun new_order_with_state<M: store + copy + drop>(
         order: SingleOrder<M>, is_active: bool
     ): OrderWithState<M> {
         OrderWithState::V1 { order, is_active }
     }
 
-    public fun get_order_from_state<M: store + copy + drop>(
+    public(friend) fun get_order_from_state<M: store + copy + drop>(
         self: &OrderWithState<M>
     ): &SingleOrder<M> {
         &self.order
     }
 
-    public fun get_metadata_from_state<M: store + copy + drop>(
+    public(friend) fun get_metadata_from_state<M: store + copy + drop>(
         self: &OrderWithState<M>
     ): M {
         self.order.metadata
     }
 
-    public fun set_metadata_in_state<M: store + copy + drop>(
+    public(friend) fun set_metadata_in_state<M: store + copy + drop>(
         self: &mut OrderWithState<M>, metadata: M
     ) {
         self.order.metadata = metadata;
     }
 
-    public fun get_order_id<M: store + copy + drop>(self: &SingleOrder<M>): OrderIdType {
+    public(friend) fun get_order_id<M: store + copy + drop>(self: &SingleOrder<M>): OrderIdType {
         self.order_id
     }
 
-    public fun get_account<M: store + copy + drop>(self: &SingleOrder<M>): address {
+    public(friend) fun get_account<M: store + copy + drop>(self: &SingleOrder<M>): address {
         self.account
     }
 
@@ -113,66 +112,66 @@ module aptos_experimental::single_order_types {
         self.unique_priority_idx
     }
 
-    public fun get_metadata_from_order<M: store + copy + drop>(self: &SingleOrder<M>): M {
+    public(friend) fun get_metadata_from_order<M: store + copy + drop>(self: &SingleOrder<M>): M {
         self.metadata
     }
 
-    public fun get_time_in_force<M: store + copy + drop>(
+    public(friend) fun get_time_in_force<M: store + copy + drop>(
         self: &SingleOrder<M>
     ): TimeInForce {
         self.time_in_force
     }
 
-    public fun get_trigger_condition_from_order<M: store + copy + drop>(
+    public(friend) fun get_trigger_condition_from_order<M: store + copy + drop>(
         self: &SingleOrder<M>
     ): Option<TriggerCondition> {
         self.trigger_condition
     }
 
-    public fun increase_remaining_size<M: store + copy + drop>(
+    public(friend) fun increase_remaining_size<M: store + copy + drop>(
         self: &mut OrderWithState<M>, size: u64
     ) {
         self.order.remaining_size += size;
     }
 
-    public fun decrease_remaining_size<M: store + copy + drop>(
+    public(friend) fun decrease_remaining_size<M: store + copy + drop>(
         self: &mut OrderWithState<M>, size: u64
     ) {
         assert!(self.order.remaining_size > size, EINVALID_ORDER_SIZE_DECREASE);
         self.order.remaining_size -= size;
     }
 
-    public fun set_remaining_size<M: store + copy + drop>(
+    public(friend) fun set_remaining_size<M: store + copy + drop>(
         self: &mut OrderWithState<M>, remaining_size: u64
     ) {
         self.order.remaining_size = remaining_size;
     }
 
-    public fun get_remaining_size_from_state<M: store + copy + drop>(
+    public(friend) fun get_remaining_size_from_state<M: store + copy + drop>(
         self: &OrderWithState<M>
     ): u64 {
         self.order.remaining_size
     }
 
-    public fun get_unique_priority_idx_from_state<M: store + copy + drop>(
+    public(friend) fun get_unique_priority_idx_from_state<M: store + copy + drop>(
         self: &OrderWithState<M>
     ): UniqueIdxType {
         self.order.unique_priority_idx
     }
 
-    public fun get_remaining_size<M: store + copy + drop>(self: &SingleOrder<M>): u64 {
+    public(friend) fun get_remaining_size<M: store + copy + drop>(self: &SingleOrder<M>): u64 {
         self.remaining_size
     }
 
-    public fun get_orig_size<M: store + copy + drop>(self: &SingleOrder<M>): u64 {
+    public(friend) fun get_orig_size<M: store + copy + drop>(self: &SingleOrder<M>): u64 {
         self.orig_size
     }
 
-    public fun get_client_order_id<M: store + copy + drop>(self: &SingleOrder<M>): Option<String> {
+    public(friend) fun get_client_order_id<M: store + copy + drop>(self: &SingleOrder<M>): Option<String> {
         self.client_order_id
     }
 
-    public fun destroy_order_from_state<M: store + copy + drop>(
+    public(friend) fun destroy_order_from_state<M: store + copy + drop>(
         self: OrderWithState<M>
     ): (SingleOrder<M>, bool) {
         (self.order, self.is_active)
@@ -211,17 +210,17 @@ module aptos_experimental::single_order_types {
         )
     }
 
-    public fun is_active_order<M: store + copy + drop>(
+    public(friend) fun is_active_order<M: store + copy + drop>(
         self: &OrderWithState<M>
     ): bool {
         self.is_active
     }
 
-    public fun get_price<M: store + copy + drop>(self: &SingleOrder<M>): u64 {
+    public(friend) fun get_price<M: store + copy + drop>(self: &SingleOrder<M>): u64 {
         self.price
     }
 
-    public fun is_bid<M: store + copy + drop>(self: &SingleOrder<M>): bool {
+    public(friend) fun is_bid<M: store + copy + drop>(self: &SingleOrder<M>): bool {
         self.is_bid
     }
 }

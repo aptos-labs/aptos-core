@@ -10,7 +10,6 @@ Order book type definitions
 -  [Struct `AccountClientOrderId`](#0x7_order_book_types_AccountClientOrderId)
 -  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
 -  [Enum `OrderType`](#0x7_order_book_types_OrderType)
--  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
 -  [Enum `TimeInForce`](#0x7_order_book_types_TimeInForce)
 -  [Enum `TriggerCondition`](#0x7_order_book_types_TriggerCondition)
 -  [Enum `OrderMatchDetails`](#0x7_order_book_types_OrderMatchDetails)
@@ -25,8 +24,6 @@ Order book type definitions
 -  [Function `new_default_big_ordered_map`](#0x7_order_book_types_new_default_big_ordered_map)
 -  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
--  [Function `new_ascending_id_generator`](#0x7_order_book_types_new_ascending_id_generator)
--  [Function `next_ascending_id`](#0x7_order_book_types_next_ascending_id)
 -  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
 -  [Function `descending_idx`](#0x7_order_book_types_descending_idx)
 -  [Function `get_order_id_value`](#0x7_order_book_types_get_order_id_value)
@@ -64,7 +61,6 @@ Order book type definitions
 -  [Function `destroy_active_matched_order`](#0x7_order_book_types_destroy_active_matched_order)
 -  [Function `get_active_matched_size`](#0x7_order_book_types_get_active_matched_size)
 -  [Function `get_active_matched_book_type`](#0x7_order_book_types_get_active_matched_book_type)
--  [Function `destroy_active_match_order`](#0x7_order_book_types_destroy_active_match_order)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
@@ -201,45 +197,6 @@ Order book type definitions
 
 
 <dl>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
-<a id="0x7_order_book_types_AscendingIdGenerator"></a>
-
-## Enum `AscendingIdGenerator`
-
-
-
-<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>FromCounter</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>value: u64</code>
-</dt>
-<dd>
-
-</dd>
 </dl>
 
 
@@ -877,55 +834,6 @@ particular match operation.
 
 </details>
 
-<a id="0x7_order_book_types_new_ascending_id_generator"></a>
-
-## Function `new_ascending_id_generator`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_ascending_id_generator">new_ascending_id_generator</a>(): <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_ascending_id_generator">new_ascending_id_generator</a>(): <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a> {
-    AscendingIdGenerator::FromCounter { value: 0 }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_types_next_ascending_id"></a>
-
-## Function `next_ascending_id`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_ascending_id">next_ascending_id</a>(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>): u128
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_ascending_id">next_ascending_id</a>(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a>): u128 {
-    self.value += 1;
-    self.value <b>as</b> u128
-}
-</code></pre>
-
-
-
-</details>
-
 <a id="0x7_order_book_types_new_unique_idx_type"></a>
 
 ## Function `new_unique_idx_type`
@@ -1108,7 +1016,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time_secs: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
 </code></pre>
 
 
@@ -1117,8 +1025,8 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
-    TriggerCondition::TimeBased(time)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time_secs: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
+    TriggerCondition::TimeBased(time_secs)
 }
 </code></pre>
 
@@ -1180,7 +1088,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -1189,7 +1097,7 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>):
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>):
     (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
     match(self) {
         TriggerCondition::PriceMoveAbove(price) =&gt; {
@@ -1765,7 +1673,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, remaining_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, remaining_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1774,7 +1682,7 @@ Validates that a reinsertion request is valid for the given original order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
     remaining_size: u64
 ): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt; {
@@ -2027,30 +1935,6 @@ Validates that a reinsertion request is valid for the given original order.
     self: &<a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a>
 ): <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> {
     self.order_book_type
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_types_destroy_active_match_order"></a>
-
-## Function `destroy_active_match_order`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_match_order">destroy_active_match_order</a>(self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, u64)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_match_order">destroy_active_match_order</a>(self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, u64, u64) {
-    (self.order_id, self.matched_size, self.remaining_size)
 }
 </code></pre>
 
