@@ -66,8 +66,16 @@ fn main() -> anyhow::Result<()> {
             .into_iter()
             .map(|p| (p, true)),
     ) {
+<<<<<<< HEAD
         let config =
             PrebuiltPackageConfig::new(latest_language, use_local_std, args.experiments.clone());
+=======
+        let config = PrebuiltPackageConfig {
+            latest_language,
+            use_local_std,
+            experiments: args.experiments.clone(),
+        };
+>>>>>>> 5ab5284a6c (fix experiments flag and add it to prebuild)
         visit(&package_path, &config, &mut all_package_paths)?;
     }
 

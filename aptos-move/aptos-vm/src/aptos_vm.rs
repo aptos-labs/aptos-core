@@ -2831,6 +2831,7 @@ impl AptosVM {
                     log_context,
                     auxiliary_info,
                 );
+                println!("VM status: {:?}", vm_status);
 
                 if let StatusType::InvariantViolation = vm_status.status_type() {
                     match vm_status.status_code() {

@@ -770,12 +770,14 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             None,
         )
         .map(BlockOutput::into_transaction_outputs_forced)
+
     }
 
     pub fn execute_transaction_block_with_state_view(
         &self,
         txn_block: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
+        check_signature: bool,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
 
@@ -792,7 +794,15 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         }
         */
 
-        let sig_verified_block = into_signature_verified_block(txn_block);
+        let sig_verified_block = if check_signature {
+            into_signature_verified_block(txn_block)
+        } else {
+            let mut verified = vec![];
+            for txn in txn_block {
+                verified.push(SignatureVerifiedTransaction::Valid(txn))
+            }
+            verified
+        };
 
         let mode = self.executor_mode.unwrap_or_else(|| {
             if env::var(ENV_ENABLE_PARALLEL).is_ok() {
@@ -876,7 +886,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         &self,
         txn_block: Vec<Transaction>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        self.execute_transaction_block_with_state_view(txn_block, &self.state_store)
+        self.execute_transaction_block_with_state_view(txn_block, &self.state_store, true)
     }
 
     pub fn execute_transaction(&self, txn: SignedTransaction) -> TransactionOutput {
