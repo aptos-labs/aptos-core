@@ -2,25 +2,24 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::types::FaucetOptions;
-use crate::{
-    account::key_rotation::lookup_address,
-    common::{
-        types::{
-            account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
-            CliTypedResult, ConfigSearchMode, EncodingOptions, HardwareWalletOptions,
-            PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions, RngArgs,
-            DEFAULT_PROFILE,
-        },
-        utils::{
-            explorer_account_link, fund_account, prompt_yes_with_override, read_line,
-            strip_private_key_prefix,
-        },
+use crate::common::{
+    types::{
+        account_address_from_public_key, get_mint_site_url, CliCommand, CliConfig, CliError,
+        CliTypedResult, ConfigSearchMode, EncodingOptions, HardwareWalletOptions,
+        PrivateKeyInputOptions, ProfileConfig, ProfileOptions, PromptOptions, RngArgs,
+        DEFAULT_PROFILE,
+    },
+    utils::{
+        explorer_account_link, fund_account, prompt_yes_with_override, read_line,
+        strip_private_key_prefix,
     },
 };
 use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, ValidCryptoMaterialStringExt};
 use aptos_ledger;
+use aptos_rest_client::{error::RestError, Client};
 use async_trait::async_trait;
 use clap::Parser;
+use move_core_types::account_address::AccountAddress;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -501,4 +500,15 @@ impl Default for Network {
     fn default() -> Self {
         Self::Devnet
     }
+}
+
+pub async fn lookup_address(
+    rest_client: &Client,
+    address_key: AccountAddress,
+    must_exist: bool,
+) -> Result<AccountAddress, RestError> {
+    Ok(rest_client
+        .lookup_address(address_key, must_exist)
+        .await?
+        .into_inner())
 }

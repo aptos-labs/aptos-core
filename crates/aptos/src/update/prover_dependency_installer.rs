@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use super::{BinaryUpdater, UpdateRequiredInfo};
-use crate::update::{
-    prover_dependencies::{REPO_NAME, REPO_OWNER},
-    update_helper::{build_updater, get_path},
+use crate::{
+    common::update::get_path,
+    update::{
+        prover_dependencies::{REPO_NAME, REPO_OWNER},
+        update_helper::build_updater,
+    },
 };
 use anyhow::{Context, Result};
 use self_update::update::ReleaseUpdate;

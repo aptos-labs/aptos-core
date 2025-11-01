@@ -5,7 +5,6 @@
 // Revela, this can also be used to install / update other binaries.
 
 mod aptos;
-mod helpers;
 mod move_mutation_test;
 mod movefmt;
 mod prover_dependencies;
@@ -16,9 +15,6 @@ mod update_helper;
 
 use crate::common::types::CliTypedResult;
 use anyhow::{anyhow, Context, Result};
-pub use helpers::get_additional_binaries_dir;
-pub use movefmt::get_movefmt_path;
-pub use revela::get_revela_path;
 use self_update::{update::ReleaseUpdate, version::bump_is_greater, Status};
 pub use tool::UpdateTool;
 
