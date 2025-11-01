@@ -101,6 +101,56 @@ module 0xABCD::simple {
         }
     }
 
+    public entry fun fibonacci_recursive(_s: &signer, n: u64) {
+        fib_rec(n);
+    }
+
+    public entry fun fibonacci_tail_recursive(_s: &signer, n: u64) {
+        fib_tail_rec(n, 0, 1);
+    }
+
+    public entry fun fibonacci_iterative(_s: &signer, n: u64) {
+        fib_iter(n);
+    }
+
+    /// Computes the n-th fibonacci number using a simple recursive algorithm.
+    fun fib_rec(n: u64): u64 {
+        if (n <= 1) {
+            n
+        } else {
+            fib_rec(n - 1) + fib_rec(n - 2)
+        }
+    }
+
+    /// Computes the n-th fibonacci number using a tail-recursive algorithm.
+    fun fib_tail_rec(n: u64, a: u64, b: u64): u64 {
+        if (n == 0) {
+            a
+        } else {
+            fib_tail_rec(n - 1, b, a + b)
+        }
+    }
+
+    /// Computes the n-th fibonacci number using an iterative algorithm.
+    fun fib_iter(n: u64): u64 {
+        if (n <= 1) {
+            return n;
+        };
+
+        let a = 0;
+        let b = 1;
+
+        let i = 2;
+        while (i <= n) {
+            let temp = a + b;
+            a = b;
+            b = temp;
+            i += 1;
+        };
+
+        b
+    }
+
     // Counter
     // This is a constant to change to check versioning of the module published.
     // In a simple way this can be used as a verion info, and incremented by 1
