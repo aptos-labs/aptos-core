@@ -6,21 +6,22 @@
 use ark_ff::FftField;
 use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial};
 
-/// Vanishing polynomial for a bunch of points
-pub fn vanishing_poly<F: FftField>(xs: &[F]) -> DensePolynomial<F> {
-    compute_product(xs)
-}
-
-/// Recursively computes the product polynomial of all `(x - root)`
+/// Recursively computes the **vanishing polynomial** for a given set of points
 /// using a divide-and-conquer approach.
-fn compute_product<F: FftField>(roots: &[F]) -> DensePolynomial<F> {
+///
+/// A vanishing polynomial `V(x)` is a polynomial that evaluates to zero at each
+/// of the points in `xs`. Formally:
+/// ```text
+///     V(x_i) = 0  for all x_i in xs
+/// ```
+pub fn from_roots<F: FftField>(roots: &[F]) -> DensePolynomial<F> {
     match roots.len() {
         0 => DensePolynomial::from_coefficients_vec(vec![F::one()]), // Empty product = 1
         1 => DensePolynomial::from_coefficients_vec(vec![-roots[0], F::one()]), // Single root
         _ => {
             let mid = roots.len() / 2;
-            let left = compute_product(&roots[..mid]);
-            let right = compute_product(&roots[mid..]);
+            let left = from_roots(&roots[..mid]);
+            let right = from_roots(&roots[mid..]);
             &left * &right // This uses FftField
         },
     }
@@ -41,7 +42,7 @@ mod tests {
             let frs: Vec<Fr> = (0..num_roots).map(|_| Fr::rand(&mut rng)).collect();
 
             // Compute product using recursive function
-            let product = compute_product(&frs);
+            let product = from_roots(&frs);
 
             // Naive computation of product
             let expected: DensePolynomial<Fr> = frs

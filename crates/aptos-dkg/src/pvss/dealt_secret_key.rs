@@ -23,6 +23,7 @@ macro_rules! dealt_secret_key_impl {
         use blstrs::{$GTProjective, Scalar};
         use ff::Field;
         use more_asserts::{assert_ge, assert_le};
+        use crate::pvss::traits::ThresholdConfig;
 
         /// The size of a serialized *dealt secret key*.
         pub(crate) const DEALT_SK_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;

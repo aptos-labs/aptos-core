@@ -6,12 +6,15 @@
 use crate::arkworks::{
     differentiate::DifferentiableFn,
     serialization::{ark_de, ark_se},
-    vanishing_poly::vanishing_poly,
+    vanishing_poly,
 };
 use anyhow::{anyhow, Result};
 use ark_ff::{batch_inversion, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
-use ark_std::rand::{Rng, RngCore};
+use ark_std::{
+    fmt,
+    rand::{Rng, RngCore},
+};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -30,7 +33,7 @@ pub struct ShamirShare<F: PrimeField> {
 /// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
 /// because Shamir shares are usually defined over such a field. For reconstructing to a group (TODO)
 /// we'll use a generic parameter `G: CurveGroup<ScalarField = F>`
-#[derive(Debug, Clone, Copy, Serialize)]
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 pub struct ThresholdConfig<F: PrimeField> {
     /// Total number of participants (shares)
     pub n: usize,
@@ -41,6 +44,12 @@ pub struct ThresholdConfig<F: PrimeField> {
     /// Used for FFT-based polynomial operations. Recomputed from `n` on deserialize
     #[serde(skip)]
     pub domain: Radix2EvaluationDomain<F>,
+}
+
+impl<F: PrimeField> fmt::Display for ThresholdConfig<F> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "ThresholdConfig {{ n: {}, t: {} }}", self.n, self.t)
+    }
 }
 
 impl<'de, F: PrimeField> Deserialize<'de> for ThresholdConfig<F> {
@@ -115,6 +124,16 @@ impl<F: PrimeField> ThresholdConfig<F> {
         ThresholdConfig { n, t, domain }
     }
 
+    /// Returns the threshold `t` for this `(t, n)` Shamir secret sharing scheme.
+    pub fn get_threshold(&self) -> usize {
+        self.t
+    }
+
+    /// Returns the total number of players `n` in this `(t, n)` Shamir secret sharing
+    pub fn get_total_num_players(&self) -> usize {
+        self.n
+    }
+
     /// Fast lagrange coefficient computation algorithm, taken from the paper
     /// "Towards Scalable Threshold Cryptosystems" by Alin Tomescu, Robert Chen, Yiming Zheng, Ittai
     /// Abraham, Benny Pinkas, Guy Golan Gueta and Srinivas Devadas
@@ -131,11 +150,16 @@ impl<F: PrimeField> ThresholdConfig<F> {
         let xs_vec: Vec<F> = xs.iter().cloned().collect();
 
         // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
-        let vanishing_poly = vanishing_poly(&xs_vec);
+        let vanishing_poly = vanishing_poly::from_roots(&xs_vec);
         let vanishing_poly_at_0 = vanishing_poly.coeffs[0]; // vanishing_poly(0) = const term
 
-        // Step 2 (numerators): for each x in xs, divide poly eval from step 1 by (-x)
-        let numerators: Vec<F> = xs_vec.iter().map(|&x| vanishing_poly_at_0 / -x).collect();
+        // Step 2 (numerators): for each x in xs, divide poly eval from step 1 by (-x) using batch inversion
+        let mut neg_xs: Vec<F> = xs_vec.iter().map(|&x| -x).collect();
+        batch_inversion(&mut neg_xs);
+        let numerators: Vec<F> = neg_xs
+            .iter()
+            .map(|inv_neg_x| vanishing_poly_at_0 * *inv_neg_x)
+            .collect();
 
         // Step 3a (denominators): Compute derivative of poly from step 1, and its evaluations
         let derivative = vanishing_poly.differentiate();
@@ -161,11 +185,25 @@ impl<F: PrimeField> ThresholdConfig<F> {
     /// 1. A random polynomial of degree `t-1` is generated with `val_to_share`
     ///    as the constant term.
     /// 2. The polynomial is evaluated over the `domain` using FFT to produce `y` values.
-    /// 3. Each share is represented as a `(x, y)` pair (`ShamirShare<F>`).
+    /// 3. Each share is represented as a `(x, y)` pair (`ShamirShare<F>`).  TODO: not used atm
     pub fn share<R: Rng + RngCore>(&self, val_to_share: F, rng: &mut R) -> Vec<ShamirShare<F>> {
         let mut coeffs = vec![val_to_share]; // constant term of polynomial
         coeffs.extend((0..(self.t - 1)).map(|_| F::rand(rng)));
-        let y_pts = self.domain.fft(&coeffs);
+
+        self.share_with_coeffs(&coeffs)
+    }
+
+    /// `Lightweight` version that only returns the evaluations
+    pub fn share_with_coeffs_only_evals(&self, coeffs: &[F]) -> Vec<F> {
+        // Evaluate the polynomial over the domain
+        let y_pts = self.domain.fft(coeffs);
+        y_pts[..self.n].to_vec()
+    }
+
+    /// Generates ShamirShares from given polynomial coefficients. TODO: not used atm
+    pub fn share_with_coeffs(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
+        // Evaluate the polynomial over the domain
+        let y_pts = self.share_with_coeffs_only_evals(coeffs);
 
         self.domain
             .elements()

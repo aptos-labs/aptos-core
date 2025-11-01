@@ -1,20 +1,20 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-use aptos_dkg::range_proofs::traits::BatchedRangeProof;
 use aptos_dkg::{
     algebra::GroupGenerators,
     range_proofs::{
         dekart_univariate::Proof as UnivariateDeKART,
-        dekart_univariate_v2::Proof as UnivariateDeKARTv2,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
     },
     utils::test_utils,
 };
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::thread_rng;
+use std::fmt::Debug;
 
 #[cfg(test)]
 fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
@@ -70,6 +70,44 @@ fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
 }
 
 #[cfg(test)]
+fn assert_keys_serialization<E: Pairing, B: BatchedRangeProof<E>>(
+    setup: &RangeProofUniversalSetup<E, B>,
+) where
+    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
+    B::VerificationKey: CanonicalDeserialize + Eq + Debug,
+{
+    let RangeProofUniversalSetup { pk, vk } = setup;
+
+    // === Prover key serialization/deserialization ===
+    let pk_encoded = {
+        let mut v = Vec::new();
+        pk.serialize_compressed(&mut v)
+            .expect("Prover key serialization should succeed");
+        v
+    };
+    println!("Serialized pk size: {} bytes", pk_encoded.len());
+
+    let pk_decoded = B::ProverKey::deserialize_compressed(&*pk_encoded)
+        .expect("Prover key deserialization should succeed");
+    assert_eq!(pk, &pk_decoded, "Round-trip pk failed");
+
+    // === Verifier key serialization/deserialization ===
+    let vk_encoded = {
+        let mut v = Vec::new();
+        vk.serialize_compressed(&mut v)
+            .expect("Verifier key serialization should succeed");
+        v
+    };
+    println!("Serialized vk size: {} bytes", vk_encoded.len());
+
+    let vk_decoded = B::VerificationKey::deserialize_compressed(&*vk_encoded)
+        .expect("Verifier key deserialization should succeed");
+    assert_eq!(vk, &vk_decoded, "Round-trip vk failed");
+
+    println!("Prover and Verifier key serialization round-trip passed.");
+}
+
+#[cfg(test)]
 const TEST_CASES: &[(usize, usize)] = &[
     // (n, \ell)
     (3, 16),
@@ -116,11 +154,32 @@ where
 }
 
 #[cfg(test)]
+fn assert_correctness_and_serialization_for_range_proof_and_curve<E, B>()
+where
+    E: Pairing,
+    B: BatchedRangeProof<E>,
+    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
+    B::VerificationKey: CanonicalDeserialize + Eq + Debug,
+{
+    let setups = make_single_curve_setup::<E, B>(31, 16);
+    for &(n, ell) in TEST_CASES {
+        assert_range_proof_correctness::<E, B>(&setups, n, ell);
+        assert_keys_serialization::<E, B>(&setups);
+    }
+}
+
+#[cfg(test)]
 #[test]
 fn assert_correctness_of_all_range_proofs() {
     assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKART<Bn254>>();
     assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKART<Bls12_381>>();
 
-    assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKARTv2<Bn254>>();
-    assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>();
+    assert_correctness_and_serialization_for_range_proof_and_curve::<
+        Bn254,
+        UnivariateDeKARTv2<Bn254>,
+    >();
+    assert_correctness_and_serialization_for_range_proof_and_curve::<
+        Bls12_381,
+        UnivariateDeKARTv2<Bls12_381>,
+    >();
 }

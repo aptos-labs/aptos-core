@@ -44,8 +44,9 @@ pub trait Trait: CanonicalSerialize {
 /// lets `h` act on the first component of the pair, so `(h ∘ π)(x,y) = h(x)`.
 ///
 /// Naturally this method immediately extends to composing arbitrary homomorphisms,
-/// but we don't need that formalism for now.
-#[derive(Debug)]
+/// but we don't need that formalism for now. We are not deriving Eq here because
+/// function pointer comparisons do not seem useful in this context.
+#[derive(Debug, Clone)]
 pub struct LiftHomomorphism<H, LargerDomain>
 where
     H: Trait,

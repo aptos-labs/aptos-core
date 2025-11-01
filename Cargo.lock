@@ -1375,6 +1375,7 @@ dependencies = [
  "blst",
  "blstrs",
  "criterion",
+ "derive_more 0.99.17",
  "ff",
  "group",
  "hex",

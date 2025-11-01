@@ -4,7 +4,7 @@
 use crate::{
     algebra::lagrange::lagrange_coefficients,
     pvss::{
-        traits::{Reconstructable, SecretSharingConfig},
+        traits::{Reconstructable, SecretSharingConfig, ThresholdConfig},
         Player, ThresholdConfigBlstrs,
     },
 };
