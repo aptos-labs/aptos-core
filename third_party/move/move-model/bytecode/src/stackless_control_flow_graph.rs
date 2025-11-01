@@ -232,6 +232,19 @@ impl StacklessControlFlowGraph {
         self.blocks.keys().cloned().collect()
     }
 
+    pub fn edges(&self) -> Vec<(BlockId, BlockId)> {
+        self.blocks
+            .iter()
+            .flat_map(|(block_id, block)| {
+                block
+                    .successors
+                    .iter()
+                    .map(|succ_id| (*block_id, *succ_id))
+                    .collect::<Vec<(BlockId, BlockId)>>()
+            })
+            .collect()
+    }
+
     pub fn reachable_blocks(
         &self,
         from: BlockId,

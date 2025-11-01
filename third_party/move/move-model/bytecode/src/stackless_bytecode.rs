@@ -598,6 +598,111 @@ impl Bytecode {
         matches!(self, SaveMem(..) | SaveSpecVar(..) | Prop(..))
     }
 
+    /// Return true if the bytecode is pure
+    /// - the results only depend on the operands
+    /// - has no side effects on `memory` (via references), control flow (including `abort`), or external state (global storage)
+    /// - recomputing it multiple times has no semantic effect.
+    /// TODO: revisit this function rigorously to make sure it is correct.
+    pub fn is_pure(&self) -> bool {
+        match self {
+            Bytecode::Label(..) => true, // does not participate in execution
+            Bytecode::Nop(..) => true, // produces no execution effect
+
+            Bytecode::SpecBlock(..) |
+            Bytecode::SaveMem(..) |
+            Bytecode::SaveSpecVar(..) |
+            Bytecode::Prop(..) => true, // spec-only instructions are considered pure
+
+            Bytecode::Assign(..) | // modify locals
+            Bytecode::Load(..) | // modify locals
+            Bytecode::Ret(..) | // change control flow
+            Bytecode::Branch(..) | // change control flow
+            Bytecode::Jump(..) | // change control flow
+            Bytecode::Abort(..) => false,
+
+            Bytecode::Call(_, _, op, _, _) => {
+                match op {
+                    Operation::Closure(..) => true,
+                    Operation::Function(..) => true,
+                    Operation::Pack(..) => true,
+                    Operation::Unpack(..) => true,
+                    Operation::TestVariant(..) => true,
+                    Operation::PackVariant(..) => true,
+                    Operation::BorrowLoc => true,
+                    Operation::BorrowField(..) => true,
+                    Operation::ReadRef => true,
+                    Operation::BitOr => true,
+                    Operation::BitAnd => true,
+                    Operation::Xor => true,
+                    Operation::Lt => true,
+                    Operation::Gt => true,
+                    Operation::Le => true,
+                    Operation::Ge => true,
+                    Operation::Or => true,
+                    Operation::And => true,
+                    Operation::Eq => true,
+                    Operation::Neq => true,
+                    Operation::Not => true,
+                    Operation::Vector => true,
+
+                    Operation::Invoke => false,
+                    Operation::UnpackVariant(..) => false, // aborts if not given variant
+                    Operation::BorrowVariantField(..) => false, // aborts if not given variant
+                    Operation::MoveTo(..) => false, // depends on global state
+                    Operation::MoveFrom(..) => false, // depends on global state
+                    Operation::Exists(..) => false, // depends on global state
+                    Operation::BorrowGlobal(..) => false, // depends on global state
+                    Operation::Drop => false, // change state of locals
+                    Operation::Release => false, // change state of references
+                    Operation::WriteRef => false, // change state of referenced value
+                    Operation::FreezeRef(_) => false, // change state of references
+                    Operation::Shl => false, // can abort on overflow
+                    Operation::Shr => false, // can abort on overflow
+                    Operation::CastU8 => false, // can abort on overflow
+                    Operation::CastU16 => false, // can abort on overflow
+                    Operation::CastU32 => false, // can abort on overflow
+                    Operation::CastU64 => false, // can abort on overflow
+                    Operation::CastU128 => false, // can abort on overflow
+                    Operation::CastU256 => false, // can abort on overflow
+                    Operation::CastI8 => false, // can abort on overflow
+                    Operation::CastI16 => false, // can abort on overflow
+                    Operation::CastI32 => false, // can abort on overflow
+                    Operation::CastI64 => false, // can abort on overflow
+                    Operation::CastI128 => false, // can abort on overflow
+                    Operation::CastI256 => false, // can abort on overflow
+                    Operation::Negate => false, // can abort on overflow
+                    Operation::Add => false, // can abort on overflow
+                    Operation::Sub => false, // can abort on overflow
+                    Operation::Mul => false, // can abort on overflow
+                    Operation::Div => false, // can abort on overflow
+                    Operation::Mod => false, // can abort on overflow
+
+                    Operation::TraceLocal(_)
+                    | Operation::TraceReturn(_)
+                    | Operation::TraceAbort
+                    | Operation::TraceExp(_, _)
+                    | Operation::TraceGlobalMem(_)
+                    | Operation::EmitEvent
+                    | Operation::EventStoreDiverge
+                    | Operation::OpaqueCallBegin(_, _, _)
+                    | Operation::OpaqueCallEnd(_, _, _)
+                    | Operation::GetField(_, _, _, _)
+                    | Operation::GetVariantField(_, _, _, _, _)
+                    | Operation::GetGlobal(_, _, _)
+                    | Operation::Uninit
+                    | Operation::Havoc(_)
+                    | Operation::Stop
+                    | Operation::IsParent(_, _)
+                    | Operation::WriteBack(_, _)
+                    | Operation::UnpackRef
+                    | Operation::PackRef
+                    | Operation::UnpackRefDeep
+                    | Operation::PackRefDeep => true, // spec
+                }
+            },
+        }
+    }
+
     /// Return the sources of the instruction (for non-spec-only instructions).
     /// If the instruction is spec-only instruction, this function panics.
     pub fn sources(&self) -> Vec<TempIndex> {

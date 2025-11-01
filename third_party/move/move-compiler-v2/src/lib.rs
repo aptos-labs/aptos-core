@@ -25,6 +25,7 @@ use crate::{
     },
     pipeline::{
         ability_processor::AbilityProcessor,
+        common_subexp_elimination::CommonSubexpElimination,
         control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
@@ -585,6 +586,12 @@ pub fn stackless_bytecode_optimization_pipeline(options: &Options) -> FunctionTa
             // for the livevar processor, which is used frequently below.
             pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
         }
+    }
+
+    // Common subexpression elimination
+    if options.experiment_on(Experiment::COMMON_SUBEXP_ELIMINATION) {
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
+        pipeline.add_processor(Box::new(CommonSubexpElimination::new(true)));
     }
 
     if options.experiment_on(Experiment::DEAD_CODE_ELIMINATION) {
