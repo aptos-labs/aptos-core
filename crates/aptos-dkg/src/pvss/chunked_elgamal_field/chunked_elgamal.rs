@@ -12,15 +12,15 @@ use ark_serialize::{
 };
 use ark_std::fmt::Debug;
 
-pub const DST_PVSS_PUBLIC_PARAMS: &[u8; 30] = b"APTOS_CHUNKED_ELGAMAL_PVSS_DST";
+pub const DST: &[u8; 25] = b"APTOS_CHUNKED_ELGAMAL_DST";
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
     /// A group element $G$ that is raised to the encrypted message
     pub G: E::G1Affine,
-    /// A group element $H$ that is used to exponentiate both the
-    /// (1) ciphertext randomness and the (2) the DSK when computing its EK.
+    /// A group element $H$ that is used to exponentiate both
+    /// (1) the ciphertext randomness and (2) the DSK when computing its EK.
     pub H: E::G1Affine,
 }
 
@@ -39,8 +39,8 @@ impl<E: Pairing> PublicParameters<E> {
     }
 
     pub fn default() -> Self {
-        let G = hashing::unsafe_hash_to_affine(b"G", DST_PVSS_PUBLIC_PARAMS);
-        let H = hashing::unsafe_hash_to_affine(b"H", DST_PVSS_PUBLIC_PARAMS);
+        let G = hashing::unsafe_hash_to_affine(b"G", DST);
+        let H = hashing::unsafe_hash_to_affine(b"H", DST);
         debug_assert_ne!(G, H);
         Self { G, H }
     }

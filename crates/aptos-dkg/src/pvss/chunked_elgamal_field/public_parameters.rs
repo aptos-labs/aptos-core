@@ -12,17 +12,23 @@ use crate::{
         },
         traits,
     },
-    range_proofs::dekart_univariate_v2,
+    range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
     utils::{self},
 };
 use aptos_crypto::{
-    arkworks::serialization::{ark_de, ark_se},
+    arkworks::{
+        hashing,
+        serialization::{ark_de, ark_se},
+    },
     CryptoMaterialError, ValidCryptoMaterial,
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_std::rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
+
+const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST";
 
 #[derive(
     CanonicalSerialize, Serialize, CanonicalDeserialize, Deserialize, Clone, Debug, PartialEq, Eq,
@@ -65,10 +71,6 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
     }
 }
 
-use crate::range_proofs::traits::BatchedRangeProof;
-use aptos_crypto::arkworks::hashing;
-use ark_std::rand::{thread_rng, CryptoRng, RngCore};
-
 #[allow(dead_code)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
@@ -77,8 +79,6 @@ impl<E: Pairing> PublicParameters<E> {
         radix_exponent: usize,
         rng: &mut R,
     ) -> Self {
-        // TODO: add &mut rng here? <R: RngCore + CryptoRng>
-        // existing initialization
         let num_chunks = max_num_shares * 255usize.div_ceil(radix_exponent);
         let num_chunks_padded = (num_chunks + 1).next_power_of_two() - 1;
         let base = E::ScalarField::from(1u64 << radix_exponent);
@@ -93,7 +93,7 @@ impl<E: Pairing> PublicParameters<E> {
                 rng,
             )
             .0,
-            G_2: hashing::unsafe_hash_to_affine(b"G_2", b"APTOS_CHUNKED_ELGAMAL_PVSS_DST"), // TODO: fix DST
+            G_2: hashing::unsafe_hash_to_affine(b"G_2", DST), // TODO: fix DST
             powers_of_radix: utils::powers(base, num_chunks_padded + 1), // TODO: why the +1?
         };
 
