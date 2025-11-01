@@ -529,6 +529,7 @@ where
         module.extension().size_in_bytes(),
         module.code().deserialized().clone(),
         runtime_environment.struct_name_index_map(),
+        runtime_environment.ty_pool(),
     )
     .map_err(|e| e.finish(Location::Undefined))?;
 
