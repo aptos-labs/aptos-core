@@ -31,6 +31,7 @@ use aptos_executor_types::{state_compute_result::StateComputeResult, BlockExecut
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_infallible::Mutex;
 use aptos_logger::{error, info, trace, warn};
+use aptos_resource_viewer::module_view::CachedModuleView;
 use aptos_storage_interface::state_store::state_view::cached_state_view::CachedStateView;
 use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
@@ -47,7 +48,6 @@ use aptos_types::{
     validator_signer::ValidatorSigner,
     vm::module_metadata::get_randomness_annotation_for_entry_function,
 };
-use aptos_vm_validator::vm_validator::ValidationState;
 use futures::FutureExt;
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::ModuleStorage;
@@ -135,7 +135,7 @@ pub struct PipelineBuilder {
     order_vote_enabled: bool,
     persisted_auxiliary_info_version: u8,
     rand_check_enabled: bool,
-    module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
+    module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
     network_sender: Arc<NetworkSender>,
 }
 
@@ -631,7 +631,7 @@ impl PipelineBuilder {
         block: Arc<Block>,
         is_randomness_enabled: bool,
         rand_check_enabled: bool,
-        module_cache: Arc<Mutex<Option<ValidationState<CachedStateView>>>>,
+        module_cache: Arc<Mutex<Option<CachedModuleView<CachedStateView>>>>,
     ) -> TaskResult<RandResult> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
@@ -666,7 +666,7 @@ impl PipelineBuilder {
                     cache_mut.reset_all(parent_state_view);
                 }
             } else {
-                *cache_guard = Some(ValidationState::new(parent_state_view));
+                *cache_guard = Some(CachedModuleView::new(parent_state_view));
             }
             let cache_ref = cache_guard.as_mut().expect("just set");
 

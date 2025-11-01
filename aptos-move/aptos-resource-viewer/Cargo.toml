@@ -15,9 +15,17 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 aptos-types = { workspace = true }
+aptos-logger = { workspace = true }
 aptos-vm = { workspace = true }
+aptos-vm-logging = { workspace = true }
 aptos-vm-environment = { workspace = true }
 move-binary-format = { workspace = true }
 move-bytecode-utils = { workspace = true }
 move-core-types = { workspace = true }
+move-vm-types = { workspace = true }
+move-vm-runtime = { workspace = true }
 move-resource-viewer = { workspace = true }
+
+[dev-dependencies]
+aptos-types = { workspace = true, features = ["testing"] }
+move-vm-types = { workspace = true, features = ["testing"] }
