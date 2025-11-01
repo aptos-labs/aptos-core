@@ -210,6 +210,7 @@ impl Verifier {
         }
 
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
+        AptosVM::set_blockstm_v2_enabled_once(true);
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.concurrent_replay)
             .thread_name(|i| format!("replay-verify-{}", i))
