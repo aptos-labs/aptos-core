@@ -814,8 +814,11 @@ impl SpecTranslator<'_> {
                 self.translate_call(*node_id, oper, args);
             },
             ExpData::Invoke(node_id, ..) => {
-                self.error(&self.env.get_node_loc(*node_id), "Invoke not yet supported");
-                // TODO(LAMBDA)
+                self.error(
+                    &self.env.get_node_loc(*node_id),
+                    "current restriction: a function \
+                           value cannot be used in a specification expression.",
+                );
             },
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
@@ -1019,7 +1022,7 @@ impl SpecTranslator<'_> {
             Operation::BitOr => self.translate_bit_op("$Or", args),
             Operation::BitAnd => self.translate_bit_op("$And", args),
             Operation::Xor => self.translate_bit_op("$Xor", args),
-            Operation::Shl => self.translate_primitive_call_shl("$shl", args),
+            Operation::Shl => self.translate_primitive_call_shl("$shl", args, &loc),
             Operation::Shr => self.translate_primitive_call_shr("$shr", args),
             Operation::Implies => self.translate_logical_op("==>", args),
             Operation::Iff => self.translate_logical_op("<==>", args),
@@ -1034,6 +1037,7 @@ impl SpecTranslator<'_> {
             Operation::Neq => self.translate_eq_neq("!$IsEqual", args),
 
             // Unary operators
+            Operation::Negate => self.translate_arithmetic_unary_op("-", args),
             Operation::Not => self.translate_logical_unary_op("!", args),
             Operation::Cast => self.translate_cast(node_id, args),
             Operation::Int2Bv => {
@@ -2031,6 +2035,20 @@ impl SpecTranslator<'_> {
         emit!(self.writer, ")");
     }
 
+    fn translate_arithmetic_unary_op(&self, boogie_op: &str, args: &[Exp]) {
+        let global_state = &self
+            .env
+            .get_extension::<GlobalNumberOperationState>()
+            .expect("global number operation state");
+        let num_oper_e = global_state.get_node_num_oper(args[0].node_id());
+        assert!(
+            num_oper_e != Bitwise,
+            "no bitwise unary arithmetic ops supported"
+        );
+        emit!(self.writer, "{}", boogie_op);
+        self.translate_exp(&args[0]);
+    }
+
     fn translate_logical_unary_op(&self, boogie_op: &str, args: &[Exp]) {
         emit!(self.writer, "{}", boogie_op);
         self.translate_exp(&args[0]);
@@ -2050,8 +2068,7 @@ impl SpecTranslator<'_> {
             .get_node_type(arg.node_id())
             .skip_reference()
             .clone();
-        let check_cast =
-            |ty: &Type| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num));
+        let check_cast = |ty: &Type| ty.is_unsigned_int();
         if cast_oper == Bitwise && check_cast(&target_type) && check_cast(&source_type) {
             let target_base =
                 boogie_num_type_base(self.env, Some(self.env.get_node_loc(node_id)), &target_type);
@@ -2099,13 +2116,28 @@ impl SpecTranslator<'_> {
                 oper_right_base
             );
         } else {
+            let ty = self.get_node_type(args[0].node_id());
+            if matches!(
+                ty,
+                Type::Primitive(PrimitiveType::I8)
+                    | Type::Primitive(PrimitiveType::I16)
+                    | Type::Primitive(PrimitiveType::I32)
+                    | Type::Primitive(PrimitiveType::I64)
+                    | Type::Primitive(PrimitiveType::I128)
+                    | Type::Primitive(PrimitiveType::I256)
+            ) {
+                self.error(
+                    &self.env.get_node_loc(args[0].node_id()),
+                    &format!("signed integer types not supported in operation {}", fun),
+                );
+            }
             emit!(self.writer, "{}(", fun);
         }
         self.translate_seq(args.iter(), ", ", |e| self.translate_exp(e));
         emit!(self.writer, ")");
     }
 
-    fn translate_primitive_call_shl(&self, fun: &str, args: &[Exp]) {
+    fn translate_primitive_call_shl(&self, fun: &str, args: &[Exp], loc: &Loc) {
         let global_state = &self
             .env
             .get_extension::<GlobalNumberOperationState>()
@@ -2138,6 +2170,18 @@ impl SpecTranslator<'_> {
                 Type::Primitive(PrimitiveType::U64) => "U64",
                 Type::Primitive(PrimitiveType::U128) => "U128",
                 Type::Primitive(PrimitiveType::U256) => "U256",
+                Type::Primitive(PrimitiveType::I8)
+                | Type::Primitive(PrimitiveType::I16)
+                | Type::Primitive(PrimitiveType::I32)
+                | Type::Primitive(PrimitiveType::I64)
+                | Type::Primitive(PrimitiveType::I128)
+                | Type::Primitive(PrimitiveType::I256) => {
+                    self.error(
+                        loc,
+                        &format!("signed integer types not supported in operation {}", fun),
+                    );
+                    "<<signed integer is not supported here>>"
+                },
                 Type::Primitive(PrimitiveType::Num) => "",
                 _ => unreachable!(),
             };

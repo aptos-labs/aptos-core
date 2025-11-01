@@ -34,7 +34,8 @@ pub enum FeatureFlag {
     STRUCT_CONSTRUCTORS = 15,
     PERIODICAL_REWARD_RATE_DECREASE = 16,
     PARTIAL_GOVERNANCE_VOTING = 17,
-    SIGNATURE_CHECKER_V2 = 18,
+    /// Enabled on mainnet and cannot be disabled
+    _SIGNATURE_CHECKER_V2 = 18,
     STORAGE_SLOT_METADATA = 19,
     CHARGE_INVARIANT_VIOLATION = 20,
     DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING = 21,
@@ -140,7 +141,6 @@ pub enum FeatureFlag {
     ORDERLESS_TRANSACTIONS = 94,
     // TODO(lazy-loading): Add link to AIP and its number + brief description.
     ENABLE_LAZY_LOADING = 95,
-
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
     MONOTONICALLY_INCREASING_COUNTER = 98,
@@ -148,6 +148,12 @@ pub enum FeatureFlag {
     /// Whether to allow trusted code optimizations.
     ENABLE_TRUSTED_CODE = 100,
     ENABLE_ENUM_OPTION = 101,
+    /// Enables bytecode version v9
+    VM_BINARY_FORMAT_V9 = 102,
+    ENABLE_FRAMEWORK_FOR_OPTION = 103,
+    /// If enabled, new single session is used by the VM to avoid squashing write-sets and cache
+    /// reads between sessions (e.g., between transaction prologue, user session and epilogue).
+    SESSION_CONTINUATION = 104,
 }
 
 impl FeatureFlag {
@@ -172,7 +178,7 @@ impl FeatureFlag {
             FeatureFlag::STRUCT_CONSTRUCTORS,
             FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
             FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
-            FeatureFlag::SIGNATURE_CHECKER_V2,
+            FeatureFlag::_SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,
             FeatureFlag::CHARGE_INVARIANT_VIOLATION,
             FeatureFlag::DELEGATION_POOL_PARTIAL_GOVERNANCE_VOTING,
@@ -251,6 +257,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_CAPTURE_OPTION,
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
+            FeatureFlag::VM_BINARY_FORMAT_V9,
         ]
     }
 }
@@ -452,6 +459,10 @@ impl Features {
         self.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION)
     }
 
+    pub fn is_session_continuation_enabled(&self) -> bool {
+        self.is_enabled(FeatureFlag::SESSION_CONTINUATION)
+    }
+
     pub fn get_max_identifier_size(&self) -> u64 {
         if self.is_enabled(FeatureFlag::LIMIT_MAX_IDENTIFIER_LENGTH) {
             IDENTIFIER_SIZE_MAX
@@ -461,7 +472,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
+            file_format_common::VERSION_9
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
             file_format_common::VERSION_8
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V7) {
             file_format_common::VERSION_7
@@ -517,7 +530,7 @@ mod test {
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_8,
+            file_format_common::VERSION_9,
             file_format_common::VERSION_MAX
         );
     }

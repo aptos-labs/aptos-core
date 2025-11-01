@@ -68,7 +68,7 @@ warning: This assignment/binding to the left-hand-side variable `s` is unused. C
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.constant {
 
 

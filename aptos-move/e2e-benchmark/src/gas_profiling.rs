@@ -524,7 +524,7 @@ mod tests {
         chain_id::ChainId,
         transaction::{EntryFunction, TransactionPayload},
     };
-    use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
+    use aptos_vm_environment::prod_configs::{set_layout_caches, set_paranoid_type_checks};
     use e2e_move_tests::MoveHarnessSend;
     use rand::{rngs::StdRng, SeedableRng};
     use std::path::PathBuf;
@@ -564,6 +564,7 @@ mod tests {
 
         let mut runner = CalibrationRunner::new(harness, profile_gas);
 
+        set_layout_caches(true);
         set_paranoid_type_checks(true);
 
         runner.run(

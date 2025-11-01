@@ -19,6 +19,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_runtime::{
+    native_extensions::UnreachableSessionListener,
     native_functions,
     native_functions::{LoaderContext, NativeContext, NativeFunction, NativeFunctionTable},
 };
@@ -37,6 +38,7 @@ use std::{
     fmt::{Debug, Display},
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 // ===========================================================================================
 // Public Data Structures and Constants
@@ -137,8 +139,8 @@ struct TableData {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
-    value_layout: MoveTypeLayout,
+    key_layout: TriompheArc<MoveTypeLayout>,
+    value_layout: TriompheArc<MoveTypeLayout>,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
 
@@ -147,6 +149,8 @@ const HANDLE_FIELD_INDEX: usize = 0;
 
 // =========================================================================================
 // Implementation of Native Table Context
+
+impl<'a> UnreachableSessionListener for NativeTableContext<'a> {}
 
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
@@ -533,7 +537,7 @@ fn native_contains_box(
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
     cost += common_gas_params.calculate_load_cost(loaded);
 
-    let exists = Value::bool(gv.exists()?);
+    let exists = Value::bool(gv.exists());
 
     Ok(NativeResult::ok(cost, smallvec![exists]))
 }

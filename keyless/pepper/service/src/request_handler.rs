@@ -2,14 +2,18 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    accounts::account_recovery_db::AccountRecoveryDBInterface,
-    dedicated_handlers::handlers::{
-        HandlerTrait, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+    accounts::{
+        account_managers::AccountRecoveryManagers, account_recovery_db::AccountRecoveryDBInterface,
     },
+    dedicated_handlers::handlers::{
+        HandlerTrait, V0DelegatedFetchHandler, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
+    },
+    deployment_information::DeploymentInformation,
     error::PepperServiceError,
     external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    utils,
+    vuf_keypair::VUFKeypair,
 };
-use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
 use aptos_logger::{error, info, warn};
 use hyper::{
@@ -29,6 +33,7 @@ pub const DEFAULT_PEPPER_SERVICE_PORT: u16 = 8000;
 // The list of endpoints/paths offered by the Pepper Service.
 // Note: if you update these paths, please also update the "ALL_PATHS" array below.
 pub const ABOUT_PATH: &str = "/about";
+pub const DELEGATED_FETCH_PATH: &str = "/v0/delegated-fetch";
 pub const FETCH_PATH: &str = "/v0/fetch";
 pub const GROTH16_VK_PATH: &str = "/cached/groth16-vk";
 pub const JWK_PATH: &str = "/cached/jwk";
@@ -38,12 +43,13 @@ pub const VERIFY_PATH: &str = "/v0/verify";
 pub const VUF_PUB_KEY_PATH: &str = "/v0/vuf-pub-key";
 
 // An array of all known endpoints/paths
-pub const ALL_PATHS: [&str; 8] = [
+pub const ALL_PATHS: [&str; 9] = [
     ABOUT_PATH,
+    DELEGATED_FETCH_PATH,
+    FETCH_PATH,
     GROTH16_VK_PATH,
     JWK_PATH,
     KEYLESS_CONFIG_PATH,
-    FETCH_PATH,
     SIGNATURE_PATH,
     VERIFY_PATH,
     VUF_PUB_KEY_PATH,
@@ -52,10 +58,6 @@ pub const ALL_PATHS: [&str; 8] = [
 // Content type constants
 const CONTENT_TYPE_JSON: &str = "application/json";
 const CONTENT_TYPE_TEXT: &str = "text/plain";
-
-// Origin header constants
-const MISSING_ORIGIN_STRING: &str = ""; // Default to empty string if origin header is missing
-const ORIGIN_HEADER: &str = "origin";
 
 // Useful message constants
 const METHOD_NOT_ALLOWED_MESSAGE: &str =
@@ -66,10 +68,11 @@ const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
-    vuf_private_key: &ark_bls12_381::Fr,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
+    account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
 ) -> Result<Response<Body>, Infallible>
 where
@@ -100,10 +103,11 @@ where
     // Invoke the handler and generate the response
     match request_handler
         .handle_request(
-            vuf_private_key,
+            vuf_keypair,
             jwk_cache,
             cached_resources,
             pepper_request,
+            account_recovery_managers,
             account_recovery_db,
         )
         .await
@@ -168,21 +172,25 @@ fn create_response_builder(origin: String, status_code: StatusCode) -> response:
 }
 
 /// Generates a response for the about endpoint
-fn generate_about_response(origin: String) -> Result<Response<Body>, Infallible> {
-    // Get the build information
-    let build_information = build_information!();
-
-    // Serialize the build information
-    let build_info_json = match serde_json::to_string_pretty(&build_information) {
-        Ok(json) => json,
-        Err(error) => {
-            error!("Failed to serialize build information to JSON: {}", error);
-            return generate_internal_server_error_response(origin);
-        },
-    };
+fn generate_about_response(
+    origin: String,
+    deployment_information: DeploymentInformation,
+) -> Result<Response<Body>, Infallible> {
+    // Serialize the deployment information
+    let deployment_info_json =
+        match serde_json::to_string_pretty(&deployment_information.get_deployment_information()) {
+            Ok(json) => json,
+            Err(error) => {
+                error!(
+                    "Failed to serialize deployment information to JSON: {}",
+                    error
+                );
+                return generate_internal_server_error_response(origin);
+            },
+        };
 
     // Generate the response
-    generate_json_response(origin, StatusCode::OK, build_info_json)
+    generate_json_response(origin, StatusCode::OK, deployment_info_json)
 }
 
 /// Generates a 400 response for bad requests
@@ -285,16 +293,6 @@ fn generate_options_response(origin: String) -> Result<Response<Body>, Infallibl
     Ok(response)
 }
 
-/// Extracts the origin header from the request
-fn get_request_origin(request: &Request<Body>) -> String {
-    request
-        .headers()
-        .get(ORIGIN_HEADER)
-        .and_then(|header_value| header_value.to_str().ok())
-        .unwrap_or(MISSING_ORIGIN_STRING)
-        .to_owned()
-}
-
 /// Generates a text response with the given status code and body string
 fn generate_text_response(
     origin: String,
@@ -311,13 +309,15 @@ fn generate_text_response(
 /// Handles the given request and returns a response
 pub async fn handle_request(
     request: Request<Body>,
-    vuf_keypair: Arc<(String, ark_bls12_381::Fr)>,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
+    account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
+    deployment_information: DeploymentInformation,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
-    let origin = get_request_origin(&request);
+    let origin = utils::get_request_origin(&request);
 
     // Handle any OPTIONS requests
     let request_method = request.method();
@@ -329,7 +329,7 @@ pub async fn handle_request(
     let request_path = request.uri().path();
     if request_method == Method::GET {
         match request_path {
-            ABOUT_PATH => return generate_about_response(origin),
+            ABOUT_PATH => return generate_about_response(origin, deployment_information.clone()),
             GROTH16_VK_PATH => {
                 let groth16_vk = cached_resources.read_on_chain_groth16_vk();
                 return generate_cached_resource_response(
@@ -352,25 +352,41 @@ pub async fn handle_request(
                 );
             },
             VUF_PUB_KEY_PATH => {
-                let (vuf_pub_key, _) = vuf_keypair.deref();
-                return generate_json_response(origin, StatusCode::OK, vuf_pub_key.clone());
+                return generate_json_response(
+                    origin,
+                    StatusCode::OK,
+                    vuf_keypair.vuf_public_key_json().clone(),
+                );
             },
             _ => { /* Continue below */ },
         };
     }
 
     // Handle any POST requests
-    let (_, vuf_priv_key) = vuf_keypair.deref();
     if request_method == Method::POST {
         match request_path {
+            DELEGATED_FETCH_PATH => {
+                return call_dedicated_request_handler(
+                    origin,
+                    request,
+                    vuf_keypair.clone(),
+                    jwk_cache,
+                    cached_resources,
+                    &V0DelegatedFetchHandler,
+                    account_recovery_managers,
+                    account_recovery_db,
+                )
+                .await
+            },
             FETCH_PATH => {
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0FetchHandler,
+                    account_recovery_managers,
                     account_recovery_db,
                 )
                 .await
@@ -379,10 +395,11 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0SignatureHandler,
+                    account_recovery_managers,
                     account_recovery_db,
                 )
                 .await
@@ -391,10 +408,11 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key,
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0VerifyHandler,
+                    account_recovery_managers,
                     account_recovery_db,
                 )
                 .await

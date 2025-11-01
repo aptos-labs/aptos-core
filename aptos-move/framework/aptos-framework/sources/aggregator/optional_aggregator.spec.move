@@ -123,21 +123,21 @@ spec aptos_framework::optional_aggregator {
     }
 
     spec destroy(optional_aggregator: OptionalAggregator) {
-        aborts_if is_parallelizable(optional_aggregator) && len(optional_aggregator.integer.vec) != 0;
-        aborts_if !is_parallelizable(optional_aggregator) && len(optional_aggregator.integer.vec) == 0;
+        aborts_if is_parallelizable(optional_aggregator) && option::is_some(optional_aggregator.integer);
+        aborts_if !is_parallelizable(optional_aggregator) && option::is_none(optional_aggregator.integer);
     }
 
     /// The aggregator exists and the integer does not exist when destroy the aggregator.
     spec destroy_optional_aggregator(optional_aggregator: OptionalAggregator): u128 {
-        aborts_if len(optional_aggregator.aggregator.vec) == 0;
-        aborts_if len(optional_aggregator.integer.vec) != 0;
+        aborts_if option::is_none(optional_aggregator.aggregator);
+        aborts_if option::is_some(optional_aggregator.integer);
         ensures result == aggregator::spec_get_limit(option::borrow(optional_aggregator.aggregator));
     }
 
     /// The integer exists and the aggregator does not exist when destroy the integer.
     spec destroy_optional_integer(optional_aggregator: OptionalAggregator): u128 {
-        aborts_if len(optional_aggregator.integer.vec) == 0;
-        aborts_if len(optional_aggregator.aggregator.vec) != 0;
+        aborts_if option::is_none(optional_aggregator.integer);
+        aborts_if option::is_some(optional_aggregator.aggregator);
         ensures result == option::borrow(optional_aggregator.integer).limit;
     }
 

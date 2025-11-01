@@ -16,7 +16,7 @@ ark-ff = { workspace = true }
 ark-poly = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
-bcs =  { workspace = true }
+bcs = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
@@ -28,7 +28,6 @@ more-asserts = { workspace = true }
 num-bigint = { workspace = true }
 num-integer = { workspace = true }
 num-traits = { workspace = true }
-once_cell = { workspace = true }
 pairing = { workspace = true }
 rand = { workspace = true }
 rand_core = { workspace = true }

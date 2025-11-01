@@ -3,7 +3,7 @@
 
 pub use aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION;
 use aptos_gas_schedule::{
-    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34},
+    gas_feature_versions::{RELEASE_V1_15, RELEASE_V1_30, RELEASE_V1_34, RELEASE_V1_38},
     AptosGasParameters,
 };
 use aptos_types::{
@@ -25,6 +25,10 @@ use once_cell::sync::OnceCell;
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
+
+/// If enabled, types layouts are cached in a global long-living cache. Caches ensure the behavior
+/// is the same as without caches, and so, using node config suffices.
+static LAYOUT_CACHES: OnceCell<bool> = OnceCell::new();
 
 /// Set the paranoid type check flag.
 pub fn set_paranoid_type_checks(enable: bool) {
@@ -54,6 +58,16 @@ pub fn set_timed_feature_override(profile: TimedFeatureOverride) {
 /// Returns the timed feature override, and [None] if not set.
 pub fn get_timed_feature_override() -> Option<TimedFeatureOverride> {
     TIMED_FEATURE_OVERRIDE.get().cloned()
+}
+
+/// Set the layout cache flag.
+pub fn set_layout_caches(enable: bool) {
+    LAYOUT_CACHES.set(enable).ok();
+}
+
+/// Returns the layout cache flag if already set, and false otherwise.
+pub fn get_layout_caches() -> bool {
+    LAYOUT_CACHES.get().cloned().unwrap_or(false)
 }
 
 /// Returns [TypeBuilder] used by the Aptos blockchain in production.
@@ -87,7 +101,6 @@ pub fn aptos_prod_deserializer_config(features: &Features) -> DeserializerConfig
 
 /// Returns [VerifierConfig] used by the Aptos blockchain in production.
 pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features) -> VerifierConfig {
-    let use_signature_checker_v2 = features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2);
     let sig_checker_v2_fix_script_ty_param_count =
         features.is_enabled(FeatureFlag::SIGNATURE_CHECKER_V2_SCRIPT_FIX);
     let sig_checker_v2_fix_function_signatures = gas_feature_version >= RELEASE_V1_34;
@@ -119,7 +132,7 @@ pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features)
         max_basic_blocks_in_script: None,
         max_per_fun_meter_units: Some(1000 * 80000),
         max_per_mod_meter_units: Some(1000 * 80000),
-        use_signature_checker_v2,
+        _use_signature_checker_v2: true,
         sig_checker_v2_fix_script_ty_param_count,
         sig_checker_v2_fix_function_signatures,
         enable_enum_types,
@@ -148,10 +161,12 @@ pub fn aptos_prod_vm_config(
 ) -> VMConfig {
     let paranoid_type_checks = get_paranoid_type_checks();
     let paranoid_ref_checks = get_paranoid_ref_checks();
+    let enable_layout_caches = get_layout_caches();
 
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
     let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
+    let enable_framework_for_option = features.is_enabled(FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION);
 
     let layout_max_size = if gas_feature_version >= RELEASE_V1_30 {
         512
@@ -186,14 +201,16 @@ pub fn aptos_prod_vm_config(
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
-        use_call_tree_and_instruction_cache: features
-            .is_call_tree_and_instruction_vm_cache_enabled(),
+        enable_function_caches: features.is_call_tree_and_instruction_vm_cache_enabled(),
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
         optimize_trusted_code: features.is_trusted_code_enabled(),
         paranoid_ref_checks,
         enable_capture_option,
         enable_enum_option,
+        enable_layout_caches,
+        propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
+        enable_framework_for_option,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

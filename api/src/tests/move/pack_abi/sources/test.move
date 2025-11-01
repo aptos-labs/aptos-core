@@ -1,12 +1,22 @@
 module abi::test {
+    use std::option;
 
     struct State has key {
         value: u64
     }
 
+    enum MyEnum has drop, store {
+        This,
+        That
+    }
+
     #[event]
     struct MyEvent has store {
         value: u64
+    }
+
+    struct TestOption has drop, copy {
+        o: option::Option<u64>
     }
 
     public fun public_function(s: &signer, state: State) {

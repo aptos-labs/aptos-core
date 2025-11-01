@@ -706,7 +706,7 @@ fun freeze_mut_ref::t8($t0: bool, $t1: &mut 0x42::freeze_mut_ref::S, $t2: &0x42:
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.freeze_mut_ref {
 struct G {
 	f: u64

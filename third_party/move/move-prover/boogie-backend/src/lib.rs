@@ -203,7 +203,7 @@ pub fn add_prelude(
     let mut bv_all_types = mono_info
         .all_types
         .iter()
-        .filter(|ty| ty.can_be_type_argument())
+        .filter(|ty| ty.can_be_type_argument() && !ty.is_signed_int())
         .map(|ty| TypeInfo::new(env, options, ty, true))
         .filter(|ty_info| !all_types.contains(ty_info))
         .collect::<BTreeSet<_>>()
@@ -212,10 +212,10 @@ pub fn add_prelude(
     all_types.append(&mut bv_all_types);
 
     // obtain bv number types appearing in the program, which is currently used to generate cast functions for bv types
-    let number_types = mono_info
+    let bv_number_types = mono_info
         .all_types
         .iter()
-        .filter(|ty| ty.is_number() && !matches!(ty, Type::Primitive(PrimitiveType::Num)))
+        .filter(|ty| ty.is_unsigned_int())
         .map(|ty| {
             boogie_num_type_base(env, None, ty)
                 .parse::<usize>()
@@ -224,7 +224,7 @@ pub fn add_prelude(
         .collect_vec();
     let bv_in_all_types = bv_instances
         .iter()
-        .filter(|bv_info| number_types.contains(&bv_info.base))
+        .filter(|bv_info| bv_number_types.contains(&bv_info.base))
         .map(|bv_info| bv_info.base)
         .collect_vec();
 

@@ -14,7 +14,7 @@ use aptos_types::event::EventKey;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
 use move_vm_types::{
@@ -32,9 +32,30 @@ pub struct NativeEventContext {
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
 
+impl SessionListener for NativeEventContext {
+    fn start(&mut self, _session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        // State is handled by finish-abort, session start does not impact anything.
+    }
+
+    fn finish(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn abort(&mut self) {
+        // TODO(sessions): implement
+    }
+}
+
 impl NativeEventContext {
-    pub fn into_events(self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
+    /// Returns events from the current context. Only used for non-continuous sessions which are
+    /// now legacy.
+    pub fn legacy_into_events(self) -> Vec<(ContractEvent, Option<MoveTypeLayout>)> {
         self.events
+    }
+
+    /// Returns iterator over all events seen so far.
+    pub fn events_iter(&self) -> impl Iterator<Item = &ContractEvent> {
+        self.events.iter().map(|(event, _)| event)
     }
 
     #[cfg(feature = "testing")]
@@ -114,8 +135,11 @@ fn native_write_to_event_store(
         ContractEvent::new_v1(key, seq_num, ty_tag, blob).map_err(|_| SafeNativeError::Abort {
             abort_code: ECANNOT_CREATE_EVENT,
         })?;
-    ctx.events
-        .push((event, contains_delayed_fields.then_some(layout)));
+    // TODO(layouts): avoid cloning layouts for events with delayed fields.
+    ctx.events.push((
+        event,
+        contains_delayed_fields.then(|| layout.as_ref().clone()),
+    ));
     Ok(smallvec![])
 }
 
@@ -174,7 +198,7 @@ fn native_emitted_events_by_handle(
                 })
         })
         .collect::<SafeNativeResult<Vec<Value>>>()?;
-    Ok(smallvec![Value::vector_for_testing_only(events)])
+    Ok(smallvec![Value::vector_unchecked(events)?])
 }
 
 #[cfg(feature = "testing")]
@@ -209,7 +233,7 @@ fn native_emitted_events(
                 })
         })
         .collect::<SafeNativeResult<Vec<Value>>>()?;
-    Ok(smallvec![Value::vector_for_testing_only(events)])
+    Ok(smallvec![Value::vector_unchecked(events)?])
 }
 
 #[inline]
@@ -282,8 +306,11 @@ fn native_write_module_event_to_store(
     let event = ContractEvent::new_v2(type_tag, blob).map_err(|_| SafeNativeError::Abort {
         abort_code: ECANNOT_CREATE_EVENT,
     })?;
-    ctx.events
-        .push((event, contains_delayed_fields.then_some(layout)));
+    // TODO(layouts): avoid cloning layouts for events with delayed fields.
+    ctx.events.push((
+        event,
+        contains_delayed_fields.then(|| layout.as_ref().clone()),
+    ));
 
     Ok(smallvec![])
 }

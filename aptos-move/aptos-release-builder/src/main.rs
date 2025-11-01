@@ -15,6 +15,7 @@ use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
+    jwks,
     jwks::{ObservedJWKs, SupportedOIDCProviders},
 };
 use clap::{Parser, Subcommand};
@@ -406,20 +407,28 @@ async fn main() -> anyhow::Result<()> {
                 )?
             );
 
-            let oidc_providers = fetch_config::<SupportedOIDCProviders>(&client);
+            let onchain_oidc_providers = fetch_config::<SupportedOIDCProviders>(&client);
             let observed_jwks = fetch_config::<ObservedJWKs>(&client);
             let jwk_consensus_config = fetch_config::<OnChainJWKConsensusConfig>(&client);
+            let oidc_providers = match jwk_consensus_config {
+                Ok(config) => {
+                    let providers = config
+                        .oidc_providers_cloned()
+                        .into_iter()
+                        .map(jwks::OIDCProvider::from)
+                        .collect();
+                    Some(SupportedOIDCProviders { providers })
+                },
+                Err(_) => onchain_oidc_providers.ok(),
+            };
             let randomness_config = fetch_config::<RandomnessConfigMoveStruct>(&client)
                 .and_then(OnChainRandomnessConfig::try_from);
             println!();
-            println!("SupportedOIDCProviders");
+            println!("OIDCProviders");
             println!("{:?}", oidc_providers);
             println!();
             println!("ObservedJWKs");
             println!("{:?}", observed_jwks);
-            println!();
-            println!("JWKConsensusConfig");
-            println!("{:?}", jwk_consensus_config);
             println!();
             println!("RandomnessConfig");
             println!("{:?}", randomness_config);

@@ -12,6 +12,7 @@ pub mod errmap;
 pub mod function;
 pub mod gas_algebra;
 pub mod identifier;
+pub mod int256;
 pub mod language_storage;
 pub mod metadata;
 pub mod move_resource;
@@ -21,7 +22,6 @@ pub mod proptest_types;
 mod safe_serialize;
 pub mod state;
 pub mod transaction_argument;
-pub mod u256;
 #[cfg(test)]
 mod unit_tests;
 pub mod value;

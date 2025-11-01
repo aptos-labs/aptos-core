@@ -18,7 +18,6 @@ use move_model::{
     model::FunctionEnv,
     ty::Type,
 };
-use num::BigInt;
 use std::fmt;
 
 #[derive(Default)]
@@ -95,22 +94,22 @@ impl UnnecessaryNumericalExtremeComparison {
             unreachable!("number must be primitive")
         };
         let max = ty.get_max_value()?;
-        let zero = BigInt::from(0);
+        let min = ty.get_min_value()?;
         match (lhs, cmp, rhs) {
-            (_, Lt, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Gt, _) if n == &zero => {
-                // exp < 0 || 0 > exp
+            (_, Lt, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Gt, _) if n == &min => {
+                // exp < min || min > exp
                 Some(AlwaysFalse)
             },
-            (_, Ge, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Le, _) if n == &zero => {
-                // exp >= 0 || 0 <= exp
+            (_, Ge, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Le, _) if n == &min => {
+                // exp >= min || min <= exp
                 Some(AlwaysTrue)
             },
-            (_, Le, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Ge, _) if n == &zero => {
-                // exp <= 0 || 0 >= exp
+            (_, Le, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Ge, _) if n == &min => {
+                // exp <= min || min >= exp
                 Some(UseEqInstead)
             },
-            (_, Gt, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Lt, _) if n == &zero => {
-                // exp > 0 || 0 < exp
+            (_, Gt, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Lt, _) if n == &min => {
+                // exp > min || min < exp
                 Some(UseNeqInstead)
             },
             (_, Gt, ExpValue(_, Number(n))) | (ExpValue(_, Number(n)), Lt, _) if *n == max => {

@@ -4,7 +4,10 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use crate::loaded_data::struct_name_indexing::StructNameIndex;
+use crate::{
+    loaded_data::struct_name_indexing::StructNameIndex,
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
+};
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
@@ -258,8 +261,36 @@ impl StructType {
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
-    pub module: ModuleId,
-    pub name: Identifier,
+    module: ModuleId,
+    interned_module_id: InternedModuleId,
+    name: Identifier,
+}
+
+impl StructIdentifier {
+    pub fn new(module_id_pool: &InternedModuleIdPool, module: ModuleId, name: Identifier) -> Self {
+        let interned_module_id = module_id_pool.intern_by_ref(&module);
+        Self {
+            module,
+            interned_module_id,
+            name,
+        }
+    }
+
+    pub fn module(&self) -> &ModuleId {
+        &self.module
+    }
+
+    pub fn interned_module_id(&self) -> InternedModuleId {
+        self.interned_module_id
+    }
+
+    pub fn name(&self) -> &Identifier {
+        &self.name
+    }
+
+    pub fn into_module_and_name(self) -> (ModuleId, Identifier) {
+        (self.module, self.name)
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -291,6 +322,12 @@ pub enum Type {
     U16,
     U32,
     U256,
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
 }
 
 pub struct TypePreorderTraversalIter<'a> {
@@ -300,7 +337,7 @@ pub struct TypePreorderTraversalIter<'a> {
 impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     type Item = &'a Type;
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn next(&mut self) -> Option<Self::Item> {
         use Type::*;
 
@@ -316,6 +353,12 @@ impl<'a> Iterator for TypePreorderTraversalIter<'a> {
                     | U64
                     | U128
                     | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
                     | Struct { .. }
                     | TyParam(..) => (),
 
@@ -425,6 +468,12 @@ impl Type {
             | U64
             | U128
             | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
             | Address
             | Vector(_)
             | Struct { .. }
@@ -446,6 +495,18 @@ impl Type {
     pub fn paranoid_check_is_bool_ty(&self) -> PartialVMResult<()> {
         if !matches!(self, Self::Bool) {
             let msg = format!("Expected boolean type, got {}", self);
+            return paranoid_failure!(msg);
+        }
+        Ok(())
+    }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub fn paranoid_check_is_sint_ty(&self) -> PartialVMResult<()> {
+        if !matches!(
+            self,
+            Self::I8 | Self::I16 | Self::I32 | Self::I64 | Self::I128 | Self::I256
+        ) {
+            let msg = format!("Expected signed integer type, got {}", self);
             return paranoid_failure!(msg);
         }
         Ok(())
@@ -691,6 +752,12 @@ impl Type {
             | Type::U32
             | Type::U256
             | Type::U128
+            | Type::I8
+            | Type::I64
+            | Type::I16
+            | Type::I32
+            | Type::I128
+            | Type::I256
             | Type::Address
             | Type::Signer
             | Type::Vector(_)
@@ -713,6 +780,12 @@ impl Type {
             | Type::U64
             | Type::U128
             | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
             | Type::Address => Ok(AbilitySet::PRIMITIVES),
 
             // Technically unreachable but, no point in erroring if we don't have to
@@ -820,6 +893,12 @@ impl Type {
                     | U64
                     | U128
                     | U256
+                    | I8
+                    | I16
+                    | I32
+                    | I64
+                    | I128
+                    | I256
                     | Vector(..)
                     | Struct { .. }
                     | Reference(..)
@@ -856,6 +935,12 @@ impl fmt::Display for Type {
             U64 => f.write_str("u64"),
             U128 => f.write_str("u128"),
             U256 => f.write_str("u256"),
+            I8 => f.write_str("i8"),
+            I16 => f.write_str("i16"),
+            I32 => f.write_str("i32"),
+            I64 => f.write_str("i64"),
+            I128 => f.write_str("i128"),
+            I256 => f.write_str("i256"),
             Address => f.write_str("address"),
             Signer => f.write_str("signer"),
             Vector(et) => write!(f, "vector<{}>", et),
@@ -906,47 +991,77 @@ impl TypeBuilder {
         }
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_bool_ty(&self) -> Type {
         Type::Bool
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_u8_ty(&self) -> Type {
         Type::U8
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_u16_ty(&self) -> Type {
         Type::U16
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_u32_ty(&self) -> Type {
         Type::U32
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_u64_ty(&self) -> Type {
         Type::U64
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_u128_ty(&self) -> Type {
         Type::U128
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_u256_ty(&self) -> Type {
         Type::U256
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
+    pub fn create_i8_ty(&self) -> Type {
+        Type::I8
+    }
+
+    #[inline(always)]
+    pub fn create_i16_ty(&self) -> Type {
+        Type::I16
+    }
+
+    #[inline(always)]
+    pub fn create_i32_ty(&self) -> Type {
+        Type::I32
+    }
+
+    #[inline(always)]
+    pub fn create_i64_ty(&self) -> Type {
+        Type::I64
+    }
+
+    #[inline(always)]
+    pub fn create_i128_ty(&self) -> Type {
+        Type::I128
+    }
+
+    #[inline(always)]
+    pub fn create_i256_ty(&self) -> Type {
+        Type::I256
+    }
+
+    #[inline(always)]
     pub fn create_address_ty(&self) -> Type {
         Type::Address
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline(always)]
     pub fn create_signer_ty(&self) -> Type {
         Type::Signer
     }
@@ -1116,6 +1231,12 @@ impl TypeBuilder {
             S::U64 => U64,
             S::U128 => U128,
             S::U256 => U256,
+            S::I8 => I8,
+            S::I16 => I16,
+            S::I32 => I32,
+            S::I64 => I64,
+            S::I128 => I128,
+            S::I256 => I256,
             S::Address => Address,
             S::Vector(elem_tok) => {
                 let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
@@ -1129,12 +1250,16 @@ impl TypeBuilder {
                 );
             },
 
-            tok => {
+            S::Signer
+            | S::Function(..)
+            | S::Reference(_)
+            | S::MutableReference(_)
+            | S::TypeParameter(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
                             "{:?} is not allowed or is not a meaningful token for a constant",
-                            tok
+                            const_tok
                         )),
                 );
             },
@@ -1230,6 +1355,12 @@ impl TypeBuilder {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I8 => I8,
+            I16 => I16,
+            I32 => I32,
+            I64 => I64,
+            I128 => I128,
+            I256 => I256,
             Address => Address,
             Signer => Signer,
             Vector(elem_ty) => {
@@ -1312,6 +1443,12 @@ impl TypeBuilder {
             T::U64 => U64,
             T::U128 => U128,
             T::U256 => U256,
+            T::I8 => I8,
+            T::I16 => I16,
+            T::I32 => I32,
+            T::I64 => I64,
+            T::I128 => I128,
+            T::I256 => I256,
             T::Address => Address,
             T::Signer => Signer,
             T::Vector(elem_ty_tag) => {
@@ -1483,6 +1620,12 @@ impl<'a> TypeParamMap<'a> {
             | (Type::U64, Type::U64)
             | (Type::U128, Type::U128)
             | (Type::U256, Type::U256)
+            | (Type::I8, Type::I8)
+            | (Type::I16, Type::I16)
+            | (Type::I32, Type::I32)
+            | (Type::I64, Type::I64)
+            | (Type::I128, Type::I128)
+            | (Type::I256, Type::I256)
             | (Type::Bool, Type::Bool)
             | (Type::Address, Type::Address)
             | (Type::Signer, Type::Signer) => true,
@@ -1495,6 +1638,12 @@ impl<'a> TypeParamMap<'a> {
             | (Type::U64, _)
             | (Type::U128, _)
             | (Type::U256, _)
+            | (Type::I8, _)
+            | (Type::I16, _)
+            | (Type::I32, _)
+            | (Type::I64, _)
+            | (Type::I128, _)
+            | (Type::I256, _)
             | (Type::Bool, _)
             | (Type::Address, _)
             | (Type::Signer, _)
@@ -1798,6 +1947,12 @@ mod unit_tests {
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U64)), U64);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U128)), U128);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U256)), U256);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I8)), I8);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I16)), I16);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I32)), I32);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I64)), I64);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I128)), I128);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I256)), I256);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::Bool)), Bool);
         assert_eq!(
             assert_ok!(ty_builder.create_constant_ty(&S::Address)),

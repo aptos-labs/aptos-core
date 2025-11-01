@@ -15,6 +15,7 @@ use aptos_native_interface::{
     safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
     SafeNativeResult,
 };
+use aptos_types::on_chain_config::TimedFeatureFlag;
 use better_any::{Tid, TidAble};
 use bytes::Bytes;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
@@ -22,10 +23,11 @@ use move_core_types::{
     account_address::AccountAddress, effects::Op, gas_algebra::NumBytes, identifier::Identifier,
     value::MoveTypeLayout, vm_status::StatusCode,
 };
-// ===========================================================================================
-// Public Data Structures and Constants
 pub use move_table_extension::{TableHandle, TableInfo, TableResolver};
-use move_vm_runtime::native_functions::{LoaderContext, NativeFunctionTable};
+use move_vm_runtime::{
+    native_extensions::SessionListener,
+    native_functions::{LoaderContext, NativeFunctionTable},
+};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
@@ -40,13 +42,16 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
+// ===========================================================================================
+// Public Data Structures and Constants
+
 /// The native table context extension. This needs to be attached to the NativeContextExtensions
 /// value which is passed into session functions, so its accessible from natives of this
 /// extension.
 #[derive(Tid)]
 pub struct NativeTableContext<'a> {
     resolver: &'a dyn TableResolver,
-    txn_hash: [u8; 32],
+    session_hash: [u8; 32],
     table_data: RefCell<TableData>,
 }
 
@@ -81,7 +86,7 @@ struct LayoutInfo {
 /// A structure representing a single table.
 struct Table {
     handle: TableHandle,
-    key_layout: MoveTypeLayout,
+    key_layout: TriompheArc<MoveTypeLayout>,
     value_layout_info: LayoutInfo,
     content: BTreeMap<Vec<u8>, GlobalValue>,
 }
@@ -105,13 +110,28 @@ pub struct TableChange {
 // =========================================================================================
 // Implementation of Native Table Context
 
+impl<'a> SessionListener for NativeTableContext<'a> {
+    fn start(&mut self, session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.session_hash = *session_hash;
+        // TODO(sessions): implement
+    }
+
+    fn finish(&mut self) {
+        // TODO(sessions): implement
+    }
+
+    fn abort(&mut self) {
+        // TODO(sessions): implement
+    }
+}
+
 impl<'a> NativeTableContext<'a> {
     /// Create a new instance of a native table context. This must be passed in via an
     /// extension into VM session functions.
-    pub fn new(txn_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
+    pub fn new(session_hash: [u8; 32], resolver: &'a dyn TableResolver) -> Self {
         Self {
             resolver,
-            txn_hash,
+            session_hash,
             table_data: Default::default(),
         }
     }
@@ -215,7 +235,7 @@ impl LayoutInfo {
             .type_to_type_layout_with_delayed_fields(value_ty)?
             .unpack();
         Ok(Self {
-            layout: TriompheArc::new(layout),
+            layout,
             contains_delayed_fields,
         })
     }
@@ -343,7 +363,7 @@ fn native_new_table_handle(
     // is unique, this should create a unique and deterministic global id.
     let mut digest = Sha3_256::new();
     let table_len = table_data.new_tables.len() as u32; // cast usize to u32 to ensure same length
-    Digest::update(&mut digest, table_context.txn_hash);
+    Digest::update(&mut digest, table_context.session_hash);
     Digest::update(&mut digest, table_len.to_be_bytes());
     let bytes = digest.finalize().to_vec();
     let handle = AccountAddress::from_bytes(&bytes[0..AccountAddress::LENGTH])
@@ -367,6 +387,8 @@ fn native_add_box(
     assert_eq!(args.len(), 3);
 
     context.charge(ADD_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -386,14 +408,17 @@ fn native_add_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
 
     let res = match gv.move_to(val) {
         Ok(_) => Ok(smallvec![]),
@@ -423,6 +448,8 @@ fn native_borrow_box(
     assert_eq!(args.len(), 2);
 
     context.charge(BORROW_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -441,14 +468,17 @@ fn native_borrow_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
 
     let res = match gv.borrow_global() {
         Ok(ref_val) => Ok(smallvec![ref_val]),
@@ -478,6 +508,8 @@ fn native_contains_box(
     assert_eq!(args.len(), 2);
 
     context.charge(CONTAINS_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -496,15 +528,18 @@ fn native_contains_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
-    let exists = Value::bool(gv.exists()?);
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
+    let exists = Value::bool(gv.exists());
 
     drop(table_data);
 
@@ -527,6 +562,8 @@ fn native_remove_box(
     assert_eq!(args.len(), 2);
 
     context.charge(REMOVE_BOX_BASE)?;
+    let fix_memory_double_counting =
+        context.timed_feature_enabled(TimedFeatureFlag::FixTableNativesMemoryDoubleCounting);
 
     let (extensions, mut loader_context, abs_val_gas_params, gas_feature_version) =
         context.extensions_with_loader_context_and_gas_params();
@@ -545,14 +582,17 @@ fn native_remove_box(
 
     let (gv, loaded) =
         table.get_or_create_global_value(&function_value_extension, table_context, key_bytes)?;
-    let mem_usage = gv
-        .view()
-        .map(|val| {
-            abs_val_gas_params
-                .abstract_heap_size(&val, gas_feature_version)
-                .map(u64::from)
-        })
-        .transpose()?;
+    let mem_usage = if !fix_memory_double_counting || loaded.is_some() {
+        gv.view()
+            .map(|val| {
+                abs_val_gas_params
+                    .abstract_heap_size(&val, gas_feature_version)
+                    .map(u64::from)
+            })
+            .transpose()?
+    } else {
+        None
+    };
 
     let res = match gv.move_from() {
         Ok(val) => Ok(smallvec![val]),

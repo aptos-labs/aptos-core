@@ -2,8 +2,8 @@
 name: Docker Build Rosetta
 
 on:
-  schedule:
-    - cron: "0 9 * * 1" # once a week
+  # schedule: # NOTE: the schedule is dictated by PIES
+  workflow_dispatch:
   pull_request:
     paths:
       - ".github/workflows/docker-build-rosetta.yaml"

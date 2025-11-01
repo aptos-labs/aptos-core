@@ -13,7 +13,7 @@
 //! It's used to compress mostly indexes into the main binary tables.
 use crate::file_format::Bytecode;
 use anyhow::{bail, Result};
-use move_core_types::value;
+use move_core_types::{int256, value};
 use std::{
     io::{Cursor, Read},
     mem::size_of,
@@ -142,7 +142,13 @@ pub enum SerializedType {
     U16                     = 0xD,
     U32                     = 0xE,
     U256                    = 0xF,
-    FUNCTION                = 0x10
+    FUNCTION                = 0x10,
+    I8                      = 0x11,
+    I16                     = 0x12,
+    I32                     = 0x13,
+    I64                     = 0x14,
+    I128                    = 0x15,
+    I256                    = 0x16,
 }
 
 /// A marker for an option in the serialized output.
@@ -316,6 +322,20 @@ pub enum Opcodes {
     PACK_CLOSURE                = 0x58,
     PACK_CLOSURE_GENERIC        = 0x59,
     CALL_CLOSURE                = 0x5A,
+    // Since bytecode version 9
+    LD_I8                       = 0x5B,
+    LD_I16                      = 0x5C,
+    LD_I32                      = 0x5D,
+    LD_I64                      = 0x5E,
+    LD_I128                     = 0x5F,
+    LD_I256                     = 0x60,
+    CAST_I8                     = 0x61,
+    CAST_I16                    = 0x62,
+    CAST_I32                    = 0x63,
+    CAST_I64                    = 0x64,
+    CAST_I128                   = 0x65,
+    CAST_I256                   = 0x66,
+    NEGATE                      = 0x67
 }
 
 /// Upper limit on the binary size
@@ -441,10 +461,7 @@ pub(crate) fn write_u128(binary: &mut BinaryData, value: u128) -> Result<()> {
 }
 
 /// Write a `u256` in Little Endian format.
-pub(crate) fn write_u256(
-    binary: &mut BinaryData,
-    value: move_core_types::u256::U256,
-) -> Result<()> {
+pub(crate) fn write_u256(binary: &mut BinaryData, value: int256::U256) -> Result<()> {
     binary.extend(&value.to_le_bytes())
 }
 
@@ -530,8 +547,13 @@ pub const VERSION_7: u32 = 7;
 /// + closure instructions
 pub const VERSION_8: u32 = 8;
 
+/// Version 9: changes compared to version 8
+/// + signed integers
+/// + allow `$` in identifiers
+pub const VERSION_9: u32 = 9;
+
 /// Mark which version is the latest version.
-pub const VERSION_MAX: u32 = VERSION_8;
+pub const VERSION_MAX: u32 = VERSION_9;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
@@ -540,6 +562,9 @@ pub const VERSION_DEFAULT: u32 = VERSION_8;
 
 /// Mark which version is the default version if compiling Move 2.
 pub const VERSION_DEFAULT_LANG_V2: u32 = VERSION_8;
+
+/// Mark which version is the default version if compiling with language version 2.3
+pub const VERSION_DEFAULT_LANG_V2_3: u32 = VERSION_9;
 
 // Mark which oldest version is supported.
 pub const VERSION_MIN: u32 = VERSION_5;
@@ -809,6 +834,20 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         PackClosure(..) => Opcodes::PACK_CLOSURE,
         PackClosureGeneric(..) => Opcodes::PACK_CLOSURE_GENERIC,
         CallClosure(_) => Opcodes::CALL_CLOSURE,
+        // Since bytecode version 9
+        LdI8(_) => Opcodes::LD_I8,
+        LdI16(_) => Opcodes::LD_I16,
+        LdI32(_) => Opcodes::LD_I32,
+        LdI64(_) => Opcodes::LD_I64,
+        LdI128(_) => Opcodes::LD_I128,
+        LdI256(_) => Opcodes::LD_I256,
+        CastI8 => Opcodes::CAST_I8,
+        CastI16 => Opcodes::CAST_I16,
+        CastI32 => Opcodes::CAST_I32,
+        CastI64 => Opcodes::CAST_I64,
+        CastI128 => Opcodes::CAST_I128,
+        CastI256 => Opcodes::CAST_I256,
+        Negate => Opcodes::NEGATE,
     };
     opcode as u8
 }

@@ -365,7 +365,7 @@ impl Execution {
         // Update features if needed to the correct binary format used by V2 compiler.
         let mut features = Features::fetch_config(&state).unwrap_or_default();
         if v2_flag {
-            features.enable(FeatureFlag::VM_BINARY_FORMAT_V8);
+            features.enable(FeatureFlag::VM_BINARY_FORMAT_V9);
         } else {
             features.enable(FeatureFlag::VM_BINARY_FORMAT_V6);
         }

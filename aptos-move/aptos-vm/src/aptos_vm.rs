@@ -44,7 +44,7 @@ use aptos_gas_algebra::{Gas, GasQuantity, NumBytes, Octa};
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra};
 use aptos_gas_schedule::{
     gas_feature_versions,
-    gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27},
+    gas_feature_versions::{RELEASE_V1_10, RELEASE_V1_27, RELEASE_V1_38},
     AptosGasParameters, VMGasParameters,
 };
 use aptos_logger::{enabled, prelude::*, Level};
@@ -563,8 +563,11 @@ impl AptosVM {
             }
         }
 
-        let txn_status =
-            TransactionStatus::from_vm_status(error_vm_status.clone(), self.features());
+        let txn_status = TransactionStatus::from_vm_status(
+            error_vm_status.clone(),
+            self.features(),
+            self.gas_feature_version() >= RELEASE_V1_38,
+        );
 
         match txn_status {
             TransactionStatus::Keep(status) => {
@@ -2611,8 +2614,11 @@ impl AptosVM {
                         );
                     },
                 }
-                let txn_status =
-                    TransactionStatus::from_vm_status(vm_status.clone(), vm.features());
+                let txn_status = TransactionStatus::from_vm_status(
+                    vm_status.clone(),
+                    vm.features(),
+                    vm.gas_feature_version() >= RELEASE_V1_38,
+                );
                 let execution_status = match txn_status {
                     TransactionStatus::Keep(status) => status,
                     _ => ExecutionStatus::MiscellaneousError(Some(vm_status.status_code())),

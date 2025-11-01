@@ -1,0 +1,15 @@
+rules:
+  - id: disallow-schedule-in-github-workflow
+    languages:
+      - yaml
+    severity: ERROR
+    message: "schedule trigger is disallowed! Use `workflow_dispatch` instead. The workflow can instead be workflow_dispatched via PIES on a schedule"
+    patterns:
+      - pattern-inside: |
+          on:
+            ...
+      - pattern: schedule
+    paths:
+      include:
+        - "/.github/workflows/*.yaml"
+        - "/.github/workflows/*.yml"

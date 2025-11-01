@@ -6,6 +6,10 @@
 /// which means specify that this order with a client order id is cancelled even before the order is placed.
 /// This reduces the latency to submit a cancellation transaction from 500 ms to 0.
 module aptos_experimental::pre_cancellation_tracker {
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::order_operations;
+    friend aptos_experimental::market_types;
+
     use std::string::String;
     use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
@@ -48,7 +52,7 @@ module aptos_experimental::pre_cancellation_tracker {
         )
     }
 
-    public(package) fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
+    public(friend) fun new_pre_cancellation_tracker(expiration_time_secs: u64): PreCancellationTracker {
         PreCancellationTracker {
             pre_cancellation_window_secs: expiration_time_secs,
             expiration_with_order_ids: new_default_big_ordered_map(),
@@ -56,23 +60,27 @@ module aptos_experimental::pre_cancellation_tracker {
         }
     }
 
-    public(package) fun pre_cancel_order_for_tracker(
+    public(friend) fun pre_cancel_order_for_tracker(
         tracker: &mut PreCancellationTracker,
         account: address,
         client_order_id: String
     ) {
         garbage_collect(tracker);
         let account_order_id = new_account_client_order_id(account, client_order_id);
-        if (tracker.account_order_ids.contains(&account_order_id)) {
+
+        // If the account_order_id already exists with a previously set expiration time,
+        // we update the expiration time.
+        let prev_expiration_time = tracker.account_order_ids.remove_or_none(&account_order_id);
+        if (prev_expiration_time.is_some()) {
             // If the account_order_id already exists with a previously set expiration time,
             // we update the expiration time.
-            let expiration_time = tracker.account_order_ids.remove(&account_order_id);
+            let expiration_time = prev_expiration_time.destroy_some();
             let order_id_with_expiration =
                 ExpirationAndOrderId { expiration_time, account_order_id };
             // If the mapping exists, then we remove the order ID with its expiration time.
             tracker.expiration_with_order_ids.remove(&order_id_with_expiration);
         };
-        let current_time = aptos_std::timestamp::now_microseconds();
+        let current_time = aptos_std::timestamp::now_seconds();
         let expiration_time = current_time + tracker.pre_cancellation_window_secs;
         let order_id_with_expiration = ExpirationAndOrderId {
             expiration_time,
@@ -82,7 +90,7 @@ module aptos_experimental::pre_cancellation_tracker {
         tracker.expiration_with_order_ids.add(order_id_with_expiration, true);
     }
 
-    public(package) fun is_pre_cancelled(
+    public(friend) fun is_pre_cancelled(
         tracker: &mut PreCancellationTracker,
         account: address,
         client_order_id: String
@@ -107,7 +115,7 @@ module aptos_experimental::pre_cancellation_tracker {
         return false
     }
 
-    public(package) fun garbage_collect(tracker: &mut PreCancellationTracker) {
+    public(friend) fun garbage_collect(tracker: &mut PreCancellationTracker) {
         let i = 0;
         let current_time = aptos_std::timestamp::now_seconds();
         while (i < MAX_ORDERS_GARBAGE_COLLECTED_PER_CALL

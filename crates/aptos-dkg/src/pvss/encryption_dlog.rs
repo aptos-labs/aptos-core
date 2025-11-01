@@ -49,13 +49,7 @@ macro_rules! encryption_dlog_pp_impl {
 /// any function of the SK via the `crate::pvss::traits::Convert` trait (e.g., $pk = h^{sk^{-1}}$).
 macro_rules! encryption_dlog_keys_impl {
     ($GT_PROJ_NUM_BYTES:ident, $gt_proj_from_bytes:ident, $GTProjective:ident) => {
-        use crate::{
-            constants::{$GT_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
-            utils::{
-                random::random_scalar,
-                serialization::{scalar_from_bytes_le, $gt_proj_from_bytes},
-            },
-        };
+        use aptos_crypto::blstrs::{$GT_PROJ_NUM_BYTES, $gt_proj_from_bytes, random_scalar, scalar_from_bytes_le, SCALAR_NUM_BYTES};
         use aptos_crypto::{
             CryptoMaterialError, Length, Uniform, ValidCryptoMaterial, ValidCryptoMaterialStringExt,
         };

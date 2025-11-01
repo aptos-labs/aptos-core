@@ -20,13 +20,13 @@ macro_rules! panic_error {
 /// Represents a unique identifier for the struct name. Note that this index has no public
 /// constructor - the only way to construct it is via [StructNameIndexMap].
 #[derive(Debug, Copy, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct StructNameIndex(usize);
+pub struct StructNameIndex(u32);
 
 impl StructNameIndex {
     /// Creates a new index for testing purposes only. For production, indices must always be
     /// created by the data structure that uses them to intern struct names.
     #[cfg(any(test, feature = "testing"))]
-    pub fn new(idx: usize) -> Self {
+    pub fn new(idx: u32) -> Self {
         Self(idx)
     }
 }
@@ -39,7 +39,7 @@ impl std::fmt::Display for StructNameIndex {
 
 #[derive(Clone)]
 struct IndexMap<T: Clone + Ord> {
-    forward_map: BTreeMap<T, usize>,
+    forward_map: BTreeMap<T, u32>,
     backward_map: Vec<Arc<T>>,
 }
 
@@ -89,7 +89,7 @@ impl StructNameIndexMap {
                 return Ok(StructNameIndex(*idx));
             }
 
-            let idx = index_map.backward_map.len();
+            let idx = index_map.backward_map.len() as u32;
             index_map.backward_map.push(backward_value);
             index_map.forward_map.insert(forward_key, idx);
             idx
@@ -102,7 +102,7 @@ impl StructNameIndexMap {
         index_map: &'a parking_lot::RwLockReadGuard<IndexMap<StructIdentifier>>,
         idx: StructNameIndex,
     ) -> PartialVMResult<&'a Arc<StructIdentifier>> {
-        index_map.backward_map.get(idx.0).ok_or_else(|| {
+        index_map.backward_map.get(idx.0 as usize).ok_or_else(|| {
             let msg = format!(
                 "Index out of bounds when accessing struct name reference \
                      at index {}, backward map length: {}",
@@ -141,9 +141,9 @@ impl StructNameIndexMap {
         let index_map = self.0.read();
         let struct_name = Self::idx_to_struct_name_helper(&index_map, idx)?.as_ref();
         Ok(StructTag {
-            address: *struct_name.module.address(),
-            module: struct_name.module.name().to_owned(),
-            name: struct_name.name.clone(),
+            address: *struct_name.module().address(),
+            module: struct_name.module().name().to_owned(),
+            name: struct_name.name().clone(),
             type_args: ty_args,
         })
     }
@@ -172,6 +172,7 @@ impl StructNameIndexMap {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::module_id_interner::{test_util::TEST_MODULE_ID_POOL, InternedModuleIdPool};
     use claims::{assert_err, assert_ok};
     use move_core_types::{
         account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
@@ -179,10 +180,14 @@ mod test {
     use proptest::{arbitrary::any, collection::vec, proptest, strategy::Strategy};
     use std::sync::Arc;
 
-    fn make_struct_name(module_name: &str, struct_name: &str) -> StructIdentifier {
+    fn make_struct_name(
+        module_id_pool: &InternedModuleIdPool,
+        module_name: &str,
+        struct_name: &str,
+    ) -> StructIdentifier {
         let module = ModuleId::new(AccountAddress::ONE, Identifier::new(module_name).unwrap());
         let name = Identifier::new(struct_name).unwrap();
-        StructIdentifier { module, name }
+        StructIdentifier::new(module_id_pool, module, name)
     }
 
     #[test]
@@ -194,14 +199,15 @@ mod test {
     #[test]
     fn test_index_map() {
         let struct_name_idx_map = StructNameIndexMap::empty();
+        let module_id_pool = InternedModuleIdPool::new();
 
         // First-time access.
 
-        let foo = make_struct_name("foo", "Foo");
+        let foo = make_struct_name(&module_id_pool, "foo", "Foo");
         let foo_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&foo));
         assert_eq!(foo_idx.0, 0);
 
-        let bar = make_struct_name("bar", "Bar");
+        let bar = make_struct_name(&module_id_pool, "bar", "Bar");
         let bar_idx = assert_ok!(struct_name_idx_map.struct_name_to_idx(&bar));
         assert_eq!(bar_idx.0, 1);
 
@@ -225,9 +231,9 @@ mod test {
         let address = any::<AccountAddress>();
         let module_identifier = any::<Identifier>();
         let struct_identifier = any::<Identifier>();
-        (address, module_identifier, struct_identifier).prop_map(|(a, m, name)| StructIdentifier {
-            module: ModuleId::new(a, m),
-            name,
+        (address, module_identifier, struct_identifier).prop_map(|(a, m, name)| {
+            let module = ModuleId::new(a, m);
+            StructIdentifier::new(&TEST_MODULE_ID_POOL, module, name)
         })
     }
 
@@ -257,7 +263,9 @@ mod test {
     #[test]
     fn test_index_map_concurrent_single_struct_name() {
         let struct_name_idx_map = Arc::new(StructNameIndexMap::empty());
-        let struct_name = make_struct_name("foo", "Foo");
+        let module_id_pool = InternedModuleIdPool::new();
+
+        let struct_name = make_struct_name(&module_id_pool, "foo", "Foo");
 
         // Each threads tries to cache the same struct name.
         std::thread::scope(|s| {

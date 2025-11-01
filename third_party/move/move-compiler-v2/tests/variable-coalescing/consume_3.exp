@@ -216,7 +216,7 @@ public fun m::test_($t0: 0xc0ffee::m::W) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module c0ffee.m {
 struct W has copy, drop {
 	a: u32

@@ -23,18 +23,34 @@ use move_model::{
     ty::Type,
     well_known,
 };
+use once_cell::sync::Lazy;
 use petgraph::{algo::kosaraju_scc, prelude::DiGraphMap};
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, env};
 
 /// [TODO]: tune the heuristic limits below
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a caller function can grow to due to inlining.
-const MAX_CALLER_CODE_SIZE: usize = 1024;
+pub static MAX_CALLER_CODE_SIZE: Lazy<usize> = Lazy::new(|| {
+    env::var("MAX_CALLER_CODE_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1024)
+});
 /// A conservative heuristic limit posed by the inlining optimization on how
 /// large a callee function can be for it to be considered for inlining.
-const MAX_CALLEE_CODE_SIZE: usize = 128;
+pub static MAX_CALLEE_CODE_SIZE: Lazy<usize> = Lazy::new(|| {
+    env::var("MAX_CALLEE_CODE_SIZE")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(128)
+});
 /// Number of times we want to apply "unrolling" of functions with inlining.
-const UNROLL_DEPTH: usize = 10;
+pub static UNROLL_DEPTH: Lazy<usize> = Lazy::new(|| {
+    env::var("UNROLL_DEPTH")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10)
+});
 
 /// Optimize functions in target modules by applying inlining transformations.
 /// With inlining, a call site of the form:
@@ -54,7 +70,9 @@ const UNROLL_DEPTH: usize = 10;
 /// With across-package inlining, calls to functions in other packages may be inlined,
 /// which means that if the other package is upgraded, one would get the behavior
 /// at the inline-time rather than the latest upgrade.
-pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
+/// With `allow_non_primary_targets`, inlining optimization is performed to functions
+/// that do not belong to the primary target.
+pub fn optimize(env: &mut GlobalEnv, across_package: bool, allow_non_primary_targets: bool) {
     let mut targets = RewriteTargets::create(env, RewritingScope::CompilationTarget);
     let skip_functions = find_cycles_in_call_graph(env, &targets);
     targets.filter(|target, _| {
@@ -62,7 +80,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             let function = env.get_function(*function_id);
             // We will consider inlining the callees in a function only if it satisfies all of:
             // - is not a part of a cycle in the call graph
-            // - is in a primary target module
+            // - is in a primary target module (if `allow_non_primary_targets` is false)
             // - is not in a script module
             // - is not a test only function
             // - is not a verify only function
@@ -70,7 +88,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
             // - is not an inline function
             // - does not have the `#[module_lock]` attribute
             !skip_functions.contains(function_id)
-                && function.module_env.is_primary_target()
+                && (allow_non_primary_targets || function.module_env.is_primary_target())
                 && !function.module_env.is_script_module()
                 && !function.is_test_only()
                 && !function.is_verify_only()
@@ -84,7 +102,7 @@ pub fn optimize(env: &mut GlobalEnv, across_package: bool) {
     });
     let mut todo: Vec<_> = targets.keys().collect();
     // Each time you unroll, a call site may be substituted with the original body of the callee.
-    for _ in 0..UNROLL_DEPTH {
+    for _ in 0..*UNROLL_DEPTH {
         if todo.is_empty() {
             break;
         }
@@ -131,6 +149,7 @@ fn inline_call_sites(
                 def,
                 caller_size,
                 across_package,
+                &function_env,
             );
             let mut rewriter = CallerRewriter { env, call_sites };
             // Rewrite the caller's body with inlined call sites.
@@ -213,6 +232,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
     def: &Exp,
     caller_function_size: FunctionSize,
     across_package: bool,
+    caller_func_env: &FunctionEnv,
 ) -> (BTreeSet<NodeId>, FunctionSize) {
     let caller_mid = caller_module.get_id();
     let callees = def.called_funs_with_callsites_and_loop_depth();
@@ -224,8 +244,9 @@ fn compute_call_sites_to_inline_and_new_function_size(
             let callee_size = get_function_size_estimate(env, &callee);
             if callee_env.is_inline()
                 || callee_env.is_native()
-                || callee_size.code_size > MAX_CALLEE_CODE_SIZE
+                || callee_size.code_size > *MAX_CALLEE_CODE_SIZE
                 || has_explicit_return(&callee_env)
+                || has_abort(&callee_env, caller_func_env)
                 || has_privileged_operations(caller_mid, &callee_env)
                 || has_invisible_calls(caller_module, &callee_env, across_package)
                 || has_module_lock_attribute(&callee_env)
@@ -242,6 +263,7 @@ fn compute_call_sites_to_inline_and_new_function_size(
                 // - callee has calls to functions that are not visible from the caller module
                 // - callee has the `#[module_lock]` attribute
                 // - callee has runtime access control checks
+                // - callee has an abort expression
                 None
             } else {
                 let function_size = get_function_size_estimate(env, &callee);
@@ -503,6 +525,25 @@ fn has_explicit_return(function: &FunctionEnv) -> bool {
     let mut found = false;
     exp.visit_pre_order(&mut |e: &ExpData| {
         if let ExpData::Return(..) = e {
+            found = true;
+        }
+        // Keep going if not yet found
+        !found
+    });
+    found
+}
+
+/// Does `function` have an abort expression in its body?
+fn has_abort(function: &FunctionEnv, caller: &FunctionEnv) -> bool {
+    let Some(exp) = function.get_def() else {
+        return false;
+    };
+    if function.module_env.get_id() == caller.module_env.get_id() {
+        return false;
+    }
+    let mut found = false;
+    exp.visit_pre_order(&mut |e: &ExpData| {
+        if let ExpData::Call(_, Operation::Abort, _) = e {
             found = true;
         }
         // Keep going if not yet found

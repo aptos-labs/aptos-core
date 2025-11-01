@@ -1315,6 +1315,8 @@ Disables confidential transfers for the specified token.
 
 Sets the auditor's public key for the specified token.
 
+NOTE: Ensures that new_auditor_ek is a valid Ristretto255 point
+
 
 <pre><code><b>public</b> <b>fun</b> <a href="confidential_asset.md#0x7_confidential_asset_set_auditor">set_auditor</a>(aptos_framework: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, token: <a href="../../aptos-framework/doc/object.md#0x1_object_Object">object::Object</a>&lt;<a href="../../aptos-framework/doc/fungible_asset.md#0x1_fungible_asset_Metadata">fungible_asset::Metadata</a>&gt;, new_auditor_ek: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;)
 </code></pre>
@@ -1570,7 +1572,7 @@ Returns the encryption key (EK) of the user for the specified token.
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="confidential_asset.md#0x7_confidential_asset_ECA_STORE_NOT_PUBLISHED">ECA_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>borrow_global_mut</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>&gt;(<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)).ek
+    <b>borrow_global</b>&lt;<a href="confidential_asset.md#0x7_confidential_asset_ConfidentialAssetStore">ConfidentialAssetStore</a>&gt;(<a href="confidential_asset.md#0x7_confidential_asset_get_user_address">get_user_address</a>(user, token)).ek
 }
 </code></pre>
 

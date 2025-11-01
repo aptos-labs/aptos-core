@@ -262,6 +262,12 @@ impl<'a> TypeTagConverter<'a> {
             Type::U64 => TypeTag::U64,
             Type::U128 => TypeTag::U128,
             Type::U256 => TypeTag::U256,
+            Type::I8 => TypeTag::I8,
+            Type::I16 => TypeTag::I16,
+            Type::I32 => TypeTag::I32,
+            Type::I64 => TypeTag::I64,
+            Type::I128 => TypeTag::I128,
+            Type::I256 => TypeTag::I256,
             Type::Address => TypeTag::Address,
             Type::Signer => TypeTag::Signer,
 
@@ -512,19 +518,23 @@ mod tests {
         );
 
         // Structs.
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
         let bar_idx = runtime_environment
             .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
-                name: Identifier::new("Bar").unwrap(),
-            })
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Bar").unwrap(),
+            ))
             .unwrap();
+        let module_id = ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap());
         let foo_idx = runtime_environment
             .struct_name_index_map()
-            .struct_name_to_idx(&StructIdentifier {
-                module: ModuleId::new(AccountAddress::TWO, Identifier::new("foo").unwrap()),
-                name: Identifier::new("Foo").unwrap(),
-            })
+            .struct_name_to_idx(&StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new("Foo").unwrap(),
+            ))
             .unwrap();
 
         let struct_ty =
@@ -596,10 +606,12 @@ mod tests {
         let runtime_environment = RuntimeEnvironment::new_with_config(vec![], vm_config);
         let ty_tag_converter = TypeTagConverter::new(&runtime_environment);
 
-        let id = StructIdentifier {
-            module: ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap()),
-            name: Identifier::new("Foo").unwrap(),
-        };
+        let module_id = ModuleId::new(AccountAddress::ONE, Identifier::new("foo").unwrap());
+        let id = StructIdentifier::new(
+            runtime_environment.module_id_pool(),
+            module_id,
+            Identifier::new("Foo").unwrap(),
+        );
         let idx = runtime_environment
             .struct_name_index_map()
             .struct_name_to_idx(&id)

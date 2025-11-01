@@ -3,11 +3,11 @@
 
 //! This submodule implements the *public parameters* for this PVSS scheme.
 
-use crate::{
-    constants::G2_PROJ_NUM_BYTES,
-    pvss::{encryption_elgamal, traits},
+use crate::pvss::{encryption_elgamal, traits};
+use aptos_crypto::{
+    blstrs::G2_PROJ_NUM_BYTES, CryptoMaterialError, ValidCryptoMaterial,
+    ValidCryptoMaterialStringExt,
 };
-use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blstrs::{G1Projective, G2Projective};
 use pairing::group::Group;

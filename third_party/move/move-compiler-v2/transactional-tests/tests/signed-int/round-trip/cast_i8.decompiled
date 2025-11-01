@@ -1,0 +1,152 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i8.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128u8 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128u16 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128u32 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128u128 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128u256 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128i16 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128i32 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128i64 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128i128 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 128i256 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -129i16 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -129i32 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -129i64 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -129i128 as i8;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -129i256 as i8;
+    }
+}
