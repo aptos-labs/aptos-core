@@ -14,9 +14,9 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::convert::TryInto;
+use std::{cmp::Ordering, convert::TryInto, ops::Deref, rc::Rc};
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct WrappedAbilitySet(pub AbilitySet);
 
 impl Serialize for WrappedAbilitySet {
@@ -41,7 +41,7 @@ impl<'de> Deserialize<'de> for WrappedAbilitySet {
 }
 
 /// VM representation of a struct type in Move.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct FatStructType {
     pub address: AccountAddress,
     pub module: Identifier,
@@ -51,20 +51,20 @@ pub(crate) struct FatStructType {
     pub layout: FatStructLayout,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum FatStructLayout {
     Singleton(Vec<FatType>),
     Variants(Vec<Vec<FatType>>),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) struct FatFunctionType {
     pub args: Vec<FatType>,
     pub results: Vec<FatType>,
     pub abilities: AbilitySet,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum FatType {
     Bool,
     U8,
@@ -73,7 +73,7 @@ pub(crate) enum FatType {
     Address,
     Signer,
     Vector(Box<FatType>),
-    Struct(Box<FatStructType>),
+    Struct(FatStructRef),
     Reference(Box<FatType>),
     MutableReference(Box<FatType>),
     TyParam(usize),
@@ -97,44 +97,65 @@ pub(crate) enum FatType {
     I256,
 }
 
-impl FatStructType {
-    fn clone_with_limit(&self, limit: &mut Limiter) -> PartialVMResult<Self> {
-        limit.charge(std::mem::size_of::<AccountAddress>())?;
-        limit.charge(self.module.as_bytes().len())?;
-        limit.charge(self.name.as_bytes().len())?;
+/// A representation for fat structs which assumes
+/// that they are interned, enabling fast pointer comparison.
+/// We can do this since `FatType` is crate private and we
+/// know ordering is only used for caching; otherwise we
+/// would need to be concerned for `ptr(rc1) != ptr(rc2)`
+/// not representing structural disequality. But it is
+/// only (?) a cache miss.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(transparent)]
+pub(crate) struct FatStructRef {
+    rc: Rc<FatStructType>,
+}
 
-        Ok(Self {
-            address: self.address,
-            module: self.module.clone(),
-            name: self.name.clone(),
-            abilities: self.abilities,
-            ty_args: self
-                .ty_args
-                .iter()
-                .map(|ty| ty.clone_with_limit(limit))
-                .collect::<PartialVMResult<_>>()?,
-            layout: match &self.layout {
-                FatStructLayout::Singleton(fields) => FatStructLayout::Singleton(
-                    fields
-                        .iter()
-                        .map(|ty| ty.clone_with_limit(limit))
-                        .collect::<PartialVMResult<_>>()?,
-                ),
-                FatStructLayout::Variants(variants) => FatStructLayout::Variants(
-                    variants
-                        .iter()
-                        .map(|fields| {
-                            fields
-                                .iter()
-                                .map(|ty| ty.clone_with_limit(limit))
-                                .collect::<PartialVMResult<Vec<_>>>()
-                        })
-                        .collect::<PartialVMResult<_>>()?,
-                ),
-            },
-        })
+impl FatStructRef {
+    pub(crate) fn new(data: FatStructType) -> Self {
+        FatStructRef { rc: Rc::new(data) }
     }
+}
 
+impl AsRef<FatStructType> for FatStructRef {
+    #[inline]
+    fn as_ref(&self) -> &FatStructType {
+        self.rc.as_ref()
+    }
+}
+impl Deref for FatStructRef {
+    type Target = FatStructType;
+
+    #[inline]
+    fn deref(&self) -> &FatStructType {
+        self.rc.as_ref()
+    }
+}
+
+impl PartialEq for FatStructRef {
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        // Notice we could also implement full semantics, but it's likely more expensive than
+        // accepting cache misses.
+        Rc::ptr_eq(&self.rc, &other.rc)
+    }
+}
+impl Eq for FatStructRef {}
+
+impl PartialOrd for FatStructRef {
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for FatStructRef {
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        (Rc::as_ptr(&self.rc) as usize).cmp(&(Rc::as_ptr(&other.rc) as usize))
+    }
+}
+
+impl FatStructType {
     pub fn subst(
         &self,
         ty_args: &[FatType],
@@ -269,7 +290,7 @@ impl FatType {
             Vector(ty) => Vector(Box::new(ty.clone_with_limit(limit)?)),
             Reference(ty) => Reference(Box::new(ty.clone_with_limit(limit)?)),
             MutableReference(ty) => MutableReference(Box::new(ty.clone_with_limit(limit)?)),
-            Struct(struct_ty) => Struct(Box::new(struct_ty.clone_with_limit(limit)?)),
+            Struct(struct_ty) => Struct(struct_ty.clone()),
             Function(fun_ty) => Function(Box::new(fun_ty.clone_with_limit(limit)?)),
             Runtime(tys) => Runtime(Self::clone_with_limit_slice(tys, limit)?),
             RuntimeVariants(vars) => RuntimeVariants(
@@ -321,7 +342,7 @@ impl FatType {
             Reference(ty) => Reference(Box::new(ty.subst(ty_args, limit)?)),
             MutableReference(ty) => MutableReference(Box::new(ty.subst(ty_args, limit)?)),
 
-            Struct(struct_ty) => Struct(Box::new(struct_ty.subst(ty_args, limit)?)),
+            Struct(struct_ty) => Struct(FatStructRef::new(struct_ty.subst(ty_args, limit)?)),
 
             Function(fun_ty) => Function(Box::new(fun_ty.subst(ty_args, limit)?)),
             Runtime(tys) => Runtime(
@@ -458,7 +479,7 @@ impl From<&TypeTag> for FatType {
             TypeTag::Address => Address,
             TypeTag::Signer => Signer,
             TypeTag::Vector(inner) => Vector(Box::new(inner.as_ref().into())),
-            TypeTag::Struct(inner) => Struct(Box::new(inner.as_ref().into())),
+            TypeTag::Struct(inner) => Struct(FatStructRef::new(inner.as_ref().into())),
             TypeTag::Function(inner) => Function(Box::new(inner.as_ref().into())),
             TypeTag::U256 => U256,
         }
