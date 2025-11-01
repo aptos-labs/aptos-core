@@ -856,15 +856,22 @@ module aptos_framework::transaction_validation {
 
             if (transaction_fee_amount > storage_fee_refunded) {
                 let burn_amount = transaction_fee_amount - storage_fee_refunded;
-                transaction_fee::burn_fee(gas_payer_address, burn_amount);
+                if (features::governed_gas_pool_enabled()){
+                    governed_gas_pool::deposit_gas_fee_v2(gas_payer_address, burn_amount);
+                } else {
+                    transaction_fee::burn_fee(gas_payer_address, burn_amount);
+                };
                 permissioned_signer::check_permission_consume(
                     &gas_payer,
                     (burn_amount as u256),
                     GasPermission {}
                 );
-            } else if (transaction_fee_amount < storage_fee_refunded) {
+            } else {
                 let mint_amount = storage_fee_refunded - transaction_fee_amount;
-                transaction_fee::mint_and_refund(gas_payer_address, mint_amount);
+                // TODO: we cannot mint to do storage refund. We need to have a storage refund pool
+                if (!features::governed_gas_pool_enabled()){
+                    transaction_fee::mint_and_refund(gas_payer_address, mint_amount);
+                };
                 permissioned_signer::increase_limit(
                     &gas_payer,
                     (mint_amount as u256),

@@ -150,6 +150,7 @@ pub enum FeatureFlag {
     CalculateTransactionFeeForDistribution,
     DistributeTransactionFee,
     GovernedGasPool,
+    SteakRewardUsingTreasury,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -397,6 +398,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             },
             FeatureFlag::DistributeTransactionFee => AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE,
             FeatureFlag::GovernedGasPool => AptosFeatureFlag::GOVERNED_GAS_POOL,
+            FeatureFlag::SteakRewardUsingTreasury => AptosFeatureFlag::STAKE_REWARD_USING_TREASURY,
         }
     }
 }
@@ -571,6 +573,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             },
             AptosFeatureFlag::DISTRIBUTE_TRANSACTION_FEE => FeatureFlag::DistributeTransactionFee,
             AptosFeatureFlag::GOVERNED_GAS_POOL => FeatureFlag::GovernedGasPool,
+            AptosFeatureFlag::STAKE_REWARD_USING_TREASURY => FeatureFlag::SteakRewardUsingTreasury,
         }
     }
 }

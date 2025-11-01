@@ -232,6 +232,15 @@ module aptos_framework::aptos_account {
         }
     }
 
+    public(friend) fun register_fa_and_apt(account_signer: &signer) {
+        if (features::new_accounts_default_to_fa_apt_store_enabled()) {
+            ensure_primary_fungible_store_exists(signer::address_of(account_signer));
+        } else {
+            coin::register<AptosCoin>(account_signer);
+            ensure_primary_fungible_store_exists(signer::address_of(account_signer));
+        }
+    }
+
     /// APT Primary Fungible Store specific specialized functions,
     /// Utilized internally once migration of APT to FungibleAsset is complete.
 

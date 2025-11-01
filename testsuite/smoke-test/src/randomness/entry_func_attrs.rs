@@ -10,14 +10,15 @@ use crate::{
     },
     smoke_test_environment::SwarmBuilder,
 };
-use aptos::{
+use movement::{
     common::types::{CliError, CliTypedResult, GasOptions, TransactionSummary},
     move_tool::MemberId,
 };
 use aptos_forge::{Swarm, SwarmExt};
 use aptos_logger::info;
 use aptos_types::on_chain_config::OnChainRandomnessConfig;
-use std::{str::FromStr, sync::Arc, time::Duration};
+use std::{sync::Arc, time::Duration};
+use std::str::FromStr;
 
 #[derive(Clone, Copy, Debug)]
 enum RollFunc {

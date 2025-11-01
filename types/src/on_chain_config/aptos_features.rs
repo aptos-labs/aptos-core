@@ -144,6 +144,7 @@ pub enum FeatureFlag {
     CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION = 96,
     DISTRIBUTE_TRANSACTION_FEE = 97,
     GOVERNED_GAS_POOL = 223,
+    STAKE_REWARD_USING_TREASURY = 224,
 }
 
 impl FeatureFlag {
@@ -166,7 +167,7 @@ impl FeatureFlag {
             FeatureFlag::BLS12_381_STRUCTURES,
             FeatureFlag::ED25519_PUBKEY_VALIDATE_RETURN_FALSE_WRONG_LENGTH,
             FeatureFlag::STRUCT_CONSTRUCTORS,
-            FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
+            // FeatureFlag::PERIODICAL_REWARD_RATE_DECREASE,
             FeatureFlag::PARTIAL_GOVERNANCE_VOTING,
             FeatureFlag::SIGNATURE_CHECKER_V2,
             FeatureFlag::STORAGE_SLOT_METADATA,

@@ -23,6 +23,7 @@
 -  [Function `set_allow_direct_coin_transfers`](#0x1_aptos_account_set_allow_direct_coin_transfers)
 -  [Function `can_receive_direct_coin_transfers`](#0x1_aptos_account_can_receive_direct_coin_transfers)
 -  [Function `register_apt`](#0x1_aptos_account_register_apt)
+-  [Function `register_fa_and_apt`](#0x1_aptos_account_register_fa_and_apt)
 -  [Function `fungible_transfer_only`](#0x1_aptos_account_fungible_transfer_only)
 -  [Function `is_fungible_balance_at_least`](#0x1_aptos_account_is_fungible_balance_at_least)
 -  [Function `burn_from_fungible_store_for_gas`](#0x1_aptos_account_burn_from_fungible_store_for_gas)
@@ -668,6 +669,35 @@ By default, this returns true if an account has not explicitly set whether the c
         <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
     } <b>else</b> {
         <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(account_signer);
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_aptos_account_register_fa_and_apt"></a>
+
+## Function `register_fa_and_apt`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_fa_and_apt">register_fa_and_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="aptos_account.md#0x1_aptos_account_register_fa_and_apt">register_fa_and_apt</a>(account_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>) {
+    <b>if</b> (<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_new_accounts_default_to_fa_apt_store_enabled">features::new_accounts_default_to_fa_apt_store_enabled</a>()) {
+        <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
+    } <b>else</b> {
+        <a href="coin.md#0x1_coin_register">coin::register</a>&lt;AptosCoin&gt;(account_signer);
+        <a href="aptos_account.md#0x1_aptos_account_ensure_primary_fungible_store_exists">ensure_primary_fungible_store_exists</a>(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(account_signer));
     }
 }
 </code></pre>

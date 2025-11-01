@@ -248,25 +248,30 @@ Initializes the governed gas pool around a resource account creation seed.
 
     // <b>return</b> <b>if</b> the governed gas pool <b>has</b> already been initialized
     <b>if</b> (<b>exists</b>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework))) {
-        <b>return</b>
-    };
+        <b>if</b> (!<b>exists</b>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPoolExtension">GovernedGasPoolExtension</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework))) {
+            <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPoolExtension">GovernedGasPoolExtension</a>{
+                deposited_treasury_counter: 0,
+                withdraw_staking_reward_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_WithdrawStakingRewardEvent">WithdrawStakingRewardEvent</a>&gt;(aptos_framework),
+            });
+        }
+    } <b>else</b> {
 
-    // generate a seed <b>to</b> be used <b>to</b> create the resource <a href="account.md#0x1_account">account</a> hosting the delegation pool
-    <b>let</b> seed = <a href="governed_gas_pool.md#0x1_governed_gas_pool_create_resource_account_seed">create_resource_account_seed</a>(delegation_pool_creation_seed);
+        // generate a seed <b>to</b> be used <b>to</b> create the resource <a href="account.md#0x1_account">account</a> hosting the delegation pool
+        <b>let</b> seed = <a href="governed_gas_pool.md#0x1_governed_gas_pool_create_resource_account_seed">create_resource_account_seed</a>(delegation_pool_creation_seed);
 
-    <b>let</b> (governed_gas_pool_signer, governed_gas_pool_signer_cap) = <a href="account.md#0x1_account_create_resource_account">account::create_resource_account</a>(aptos_framework, seed);
+        <b>let</b> (governed_gas_pool_signer, governed_gas_pool_signer_cap) = <a href="account.md#0x1_account_create_resource_account">account::create_resource_account</a>(aptos_framework, seed);
 
-    // register apt
-    <a href="aptos_account.md#0x1_aptos_account_register_apt">aptos_account::register_apt</a>(&governed_gas_pool_signer);
+        // register apt
+        <a href="aptos_account.md#0x1_aptos_account_register_fa_and_apt">aptos_account::register_fa_and_apt</a>(&governed_gas_pool_signer);
+        <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>{
+            signer_capability: governed_gas_pool_signer_cap,
+        });
 
-    <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a>{
-        signer_capability: governed_gas_pool_signer_cap,
-    });
-
-    <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPoolExtension">GovernedGasPoolExtension</a>{
-        deposited_treasury_counter: 0,
-        withdraw_staking_reward_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_WithdrawStakingRewardEvent">WithdrawStakingRewardEvent</a>&gt;(aptos_framework),
-    });
+        <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPoolExtension">GovernedGasPoolExtension</a>{
+            deposited_treasury_counter: 0,
+            withdraw_staking_reward_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_WithdrawStakingRewardEvent">WithdrawStakingRewardEvent</a>&gt;(aptos_framework),
+        });
+    }
 }
 </code></pre>
 
@@ -298,13 +303,13 @@ Initializes the governed gas pool extension alone.
 
     // <b>return</b> <b>if</b> the governed gas extension <b>has</b> already been initialized
     <b>if</b> (<b>exists</b>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPoolExtension">GovernedGasPoolExtension</a>&gt;(<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(aptos_framework))) {
-        <b>return</b>
-    };
+    } <b>else</b> {
 
     <b>move_to</b>(aptos_framework, <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPoolExtension">GovernedGasPoolExtension</a>{
         deposited_treasury_counter: 0,
         withdraw_staking_reward_events: <a href="account.md#0x1_account_new_event_handle">account::new_event_handle</a>&lt;<a href="governed_gas_pool.md#0x1_governed_gas_pool_WithdrawStakingRewardEvent">WithdrawStakingRewardEvent</a>&gt;(aptos_framework),
     });
+    }
 }
 </code></pre>
 
@@ -498,7 +503,8 @@ Deposits some coin from an account to the governed gas pool.
 
 
 <pre><code><b>fun</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit_from">deposit_from</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>: <b>address</b>, amount: u64) <b>acquires</b> <a href="governed_gas_pool.md#0x1_governed_gas_pool_GovernedGasPool">GovernedGasPool</a> {
-   <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit">deposit</a>(<a href="coin.md#0x1_coin_withdraw_from">coin::withdraw_from</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>, amount));
+   <b>let</b> asset = <a href="coin.md#0x1_coin_withdraw_from">coin::withdraw_from</a>&lt;CoinType&gt;(<a href="account.md#0x1_account">account</a>, amount);
+   <a href="governed_gas_pool.md#0x1_governed_gas_pool_deposit">deposit</a>(asset);
 }
 </code></pre>
 

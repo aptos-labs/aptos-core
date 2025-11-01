@@ -75,28 +75,33 @@ module aptos_framework::governed_gas_pool {
 
         // return if the governed gas pool has already been initialized
         if (exists<GovernedGasPool>(signer::address_of(aptos_framework))) {
-            return
-        };
+            if (!exists<GovernedGasPoolExtension>(signer::address_of(aptos_framework))) {
+                move_to(aptos_framework, GovernedGasPoolExtension{
+                    deposited_treasury_counter: 0,
+                    withdraw_staking_reward_events: account::new_event_handle<WithdrawStakingRewardEvent>(aptos_framework),
+                });
+            }
+        } else {
 
-        // generate a seed to be used to create the resource account hosting the delegation pool
-        let seed = create_resource_account_seed(delegation_pool_creation_seed);
+            // generate a seed to be used to create the resource account hosting the delegation pool
+            let seed = create_resource_account_seed(delegation_pool_creation_seed);
 
-        let (governed_gas_pool_signer, governed_gas_pool_signer_cap) = account::create_resource_account(aptos_framework, seed);
+            let (governed_gas_pool_signer, governed_gas_pool_signer_cap) = account::create_resource_account(aptos_framework, seed);
 
-        // register apt
-        aptos_account::register_apt(&governed_gas_pool_signer);
+            // register apt
+            aptos_account::register_fa_and_apt(&governed_gas_pool_signer);
+            move_to(aptos_framework, GovernedGasPool{
+                signer_capability: governed_gas_pool_signer_cap,
+            });
 
-        move_to(aptos_framework, GovernedGasPool{
-            signer_capability: governed_gas_pool_signer_cap,
-        });
-
-        move_to(aptos_framework, GovernedGasPoolExtension{
-            deposited_treasury_counter: 0,
-            withdraw_staking_reward_events: account::new_event_handle<WithdrawStakingRewardEvent>(aptos_framework),
-        });
+            move_to(aptos_framework, GovernedGasPoolExtension{
+                deposited_treasury_counter: 0,
+                withdraw_staking_reward_events: account::new_event_handle<WithdrawStakingRewardEvent>(aptos_framework),
+            });
+        }
     }
 
-    /// Initializes the governed gas pool extension alone. 
+    /// Initializes the governed gas pool extension alone.
     /// @param aptos_framework The signer of the aptos_framework module.
     public entry fun initialize_governed_gas_pool_extension(
         aptos_framework: &signer,
@@ -105,16 +110,14 @@ module aptos_framework::governed_gas_pool {
 
         // return if the governed gas extension has already been initialized
         if (exists<GovernedGasPoolExtension>(signer::address_of(aptos_framework))) {
-            return
-        };
+        } else {
 
         move_to(aptos_framework, GovernedGasPoolExtension{
             deposited_treasury_counter: 0,
             withdraw_staking_reward_events: account::new_event_handle<WithdrawStakingRewardEvent>(aptos_framework),
         });
+        }
     }
-
-
 
     /// Initialize the governed gas pool as a module
     /// @param aptos_framework The signer of the aptos_framework module.
@@ -167,7 +170,8 @@ module aptos_framework::governed_gas_pool {
     /// @param account The account from which the coin is to be deposited.
     /// @param amount The amount of coin to be deposited.
     fun deposit_from<CoinType>(account: address, amount: u64) acquires GovernedGasPool {
-       deposit(coin::withdraw_from<CoinType>(account, amount));
+       let asset = coin::withdraw_from<CoinType>(account, amount);
+       deposit(asset);
     }
 
     /// Deposits some FA from the fungible store.

@@ -281,6 +281,8 @@ pub fn encode_genesis_change_set(
     } else {
         initialize_aptos_coin(&mut session, &module_storage);
     }
+    // Initialize the governed gas pool with a default seed
+    initialize_governed_gas_pool(&mut session, &module_storage);
     initialize_config_buffer(&mut session, &module_storage);
     initialize_dkg(&mut session, &module_storage);
     initialize_reconfiguration_state(&mut session, &module_storage);
@@ -293,7 +295,14 @@ pub fn encode_genesis_change_set(
     initialize_randomness_config(&mut session, &module_storage, randomness_config);
     initialize_randomness_resources(&mut session, &module_storage);
     initialize_on_chain_governance(&mut session, &module_storage, genesis_config);
-    initialize_account_abstraction(&mut session, &module_storage);
+    let not_skip_aa: bool = if let Some(features) =  &genesis_config.initial_features_override {
+        features.is_enabled(FeatureFlag::ACCOUNT_ABSTRACTION) || features.is_enabled(FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION)
+    } else {
+        false
+    };
+    if not_skip_aa {
+        initialize_account_abstraction(&mut session, &module_storage);
+    }
     create_and_initialize_validators(&mut session, &module_storage, validators);
     if genesis_config.is_test {
         allow_core_resources_to_set_version(&mut session, &module_storage);
@@ -493,6 +502,24 @@ fn initialize_aptos_coin(
         "initialize_aptos_coin",
         vec![],
         serialize_values(&vec![MoveValue::Signer(CORE_CODE_ADDRESS)]),
+    );
+}
+
+fn initialize_governed_gas_pool(
+    session: &mut SessionExt<impl AptosMoveResolver>,
+    module_storage: &impl AptosModuleStorage,
+) {
+    let delegation_pool_creation_seed = b"aptos_framework::governed_gas_pool";
+    exec_function(
+        session,
+        module_storage,
+        GENESIS_MODULE_NAME,
+        "initialize_governed_gas_pool",
+        vec![],
+        serialize_values(&vec![
+            MoveValue::Signer(CORE_CODE_ADDRESS),
+            MoveValue::vector_u8(delegation_pool_creation_seed.to_vec()),
+        ]),
     );
 }
 

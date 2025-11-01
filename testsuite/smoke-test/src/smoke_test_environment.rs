@@ -12,6 +12,7 @@ use aptos_infallible::Mutex;
 use aptos_logger::prelude::*;
 use aptos_types::chain_id::ChainId;
 use movement::test::CliTestFramework;
+use aptos_types::on_chain_config::Features;
 use once_cell::sync::Lazy;
 use rand::rngs::OsRng;
 use std::{num::NonZeroUsize, sync::Arc};
@@ -29,6 +30,7 @@ pub struct SwarmBuilder {
     vfn_config: Option<NodeConfig>,
     init_genesis_stake: Option<InitGenesisStakeFn>,
     init_genesis_config: Option<InitGenesisConfigFn>,
+    initial_features_override: Option<Features>,
 }
 
 impl SwarmBuilder {
@@ -42,6 +44,7 @@ impl SwarmBuilder {
             vfn_config: None,
             init_genesis_stake: None,
             init_genesis_config: None,
+            initial_features_override: None,
         }
     }
 
@@ -84,6 +87,11 @@ impl SwarmBuilder {
         self
     }
 
+    pub fn with_initial_features_override(mut self, features: Features) -> Self {
+        self.initial_features_override = Some(features);
+        self
+    }
+
     // Gas is not enabled with this setup, it's enabled via forge instance.
     pub async fn build_inner(&mut self) -> anyhow::Result<LocalSwarm> {
         ::aptos_logger::Logger::new().init();
@@ -103,6 +111,7 @@ impl SwarmBuilder {
 
         let builder = self.clone();
         let init_genesis_config = builder.init_genesis_config;
+        let initial_features_override = builder.initial_features_override;
         FACTORY
             .new_swarm_with_version(
                 OsRng,
@@ -116,6 +125,9 @@ impl SwarmBuilder {
                 Some(Arc::new(move |genesis_config| {
                     if let Some(init_genesis_config) = &init_genesis_config {
                         (init_genesis_config)(genesis_config);
+                    }
+                    if let Some(features) = &initial_features_override {
+                        genesis_config.initial_features_override = Some(features.clone());
                     }
                 })),
                 guard,

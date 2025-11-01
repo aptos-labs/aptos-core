@@ -13,6 +13,7 @@ script {
             58, // RejectUnstableBytecode
             67, // ConcurrentFungibleBalance
             40, // VMBinaryFormat7
+            73, // USE_COMPATIBILITY_CHECKER_V2
             74, // EnumTypes
             80, // NativeMemoryOperation
             223, // new GGP

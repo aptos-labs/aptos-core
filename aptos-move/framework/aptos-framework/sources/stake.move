@@ -25,7 +25,7 @@ module aptos_framework::stake {
     use std::vector;
     use aptos_std::bls12381;
     use aptos_std::math64::min;
-    use aptos_std::table::Table;
+    use aptos_std::table::{Self, Table};
     use aptos_framework::aptos_coin::AptosCoin;
     use aptos_framework::account;
     use aptos_framework::coin::{Self, Coin, MintCapability};
@@ -1803,6 +1803,8 @@ module aptos_framework::stake {
         // Initialize the governed gas pool
         let seed: vector<u8> = b"test";
         governed_gas_pool::initialize(aptos_framework, seed);
+        // Explicitly ensure the extension is initialized for event emission
+        governed_gas_pool::initialize_governed_gas_pool_extension(aptos_framework);
         let pool_addr = governed_gas_pool::governed_gas_pool_address();
         if (!coin::is_account_registered<AptosCoin>(pool_addr)) {
             governed_gas_pool::register_coin<AptosCoin>();

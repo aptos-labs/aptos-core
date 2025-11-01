@@ -36,6 +36,7 @@ use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
     fmt::Write,
+    str::FromStr,
     sync::Arc,
     time::Duration,
 };
@@ -544,6 +545,7 @@ pub(crate) fn generate_blob(data: &[u8]) -> String {
     write!(buf, "]").unwrap();
     buf
 }
+
 
 #[tokio::test]
 async fn test_large_total_stake() {
@@ -1547,4 +1549,430 @@ async fn get_validator_state(cli: &CliTestFramework, pool_index: usize) -> Valid
 
 fn get_gas(transaction: TransactionSummary) -> u64 {
     transaction.gas_used.unwrap() * transaction.gas_unit_price.unwrap()
+}
+
+#[tokio::test]
+async fn test_multivalidator_staking_reward() {
+    // Run the actual test in a thread with larger stack size (8MB instead of default 2MB)
+    let handle = std::thread::Builder::new()
+        .stack_size(8 * 1024 * 1024) // 8MB stack
+        .spawn(|| {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            runtime.block_on(async {
+                test_multivalidator_staking_reward_impl().await;
+            })
+        })
+        .unwrap();
+
+    handle.join().unwrap();
+}
+
+
+async fn test_multivalidator_staking_reward_impl() {
+    // Base stake amount for rewards calculation
+    const BASE_STAKE: u64 = 3600u64 * 24 * 365 * 10 * 100; // with 10% APY, this gives 100 rewards per second
+
+    let (mut swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
+        .with_init_config(Arc::new(|_, conf, _| {
+            // Configure consensus parameters
+            conf.consensus.round_initial_timeout_ms = 200;
+            conf.consensus.quorum_store_poll_time_ms = 100;
+        }))
+        .with_init_genesis_stake(Arc::new(|i, genesis_stake_amount| {
+            // Set different stake amounts for each validator
+            *genesis_stake_amount = match i {
+                0 => 10 * BASE_STAKE,  // Validator 0: 10x base stake
+                1 => 8 * BASE_STAKE,   // Validator 1: 8x base stake
+                2 => 6 * BASE_STAKE,   // Validator 2: 6x base stake
+                3 => 4 * BASE_STAKE,   // Validator 3: 4x base stake
+                _ => BASE_STAKE,
+            };
+        }))
+        .with_init_genesis_config(Arc::new(|genesis_config| {
+            // Configure epochs and rewards
+            genesis_config.epoch_duration_secs = 4;  // Short epochs for testing
+            genesis_config.recurring_lockup_duration_secs = 4;
+            genesis_config.voting_duration_secs = 3;
+            genesis_config.rewards_apy_percentage = 10;  // 10% APY
+        }))
+        .with_aptos()
+        .with_initial_features_override(create_features_with_treasury_rewards())
+        .build_with_cli(0)
+        .await;
+
+    // Wait for the swarm to be fully ready
+    println!("Waiting for swarm to be fully ready...");
+    swarm
+        .wait_for_all_nodes_to_catchup(Duration::from_secs(30))
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_secs(2)).await;
+
+    // Add root account to CLI for governance operations
+    cli.add_account_with_address_to_cli(
+        swarm.root_key(),
+        swarm.chain_info().root_account().address(),
+    );
+
+    let transaction_factory = swarm.chain_info().transaction_factory();
+    let rest_client = swarm.validators().next().unwrap().rest_client();
+
+    // Note: The 10% APY is already configured in genesis_config.rewards_apy_percentage above
+    // If we need to modify it, we can try using update_rewards_config instead of update_rewards_rate
+    // as update_rewards_rate requires the periodical_reward_rate_decrease feature to be disabled
+    println!("APR rate already configured at 10% in genesis config");
+
+    println!("Creating treasury account...");
+    let treasury_account = create_and_fund_account(&mut swarm,  2*BASE_STAKE).await;
+    let treasury_address = treasury_account.address();
+    println!("Treasury account created at address: {}", treasury_address);
+
+    let deposit_treasury_txn = treasury_account.sign_with_transaction_builder(
+        transaction_factory.payload(
+            aptos_cached_packages::aptos_stdlib::governed_gas_pool_deposit_treasury(BASE_STAKE)
+        )
+    );
+
+    println!("Depositing {} from treasury to governed gas pool...", BASE_STAKE);
+    rest_client.submit_and_wait(&deposit_treasury_txn).await
+        .expect("Failed to deposit from treasury to governed gas pool");
+
+    println!("Using default staking rewards mechanism with 10% APY from genesis config...");
+
+    // Enable the STAKE_REWARD_USING_TREASURY feature after GGP has sufficient balance
+    println!("Enabling stake_reward_using_treasury feature...");
+    let enable_feature_script = format!(
+        r#"
+    script {{
+        use aptos_framework::aptos_governance;
+        use std::features;
+        fun main(core_resources: &signer) {{
+            let framework_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+            features::change_feature_flags_for_next_epoch(&framework_signer, vector[224], vector[]);
+        }}
+    }}
+    "#
+    );
+    
+    cli.run_script(0, &enable_feature_script)
+        .await
+        .expect("Failed to enable stake_reward_using_treasury feature");
+    
+    // Resync after running script
+    swarm
+        .chain_info()
+        .resync_root_account_seq_num(&rest_client)
+        .await
+        .unwrap();
+
+    // Collect validator information
+    let mut validators: Vec<_> = swarm.validators().collect();
+    validators.sort_by_key(|v| v.name());
+
+    let validator_addresses: Vec<_> = validators
+        .iter()
+        .map(|validator| validator.peer_id())
+        .collect();
+
+    // Check governed gas pool balance
+    // The governed gas pool should contain the treasury deposit plus collected gas fees
+    let gas_pool_balance: u64 = rest_client
+        .view(
+            &aptos_rest_client::aptos_api_types::ViewRequest {
+                function: aptos_rest_client::aptos_api_types::EntryFunctionId::from_str("0x1::governed_gas_pool::get_balance").unwrap(),
+                type_arguments: vec![aptos_rest_client::aptos_api_types::MoveType::from_str("0x1::aptos_coin::AptosCoin").unwrap()],
+                arguments: vec![],
+            },
+            None,
+        )
+        .await
+        .expect("GGP balance view request failed")
+        .inner()
+        .first()
+        .unwrap()
+        .as_str()
+        .unwrap_or("0")
+        .parse()
+        .unwrap();
+    // assert gas being deposited to ggp
+    assert!(gas_pool_balance > BASE_STAKE, "ggp balance: {}, treasury amount: {}", gas_pool_balance, BASE_STAKE);
+
+    // Calculate expected reward rate based on actual epoch count with 10% APY and 4-second epochs
+    const SECONDS_PER_YEAR: u64 = 365 * 24 * 60 * 60; // 31,536,000
+    const EPOCH_DURATION_SECS: u64 = 4;  // Must match genesis_config.epoch_duration_secs
+    const APY_PERCENTAGE: u64 = 10;
+    const REWARDS_RATE_DENOMINATOR: f64 = 1_000_000_000.0;
+    
+    let epochs_per_year = SECONDS_PER_YEAR as f64 / EPOCH_DURATION_SECS as f64;
+    let rewards_rate_numerator = (APY_PERCENTAGE as f64 * REWARDS_RATE_DENOMINATOR / 100.0) / epochs_per_year;
+    let per_epoch_rate = rewards_rate_numerator / REWARDS_RATE_DENOMINATOR;
+    
+    println!("Per-epoch reward rate: {:.10}", per_epoch_rate);
+
+     // Get initial validator state
+    let (initial_state, initial_validator_set) = get_validator_set_and_state(&rest_client).await;
+    println!(
+        "Initial state - Epoch: {}, Version: {}",
+        initial_state.epoch, initial_state.version
+    );
+    println!("Initial validator voting power: {:?}", initial_validator_set);
+
+    // Store initial voting power for comparison
+    let initial_voting_powers = initial_validator_set.clone();
+
+    // Track previous epoch state for reward verification
+    let mut previous_epoch_set = initial_validator_set.clone();
+    let mut final_epoch_info = None;
+
+    // Run through 2 epochs
+    for epoch_num in 1..=2 {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        // Trigger epoch change
+        let epoch_result = reconfig(
+            &rest_client,
+            &transaction_factory,
+            swarm.chain_info().root_account(),
+        )
+        .await;
+        
+        // Get state after epoch
+        let (epoch_state, epoch_validator_set) = get_validator_set_and_state(&rest_client).await;
+        println!(
+            "\n=== After Round {} (Blockchain Epoch: {}, Version: {}) ===",
+            epoch_num, epoch_state.epoch, epoch_state.version
+        );
+        
+        // Track rewards for this epoch
+        let mut epoch_rewards = HashMap::new();
+
+        // Verify rewards were distributed in this epoch with detailed logging
+        println!("\nPer-Validator Rewards for Round {}:", epoch_num);
+        println!("{:<70} | {:>20} | {:>20} | {:>20} | {:>12}", 
+                 "Validator Address", "Previous Power", "Current Power", "Reward Earned", "Reward Rate");
+        println!("{}", "-".repeat(160));
+        
+        for (address, current_power) in &epoch_validator_set {
+            let previous_power = previous_epoch_set.get(address).unwrap();
+            let reward_earned = if current_power > previous_power {
+                current_power - previous_power
+            } else {
+                0
+            };
+            
+            epoch_rewards.insert(*address, reward_earned);
+            
+            let epoch_reward_rate = reward_earned as f64 / *previous_power as f64;
+            
+            println!("{:<70} | {:>20} | {:>20} | {:>20} | {:>12.10}",
+                     address.to_string(),
+                     previous_power,
+                     current_power,
+                     reward_earned,
+                     epoch_reward_rate);
+            
+            if reward_earned == 0 {
+                println!("  ⚠️  WARNING: Validator {} earned NO rewards in epoch {}", address, epoch_num);
+            }
+        }
+        
+        // Update previous epoch state for next iteration
+        previous_epoch_set = epoch_validator_set.clone();
+        
+        // Store final epoch info
+        if epoch_num == 2 {
+            final_epoch_info = Some((epoch_result, epoch_state, epoch_validator_set));
+        }
+    }
+
+    // Extract final epoch data
+    let (final_epoch_result, final_state, final_validator_set) = final_epoch_info.unwrap();
+  
+    // Calculate actual epoch count and expected rate
+    let actual_epochs = final_epoch_result.epoch - initial_state.epoch;
+    let expected_rate = per_epoch_rate * (actual_epochs as f64);
+    
+    println!(
+        "Actual epochs passed: {}, Expected reward rate: {:.10}",
+        actual_epochs, expected_rate
+    );
+  
+    // Verify proportional reward distribution across actual epochs
+    // Calculate total rewards and rates in a single pass
+    let mut reward_rates: Vec<(PeerId, f64)> = Vec::new();
+    let mut total_rewards_distributed = 0u64;
+
+    for address in &validator_addresses {
+        let initial_power = initial_voting_powers.get(address).unwrap();
+        let final_power = final_validator_set.get(address).unwrap();
+        let total_rewards = final_power - initial_power;
+        total_rewards_distributed += total_rewards;  // Accumulate total as we go
+        
+        let reward_rate = total_rewards as f64 / *initial_power as f64;
+        reward_rates.push((*address, reward_rate));
+
+        println!(
+            "Validator {} - Initial stake: {}, Final stake: {}, Total rewards: {}, Reward rate: {:.10}",
+            address, initial_power, final_power, total_rewards, reward_rate
+        );
+        
+        // Assert that the actual reward rate is close to the expected rate (within 50% tolerance)
+        // We use a generous tolerance because:
+        // 1. Validators may have different success rates in proposals
+        // 2. There may be rounding in the on-chain calculations
+        // 3. The test runs with short epochs which can introduce timing variations
+        let rate_deviation = ((reward_rate - expected_rate) / expected_rate).abs();
+        assert!(
+            rate_deviation < 0.5,
+            "Validator {} reward rate {:.10} is too far from expected {:.10} for {} epochs (deviation: {:.2}%)",
+            address,
+            reward_rate,
+            expected_rate,
+            actual_epochs,
+            rate_deviation * 100.0
+        );
+    }
+
+    let avg_rate: f64 = reward_rates.iter().map(|(_, r)| r).sum::<f64>() / reward_rates.len() as f64;
+    for (address, rate) in &reward_rates {
+        let deviation = ((rate - avg_rate) / avg_rate).abs();
+        assert!(
+            deviation < 0.5,
+            "Validator {} reward rate {:.10} deviates too much from average {:.10} (deviation: {:.2}%)",
+            address,
+            rate,
+            avg_rate,
+            deviation * 100.0
+        );
+    }
+
+    println!("All validators received proportional rewards correctly!");
+    println!("Average reward rate: {:.6}", avg_rate);
+    println!("Total rewards distributed across all validators: {}", total_rewards_distributed);
+
+    // Use the CLI to analyze validator performance
+    cli.analyze_validator_performance(Some(initial_state.epoch as i64), Some(final_epoch_result.epoch as i64))
+        .await
+        .unwrap();
+
+    // Verify we ran through at least 2 epochs (may be more due to initialization)
+    assert!(
+        final_epoch_result.epoch - initial_state.epoch >= 2,
+        "Should have progressed through at least 2 epochs, actual: {}",
+        final_epoch_result.epoch - initial_state.epoch
+    );
+
+    // Fetch and verify WithdrawStakingRewardEvent amounts match the stake rewards
+    println!("Fetching WithdrawStakingRewardEvent events...");
+    let events = rest_client
+        .get_account_events_bcs(
+            CORE_CODE_ADDRESS,
+            "0x1::governed_gas_pool::GovernedGasPoolExtension",
+            "withdraw_staking_reward_events",
+            None,
+            None,
+        )
+        .await
+        .expect("Failed to fetch withdraw staking reward events");
+
+    // Deserialize events and sum up the amounts
+    #[derive(Debug, serde::Deserialize)]
+    struct WithdrawStakingRewardEvent {
+        amount: u64,
+    }
+
+    let mut total_event_amount = 0u64;
+    let mut events_in_range = 0;
+    for event_with_version in events.inner() {
+        let version = event_with_version.transaction_version;
+        
+        // Only count events that occurred between initial and final versions
+        if version >= initial_state.version && version <= final_state.version {
+            let event = event_with_version.event.v1()
+                .expect("Failed to get v1 event");
+            let withdraw_event: WithdrawStakingRewardEvent = bcs::from_bytes(event.event_data())
+                .expect("Failed to deserialize WithdrawStakingRewardEvent");
+            total_event_amount += withdraw_event.amount;
+            events_in_range += 1;
+            println!(
+                "WithdrawStakingRewardEvent at version {}: amount = {}",
+                version,
+                withdraw_event.amount
+            );
+        }
+    }
+
+    println!(
+        "Found {} WithdrawStakingRewardEvent(s) in version range [{}, {}]",
+        events_in_range,
+        initial_state.version,
+        final_state.version
+    );
+
+    println!(
+        "Total rewards from events: {}, Total rewards distributed: {}",
+        total_event_amount, total_rewards_distributed
+    );
+
+    // Assert that the event amounts equal the stake rewards
+    assert_eq!(
+        total_event_amount,
+        total_rewards_distributed,
+        "WithdrawStakingRewardEvent total amount ({}) should equal total stake rewards distributed ({})",
+        total_event_amount,
+        total_rewards_distributed
+    );
+
+    println!("Successfully verified that WithdrawStakingRewardEvent amounts match stake rewards!");
+
+    swarm.wait_for_all_nodes_to_catchup(Duration::from_secs(30))
+    .await
+    .unwrap();
+}
+
+// Helper function to get validator set and state
+async fn get_validator_set_and_state(rest_client: &Client) -> (State, HashMap<PeerId, u64>) {
+    let (validator_set, state): (ValidatorSet, State) = rest_client
+        .get_account_resource_bcs(CORE_CODE_ADDRESS, "0x1::stake::ValidatorSet")
+        .await
+        .unwrap()
+        .into_parts();
+
+    let validator_to_voting_power = validator_set
+        .active_validators
+        .iter()
+        .map(|v| (v.account_address, v.consensus_voting_power()))
+        .collect::<HashMap<_, _>>();
+
+    (state, validator_to_voting_power)
+}
+
+/// Creates a Features object with specific features disabled for testing
+/// Disables FA migration features (treasury rewards will be enabled via governance after GGP has balance)
+/// Disables:
+/// - PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS
+/// - NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE
+/// - OPERATIONS_DEFAULT_TO_FA_APT_STORE
+/// - DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE
+/// - ORDERLESS_TRANSACTIONS
+/// - CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION
+/// - DISTRIBUTE_TRANSACTION_FEE
+pub fn create_features_with_treasury_rewards() -> aptos_types::on_chain_config::Features {
+    use aptos_types::on_chain_config::{Features, FeatureFlag};
+
+    let mut features = Features::default();
+
+    // Disable the features related to fungible asset migration
+    features.disable(FeatureFlag::PRIMARY_APT_FUNGIBLE_STORE_AT_USER_ADDRESS);
+    features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
+    features.disable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
+    features.disable(FeatureFlag::DEFAULT_TO_CONCURRENT_FUNGIBLE_BALANCE);
+    features.disable(FeatureFlag::ORDERLESS_TRANSACTIONS);
+    features.disable(FeatureFlag::CALCULATE_TRANSACTION_FEE_FOR_DISTRIBUTION);
+    features.disable(FeatureFlag::DISTRIBUTE_TRANSACTION_FEE);
+    features.disable(FeatureFlag::ACCOUNT_ABSTRACTION);
+    features.disable(FeatureFlag::TRANSACTION_PAYLOAD_V2);
+    features.disable(FeatureFlag::DERIVABLE_ACCOUNT_ABSTRACTION);
+        
+    features
 }
