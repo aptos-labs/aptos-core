@@ -324,7 +324,7 @@ impl AptosModuleCacheManagerGuard<'_> {
     /// Only available under fuzzing. The snapshot shares underlying Arc module code.
     #[cfg(fuzzing)]
     pub fn snapshot_hot_cache(&self) -> ModuleHotCacheSnapshot {
-        self.module_cache().clone()
+        self.module_cache().clone_for_fuzzing()
     }
 
     /// Rolls back the global module cache to a previously captured snapshot.

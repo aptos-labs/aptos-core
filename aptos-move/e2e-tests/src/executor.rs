@@ -94,16 +94,14 @@ use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
+    cell::Cell,
     collections::{BTreeMap, BTreeSet},
     env,
     fs::{self, OpenOptions},
     io::Write,
     path::{Path, PathBuf},
     str::FromStr,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc, Mutex,
-    },
+    sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
 
@@ -142,6 +140,20 @@ fn empty_in_memory_state_store() -> FakeExecutorStateStore {
     DeltaStateStore::new_with_base(EitherStateView::Left(EmptyStateView))
 }
 
+/// Represents per-block execution state used to control special modes (e.g., fuzzing/shared cache).
+/// In normal runs, this remains `None` and the executor behaves as before.
+enum BlockState {
+    None,
+    Fuzzing(SharedCacheState),
+}
+
+/// Shared cache state used only in fuzzing/test flows to enable hot module cache persistence and
+/// deterministic block metadata increments across transaction blocks.
+struct SharedCacheState {
+    manager: AptosModuleCacheManager,
+    next_block_id: Cell<u64>,
+}
+
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
@@ -158,11 +170,9 @@ pub struct FakeExecutorImpl<O: OutputLogger> {
     /// s.t. the comparison test is executed (BothComparison).
     executor_mode: Option<ExecutorMode>,
     allow_block_executor_fallback: bool,
-    /// When set (only in fuzzing/test constructor with external thread pool), reuse a shared
-    /// module cache manager across transaction blocks to enable cache persistence.
-    shared_module_cache_manager: Option<AptosModuleCacheManager>,
-    /// Monotonic counter for generating consecutive block metadata when using a shared cache.
-    next_block_id: AtomicU64,
+    /// Encapsulated execution state. When set to `Fuzzing`, it enables hot cache persistence and
+    /// TxnSlice metadata generation for linearized blocks.
+    block_state: BlockState,
 }
 
 pub type FakeExecutor = FakeExecutorImpl<GoldenOutputs>;
@@ -234,8 +244,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
-            shared_module_cache_manager: None,
-            next_block_id: AtomicU64::new(1),
+            block_state: BlockState::None,
         };
         executor.apply_write_set(write_set);
         executor
@@ -262,8 +271,13 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             executor_mode: None,
             allow_block_executor_fallback: true,
             // Enable a shared module cache for fuzzing/test usage with external thread pool.
-            shared_module_cache_manager: module_cache_manager,
-            next_block_id: AtomicU64::new(1),
+            block_state: match module_cache_manager {
+                Some(manager) => BlockState::Fuzzing(SharedCacheState {
+                    manager,
+                    next_block_id: Cell::new(1),
+                }),
+                None => BlockState::None,
+            },
         };
         executor.apply_write_set(write_set);
         executor
@@ -308,8 +322,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
-            shared_module_cache_manager: None,
-            next_block_id: AtomicU64::new(1),
+            block_state: BlockState::None,
         }
     }
 
@@ -356,20 +369,19 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// Sets the gas unit scaling factor by publishing a modified GasScheduleV2 and
     /// forcing an epoch end. Chainable for convenient creation-time configuration.
     pub fn with_gas_scaling(mut self, gas_scaling_factor: u64) -> Self {
-        self.set_gas_scaling(gas_scaling_factor);
+        self.modify_gas_scaling(gas_scaling_factor);
         self
     }
 
     /// Mutably sets the gas unit scaling factor by updating on-chain gas schedule state
     /// in this executor's simulated store.
-    pub fn set_gas_scaling(&mut self, gas_scaling_factor: u64) {
-        // Build a GasScheduleV2 overriding txn.gas_unit_scaling_factor.
+    pub fn override_one_gas_param(&mut self, param: &str, param_value: u64) {
         let entries = AptosGasParameters::initial()
             .to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION)
             .into_iter()
             .map(|(name, val)| {
-                if name == "txn.gas_unit_scaling_factor" {
-                    (name, gas_scaling_factor)
+                if name == param {
+                    (name, param_value)
                 } else {
                     (name, val)
                 }
@@ -396,6 +408,12 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         self.exec("aptos_governance", "force_end_epoch", vec![], vec![
             core_signer_arg,
         ]);
+    }
+
+    /// Mutably sets the gas unit scaling factor by updating on-chain gas schedule state
+    /// in this executor's simulated store.
+    pub fn modify_gas_scaling(&mut self, gas_scaling_factor: u64) {
+        self.override_one_gas_param("txn.gas_unit_scaling_factor", gas_scaling_factor);
     }
 
     pub fn disable_block_executor_fallback(&mut self) {
@@ -454,8 +472,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
-            shared_module_cache_manager: None,
-            next_block_id: AtomicU64::new(1),
+            block_state: BlockState::None,
         }
     }
 
@@ -821,8 +838,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 self.executor_thread_pool.clone(),
                 &txn_provider,
                 &state_view,
-                self.shared_module_cache_manager
-                    .as_ref()
+                self.module_cache_manager_opt()
                     .unwrap_or(&AptosModuleCacheManager::new()),
                 config,
                 metadata.unwrap_or_else(TransactionSliceMetadata::unknown),
@@ -836,6 +852,69 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             outputs.truncate(requested);
         }
         Ok(outputs)
+    }
+
+    /// Returns a reference to the shared module cache manager if enabled (fuzzing/test). Otherwise
+    /// returns [None].
+    fn module_cache_manager_opt(&self) -> Option<&AptosModuleCacheManager> {
+        match &self.block_state {
+            BlockState::Fuzzing(shared) => Some(&shared.manager),
+            BlockState::None => None,
+        }
+    }
+
+    /// Generates a [TransactionSliceMetadata::Block] when running with a shared cache (fuzzing/test)
+    /// to enable cache reuse across calls. For normal runs, returns [None].
+    fn get_txn_slice_metadata(&self, _mode: ExecutorMode) -> Option<TransactionSliceMetadata> {
+        match &self.block_state {
+            BlockState::Fuzzing(shared) => {
+                let child = shared.next_block_id.get();
+                shared.next_block_id.set(child + 1);
+                Some(TransactionSliceMetadata::block(
+                    HashValue::from_u64(child - 1),
+                    HashValue::from_u64(child),
+                ))
+            },
+            BlockState::None => None,
+        }
+    }
+
+    #[cfg(fuzzing)]
+    fn maybe_snapshot_hot_cache(
+        &self,
+        state_view: &(impl StateView + Sync),
+        local_cfg: &BlockExecutorModuleCacheLocalConfig,
+        metadata: TransactionSliceMetadata,
+    ) -> Option<ModuleHotCacheSnapshot> {
+        match &self.block_state {
+            BlockState::Fuzzing(shared) => {
+                let mut guard = shared
+                    .manager
+                    .try_lock(state_view, local_cfg, metadata)
+                    .unwrap();
+                Some(guard.snapshot_hot_cache())
+            },
+            BlockState::None => None,
+        }
+    }
+
+    #[cfg(fuzzing)]
+    fn maybe_rollback_hot_cache(
+        &self,
+        state_view: &(impl StateView + Sync),
+        local_cfg: &BlockExecutorModuleCacheLocalConfig,
+        metadata: TransactionSliceMetadata,
+        snapshot: Option<ModuleHotCacheSnapshot>,
+    ) {
+        if let Some(s) = snapshot {
+            if let BlockState::Fuzzing(shared) = &self.block_state {
+                let mut guard = shared
+                    .manager
+                    .try_lock(state_view, local_cfg, metadata)
+                    .unwrap();
+                guard.rollback_hot_cache(s);
+            }
+        }
     }
 
     pub fn execute_transaction_block_with_state_view(
@@ -872,17 +951,9 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         // TODO fetch values from state?
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
-        // Use consecutive block metadata to enable cache reuse across calls. If comparison mode is enabled, is correc to not increment the counter.
-        let metadata: Option<TransactionSliceMetadata> =
-            if self.shared_module_cache_manager.is_some() {
-                let child = self.next_block_id.fetch_add(1, Ordering::Relaxed);
-                Some(TransactionSliceMetadata::block(
-                    HashValue::from_u64(child - 1),
-                    HashValue::from_u64(child),
-                ))
-            } else {
-                None
-            };
+        // Generate consecutive block metadata when using a shared cache (fuzzing/test).
+        // The same metadata is reused across sequential and parallel runs in comparison mode.
+        let metadata: Option<TransactionSliceMetadata> = self.get_txn_slice_metadata(mode);
 
         let config = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
@@ -898,17 +969,11 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         #[cfg(fuzzing)]
         {
             if mode == ExecutorMode::BothComparison {
-                let mut guard = self
-                    .shared_module_cache_manager
-                    .as_ref()
-                    .unwrap()
-                    .try_lock(
-                        state_view,
-                        &config.local.module_cache_config,
-                        metadata.unwrap(),
-                    )
-                    .unwrap();
-                snapshot = Some(guard.snapshot_hot_cache());
+                snapshot = self.maybe_snapshot_hot_cache(
+                    state_view,
+                    &config.local.module_cache_config,
+                    metadata.unwrap(),
+                );
             }
         }
 
@@ -926,19 +991,12 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         #[cfg(fuzzing)]
         {
             if mode == ExecutorMode::BothComparison {
-                if let Some(s) = snapshot.take() {
-                    let mut guard = self
-                        .shared_module_cache_manager
-                        .as_ref()
-                        .unwrap()
-                        .try_lock(
-                            state_view,
-                            &config.local.module_cache_config,
-                            metadata.unwrap(),
-                        )
-                        .unwrap();
-                    guard.rollback_hot_cache(s);
-                }
+                self.maybe_rollback_hot_cache(
+                    state_view,
+                    &config.local.module_cache_config,
+                    metadata.unwrap(),
+                    snapshot.take(),
+                );
             }
         }
 

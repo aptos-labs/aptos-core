@@ -68,14 +68,12 @@ where
     }
 }
 
-#[cfg(fuzzing)]
-impl<Deserialized, Verified, Extension> Clone for Entry<Deserialized, Verified, Extension>
+impl<Deserialized, Verified, Extension> Entry<Deserialized, Verified, Extension>
 where
     Verified: Deref<Target = Arc<Deserialized>>,
     Extension: WithSize,
 {
-    fn clone(&self) -> Self {
-        // Copy the overridden flag and clone the Arc to the module code.
+    pub fn clone_for_fuzzing(&self) -> Self {
         let overridden = self.overridden.load(Ordering::Relaxed);
         Self {
             overridden: AtomicBool::new(overridden),
@@ -248,17 +246,16 @@ where
     }
 }
 
-#[cfg(fuzzing)]
-impl<K, D, V, E> Clone for GlobalModuleCache<K, D, V, E>
+impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
 where
     K: Hash + Eq + Clone,
     V: Deref<Target = Arc<D>>,
     E: WithSize,
 {
-    fn clone(&self) -> Self {
+    pub fn clone_for_fuzzing(&self) -> Self {
         let mut module_cache: HashMap<K, Entry<D, V, E>> = HashMap::new();
         for (k, v) in self.module_cache.iter() {
-            module_cache.insert(k.clone(), v.clone());
+            module_cache.insert(k.clone(), v.clone_for_fuzzing());
         }
         Self {
             module_cache,
