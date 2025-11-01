@@ -7,4 +7,3 @@ mod dealt_keys;
 mod hkzg_chunked_elgamal;
 mod input_secret;
 mod public_parameters;
-// mod transcript;

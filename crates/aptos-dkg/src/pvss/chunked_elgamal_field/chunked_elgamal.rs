@@ -12,8 +12,9 @@ use ark_serialize::{
 };
 use ark_std::fmt::Debug;
 
-pub const DST: &[u8; 25] = b"APTOS_CHUNKED_ELGAMAL_DST";
+pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST";
 
+// TODO: Change this to PublicParameters<E: CurveGroup>. Would first require changing Scalar<E: Pairing> to Scalar<F: PrimeField>, which would be a bit of work
 #[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
@@ -65,7 +66,7 @@ impl<E: Pairing> PublicParameters<E> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct Homomorphism<'a, E: Pairing> {
-    pub pp: &'a PublicParameters<E>,
+    pub pp: &'a PublicParameters<E>, // This is small so could clone it here, then no custom `CanonicalSerialize` needed
     pub eks: &'a [E::G1Affine],
 }
 
@@ -95,7 +96,7 @@ impl<'a, E: Pairing> CanonicalSerialize for Homomorphism<'a, E> {
     }
 }
 
-/// This struct is used as `CodomainShape`, but the same layout also applies to the `Witness` type.
+/// This struct is used as `CodomainShape<T>`, but the same layout also applies to the `Witness` type.
 /// Hence, for brevity, we reuse this struct for both purposes.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ChunksAndRandomness<T: CanonicalSerialize + CanonicalDeserialize + Clone> {

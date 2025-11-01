@@ -185,7 +185,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
     /// 1. A random polynomial of degree `t-1` is generated with `val_to_share`
     ///    as the constant term.
     /// 2. The polynomial is evaluated over the `domain` using FFT to produce `y` values.
-    /// 3. Each share is represented as a `(x, y)` pair (`ShamirShare<F>`).
+    /// 3. Each share is represented as a `(x, y)` pair (`ShamirShare<F>`).  TODO: not used atm
     pub fn share<R: Rng + RngCore>(&self, val_to_share: F, rng: &mut R) -> Vec<ShamirShare<F>> {
         let mut coeffs = vec![val_to_share]; // constant term of polynomial
         coeffs.extend((0..(self.t - 1)).map(|_| F::rand(rng)));
@@ -200,7 +200,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
         y_pts[..self.n].to_vec()
     }
 
-    /// Generates ShamirShares from given polynomial coefficients.
+    /// Generates ShamirShares from given polynomial coefficients. TODO: not used atm
     pub fn share_with_coeffs(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
         // Evaluate the polynomial over the domain
         let y_pts = self.share_with_coeffs_only_evals(coeffs);

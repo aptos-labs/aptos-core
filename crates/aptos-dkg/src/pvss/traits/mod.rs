@@ -50,7 +50,8 @@ pub trait SecretSharingConfig: Display {
 /// Trait for secret sharing schemes that expose a threshold `t`.
 ///
 /// This trait is required because some operations (such as those in SCRAPE LDT) need access to `t`,
-/// but not all secret sharing schemes are threshold-based.
+/// but not all secret sharing schemes are threshold secret sharing schemes; they can have more
+/// general access structures.
 pub trait ThresholdConfig: SecretSharingConfig {
     fn get_threshold(&self) -> usize;
 }
@@ -88,6 +89,7 @@ impl<F: ark_ff::PrimeField> SecretSharingConfig for arkworks::shamir::ThresholdC
 }
 
 /// All dealt secret keys should be reconstructable from a subset of \[dealt secret key\] shares.
+/// TODO: Should we keep Vec<(Player, Self::Share)> ? Vec<ShamirShare> looks simpler / more descriptive
 pub trait Reconstructable<SSC: SecretSharingConfig> {
     type Share: Clone;
 

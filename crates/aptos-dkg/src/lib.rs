@@ -50,11 +50,12 @@ pub mod weighted_vuf;
 /// `E::ScalarField`.
 #[repr(transparent)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Scalar<E: Pairing>(pub E::ScalarField); // TODO: Maybe this should be  Scalar<F: PrimeField> ??
+pub struct Scalar<E: Pairing>(pub E::ScalarField); // TODO: Maybe this should be Scalar<F: PrimeField> ?? (PrimeField is needed for ThresholdConfig below)
 
 impl<E: Pairing> Scalar<E> {
     /// Converts a `&[Scalar<E>]` into a `&[E::ScalarField]`; could do this without copying
-    /// by using #[repr(transparent)] and unsafe Rust, but we want to avoid that
+    /// (and similarly for the other functions below) by using `#[repr(transparent)]` and
+    /// unsafe Rust, but we want to avoid that
     pub fn slice_as_inner(slice: &[Self]) -> Vec<E::ScalarField>
     where
         E::ScalarField: Clone,
@@ -87,6 +88,8 @@ impl<E: Pairing> Scalar<E> {
 impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
+    // TODO: converting between Vec<(Player, Self::Share)> and Vec<ShamirShare<E::ScalarField>> feels bulky,
+    // one of them needs to go
     fn reconstruct(
         sc: &ThresholdConfig<E::ScalarField>,
         shares: &Vec<(Player, Self::Share)>,

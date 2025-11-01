@@ -18,7 +18,6 @@ pub(crate) fn chunk_field_elt<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec
     let mut chunks = Vec::with_capacity(num_chunks);
 
     for bytes_chunk in bytes.chunks(num_bytes) {
-        // Copy into a fixed 8-byte array (up to 64 bits)
         let mut padded = [0u8; 8];
         padded[..bytes_chunk.len()].copy_from_slice(bytes_chunk);
 
@@ -38,12 +37,12 @@ pub(crate) fn unchunk_field_elt<F: PrimeField>(num_bits: usize, chunks: &[F]) ->
         "Invalid chunk size"
     );
 
-    let base = F::from(1u128 << num_bits);
+    let base = F::from(1u128 << num_bits); // need u128 in the case where `num_bits` is 64, because of `chunk * multiplier`
     let mut acc = F::zero();
     let mut multiplier = F::one();
 
-    for chunk in chunks {
-        acc += *chunk * multiplier;
+    for &chunk in chunks {
+        acc += chunk * multiplier;
         multiplier *= base;
     }
 
@@ -60,7 +59,7 @@ mod tests {
     #[test]
     fn test_chunk_unchunk_roundtrip() {
         let mut rng = test_rng();
-        let num_bits_list = [8, 16, 32, 64]; // include 64 bits now
+        let num_bits_list = [8, 16, 32, 64];
 
         for &num_bits in &num_bits_list {
             for _ in 0..100 {
