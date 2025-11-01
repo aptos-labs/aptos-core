@@ -9,7 +9,7 @@ use aptos_transaction_generator_lib::{
     entry_point_trait::{AutomaticArgs, EntryPointTrait, MultiSigConfig},
     publishing::publish_util::{Package, PackageHandler},
 };
-use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType, OrderBookState};
+use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType};
 use aptos_types::{
     account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayload,
 };
@@ -341,14 +341,15 @@ fn main() {
             repeats: 100,
             map_type: MapType::OrderedMap,
         }),
-        (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::OrderBook {
-            state: OrderBookState::new(),
-            num_markets: 1,
-            overlap_ratio: 0.0, // Since we run a single txn, no matches will happen irrespectively
-            buy_frequency: 0.5,
-            max_sell_size: 1,
-            max_buy_size: 1,
-        }),
+        // TODO need to support transaction context to enable
+        // (LANDBLOCKING_AND_CONTINUOUS, EntryPoints::OrderBook {
+        //     state: OrderBookState::new(),
+        //     num_markets: 1,
+        //     overlap_ratio: 0.0, // Since we run a single txn, no matches will happen irrespectively
+        //     buy_frequency: 0.5,
+        //     max_sell_size: 1,
+        //     max_buy_size: 1,
+        // }),
     ];
 
     let mut failures = Vec::new();
@@ -403,6 +404,11 @@ fn main() {
             } else {
                 100
             },
+        );
+        assert!(
+            !measurement.had_error(),
+            "Entry point {:?} failed with an error",
+            entry_point
         );
         let elapsed_micros = measurement.elapsed_micros_f64();
         let diff = (elapsed_micros - expected_time_micros) / expected_time_micros * 100.0;

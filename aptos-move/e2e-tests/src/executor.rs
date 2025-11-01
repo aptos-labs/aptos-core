@@ -164,6 +164,8 @@ pub struct Measurement {
     execution_gas: u64,
     /// In internal gas units
     io_gas: u64,
+
+    had_error: bool,
 }
 
 const GAS_SCALING_FACTOR: f64 = 1_000_000.0;
@@ -187,6 +189,10 @@ impl Measurement {
 
     pub fn io_gas_units(&self) -> f64 {
         self.io_gas as f64 / GAS_SCALING_FACTOR
+    }
+
+    pub fn had_error(&self) -> bool {
+        self.had_error
     }
 }
 
@@ -1204,7 +1210,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 ),
             };
             let elapsed = start.elapsed();
-            if let Err(err) = result {
+            if let Err(err) = &result {
                 if !should_error {
                     println!(
                         "Entry function under measurement failed with an error. Continuing, but measurements are probably not what is expected. Error: {}",
@@ -1222,6 +1228,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     io_gas: regular
                         .as_ref()
                         .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+                    had_error: result.is_err(),
                 });
             }
             i += 1;
@@ -1240,6 +1247,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     + measurements[mid].execution_gas)
                     / 2,
                 io_gas: (measurements[mid - 1].io_gas + measurements[mid].io_gas) / 2,
+                had_error: measurements[mid - 1].had_error || measurements[mid].had_error,
             };
         }
 
