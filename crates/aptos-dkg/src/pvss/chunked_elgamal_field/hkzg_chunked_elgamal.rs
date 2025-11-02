@@ -36,12 +36,14 @@ pub struct HkzgElgamalWitness<E: Pairing> {
 }
 
 /// The two steps described earlier — (1) generating HKZG randomness for the DeKARTv2 proof
-/// and (2) encrypting with ElGamal randomness — can be reinterpreted as a single Σ-protocol
-/// proving knowledge of a *preimage* under a tuple homomorphism.
+/// and (2) encrypting with ElGamal randomness — are part of a single Σ-protocol
+/// proving knowledge of a *preimage* under a tuple homomorphism, consisting of:
+/// (i) the HKZG commitment homomorphism, and
+/// (ii) the chunked_elgamal homomorphism.
 ///
-/// Each component of this tuple homomorphism corresponds to one of the two steps:
-/// in each case, the witness omits (or “ignores”) one of its fields. Thus, the overall
-/// homomorphism can be viewed as a tuple of two *lifted* homomorphisms.
+/// On the domain side, each component of this tuple homomorphism corresponds to one of the
+/// two steps: in each case, the witness omits (or “ignores”) one of its three fields. Thus,
+/// the overall homomorphism of the Σ-protocol can be viewed as a tuple of two *lifted* homomorphisms.
 type LiftedKZG<'a, E> =
     LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgElgamalWitness<E>>;
 type LiftedChunkedElGamal<'a, E> =
