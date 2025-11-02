@@ -1072,7 +1072,7 @@ module aptos_experimental::single_order_book {
         );
         assert!(match_result.is_empty());
 
-        // Try to update non existant order
+        // Try to update non-existent order
         let match_result = order_book.update_order_and_get_matches(
             &mut price_time_idx,
             create_simple_test_order_request(

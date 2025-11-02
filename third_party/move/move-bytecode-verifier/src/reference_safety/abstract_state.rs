@@ -510,7 +510,7 @@ impl AbstractState {
         result_tys: &[SignatureToken],
         meter: &mut impl Meter,
     ) -> PartialVMResult<Vec<AbstractValue>> {
-        // Check mutable references can be transfered
+        // Check mutable references can be transferred
         let mut all_references_to_borrow_from = BTreeSet::new();
         let mut mutable_references_to_borrow_from = BTreeSet::new();
         for id in arguments.iter().filter_map(|v| v.ref_id()) {

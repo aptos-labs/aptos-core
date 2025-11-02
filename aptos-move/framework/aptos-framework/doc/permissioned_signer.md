@@ -1389,7 +1389,7 @@ to bypass the checks.
 <pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_exists">check_permission_exists</a>&lt;PermKey: <b>copy</b> + drop + store&gt;(
     s: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, perm: PermKey
 ): bool <b>acquires</b> <a href="permissioned_signer.md#0x1_permissioned_signer_PermissionStorage">PermissionStorage</a> {
-    // 0 capacity permissions will be treated <b>as</b> non-existant.
+    // 0 capacity permissions will be treated <b>as</b> non-existent.
     <a href="permissioned_signer.md#0x1_permissioned_signer_check_permission_capacity_above">check_permission_capacity_above</a>(s, 1, perm)
 }
 </code></pre>

@@ -293,7 +293,7 @@ pub async fn get_stake_balances(
 ) -> ApiResult<Option<BalanceResult>> {
     const STAKE_POOL: &str = "0x1::stake::StakePool";
 
-    // Retreive the pool resource
+    // Retrieve the pool resource
     if let Ok(response) = rest_client
         .get_account_resource_at_version_bcs::<StakePool>(pool_address, STAKE_POOL, version)
         .await

@@ -3,7 +3,7 @@
 # This assumes you have already poetry installed.
 # If not, please follow README.md instructions to install poetry and necessary dependencies.
 
-# Run the necesary linters and formatters for CLI e2e tests
+# Run the necessary linters and formatters for CLI e2e tests
 echo "Start linter.sh..."
 
 # Run isort

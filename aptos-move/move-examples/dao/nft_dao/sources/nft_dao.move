@@ -254,7 +254,7 @@ module dao_platform::nft_dao {
         let (res_signer, res_cap) = account::create_resource_account(admin, seed);
         let src_addr = signer::address_of(admin);
 
-        // initalize token store and opt-in direct NFT transfer for easy of operation
+        // initialize token store and opt-in direct NFT transfer for easy of operation
         token::opt_in_direct_transfer(&res_signer, true);
 
         assert!(string::length(&name) < 128, error::invalid_argument(ESTRING_TOO_LONG));

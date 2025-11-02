@@ -160,7 +160,7 @@ impl FetchMetadata {
             let oldest_fetchable_epoch = std::cmp::max(oldest_event.event.epoch() + 1, 2);
             if oldest_fetchable_epoch > wanted_start_epoch as u64 {
                 println!(
-                    "Oldest full epoch that can be retreived is {} ",
+                    "Oldest full epoch that can be retrieved is {} ",
                     oldest_fetchable_epoch
                 );
                 oldest_fetchable_epoch

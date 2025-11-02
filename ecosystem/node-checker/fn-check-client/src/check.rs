@@ -312,9 +312,9 @@ impl SingleCheck {
 #[derive(Debug, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum SingleCheckResult {
-    /// The node was successfully checked. Note: The evaulation itself could
+    /// The node was successfully checked. Note: The evaluation itself could
     /// still indicate a problem with the node, this just states that we were
-    /// able to check the node sucessfully with NHC.
+    /// able to check the node successfully with NHC.
     Success(SingleCheckSuccess),
 
     /// Something went wrong with checking the node with NHC.

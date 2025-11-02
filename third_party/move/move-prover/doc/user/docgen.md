@@ -124,7 +124,7 @@ decorated as follows:
    positives, as the generator does not analyze the syntax right now.
 
 -  Identifiers are attempted to resolve against the documented code and on success, hyperlinked to the declaration.
-   For example, within the `DiemAccount` module, all occurences of `T`, `Self::T`, `DiemAccount::T`, and
+   For example, within the `DiemAccount` module, all occurrences of `T`, `Self::T`, `DiemAccount::T`, and
    `0x1::DiemAccount:T` will resolve into a link to the declaration. This resolution is heuristic and may have
    positive and negative false positives. Specifically, it currently does not consider aliases and use-declarations.
 
