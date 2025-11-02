@@ -141,30 +141,8 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
     type Error = CryptoMaterialError;
 
     fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
-        use ark_serialize::CanonicalDeserialize;
-
-        let mut reader = bytes;
-
-        // Deserialize pp_elgamal
-        let pp_elgamal =
-            chunked_elgamal::PublicParameters::<E>::deserialize_compressed(&mut reader)
-                .map_err(|_| CryptoMaterialError::DeserializationError)?;
-
-        // Deserialize pk_range_proof
-        let pk_range_proof =
-            dekart_univariate_v2::ProverKey::<E>::deserialize_compressed(&mut reader)
-                .map_err(|_| CryptoMaterialError::DeserializationError)?;
-
-        // Deserialize G_2
-        let G_2 = E::G2Affine::deserialize_compressed(&mut reader)
-            .map_err(|_| CryptoMaterialError::DeserializationError)?;
-
-        Ok(PublicParameters {
-            pp_elgamal,
-            pk_range_proof,
-            G_2,
-            powers_of_radix: compute_powers_of_radix::<E>(),
-        })
+        bcs::from_bytes::<PublicParameters<E>>(bytes)
+            .map_err(|_| CryptoMaterialError::DeserializationError)
     }
 }
 
@@ -197,34 +175,13 @@ impl<E: Pairing> PublicParameters<E> {
 
         pp
     }
-
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-
-        // Serialize pp_elgamal
-        self.pp_elgamal.serialize_compressed(&mut bytes).unwrap();
-
-        // Serialize pk_range_proof
-        self.pk_range_proof
-            .serialize_compressed(&mut bytes)
-            .unwrap();
-
-        // Serialize G_2
-        self.G_2.serialize_compressed(&mut bytes).unwrap();
-
-        bytes
-    }
-
-    pub fn get_commitment_base(&self) -> &E::G2Affine {
-        &self.G_2
-    }
 }
 
 impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
-        self.to_bytes()
+        bcs::to_bytes(&self).expect("unexpected error during PVSS transcript serialization")
     }
 }
 
