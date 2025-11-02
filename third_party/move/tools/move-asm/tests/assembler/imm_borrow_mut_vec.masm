@@ -1,0 +1,82 @@
+//# publish --verbose
+module 0x66::a
+enum Foo has drop + copy + store
+  Z
+  A
+    x: ||u8 has copy+drop+store
+  B
+    x: |u8|u8 has copy+drop+store
+#[persistent] entry public fun c1(): u8
+    ld_u8 0
+    ret
+#[persistent] entry public fun c2(x: u8): u8
+    ld_u8 0
+    ret
+entry public fun bar(a: &mut Foo, b: &Foo)
+    local ir: &||u8 has copy+drop+store
+    local ir2: &|u8|u8 has copy+drop+store
+    local c1: ||u8 has copy+drop+store
+    local c2: |u8|u8 has copy+drop+store
+    pack_closure c1, 0
+    pack_variant Foo, A
+    copy_loc a
+    write_ref
+    copy_loc b
+    borrow_variant_field Foo, A::x
+    st_loc ir
+    pack_closure c2, 0
+    pack_variant Foo, B
+    copy_loc a
+    write_ref
+    copy_loc ir
+    read_ref
+    st_loc c1
+    copy_loc b
+    borrow_variant_field Foo, B::x
+    st_loc ir2
+    pack_closure c1, 0
+    pack_variant Foo, A
+    copy_loc a
+    write_ref
+    copy_loc ir2
+    read_ref
+    st_loc c2
+    ld_u8 0 // this u8 will remain on the stack
+    copy_loc c2
+    // this call will push 1 and pop 1 value off the stack in stack balance verification pass.
+    // but at runtime it will only push 1 value leaving the extra u8 on stack
+    call_closure<|u8|u8>
+    pop
+// This call will fix the stack balance at runtime if needed. Since it pops an extra value at runtime compared to verifier pass
+//
+//  copy_loc c1
+//  call_closure<||u8>
+//  pop
+    ret
+public fun foo(s: &signer)
+    local data: vector<Foo>
+    local ref: &mut vector<Foo>
+    local a: &mut Foo
+    local b: &Foo
+    local d: u64
+    pack_variant Foo, Z
+    vec_pack<Foo> 1
+    st_loc data
+    mut_borrow_loc data
+    st_loc ref
+    copy_loc ref
+    ld_u64 0
+    vec_mut_borrow<Foo>
+    st_loc a
+    copy_loc ref
+    ld_u64 0
+    vec_borrow<Foo>
+    st_loc b
+    ld_u64 0
+    copy_loc a
+    copy_loc b
+    call bar
+    st_loc d // bar will have positive stack balance and the extra u8 pushed there will be attempted to be stored here.
+    ret
+
+//# run 0x66::a::foo --signers 0x42 --verbose

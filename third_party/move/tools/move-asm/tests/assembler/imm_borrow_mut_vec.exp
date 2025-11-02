@@ -1,0 +1,21 @@
+processed 2 tasks
+task 0 lines 1-80:  publish --verbose [module 0x66::a]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000066::a'. Got VMError: {
+    message: None,
+    major_status: VEC_BORROW_ELEMENT_EXISTS_MUTABLE_BORROW_ERROR,
+    sub_status: None,
+    location: 0x66::a,
+    indices: [(FunctionDefinition, 3)],
+    offsets: [(FunctionDefinitionIndex(3), 11)],
+    exec_state: None,
+}
+task 1 lines 82-82:  run 0x66::a::foo --signers 0x42 --verbose
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000066::a doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

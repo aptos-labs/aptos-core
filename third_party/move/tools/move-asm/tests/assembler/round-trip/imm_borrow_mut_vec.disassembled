@@ -1,0 +1,96 @@
+//**** Cross-compiled for `masm` syntax from `tests/assembler/imm_borrow_mut_vec.masm`
+
+//# publish --verbose
+// Bytecode version v8
+module 0x66::a
+enum Foo has copy + drop + store
+  Z
+  A
+    x: ||u8 has copy + drop + store
+  B
+    x: |u8|u8 has copy + drop + store
+
+// Function definition at index 0
+#[persistent] entry public fun c1(): u8
+    ld_u8 0
+    ret
+
+// Function definition at index 1
+#[persistent] entry public fun c2(l0: u8): u8
+    ld_u8 0
+    ret
+
+// Function definition at index 2
+entry public fun bar(l0: &mut Foo, l1: &Foo)
+    local l2: &||u8 has copy + drop + store
+    local l3: &|u8|u8 has copy + drop + store
+    local l4: ||u8 has copy + drop + store
+    local l5: |u8|u8 has copy + drop + store
+    pack_closure c1, 0
+    pack_variant Foo, A
+    copy_loc l0
+    write_ref
+    copy_loc l1
+    // @5
+    borrow_variant_field Foo, A::x
+    st_loc l2
+    pack_closure c2, 0
+    pack_variant Foo, B
+    copy_loc l0
+    // @10
+    write_ref
+    copy_loc l2
+    read_ref
+    st_loc l4
+    copy_loc l1
+    // @15
+    borrow_variant_field Foo, B::x
+    st_loc l3
+    pack_closure c1, 0
+    pack_variant Foo, A
+    copy_loc l0
+    // @20
+    write_ref
+    copy_loc l3
+    read_ref
+    st_loc l5
+    ld_u8 0
+    // @25
+    copy_loc l5
+    call_closure <|u8|u8>
+    pop
+    ret
+
+// Function definition at index 3
+public fun foo(l0: &signer)
+    local l1: vector<Foo>
+    local l2: &mut vector<Foo>
+    local l3: &mut Foo
+    local l4: &Foo
+    local l5: u64
+    pack_variant Foo, Z
+    vec_pack <Foo>, 1
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    // @5
+    copy_loc l2
+    ld_u64 0
+    vec_mut_borrow <Foo>
+    st_loc l3
+    copy_loc l2
+    // @10
+    ld_u64 0
+    vec_borrow <Foo>
+    st_loc l4
+    ld_u64 0
+    copy_loc l3
+    // @15
+    copy_loc l4
+    call bar
+    st_loc l5
+    ret
+
+
+
+//# run 0x66::a::foo --signers 0x42 --verbose
