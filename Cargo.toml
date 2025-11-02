@@ -911,6 +911,9 @@ move-vm-types = { path = "third_party/move/move-vm/types" }
 debug = true
 overflow-checks = true
 
+[profile.release.build-override]
+opt-level = 3
+
 # The performance build is not currently recommended
 # for production deployments. It has not been widely tested.
 [profile.performance]
