@@ -15,7 +15,9 @@ use ark_std::rand::{CryptoRng, RngCore};
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
-/// In this PVSS scheme, plaintexts (which are shares) are first divided into chunks. Then:
+/// In this PVSS scheme, plaintexts (which are shares) are first divided into chunks. Then
+/// two (independent) steps are done:
+///
 /// 1. **HKZG randomness** is generated and used in the DeKARTv2 range proof,
 ///    to prove that the chunks lie in the correct range.
 /// 2. **ElGamal randomness** is generated and used to encrypt the chunks.
@@ -37,6 +39,7 @@ pub struct HkzgElgamalWitness<E: Pairing> {
 /// The two steps described earlier — (1) generating HKZG randomness for the DeKARTv2 proof
 /// and (2) encrypting with ElGamal randomness — are part of a single Σ-protocol
 /// proving knowledge of a *preimage* under a tuple homomorphism, consisting of:
+///
 /// (i) the HKZG commitment homomorphism, and
 /// (ii) the `chunked_elgamal` homomorphism.
 ///

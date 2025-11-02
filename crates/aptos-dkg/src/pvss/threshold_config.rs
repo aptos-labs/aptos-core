@@ -38,15 +38,15 @@ impl<'de> Deserialize<'de> for ThresholdConfigBlstrs {
     {
         // Deserialize only the serializable fields (t, n)
         #[derive(Deserialize)]
-        struct BasicFields {
+        struct SerializedFields {
             t: usize,
             n: usize,
         }
 
-        let basic_fields = BasicFields::deserialize(deserializer)?;
+        let serialized = SerializedFields::deserialize(deserializer)?;
 
         // Rebuild the skipped fields using `new`
-        ThresholdConfigBlstrs::new(basic_fields.t, basic_fields.n).map_err(serde::de::Error::custom)
+        ThresholdConfigBlstrs::new(serialized.t, serialized.n).map_err(serde::de::Error::custom)
     }
 }
 
