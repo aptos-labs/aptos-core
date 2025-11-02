@@ -32,11 +32,12 @@ use std::ops::Mul;
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST";
 
-const CHUNK_SIZE: u8 = 16; // Will probably move this elsewhere. Or can make it a run-time variable...
+pub const CHUNK_SIZE: u8 = 16; // Will probably move this elsewhere in the next PR. Maybe it becomes a run-time variable...
 
 fn compute_powers_of_radix<E: Pairing>() -> Vec<E::ScalarField> {
-    let num_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
-    arkworks::powers_of_two(num_chunks)
+    let num_chunks_per_share =
+        E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
+    arkworks::powers_of_two(num_chunks_per_share)
 }
 
 #[derive(CanonicalSerialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -64,7 +65,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
     {
         // Deserialize the serializable fields directly
         #[derive(Deserialize)]
-        struct Inner<E: Pairing> {
+        struct SerializedFields<E: Pairing> {
             #[serde(deserialize_with = "ark_de")]
             pp_elgamal: chunked_elgamal::PublicParameters<E>,
             #[serde(deserialize_with = "ark_de")]
@@ -73,12 +74,12 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             G_2: E::G2Affine,
         }
 
-        let inner = Inner::<E>::deserialize(deserializer)?;
+        let serialized = SerializedFields::<E>::deserialize(deserializer)?;
 
         Ok(Self {
-            pp_elgamal: inner.pp_elgamal,
-            pk_range_proof: inner.pk_range_proof,
-            G_2: inner.G_2,
+            pp_elgamal: serialized.pp_elgamal,
+            pk_range_proof: serialized.pk_range_proof,
+            G_2: serialized.G_2,
             powers_of_radix: compute_powers_of_radix::<E>(),
         })
     }
@@ -91,7 +92,6 @@ impl<E: Pairing> CanonicalDeserialize for PublicParameters<E> {
         compress: Compress,
         validate: Validate,
     ) -> Result<Self, SerializationError> {
-        // Deserialize fields in canonical order
         let pp_elgamal = chunked_elgamal::PublicParameters::<E>::deserialize_with_mode(
             &mut reader,
             compress,
@@ -231,6 +231,6 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
 impl<E: Pairing> Default for PublicParameters<E> {
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, 16, &mut rng) // TODO: REFER TO CONSTANT HERE: build_constants::CHUNK_SIZE as usize
+        Self::new(1, CHUNK_SIZE as usize, &mut rng)
     }
 }

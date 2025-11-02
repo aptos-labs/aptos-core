@@ -16,12 +16,32 @@ use ark_std::rand::{CryptoRng, RngCore};
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
+
+/// Witness data for the `chunked_elgamal_field` PVSS protocol.
+///
+/// In this PVSS scheme, plaintexts (which are shares) are first divided into chunks. Then:
+/// 1. **HKZG randomness** is generated and used in the DeKARTv2 range proof,
+///    to prove that the chunks lie in the correct range.
+/// 2. **ElGamal randomness** is generated and used to encrypt the chunks.
+///
+/// To prove consistency between these components, we thus construct a Σ-protocol
+/// defined over a domain that jointly includes:
+/// - the HKZG randomness,
+/// - the chunked plaintexts, and
+/// - the ElGamal randomness.
 pub struct HkzgElgamalWitness<E: Pairing> {
     pub hkzg_randomness: Scalar<E>,
     pub chunked_plaintexts: Vec<Vec<Scalar<E>>>,
     pub elgamal_randomness: Vec<Scalar<E>>,
 }
 
+/// The two steps described earlier — (1) generating HKZG randomness for the DeKARTv2 proof
+/// and (2) encrypting with ElGamal randomness — can be reinterpreted as a single Σ-protocol
+/// proving knowledge of a *preimage* under a tuple homomorphism.
+///
+/// Each component of this tuple homomorphism corresponds to one of the two steps:
+/// in each case, the witness omits (or “ignores”) one of its fields. Thus, the overall
+/// homomorphism can be viewed as a tuple of two *lifted* homomorphisms.
 type LiftedKZG<'a, E> =
     LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgElgamalWitness<E>>;
 type LiftedChunkedElGamal<'a, E> =
