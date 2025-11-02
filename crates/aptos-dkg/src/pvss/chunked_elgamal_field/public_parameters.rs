@@ -13,11 +13,10 @@ use crate::{
         traits,
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
-    utils::{self},
 };
 use aptos_crypto::{
     arkworks::{
-        hashing,
+        self, hashing,
         serialization::{ark_de, ark_se},
     },
     CryptoMaterialError, ValidCryptoMaterial,
@@ -36,9 +35,8 @@ const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST";
 const CHUNK_SIZE: u8 = 16; // Will probably move this elsewhere. Or can make it a run-time variable...
 
 fn compute_powers_of_radix<E: Pairing>() -> Vec<E::ScalarField> {
-    let base = E::ScalarField::from(1u64 << CHUNK_SIZE);
     let num_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
-    utils::powers(base, num_chunks) // TODO: old code used num_chunks + 1?
+    arkworks::powers_of_two(num_chunks)
 }
 
 #[derive(CanonicalSerialize, Serialize, Clone, Debug, PartialEq, Eq)]
@@ -182,7 +180,6 @@ impl<E: Pairing> PublicParameters<E> {
             E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
         let max_num_chunks_padded =
             ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
-        let base = E::ScalarField::from(1u64 << CHUNK_SIZE);
 
         let group_generators = GroupGenerators::sample(rng); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp = Self {
@@ -195,7 +192,7 @@ impl<E: Pairing> PublicParameters<E> {
             )
             .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
-            powers_of_radix: utils::powers(base, num_chunks_per_share),
+            powers_of_radix: arkworks::powers_of_two(num_chunks_per_share),
         };
 
         pp
