@@ -13,10 +13,6 @@ use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 
-#[derive(
-    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
-)]
-
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
 /// In this PVSS scheme, plaintexts (which are shares) are first divided into chunks. Then:
@@ -29,6 +25,9 @@ use ark_std::rand::{CryptoRng, RngCore};
 /// - the HKZG randomness,
 /// - the chunked plaintexts, and
 /// - the ElGamal randomness.
+#[derive(
+    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
+)]
 pub struct HkzgElgamalWitness<E: Pairing> {
     pub hkzg_randomness: Scalar<E>,
     pub chunked_plaintexts: Vec<Vec<Scalar<E>>>,
@@ -39,7 +38,7 @@ pub struct HkzgElgamalWitness<E: Pairing> {
 /// and (2) encrypting with ElGamal randomness — are part of a single Σ-protocol
 /// proving knowledge of a *preimage* under a tuple homomorphism, consisting of:
 /// (i) the HKZG commitment homomorphism, and
-/// (ii) the chunked_elgamal homomorphism.
+/// (ii) the `chunked_elgamal` homomorphism.
 ///
 /// On the domain side, each component of this tuple homomorphism corresponds to one of the
 /// two steps: in each case, the witness omits (or “ignores”) one of its three fields. Thus,
@@ -54,7 +53,7 @@ pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedKZG<'a, E>, LiftedChunked
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
-        lagr_g1: &'a [E::G1Affine],
+        lagr_g1: &'a [E::G1Affine], // TODO: could combine lagr_g1 and xi_1 into hkzg::PublicParamaters<E>?
         xi_1: E::G1Affine,
         pp: &'a chunked_elgamal::PublicParameters<E>,
         eks: &'a [E::G1Affine],
