@@ -45,7 +45,7 @@ pub struct Commitment<E: Pairing>(pub(crate) E::G1);
 pub struct ProverKey<E: Pairing> {
     vk: VerificationKey<E>,
     pub(crate) ck_S: univariate_hiding_kzg::CommitmentKey<E>,
-    max_n: usize,
+    pub(crate) max_n: usize,
     pub(crate) prover_precomputed: ProverPrecomputed<E>,
 }
 

@@ -24,27 +24,101 @@ use aptos_crypto::{
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
+};
 use ark_std::rand::{thread_rng, CryptoRng, RngCore};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST";
 
-#[derive(
-    CanonicalSerialize, Serialize, CanonicalDeserialize, Deserialize, Clone, Debug, PartialEq, Eq,
-)]
+const CHUNK_SIZE: u8 = 16; // Will probably move this elsewhere. Or can make it a run-time variable...
+
+fn compute_powers_of_radix<E: Pairing>() -> Vec<E::ScalarField> {
+    let base = E::ScalarField::from(1u64 << CHUNK_SIZE);
+    let num_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
+    utils::powers(base, num_chunks) // TODO: old code used num_chunks + 1?
+}
+
+#[derive(CanonicalSerialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub pp_elgamal: chunked_elgamal::PublicParameters<E>, // TODO: make this <E::G1> or <E::G1Affine> instead?
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(serialize_with = "ark_se")]
+    pub pp_elgamal: chunked_elgamal::PublicParameters<E>, // TODO: make this <E::G1> or <E::G1Affine> instead of <E>?
+
+    #[serde(serialize_with = "ark_se")]
     pub pk_range_proof: dekart_univariate_v2::ProverKey<E>,
+
     /// Base for the commitments to the polynomial evaluations (and for the dealt public key [shares])
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    #[serde(serialize_with = "ark_se")]
     G_2: E::G2Affine,
+
     #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
+}
+
+#[allow(non_snake_case)]
+impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize the serializable fields directly
+        #[derive(Deserialize)]
+        struct Inner<E: Pairing> {
+            #[serde(deserialize_with = "ark_de")]
+            pp_elgamal: chunked_elgamal::PublicParameters<E>,
+            #[serde(deserialize_with = "ark_de")]
+            pk_range_proof: dekart_univariate_v2::ProverKey<E>,
+            #[serde(deserialize_with = "ark_de")]
+            G_2: E::G2Affine,
+        }
+
+        let inner = Inner::<E>::deserialize(deserializer)?;
+
+        Ok(Self {
+            pp_elgamal: inner.pp_elgamal,
+            pk_range_proof: inner.pk_range_proof,
+            G_2: inner.G_2,
+            powers_of_radix: compute_powers_of_radix::<E>(),
+        })
+    }
+}
+
+#[allow(non_snake_case)]
+impl<E: Pairing> CanonicalDeserialize for PublicParameters<E> {
+    fn deserialize_with_mode<R: Read>(
+        mut reader: R,
+        compress: Compress,
+        validate: Validate,
+    ) -> Result<Self, SerializationError> {
+        // Deserialize fields in canonical order
+        let pp_elgamal = chunked_elgamal::PublicParameters::<E>::deserialize_with_mode(
+            &mut reader,
+            compress,
+            validate,
+        )?;
+        let pk_range_proof = dekart_univariate_v2::ProverKey::<E>::deserialize_with_mode(
+            &mut reader,
+            compress,
+            validate,
+        )?;
+        let G_2 = E::G2Affine::deserialize_with_mode(&mut reader, compress, validate)?;
+
+        Ok(Self {
+            pp_elgamal,
+            pk_range_proof,
+            G_2,
+            powers_of_radix: compute_powers_of_radix::<E>(),
+        })
+    }
+}
+
+impl<E: Pairing> Valid for PublicParameters<E> {
+    fn check(&self) -> Result<(), SerializationError> {
+        Ok(())
+    }
 }
 
 impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
@@ -87,16 +161,11 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
         let G_2 = E::G2Affine::deserialize_compressed(&mut reader)
             .map_err(|_| CryptoMaterialError::DeserializationError)?;
 
-        // Recompute powers_of_radix
-        let base = E::ScalarField::from(1u64 << 16); // TODO: change radix here
-        let num_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(16) as usize;
-        let powers_of_radix = utils::powers(base, num_chunks + 1);
-
         Ok(PublicParameters {
             pp_elgamal,
             pk_range_proof,
             G_2,
-            powers_of_radix,
+            powers_of_radix: compute_powers_of_radix::<E>(),
         })
     }
 }
@@ -106,26 +175,27 @@ impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(
         max_num_shares: usize,
-        radix_exponent: usize,
+        _radix_exponent: usize,
         rng: &mut R,
     ) -> Self {
-        let max_num_chunks =
-            max_num_shares * (E::ScalarField::MODULUS_BIT_SIZE as usize).div_ceil(radix_exponent);
-        let max_num_chunks_padded = (max_num_chunks + 1).next_power_of_two() - 1;
-        let base = E::ScalarField::from(1u64 << radix_exponent);
-        let group_generators = GroupGenerators::sample(rng); // hmm at one of these should come from a powers of tau ceremony
+        let num_chunks_per_share =
+            E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
+        let max_num_chunks_padded =
+            ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
+        let base = E::ScalarField::from(1u64 << CHUNK_SIZE);
 
+        let group_generators = GroupGenerators::sample(rng); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp = Self {
             pp_elgamal: chunked_elgamal::PublicParameters::default(),
             pk_range_proof: dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded,
-                radix_exponent,
+                CHUNK_SIZE as usize,
                 group_generators,
                 rng,
             )
             .0,
-            G_2: hashing::unsafe_hash_to_affine(b"G_2", DST), // TODO: fix DST
-            powers_of_radix: utils::powers(base, max_num_chunks_padded + 1), // TODO: why the +1?
+            G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
+            powers_of_radix: utils::powers(base, num_chunks_per_share),
         };
 
         pp
@@ -167,50 +237,3 @@ impl<E: Pairing> Default for PublicParameters<E> {
         Self::new(1, 16, &mut rng) // TODO: REFER TO CONSTANT HERE: build_constants::CHUNK_SIZE as usize
     }
 }
-
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
-//     use ark_bls12_381::Bls12_381;
-//     use ark_std::rand::thread_rng;
-
-//     #[test]
-//     fn test_public_parameters_roundtrip() {
-//         let mut rng = thread_rng();
-
-//         // Create some public parameters
-//         let pp_original = PublicParameters::<Bls12_381>::new(5, 16, &mut rng);
-
-//         // Serialize to bytes
-//         let serialized_bytes = pp_original.to_bytes();
-
-//         // Deserialize back
-//         let pp_deserialized = PublicParameters::<Bls12_381>::try_from(serialized_bytes.as_slice())
-//             .expect("Deserialization failed");
-
-//         // Check equality
-//         assert_eq!(pp_original, pp_deserialized, "Roundtrip failed: deserialized parameters differ from original");
-//     }
-
-//     #[test]
-//     fn test_public_parameters_serde_roundtrip() {
-//         let mut rng = thread_rng();
-
-//         // Create some public parameters
-//         let pp_original = PublicParameters::<Bls12_381>::new(5, 16, &mut rng);
-
-//         // Serialize with serde
-//         let serialized = bcs::to_bytes(&pp_original).expect("Serde serialization failed");
-
-//         // Deserialize with serde
-//         let deserialized: PublicParameters<Bls12_381> =
-//             bcs::from_bytes(&serialized).expect("Serde deserialization failed");
-
-//         // Check equality
-//         assert_eq!(pp_original, deserialized, "Serde roundtrip failed");
-//         // THIS IS ALWAYS GOING TO FAIL. BETTER:
-//         assert_eq!(pp_original.pp_elgamal, deserialized.pp_elgamal);
-//         assert_eq!(pp_original.pk_range_proof, deserialized.pk_range_proof);
-//         assert_eq!(pp_original.G_2, deserialized.G_2);
-//     }
-// }
