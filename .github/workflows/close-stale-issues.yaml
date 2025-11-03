@@ -1,7 +1,6 @@
 name: "Close stale issues and PRs"
 on:
-  schedule:
-    - cron: "30 1 * * *"
+  # schedule: # NOTE: the schedule is dictated by PIES
   workflow_dispatch:
 
 permissions:

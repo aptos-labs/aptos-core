@@ -74,6 +74,7 @@ members = [
     "crates/aptos-genesis",
     "crates/aptos-github-client",
     "crates/aptos-id-generator",
+    "crates/aptos-in-memory-cache",
     "crates/aptos-infallible",
     "crates/aptos-inspection-service",
     "crates/aptos-jwk-consensus",
@@ -363,6 +364,7 @@ aptos-genesis = { path = "crates/aptos-genesis" }
 aptos-github-client = { path = "crates/aptos-github-client" }
 aptos-global-constants = { path = "config/global-constants" }
 aptos-id-generator = { path = "crates/aptos-id-generator" }
+aptos-in-memory-cache = { path = "crates/aptos-in-memory-cache" }
 aptos-indexer = { path = "crates/indexer" }
 aptos-indexer-grpc-cache-worker = { path = "ecosystem/indexer-grpc/indexer-grpc-cache-worker" }
 aptos-indexer-grpc-data-service = { path = "ecosystem/indexer-grpc/indexer-grpc-data-service" }
@@ -504,7 +506,7 @@ ark-ff = "0.5.0"
 ark-groth16 = "0.5.0"
 ark-poly = "0.5.0"
 ark-relations = "0.5.0"
-ark-serialize = "0.5.0"
+ark-serialize = { version = "0.5.0", features = ["derive"] }
 ark-std = { version = "0.5.0", features = ["getrandom"] }
 aptos-indexer-processor-sdk = { git = "https://github.com/aptos-labs/aptos-indexer-processor-sdk.git", tag = "aptos-indexer-processor-sdk-v2.1.2", features = [
     "postgres_partial",
@@ -526,6 +528,7 @@ version-compare = "0.1.1"
 bitvec = "1.0.1"
 blake2 = "0.10.4"
 blake2-rfc = "0.2.18"
+bls12_381 = "0.8.0"
 blst = "0.3.15"
 # The __private_bench feature exposes the Fp12 type which we need to implement a multi-threaded multi-pairing.
 blstrs = { version = "0.7.1", features = ["serde", "__private_bench"] }
@@ -591,6 +594,7 @@ digest = "0.9.0"
 dir-diff = "0.3.2"
 dirs = "5.0.1"
 dirs-next = "2.0.0"
+dudect-bencher = "0.6"
 dunce = "1.0.4"
 ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
@@ -599,7 +603,7 @@ enum_dispatch = "0.3.12"
 env_logger = "0.10.0"
 equivalent = "1.0"
 erased-serde = "0.3.13"
-ethnum = "1.5.0"
+ethnum = "1.5.2"
 ethers = { version = "2" }
 dearbitrary = { version = "1.0.4", features = ["derive"] }
 fail = "0.5.0"
@@ -621,6 +625,7 @@ fs2 = "0.4.3"
 getrandom = "0.2.2"
 gcp-bigquery-client = "0.16.8"
 get_if_addrs = "0.5.3"
+get-size = { version = "0.1.4", features = ["derive"] }
 git2 = "0.16.1"
 glob = "0.3.0"
 goldenfile = "1.5.2"
@@ -934,6 +939,8 @@ debug-assertions = true
 debug = true
 
 [patch.crates-io]
+# version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
+dudect-bencher = { git = "https://github.com/aptos-labs/dudect-bencher", rev = "9515677c83c58884c1a8c764251753269d46fc0e" }
 serde-reflection = { git = "https://github.com/aptos-labs/serde-reflection", rev = "73b6bbf748334b71ff6d7d09d06a29e3062ca075" }
 merlin = { git = "https://github.com/aptos-labs/merlin" }
 futures = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }

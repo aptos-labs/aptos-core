@@ -6,7 +6,7 @@ use crate::{
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
         single_signature_loader::load_single_signatures_for_module,
-        type_loader::intern_type,
+        type_loader::{convert_tok_to_type, convert_toks_to_types},
     },
     native_functions::NativeFunctions,
 };
@@ -27,9 +27,13 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
-use move_vm_types::loaded_data::{
-    runtime_types::{StructIdentifier, StructLayout, StructType, Type},
-    struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+use move_vm_types::{
+    loaded_data::{
+        runtime_types::{StructIdentifier, StructLayout, StructType, Type},
+        struct_name_indexing::{StructNameIndex, StructNameIndexMap},
+    },
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
+    ty_interner::{InternedTypePool, TypeVecId},
 };
 use std::{
     collections::{BTreeMap, BTreeSet, HashMap},
@@ -45,6 +49,8 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct Module {
     id: ModuleId,
+
+    pub(crate) interned_id: InternedModuleId,
 
     // size in bytes
     #[allow(dead_code)]
@@ -153,10 +159,14 @@ impl Module {
         size: usize,
         module: Arc<CompiledModule>,
         struct_name_index_map: &StructNameIndexMap,
+        ty_pool: &InternedTypePool,
+        module_id_pool: &InternedModuleIdPool,
     ) -> PartialVMResult<Self> {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
         let id = module.self_id();
+        let interned_id = module_id_pool.intern_by_ref(&id);
+
         let friends = module
             .immediate_friends_iter()
             .map(|(addr, name)| ModuleId::new(*addr, name.to_owned()))
@@ -176,6 +186,7 @@ impl Module {
         let mut function_map = HashMap::new();
         let mut struct_map = HashMap::new();
         let mut signature_table = vec![];
+        let mut is_fully_instantiated_signature = vec![];
 
         let mut struct_idxs = vec![];
         let mut struct_names = vec![];
@@ -185,24 +196,21 @@ impl Module {
             let struct_name = module.identifier_at(struct_handle.name);
             let module_handle = module.module_handle_at(struct_handle.module);
             let module_id = module.module_id_for_handle(module_handle);
-
-            let struct_name = StructIdentifier {
-                module: module_id,
-                name: struct_name.to_owned(),
-            };
+            let struct_name =
+                StructIdentifier::new(module_id_pool, module_id, struct_name.to_owned());
             struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
             struct_names.push(struct_name)
         }
 
         // Build signature table
         for signatures in module.signatures() {
-            signature_table.push(
-                signatures
-                    .0
-                    .iter()
-                    .map(|sig| intern_type(BinaryIndexedView::Module(&module), sig, &struct_idxs))
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            )
+            let (tys, is_fully_instantiated) = convert_toks_to_types(
+                BinaryIndexedView::Module(&module),
+                &signatures.0,
+                &struct_idxs,
+            )?;
+            signature_table.push(tys);
+            is_fully_instantiated_signature.push(is_fully_instantiated);
         }
 
         for (idx, struct_def) in module.struct_defs().iter().enumerate() {
@@ -289,9 +297,17 @@ impl Module {
 
         for func_inst in module.function_instantiations() {
             let handle = function_refs[func_inst.handle.0 as usize].clone();
+            let idx = func_inst.type_parameters.0 as usize;
+            let instantiation = signature_table[idx].clone();
+            let ty_args_id = if is_fully_instantiated_signature[idx] {
+                Some(ty_pool.intern_ty_args(&instantiation))
+            } else {
+                None
+            };
             function_instantiations.push(FunctionInstantiation {
                 handle,
-                instantiation: signature_table[func_inst.type_parameters.0 as usize].clone(),
+                instantiation,
+                ty_args_id,
             });
         }
 
@@ -365,6 +381,7 @@ impl Module {
 
         Ok(Self {
             id,
+            interned_id,
             size,
             module,
             structs,
@@ -388,7 +405,7 @@ impl Module {
     /// Creates a new Module instance for testing purposes.
     /// This method creates a minimal Module with empty contents.
     #[cfg(any(test, feature = "testing"))]
-    pub fn new_for_test(module_id: ModuleId) -> Self {
+    pub fn new_for_test(module_id_pool: &InternedModuleIdPool, module_id: ModuleId) -> Self {
         use move_binary_format::file_format::empty_module;
 
         // Start with an empty module
@@ -402,7 +419,8 @@ impl Module {
         let module_arc = Arc::new(empty_module);
 
         Self {
-            id: module_id,
+            id: module_id.clone(),
+            interned_id: module_id_pool.intern(module_id),
             size: 0,
             module: module_arc,
             structs: vec![],
@@ -475,7 +493,7 @@ impl Module {
         field: &FieldDefinition,
         struct_name_table: &[StructNameIndex],
     ) -> PartialVMResult<(Identifier, Type)> {
-        let ty = intern_type(
+        let ty = convert_tok_to_type(
             BinaryIndexedView::Module(module),
             &field.signature.0,
             struct_name_table,
@@ -516,8 +534,9 @@ impl Module {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    pub(crate) fn function_instantiation_at(&self, idx: u16) -> &[Type] {
-        &self.function_instantiations[idx as usize].instantiation
+    pub(crate) fn function_instantiation_at(&self, idx: u16) -> (&[Type], Option<TypeVecId>) {
+        let instantiation = &self.function_instantiations[idx as usize];
+        (&instantiation.instantiation, instantiation.ty_args_id)
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]

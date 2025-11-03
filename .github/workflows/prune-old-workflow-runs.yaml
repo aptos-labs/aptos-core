@@ -4,9 +4,7 @@
 name: Prune old workflow runs
 on:
   workflow_dispatch:
-  schedule:
-    # every day at 3am PST
-    - cron: "0 10 * * *"
+  # schedule: # NOTE: the schedule is dictated by PIES
 
 permissions:
   actions: write

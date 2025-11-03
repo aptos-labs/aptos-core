@@ -24,9 +24,9 @@ use move_core_types::{
     account_address::AccountAddress,
     function::{ClosureMask, MoveClosure},
     identifier::{IdentStr, Identifier},
+    int256,
     language_storage::{FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag},
     transaction_argument::{convert_txn_args, TransactionArgument},
-    u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
 };
@@ -84,10 +84,17 @@ pub enum AnnotatedMoveValue {
     // NOTE: Added in bytecode version v6, do not reorder!
     U16(u16),
     U32(u32),
-    U256(u256::U256),
+    U256(int256::U256),
     // NOTE: Added in v8
     Closure(AnnotatedMoveClosure),
     RawStruct(RawMoveStruct),
+    // NOTE: Added in bytecode version v9, do not reorder!
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    I256(int256::I256),
 }
 
 pub struct MoveValueAnnotator<V> {
@@ -196,7 +203,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 | FatType::TyParam(_)
                 | FatType::U16
                 | FatType::U32
-                | FatType::U256 => true,
+                | FatType::U256
+                | FatType::I8
+                | FatType::I16
+                | FatType::I32
+                | FatType::I64
+                | FatType::I128
+                | FatType::I256 => true,
             })
             .collect();
         anyhow::ensure!(
@@ -413,6 +426,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::U64 => FatType::U64,
             SignatureToken::U128 => FatType::U128,
             SignatureToken::U256 => FatType::U256,
+            SignatureToken::I8 => FatType::I8,
+            SignatureToken::I16 => FatType::I16,
+            SignatureToken::I32 => FatType::I32,
+            SignatureToken::I64 => FatType::I64,
+            SignatureToken::I128 => FatType::I128,
+            SignatureToken::I256 => FatType::I256,
             SignatureToken::Address => FatType::Address,
             SignatureToken::Signer => FatType::Signer,
             SignatureToken::Vector(ty) => {
@@ -444,7 +463,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                                 | SignatureToken::TypeParameter(_)
                                 | SignatureToken::U16
                                 | SignatureToken::U32
-                                | SignatureToken::U256 => {
+                                | SignatureToken::U256
+                                | SignatureToken::I8
+                                | SignatureToken::I16
+                                | SignatureToken::I32
+                                | SignatureToken::I64
+                                | SignatureToken::I128
+                                | SignatureToken::I256 => {
                                     self.resolve_signature(module, tok, limit)?
                                 },
                             })
@@ -519,6 +544,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::U64 => FatType::U64,
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
+            TypeTag::I8 => FatType::I8,
+            TypeTag::I16 => FatType::I16,
+            TypeTag::I32 => FatType::I32,
+            TypeTag::I64 => FatType::I64,
+            TypeTag::I128 => FatType::I128,
+            TypeTag::I256 => FatType::I256,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
             TypeTag::Function(function_tag) => {
                 let mut convert_tags = |tags: &[FunctionParamOrReturnTag]| {
@@ -726,6 +757,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             (MoveValue::U64(i), FatType::U64) => AnnotatedMoveValue::U64(*i),
             (MoveValue::U128(i), FatType::U128) => AnnotatedMoveValue::U128(*i),
             (MoveValue::U256(i), FatType::U256) => AnnotatedMoveValue::U256(*i),
+            (MoveValue::I8(i), FatType::I8) => AnnotatedMoveValue::I8(*i),
+            (MoveValue::I16(i), FatType::I16) => AnnotatedMoveValue::I16(*i),
+            (MoveValue::I32(i), FatType::I32) => AnnotatedMoveValue::I32(*i),
+            (MoveValue::I64(i), FatType::I64) => AnnotatedMoveValue::I64(*i),
+            (MoveValue::I128(i), FatType::I128) => AnnotatedMoveValue::I128(*i),
+            (MoveValue::I256(i), FatType::I256) => AnnotatedMoveValue::I256(*i),
             (MoveValue::Address(a), FatType::Address) => AnnotatedMoveValue::Address(*a),
             (MoveValue::Vector(a), FatType::Vector(ty)) => match ty.as_ref() {
                 FatType::U8 => AnnotatedMoveValue::Bytes(
@@ -763,7 +800,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             | (MoveValue::Signer(_), _)
             | (MoveValue::U16(_), _)
             | (MoveValue::U32(_), _)
-            | (MoveValue::U256(_), _) => {
+            | (MoveValue::U256(_), _)
+            | (MoveValue::I8(_), _)
+            | (MoveValue::I16(_), _)
+            | (MoveValue::I32(_), _)
+            | (MoveValue::I64(_), _)
+            | (MoveValue::I128(_), _)
+            | (MoveValue::I256(_), _) => {
                 return Err(anyhow!(
                     "Cannot annotate value {:?} with type {:?}",
                     value,
@@ -815,6 +858,12 @@ fn pretty_print_value(
         AnnotatedMoveValue::U64(v) => write!(f, "{}", v),
         AnnotatedMoveValue::U128(v) => write!(f, "{}u128", v),
         AnnotatedMoveValue::U256(v) => write!(f, "{}u256", v),
+        AnnotatedMoveValue::I8(v) => write!(f, "{}i8", v),
+        AnnotatedMoveValue::I16(v) => write!(f, "{}i16", v),
+        AnnotatedMoveValue::I32(v) => write!(f, "{}i32", v),
+        AnnotatedMoveValue::I64(v) => write!(f, "{}i64", v),
+        AnnotatedMoveValue::I128(v) => write!(f, "{}i128", v),
+        AnnotatedMoveValue::I256(v) => write!(f, "{}i256", v),
         AnnotatedMoveValue::Address(a) => write!(f, "{}", a.short_str_lossless()),
         AnnotatedMoveValue::Vector(_, v) => {
             writeln!(f, "[")?;
@@ -1030,6 +1079,24 @@ impl serde::Serialize for AnnotatedMoveValue {
                 // Copying logic & reasoning from above because if u128 is needs arb precision, u256 should too
                 if let Ok(i) = u64::try_from(*n) {
                     serializer.serialize_u64(i)
+                } else {
+                    serializer.serialize_bytes(&n.to_le_bytes())
+                }
+            },
+            I8(n) => serializer.serialize_i8(*n),
+            I16(n) => serializer.serialize_i16(*n),
+            I32(n) => serializer.serialize_i32(*n),
+            I64(n) => serializer.serialize_i64(*n),
+            I128(n) => {
+                if let Ok(i) = i64::try_from(*n) {
+                    serializer.serialize_i64(i)
+                } else {
+                    serializer.serialize_bytes(&n.to_le_bytes())
+                }
+            },
+            I256(n) => {
+                if let Ok(i) = i64::try_from(*n) {
+                    serializer.serialize_i64(i)
                 } else {
                     serializer.serialize_bytes(&n.to_le_bytes())
                 }

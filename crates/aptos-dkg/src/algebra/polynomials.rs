@@ -6,7 +6,7 @@ use crate::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         fft,
     },
-    pvss::{input_secret::InputSecret, ThresholdConfig},
+    pvss::{input_secret::InputSecret, ThresholdConfigBlstrs},
     utils::{is_power_of_two, random::random_scalars},
 };
 use ark_ff::Field;
@@ -15,6 +15,17 @@ use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 
+pub(crate) fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
+    let degree = coeffs.len().saturating_sub(1);
+    let mut result = Vec::with_capacity(degree);
+
+    for i in 0..degree {
+        result.push(coeffs[i + 1].mul(F::from((i + 1) as u64)));
+    }
+
+    result
+}
+
 pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
     for i in 0..degree {
@@ -22,6 +33,99 @@ pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     }
 
     coeffs.truncate(degree);
+}
+
+/// Computes a batch of quotient evaluations of the form `(f_i - y) / (x_i - x)`
+/// for slices of field elements `f_vals` and `x_vals`.
+///
+/// Useful to compute the scalars needed to interpolate a KZG proof (i.e., a quotient commitment) for $f(\gamma) = y$ as
+///    $\pi = sum_i ( f(\omega^i) - f(\gamma) ) / (\omega^i - \gamma) ) * L_i$
+/// Here, $y_i = f(\omega^i), x_i$ = \omega^i, y=f(\gamma) and $x=\gamma$.
+///
+/// # Arguments
+/// * `f_vals` - Slice of field elements representing `f_i`.
+/// * `x_vals` - Slice of field elements representing `x_i`. Must have the same length as `f_vals`.
+/// * `x` - The field element `x` appearing in each denominator `(x_i - x)`.
+/// * `y` - The field element `y` subtracted from each `f_i` in the numerator.
+///
+/// # Returns
+/// A `Vec<F>` containing the evaluations of `(f_i - y) / (x_i - x)` for each index `i`.
+/// Or will panic if one of the `x_i` equals `x`.
+pub(crate) fn quotient_evaluations_batch<F: Field>(
+    f_vals: &[F],
+    x_vals: &[F],
+    x: F,
+    y: F,
+) -> Vec<F> {
+    assert_eq!(f_vals.len(), x_vals.len());
+
+    // Step 1: compute denominators x_i - x
+    let mut denoms: Vec<F> = x_vals.iter().map(|&xi| xi - x).collect();
+
+    // Step 2: batch inversion in place
+    ark_ff::batch_inversion(&mut denoms);
+
+    // Step 3: multiply numerators by inverses
+    f_vals
+        .iter()
+        .zip(denoms.iter())
+        .map(|(&f_val, &denom_inv)| (f_val - y) * denom_inv)
+        .collect()
+}
+
+/// Evaluate a polynomial given in Lagrange basis (i.e., given by its values at roots of unity)
+/// using the barycentric formula in a field `F`.
+///
+/// `evals[j] = f(roots_of_unity_in_eval_dom[j])`
+///
+/// # Arguments
+/// * `evals` - evaluations of the polynomial at the roots of unity
+/// * `roots_of_unity_in_eval_dom` - the roots of unity
+/// * `x` - the point at which to evaluate the polynomial
+/// * `n_inv` - precomputed inverse of n, where n is the number roots of unity
+///
+/// # Returns
+/// * `f(x)` in `F`
+pub fn barycentric_eval<F: Field>(
+    evals: &[F],
+    roots_of_unity_in_eval_dom: &[F],
+    x: F,
+    n_inv: F,
+) -> F {
+    let n = evals.len();
+    assert_eq!(n, roots_of_unity_in_eval_dom.len());
+    debug_assert_eq!(n_inv, F::from(n as u64).inverse().unwrap());
+
+    let mut denoms = Vec::with_capacity(roots_of_unity_in_eval_dom.len());
+
+    for (&omega_j, &val) in roots_of_unity_in_eval_dom.iter().zip(evals.iter()) {
+        let denom = x - omega_j;
+        if denom.is_zero() {
+            // x exactly matches a root, so we can return early
+            return val;
+        }
+        denoms.push(denom);
+    }
+
+    // Compute prefactor: (x^n - 1) / n
+    let mut z_pow_n = x.pow([n as u64]);
+    z_pow_n -= F::one();
+    let prefactor = z_pow_n * n_inv;
+
+    // Efficient batch inversion
+    ark_ff::batch_inversion(&mut denoms); // Using `batch_inversion_and_mul()` here instead shouldn't speed things up
+
+    // Compute sum_j (omega^j * f(omega^j) * (prefactor / (x - omega^j)))
+    let mut sum = F::zero();
+    for ((omega_j, &f_j), &inv_pref_denom_j) in roots_of_unity_in_eval_dom
+        .iter()
+        .zip(evals.iter())
+        .zip(denoms.iter())
+    {
+        sum += *omega_j * f_j * inv_pref_denom_j;
+    }
+    sum *= prefactor;
+    sum
 }
 
 /// Returns $\[1, \tau, \tau^2, \tau^3, \ldots, \tau^{n-1}\]$.
@@ -545,7 +649,7 @@ fn accumulator_poly_scheduled_inner(
 pub fn shamir_secret_share<
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
 >(
-    sc: &ThresholdConfig,
+    sc: &ThresholdConfigBlstrs,
     s: &InputSecret,
     rng: &mut R,
 ) -> (Vec<Scalar>, Vec<Scalar>) {

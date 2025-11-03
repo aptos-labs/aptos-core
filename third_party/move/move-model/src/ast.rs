@@ -1979,6 +1979,7 @@ pub enum Operation {
     // Unary operators
     Not,
     Cast,
+    Negate,
 
     // Builtin functions (impl and spec)
     Exists(Option<MemoryLabel>),
@@ -2799,7 +2800,8 @@ impl Operation {
 
             // Unary operators
             Not => true,
-            Cast => false, // can overflow
+            Cast => false,   // can overflow
+            Negate => false, // can overflow
 
             // Builtin functions (impl and spec)
             Exists(..) => false, // Spec
@@ -3061,6 +3063,14 @@ pub struct ModuleName(Address, Symbol);
 impl ModuleName {
     pub fn new(addr: Address, name: Symbol) -> ModuleName {
         ModuleName(addr, name)
+    }
+
+    /// Returns builtin module name.
+    pub fn builtin_module(env: &GlobalEnv) -> Self {
+        Self::new(
+            Address::Numerical(AccountAddress::ZERO),
+            env.symbol_pool().make("$$"),
+        )
     }
 
     pub fn from_address_bytes_and_name(

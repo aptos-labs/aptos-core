@@ -384,6 +384,22 @@ pub static GLOBAL_MODULE_CACHE_MISS_SECONDS: Lazy<Histogram> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "global_layout_cache_num_entries",
+        "Number of struct/enum layouts cached in global cache"
+    )
+    .unwrap()
+});
+
+pub static GLOBAL_LAYOUT_CACHE_MISSES: Lazy<IntCounter> = Lazy::new(|| {
+    register_int_counter!(
+        "global_layout_cache_misses",
+        "Number of misses when fetching struct/enum layouts from the global cache",
+    )
+    .unwrap()
+});
+
 pub static STRUCT_NAME_INDEX_MAP_NUM_ENTRIES: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "struct_name_index_map_num_entries",
@@ -400,6 +416,30 @@ pub static HOT_STATE_OP_ACCUMULATOR_COUNTER: Lazy<IntCounterVec> = Lazy::new(|| 
         "Various counters for BlockHotStateOpAccumulator",
         // metric labels (dimensions)
         &["name"],
+    )
+    .unwrap()
+});
+
+pub static NUM_INTERNED_TYPES: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "num_interned_types",
+        "Number of interned types cached in execution environment"
+    )
+    .unwrap()
+});
+
+pub static NUM_INTERNED_TYPE_VECS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "num_interned_type_vecs",
+        "Number of interned type vectors cached in execution environment"
+    )
+    .unwrap()
+});
+
+pub static NUM_INTERNED_MODULE_IDS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "num_interned_module_ids",
+        "Number of interned module IDs cached in execution environment"
     )
     .unwrap()
 });

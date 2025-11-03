@@ -19,8 +19,8 @@ fn initialize(h: &mut MoveHarness) {
 }
 
 #[rstest(enabled, disabled,
-    case(vec![FeatureFlag::ENABLE_ENUM_OPTION], vec![]),
-    case(vec![], vec![FeatureFlag::ENABLE_ENUM_OPTION]),
+    case(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![]),
+    case(vec![], vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION]),
 )]
 fn test_function_value_formatting_in_modules(
     enabled: Vec<FeatureFlag>,

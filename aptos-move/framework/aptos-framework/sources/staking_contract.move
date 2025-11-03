@@ -720,6 +720,10 @@ module aptos_framework::staking_contract {
         let staker_address = signer::address_of(staker);
         assert_staking_contract_exists(staker_address, old_operator);
 
+        assert!(
+            new_commission_percentage <= 100,
+            error::invalid_argument(EINVALID_COMMISSION_PERCENTAGE),
+        );
         // Merging two existing staking contracts is too complex as we'd need to merge two separate stake pools.
         let store = borrow_global_mut<Store>(staker_address);
         let staking_contracts = &mut store.staking_contracts;

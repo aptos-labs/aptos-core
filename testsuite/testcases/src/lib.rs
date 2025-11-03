@@ -32,6 +32,7 @@ use aptos_forge::{
     EmitJob, EmitJobRequest, NetworkContext, NetworkContextSynchronizer, NetworkTest, NodeExt,
     Result, Swarm, SwarmExt, Test, TestReport, TxnEmitter, TxnStats, Version,
 };
+use aptos_logger::warn;
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{transaction_builder::TransactionFactory, types::PeerId};
 use async_trait::async_trait;
@@ -370,6 +371,7 @@ pub async fn create_buffered_load(
     }
 
     info!("Starting emitting txns for {}s", duration.as_secs());
+    let job_init_timer = Instant::now();
     let mut job = emitter
         .start_job(
             swarm.read().await.chain_info().root_account,
@@ -378,6 +380,23 @@ pub async fn create_buffered_load(
         )
         .await
         .context("start emitter job")?;
+    let job_setup_duration = job_init_timer.elapsed();
+
+    info!(
+        "Emitter setup took {}s. Reducing from total duration of {}s",
+        job_setup_duration.as_secs(),
+        duration.as_secs(),
+    );
+    let duration = if duration > job_setup_duration {
+        duration.saturating_sub(job_setup_duration)
+    } else {
+        warn!(
+            "Setup took too long: {}s. Not enough test time left from total duration {}s",
+            job_setup_duration.as_secs(),
+            duration.as_secs()
+        );
+        Duration::from_secs(60)
+    };
 
     let total_start = PhaseTimingStart::now();
 

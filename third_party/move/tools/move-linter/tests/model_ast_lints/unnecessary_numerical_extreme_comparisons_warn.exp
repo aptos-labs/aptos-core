@@ -116,3 +116,111 @@ warning: [lint] Comparison is always false, consider rewriting the code to remov
    │
    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:58:13
+   │
+58 │         if (x + 1 > 127) { bar() };
+   │             ^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:62:13
+   │
+62 │         if ((*x + *y > 127) == true) { bar() };
+   │             ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Directly use the boolean expression, instead of comparing it with `true`.
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:62:13
+   │
+62 │         if ((*x + *y > 127) == true) { bar() };
+   │             ^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_boolean_identity_comparison)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_boolean_identity_comparison.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:90:13
+   │
+90 │         if (x < I8_MIN || I8_MIN > x) { bar() };
+   │             ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:90:27
+   │
+90 │         if (x < I8_MIN || I8_MIN > x) { bar() };
+   │                           ^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:95:13
+   │
+95 │         if (foo(x) >= I8_MIN) { bar() };
+   │             ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+   ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:96:13
+   │
+96 │         if (I8_MIN <= foo(x)) { bar() };
+   │             ^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:100:13
+    │
+100 │         if (a > I8_MAX) { bar() };
+    │             ^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always false, consider rewriting the code to remove the redundant comparison
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:102:13
+    │
+102 │         if (I32_MAX < c) { bar() };
+    │             ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:105:13
+    │
+105 │         if (f <= I256_MAX) { bar() };
+    │             ^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:106:13
+    │
+106 │         if (I256_MAX >= f) { bar() };
+    │             ^^^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.
+
+warning: [lint] Comparison is always true, consider rewriting the code to remove the redundant comparison
+    ┌─ tests/model_ast_lints/unnecessary_numerical_extreme_comparisons_warn.move:109:20
+    │
+109 │             assert a <= I8_MAX;
+    │                    ^^^^^^^^^^^
+    │
+    = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(unnecessary_numerical_extreme_comparison)]`.
+    = For more information, see https://aptos.dev/en/build/smart-contracts/linter#unnecessary_numerical_extreme_comparison.

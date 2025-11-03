@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_crypto::{blstrs::g2_proj_from_bytes, ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{
     account_recovery_db::AccountRecoveryDbEntry,
@@ -10,8 +10,7 @@ use aptos_keyless_pepper_common::{
     PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, SignatureResponse,
 };
 use aptos_types::{keyless::OpenIdSig, transaction::authenticator::EphemeralPublicKey};
-use ark_bls12_381::G2Projective;
-use ark_serialize::CanonicalDeserialize;
+use blstrs::G2Projective;
 use firestore::{path, paths, FirestoreDb, FirestoreDbOptions};
 use rand::RngCore;
 use reqwest::{Client, StatusCode};
@@ -144,9 +143,7 @@ async fn fetch_verification_public_key(
     );
 
     // Deserialize the verification key
-    ark_bls12_381::G2Affine::deserialize_compressed(verification_key.public_key.as_slice())
-        .unwrap()
-        .into()
+    g2_proj_from_bytes(verification_key.public_key.as_slice()).unwrap()
 }
 
 /// Step 2: Generate a blinder, an ephemeral key pair, and an expiry time for the ephemeral key
@@ -441,6 +438,14 @@ async fn verify_firestore_pepper_entry(
     let firestore_db = FirestoreDb::with_options(firestore_db_options)
         .await
         .unwrap();
+
+    // Wait for a short duration to ensure the firestore entry is available.
+    // This is required because firestore writes may be asynchronous.
+    utils::print(
+        "Waiting for 2 seconds to ensure the firestore entry is available...",
+        false,
+    );
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Query the firestore DB for the pepper input entry
     let docs: Vec<AccountRecoveryDbEntry> = firestore_db

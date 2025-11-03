@@ -171,7 +171,7 @@ impl FileStoreUploader {
                     }
                     if len == 0 {
                         info!("No transaction was returned from cache, requested version: {next_version}.");
-                        tokio::time::sleep(Duration::from_millis(100)).await;
+                        tokio::time::sleep(Duration::from_millis(200)).await;
                     }
                 }
             });

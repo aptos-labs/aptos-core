@@ -533,6 +533,8 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Sets the auditor's public key for the specified token.
+    ///
+    /// NOTE: Ensures that new_auditor_ek is a valid Ristretto255 point
     public fun set_auditor(
         aptos_framework: &signer, token: Object<Metadata>, new_auditor_ek: vector<u8>
     ) acquires FAConfig, FAController {
@@ -642,7 +644,7 @@ module aptos_experimental::confidential_asset {
             error::not_found(ECA_STORE_NOT_PUBLISHED)
         );
 
-        borrow_global_mut<ConfidentialAssetStore>(get_user_address(user, token)).ek
+        borrow_global<ConfidentialAssetStore>(get_user_address(user, token)).ek
     }
 
     #[view]

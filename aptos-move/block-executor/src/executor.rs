@@ -2066,6 +2066,7 @@ where
             unsync_map.write(key, TriompheArc::new(write_op), None);
         }
 
+        let mut modules_published = false;
         for write in output_before_guard.module_write_set().values() {
             add_module_write_to_module_cache::<T>(
                 write,
@@ -2074,6 +2075,11 @@ where
                 global_module_cache,
                 unsync_map.module_cache(),
             )?;
+            modules_published = true;
+        }
+        // For simplicity, flush layout cache on module publish.
+        if modules_published {
+            global_module_cache.flush_layout_cache();
         }
 
         let mut second_phase = Vec::new();
@@ -2528,7 +2534,7 @@ where
             module_cache_manager_guard
                 .environment()
                 .runtime_environment()
-                .flush_struct_name_and_tag_caches();
+                .flush_all_caches();
             module_cache_manager_guard.module_cache_mut().flush();
 
             info!("parallel execution requiring fallback");

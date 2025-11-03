@@ -4,10 +4,11 @@
 use crate::{
     emitter::{
         stats::{DynamicStatsTracking, StatsAccumulator},
-        wait_for_accounts_sequence,
+        wait_for_accounts_sequence, wait_for_orderless_txns,
     },
     EmitModeParams,
 };
+use aptos_crypto::HashValue;
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_rest_client::Client as RestClient;
 use aptos_sdk::{
@@ -15,6 +16,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, vm_status::StatusCode, LocalAccount},
 };
 use aptos_transaction_generator_lib::TransactionGenerator;
+use aptos_types::transaction::ReplayProtector;
 use core::{
     cmp::{max, min},
     result::Result::{Err, Ok},
@@ -27,7 +29,7 @@ use log::{debug, error, info, warn};
 use rand::seq::IteratorRandom;
 use std::{
     borrow::Borrow,
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     sync::{atomic::AtomicU64, Arc},
     time::Instant,
 };
@@ -101,19 +103,29 @@ impl SubmissionWorker {
             let requests = self.gen_requests();
             if !requests.is_empty() {
                 let mut account_to_start_and_end_seq_num = HashMap::new();
+                let mut account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>> =
+                    HashMap::new();
                 for req in requests.iter() {
-                    let cur = req.sequence_number();
-                    let _ = *account_to_start_and_end_seq_num
-                        .entry(req.sender())
-                        .and_modify(|(start, end)| {
-                            if *start > cur {
-                                *start = cur;
-                            }
-                            if *end < cur + 1 {
-                                *end = cur + 1;
-                            }
-                        })
-                        .or_insert((cur, cur + 1));
+                    match req.replay_protector() {
+                        ReplayProtector::SequenceNumber(cur) => {
+                            let _ = *account_to_start_and_end_seq_num
+                                .entry(req.sender())
+                                .and_modify(|(start, end)| {
+                                    if *start > cur {
+                                        *start = cur;
+                                    }
+                                    if *end < cur + 1 {
+                                        *end = cur + 1;
+                                    }
+                                })
+                                .or_insert((cur, cur + 1));
+                        },
+                        ReplayProtector::Nonce(_) => {
+                            let txn_hashes =
+                                account_to_orderless_txns.entry(req.sender()).or_default();
+                            txn_hashes.insert(req.committed_hash());
+                        },
+                    };
                 }
                 // Some transaction generators use burner accounts, and will have different
                 // number of accounts per transaction, so useful to very rarely log.
@@ -176,6 +188,7 @@ impl SubmissionWorker {
                     loop_start_time,
                     txn_offset_time.load(Ordering::Relaxed) / (requests.len() as u64),
                     account_to_start_and_end_seq_num,
+                    account_to_orderless_txns,
                     // skip latency if asked to check seq_num only once
                     // even if we check more often due to stop (to not affect sampling)
                     self.skip_latency_stats,
@@ -281,6 +294,7 @@ impl SubmissionWorker {
         start_time: Instant,
         avg_txn_offset_time: u64,
         account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
+        account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
         skip_latency_stats: bool,
         txn_expiration_ts_secs: u64,
         check_account_sleep_duration: Duration,
@@ -296,6 +310,14 @@ impl SubmissionWorker {
             )
             .await;
 
+        let failed_orderless_txns = wait_for_orderless_txns(
+            self.client(),
+            &account_to_orderless_txns,
+            txn_expiration_ts_secs,
+            check_account_sleep_duration,
+        )
+        .await;
+
         for account in self.accounts.iter_mut() {
             update_account_seq_num(
                 Arc::get_mut(account).unwrap(),
@@ -303,8 +325,12 @@ impl SubmissionWorker {
                 &latest_fetched_counts,
             );
         }
-        let (num_committed, num_expired) =
-            count_committed_expired_stats(account_to_start_and_end_seq_num, latest_fetched_counts);
+        let (num_committed, num_expired) = count_committed_expired_stats(
+            account_to_start_and_end_seq_num,
+            latest_fetched_counts,
+            account_to_orderless_txns,
+            failed_orderless_txns,
+        );
 
         if num_expired > 0 {
             loop_stats
@@ -331,7 +357,7 @@ impl SubmissionWorker {
 
             if !skip_latency_stats {
                 let sum_latency = sum_of_completion_timestamps_millis
-                    - (avg_txn_offset_time as u128 * num_committed as u128);
+                    .saturating_sub(avg_txn_offset_time as u128 * num_committed as u128);
                 let avg_latency = (sum_latency / num_committed as u128) as u64;
                 loop_stats
                     .latency
@@ -410,8 +436,10 @@ fn update_account_seq_num(
 fn count_committed_expired_stats(
     account_to_start_and_end_seq_num: HashMap<AccountAddress, (u64, u64)>,
     latest_fetched_counts: HashMap<AccountAddress, u64>,
+    account_to_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
+    failed_orderless_txns: HashMap<AccountAddress, HashSet<HashValue>>,
 ) -> (usize, usize) {
-    account_to_start_and_end_seq_num
+    let (seq_num_committed, seq_num_failed) = account_to_start_and_end_seq_num
         .iter()
         .map(
             |(address, (start_seq_num, end_seq_num))| match latest_fetched_counts.get(address) {
@@ -441,7 +469,18 @@ fn count_committed_expired_stats(
             |(committed, expired), (cur_committed, cur_expired)| {
                 (committed + cur_committed, expired + cur_expired)
             },
-        )
+        );
+    let total_orderless_txns: usize = account_to_orderless_txns
+        .values()
+        .map(|txns| txns.len())
+        .sum();
+    let failed_orderless_txns: usize = failed_orderless_txns.values().map(|txns| txns.len()).sum();
+    let committed_orderless_txns = total_orderless_txns - failed_orderless_txns;
+
+    (
+        seq_num_committed + committed_orderless_txns,
+        seq_num_failed + failed_orderless_txns,
+    )
 }
 
 pub async fn submit_transactions(

@@ -10,6 +10,7 @@ use crate::{
             ambassador_impl_WithRuntimeEnvironment, RuntimeEnvironment, WithRuntimeEnvironment,
         },
         implementations::unsync_module_storage::{AsUnsyncModuleStorage, UnsyncModuleStorage},
+        layout_cache::NoOpLayoutCache,
         module_storage::{ambassador_impl_ModuleStorage, ModuleStorage},
     },
 };
@@ -38,6 +39,8 @@ pub struct UnsyncCodeStorage<M> {
     script_cache: UnsyncScriptCache<[u8; 32], CompiledScript, Script>,
     module_storage: M,
 }
+
+impl<M> NoOpLayoutCache for UnsyncCodeStorage<M> {}
 
 impl<M: ModuleStorage> UnsyncCodeStorage<M> {
     /// Creates a new storage with no scripts. There are no constraints on which modules exist in

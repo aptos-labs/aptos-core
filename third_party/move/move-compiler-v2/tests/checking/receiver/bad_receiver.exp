@@ -6,11 +6,11 @@ error: undeclared receiver function `borrow` for type `vector<Entry<K, V>>`
 25 │         &map.entries.borrow(self.index).key
    │          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-error: undeclared receiver function `lower_bound` for type `OrderedMap<K, V>`
-   ┌─ tests/checking/receiver/bad_receiver.move:29:27
+error: undeclared receiver function `internal_lower_bound` for type `OrderedMap<K, V>`
+   ┌─ tests/checking/receiver/bad_receiver.move:29:36
    │
-29 │         let lower_bound = self.lower_bound(key);
-   │                           ^^^^^^^^^^^^^^^^^^^^^
+29 │         let internal_lower_bound = self.internal_lower_bound(key);
+   │                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error: type cannot have type arguments
    ┌─ tests/checking/receiver/bad_receiver.move:39:36

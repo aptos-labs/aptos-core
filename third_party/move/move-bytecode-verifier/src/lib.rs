@@ -7,7 +7,6 @@
 //! Verifies bytecode sanity.
 
 // Bounds checks are implemented in the `vm` crate.
-pub mod ability_field_requirements;
 pub mod absint;
 pub mod check_duplication;
 pub mod code_unit_verifier;
@@ -22,7 +21,6 @@ pub mod instruction_consistency;
 pub mod limits;
 pub mod loop_summary;
 pub mod script_signature;
-pub mod signature;
 pub mod signature_v2;
 pub mod struct_defs;
 pub mod verifier;
@@ -33,7 +31,6 @@ pub use instruction_consistency::InstructionConsistency;
 pub use script_signature::{
     legacy_script_signature_checks, no_additional_script_signature_checks, FnCheckScriptSignature,
 };
-pub use signature::SignatureChecker;
 pub use struct_defs::RecursiveStructDefChecker;
 pub use verifier::{
     verify_module, verify_module_with_config, verify_module_with_config_for_test, verify_script,

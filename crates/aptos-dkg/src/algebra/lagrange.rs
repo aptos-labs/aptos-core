@@ -316,8 +316,9 @@ mod test {
             lagrange::{all_n_lagrange_coefficients, lagrange_coefficients, FFT_THRESH},
             polynomials::poly_eval,
         },
-        utils::random::{random_scalar, random_scalars},
+        utils::random::random_scalars,
     };
+    use aptos_crypto::blstrs::random_scalar;
     use blstrs::Scalar;
     use ff::Field;
     use rand::{seq::IteratorRandom, thread_rng};

@@ -1,13 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::blstrs::{multi_pairing, random_scalar};
 use aptos_dkg::{
     algebra::polynomials::{
         poly_eval, poly_mul_fft, poly_mul_less_slow, poly_mul_slow, poly_xnmul,
     },
     utils::{
-        multi_pairing, parallel_multi_pairing,
-        random::{random_g1_point, random_g2_point, random_scalar, random_scalars},
+        parallel_multi_pairing,
+        random::{random_g1_point, random_g2_point, random_scalars},
     },
     weighted_vuf::pinkas::MIN_MULTIPAIR_NUM_JOBS,
 };

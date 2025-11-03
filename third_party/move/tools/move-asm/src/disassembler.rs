@@ -29,13 +29,17 @@ use std::{
     fmt,
 };
 
-pub fn disassemble_module<T: fmt::Write>(out: T, module: &CompiledModule) -> anyhow::Result<T> {
-    Disassembler::run(out, module)
+pub fn disassemble_module<T: fmt::Write>(
+    out: T,
+    module: &CompiledModule,
+    print_code_size: bool,
+) -> anyhow::Result<T> {
+    Disassembler::run(out, module, print_code_size)
 }
 
 pub fn disassemble_script<T: fmt::Write>(out: T, script: &CompiledScript) -> anyhow::Result<T> {
     let script_as_module = script_into_module(script.clone(), "main");
-    Disassembler::run(out, &script_as_module)
+    Disassembler::run(out, &script_as_module, false)
 }
 
 struct Disassembler<T>
@@ -48,7 +52,7 @@ where
 }
 
 impl<T: fmt::Write> Disassembler<T> {
-    fn run(out: T, module: &CompiledModule) -> anyhow::Result<T> {
+    fn run(out: T, module: &CompiledModule, print_code_size: bool) -> anyhow::Result<T> {
         let version = module.version;
         let module = ModuleView::new(module);
         let mut dis = Disassembler {
@@ -102,7 +106,7 @@ impl<T: fmt::Write> Disassembler<T> {
         }
         for (idx, fdef) in module.functions().enumerate() {
             writeln!(dis.out, "// Function definition at index {}", idx)?;
-            dis.fun(fdef)?;
+            dis.fun(fdef, print_code_size)?;
             writeln!(dis.out)?
         }
 
@@ -183,6 +187,12 @@ impl<T: fmt::Write> Disassembler<T> {
             U64 => self.out.write_str("u64")?,
             U128 => self.out.write_str("u128")?,
             U256 => self.out.write_str("u256")?,
+            I8 => self.out.write_str("i8")?,
+            I16 => self.out.write_str("i16")?,
+            I32 => self.out.write_str("i32")?,
+            I64 => self.out.write_str("i64")?,
+            I128 => self.out.write_str("i128")?,
+            I256 => self.out.write_str("i256")?,
             Address => self.out.write_str("address")?,
             Signer => self.out.write_str("signer")?,
             Vector(elem_ty) => {
@@ -252,7 +262,18 @@ impl<T: fmt::Write> Disassembler<T> {
     // --------------------------------------------------------------------------------------
     // Functions
 
-    fn fun(&mut self, fdef: FunctionDefinitionView<CompiledModule>) -> anyhow::Result<()> {
+    fn fun(
+        &mut self,
+        fdef: FunctionDefinitionView<CompiledModule>,
+        print_code_size: bool,
+    ) -> anyhow::Result<()> {
+        if print_code_size && fdef.code().is_some() {
+            println!(
+                "function {} has {} instructions",
+                fdef.name(),
+                fdef.code().unwrap().code.len()
+            );
+        }
         if !fdef.attributes().is_empty() {
             self.list(
                 fdef.attributes(),
@@ -397,12 +418,24 @@ impl<T: fmt::Write> Disassembler<T> {
             LdU64(v) => write!(self.out, "ld_u64 {}", v)?,
             LdU128(v) => write!(self.out, "ld_u128 {}", v)?,
             LdU256(v) => write!(self.out, "ld_u256 {}", v)?,
+            LdI8(v) => write!(self.out, "ld_i8 {}", v)?,
+            LdI16(v) => write!(self.out, "ld_i16 {}", v)?,
+            LdI32(v) => write!(self.out, "ld_i32 {}", v)?,
+            LdI64(v) => write!(self.out, "ld_i64 {}", v)?,
+            LdI128(v) => write!(self.out, "ld_i128 {}", v)?,
+            LdI256(v) => write!(self.out, "ld_i256 {}", v)?,
             CastU8 => write!(self.out, "cast_u8")?,
             CastU16 => write!(self.out, "cast_u16")?,
             CastU32 => write!(self.out, "cast_u32")?,
             CastU64 => write!(self.out, "cast_u64")?,
             CastU128 => write!(self.out, "cast_u128")?,
             CastU256 => write!(self.out, "cast_u256")?,
+            CastI8 => write!(self.out, "cast_i8")?,
+            CastI16 => write!(self.out, "cast_i16")?,
+            CastI32 => write!(self.out, "cast_i32")?,
+            CastI64 => write!(self.out, "cast_i64")?,
+            CastI128 => write!(self.out, "cast_i128")?,
+            CastI256 => write!(self.out, "cast_i256")?,
             LdConst(hdl) => {
                 write!(self.out, "ld_const")?;
                 let cons = module.constant_at(*hdl);
@@ -572,6 +605,7 @@ impl<T: fmt::Write> Disassembler<T> {
             Mul => write!(self.out, "mul")?,
             Mod => write!(self.out, "mod")?,
             Div => write!(self.out, "div")?,
+            Negate => write!(self.out, "negate")?,
             BitOr => write!(self.out, "bit_or")?,
             BitAnd => write!(self.out, "bit_and")?,
             Xor => write!(self.out, "xor")?,

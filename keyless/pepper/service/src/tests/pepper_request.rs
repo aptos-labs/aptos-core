@@ -25,16 +25,14 @@ use aptos_types::{
 };
 use std::{
     collections::HashMap,
-    ops::Deref,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
 
 #[tokio::test]
 async fn request_ephemeral_public_key_expired() {
-    // Generate a VUF private key
-    let vuf_keypair = utils::create_vuf_public_private_keypair();
-    let (_, vuf_private_key) = vuf_keypair.deref();
+    // Generate a VUF keypair
+    let vuf_keypair = utils::create_vuf_keypair(None);
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
@@ -55,7 +53,7 @@ async fn request_ephemeral_public_key_expired() {
 
     // Handle the pepper request
     let pepper_result = handle_pepper_request(
-        vuf_private_key,
+        vuf_keypair,
         jwk_cache,
         cached_resources,
         jwt,
@@ -64,6 +62,7 @@ async fn request_ephemeral_public_key_expired() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -78,9 +77,8 @@ async fn request_ephemeral_public_key_expired() {
 
 #[tokio::test]
 async fn request_ephemeral_public_key_expiry_too_large() {
-    // Generate a VUF private key
-    let vuf_keypair = utils::create_vuf_public_private_keypair();
-    let (_, vuf_private_key) = vuf_keypair.deref();
+    // Generate a VUF keypair
+    let vuf_keypair = utils::create_vuf_keypair(None);
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
@@ -101,7 +99,7 @@ async fn request_ephemeral_public_key_expiry_too_large() {
 
     // Handle the pepper request
     let pepper_result = handle_pepper_request(
-        vuf_private_key,
+        vuf_keypair,
         jwk_cache,
         cached_resources,
         jwt,
@@ -110,6 +108,7 @@ async fn request_ephemeral_public_key_expiry_too_large() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -124,9 +123,8 @@ async fn request_ephemeral_public_key_expiry_too_large() {
 
 #[tokio::test]
 async fn request_invalid_oath_nonce() {
-    // Generate a VUF private key
-    let vuf_keypair = utils::create_vuf_public_private_keypair();
-    let (_, vuf_private_key) = vuf_keypair.deref();
+    // Generate a VUF keypair
+    let vuf_keypair = utils::create_vuf_keypair(None);
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
@@ -147,7 +145,7 @@ async fn request_invalid_oath_nonce() {
 
     // Handle the pepper request
     let pepper_result = handle_pepper_request(
-        vuf_private_key,
+        vuf_keypair,
         jwk_cache,
         cached_resources,
         jwt,
@@ -156,6 +154,7 @@ async fn request_invalid_oath_nonce() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -170,9 +169,8 @@ async fn request_invalid_oath_nonce() {
 
 #[tokio::test]
 async fn request_invalid_jwt() {
-    // Generate a VUF private key
-    let vuf_keypair = utils::create_vuf_public_private_keypair();
-    let (_, vuf_private_key) = vuf_keypair.deref();
+    // Generate a VUF keypair
+    let vuf_keypair = utils::create_vuf_keypair(None);
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
@@ -183,7 +181,7 @@ async fn request_invalid_jwt() {
 
     // Handle the pepper request
     let pepper_result = handle_pepper_request(
-        vuf_private_key,
+        vuf_keypair,
         jwk_cache,
         cached_resources,
         "invalid jwt string".into(),
@@ -192,6 +190,7 @@ async fn request_invalid_jwt() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -203,9 +202,8 @@ async fn request_invalid_jwt() {
 
 #[tokio::test]
 async fn request_invalid_jwt_signature() {
-    // Generate a VUF private key
-    let vuf_keypair = utils::create_vuf_public_private_keypair();
-    let (_, vuf_private_key) = vuf_keypair.deref();
+    // Generate a VUF keypair
+    let vuf_keypair = utils::create_vuf_keypair(None);
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
@@ -244,7 +242,7 @@ async fn request_invalid_jwt_signature() {
 
     // Handle the pepper request
     let pepper_result = handle_pepper_request(
-        vuf_private_key,
+        vuf_keypair,
         jwk_cache,
         cached_resources,
         jwt,
@@ -253,6 +251,7 @@ async fn request_invalid_jwt_signature() {
         epk_blinder,
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )
@@ -264,9 +263,8 @@ async fn request_invalid_jwt_signature() {
 
 #[tokio::test]
 async fn request_max_exp_data_secs_overflowed() {
-    // Generate a VUF private key
-    let vuf_keypair = utils::create_vuf_public_private_keypair();
-    let (_, vuf_private_key) = vuf_keypair.deref();
+    // Generate a VUF keypair
+    let vuf_keypair = utils::create_vuf_keypair(None);
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
@@ -287,7 +285,7 @@ async fn request_max_exp_data_secs_overflowed() {
 
     // Handle the pepper request
     let pepper_result = handle_pepper_request(
-        vuf_private_key,
+        vuf_keypair,
         jwk_cache,
         cached_resources,
         jwt,
@@ -296,6 +294,7 @@ async fn request_max_exp_data_secs_overflowed() {
         get_sample_epk_blinder(),
         None,
         None,
+        utils::get_empty_account_recovery_managers(),
         None,
         utils::get_mock_account_recovery_db(),
     )

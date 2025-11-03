@@ -1,0 +1,24 @@
+processed 2 tasks
+task 0 lines 1-6:  publish --print-bytecode [module 0x66::m {]
+
+== BEGIN Bytecode ==
+// Bytecode version v9
+module 0x66::m
+// Function definition at index 0
+fun run()
+    branch l0
+    ld_u64 1
+    abort
+l0: ld_u64 2
+    abort
+
+
+== END Bytecode ==
+task 1 lines 8-8:  run 0x66::m::run
+Error: Function execution failed with VMError: {
+    major_status: ABORTED,
+    sub_status: Some(2),
+    location: 0x66::m,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 4)],
+}

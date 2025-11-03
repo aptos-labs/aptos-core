@@ -240,7 +240,7 @@ impl<'a> LowDegreeTest<'a> {
 mod test {
     use crate::{
         algebra::{evaluation_domain::BatchEvaluationDomain, fft::fft_assign},
-        pvss::{test_utils, LowDegreeTest, ThresholdConfig},
+        pvss::{test_utils, LowDegreeTest, ThresholdConfigBlstrs},
         utils::random::random_scalars,
     };
     use blstrs::Scalar;
@@ -278,8 +278,8 @@ mod test {
 
         for t in 1..8 {
             for n in (t + 1)..(3 * t + 1) {
-                let sc = ThresholdConfig::new(t, n).unwrap();
-                let sc_higher_degree = ThresholdConfig::new(sc.t + 1, sc.n).unwrap();
+                let sc = ThresholdConfigBlstrs::new(t, n).unwrap();
+                let sc_higher_degree = ThresholdConfigBlstrs::new(sc.t + 1, sc.n).unwrap();
 
                 // A degree t polynomial p(X), higher by 1 than what the LDT expects
                 let (p_0, batch_dom, mut evals) =
@@ -301,7 +301,7 @@ mod test {
 
     fn random_polynomial_evals(
         mut rng: &mut ThreadRng,
-        sc: &ThresholdConfig,
+        sc: &ThresholdConfigBlstrs,
     ) -> (Scalar, BatchEvaluationDomain, Vec<Scalar>) {
         let p = random_scalars(sc.t, &mut rng);
         let p_0 = p[0];

@@ -18,12 +18,13 @@ mod tests {
         account_address::AccountAddress,
         function::{ClosureMask, MoveClosure},
         identifier::Identifier,
+        int256,
         language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
-        u256,
         value::{IdentifierMappingKind, MoveStruct, MoveStructLayout, MoveTypeLayout, MoveValue},
     };
     use serde::{Deserialize, Serialize};
     use std::iter;
+
     // ==========================================================================
     // Enums
 
@@ -474,7 +475,7 @@ mod tests {
             (Value::u32(10), U32),
             (Value::u64(10), U64),
             (Value::u128(10), U128),
-            (Value::u256(u256::U256::one()), U256),
+            (Value::u256(int256::U256::ONE), U256),
             (Value::bool(true), Bool),
             (Value::address(AccountAddress::ONE), Address),
             (Value::master_signer(AccountAddress::ONE), Signer),

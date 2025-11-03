@@ -30,7 +30,11 @@ use move_vm_metrics::{Timer, VERIFIED_MODULE_CACHE_SIZE, VM_TIMER};
 use move_vm_types::loaded_data::{
     runtime_types::StructIdentifier, struct_name_indexing::StructNameIndex,
 };
-use move_vm_types::loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap};
+use move_vm_types::{
+    loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap},
+    module_id_interner::InternedModuleIdPool,
+    ty_interner::InternedTypePool,
+};
 use std::sync::Arc;
 
 const OPTION_MODULE_BYTES: &[u8] = include_bytes!("option.mv");
@@ -61,6 +65,12 @@ pub struct RuntimeEnvironment {
     /// Caches struct tags for instantiated types. This cache can be used concurrently and
     /// speculatively because type tag information does not change with module publishes.
     ty_tag_cache: Arc<TypeTagCache>,
+
+    /// Pool of interned type representations. Same lifetime as struct index map.
+    interned_ty_pool: Arc<InternedTypePool>,
+
+    /// Pool of interned module ids.
+    interned_module_id_pool: Arc<InternedModuleIdPool>,
 }
 
 impl RuntimeEnvironment {
@@ -99,12 +109,23 @@ impl RuntimeEnvironment {
             natives,
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
+            interned_ty_pool: Arc::new(InternedTypePool::new()),
+            interned_module_id_pool: Arc::new(InternedModuleIdPool::new()),
         }
     }
 
     /// Returns the config currently used by this runtime environment.
     pub fn vm_config(&self) -> &VMConfig {
         &self.vm_config
+    }
+
+    /// Returns the type pool for interning that is currently used by this runtime environment.
+    pub fn ty_pool(&self) -> &InternedTypePool {
+        &self.interned_ty_pool
+    }
+
+    pub fn module_id_pool(&self) -> &InternedModuleIdPool {
+        &self.interned_module_id_pool
     }
 
     /// Enables delayed field optimization for this environment.
@@ -140,8 +161,13 @@ impl RuntimeEnvironment {
                 .iter()
                 .map(|module| module.as_ref().as_ref()),
         )?;
-        Script::new(locally_verified_script.0, self.struct_name_index_map())
-            .map_err(|err| err.finish(Location::Script))
+        Script::new(
+            locally_verified_script.0,
+            self.struct_name_index_map(),
+            self.ty_pool(),
+            self.module_id_pool(),
+        )
+        .map_err(|err| err.finish(Location::Script))
     }
 
     /// Creates a locally verified compiled module by running:
@@ -191,6 +217,8 @@ impl RuntimeEnvironment {
             locally_verified_module.1,
             locally_verified_module.0,
             self.struct_name_index_map(),
+            self.ty_pool(),
+            self.module_id_pool(),
         );
 
         // Note: loader V1 implementation does not set locations for this error.
@@ -208,6 +236,8 @@ impl RuntimeEnvironment {
             locally_verified_module.1,
             locally_verified_module.0,
             self.struct_name_index_map(),
+            self.ty_pool(),
+            self.module_id_pool(),
         )
         .map_err(|err| err.finish(Location::Undefined))
     }
@@ -272,7 +302,7 @@ impl RuntimeEnvironment {
 
     /// Returns the re-indexing map currently used by this runtime environment to remap struct
     /// identifiers into indices.
-    pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
+    pub fn struct_name_index_map(&self) -> &StructNameIndexMap {
         &self.struct_name_index_map
     }
 
@@ -297,7 +327,8 @@ impl RuntimeEnvironment {
         Ok(match ty {
             Struct { idx, .. } | StructInstantiation { idx, .. } => {
                 let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
-                Some((struct_identifier.module, struct_identifier.name))
+                let (module, name) = struct_identifier.into_module_and_name();
+                Some((module, name))
             },
             Bool
             | U8
@@ -306,6 +337,12 @@ impl RuntimeEnvironment {
             | U64
             | U128
             | U256
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
             | Address
             | Signer
             | TyParam(_)
@@ -324,9 +361,11 @@ impl RuntimeEnvironment {
 
     /// Flushes the global caches with struct name indices and struct tags. Note that when calling
     /// this function, modules that still store indices into struct name cache must also be flushed.
-    pub fn flush_struct_name_and_tag_caches(&self) {
+    pub fn flush_all_caches(&self) {
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();
+        self.interned_ty_pool.flush();
+        self.interned_module_id_pool.flush();
     }
 
     /// Flushes the global verified module cache. Should be used when verifier configuration has
@@ -373,7 +412,8 @@ impl RuntimeEnvironment {
         name: &IdentStr,
     ) -> Option<Bytes> {
         let enable_enum_option = self.vm_config().enable_enum_option;
-        if enable_enum_option {
+        let enable_framework_for_option = self.vm_config().enable_framework_for_option;
+        if !enable_framework_for_option && enable_enum_option {
             if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
                 return Some(self.get_option_module_bytes());
             }
@@ -392,6 +432,8 @@ impl Clone for RuntimeEnvironment {
             natives: self.natives.clone(),
             struct_name_index_map: Arc::clone(&self.struct_name_index_map),
             ty_tag_cache: Arc::clone(&self.ty_tag_cache),
+            interned_ty_pool: Arc::clone(&self.interned_ty_pool),
+            interned_module_id_pool: Arc::clone(&self.interned_module_id_pool),
         }
     }
 }

@@ -13,7 +13,7 @@ use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
 
 const MUTATION_TEST_BINARY_NAME: &str = "move-mutation-test";
-const TARGET_MUTATION_TEST_VERSION: &str = "1.0.0";
+const TARGET_MUTATION_TEST_VERSION: &str = "2.0.0";
 
 const MUTATION_TEST_EXE_ENV: &str = "MUTATION_TEST_EXE";
 #[cfg(target_os = "windows")]

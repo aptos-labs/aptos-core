@@ -15,3 +15,9 @@ cargo run -p aptos -- move run --session sess --function-id 0x1::aptos_account::
 
 # view account sequence number
 cargo run -p aptos -- move view --session sess --function-id 0x1::account::get_sequence_number --args address:default
+
+# view resource
+cargo run -p aptos -- move sim view-resource --session sess --account default --resource 0x1::account::Account
+
+# view resource group
+cargo run -p aptos -- move sim view-resource-group --session sess --account default --resource-group 0x1::object::ObjectGroup --derived-object-address 0xA

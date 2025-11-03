@@ -1057,4 +1057,29 @@ module aptos_token_objects::collection {
         let token_constructor_ref = &object::create_object(signer::address_of(creator));
         object::generate_signer(token_constructor_ref)
     }
+
+    #[test_only]
+    /// Get all data from Burn event
+    public fun get_burn_event_data(
+        event: &Burn
+    ): (address, u64, address, address) {
+        (event.collection, event.index, event.token, event.previous_owner)
+    }
+
+    #[test_only]
+    /// Get all data from Mint event
+    public fun get_mint_event_data(
+        event: &Mint
+    ): (address, u64, address) {
+        (event.collection, aggregator_v2::read_snapshot(&event.index), event.token)
+    }
+
+    #[test_only]
+    /// Get all data from SetMaxSupply event
+    public fun get_set_max_supply_event_data(
+        event: &SetMaxSupply
+    ): (Object<Collection>, u64, u64) {
+        (event.collection, event.old_max_supply, event.new_max_supply)
+    }
+
 }

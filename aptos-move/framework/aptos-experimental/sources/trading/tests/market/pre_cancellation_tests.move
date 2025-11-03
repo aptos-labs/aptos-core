@@ -44,7 +44,7 @@ module aptos_experimental::pre_cancellation_tests {
                 true,
                 good_till_cancelled(),
                 &mut event_store,
-                false,
+                true,
                 true, // Order should be cancelled as it was pre-cancelled
                 new_test_order_metadata(1),
                 option::some(std::string::utf8(b"1000")),
@@ -60,7 +60,7 @@ module aptos_experimental::pre_cancellation_tests {
                 true,
                 good_till_cancelled(),
                 &mut event_store,
-                false,
+                true,
                 true, // Order should be cancelled as it was pre-cancelled
                 new_test_order_metadata(1),
                 option::some(std::string::utf8(b"1000")),
@@ -164,7 +164,7 @@ module aptos_experimental::pre_cancellation_tests {
                 true,
                 good_till_cancelled(),
                 &mut event_store,
-                false,
+                true,
                 true, // Order should be cancelled as it was pre-cancelled
                 new_test_order_metadata(1),
                 option::some(std::string::utf8(b"1000")),

@@ -65,7 +65,7 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 ### Error Codes:
 
 - <code><a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a></code>: Order already exists for the account
-- <code><a href="bulk_order_book.md#0x7_bulk_order_book_EPOST_ONLY_FILLED">EPOST_ONLY_FILLED</a></code>: Post-only order was filled (not implemented in bulk orders)
+- <code><a href="bulk_order_book.md#0x7_bulk_order_book_EPOST_ONLY_FILLED">EPOST_ONLY_FILLED</a></code>: Post-only order was filled (crossed the spread)
 - <code><a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a></code>: Order not found for cancellation or reinsertion
 - <code><a href="bulk_order_book.md#0x7_bulk_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a></code>: Order is in an invalid inactive state
 - <code><a href="bulk_order_book.md#0x7_bulk_order_book_EINVALID_ADD_SIZE_TO_ORDER">EINVALID_ADD_SIZE_TO_ORDER</a></code>: Invalid size addition to order
@@ -106,6 +106,7 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 -  [Function `cancel_bulk_order`](#0x7_bulk_order_book_cancel_bulk_order)
     -  [Arguments:](#@Arguments:_19)
     -  [Aborts:](#@Aborts:_20)
+-  [Function `get_bulk_order`](#0x7_bulk_order_book_get_bulk_order)
 -  [Function `get_remaining_size`](#0x7_bulk_order_book_get_remaining_size)
 -  [Function `get_prices`](#0x7_bulk_order_book_get_prices)
 -  [Function `get_sizes`](#0x7_bulk_order_book_get_sizes)
@@ -116,6 +117,8 @@ sophisticated order matching, cancellation, and reinsertion capabilities.
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types">0x7::bulk_order_book_types</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 <b>use</b> <a href="price_time_index.md#0x7_price_time_index">0x7::price_time_index</a>;
@@ -182,6 +185,15 @@ Main bulk order book container that manages all orders and their matching.
 ## Constants
 
 
+<a id="0x7_bulk_order_book_E_REINSERT_ORDER_MISMATCH"></a>
+
+
+
+<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
+</code></pre>
+
+
+
 <a id="0x7_bulk_order_book_EORDER_ALREADY_EXISTS"></a>
 
 
@@ -205,15 +217,6 @@ Main bulk order book container that manages all orders and their matching.
 
 
 <pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EPRICE_CROSSING">EPRICE_CROSSING</a>: u64 = 11;
-</code></pre>
-
-
-
-<a id="0x7_bulk_order_book_E_REINSERT_ORDER_MISMATCH"></a>
-
-
-
-<pre><code><b>const</b> <a href="bulk_order_book.md#0x7_bulk_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
 </code></pre>
 
 
@@ -304,7 +307,7 @@ Creates a new empty bulk order book.
 A new <code><a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a></code> instance with empty order collections.
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_new_bulk_order_book">new_bulk_order_book</a>&lt;M: <b>copy</b>, drop, store&gt;(): <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_new_bulk_order_book">new_bulk_order_book</a>&lt;M: <b>copy</b>, drop, store&gt;(): <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;
 </code></pre>
 
 
@@ -313,7 +316,7 @@ A new <code><a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkO
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_new_bulk_order_book">new_bulk_order_book</a>&lt;M: store + <b>copy</b> + drop&gt;(): <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt; {
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_new_bulk_order_book">new_bulk_order_book</a>&lt;M: store + <b>copy</b> + drop&gt;(): <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt; {
     BulkOrderBook::V1 {
         orders:  <a href="order_book_types.md#0x7_order_book_types_new_default_big_ordered_map">order_book_types::new_default_big_ordered_map</a>(),
         order_id_to_address:  <a href="order_book_types.md#0x7_order_book_types_new_default_big_ordered_map">order_book_types::new_default_big_ordered_map</a>()
@@ -362,7 +365,7 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
 - Updates the active order book
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, active_matched_order: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, active_matched_order: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>, is_bid: bool): <a href="order_book_types.md#0x7_order_book_types_OrderMatch">order_book_types::OrderMatch</a>&lt;M&gt;
 </code></pre>
 
 
@@ -371,7 +374,7 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_single_match_for_taker">get_single_match_for_taker</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
     active_matched_order: ActiveMatchedOrder,
@@ -379,7 +382,7 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
 ): OrderMatch&lt;M&gt; {
     <b>let</b> (order_id, matched_size, remaining_size, order_book_type) =
         active_matched_order.destroy_active_matched_order();
-    <b>assert</b>!(order_book_type == bulk_order_book_type(), <a href="bulk_order_book.md#0x7_bulk_order_book_ENOT_BULK_ORDER">ENOT_BULK_ORDER</a>);
+    <b>assert</b>!(order_book_type == bulk_order_type(), <a href="bulk_order_book.md#0x7_bulk_order_book_ENOT_BULK_ORDER">ENOT_BULK_ORDER</a>);
     <b>let</b> order_address = self.order_id_to_address.get(&order_id).destroy_some();
     <b>let</b> order = self.orders.remove(&order_address);
     <b>let</b> order_match = new_bulk_order_match&lt;M&gt;(
@@ -393,7 +396,7 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
         <b>let</b> size = next_size.destroy_some();
         price_time_idx.place_maker_order(
             order_id,
-            bulk_order_book_type(),
+            bulk_order_type(),
             price,
             order.get_unique_priority_idx(),
             size,
@@ -527,7 +530,7 @@ Activates the first price level for a specific side of a bulk order.
     <b>if</b> (active_price.is_some()) {
         price_time_idx.place_maker_order(
             order_id,
-            bulk_order_book_type(),
+            bulk_order_type(),
             active_price.destroy_some(),
             order.get_unique_priority_idx(),
             active_size.destroy_some(),
@@ -606,7 +609,7 @@ effectively allowing them to "reuse" matched liquidity.
 - If the reinsertion validation fails
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_reinsert_order">reinsert_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, reinsert_order: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, original_order: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_reinsert_order">reinsert_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, reinsert_order: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, original_order: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -615,16 +618,17 @@ effectively allowing them to "reuse" matched liquidity.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_reinsert_order">reinsert_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_reinsert_order">reinsert_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
     reinsert_order: OrderMatchDetails&lt;M&gt;,
     original_order: &OrderMatchDetails&lt;M&gt;
 ) {
-    <b>assert</b>!(reinsert_order.validate_reinsertion_request(original_order), <a href="bulk_order_book.md#0x7_bulk_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+    <b>assert</b>!(reinsert_order.validate_bulk_order_reinsertion_request(original_order), <a href="bulk_order_book.md#0x7_bulk_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = reinsert_order.get_account_from_match_details();
-    <b>assert</b>!(self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
-    <b>let</b> order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>let</b> order_option = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(order_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order = order_option.destroy_some();
     <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &order);
     order.<a href="bulk_order_book.md#0x7_bulk_order_book_reinsert_order">reinsert_order</a>(&reinsert_order);
     <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_levels">activate_first_price_levels</a>(price_time_idx, &order, reinsert_order.get_order_id_from_match_details());
@@ -663,7 +667,7 @@ with the same order ID in the future.
 - If no order exists for the specified account
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, u64)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;
 </code></pre>
 
 
@@ -672,24 +676,52 @@ with the same order ID in the future.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_bulk_order">cancel_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>
-): (OrderIdType, u64, u64) {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
+): BulkOrder&lt;M&gt; {
     // For cancellation, instead of removing the order, we will just cancel the active orders and set the sizes <b>to</b> 0.
     // This allows us <b>to</b> reuse the order id for the same <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> in the future without creating a new order.
-    <b>let</b> order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-    <b>let</b> order_id = order.get_order_id();
-    <b>let</b> remaining_bid_size = order.get_total_remaining_size(<b>true</b>);
-    <b>let</b> remaining_ask_size = order.get_total_remaining_size(<b>false</b>);
+    <b>let</b> order_opt = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(order_opt.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    <b>let</b> order = order_opt.destroy_some();
+    <b>let</b> order_copy = order;
     <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &order);
     order.set_empty();
     self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order);
-    (order_id, remaining_bid_size, remaining_ask_size)
+    order_copy
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_bulk_order_book_get_bulk_order"></a>
+
+## Function `get_bulk_order`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_bulk_order">get_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_bulk_order">get_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>
+): BulkOrder&lt;M&gt; {
+    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
+        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
+    };
+
+    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some()
 }
 </code></pre>
 
@@ -703,7 +735,7 @@ with the same order ID in the future.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_remaining_size">get_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): u64
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_remaining_size">get_remaining_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): u64
 </code></pre>
 
 
@@ -712,16 +744,14 @@ with the same order ID in the future.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_remaining_size">get_remaining_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     is_bid: bool
 ): u64 {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
-
-    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_total_remaining_size(is_bid)
+    <b>let</b> result_option = self.orders.get_and_map(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, |order| order.get_total_remaining_size(is_bid));
+    <b>assert</b>!(result_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    result_option.destroy_some()
 }
 </code></pre>
 
@@ -735,7 +765,7 @@ with the same order ID in the future.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_prices">get_prices</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_prices">get_prices</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -744,16 +774,14 @@ with the same order ID in the future.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_prices">get_prices</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_prices">get_prices</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     is_bid: bool
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
-
-    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_all_prices(is_bid)
+    <b>let</b> result_option = self.orders.get_and_map(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, |order| order.get_all_prices(is_bid));
+    <b>assert</b>!(result_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    result_option.destroy_some()
 }
 </code></pre>
 
@@ -767,7 +795,7 @@ with the same order ID in the future.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_sizes">get_sizes</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_sizes">get_sizes</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, is_bid: bool): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -776,16 +804,14 @@ with the same order ID in the future.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_sizes">get_sizes</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_get_sizes">get_sizes</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     is_bid: bool
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt; {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
-
-    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some().get_all_sizes(is_bid)
+    <b>let</b> result_option = self.orders.get_and_map(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, |order| order.get_all_sizes(is_bid));
+    <b>assert</b>!(result_option.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    result_option.destroy_some()
 }
 </code></pre>
 
@@ -809,7 +835,6 @@ The first price levels of both bid and ask sides will be activated in the active
 
 - <code>self</code>: Mutable reference to the bulk order book
 - <code>price_time_idx</code>: Mutable reference to the price time index
-- <code>ascending_id_generator</code>: Mutable reference to the ascending id generator
 - <code>order_req</code>: The bulk order request to place
 
 
@@ -820,7 +845,7 @@ The first price levels of both bid and ask sides will be activated in the active
 - If the order request validation fails
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">bulk_order_book::BulkOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_req: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;
 </code></pre>
 
 
@@ -829,29 +854,35 @@ The first price levels of both bid and ask sides will be activated in the active
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book.md#0x7_bulk_order_book_place_bulk_order">place_bulk_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<b>mut</b> <a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     price_time_idx: &<b>mut</b> aptos_experimental::price_time_index::PriceTimeIndex,
-    ascending_id_generator: &<b>mut</b> AscendingIdGenerator,
     order_req: BulkOrderRequest&lt;M&gt;
-) : BulkOrder&lt;M&gt; {
+) : BulkOrderPlaceResponse&lt;M&gt; {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = get_account_from_order_request(&order_req);
-    <b>let</b> new_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_order_request(&order_req);
-    <b>let</b> existing_order = self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-    <b>let</b> order_id = <b>if</b> (existing_order) {
-        <b>let</b> old_order = self.orders.remove(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-        <b>let</b> existing_sequence_number = aptos_experimental::bulk_order_book_types::get_sequence_number_from_bulk_order(&old_order);
-        <b>assert</b>!(new_sequence_number &gt; existing_sequence_number, <a href="bulk_order_book.md#0x7_bulk_order_book_E_INVALID_SEQUENCE_NUMBER">E_INVALID_SEQUENCE_NUMBER</a>);
+    <b>let</b> new_sequence_number = get_sequence_number_from_order_request(&order_req);
+    <b>let</b> order_option = self.orders.remove_or_none(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>let</b> (order_id, previous_seq_num) = <b>if</b> (order_option.is_some()) {
+        <b>let</b> old_order = order_option.destroy_some();
+        <b>let</b> existing_sequence_number = get_sequence_number_from_bulk_order(&old_order);
+        <b>if</b> (new_sequence_number &lt;= existing_sequence_number) {
+            // Return rejection response for invalid sequence number
+            self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, old_order); // Re-add the <b>old</b> order back since we are rejecting the new one
+            <b>return</b> new_bulk_order_place_response_rejection(
+                get_sequence_number_out_of_order_rejection(),
+                std::string::utf8(b"Invalid sequence number")
+            );
+        };
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
-        old_order.get_order_id()
+        (old_order.get_order_id(), std::option::some(existing_sequence_number))
     } <b>else</b> {
-        <b>let</b> order_id = new_order_id_type(ascending_id_generator.next_ascending_id());
+        <b>let</b> order_id = new_order_id_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
         self.order_id_to_address.add(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
-        order_id
+        (order_id, std::option::none())
     };
-    <b>let</b> bulk_order = new_bulk_order(
+    <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = new_bulk_order(
         order_id,
-        new_unique_idx_type(ascending_id_generator.next_ascending_id()),
+        new_unique_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()),
         order_req,
         price_time_idx.best_bid_price(),
         price_time_idx.best_ask_price(),
@@ -859,7 +890,14 @@ The first price levels of both bid and ask sides will be activated in the active
     self.orders.add(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bulk_order);
     // Activate the first price levels in the active order book
     <a href="bulk_order_book.md#0x7_bulk_order_book_activate_first_price_levels">activate_first_price_levels</a>(price_time_idx, &bulk_order, order_id);
-    bulk_order
+    new_bulk_order_place_response_success(
+        bulk_order,
+        cancelled_bid_prices,
+        cancelled_bid_sizes,
+        cancelled_ask_prices,
+        cancelled_ask_sizes,
+        previous_seq_num
+    )
 }
 </code></pre>
 

@@ -71,6 +71,7 @@ impl GrpcManager {
                 config.file_store_config.clone(),
                 config.cache_config.clone(),
                 metadata_manager.clone(),
+                config.allow_fn_fallback,
             )
             .await,
         );

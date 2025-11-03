@@ -187,6 +187,8 @@ impl MetadataManager {
                     s.spawn(async move {
                         if let Err(e) = self.heartbeat(client).await {
                             warn!("Failed to send heartbeat to other grpc manager ({address}): {e:?}.");
+                        } else {
+                            trace!("Successfully sent heartbeat to other grpc manager ({address}).");
                         }
                     });
                 }
@@ -205,6 +207,8 @@ impl MetadataManager {
                         s.spawn(async move {
                             if let Err(e) = self.ping_fullnode(address.clone(), client).await {
                                 warn!("Failed to ping FN ({address}): {e:?}.");
+                            } else {
+                                trace!("Successfully pinged FN ({address}).");
                             }
                         });
                     }
@@ -236,6 +240,8 @@ impl MetadataManager {
                                 self.ping_live_data_service(address.clone(), client).await
                             {
                                 warn!("Failed to ping live data service ({address}): {e:?}.");
+                            } else {
+                                trace!("Successfully pinged live data service ({address}).");
                             }
                         });
                     }
@@ -275,6 +281,8 @@ impl MetadataManager {
                                 .await
                             {
                                 warn!("Failed to ping historical data service ({address}): {e:?}.");
+                            } else {
+                                trace!("Successfully pinged historical data service ({address}).");
                             }
                         });
                     }

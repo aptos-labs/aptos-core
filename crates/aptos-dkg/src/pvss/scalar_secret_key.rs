@@ -5,17 +5,17 @@ use crate::{
     algebra::lagrange::lagrange_coefficients,
     pvss::{
         traits::{Reconstructable, SecretSharingConfig},
-        Player, ThresholdConfig,
+        Player, ThresholdConfigBlstrs,
     },
 };
 use blstrs::Scalar;
 use ff::Field;
 use more_asserts::{assert_ge, assert_le};
 
-impl Reconstructable<ThresholdConfig> for Scalar {
+impl Reconstructable<ThresholdConfigBlstrs> for Scalar {
     type Share = Scalar;
 
-    fn reconstruct(sc: &ThresholdConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
+    fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<(Player, Self::Share)>) -> Self {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
 

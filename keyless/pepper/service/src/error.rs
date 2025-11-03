@@ -14,3 +14,9 @@ pub enum PepperServiceError {
     #[error("Unexpected error: {0}")]
     UnexpectedError(String),
 }
+
+impl From<tokio::task::JoinError> for PepperServiceError {
+    fn from(error: tokio::task::JoinError) -> PepperServiceError {
+        PepperServiceError::UnexpectedError(format!("JoinError: {:?}", error))
+    }
+}

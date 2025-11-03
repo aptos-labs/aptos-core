@@ -6,10 +6,13 @@
 //!
 //! A valid identifier consists of an ASCII string which satisfies any of the conditions:
 //!
-//! * The first character is a letter and the remaining characters are letters, digits or
-//!   underscores.
-//! * The first character is an underscore, and there is at least one further letter, digit or
-//!   underscore.
+//! * The first character is a letter and the remaining characters are letters, digits,
+//!   underscores, or dollar.
+//! * The first character is an underscore or dollar, and there is at least one further letter,
+//!   digit, underscore, or dollar.
+//!
+//! Notice that dollar (`$`) is reserved for compiler or runtime intrinsic identifiers
+//! and cannot be reached from the Move language.
 //!
 //! The spec for allowed identifiers is similar to Rust's spec
 //! ([as of version 1.38](https://doc.rust-lang.org/1.38.0/reference/identifiers.html)).
@@ -40,7 +43,7 @@ use std::{borrow::Borrow, fmt, ops::Deref, str::FromStr};
 /// identifier--only alphabetic characters are allowed here.
 #[inline]
 pub const fn is_valid_identifier_char(c: char) -> bool {
-    matches!(c, '_' | 'a'..='z' | 'A'..='Z' | '0'..='9')
+    matches!(c, '_' | '$' | 'a'..='z' | 'A'..='Z' | '0'..='9')
 }
 
 /// Returns `true` if all bytes in `b` after the offset `start_offset` are valid
@@ -85,7 +88,7 @@ pub const fn is_valid(s: &str) -> bool {
         b"<SELF>" => true,
         [b'<', b'S', b'E', b'L', b'F', b'>', b'_', ..] if b.len() > 7 => all_bytes_numeric(b, 7),
         [b'a'..=b'z', ..] | [b'A'..=b'Z', ..] => all_bytes_valid(b, 1),
-        [b'_', ..] if b.len() > 1 => all_bytes_valid(b, 1),
+        [b'_', ..] | [b'$', ..] if b.len() > 1 => all_bytes_valid(b, 1),
         _ => false,
     }
 }
@@ -96,10 +99,10 @@ pub const fn is_valid(s: &str) -> bool {
 #[cfg(any(test, feature = "fuzzing"))]
 #[allow(dead_code)]
 pub(crate) static ALLOWED_IDENTIFIERS: &str =
-    r"(?:[a-zA-Z][a-zA-Z0-9_]*)|(?:_[a-zA-Z0-9_]+)|(?:<SELF>)|(?:<SELF>_[0-9]+)";
+    r"(?:[a-zA-Z][a-zA-Z0-9_$]*)|(?:_[a-zA-Z0-9_$]+)|(?:<SELF>)|(?:<SELF>_[0-9]+)";
 #[cfg(any(test, feature = "fuzzing"))]
 pub(crate) static ALLOWED_NO_SELF_IDENTIFIERS: &str =
-    r"(?:[a-zA-Z][a-zA-Z0-9_]*)|(?:_[a-zA-Z0-9_]+)";
+    r"(?:[a-zA-Z][a-zA-Z0-9_$]*)|(?:_[a-zA-Z0-9_$]+)";
 
 /// An owned identifier.
 ///
@@ -124,7 +127,9 @@ impl Identifier {
     }
 
     /// Creates an unchecked `Identifier` instance, allowing characters which
-    /// are invalid in the language.
+    /// are invalid. This is, for example, used by move-asm
+    /// to create invalid identifiers which are expected to be caught by
+    /// validation.
     pub fn new_unchecked(s: impl Into<Box<str>>) -> Self {
         Self(s.into())
     }

@@ -1,10 +1,9 @@
 name: "Test_Coverage"
 on:
   # Trigger if any of the conditions
-  #   1. Daily at 12am UTC from the main branch, or
+  #   1. Daily via PIES scheduled workflow, or
   #   2. PR with a specific label (see below)
-  schedule:
-    - cron: "0 0 * * *"
+  # schedule: # NOTE: the schedule is dictated by PIES
   pull_request:
     types: [labeled]
   workflow_dispatch:
@@ -24,7 +23,7 @@ jobs:
   rust-unit-coverage:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
-      (github.event_name == 'schedule' && github.ref_name == 'main')
+      (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
     # Note the tests run slowly due to instrutmentation. It takes CI 10 hrs
     timeout-minutes: 720
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
@@ -55,7 +54,7 @@ jobs:
   rust-smoke-coverage:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
-      (github.event_name == 'schedule' && github.ref_name == 'main')
+      (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
     timeout-minutes: 720 # incremented from 240 due to execution time limit hit in cron
     runs-on: runs-on,cpu=64,family=c7,disk=large,image=aptos-ubuntu-x64,run-id=${{ github.run_id }}
     steps:
@@ -85,7 +84,7 @@ jobs:
   upload-to-codecov:
     if: |
       contains(github.event.pull_request.labels.*.name, 'CICD:run-coverage') ||
-      (github.event_name == 'schedule' && github.ref_name == 'main')
+      (github.event_name == 'workflow_dispatch' && github.ref_name == 'main')
       && !cancelled()
     needs: [ rust-unit-coverage, rust-smoke-coverage ]
     runs-on: ubuntu-latest

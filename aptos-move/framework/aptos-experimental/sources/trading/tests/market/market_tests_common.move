@@ -26,7 +26,7 @@ module aptos_experimental::market_tests_common {
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
 
-    const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
+    const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
     const U64_MAX: u64 = 0xFFFFFFFFFFFFFFFF;
 
     // Helper function to setup market and clearinghouse
@@ -38,7 +38,7 @@ module aptos_experimental::market_tests_common {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(allow_self_matching, true, PRE_CANCEL_WINDOW_MICROS)
+            new_market_config(allow_self_matching, true, PRE_CANCEL_WINDOW_SECS)
         );
         clearinghouse_test::initialize(admin);
         market
@@ -566,7 +566,7 @@ module aptos_experimental::market_tests_common {
             false, // is_bid
             immediate_or_cancel(), // order_type
             &mut event_store,
-            false, // Despite it being a "taker", this order will not cross
+            true, // Despite it being a "taker", this order will not cross
             true,
             new_test_order_metadata(1),
             option::none(),

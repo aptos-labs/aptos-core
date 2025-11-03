@@ -4,18 +4,20 @@
 
 use crate::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment,
-    data_cache::{DataCacheEntry, TransactionDataCache},
+    data_cache::NativeContextMoveVmDataCache,
     dispatch_loader,
     interpreter::InterpreterDebugInterface,
     loader::{LazyLoadedFunction, LazyLoadedFunctionState},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     storage::{
+        layout_cache::StructKey,
         loader::traits::NativeModuleLoader,
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
-    Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
+    LayoutCache, LayoutCacheEntry, Module, ModuleStorage, RuntimeEnvironment,
+    WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;
@@ -36,13 +38,13 @@ use move_vm_types::{
     gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
     loaded_data::runtime_types::Type,
     natives::function::NativeResult,
-    resolver::ResourceResolver,
     values::{AbstractFunction, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
     sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
     + Send
@@ -113,8 +115,7 @@ impl NativeFunctions {
 
 pub struct NativeContext<'a, 'b, 'c> {
     interpreter: &'a dyn InterpreterDebugInterface,
-    data_store: &'a mut TransactionDataCache,
-    resource_resolver: &'a dyn ResourceResolver,
+    data_cache: &'a mut dyn NativeContextMoveVmDataCache,
     module_storage: &'a dyn ModuleStorage,
     extensions: &'a mut NativeContextExtensions<'b>,
     gas_meter: &'a mut dyn NativeGasMeter,
@@ -124,8 +125,7 @@ pub struct NativeContext<'a, 'b, 'c> {
 impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     pub(crate) fn new(
         interpreter: &'a dyn InterpreterDebugInterface,
-        data_store: &'a mut TransactionDataCache,
-        resource_resolver: &'a dyn ResourceResolver,
+        data_cache: &'a mut dyn NativeContextMoveVmDataCache,
         module_storage: &'a dyn ModuleStorage,
         extensions: &'a mut NativeContextExtensions<'b>,
         gas_meter: &'a mut dyn NativeGasMeter,
@@ -133,8 +133,7 @@ impl<'a, 'b, 'c> NativeContext<'a, 'b, 'c> {
     ) -> Self {
         Self {
             interpreter,
-            data_store,
-            resource_resolver,
+            data_cache,
             module_storage,
             extensions,
             gas_meter,
@@ -154,21 +153,12 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
         address: AccountAddress,
         ty: &Type,
     ) -> PartialVMResult<(bool, Option<NumBytes>)> {
-        // TODO(#16516):
-        //   Propagate exists call all the way to resolver, because we can implement the check more
-        //   efficiently, without the need to actually load bytes, deserialize the value and cache
-        //   it in the data cache.
-        Ok(if !self.data_store.contains_resource(&address, ty) {
-            let (entry, bytes_loaded) =
-                self.loader_context().create_data_cache_entry(address, ty)?;
-            let exists = entry.value().exists()?;
-            self.data_store
-                .insert_resource(address, ty.clone(), entry)?;
-            (exists, Some(bytes_loaded))
-        } else {
-            let exists = self.data_store.get_resource_mut(&address, ty)?.exists()?;
-            (exists, None)
-        })
+        self.data_cache.native_check_resource_exists(
+            self.gas_meter,
+            self.traversal_context,
+            &address,
+            ty,
+        )
     }
 
     pub fn type_to_type_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
@@ -178,7 +168,10 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     /// Returns the runtime layout of a type that can be used to (de)serialize the value.
     ///
     /// NOTE: use with caution as this ignores the flag if layout contains delayed fields or not.
-    pub fn type_to_type_layout(&mut self, ty: &Type) -> PartialVMResult<MoveTypeLayout> {
+    pub fn type_to_type_layout(
+        &mut self,
+        ty: &Type,
+    ) -> PartialVMResult<TriompheArc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
             .type_to_type_layout_with_delayed_fields(ty)?
@@ -202,7 +195,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn type_to_type_layout_check_no_delayed_fields(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<MoveTypeLayout> {
+    ) -> PartialVMResult<TriompheArc<MoveTypeLayout>> {
         let layout = self
             .loader_context()
             .type_to_type_layout_with_delayed_fields(ty)?;
@@ -219,7 +212,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     pub fn type_to_fully_annotated_layout(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<Option<MoveTypeLayout>> {
+    ) -> PartialVMResult<Option<TriompheArc<MoveTypeLayout>>> {
         self.loader_context().type_to_fully_annotated_layout(ty)
     }
 
@@ -239,12 +232,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
     ) -> (&NativeContextExtensions<'b>, LoaderContext<'_, 'c>) {
         (
             self.extensions,
-            LoaderContext::new(
-                self.resource_resolver,
-                self.module_storage,
-                self.gas_meter,
-                self.traversal_context,
-            ),
+            LoaderContext::new(self.module_storage, self.gas_meter, self.traversal_context),
         )
     }
 
@@ -270,12 +258,7 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
 
     /// Returns the loader context used by the natives.
     pub fn loader_context(&mut self) -> LoaderContext<'_, 'c> {
-        LoaderContext::new(
-            self.resource_resolver,
-            self.module_storage,
-            self.gas_meter,
-            self.traversal_context,
-        )
+        LoaderContext::new(self.module_storage, self.gas_meter, self.traversal_context)
     }
 
     pub fn traversal_context(&self) -> &TraversalContext<'c> {
@@ -292,7 +275,6 @@ impl<'b, 'c> NativeContext<'_, 'b, 'c> {
 /// Helper struct that can be returned together with extensions so that layouts can be constructed
 /// while there is a live mutable reference to context extensions.
 pub struct LoaderContext<'a, 'b> {
-    resource_resolver: &'a dyn ResourceResolver,
     module_storage: ModuleStorageWrapper<'a>,
     gas_meter: DependencyGasMeterWrapper<'a>,
     traversal_context: &'a mut TraversalContext<'b>,
@@ -370,45 +352,22 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
 impl<'a, 'b> LoaderContext<'a, 'b> {
     /// Creates a new loader context.
     fn new(
-        resource_resolver: &'a dyn ResourceResolver,
         module_storage: &'a dyn ModuleStorage,
         gas_meter: &'a mut dyn DependencyGasMeter,
         traversal_context: &'a mut TraversalContext<'b>,
     ) -> Self {
         Self {
-            resource_resolver,
             module_storage: ModuleStorageWrapper { module_storage },
             gas_meter: DependencyGasMeterWrapper { gas_meter },
             traversal_context,
         }
     }
 
-    /// Creates a new [DataCacheEntry], loading its layout, deserializing it and recording its
-    /// size in bytes.
-    fn create_data_cache_entry(
-        &mut self,
-        address: AccountAddress,
-        ty: &Type,
-    ) -> PartialVMResult<(DataCacheEntry, NumBytes)> {
-        dispatch_loader!(&self.module_storage, loader, {
-            TransactionDataCache::create_data_cache_entry(
-                &loader,
-                &LayoutConverter::new(&loader),
-                &mut self.gas_meter,
-                self.traversal_context,
-                &self.module_storage,
-                self.resource_resolver,
-                &address,
-                ty,
-            )
-        })
-    }
-
     /// Converts a runtime type into decorated layout for pretty-printing.
     fn type_to_fully_annotated_layout(
         &mut self,
         ty: &Type,
-    ) -> PartialVMResult<Option<MoveTypeLayout>> {
+    ) -> PartialVMResult<Option<TriompheArc<MoveTypeLayout>>> {
         let layout = dispatch_loader!(&self.module_storage, loader, {
             LayoutConverter::new(&loader).type_to_annotated_type_layout_with_delayed_fields(
                 &mut self.gas_meter,
@@ -425,6 +384,16 @@ struct ModuleStorageWrapper<'a> {
     module_storage: &'a dyn ModuleStorage,
 }
 
+impl<'a> LayoutCache for ModuleStorageWrapper<'a> {
+    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+        self.module_storage.get_struct_layout(key)
+    }
+
+    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
+        self.module_storage.store_struct_layout(key, entry)
+    }
+}
+
 #[delegate_to_methods]
 #[delegate(WithRuntimeEnvironment, target_ref = "inner")]
 #[delegate(ModuleStorage, target_ref = "inner")]
@@ -434,8 +403,14 @@ impl<'a> ModuleStorageWrapper<'a> {
     }
 }
 
-struct DependencyGasMeterWrapper<'a> {
+pub(crate) struct DependencyGasMeterWrapper<'a> {
     gas_meter: &'a mut dyn DependencyGasMeter,
+}
+
+impl<'a> DependencyGasMeterWrapper<'a> {
+    pub(crate) fn new(gas_meter: &'a mut dyn DependencyGasMeter) -> Self {
+        Self { gas_meter }
+    }
 }
 
 #[delegate_to_methods]

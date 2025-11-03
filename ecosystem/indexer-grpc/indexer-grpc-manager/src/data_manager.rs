@@ -125,12 +125,14 @@ impl Cache {
             }
         }
         if update_file_store_version {
-            let old_version = self
-                .file_store_version
-                .fetch_add(transactions.len() as u64, Ordering::SeqCst);
-            let new_version = old_version + transactions.len() as u64;
-            FILE_STORE_VERSION_IN_CACHE.set(new_version as i64);
-            info!("Updated file_store_version in cache to {new_version}.");
+            if !transactions.is_empty() {
+                let old_version = self
+                    .file_store_version
+                    .fetch_add(transactions.len() as u64, Ordering::SeqCst);
+                let new_version = old_version + transactions.len() as u64;
+                FILE_STORE_VERSION_IN_CACHE.set(new_version as i64);
+                info!("Updated file_store_version in cache to {new_version}.");
+            }
         } else {
             trace!(
                 "Returned {} transactions from Cache, total {size_bytes} bytes.",
@@ -147,6 +149,7 @@ pub(crate) struct DataManager {
     cache: RwLock<Cache>,
     file_store_reader: FileStoreReader,
     metadata_manager: Arc<MetadataManager>,
+    allow_fn_fallback: bool,
 }
 
 impl DataManager {
@@ -155,6 +158,7 @@ impl DataManager {
         file_store_config: IndexerGrpcFileStoreConfig,
         cache_config: CacheConfig,
         metadata_manager: Arc<MetadataManager>,
+        allow_fn_fallback: bool,
     ) -> Self {
         let file_store = file_store_config.create_filestore().await;
         let file_store_reader = FileStoreReader::new(chain_id, file_store).await;
@@ -163,6 +167,7 @@ impl DataManager {
             cache: RwLock::new(Cache::new(cache_config, file_store_version)),
             file_store_reader,
             metadata_manager,
+            allow_fn_fallback,
         }
     }
 
@@ -211,6 +216,7 @@ impl DataManager {
             );
             let (address, mut fullnode_client) =
                 self.metadata_manager.get_fullnode_for_request(&request);
+            trace!("Fullnode ({address}) is picked for request.");
             let response = fullnode_client.get_transactions_from_node(request).await;
             if response.is_err() {
                 warn!(
@@ -219,13 +225,18 @@ impl DataManager {
                 );
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 continue;
+            } else {
+                trace!("Got success response from fullnode.");
             }
 
             let mut response = response.unwrap().into_inner();
             while let Some(response_item) = response.next().await {
+                trace!("Processing 1 response item.");
                 loop {
+                    trace!("Maybe running GC.");
                     if self.cache.write().await.maybe_gc() {
                         IS_FILE_STORE_LAGGING.set(0);
+                        trace!("GC is done, file store is not lagging.");
                         break;
                     }
                     IS_FILE_STORE_LAGGING.set(1);
@@ -248,6 +259,10 @@ impl DataManager {
                         if let Some(response) = r.response {
                             match response {
                                 Response::Data(data) => {
+                                    trace!(
+                                        "Putting data into cache, {} transaction(s).",
+                                        data.transactions.len()
+                                    );
                                     self.cache.write().await.put_transactions(data.transactions);
                                 },
                                 Response::Status(_) => continue,
@@ -284,7 +299,7 @@ impl DataManager {
         if start_version >= cache_start_version {
             if start_version >= cache_next_version {
                 // If lagging, try to fetch the data from FN.
-                if self.lagging(cache_next_version) {
+                if self.lagging(cache_next_version) && self.allow_fn_fallback {
                     debug!("GrpcManager is lagging, getting data from FN, requested_version: {start_version}, cache_next_version: {cache_next_version}.");
                     let request = GetTransactionsFromNodeRequest {
                         starting_version: Some(start_version),
@@ -306,6 +321,8 @@ impl DataManager {
                         }
                     }
                 }
+
+                tokio::time::sleep(Duration::from_millis(200)).await;
 
                 // Let client side to retry.
                 return Ok(vec![]);

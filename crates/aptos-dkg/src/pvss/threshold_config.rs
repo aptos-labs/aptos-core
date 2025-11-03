@@ -13,9 +13,9 @@ use std::fmt::{Display, Formatter};
 
 /// Encodes the *threshold configuration* for a normal/unweighted PVSS: i.e., the threshold $t$ and
 /// the number of players $n$ such that any $t$ or more players can reconstruct a dealt secret given
-/// a PVSS transcript. this is Alin leaving his laptop open again...
+/// a PVSS transcript. Due to the last fields, this struct should only be used in the context of `blstrs`
 #[derive(Clone, PartialEq, Deserialize, Serialize, Debug, Eq)]
-pub struct ThresholdConfig {
+pub struct ThresholdConfigBlstrs {
     /// The reconstruction threshold $t$ that must be exceeded in order to reconstruct the dealt
     /// secret; i.e., $t$ or more shares are needed
     pub(crate) t: usize,
@@ -29,7 +29,7 @@ pub struct ThresholdConfig {
     batch_dom: BatchEvaluationDomain,
 }
 
-impl ThresholdConfig {
+impl ThresholdConfigBlstrs {
     /// Creates a new $t$ out of $n$ secret sharing configuration where any subset of $t$ or more
     /// players can reconstruct the secret.
     pub fn new(t: usize, n: usize) -> anyhow::Result<Self> {
@@ -49,7 +49,7 @@ impl ThresholdConfig {
 
         let batch_dom = BatchEvaluationDomain::new(n);
         let dom = batch_dom.get_subdomain(n);
-        Ok(ThresholdConfig {
+        Ok(ThresholdConfigBlstrs {
             t,
             n,
             dom,
@@ -71,13 +71,13 @@ impl ThresholdConfig {
     }
 }
 
-impl Display for ThresholdConfig {
+impl Display for ThresholdConfigBlstrs {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "threshold/{}-out-of-{}", self.t, self.n)
     }
 }
 
-impl traits::SecretSharingConfig for ThresholdConfig {
+impl traits::SecretSharingConfig for ThresholdConfigBlstrs {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where
@@ -111,7 +111,7 @@ impl traits::SecretSharingConfig for ThresholdConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::pvss::ThresholdConfig;
+    use crate::pvss::ThresholdConfigBlstrs;
 
     #[test]
     fn create_many_configs() {
@@ -119,7 +119,7 @@ mod test {
 
         for t in 1..100 {
             for n in t..100 {
-                _tcs.push(ThresholdConfig::new(t, n).unwrap())
+                _tcs.push(ThresholdConfigBlstrs::new(t, n).unwrap())
             }
         }
     }

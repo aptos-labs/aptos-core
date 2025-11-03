@@ -8,7 +8,7 @@
 //! system, as well as type checking it and translating it to the spec language ast.
 
 use crate::{
-    ast::{Address, Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
+    ast::{Attribute, FriendDecl, ModuleName, Operation, QualifiedSymbol, Spec, Value},
     builder::builtins,
     intrinsics::IntrinsicDecl,
     model::{
@@ -23,7 +23,7 @@ use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
 use legacy_move_compiler::{expansion::ast as EA, parser::ast as PA, shared::NumericalAddress};
 use move_binary_format::file_format::Visibility;
-use move_core_types::{ability::AbilitySet, account_address::AccountAddress};
+use move_core_types::ability::AbilitySet;
 use std::collections::{BTreeMap, BTreeSet};
 
 /// A builder is used to enter a sequence of modules in acyclic dependency order into the model. The
@@ -693,10 +693,7 @@ impl<'env> ModelBuilder<'env> {
 
     /// Returns the name for the pseudo builtin module.
     pub fn builtin_module(&self) -> ModuleName {
-        ModuleName::new(
-            Address::Numerical(AccountAddress::ZERO),
-            self.env.symbol_pool().make("$$"),
-        )
+        ModuleName::builtin_module(self.env)
     }
 
     /// Adds a spec function to used_spec_funs set.

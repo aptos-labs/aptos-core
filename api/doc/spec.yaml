@@ -12661,6 +12661,33 @@ components:
 
         Unlike the `Address` type, HexEncodedBytes will not trim any zeros.
       example: 0x88fbd33f54e1126269769780feb24480428179f552e2313fbe571b72e62a1ca1
+    I128:
+      type: string
+      format: int128
+      description: |
+        A string containing a 128-bit signed integer.
+
+        We represent i128 values as a string to ensure compatibility with languages such
+        as JavaScript that do not parse i128s in JSON natively.
+      example: '-32425224034'
+    I256:
+      type: string
+      format: int256
+      description: |
+        A string containing a 256-bit signed integer.
+
+        We represent i256 values as a string to ensure compatibility with languages such
+        as JavaScript that do not parse i256s in JSON natively.
+      example: '-32425224034'
+    I64:
+      type: string
+      format: int64
+      description: |
+        A string containing a 64-bit signed integer.
+
+        We represent i64 values as a string to ensure compatibility with languages such
+        as JavaScript that do not parse i64s in JSON natively.
+      example: '-32425224034'
     IdentifierWrapper:
       type: string
     IndexResponse:
@@ -12909,6 +12936,7 @@ components:
       - name
       - is_native
       - is_event
+      - is_enum
       - abilities
       - generic_type_params
       - fields
@@ -12921,6 +12949,9 @@ components:
         is_event:
           type: boolean
           description: 'Whether the struct is marked with the #[event] annotation'
+        is_enum:
+          type: boolean
+          description: Whether the struct is an enum (i.e. enum MyEnum vs struct MyStruct).
         abilities:
           type: array
           description: Abilities associated with the struct
@@ -12990,9 +13021,9 @@ components:
 
         Move `bool` type value is serialized into `boolean`.
 
-        Move `u8`, `u16` and `u32` type value is serialized into `integer`.
+        Move `u8`, `u16`, `u32`, `i8`, `i16`, and `i32` type value is serialized into `integer`.
 
-        Move `u64`, `u128` and `u256` type value is serialized into `string`.
+        Move `u64`, `u128`, `u256`, `i64`, `i128`, and `i256` type value is serialized into `string`.
 
         Move `address` type value (32 byte Aptos account address) is serialized into a HexEncodedBytes string.
         For example:
@@ -13043,6 +13074,12 @@ components:
               - u64
               - u128
               - u256
+              - i8
+              - i16
+              - i32
+              - i64
+              - i128
+              - i256
               - address
               - signer
               - vector: `vector<{non-reference MoveTypeId}>`
@@ -13060,7 +13097,7 @@ components:
             Note:
               1. Empty chars should be ignored when comparing 2 struct tag ids.
               2. When used in an URL path, should be encoded by url-encoding (AKA percent-encoding).
-      pattern: ^(bool|u8|u64|u128|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$
+      pattern: ^(bool|u8|u16|u32|u64|u128|u256|i8|i16|i32|i64|i128|i256|address|signer|vector<.+>|0x[0-9a-zA-Z:_<, >]+)$
     MoveValue:
       type: object
       description: An enum of the possible Move value types
@@ -13074,6 +13111,15 @@ components:
       - $ref: '#/components/schemas/U64'
       - $ref: '#/components/schemas/U128'
       - $ref: '#/components/schemas/U256'
+      - type: integer
+        format: int8
+      - type: integer
+        format: int16
+      - type: integer
+        format: int32
+      - $ref: '#/components/schemas/I64'
+      - $ref: '#/components/schemas/I128'
+      - $ref: '#/components/schemas/I256'
       - type: boolean
       - $ref: '#/components/schemas/Address'
       - type: array

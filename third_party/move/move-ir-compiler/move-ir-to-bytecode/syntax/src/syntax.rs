@@ -5,11 +5,10 @@
 use crate::lexer::*;
 use anyhow::{anyhow, Context};
 use move_command_line_common::files::FileHash;
-use move_core_types::{account_address::AccountAddress, u256};
+use move_core_types::{account_address::AccountAddress, int256};
 use move_ir_types::{ast::*, location::*, spec_language_ast::*};
 use move_symbol_pool::Symbol;
 use std::{collections::BTreeSet, fmt, str::FromStr};
-
 // FIXME: The following simplified version of ParseError copied from
 // lalrpop-util should be replaced.
 
@@ -319,7 +318,7 @@ fn parse_copyable_val(tokens: &mut Lexer) -> Result<CopyableVal, ParseError<Loc,
             if s.ends_with("256") {
                 s = &s[..s.len() - 4]
             }
-            let i = u256::U256::from_str(s).unwrap();
+            let i = int256::U256::from_str(s).unwrap();
             tokens.advance()?;
             CopyableVal_::U256(i)
         },
