@@ -10,7 +10,7 @@ use crate::{
 };
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::{
-    config::{Identity, NodeConfig, PeerRole, RoleType},
+    config::{Identity, NodeConfig, PeerRole},
     network_id::{NetworkId, PeerNetworkId},
 };
 use aptos_crypto::{x25519::PrivateKey, Uniform};
@@ -125,9 +125,6 @@ pub trait NodeInfoTrait {
         PeerNetworkId::new(network_id, self.peer_id(network_id))
     }
 
-    /// `RoleType` of the `Node`
-    fn role(&self) -> RoleType;
-
     /// `PeerRole` for use in the upstream / downstream peers
     fn peer_role(&self) -> PeerRole;
 }
@@ -158,10 +155,6 @@ impl NodeInfoTrait for ValidatorNodeInfo {
             NetworkId::Vfn => self.vfn_peer_id,
             NetworkId::Public => panic!("Invalid network id for validator"),
         }
-    }
-
-    fn role(&self) -> RoleType {
-        RoleType::Validator
     }
 
     fn peer_role(&self) -> PeerRole {
@@ -197,10 +190,6 @@ impl NodeInfoTrait for ValidatorFullNodeInfo {
         }
     }
 
-    fn role(&self) -> RoleType {
-        RoleType::FullNode
-    }
-
     fn peer_role(&self) -> PeerRole {
         PeerRole::ValidatorFullNode
     }
@@ -229,10 +218,6 @@ impl NodeInfoTrait for FullNodeInfo {
         } else {
             panic!("Invalid network id for public full node")
         }
-    }
-
-    fn role(&self) -> RoleType {
-        RoleType::FullNode
     }
 
     fn peer_role(&self) -> PeerRole {
@@ -336,10 +321,6 @@ impl NodeInfoTrait for Node {
         self.node_info.peer_id(network_id)
     }
 
-    fn role(&self) -> RoleType {
-        self.node_info.role()
-    }
-
     fn peer_role(&self) -> PeerRole {
         self.node_info.peer_role()
     }
@@ -368,7 +349,7 @@ impl Node {
     }
 
     /// Retrieves a `CoreMempool`
-    pub fn mempool(&self) -> MutexGuard<CoreMempool> {
+    pub fn mempool(&self) -> MutexGuard<'_, CoreMempool> {
         self.mempool.lock()
     }
 

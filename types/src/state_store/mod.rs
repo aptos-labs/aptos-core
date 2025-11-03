@@ -80,15 +80,18 @@ pub trait TStateView {
     }
 
     /// Checks if a state keyed by the given state key exists in the hot state.
+    // TODO(HotState): not used.
     fn contains_hot_state_value(&self, _state_key: &Self::Key) -> bool {
         false
     }
 
     /// Number of free slots in hot state.
+    // TODO(HotState): not used.
     fn num_free_hot_slots(&self) -> [usize; NUM_STATE_SHARDS] {
         [0; NUM_STATE_SHARDS]
     }
 
+    // TODO(HotState): not used.
     fn get_shard_id(&self, _state_key: &Self::Key) -> usize {
         unimplemented!();
     }
@@ -100,6 +103,7 @@ pub trait TStateView {
     /// or `Some(None)` if the input key is already the newest.
     ///
     /// Returns `None` if the input key does not exist in hot state at all.
+    // TODO(HotState): not used.
     fn get_next_old_key(
         &self,
         _shard_id: usize,

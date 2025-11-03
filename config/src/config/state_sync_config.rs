@@ -10,6 +10,10 @@ use aptos_types::chain_id::ChainId;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
+// Whether to enable size and time-aware chunking (for non-production networks).
+// Note: once this becomes stable, we should enable it for all networks (e.g., Mainnet).
+const ENABLE_SIZE_AND_TIME_AWARE_CHUNKING: bool = true;
+
 // The maximum message size per state sync message
 const SERVER_MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
@@ -444,6 +448,8 @@ pub struct AptosDataClientConfig {
     pub max_transaction_output_chunk_size: u64,
     /// Timeout (in ms) when waiting for an optimistic fetch response
     pub optimistic_fetch_timeout_ms: u64,
+    /// The duration (in seconds) after which to panic if no progress has been made
+    pub progress_check_max_stall_time_secs: u64,
     /// First timeout (in ms) when waiting for a response
     pub response_timeout_ms: u64,
     /// Timeout (in ms) when waiting for a subscription response
@@ -470,8 +476,9 @@ impl Default for AptosDataClientConfig {
             max_subscription_lag_secs: 20, // 20 seconds
             max_transaction_chunk_size: MAX_TRANSACTION_CHUNK_SIZE,
             max_transaction_output_chunk_size: MAX_TRANSACTION_OUTPUT_CHUNK_SIZE,
-            optimistic_fetch_timeout_ms: 5000,        // 5 seconds
-            response_timeout_ms: 10_000,              // 10 seconds
+            optimistic_fetch_timeout_ms: 5000,         // 5 seconds
+            progress_check_max_stall_time_secs: 86400, // 24 hours (long enough to debug any issues at runtime)
+            response_timeout_ms: 10_000,               // 10 seconds
             subscription_response_timeout_ms: 15_000, // 15 seconds (longer than a regular timeout because of prefetching)
             use_compression: true,
         }
@@ -611,10 +618,11 @@ impl ConfigOptimizer for StorageServiceConfig {
         let storage_service_config = &mut node_config.state_sync.storage_service;
         let local_storage_config_yaml = &local_config_yaml["state_sync"]["storage_service"];
 
-        // Enable size and time-aware chunking for all networks except Mainnet
+        // Potentially enable size and time-aware chunking for all networks except Mainnet
         let mut modified_config = false;
         if let Some(chain_id) = chain_id {
-            if !chain_id.is_mainnet()
+            if ENABLE_SIZE_AND_TIME_AWARE_CHUNKING
+                && !chain_id.is_mainnet()
                 && local_storage_config_yaml["enable_size_and_time_aware_chunking"].is_null()
             {
                 storage_service_config.enable_size_and_time_aware_chunking = true;

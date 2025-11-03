@@ -1,0 +1,10 @@
+[package]
+name = "calculator"
+version = "0.0.0"
+
+[addresses]
+account = "_"
+
+[dependencies]
+AptosFramework = { local = "../../../framework/aptos-framework" }
+AptosStdlib = { local = "../../../framework/aptos-stdlib" }

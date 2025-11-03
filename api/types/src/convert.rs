@@ -916,6 +916,12 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             MoveTypeLayout::U64 => serde_json::from_value::<crate::U64>(val)?.into(),
             MoveTypeLayout::U128 => serde_json::from_value::<crate::U128>(val)?.into(),
             MoveTypeLayout::U256 => serde_json::from_value::<crate::U256>(val)?.into(),
+            MoveTypeLayout::I8 => I8(serde_json::from_value::<i8>(val)?),
+            MoveTypeLayout::I16 => I16(serde_json::from_value::<i16>(val)?),
+            MoveTypeLayout::I32 => I32(serde_json::from_value::<i32>(val)?),
+            MoveTypeLayout::I64 => serde_json::from_value::<crate::I64>(val)?.into(),
+            MoveTypeLayout::I128 => serde_json::from_value::<crate::I128>(val)?.into(),
+            MoveTypeLayout::I256 => serde_json::from_value::<crate::I256>(val)?.into(),
             MoveTypeLayout::Address => serde_json::from_value::<crate::Address>(val)?.into(),
             MoveTypeLayout::Vector(item_layout) => {
                 self.try_into_vm_value_vector(item_layout.as_ref(), val)?
@@ -1173,7 +1179,7 @@ pub trait AsConverter<R> {
         &self,
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
-    ) -> MoveConverter<R>;
+    ) -> MoveConverter<'_, R>;
 }
 
 impl<R: StateView> AsConverter<R> for R {
@@ -1181,7 +1187,7 @@ impl<R: StateView> AsConverter<R> for R {
         &self,
         db: Arc<dyn DbReader>,
         indexer_reader: Option<Arc<dyn IndexerReader>>,
-    ) -> MoveConverter<R> {
+    ) -> MoveConverter<'_, R> {
         MoveConverter::new(self, db, indexer_reader)
     }
 }

@@ -10,9 +10,9 @@ module 0xc0ffee::m {
         e: u64,
     }
     public fun main() {
-        let _t6 = sequential(Foo{a: 1, b: 2, c: 3, d: 4, e: 5});
-        let _t12 = Foo{a: 1, b: 2, c: 3, d: 4, e: 5};
-        if (!(_t6 == _t12)) abort 0;
+        let _v0 = sequential(Foo{a: 1, b: 2, c: 3, d: 4, e: 5});
+        let _v1 = Foo{a: 1, b: 2, c: 3, d: 4, e: 5};
+        assert!(_v0 == _v1, 0);
     }
     fun sequential(p0: Foo): Foo {
         p0

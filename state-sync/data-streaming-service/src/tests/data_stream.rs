@@ -3952,8 +3952,7 @@ fn get_pending_client_request(
 ) -> DataClientRequest {
     let (sent_requests, _) = data_stream.get_sent_requests_and_notifications();
     let pending_response = sent_requests.as_ref().unwrap().get(index).unwrap();
-    let client_request = pending_response.lock().client_request.clone();
-    client_request
+    pending_response.lock().client_request.clone()
 }
 
 /// Returns the subscription stream ID from the pending client request at the given index

@@ -150,6 +150,8 @@ pub struct P2PTransactionGenerator {
     sampler: Box<dyn Sampler<AccountAddress>>,
     invalid_transaction_ratio: usize,
     use_fa_transfer: bool,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 }
 
 impl P2PTransactionGenerator {
@@ -161,6 +163,8 @@ impl P2PTransactionGenerator {
         invalid_transaction_ratio: usize,
         use_fa_transfer: bool,
         sampler: Box<dyn Sampler<AccountAddress>>,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> Self {
         Self {
             rng,
@@ -170,6 +174,8 @@ impl P2PTransactionGenerator {
             sampler,
             invalid_transaction_ratio,
             use_fa_transfer,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         }
     }
 
@@ -179,14 +185,29 @@ impl P2PTransactionGenerator {
         to: &AccountAddress,
         num_coins: u64,
         txn_factory: &TransactionFactory,
+        rng: &mut impl Rng,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> SignedTransaction {
         from.sign_with_transaction_builder(
             if self.use_fa_transfer {
-                txn_factory.payload(aptos_stdlib::aptos_account_fungible_transfer_only(
-                    *to, num_coins,
-                ))
+                txn_factory
+                    .payload(aptos_stdlib::aptos_account_fungible_transfer_only(
+                        *to, num_coins,
+                    ))
+                    .upgrade_payload_with_rng(
+                        rng,
+                        use_txn_payload_v2_format,
+                        use_orderless_transactions,
+                    )
             } else {
-                txn_factory.payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
+                txn_factory
+                    .payload(aptos_stdlib::aptos_coin_transfer(*to, num_coins))
+                    .upgrade_payload_with_rng(
+                        rng,
+                        use_txn_payload_v2_format,
+                        use_orderless_transactions,
+                    )
             },
         )
     }
@@ -203,26 +224,48 @@ impl P2PTransactionGenerator {
         match Standard.sample(rng) {
             InvalidTransactionType::ChainId => {
                 let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                self.gen_single_txn(sender, receiver, self.send_amount, txn_factory)
+                self.gen_single_txn(
+                    sender,
+                    receiver,
+                    self.send_amount,
+                    txn_factory,
+                    rng,
+                    false,
+                    false,
+                )
             },
             InvalidTransactionType::Sender => self.gen_single_txn(
                 &invalid_account,
                 receiver,
                 self.send_amount,
                 &self.txn_factory,
+                rng,
+                false,
+                false,
             ),
             InvalidTransactionType::Receiver => self.gen_single_txn(
                 sender,
                 &invalid_address,
                 self.send_amount,
                 &self.txn_factory,
+                rng,
+                false,
+                false,
             ),
             InvalidTransactionType::Duplication => {
                 // if this is the first tx, default to generate invalid tx with wrong chain id
                 // otherwise, make a duplication of an exist valid tx
                 if reqs.is_empty() {
                     let txn_factory = &self.txn_factory.clone().with_chain_id(ChainId::new(255));
-                    self.gen_single_txn(sender, receiver, self.send_amount, txn_factory)
+                    self.gen_single_txn(
+                        sender,
+                        receiver,
+                        self.send_amount,
+                        txn_factory,
+                        rng,
+                        false,
+                        false,
+                    )
                 } else {
                     let random_index = rng.gen_range(0, reqs.len());
                     reqs[random_index].clone()
@@ -282,18 +325,22 @@ impl TransactionGenerator for P2PTransactionGenerator {
             receivers.len(),
             num_to_create
         );
+        let mut rng = self.rng.clone();
         for i in 0..num_to_create {
             let receiver = receivers.get(i).expect("all_addresses can't be empty");
             let request = if num_valid_tx > 0 {
                 num_valid_tx -= 1;
-                self.gen_single_txn(account, receiver, self.send_amount, &self.txn_factory)
-            } else {
-                self.generate_invalid_transaction(
-                    &mut self.rng.clone(),
+                self.gen_single_txn(
                     account,
                     receiver,
-                    &requests,
+                    self.send_amount,
+                    &self.txn_factory,
+                    &mut rng,
+                    self.use_txn_payload_v2_format,
+                    self.use_orderless_transactions,
                 )
+            } else {
+                self.generate_invalid_transaction(&mut rng, account, receiver, &requests)
             };
             requests.push(request);
         }
@@ -308,6 +355,8 @@ pub struct P2PTransactionGeneratorCreator {
     invalid_transaction_ratio: usize,
     use_fa_transfer: bool,
     sampling_mode: SamplingMode,
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
 }
 
 impl P2PTransactionGeneratorCreator {
@@ -318,6 +367,8 @@ impl P2PTransactionGeneratorCreator {
         invalid_transaction_ratio: usize,
         use_fa_transfer: bool,
         sampling_mode: SamplingMode,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     ) -> Self {
         let mut rng = StdRng::from_entropy();
         all_addresses.shuffle(&mut rng);
@@ -329,6 +380,8 @@ impl P2PTransactionGeneratorCreator {
             invalid_transaction_ratio,
             use_fa_transfer,
             sampling_mode,
+            use_txn_payload_v2_format,
+            use_orderless_transactions,
         }
     }
 }
@@ -350,6 +403,8 @@ impl TransactionGeneratorCreator for P2PTransactionGeneratorCreator {
             self.invalid_transaction_ratio,
             self.use_fa_transfer,
             sampler,
+            self.use_txn_payload_v2_format,
+            self.use_orderless_transactions,
         ))
     }
 }

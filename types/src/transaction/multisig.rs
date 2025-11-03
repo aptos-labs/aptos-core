@@ -44,7 +44,7 @@ impl Multisig {
         }
     }
 
-    pub fn as_transaction_executable_ref(&self) -> TransactionExecutableRef {
+    pub fn as_transaction_executable_ref(&self) -> TransactionExecutableRef<'_> {
         match &self.transaction_payload {
             Some(MultisigTransactionPayload::EntryFunction(entry)) => {
                 TransactionExecutableRef::EntryFunction(entry)

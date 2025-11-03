@@ -6,10 +6,10 @@ module 0x42::m {
         data: vector<u8>,
     }
     public fun new_scalar_from_u8(p0: u8): Scalar {
-        let _t1 = scalar_zero();
-        let _t2 = 0x1::vector::borrow_mut<u8>(&mut (&mut _t1).data, 0);
-        *_t2 = p0;
-        _t1
+        let _v0 = scalar_zero();
+        let _v1 = 0x1::vector::borrow_mut<u8>(&mut (&mut _v0).data, 0);
+        *_v1 = p0;
+        _v0
     }
     public fun scalar_zero(): Scalar {
         Scalar{data: vector[0u8]}

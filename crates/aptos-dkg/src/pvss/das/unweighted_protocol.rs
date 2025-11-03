@@ -6,20 +6,25 @@ use crate::{
     pvss,
     pvss::{
         contribution::{batch_verify_soks, Contribution, SoK},
-        das, encryption_dlog, fiat_shamir, schnorr, traits,
+        das,
+        das::fiat_shamir,
+        encryption_dlog, schnorr, traits,
         traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
-        LowDegreeTest, Player, ThresholdConfig,
+        LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
     utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing,
+        g1_multi_exp, g2_multi_exp,
         random::{
             insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_g2_point,
-            random_scalar,
         },
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381,
+    blstrs::{multi_pairing, random_scalar},
+    CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;
@@ -29,7 +34,6 @@ use std::ops::{Add, Mul, Neg, Sub};
 pub const DAS_SK_IN_G1: &'static str = "das_sk_in_g1";
 
 /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
-const DAS_PVSS_FIAT_SHAMIR_DST: &[u8; 30] = b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, BCSCryptoHash, CryptoHasher)]
 #[allow(non_snake_case)]
@@ -80,9 +84,13 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = ThresholdConfig;
+    type SecretSharingConfig = ThresholdConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
+
+    fn dst() -> Vec<u8> {
+        b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         DAS_SK_IN_G1.to_string()
@@ -167,16 +175,8 @@ impl traits::Transcript for Transcript {
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         // TODO: benchmark this
-        let (f, extra) = fiat_shamir::fiat_shamir(
-            self,
-            sc,
-            pp,
-            spks,
-            eks,
-            auxs,
-            &DAS_PVSS_FIAT_SHAMIR_DST[..],
-            2,
-        );
+        let (f, extra) =
+            fiat_shamir::derive_challenge_scalars(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();

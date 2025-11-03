@@ -53,6 +53,73 @@ module 0xc0ffee::m {
     public fun test5(x: u8): bool {
         apply(|x| x > U8_MAX, x)
     }
+
+    public fun test6(x: i8) {
+        if (x + 1 > 127) { bar() };
+    }
+
+    public fun test7(x: &i8, y: &i8) {
+        if ((*x + *y > 127) == true) { bar() };
+    }
+
+        // 8-bit
+    const I8_MIN: i8 = -128;
+    const I8_MAX: i8 = 127;
+
+    // 16-bit
+    const I16_MIN: i16 = -32768;
+    const I16_MAX: i16 = 32767;
+
+    // 32-bit
+    const I32_MIN: i32 = -2147483648;
+    const I32_MAX: i32 = 2147483647;
+
+    // 64-bit
+    const I64_MIN: i64 = -9223372036854775808;
+    const I64_MAX: i64 = 9223372036854775807;
+
+    // 128-bit
+    const I128_MIN: i128 = -170141183460469231731687303715884105728;
+    const I128_MAX: i128 = 170141183460469231731687303715884105727;
+
+    // 256-bit (custom / nonstandard)
+    const I256_MIN: i256 = -57896044618658097711785492504343953926634992332820282019728792003956564819968;
+    const I256_MAX: i256 = 57896044618658097711785492504343953926634992332820282019728792003956564819967;
+
+    public fun test8(x: i8) {
+        if (x < I8_MIN || I8_MIN > x) { bar() };
+        if (foo(x) <= I8_MIN) { bar() };
+        if (I8_MIN >= foo(x)) { bar() };
+        if (foo(x) > I8_MIN) { bar() };
+        if (I8_MIN < foo(x)) { bar() };
+        if (foo(x) >= I8_MIN) { bar() };
+        if (I8_MIN <= foo(x)) { bar() };
+    }
+
+    public fun test9(a: i8, b: i16, c: i32, d: i64, e: i128, f: i256) {
+        if (a > I8_MAX) { bar() };
+        if (b >= I16_MAX) { bar() };
+        if (I32_MAX < c) { bar() };
+        if (I64_MAX <= d) { bar() };
+        if (e < I128_MAX) { bar() };
+        if (f <= I256_MAX) { bar() };
+        if (I256_MAX >= f) { bar() };
+        if (I128_MAX > e) { bar() };
+        spec {
+            assert a <= I8_MAX;
+        }
+    }
+
+    // simulate `abs`
+    public fun test_abs(x: i64): i64 {
+        // should not warn for `x >= 0`
+        if (x >= 0) {
+            x
+        } else {
+            -x
+        }
+    }
+
 }
 
 module 0xc0ffee::no_warn {

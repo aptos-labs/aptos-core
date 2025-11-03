@@ -64,7 +64,7 @@ impl TransactionStore {
         min_seq_num: u64,
         num_versions: u64,
         ledger_version: Version,
-    ) -> Result<AccountOrderedTransactionsIter> {
+    ) -> Result<AccountOrderedTransactionsIter<'_>> {
         let mut iter = self
             .ledger_db
             .transaction_db_raw()
@@ -88,7 +88,7 @@ impl TransactionStore {
         end_version: Option<u64>,
         limit: u64,
         ledger_version: Version,
-    ) -> Result<AccountTransactionSummariesIter> {
+    ) -> Result<AccountTransactionSummariesIter<'_>> {
         // Question[Orderless]: When start version is specified, we are current scanning forward from start version.
         // When start version is not specified we are scanning backward, so as to return the most recent transactions.
         // This doesn't seem to be a good design. Should we instead let the API take scan direction as input?

@@ -1219,6 +1219,36 @@ impl ExpData {
         called
     }
 
+    /// Returns the Move functions called by this expression, along with call sites and their
+    /// loop depth.
+    pub fn called_funs_with_callsites_and_loop_depth(
+        &self,
+    ) -> BTreeMap<QualifiedId<FunId>, BTreeSet<(NodeId, usize)>> {
+        let mut called: BTreeMap<_, BTreeSet<_>> = BTreeMap::new();
+        let mut loop_depth = 0;
+        let mut visitor = |post: bool, e: &ExpData| {
+            match e {
+                ExpData::Loop(..) => {
+                    if post {
+                        loop_depth -= 1
+                    } else {
+                        loop_depth += 1
+                    }
+                },
+                ExpData::Call(node_id, Operation::MoveFunction(mid, fid), _) if !post => {
+                    called
+                        .entry(mid.qualified(*fid))
+                        .or_default()
+                        .insert((*node_id, loop_depth));
+                },
+                _ => {},
+            }
+            true // keep going
+        };
+        self.visit_pre_post(&mut visitor);
+        called
+    }
+
     /// Returns true if the given expression contains a `continue` or
     /// `break` which refers to a loop in the given `nest_range`.
     /// For example, `branches_to(loop { break }, 1..10)` will return false,
@@ -1949,6 +1979,7 @@ pub enum Operation {
     // Unary operators
     Not,
     Cast,
+    Negate,
 
     // Builtin functions (impl and spec)
     Exists(Option<MemoryLabel>),
@@ -2422,7 +2453,7 @@ impl PatDisplay<'_> {
         Self { show_type, ..self }
     }
 
-    fn type_ctx(&self) -> TypeDisplayContext {
+    fn type_ctx(&self) -> TypeDisplayContext<'_> {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {
@@ -2769,7 +2800,8 @@ impl Operation {
 
             // Unary operators
             Not => true,
-            Cast => false, // can overflow
+            Cast => false,   // can overflow
+            Negate => false, // can overflow
 
             // Builtin functions (impl and spec)
             Exists(..) => false, // Spec
@@ -3031,6 +3063,14 @@ pub struct ModuleName(Address, Symbol);
 impl ModuleName {
     pub fn new(addr: Address, name: Symbol) -> ModuleName {
         ModuleName(addr, name)
+    }
+
+    /// Returns builtin module name.
+    pub fn builtin_module(env: &GlobalEnv) -> Self {
+        Self::new(
+            Address::Numerical(AccountAddress::ZERO),
+            env.symbol_pool().make("$$"),
+        )
     }
 
     pub fn from_address_bytes_and_name(
@@ -3498,7 +3538,7 @@ fn indent(fmt: impl fmt::Display) -> String {
 }
 
 impl ExpDisplay<'_> {
-    fn type_ctx(&self) -> TypeDisplayContext {
+    fn type_ctx(&self) -> TypeDisplayContext<'_> {
         if let Some(fe) = &self.fun_env {
             fe.get_type_display_ctx()
         } else {

@@ -2,18 +2,26 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    cached_resources::CachedResources,
-    groth16_vk::OnChainGroth16VerificationKey,
-    jwk::JWKCache,
-    keyless_config::OnChainKeylessConfiguration,
+    deployment_information::DeploymentInformation,
+    external_resources::{
+        groth16_vk::OnChainGroth16VerificationKey, jwk_fetcher::JWKCache,
+        keyless_config::OnChainKeylessConfiguration, resource_fetcher::CachedResources,
+    },
     request_handler::{
-        handle_request, ABOUT_PATH, DEFAULT_PEPPER_SERVICE_PORT, FETCH_PATH, GROTH16_VK_PATH,
-        JWK_PATH, KEYLESS_CONFIG_PATH, SIGNATURE_PATH, VERIFY_PATH, VUF_PUB_KEY_PATH,
+        handle_request, ABOUT_PATH, DEFAULT_PEPPER_SERVICE_PORT, DELEGATED_FETCH_PATH, FETCH_PATH,
+        GROTH16_VK_PATH, JWK_PATH, KEYLESS_CONFIG_PATH, SIGNATURE_PATH, VERIFY_PATH,
+        VUF_PUB_KEY_PATH,
     },
     tests::utils,
+    vuf_keypair::VUFKeypair,
+};
+use aptos_crypto::{
+    ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    Uniform,
 };
 use aptos_infallible::Mutex;
-use aptos_types::jwks::rsa::SECURE_TEST_RSA_JWK;
+use aptos_keyless_pepper_common::{PepperRequest, PepperRequestV2, PepperRequestWithAudOverride};
+use aptos_types::{jwks::rsa::SECURE_TEST_RSA_JWK, transaction::authenticator::EphemeralPublicKey};
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_HEADERS, ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN,
@@ -27,7 +35,7 @@ use std::{collections::HashMap, ops::Deref, sync::Arc};
 async fn test_options_request() {
     // Send an options request to the root path
     let response =
-        send_request_to_path(Method::OPTIONS, "/", Body::empty(), None, None, None).await;
+        send_request_to_path(Method::OPTIONS, "/", Body::empty(), None, None, None, None).await;
 
     // Assert that the response status is OK
     assert_eq!(response.status(), StatusCode::OK);
@@ -48,9 +56,25 @@ async fn test_options_request() {
 
 #[tokio::test]
 async fn test_get_about_request() {
+    // Create a new deployment information object
+    let mut deployment_information = DeploymentInformation::new();
+
+    // Insert a test entry into the deployment information
+    let test_key = "test_key".to_string();
+    let test_value = "test_value".to_string();
+    deployment_information.extend_deployment_information(test_key.clone(), test_value.clone());
+
     // Send a GET request to the about endpoint
-    let response =
-        send_request_to_path(Method::GET, ABOUT_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::GET,
+        ABOUT_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        Some(deployment_information),
+    )
+    .await;
 
     // Assert that the response status is OK
     assert_eq!(response.status(), StatusCode::OK);
@@ -64,12 +88,15 @@ async fn test_get_about_request() {
     assert!(json_map.contains_key("build_cargo_version"));
     assert!(json_map.contains_key("build_commit_hash"));
     assert!(json_map.contains_key("build_is_release_build"));
+
+    // Verify the test entry is present in the response body
+    assert_eq!(json_map.get(&test_key).unwrap(), test_value.as_str());
 }
 
 #[tokio::test]
 async fn test_get_groth16_vk_request() {
     // Create a cached resources object with no cached resources
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Send a GET request to the groth16 vk endpoint
     let response = send_request_to_path(
@@ -79,6 +106,7 @@ async fn test_get_groth16_vk_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -97,6 +125,7 @@ async fn test_get_groth16_vk_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -121,6 +150,7 @@ async fn test_get_groth16_vk_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -146,6 +176,7 @@ async fn test_get_jwk_request() {
         Body::empty(),
         None,
         Some(jwk_cache.clone()),
+        None,
         None,
     )
     .await;
@@ -182,6 +213,7 @@ async fn test_get_jwk_request() {
         None,
         Some(jwk_cache.clone()),
         None,
+        None,
     )
     .await;
 
@@ -210,7 +242,7 @@ async fn test_get_jwk_request() {
 #[tokio::test]
 async fn test_get_keyless_config_request() {
     // Create a cached resources object with no cached resources
-    let cached_resources = CachedResources::default();
+    let cached_resources = CachedResources::new_for_testing();
 
     // Send a GET request to the keyless config endpoint
     let response = send_request_to_path(
@@ -220,6 +252,7 @@ async fn test_get_keyless_config_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -238,6 +271,7 @@ async fn test_get_keyless_config_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -262,6 +296,7 @@ async fn test_get_keyless_config_request() {
         None,
         None,
         Some(cached_resources.clone()),
+        None,
     )
     .await;
 
@@ -278,7 +313,7 @@ async fn test_get_keyless_config_request() {
 #[tokio::test]
 async fn test_get_vuf_pub_key_request() {
     // Generate a test VUF public private keypair
-    let vuf_keypair = utils::create_vuf_public_private_keypair();
+    let vuf_keypair = utils::create_vuf_keypair(None);
 
     // Send a GET request to the vuf public key endpoint
     let response = send_request_to_path(
@@ -286,6 +321,7 @@ async fn test_get_vuf_pub_key_request() {
         VUF_PUB_KEY_PATH,
         Body::empty(),
         Some(vuf_keypair.clone()),
+        None,
         None,
         None,
     )
@@ -299,8 +335,7 @@ async fn test_get_vuf_pub_key_request() {
     let response_vuf_public_key = get_public_key_from_json(&body_string);
 
     // Get the expected public key from the keypair
-    let (vuf_public_key_json, _) = vuf_keypair.deref();
-    let vuf_public_key = get_public_key_from_json(vuf_public_key_json);
+    let vuf_public_key = get_public_key_from_json(vuf_keypair.vuf_public_key_json());
 
     // Verify the public key is correct
     assert_eq!(response_vuf_public_key, vuf_public_key);
@@ -316,33 +351,166 @@ async fn test_get_invalid_path_or_method_request() {
         None,
         None,
         None,
+        None,
     )
     .await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
 
     // Send a GET request to an endpoint that only supports POST requests, and verify that it returns 405
-    let response =
-        send_request_to_path(Method::GET, VERIFY_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::GET,
+        VERIFY_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 
     // Send a POST request to an endpoint that only supports GET requests, and verify that it returns 405
-    let response =
-        send_request_to_path(Method::POST, ABOUT_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::POST,
+        ABOUT_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
     assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
 }
 
-// TODO: add tests that check the fetch logic
 #[tokio::test]
-async fn test_post_fetch_request_bad_request() {
-    // Send a POST request to the fetch endpoint
-    let response =
-        send_request_to_path(Method::POST, FETCH_PATH, Body::empty(), None, None, None).await;
+async fn test_post_delegated_fetch_request_bad_request() {
+    // Send a POST request to the delegated fetch endpoint
+    let response = send_request_to_path(
+        Method::POST,
+        DELEGATED_FETCH_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
 
     // Assert that the response is a 400 (bad request, since no body was provided)
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-// TODO: add tests that check the signature logic
+#[tokio::test]
+async fn test_post_delegated_fetch_request_invalid_jwt() {
+    // Create a cached resources object
+    let cached_resources = CachedResources::new_for_testing();
+
+    // Update the keyless config cached resource
+    let mut on_chain_keyless_configuration = OnChainKeylessConfiguration::default();
+    on_chain_keyless_configuration.data.max_exp_horizon_secs = "0".into();
+    cached_resources.set_on_chain_keyless_configuration(on_chain_keyless_configuration.clone());
+
+    // Create a pepper request with an invalid JWT
+    let pepper_request = PepperRequest {
+        jwt: "invalid_jwt".into(),
+        epk: create_ephemeral_public_key(),
+        exp_date_secs: 0,
+        epk_blinder: vec![0u8; 32],
+        uid_key: None,
+        derivation_path: None,
+    };
+    let pepper_request_v2 = PepperRequestV2::RequestWithAudOverride(PepperRequestWithAudOverride {
+        aud_override: "0".into(),
+        pepper_request,
+    });
+
+    // Serialize the pepper request to JSON
+    let request_body = serde_json::to_vec(&pepper_request_v2).unwrap();
+
+    // Send a POST request to the delegated fetch endpoint
+    let body = Body::from(request_body);
+    let response = send_request_to_path(
+        Method::POST,
+        DELEGATED_FETCH_PATH,
+        body,
+        None,
+        None,
+        Some(cached_resources),
+        None,
+    )
+    .await;
+
+    // Assert that the response is a 500 (bad request, since an invalid JWT was provided)
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    // Assert that the response body contains an error message
+    let body_string = get_response_body_string(response).await;
+    assert!(body_string.contains("JWT decoding error"));
+}
+
+#[tokio::test]
+async fn test_post_fetch_request_bad_request() {
+    // Send a POST request to the fetch endpoint
+    let response = send_request_to_path(
+        Method::POST,
+        FETCH_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
+
+    // Assert that the response is a 400 (bad request, since no body was provided)
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn test_post_fetch_request_invalid_jwt() {
+    // Create a cached resources object
+    let cached_resources = CachedResources::new_for_testing();
+
+    // Update the keyless config cached resource
+    let mut on_chain_keyless_configuration = OnChainKeylessConfiguration::default();
+    on_chain_keyless_configuration.data.max_exp_horizon_secs = "0".into();
+    cached_resources.set_on_chain_keyless_configuration(on_chain_keyless_configuration.clone());
+
+    // Create a pepper request with an invalid JWT
+    let pepper_request = PepperRequest {
+        jwt: "invalid_jwt".into(),
+        epk: create_ephemeral_public_key(),
+        exp_date_secs: 0,
+        epk_blinder: vec![0u8; 32],
+        uid_key: None,
+        derivation_path: None,
+    };
+
+    // Serialize the pepper request to JSON
+    let request_body = serde_json::to_vec(&pepper_request).unwrap();
+
+    // Send a POST request to the fetch endpoint
+    let body = Body::from(request_body);
+    let response = send_request_to_path(
+        Method::POST,
+        FETCH_PATH,
+        body,
+        None,
+        None,
+        Some(cached_resources),
+        None,
+    )
+    .await;
+
+    // Assert that the response is a 500 (bad request, since an invalid JWT was provided)
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    // Assert that the response body contains an error message
+    let body_string = get_response_body_string(response).await;
+    assert!(body_string.contains("JWT decoding error"));
+}
+
 #[tokio::test]
 async fn test_post_signature_request_bad_request() {
     // Send a POST request to the signature endpoint
@@ -353,6 +521,7 @@ async fn test_post_signature_request_bad_request() {
         None,
         None,
         None,
+        None,
     )
     .await;
 
@@ -360,15 +529,30 @@ async fn test_post_signature_request_bad_request() {
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
 }
 
-// TODO: add tests that check the verify logic
 #[tokio::test]
 async fn test_post_verify_request_bad_request() {
     // Send a POST request to the verify endpoint
-    let response =
-        send_request_to_path(Method::POST, VERIFY_PATH, Body::empty(), None, None, None).await;
+    let response = send_request_to_path(
+        Method::POST,
+        VERIFY_PATH,
+        Body::empty(),
+        None,
+        None,
+        None,
+        None,
+    )
+    .await;
 
     // Assert that the response is a 400 (bad request, since no body was provided)
     assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+}
+
+/// Creates and returns an ephemeral public key for testing purposes
+fn create_ephemeral_public_key() -> EphemeralPublicKey {
+    let private_key = Ed25519PrivateKey::generate_for_testing();
+    let public_key = Ed25519PublicKey::from(&private_key);
+
+    EphemeralPublicKey::Ed25519 { public_key }
 }
 
 /// Gets the public key from a JSON string map
@@ -390,9 +574,10 @@ async fn send_request_to_path(
     method: Method,
     endpoint: &str,
     body: Body,
-    vuf_keypair: Option<Arc<(String, ark_bls12_381::Fr)>>,
+    vuf_keypair: Option<Arc<VUFKeypair>>,
     jwk_cache: Option<JWKCache>,
     cached_resources: Option<CachedResources>,
+    deployment_information: Option<DeploymentInformation>,
 ) -> Response<Body> {
     // Build the URI
     let uri = format!(
@@ -408,16 +593,33 @@ async fn send_request_to_path(
         .unwrap();
 
     // Get or create a VUF public private keypair
-    let vuf_keypair = vuf_keypair.unwrap_or_else(utils::create_vuf_public_private_keypair);
+    let vuf_keypair = vuf_keypair.unwrap_or_else(|| utils::create_vuf_keypair(None));
 
     // Get or create a JWK cache
     let jwk_cache = jwk_cache.unwrap_or_else(|| Arc::new(Mutex::new(HashMap::new())));
 
     // Get or create cached resources
-    let cached_resources = cached_resources.unwrap_or_default();
+    let cached_resources = cached_resources.unwrap_or(CachedResources::new_for_testing());
+
+    // Create the account recovery managers
+    let account_recovery_managers = utils::get_empty_account_recovery_managers();
+
+    // Create the mock account recovery DB
+    let account_recovery_db = utils::get_mock_account_recovery_db();
+
+    // Get or create deployment information
+    let deployment_information = deployment_information.unwrap_or_default();
 
     // Serve the request
-    handle_request(request, vuf_keypair, jwk_cache, cached_resources)
-        .await
-        .unwrap()
+    handle_request(
+        request,
+        vuf_keypair,
+        jwk_cache,
+        cached_resources,
+        account_recovery_managers,
+        account_recovery_db,
+        deployment_information,
+    )
+    .await
+    .unwrap()
 }

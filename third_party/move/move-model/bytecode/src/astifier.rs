@@ -154,14 +154,14 @@ pub fn generate_ast_raw(target: &FunctionTarget) -> Option<Exp> {
     ctx.compute_loop_info(&fat_loop_info);
 
     // Create the generator and run it.
-    let mut gen = Generator {
+    let mut r#gen = Generator {
         block_stack: vec![],
         unreached_labels,
         used_labels: BTreeSet::new(),
         current_attr: None,
         block_order: BTreeMap::new(),
     };
-    Some(gen.gen(&ctx))
+    Some(r#gen.r#gen(&ctx))
 }
 
 // -------------------------------------------------------------------------------------------
@@ -502,7 +502,7 @@ impl<'a> Context<'a> {
 
 impl Generator {
     /// Run the generator.
-    fn gen(&mut self, ctx: &Context) -> Exp {
+    fn r#gen(&mut self, ctx: &Context) -> Exp {
         let mut blocks = ctx.forward_cfg.blocks();
         // Sort blocks topologically.
         self.sort_blocks(ctx, &mut blocks);
@@ -651,7 +651,7 @@ impl Generator {
                     top_sort.add_dependency(min, other)
                 }
             }
-            debug_assert_eq!(min, top_sort.pop().expect("expected order consistent"));
+            assert_eq!(min, top_sort.pop().expect("expected order consistent"));
             blocks.push(min);
         }
         assert!(top_sort.is_empty(), "unexpected cycle in forward jumps");
@@ -1173,7 +1173,8 @@ impl Generator {
                 self.gen_call_stm(ctx, None, dests, Operation::Freeze(*explicit), srcs)
             },
             Vector => self.gen_call_stm(ctx, None, dests, Operation::Vector, srcs),
-            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 => {
+            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | CastI8 | CastI16
+            | CastI32 | CastI64 | CastI128 | CastI256 => {
                 self.gen_call_stm(ctx, None, dests, Operation::Cast, srcs)
             },
             Not => self.gen_call_stm(ctx, None, dests, Operation::Not, srcs),
@@ -1195,6 +1196,7 @@ impl Generator {
             And => self.gen_call_stm(ctx, None, dests, Operation::And, srcs),
             Eq => self.gen_call_stm(ctx, None, dests, Operation::Eq, srcs),
             Neq => self.gen_call_stm(ctx, None, dests, Operation::Neq, srcs),
+            Negate => self.gen_call_stm(ctx, None, dests, Operation::Negate, srcs),
 
             OpaqueCallBegin(_, _, _)
             | OpaqueCallEnd(_, _, _)
@@ -2191,7 +2193,7 @@ impl AssignTransformer<'_> {
         // If there are no statements after the assignment, or
         // if the target var is used immediately after its assignment, we can safely simplify it.
         // While this seems to be hacky, it is very effective in reducing compiler-introduced temp vars.
-        if stmts.first().map_or(true, |first_exp| {
+        if stmts.first().is_none_or(|first_exp| {
             Self::used_immediately(
                 target_var,
                 &self.builder.unfold(substitution, first_exp.clone()),
@@ -2249,7 +2251,7 @@ impl AssignTransformer<'_> {
             ExpData::Assign(_, _, rhs) => Self::used_immediately(target_var, rhs, rhs_safe),
             ExpData::Sequence(_, stmts) => stmts
                 .first()
-                .map_or(false, |e| Self::used_immediately(target_var, e, rhs_safe)),
+                .is_some_and(|e| Self::used_immediately(target_var, e, rhs_safe)),
             ExpData::Block(_, _, bind, body) => {
                 if let Some(bind) = bind {
                     // If there is a binding, we check the bind
@@ -2268,12 +2270,13 @@ impl AssignTransformer<'_> {
                 | Operation::Borrow(_)
                 | Operation::Deref
                 | Operation::Not
+                | Operation::Negate
                 | Operation::Cast
                 | Operation::Select(_, _, _)
                 | Operation::SelectVariants(_, _, _)
                 | Operation::TestVariants(_, _, _) => args
                     .first()
-                    .map_or(false, |e| Self::used_immediately(target_var, e, rhs_safe)),
+                    .is_some_and(|e| Self::used_immediately(target_var, e, rhs_safe)),
                 // Operations with two arguments
                 Operation::Add
                 | Operation::Copy
@@ -2294,7 +2297,7 @@ impl AssignTransformer<'_> {
                 | Operation::Lt
                 | Operation::Gt
                 | Operation::Le
-                | Operation::Ge => args.first().zip(args.get(1)).map_or(false, |(op1, op2)| {
+                | Operation::Ge => args.first().zip(args.get(1)).is_some_and(|(op1, op2)| {
                     // Safe to assume immediate reuse if:
                     // - the target variable is used in the first argument, OR
                     // - the target variable is used in the second argument, but both the first argument and the RHS have no side effects.
@@ -2461,7 +2464,7 @@ impl<'a> FreeVariableBinder<'a> {
     fn all_usage_contained(&self, target_var: Symbol, local_var_usage: &BTreeSet<NodeId>) -> bool {
         self.usage
             .get(&target_var)
-            .map_or(true, |global_usage| *global_usage == *local_var_usage)
+            .is_none_or(|global_usage| *global_usage == *local_var_usage)
     }
 
     /// Given a sequence of statements and a list of free vars that can be safely bound to the sequence,
@@ -2671,7 +2674,7 @@ impl UsageInfo {
 
     /// Check if a var is read in the given range of expressions
     fn only_read_in_range(&self, var: &Symbol, range: &[Exp]) -> bool {
-        self.reads.get(var).map_or(true, |read_set| {
+        self.reads.get(var).is_none_or(|read_set| {
             read_set.iter().all(|reader| {
                 // Check if every read of the variable is by some expression in the range
                 range.iter().any(|exp| exp.node_ids().contains(reader))

@@ -278,7 +278,7 @@ impl<'cfg, F: Factory> Forge<'cfg, F> {
             // The genesis version should always match the initial node version
             let genesis_version = initial_version.clone();
             let runtime = Runtime::new().unwrap(); // TODO: new multithreaded?
-            let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.gen());
+            let mut rng = ::rand::rngs::StdRng::from_seed(OsRng.r#gen());
             let mut swarm = runtime.block_on(self.factory.launch_swarm(
                 &mut rng,
                 self.tests.initial_validator_count,
@@ -417,34 +417,48 @@ mod test {
         let original_kubernetes_service_host = std::env::var(KUBERNETES_SERVICE_HOST);
 
         // Test the default locally
-        std::env::remove_var(FORGE_RUNNER_MODE);
-        std::env::remove_var(KUBERNETES_SERVICE_HOST);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var(FORGE_RUNNER_MODE) };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var(KUBERNETES_SERVICE_HOST) };
         let default_local_runner_mode = ForgeRunnerMode::try_from_env();
 
-        std::env::remove_var(FORGE_RUNNER_MODE);
-        std::env::set_var(KUBERNETES_SERVICE_HOST, "1.1.1.1");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var(FORGE_RUNNER_MODE) };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var(KUBERNETES_SERVICE_HOST, "1.1.1.1") };
         let default_kubernetes_runner_mode = ForgeRunnerMode::try_from_env();
 
-        std::env::set_var(FORGE_RUNNER_MODE, "local");
-        std::env::set_var(KUBERNETES_SERVICE_HOST, "1.1.1.1");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var(FORGE_RUNNER_MODE, "local") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var(KUBERNETES_SERVICE_HOST, "1.1.1.1") };
         let local_runner_mode = ForgeRunnerMode::try_from_env();
 
-        std::env::set_var(FORGE_RUNNER_MODE, "k8s");
-        std::env::remove_var(KUBERNETES_SERVICE_HOST);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var(FORGE_RUNNER_MODE, "k8s") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var(KUBERNETES_SERVICE_HOST) };
         let k8s_runner_mode = ForgeRunnerMode::try_from_env();
 
-        std::env::set_var(FORGE_RUNNER_MODE, "durian");
-        std::env::remove_var(KUBERNETES_SERVICE_HOST);
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::set_var(FORGE_RUNNER_MODE, "durian") };
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe { std::env::remove_var(KUBERNETES_SERVICE_HOST) };
         let invalid_runner_mode = ForgeRunnerMode::try_from_env();
 
         // Reset the env variables after running
         match original_forge_runner_mode {
-            Ok(mode) => std::env::set_var(FORGE_RUNNER_MODE, mode),
-            Err(_) => std::env::remove_var(FORGE_RUNNER_MODE),
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            Ok(mode) => unsafe { std::env::set_var(FORGE_RUNNER_MODE, mode) },
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            Err(_) => unsafe { std::env::remove_var(FORGE_RUNNER_MODE) },
         }
         match original_kubernetes_service_host {
-            Ok(service_host) => std::env::set_var(KUBERNETES_SERVICE_HOST, service_host),
-            Err(_) => std::env::remove_var(KUBERNETES_SERVICE_HOST),
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            Ok(service_host) => unsafe { std::env::set_var(KUBERNETES_SERVICE_HOST, service_host) },
+            // TODO: Audit that the environment access only happens in single-threaded code.
+            Err(_) => unsafe { std::env::remove_var(KUBERNETES_SERVICE_HOST) },
         }
 
         assert_eq!(default_local_runner_mode.unwrap(), ForgeRunnerMode::Local);

@@ -28,7 +28,7 @@ use move_core_types::{
 };
 use move_resource_viewer::MoveValueAnnotator;
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::MoveVM,
@@ -118,6 +118,7 @@ impl TestRunner {
         native_function_table: Option<NativeFunctionTable>,
         genesis_state: Option<ChangeSet>,
         record_writeset: bool,
+        enable_enum_option: bool,
     ) -> Result<Self> {
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
@@ -125,7 +126,10 @@ impl TestRunner {
                 move_stdlib::natives::GasParameters::zeros(),
             )
         });
-        let runtime_environment = RuntimeEnvironment::new(native_function_table);
+        let runtime_environment = RuntimeEnvironment::new_for_move_third_party_tests(
+            native_function_table,
+            enable_enum_option,
+        );
 
         let source_files = tests
             .files
@@ -248,7 +252,7 @@ impl SharedTestingConfig {
         factory: &Mutex<F>,
     ) -> (
         VMResult<ChangeSet>,
-        VMResult<NativeContextExtensions>,
+        VMResult<NativeContextExtensions<'_>>,
         VMResult<Vec<Vec<u8>>>,
         TestRunInfo,
     ) {
@@ -279,12 +283,15 @@ impl SharedTestingConfig {
                     MoveVM::execute_loaded_function(
                         function,
                         args,
-                        &mut data_cache,
+                        &mut MoveVmDataCacheAdapter::new(
+                            &mut data_cache,
+                            &self.starting_storage_state,
+                            &loader,
+                        ),
                         &mut gas_meter,
                         &mut traversal_context,
                         &mut extensions,
                         &loader,
-                        &self.starting_storage_state,
                     )
                 })
         });

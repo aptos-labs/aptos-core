@@ -8,7 +8,7 @@ use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,
     combinatorial_tests::{
         baseline::BaselineOutput,
-        mock_executor::{MockOutput, MockTask},
+        mock_executor::MockTask,
         types::{KeyType, MockTransaction, TransactionGen, TransactionGenParams},
     },
     executor::BlockExecutor,
@@ -141,7 +141,7 @@ where
             MockTransaction<KeyType<K>, E>,
             MockTask<KeyType<K>, E>,
             MockStateView<KeyType<K>>,
-            NoOpTransactionCommitHook<MockOutput<KeyType<K>, E>, usize>,
+            NoOpTransactionCommitHook<usize>,
             DefaultTxnProvider<MockTransaction<KeyType<K>, E>, AuxiliaryInfo>,
             AuxiliaryInfo,
         >::new(config, executor_thread_pool, None)

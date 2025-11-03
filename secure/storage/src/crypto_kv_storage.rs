@@ -113,7 +113,7 @@ impl<T: CryptoKVStorage> CryptoStorage for T {
 /// Private helper method to generate a new ed25519 key pair using entropy from the OS.
 fn new_ed25519_key_pair() -> (Ed25519PrivateKey, Ed25519PublicKey) {
     let mut seed_rng = OsRng;
-    let mut rng = rand::rngs::StdRng::from_seed(seed_rng.gen());
+    let mut rng = rand::rngs::StdRng::from_seed(seed_rng.r#gen());
     let private_key = Ed25519PrivateKey::generate(&mut rng);
     let public_key = private_key.public_key();
     (private_key, public_key)

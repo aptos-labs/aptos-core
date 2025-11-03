@@ -27,7 +27,7 @@ where
 /// Create an endpoint to serve the OpenAPI specification as json. We define this
 /// ourselves because we need to use our custom `get_spec` function that changes the
 /// spec to remove charset from the content type.
-pub fn spec_endpoint_json<T, W>(service: &OpenApiService<T, W>) -> impl Endpoint
+pub fn spec_endpoint_json<T, W>(service: &OpenApiService<T, W>) -> impl Endpoint + use<T, W>
 where
     T: OpenApi,
     W: Webhook,
@@ -43,7 +43,7 @@ where
 /// Create an endpoint to serve the OpenAPI specification as yaml. We define this
 /// ourselves because we need to use our custom `get_spec` function that changes the
 /// spec to remove charset from the content type.
-pub fn spec_endpoint_yaml<T, W>(service: &OpenApiService<T, W>) -> impl Endpoint
+pub fn spec_endpoint_yaml<T, W>(service: &OpenApiService<T, W>) -> impl Endpoint + use<T, W>
 where
     T: OpenApi,
     W: Webhook,

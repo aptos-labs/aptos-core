@@ -195,6 +195,7 @@ impl VMStatus {
     pub fn keep_or_discard(
         self,
         function_values_enabled: bool,
+        memory_limit_exceeded_as_miscellaneous_error: bool,
     ) -> Result<KeptVMStatus, DiscardedVMStatus> {
         match self {
             VMStatus::Executed => Ok(KeptVMStatus::Executed),
@@ -218,7 +219,18 @@ impl VMStatus {
                 status_code: StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
                 ..
             } if function_values_enabled => Ok(KeptVMStatus::MiscellaneousError),
-
+            VMStatus::ExecutionFailure {
+                status_code: StatusCode::MEMORY_LIMIT_EXCEEDED,
+                ..
+            } if memory_limit_exceeded_as_miscellaneous_error => {
+                Ok(KeptVMStatus::MiscellaneousError)
+            },
+            VMStatus::Error {
+                status_code: StatusCode::MEMORY_LIMIT_EXCEEDED,
+                ..
+            } if memory_limit_exceeded_as_miscellaneous_error => {
+                Ok(KeptVMStatus::MiscellaneousError)
+            },
             VMStatus::ExecutionFailure {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED
@@ -614,9 +626,9 @@ pub enum StatusCode {
     NONCE_ALREADY_USED = 42,
     EMPTY_PAYLOAD_PROVIDED = 43,
     TRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE = 44,
+    INVALID_NUMBER_OF_AUTHENTICATION_PROOFS = 45,
 
     // Reserved error code for future use
-    RESERVED_VALIDATION_ERROR_10 = 45,
     RESERVED_VALIDATION_ERROR_11 = 46,
     RESERVED_VALIDATION_ERROR_12 = 47,
     RESERVED_VALIDATION_ERROR_13 = 48,
@@ -855,12 +867,16 @@ pub enum StatusCode {
     VALUE_DESERIALIZATION_ERROR = 3023,
     CODE_DESERIALIZATION_ERROR = 3024,
     INVALID_FLAG_BITS = 3025,
+    // Returned when a function value is trying to capture an option. This is not allowed
+    // until the feature flag ENABLE_CAPTURE_OPTION is on.
+    UNABLE_TO_CAPTURE_OPTION_TYPE = 3026,
+
     // Reserved error code for future use
-    RESERVED_DESERIALIZAION_ERROR_1 = 3026,
-    RESERVED_DESERIALIZAION_ERROR_2 = 3027,
-    RESERVED_DESERIALIZAION_ERROR_3 = 3028,
-    RESERVED_DESERIALIZAION_ERROR_4 = 3029,
-    RESERVED_DESERIALIZAION_ERROR_5 = 3030,
+    RESERVED_DESERIALIZAION_ERROR_1 = 3027,
+    RESERVED_DESERIALIZAION_ERROR_2 = 3028,
+    RESERVED_DESERIALIZAION_ERROR_3 = 3029,
+    RESERVED_DESERIALIZAION_ERROR_4 = 3030,
+    RESERVED_DESERIALIZAION_ERROR_5 = 3031,
 
     // Errors that can arise at runtime
     // Runtime Errors: 4000-4999
@@ -1056,21 +1072,24 @@ fn test_status_codes() {
 }
 
 pub mod sub_status {
-    // Native Function Error sub-codes
+    /// Native Function Error sub-codes
     pub const NFE_VECTOR_ERROR_BASE: u64 = 0;
-    // Failure in BCS deserialization
+    /// Failure in BCS deserialization
     pub const NFE_BCS_SERIALIZATION_FAILURE: u64 = 0x1C5;
 
     pub mod unknown_invariant_violation {
-        // Paranoid Type checking returns an error
+        /// Paranoid Type checking returns an error
         pub const EPARANOID_FAILURE: u64 = 0x1;
 
-        // Reference safety checks failure
+        /// Reference counting checks failure
         pub const EREFERENCE_COUNTING_FAILURE: u64 = 0x2;
+
+        /// Dynamic reference safety checks failure
+        pub const EREFERENCE_SAFETY_FAILURE: u64 = 0x3;
     }
 
     pub mod type_resolution_failure {
-        // User provided typetag failed to load.
+        /// User provided typetag failed to load.
         pub const EUSER_TYPE_LOADING_FAILURE: u64 = 0x1;
     }
 }

@@ -4,7 +4,7 @@ Error: compilation errors:
  error: cannot select field `_0` since it has different types in variants of enum `E`
    ┌─ TEMPFILE:68:28
    │
-68 │             let _t8 = &mut p0._0;
+68 │             let _v0 = &mut p0._0;
    │                            ^^
    │
    = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`
@@ -12,7 +12,7 @@ Error: compilation errors:
 error: cannot select field `_0` since it has different types in variants of enum `E`
    ┌─ TEMPFILE:73:28
    │
-73 │             let _t4 = &mut p0._0;
+73 │             let _v2 = &mut p0._0;
    │                            ^^
    │
    = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`

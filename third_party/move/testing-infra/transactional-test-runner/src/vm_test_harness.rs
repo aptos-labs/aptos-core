@@ -37,7 +37,7 @@ use move_stdlib::move_stdlib_named_addresses;
 use move_symbol_pool::Symbol;
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
@@ -459,12 +459,11 @@ impl SimpleVMTestAdapter<'_> {
             MoveVM::execute_loaded_function(
                 function,
                 args,
-                &mut data_cache,
+                &mut MoveVmDataCacheAdapter::new(&mut data_cache, &self.storage, &loader),
                 &mut gas_meter,
                 &mut traversal_context,
                 &mut extensions,
                 &loader,
-                &self.storage,
             )?
         });
 
@@ -594,6 +593,7 @@ impl TestRunConfig {
             vm_config: VMConfig {
                 verifier_config: VerifierConfig::production(),
                 paranoid_type_checks: true,
+                enable_enum_option: false,
                 ..VMConfig::default()
             },
             use_masm: true,
@@ -638,6 +638,13 @@ impl TestRunConfig {
 
     pub(crate) fn verifier_disabled(&self) -> bool {
         self.vm_config.verifier_config.verify_nothing()
+    }
+
+    pub fn with_runtime_ref_checks(self) -> Self {
+        Self {
+            vm_config: self.vm_config.set_paranoid_ref_checks(true),
+            ..self
+        }
     }
 }
 

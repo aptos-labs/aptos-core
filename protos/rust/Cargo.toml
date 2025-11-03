@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptoslabs.com"
 license = "Apache-2.0"
 publish = true
-edition = "2021"
+edition = { workspace = true }
 
 [dependencies]
 pbjson = { workspace = true }

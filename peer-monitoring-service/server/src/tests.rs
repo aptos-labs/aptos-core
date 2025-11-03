@@ -597,7 +597,7 @@ pub fn initialize_logger() {
 /// Returns a random network ID
 fn get_random_network_id() -> NetworkId {
     let mut rng = OsRng;
-    let random_number: u8 = rng.gen();
+    let random_number: u8 = rng.r#gen();
     match random_number % 3 {
         0 => NetworkId::Validator,
         1 => NetworkId::Vfn,

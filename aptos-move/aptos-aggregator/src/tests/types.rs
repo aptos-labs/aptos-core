@@ -21,8 +21,8 @@ use move_vm_types::delayed_values::delayed_field_id::{DelayedFieldID, ExtractUni
 use std::{
     cell::RefCell,
     collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 pub fn aggregator_v1_id_for_test(key: u128) -> AggregatorID {
     AggregatorID(aggregator_v1_state_key_for_test(key))
@@ -132,7 +132,7 @@ impl TDelayedFieldView for FakeAggregatorView {
         _delayed_write_set_keys: &HashSet<Self::Identifier>,
         _skip: &HashSet<Self::ResourceKey>,
     ) -> Result<
-        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
         PanicError,
     > {
         unimplemented!();

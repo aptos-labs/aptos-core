@@ -824,6 +824,8 @@ impl LoggerFilterUpdater {
 
 #[cfg(test)]
 mod tests {
+    #![allow(unsafe_code)]
+
     use super::{text_format, AptosData, LogEntry};
     use crate::{
         aptos_logger::{json_format, TruncatedLogString, RUST_LOG_TELEMETRY},
@@ -1148,7 +1150,10 @@ mod tests {
             .telemetry_filter
             .enabled(debug_metadata));
 
-        std::env::set_var(RUST_LOG_TELEMETRY, "debug");
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe {
+            std::env::set_var(RUST_LOG_TELEMETRY, "debug");
+        }
 
         let updater = LoggerFilterUpdater::new(logger.clone(), logger_builder);
         updater.update_filter();
@@ -1159,7 +1164,10 @@ mod tests {
             .telemetry_filter
             .enabled(debug_metadata));
 
-        std::env::set_var(RUST_LOG_TELEMETRY, "debug;hyper=off"); // log values should be separated by commas not semicolons.
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe {
+            std::env::set_var(RUST_LOG_TELEMETRY, "debug;hyper=off"); // log values should be separated by commas not semicolons.
+        }
         updater.update_filter();
 
         assert!(!logger
@@ -1168,7 +1176,10 @@ mod tests {
             .telemetry_filter
             .enabled(debug_metadata));
 
-        std::env::set_var(RUST_LOG_TELEMETRY, "debug,hyper=off"); // log values should be separated by commas not semicolons.
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe {
+            std::env::set_var(RUST_LOG_TELEMETRY, "debug,hyper=off"); // log values should be separated by commas not semicolons.
+        }
         updater.update_filter();
 
         assert!(logger

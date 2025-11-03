@@ -10,7 +10,7 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
 };
 use move_vm_runtime::{
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
@@ -27,7 +27,6 @@ mod binary_format_version;
 mod exec_func_effects_tests;
 mod function_arg_tests;
 mod instantiation_tests;
-mod invariant_violation_tests;
 mod leak_tests;
 mod loader_tests;
 mod module_storage_tests;
@@ -100,6 +99,8 @@ fn execute_function_for_test(
     ty_args: &[TypeTag],
     args: Vec<Vec<u8>>,
 ) -> VMResult<SerializedReturnValues> {
+    let mut data_cache = TransactionDataCache::empty();
+
     let mut gas_meter = UnmeteredGasMeter;
     let traversal_storage = TraversalStorage::new();
     let mut traversal_context = TraversalContext::new(&traversal_storage);
@@ -116,12 +117,11 @@ fn execute_function_for_test(
         MoveVM::execute_loaded_function(
             func,
             args,
-            &mut TransactionDataCache::empty(),
+            &mut MoveVmDataCacheAdapter::new(&mut data_cache, data_storage, &loader),
             &mut gas_meter,
             &mut traversal_context,
             &mut NativeContextExtensions::default(),
             &loader,
-            data_storage,
         )
     })
 }
@@ -151,12 +151,11 @@ fn execute_script_impl(
         MoveVM::execute_loaded_function(
             function,
             args,
-            &mut data_cache,
+            &mut MoveVmDataCacheAdapter::new(&mut data_cache, storage, &loader),
             &mut gas_meter,
             &mut traversal_context,
             &mut NativeContextExtensions::default(),
             &loader,
-            storage,
         )
     })?;
 

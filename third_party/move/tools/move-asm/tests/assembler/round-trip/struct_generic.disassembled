@@ -1,7 +1,7 @@
 //**** Cross-compiled for `masm` syntax from `tests/assembler/struct_generic.masm`
 
 //# publish --print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test
 struct S<T0> has drop
   _1: u64

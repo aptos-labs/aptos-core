@@ -19,7 +19,10 @@ use crate::{
 };
 use itertools::Itertools;
 use move_core_types::ability::AbilitySet;
-use std::collections::{BTreeMap, BTreeSet};
+use std::{
+    cell::RefCell,
+    collections::{BTreeMap, BTreeSet},
+};
 //
 // ========================================================================================
 //
@@ -29,7 +32,9 @@ use std::collections::{BTreeMap, BTreeSet};
 pub struct Sourcifier<'a> {
     builder: ExpBuilder<'a>,
     writer: CodeWriter,
-    // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names)
+    // A mapping from symbols to their aliased string representation, if any.
+    sym_alias_map: RefCell<BTreeMap<Symbol, String>>,
+    // whether to amend the displayed results to be recompilable (e.g., remove `__` from lambda names) and more readable (e.g., local var names starting from `_v0`)
     amend: bool,
 }
 
@@ -41,6 +46,7 @@ impl<'a> Sourcifier<'a> {
             // Location not used, but required by the constructor
             writer: CodeWriter::new(env.unknown_loc()),
             amend,
+            sym_alias_map: RefCell::new(BTreeMap::new()),
         }
     }
 
@@ -158,6 +164,8 @@ impl<'a> Sourcifier<'a> {
             self.print_access_specifiers(&tctx, &fun_env);
         }
         if let Some(def) = def {
+            // Set up aliases for all temporary variables in the function body
+            self.set_temp_var_alias(def);
             // A sequence or block is already automatically printed in braces with indent
             let requires_braces = !Self::is_braced(def);
             let exp_sourcifier = ExpSourcifier::for_fun(self, &fun_env, tctx, def, self.amend);
@@ -172,6 +180,8 @@ impl<'a> Sourcifier<'a> {
                 exp_sourcifier.print_exp(Prio::General, true, def)
             }
             emitln!(self.writer);
+            // Clear all temporary variable aliases after printing the function body
+            self.clear_temp_var_alias();
         } else {
             emitln!(self.writer, ";");
         }
@@ -202,65 +212,90 @@ impl<'a> Sourcifier<'a> {
     }
 
     fn print_access_specifiers(&self, tctx: &TypeDisplayContext, fun: &FunctionEnv) {
-        if let Some(specs) = fun.get_access_specifiers() {
-            self.writer.indent();
-            for spec in specs {
-                emitln!(self.writer);
-                if spec.negated {
-                    emit!(self.writer, "!")
-                }
-                match &spec.kind {
-                    AccessSpecifierKind::Reads => emit!(self.writer, "reads "),
-                    AccessSpecifierKind::Writes => emit!(self.writer, "writes "),
-                    AccessSpecifierKind::LegacyAcquires => emit!(self.writer, "acquires "),
-                }
-                match &spec.resource.1 {
-                    ResourceSpecifier::Any => emit!(self.writer, "*"),
-                    ResourceSpecifier::DeclaredAtAddress(addr) => {
-                        emit!(
-                            self.writer,
-                            "0x{}::*::*",
-                            addr.expect_numerical().short_str_lossless()
-                        )
-                    },
-                    ResourceSpecifier::DeclaredInModule(mid) => {
-                        emit!(
-                            self.writer,
-                            "{}::*",
-                            self.env().get_module(*mid).get_full_name_str()
-                        )
-                    },
-                    ResourceSpecifier::Resource(sid) => {
-                        emit!(self.writer, "{}", sid.to_type().display(tctx))
-                    },
-                }
-                match &spec.address.1 {
-                    AddressSpecifier::Any => {},
-                    AddressSpecifier::Address(addr) => {
-                        emit!(
-                            self.writer,
-                            "(0x{})",
-                            addr.expect_numerical().short_str_lossless()
-                        )
-                    },
-                    AddressSpecifier::Parameter(sym) => {
-                        emit!(self.writer, "({})", self.sym(*sym))
-                    },
-                    AddressSpecifier::Call(fun, sym) => {
-                        let func_env = self.env().get_function(fun.to_qualified_id());
-                        emit!(
-                            self.writer,
-                            "({}{}({}))",
-                            self.module_qualifier(tctx, func_env.module_env.get_id()),
-                            func_env.get_name_str(),
-                            self.sym(*sym)
-                        )
-                    },
-                }
-            }
-            self.writer.unindent();
-            emitln!(self.writer)
+        let Some(specs) = fun.get_access_specifiers() else {
+            return;
+        };
+        self.writer.indent();
+        let mut acc_spec_map = BTreeMap::new();
+
+        // gather resources together under each spec kind
+        for spec_kind in [
+            "!reads",
+            "!writes",
+            "!acquires",
+            "reads",
+            "writes",
+            "acquires",
+        ] {
+            acc_spec_map.insert(spec_kind.to_string(), BTreeSet::new());
         }
+
+        for spec in specs {
+            let resource = match &spec.resource.1 {
+                ResourceSpecifier::Any => "*".to_string(),
+                ResourceSpecifier::DeclaredAtAddress(addr) => {
+                    format!("0x{}::*::*", addr.expect_numerical().short_str_lossless())
+                },
+                ResourceSpecifier::DeclaredInModule(mid) => {
+                    format!("{}::*", self.env().get_module(*mid).get_full_name_str())
+                },
+                ResourceSpecifier::Resource(sid) => {
+                    format!("{}", sid.to_type().display(tctx))
+                },
+            };
+
+            let address = match &spec.address.1 {
+                AddressSpecifier::Any => "".to_string(),
+                AddressSpecifier::Address(addr) => {
+                    format!("(0x{})", addr.expect_numerical().short_str_lossless())
+                },
+                AddressSpecifier::Parameter(sym) => {
+                    format!("({})", self.sym(*sym))
+                },
+                AddressSpecifier::Call(fun, sym) => {
+                    let func_env = self.env().get_function(fun.to_qualified_id());
+                    format!(
+                        "({}{}({}))",
+                        self.module_qualifier(tctx, func_env.module_env.get_id()),
+                        func_env.get_name_str(),
+                        self.sym(*sym)
+                    )
+                },
+            };
+
+            let spec_kind = match spec.kind {
+                AccessSpecifierKind::Reads => "reads",
+                AccessSpecifierKind::Writes => "writes",
+                AccessSpecifierKind::LegacyAcquires => "acquires",
+            };
+
+            let spec_key = if spec.negated {
+                format!("!{}", spec_kind)
+            } else {
+                spec_kind.to_string()
+            };
+
+            acc_spec_map
+                .get_mut(&spec_key)
+                .expect("spec kind key expected")
+                .insert(format!("{}{}", resource, address));
+        }
+
+        // print the spec kind and associated resources one by one
+        for (spec_kind, resources) in &acc_spec_map {
+            if !resources.is_empty() {
+                emitln!(self.writer);
+                self.print_list(
+                    &format!("{} ", spec_kind),
+                    ", ",
+                    "",
+                    resources.iter(),
+                    |resource| emit!(self.writer, "{}", resource),
+                );
+            }
+        }
+        self.writer.unindent();
+        emitln!(self.writer)
     }
 
     pub fn print_value(&self, value: &Value, ty: Option<&Type>) {
@@ -276,6 +311,12 @@ impl<'a> Sourcifier<'a> {
                         PrimitiveType::U64 => "",
                         PrimitiveType::U128 => "u128",
                         PrimitiveType::U256 => "u256",
+                        PrimitiveType::I8 => "i8",
+                        PrimitiveType::I16 => "i16",
+                        PrimitiveType::I32 => "i32",
+                        PrimitiveType::I64 => "i64",
+                        PrimitiveType::I128 => "i128",
+                        PrimitiveType::I256 => "i256",
                         _ => "",
                     })
                 }
@@ -465,7 +506,12 @@ impl<'a> Sourcifier<'a> {
     }
 
     fn sym(&self, sym: Symbol) -> String {
-        let sym_str = sym.display(self.env().symbol_pool()).to_string();
+        let sym_str = if let Some(alias) = self.sym_alias_map.borrow().get(&sym) {
+            alias.clone()
+        } else {
+            sym.display(self.env().symbol_pool()).to_string()
+        };
+
         // Replace the `invalid` characters so that the generated code is recompilable.
         if self.amend {
             sym_str.replace('$', "_")
@@ -541,6 +587,68 @@ impl<'a> Sourcifier<'a> {
         }
         // Give up after too many attempts
         panic!("too many fruitless attempts to generate unique name")
+    }
+
+    fn is_temp_var(s: &str) -> bool {
+        if let Some(rest) = s.strip_prefix("_t") {
+            rest.chars().all(|c| c.is_ascii_digit())
+        } else {
+            false
+        }
+    }
+
+    /// our assignment optimization at the AST level removes many dummy temp vars. As such, their names no longer start from `_t0`
+    /// this function amends names of temp vars in the function body to start from `_v0`
+    fn set_temp_var_alias(&self, def: &ExpData) {
+        if self.amend {
+            // Collect all used local variables in the function body
+            // Why use vec instead of set: we need to keep the order of the symbols as they appear in the function body
+            let mut used_vars = Vec::new();
+            let mut visitor = |exp: &ExpData| {
+                match exp {
+                    ExpData::Block(_, pat, _, _) => {
+                        for (_, sym) in pat.vars().iter() {
+                            if !used_vars.contains(sym) {
+                                used_vars.push(*sym);
+                            }
+                        }
+                    },
+                    ExpData::LocalVar(_, sym) => {
+                        if !used_vars.contains(sym) {
+                            used_vars.push(*sym);
+                        }
+                    },
+                    ExpData::Assign(_, pat, _) => {
+                        for (_, sym) in pat.vars().iter() {
+                            if !used_vars.contains(sym) {
+                                used_vars.push(*sym);
+                            }
+                        }
+                    },
+                    _ => {},
+                }
+                true
+            };
+            def.visit_pre_order(&mut visitor);
+
+            // set up alias for each temp var
+            for used_var in used_vars {
+                let var_name = used_var.display(self.env().symbol_pool()).to_string();
+                if Self::is_temp_var(&var_name) {
+                    let new_name = Self::new_global_unique_name(
+                        self.env(),
+                        format!("_v{}", self.sym_alias_map.borrow().len()).as_str(),
+                    );
+                    self.sym_alias_map
+                        .borrow_mut()
+                        .insert(used_var, new_name.clone());
+                }
+            }
+        }
+    }
+
+    fn clear_temp_var_alias(&self) {
+        self.sym_alias_map.borrow_mut().clear();
     }
 }
 
@@ -738,6 +846,10 @@ impl<'a> ExpSourcifier<'a> {
                 }
             },
             IfElse(_, cond, if_exp, else_exp) => {
+                // Special case: the if-else can be printed as an `assert!`
+                if self.print_assert(context_prio, cond, if_exp, else_exp) {
+                    return;
+                }
                 self.parenthesize(context_prio, Prio::General, || {
                     emit!(self.wr(), "if (");
                     self.print_exp(Prio::General, false, cond);
@@ -1108,6 +1220,10 @@ impl<'a> ExpSourcifier<'a> {
                 emit!(self.wr(), "!");
                 self.print_exp(Prio::Prefix, false, &args[0])
             }),
+            Operation::Negate => self.parenthesize(context_prio, Prio::Prefix, || {
+                emit!(self.wr(), "-");
+                self.print_exp(Prio::Prefix, false, &args[0])
+            }),
             Operation::Cast => self.parenthesize(context_prio, Prio::General, || {
                 // We take `as` as a postfix operator, to enforce a parenthesis around LHS as needed
                 self.print_exp(Prio::Postfix, false, &args[0]);
@@ -1209,6 +1325,31 @@ impl<'a> ExpSourcifier<'a> {
                 emitln!(self.wr(), "/* unsupported spec operation {:?} */", oper)
             },
         }
+    }
+
+    fn print_assert(&self, context_prio: Priority, cond_: &Exp, then_: &Exp, else_: &Exp) -> bool {
+        // Match the pattern `if (!cond) abort(code) else ()`
+        let inner_cond = match cond_.as_ref() {
+            ExpData::Call(_, Operation::Not, args) if args.len() == 1 => args[0].clone(),
+            _ => return false,
+        };
+        let abort_code = match then_.as_ref() {
+            ExpData::Call(_, Operation::Abort, args) if args.len() == 1 => args[0].clone(),
+            _ => return false,
+        };
+        if !else_.is_unit_exp() {
+            return false;
+        }
+
+        // All matched, print as `assert!(cond, code)`
+        self.parenthesize(context_prio, Prio::General, || {
+            emit!(self.wr(), "assert!(");
+            self.print_exp(Prio::General, false, &inner_cond);
+            emit!(self.wr(), ", ");
+            self.print_exp(Prio::General, false, &abort_code);
+            emit!(self.wr(), ")");
+        });
+        true
     }
 
     fn print_constructor<I>(

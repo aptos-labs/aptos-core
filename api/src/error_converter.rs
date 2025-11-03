@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_api_types::{mime_types::JSON, AptosError, AptosErrorCode};
+use aptos_logger::error;
 use poem::{
     http::header::{HeaderValue, CONTENT_TYPE},
     IntoResponse, Response,
 };
 use poem_openapi::payload::Json;
-
+use std::any::Any;
 // The way I'm determining which errors are framework errors is very janky, as
 // is the way I'm building the response. See:
 // - https://github.com/poem-web/poem/issues/343
@@ -41,6 +42,19 @@ fn build_error_response(error_string: String) -> Response {
     Json(AptosError::new_with_error_code(
         error_string,
         AptosErrorCode::WebFrameworkError,
+    ))
+    .into_response()
+}
+
+pub fn panic_handler(err: Box<dyn Any + Send>) -> Response {
+    error!("Panic captured: {:?}", err);
+    build_panic_response("internal error".into())
+}
+
+fn build_panic_response(error_string: String) -> Response {
+    Json(AptosError::new_with_error_code(
+        error_string,
+        AptosErrorCode::InternalError,
     ))
     .into_response()
 }

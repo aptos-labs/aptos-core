@@ -4,6 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
+use aptos_crypto::blstrs::random_scalar;
 use aptos_dkg::{
     pvss,
     pvss::{
@@ -12,7 +13,6 @@ use aptos_dkg::{
         traits::{SecretSharingConfig, Transcript},
         Player, WeightedConfig,
     },
-    utils::random::random_scalar,
     weighted_vuf::{pinkas::PinkasWUF, traits::WeightedVUF},
 };
 use aptos_runtimes::spawn_rayon_thread_pool;

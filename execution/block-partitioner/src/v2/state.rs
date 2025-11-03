@@ -245,12 +245,11 @@ impl PartitionState {
         let tracker = tracker_ref.read().unwrap();
         let start = ShardedTxnIndexV2::new(sub_block.round_id, sub_block.shard_id, 0);
         let end = ShardedTxnIndexV2::new(sub_block.round_id, sub_block.shard_id + 1, 0);
-        let ret = tracker
+        tracker
             .finalized_writes
             .range(start..end)
             .last()
-            .map(|t| t.pre_partitioned_txn_idx);
-        ret
+            .map(|t| t.pre_partitioned_txn_idx)
     }
 
     /// Get the 1st txn after `since` that writes a given key.

@@ -1,6 +1,7 @@
 module 0x1::string_utils_test {
     use std::string;
     use aptos_std::string_utils;
+    use std::option;
 
     struct Test has copy, drop {
         x: u64,
@@ -9,6 +10,10 @@ module 0x1::string_utils_test {
     enum TestEnum has copy, drop {
         V1 { x: u64, },
         V2 { x: u64, y: Test },
+    }
+
+    struct OptionTest has copy, drop {
+        o: option::Option<u64>,
     }
 
     public fun dummy(_x: &u64, _v: u64) { }
@@ -78,6 +83,17 @@ module 0x1::string_utils_test {
             b"0x1::string_utils_test::test3(0x1::string_utils_test::dummy(_, 10, ..), 30, ..)",
             10,
         );
+
+        // === option type === //
+        let vec = vector[std::option::none<u64>(), std::option::some(2)];
+        assert_eq(&vec, b"[ None, Some(2) ]", 11);
+
+        let o = OptionTest { o: std::option::none<u64>() };
+        assert_eq(&o, b"OptionTest { o: None }", 12);
+
+        let o = OptionTest { o: std::option::some(2) };
+        assert_eq(&o, b"OptionTest { o: Some(2) }", 13);
+
     }
 
     public fun assert_eq<T>(x: &T, expected: vector<u8>, abort_code: u64) {

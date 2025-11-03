@@ -249,8 +249,8 @@ impl<'a> Instrumenter<'a> {
 
         // derive all the borrow edges that uniquely differentiate this chain
         let base = &tree[index];
-        let diffs = tree
-            .iter()
+        // return the indices of the actions that differentiate this borrow chain
+        tree.iter()
             .enumerate()
             .filter_map(|(i, chain)| {
                 if i == index {
@@ -259,10 +259,7 @@ impl<'a> Instrumenter<'a> {
                     Some(index_of_first_different_action(base, chain))
                 }
             })
-            .collect();
-
-        // return the indices of the actions that differentiate this borrow chain
-        diffs
+            .collect()
     }
 
     fn write_back_chain(

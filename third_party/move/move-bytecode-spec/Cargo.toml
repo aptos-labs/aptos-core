@@ -7,7 +7,7 @@ repository = "https://github.com/aptos-labs/aptos-core"
 homepage = "https://aptosfoundation.org/"
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 
 [dependencies]
 once_cell = { workspace = true }

@@ -3,7 +3,7 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(): u8 {
-        let _t2 = 250u8 + 50u8;
+        let _v0 = 250u8 + 50u8;
         55u8
     }
 }

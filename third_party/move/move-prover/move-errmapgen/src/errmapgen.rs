@@ -58,7 +58,7 @@ impl<'env> ErrmapGen<'env> {
         self.output.to_file(&self.options.output_file);
     }
 
-    pub fn gen(&mut self) {
+    pub fn r#gen(&mut self) {
         for module in self.env.get_modules() {
             if !module.is_script_module() {
                 self.build_error_map(&module).unwrap()

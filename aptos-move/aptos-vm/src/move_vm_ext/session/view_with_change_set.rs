@@ -31,10 +31,8 @@ use bytes::Bytes;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{language_storage::StructTag, value::MoveTypeLayout};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{
-    collections::{BTreeMap, HashMap, HashSet},
-    sync::Arc,
-};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use triomphe::Arc as TriompheArc;
 
 /// Adapter to allow resolving the calls to `ExecutorView` via change set.
 pub struct ExecutorViewWithChangeSet<'r> {
@@ -212,7 +210,7 @@ impl TDelayedFieldView for ExecutorViewWithChangeSet<'_> {
         delayed_write_set_keys: &HashSet<Self::Identifier>,
         skip: &HashSet<Self::ResourceKey>,
     ) -> Result<
-        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<Self::ResourceKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
         PanicError,
     > {
         self.base_executor_view

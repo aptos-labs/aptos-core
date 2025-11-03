@@ -6,8 +6,8 @@ module 0x42::test {
         f: u64,
     }
     public fun one_captured(p0: u64): u64 {
-        let _t1 = |arg0| lambda__1__one_captured(p0, arg0);
-        _t1(2)
+        let _v0 = |arg0| lambda__1__one_captured(p0, arg0);
+        _v0(2)
     }
     fun lambda__1__one_captured(p0: u64, p1: u64): u64 {
         p0 + p1
@@ -16,19 +16,19 @@ module 0x42::test {
         struct_captured_helper(S{f: p0})
     }
     fun struct_captured_helper(p0: S): u64 {
-        let _t1 = |arg0| lambda__1__struct_captured_helper(p0, arg0);
-        _t1(4)
+        let _v0 = |arg0| lambda__1__struct_captured_helper(p0, arg0);
+        _v0(4)
     }
     fun lambda__1__struct_captured_helper(p0: S, p1: u64): u64 {
         *&(&p0).f + p1
     }
     public fun two_captured(p0: u64, p1: u8): u64 {
-        let _t2 = |arg0| lambda__1__two_captured(p0, p1, arg0);
-        _t2(3)
+        let _v0 = |arg0| lambda__1__two_captured(p0, p1, arg0);
+        _v0(3)
     }
     fun lambda__1__two_captured(p0: u64, p1: u8, p2: u64): u64 {
-        let _t5 = p1 as u64;
-        p0 + _t5 + p2
+        let _v0 = p1 as u64;
+        p0 + _v0 + p2
     }
 }
 

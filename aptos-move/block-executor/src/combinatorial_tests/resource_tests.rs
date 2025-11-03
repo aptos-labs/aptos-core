@@ -23,7 +23,7 @@ use aptos_types::{
     vm::modules::AptosModuleExtension,
 };
 use move_core_types::language_storage::ModuleId;
-use move_vm_runtime::Module;
+use move_vm_runtime::{Module, WithRuntimeEnvironment};
 use move_vm_types::code::ModuleCode;
 use proptest::{
     collection::vec,
@@ -74,7 +74,8 @@ pub(crate) fn populate_guard_with_modules(
 ) {
     for module_id in module_ids {
         // Create an empty module for testing with Module::new_for_test
-        let module = Module::new_for_test(module_id.clone());
+        let module_id_pool = guard.environment().runtime_environment().module_id_pool();
+        let module = Module::new_for_test(module_id_pool, module_id.clone());
 
         // Serialize the module
         let mut serialized_bytes = Vec::new();
@@ -123,7 +124,7 @@ where
         TxnType,
         MockTask<KeyType<[u8; 32]>, MockEvent>,
         ViewType,
-        NoOpTransactionCommitHook<MockOutput<KeyType<[u8; 32]>, MockEvent>, usize>,
+        NoOpTransactionCommitHook<usize>,
         Provider,
         AuxiliaryInfo,
     >::new(config, executor_thread_pool, None);

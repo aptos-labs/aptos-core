@@ -1,8 +1,6 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#![forbid(unsafe_code)]
-
 use crate::{
     constants::*, core_metrics::create_core_metric_telemetry_event, metrics,
     network_metrics::create_network_metric_telemetry_event, sender::TelemetrySender,
@@ -44,52 +42,70 @@ const APTOS_NODE_CONFIG_EVENT_NAME: &str = "APTOS_NODE_CONFIG";
 /// TODO(joshlind): leverage real authentication!
 static TELEMETRY_TOKEN: Lazy<String> = Lazy::new(|| {
     let mut rng = OsRng;
-    let token = rng.gen::<u32>();
+    let token = rng.r#gen::<u32>();
     format!("TOKEN_{:?}", token)
 });
+
+/// Returns true iff the given environment variable is set to true. Note: true
+/// values are "true", "t", "1", "yes" or "y" (all case-insensitive). Any other
+/// values are considered false (including when the variable is not set).
+#[inline]
+fn is_env_variable_true(env_variable: &str) -> bool {
+    match env::var(env_variable) {
+        Ok(value) => {
+            matches!(
+                value.to_lowercase().as_str(),
+                "true" | "t" | "1" | "yes" | "y"
+            )
+        },
+        Err(_) => false,
+    }
+}
 
 /// Returns true iff telemetry is disabled
 #[inline]
 pub fn telemetry_is_disabled() -> bool {
-    env::var(ENV_APTOS_DISABLE_TELEMETRY).is_ok()
+    is_env_variable_true(ENV_APTOS_DISABLE_TELEMETRY)
 }
 
 /// Flag to force enabling/disabling of telemetry
 #[inline]
 fn force_enable_telemetry() -> bool {
-    env::var(ENV_APTOS_FORCE_ENABLE_TELEMETRY).is_ok()
+    is_env_variable_true(ENV_APTOS_FORCE_ENABLE_TELEMETRY)
 }
 
 /// Flag to control enabling/disabling prometheus push metrics
 #[inline]
 fn enable_prometheus_push_metrics() -> bool {
     force_enable_telemetry()
-        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS).is_ok())
+        || !(telemetry_is_disabled()
+            || is_env_variable_true(ENV_APTOS_DISABLE_TELEMETRY_PUSH_METRICS))
 }
 
 #[inline]
 fn enable_prometheus_node_metrics() -> bool {
-    env::var(ENV_APTOS_DISABLE_PROMETHEUS_NODE_METRICS).is_err()
+    !is_env_variable_true(ENV_APTOS_DISABLE_PROMETHEUS_NODE_METRICS)
 }
 
 /// Flag to control enabling/disabling push logs
 #[inline]
 fn enable_push_logs() -> bool {
     force_enable_telemetry()
-        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS).is_ok())
+        || !(telemetry_is_disabled() || is_env_variable_true(ENV_APTOS_DISABLE_TELEMETRY_PUSH_LOGS))
 }
 
 /// Flag to control enabling/disabling telemetry push events
 #[inline]
 fn enable_push_custom_events() -> bool {
     force_enable_telemetry()
-        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS).is_ok())
+        || !(telemetry_is_disabled()
+            || is_env_variable_true(ENV_APTOS_DISABLE_TELEMETRY_PUSH_EVENTS))
 }
 
 #[inline]
 fn enable_log_env_polling() -> bool {
     force_enable_telemetry()
-        || !(telemetry_is_disabled() || env::var(ENV_APTOS_DISABLE_LOG_ENV_POLLING).is_ok())
+        || !(telemetry_is_disabled() || is_env_variable_true(ENV_APTOS_DISABLE_LOG_ENV_POLLING))
 }
 
 /// Starts the telemetry service and returns the execution runtime.
@@ -207,11 +223,14 @@ fn try_spawn_log_env_poll_task(sender: TelemetrySender) {
                         env::var(RUST_LOG_TELEMETRY).ok(),
                         env
                     );
-                    env::set_var(RUST_LOG_TELEMETRY, env)
+                    // TODO: Audit that the environment access only happens in single-threaded code.
+                    unsafe { env::set_var(RUST_LOG_TELEMETRY, env) }
                 } else if let Some(ref value) = original_value {
-                    env::set_var(RUST_LOG_TELEMETRY, value)
+                    // TODO: Audit that the environment access only happens in single-threaded code.
+                    unsafe { env::set_var(RUST_LOG_TELEMETRY, value) }
                 } else {
-                    env::remove_var(RUST_LOG_TELEMETRY)
+                    // TODO: Audit that the environment access only happens in single-threaded code.
+                    unsafe { env::remove_var(RUST_LOG_TELEMETRY) }
                 }
             }
         });

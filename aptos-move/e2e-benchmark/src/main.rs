@@ -13,6 +13,7 @@ use aptos_transaction_workloads_lib::{EntryPoints, LoopType, MapType, OrderBookS
 use aptos_types::{
     account_address::AccountAddress, chain_id::ChainId, transaction::TransactionPayload,
 };
+use aptos_vm_environment::prod_configs::set_layout_caches;
 use clap::Parser;
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
@@ -123,6 +124,8 @@ const LANDBLOCKING_AND_CONTINUOUS: bool = true;
 const ONLY_CONTINUOUS: bool = false;
 
 fn main() {
+    set_layout_caches(true);
+
     let args = Args::parse();
     let executor = FakeExecutor::from_head_genesis();
     let mut executor = executor.set_not_parallel();

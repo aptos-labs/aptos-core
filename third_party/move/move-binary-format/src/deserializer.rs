@@ -8,6 +8,7 @@ use move_core_types::{
     account_address::AccountAddress,
     function::ClosureMask,
     identifier::Identifier,
+    int256::{I256, U256},
     metadata::Metadata,
     state::VMState,
     vm_status::StatusCode,
@@ -151,14 +152,23 @@ fn read_u128_internal(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u128> 
     Ok(u128::from_le_bytes(u128_bytes))
 }
 
-fn read_u256_internal(
-    cursor: &mut VersionedCursor,
-) -> BinaryLoaderResult<move_core_types::u256::U256> {
-    let mut u256_bytes = [0; 32];
+fn read_u256_internal(cursor: &mut VersionedCursor) -> BinaryLoaderResult<U256> {
+    let mut bytes = [0; 32];
     cursor
-        .read_exact(&mut u256_bytes)
+        .read_exact(&mut bytes)
         .map_err(|_| PartialVMError::new(StatusCode::BAD_U256))?;
-    Ok(move_core_types::u256::U256::from_le_bytes(&u256_bytes))
+    Ok(U256::from_le_bytes(bytes))
+}
+
+macro_rules! read_signed_int_internal {
+    ($cursor:ident, $ty:ty, $bytes:literal) => {{
+        let mut bytes = [0; $bytes];
+        $cursor
+            .read_exact(&mut bytes)
+            .map_err(|_| PartialVMError::new(StatusCode::MALFORMED).with_message("bad integer"))?;
+        let result: $ty = <$ty>::from_le_bytes(bytes);
+        Ok(result)
+    }};
 }
 
 //
@@ -971,11 +981,21 @@ fn load_identifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Identifie
     let mut buffer: Vec<u8> = vec![0u8; size];
     if !cursor.read(&mut buffer).map(|count| count == size).unwrap() {
         Err(PartialVMError::new(StatusCode::MALFORMED)
-            .with_message("Bad Identifier pool size".to_string()))?
+            .with_message("Bad Identifier pool size".to_string()))?;
     }
-    Identifier::from_utf8(buffer).map_err(|_| {
+    let ident = Identifier::from_utf8(buffer).map_err(|_| {
         PartialVMError::new(StatusCode::MALFORMED).with_message("Invalid Identifier".to_string())
-    })
+    })?;
+    if cursor.version() < VERSION_9 && ident.as_str().contains('$') {
+        Err(
+            PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                "`$` in identifiers not supported in bytecode version {}",
+                cursor.version()
+            )),
+        )
+    } else {
+        Ok(ident)
+    }
 }
 
 fn load_address_identifier(cursor: &mut VersionedCursor) -> BinaryLoaderResult<AccountAddress> {
@@ -1269,6 +1289,16 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                         )),
                     );
                 },
+                S::I8 | S::I16 | S::I32 | S::I64 | S::I128 | S::I256
+                    if cursor.version() < VERSION_9 =>
+                {
+                    return Err(
+                        PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                            "signer integer types not supported in bytecode version {}",
+                            cursor.version()
+                        )),
+                    );
+                },
                 _ => (),
             };
             Ok(match ser_type {
@@ -1279,6 +1309,12 @@ fn load_signature_token(cursor: &mut VersionedCursor) -> BinaryLoaderResult<Sign
                 S::U64 => T::Saturated(SignatureToken::U64),
                 S::U128 => T::Saturated(SignatureToken::U128),
                 S::U256 => T::Saturated(SignatureToken::U256),
+                S::I8 => T::Saturated(SignatureToken::I8),
+                S::I16 => T::Saturated(SignatureToken::I16),
+                S::I32 => T::Saturated(SignatureToken::I32),
+                S::I64 => T::Saturated(SignatureToken::I64),
+                S::I128 => T::Saturated(SignatureToken::I128),
+                S::I256 => T::Saturated(SignatureToken::I256),
                 S::ADDRESS => T::Saturated(SignatureToken::Address),
                 S::SIGNER => T::Saturated(SignatureToken::Signer),
                 S::VECTOR => T::Vector,
@@ -1748,20 +1784,6 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                     )),
                 );
             },
-            Opcodes::PACK_CLOSURE | Opcodes::PACK_CLOSURE_GENERIC | Opcodes::CALL_CLOSURE
-                if cursor.version() < VERSION_8 =>
-            {
-                return Err(
-                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
-                        "Closure operations not available before bytecode version {}",
-                        VERSION_8
-                    )),
-                );
-            },
-            _ => {},
-        };
-
-        match opcode {
             Opcodes::LD_U16
             | Opcodes::LD_U32
             | Opcodes::LD_U256
@@ -1777,7 +1799,39 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                         )),
                     );
             },
-            _ => (),
+            Opcodes::PACK_CLOSURE | Opcodes::PACK_CLOSURE_GENERIC | Opcodes::CALL_CLOSURE
+                if cursor.version() < VERSION_8 =>
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "Closure operations not available before bytecode version {}",
+                        VERSION_8
+                    )),
+                );
+            },
+            Opcodes::LD_I8
+            | Opcodes::LD_I16
+            | Opcodes::LD_I32
+            | Opcodes::LD_I64
+            | Opcodes::LD_I128
+            | Opcodes::LD_I256
+            | Opcodes::CAST_I8
+            | Opcodes::CAST_I16
+            | Opcodes::CAST_I32
+            | Opcodes::CAST_I64
+            | Opcodes::CAST_I128
+            | Opcodes::CAST_I256
+            | Opcodes::NEGATE
+                if cursor.version() < VERSION_9 =>
+            {
+                return Err(
+                    PartialVMError::new(StatusCode::MALFORMED).with_message(format!(
+                        "signed integer operations not available before bytecode version {}",
+                        VERSION_9
+                    )),
+                );
+            },
+            _ => {},
         };
 
         // conversion
@@ -1873,6 +1927,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::MUL => Bytecode::Mul,
             Opcodes::MOD => Bytecode::Mod,
             Opcodes::DIV => Bytecode::Div,
+            Opcodes::NEGATE => Bytecode::Negate,
             Opcodes::BIT_OR => Bytecode::BitOr,
             Opcodes::BIT_AND => Bytecode::BitAnd,
             Opcodes::XOR => Bytecode::Xor,
@@ -1935,6 +1990,20 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::CAST_U16 => Bytecode::CastU16,
             Opcodes::CAST_U32 => Bytecode::CastU32,
             Opcodes::CAST_U256 => Bytecode::CastU256,
+
+            Opcodes::LD_I8 => Bytecode::LdI8(read_signed_int_internal!(cursor, i8, 1)?),
+            Opcodes::LD_I16 => Bytecode::LdI16(read_signed_int_internal!(cursor, i16, 2)?),
+            Opcodes::LD_I32 => Bytecode::LdI32(read_signed_int_internal!(cursor, i32, 4)?),
+            Opcodes::LD_I64 => Bytecode::LdI64(read_signed_int_internal!(cursor, i64, 8)?),
+            Opcodes::LD_I128 => Bytecode::LdI128(read_signed_int_internal!(cursor, i128, 16)?),
+            Opcodes::LD_I256 => Bytecode::LdI256(read_signed_int_internal!(cursor, I256, 32)?),
+
+            Opcodes::CAST_I8 => Bytecode::CastI8,
+            Opcodes::CAST_I16 => Bytecode::CastI16,
+            Opcodes::CAST_I32 => Bytecode::CastI32,
+            Opcodes::CAST_I64 => Bytecode::CastI64,
+            Opcodes::CAST_I128 => Bytecode::CastI128,
+            Opcodes::CAST_I256 => Bytecode::CastI256,
         };
         code.push(bytecode);
     }
@@ -1987,6 +2056,12 @@ impl SerializedType {
             0xE => Ok(SerializedType::U32),
             0xF => Ok(SerializedType::U256),
             0x10 => Ok(SerializedType::FUNCTION),
+            0x11 => Ok(SerializedType::I8),
+            0x12 => Ok(SerializedType::I16),
+            0x13 => Ok(SerializedType::I32),
+            0x14 => Ok(SerializedType::I64),
+            0x15 => Ok(SerializedType::I128),
+            0x16 => Ok(SerializedType::I256),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_SERIALIZED_TYPE)),
         }
     }
@@ -2137,6 +2212,20 @@ impl Opcodes {
             0x58 => Ok(Opcodes::PACK_CLOSURE),
             0x59 => Ok(Opcodes::PACK_CLOSURE_GENERIC),
             0x5A => Ok(Opcodes::CALL_CLOSURE),
+            // Since bytecode version 9
+            0x5B => Ok(Opcodes::LD_I8),
+            0x5C => Ok(Opcodes::LD_I16),
+            0x5D => Ok(Opcodes::LD_I32),
+            0x5E => Ok(Opcodes::LD_I64),
+            0x5F => Ok(Opcodes::LD_I128),
+            0x60 => Ok(Opcodes::LD_I256),
+            0x61 => Ok(Opcodes::CAST_I8),
+            0x62 => Ok(Opcodes::CAST_I16),
+            0x63 => Ok(Opcodes::CAST_I32),
+            0x64 => Ok(Opcodes::CAST_I64),
+            0x65 => Ok(Opcodes::CAST_I128),
+            0x66 => Ok(Opcodes::CAST_I256),
+            0x67 => Ok(Opcodes::NEGATE),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
                 .with_message(format!("code {:X}", value))),
         }

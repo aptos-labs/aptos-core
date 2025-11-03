@@ -65,7 +65,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             vm_config: vm_config_for_tests(
                 VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
             ),
-            include: &["/function_values_safety/"],
+            include: &["/function_values_safety/", "/trusted_code/"],
             exclude: &[],
         },
         TestConfig {
@@ -76,6 +76,7 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 verifier_config: VerifierConfig::production(),
                 paranoid_type_checks: true,
                 enable_lazy_loading: false,
+                enable_enum_option: false,
                 ..VMConfig::default()
             },
             include: &[],
@@ -83,16 +84,35 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 "/lazy_loading/",
                 "/paranoid-tests/",
                 "/function_values_safety/",
+                "/trusted_code/",
+                "/runtime_ref_checks/",
             ],
+        },
+        // This config is used to test the runtime reference checker.
+        TestConfig {
+            name: "ref",
+            experiments: &[],
+            language_version: LanguageVersion::latest(),
+            // Verifier config is irrelevant here, because we disable verifier for these tests.
+            // Importantly, paranoid checks and runtime ref checks are enabled.
+            vm_config: vm_config_for_tests(
+                VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
+            )
+            .set_paranoid_ref_checks(true),
+            include: &["/runtime_ref_checks/"],
+            exclude: &[],
         },
     ]
 });
 
-/// VM configuration used for testing. By default, paranoid mode is always on.
+/// VM configuration used for testing.
+/// By default, paranoid mode is always on.
 fn vm_config_for_tests(verifier_config: VerifierConfig) -> VMConfig {
     VMConfig {
         paranoid_type_checks: true,
+        optimize_trusted_code: true,
         verifier_config,
+        enable_enum_option: false,
         ..VMConfig::default()
     }
 }
@@ -107,6 +127,8 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/function_values_safety/",
     "/module_publishing/",
     "/re_entrancy/",
+    "/trusted_code/",
+    "/runtime_ref_checks/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {

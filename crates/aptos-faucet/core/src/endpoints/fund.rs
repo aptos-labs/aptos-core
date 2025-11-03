@@ -56,19 +56,13 @@ impl FundRequest {
         if let Some(auth_key) = self.auth_key.as_ref() {
             return match AccountAddress::from_hex_literal(auth_key) {
                 Ok(auth_key) => Some(auth_key),
-                Err(_) => match AccountAddress::from_hex(auth_key) {
-                    Ok(auth_key) => Some(auth_key),
-                    Err(_) => None,
-                },
+                Err(_) => AccountAddress::from_hex(auth_key).ok(),
             };
         }
         if let Some(address) = self.address.as_ref() {
             return match AccountAddress::from_hex_literal(address) {
                 Ok(address) => Some(address),
-                Err(_) => match AccountAddress::from_hex(address) {
-                    Ok(address) => Some(address),
-                    Err(_) => None,
-                },
+                Err(_) => AccountAddress::from_hex(address).ok(),
             };
         }
         if let Some(pub_key) = self.pub_key.as_ref() {
@@ -198,7 +192,7 @@ impl FundApiComponents {
         source_ip: RealIp,
         header_map: &HeaderMap,
         dry_run: bool,
-    ) -> poem::Result<(CheckerData, bool, Option<SemaphorePermit>), AptosTapError> {
+    ) -> poem::Result<(CheckerData, bool, Option<SemaphorePermit<'_>>), AptosTapError> {
         let permit = match &self.concurrent_requests_semaphore {
             Some(semaphore) => match semaphore.try_acquire() {
                 Ok(permit) => Some(permit),

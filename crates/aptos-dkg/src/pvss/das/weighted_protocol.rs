@@ -3,24 +3,30 @@
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
-    pvss,
     pvss::{
+        self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das, encryption_dlog, fiat_shamir, schnorr, traits,
-        traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
+        das::{self, fiat_shamir},
+        encryption_dlog, schnorr,
+        traits::{
+            self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
+        },
         LowDegreeTest, Player, WeightedConfig,
     },
     utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing,
+        g1_multi_exp, g2_multi_exp,
         random::{
-            insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_scalar,
-            random_scalars,
+            insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_scalars,
         },
         HasMultiExp,
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381,
+    blstrs::{multi_pairing, random_scalar},
+    CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{pairing, G1Affine, G1Projective, G2Affine, G2Projective, Gt};
 use group::{Curve, Group};
@@ -29,10 +35,6 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 /// Scheme name
 pub const WEIGHTED_DAS_SK_IN_G1: &'static str = "provable_weighted_das_sk_in_g1";
-
-/// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
-const DAS_WEIGHTED_PVSS_FIAT_SHAMIR_DST: &[u8; 48] =
-    b"APTOS_DAS_WEIGHTED_PROVABLY_PVSS_FIAT_SHAMIR_DST";
 
 /// A weighted transcript where the max player weight is $M$.
 /// Each player has weight $w_i$ and the threshold weight is $w$.
@@ -96,6 +98,10 @@ impl traits::Transcript for Transcript {
     type SecretSharingConfig = WeightedConfig;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
+
+    fn dst() -> Vec<u8> {
+        b"APTOS_DAS_WEIGHTED_PROVABLY_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         WEIGHTED_DAS_SK_IN_G1.to_string()
@@ -194,14 +200,14 @@ impl traits::Transcript for Transcript {
         let W = sc.get_total_weight();
 
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::fiat_shamir(
+        let (f, extra) = fiat_shamir::derive_challenge_scalars(
             self,
             sc.get_threshold_config(),
             pp,
             spks,
             eks,
             auxs,
-            &DAS_WEIGHTED_PVSS_FIAT_SHAMIR_DST[..],
+            &Self::dst(),
             2 + W * 3, // 3W+1 for encryption check, 1 for SoK verification.
         );
 

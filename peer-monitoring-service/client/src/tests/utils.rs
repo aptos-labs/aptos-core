@@ -227,7 +227,7 @@ pub fn get_distance_from_validators(peer_network_id: &PeerNetworkId) -> u64 {
 
 /// Returns a random u64 for test purposes
 fn get_random_u64() -> u64 {
-    OsRng.gen()
+    OsRng.r#gen()
 }
 
 /// Handle several latency ping requests and responses for the given peer

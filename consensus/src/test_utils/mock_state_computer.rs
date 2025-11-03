@@ -61,6 +61,7 @@ impl StateComputer for RandomComputeResultStateComputer {
         _: bool,
         _: OnChainConsensusConfig,
         _: u8,
+        _: Arc<crate::network::NetworkSender>,
     ) {
     }
 

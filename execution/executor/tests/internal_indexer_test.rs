@@ -127,7 +127,7 @@ pub fn create_test_db() -> (Arc<AptosDB>, LocalAccount) {
             TEST_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         )
         .unwrap();
-    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, &[signer.clone()]);
+    let li1 = gen_ledger_info_with_sigs(1, &output1, block1_id, std::slice::from_ref(&signer));
     executor.commit_blocks(vec![block1_id], li1).unwrap();
     (aptos_db, core_resources_account)
 }
@@ -311,6 +311,7 @@ fn test_db_indexer_data() {
         ident_str!("ristretto255_elgamal"),
         ident_str!("reconfiguration_state"),
         ident_str!("ristretto255_pedersen"),
+        ident_str!("sui_derivable_account"),
         ident_str!("object_code_deployment"),
         ident_str!("primary_fungible_store"),
         ident_str!("transaction_validation"),

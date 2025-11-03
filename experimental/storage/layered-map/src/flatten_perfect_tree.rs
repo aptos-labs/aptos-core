@@ -23,13 +23,13 @@ impl<K, V> FlattenPerfectTree<K, V> {
         }
     }
 
-    pub fn get_ref(&self) -> FptRef<K, V> {
+    pub fn get_ref(&self) -> FptRef<'_, K, V> {
         FptRef {
             leaves: &self.leaves,
         }
     }
 
-    pub fn get_mut(&mut self) -> FptRefMut<K, V> {
+    pub fn get_mut(&mut self) -> FptRefMut<'_, K, V> {
         FptRefMut {
             leaves: &mut self.leaves,
         }

@@ -37,7 +37,8 @@ use aptos_types::{
     keyless::{Groth16Proof, Pepper, ZeroKnowledgeSig, ZKP},
     state_store::state_key::StateKey,
     transaction::{
-        authenticator::EphemeralSignature, IndexedTransactionSummary, SignedTransaction,
+        authenticator::EphemeralSignature, IndexedTransactionSummary, PersistedAuxiliaryInfo,
+        SignedTransaction, Version,
     },
 };
 use move_core_types::{
@@ -1007,6 +1008,21 @@ impl Client {
         let url = self.build_path("transactions")?;
         let response = self.get_bcs_with_page(url, start, limit).await?;
         Ok(response.and_then(|inner| bcs::from_bytes(&inner))?)
+    }
+
+    pub async fn get_persisted_auxiliary_infos(
+        &self,
+        start: Version,
+        limit: u64,
+    ) -> AptosResult<Vec<PersistedAuxiliaryInfo>> {
+        let mut url = self.build_path("transactions/auxiliary_info")?;
+        url.set_query(Some(&format!("start_version={}&limit={}", start, limit)));
+
+        let response = self.inner.get(url).header(ACCEPT, BCS).send().await?;
+        let response = self.check_and_parse_bcs_response(response).await?;
+        Ok(response
+            .and_then(|inner| bcs::from_bytes(&inner))?
+            .into_inner())
     }
 
     pub async fn get_transaction_by_hash(

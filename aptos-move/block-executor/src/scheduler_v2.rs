@@ -648,7 +648,7 @@ impl SchedulerV2 {
             if self
                 .committed_marker
                 .get(next_to_commit_idx as usize)
-                .map_or(false, |marker| {
+                .is_some_and(|marker| {
                     marker.swap(CommitMarkerFlag::CommitStarted as u8, Ordering::Relaxed)
                         != CommitMarkerFlag::NotCommitted as u8
                 })
@@ -795,7 +795,7 @@ impl SchedulerV2 {
     ///
     /// TODO: take worker ID, dedicate some workers to scan high priority tasks (can use armed lock).
     /// We can also have different versions (e.g. for testing) of next_task.
-    pub(crate) fn next_task(&self, worker_id: u32) -> Result<TaskKind, PanicError> {
+    pub(crate) fn next_task(&self, worker_id: u32) -> Result<TaskKind<'_>, PanicError> {
         if self.is_done() {
             return Ok(TaskKind::Done);
         }
@@ -1075,7 +1075,7 @@ impl SchedulerV2 {
     fn handle_cold_validation_requirements(
         &self,
         worker_id: u32,
-    ) -> Result<Option<TaskKind>, PanicError> {
+    ) -> Result<Option<TaskKind<'_>>, PanicError> {
         if !self
             .cold_validation_requirements
             .is_dedicated_worker(worker_id)

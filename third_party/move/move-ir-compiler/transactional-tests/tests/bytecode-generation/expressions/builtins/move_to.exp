@@ -1,6 +1,6 @@
 processed 4 tasks
 task 0 lines 1-16:  print-bytecode --input=module [// Moving a type defined as part of the same module is valid.]
-// Bytecode version v7
+// Bytecode version v8
 module 0x2d6::M
 struct T has key
   b: bool

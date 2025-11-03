@@ -2,7 +2,7 @@ processed 1 task
 task 0 lines 1-26:  publish --print-bytecode [module 0x66::test]
 
 == BEGIN Bytecode ==
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test
 struct S<T0> has drop
   _1: u64

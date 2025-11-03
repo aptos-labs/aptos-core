@@ -43,13 +43,13 @@ impl CoinSourceArgs {
             &self.coin_source_key,
             &self.coin_source_file,
         ) {
-            (Some(ref key), None, None, None) => Ok((key.private_key(), true)),
+            (Some(key), None, None, None) => Ok((key.private_key(), true)),
             (None, Some(path), None, None) => Ok((
                 EncodingType::BCS
                     .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,
                 true,
             )),
-            (None, None, Some(ref key), None) => Ok((key.private_key(), false)),
+            (None, None, Some(key), None) => Ok((key.private_key(), false)),
             (None, None, None, Some(path)) => Ok((
                 EncodingType::BCS
                     .load_key::<Ed25519PrivateKey>("mint key pair", Path::new(path))?,

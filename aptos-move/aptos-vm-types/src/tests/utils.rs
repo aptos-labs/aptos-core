@@ -27,7 +27,8 @@ use move_core_types::{
     value::MoveTypeLayout,
 };
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc as TriompheArc;
 
 macro_rules! as_state_key {
     ($k:ident) => {
@@ -86,7 +87,7 @@ pub(crate) fn mock_delete(k: impl ToString) -> (StateKey, WriteOp) {
 pub(crate) fn mock_create_with_layout(
     k: impl ToString,
     v: u128,
-    layout: Option<Arc<MoveTypeLayout>>,
+    layout: Option<TriompheArc<MoveTypeLayout>>,
 ) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
@@ -100,7 +101,7 @@ pub(crate) fn mock_create_with_layout(
 pub(crate) fn mock_modify_with_layout(
     k: impl ToString,
     v: u128,
-    layout: Option<Arc<MoveTypeLayout>>,
+    layout: Option<TriompheArc<MoveTypeLayout>>,
 ) -> (StateKey, AbstractResourceWriteOp) {
     (
         as_state_key!(k),
@@ -256,13 +257,13 @@ pub(crate) fn build_vm_output(
 }
 
 pub(crate) struct ExpandedVMChangeSetBuilder {
-    resource_write_set: BTreeMap<StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>)>,
+    resource_write_set: BTreeMap<StateKey, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)>,
     resource_group_write_set: BTreeMap<StateKey, GroupWrite>,
     aggregator_v1_write_set: BTreeMap<StateKey, WriteOp>,
     aggregator_v1_delta_set: BTreeMap<StateKey, DeltaOp>,
     delayed_field_change_set: BTreeMap<DelayedFieldID, DelayedChange<DelayedFieldID>>,
     reads_needing_delayed_field_exchange:
-        BTreeMap<StateKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)>,
+        BTreeMap<StateKey, (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>)>,
     group_reads_needing_delayed_field_exchange: BTreeMap<StateKey, (StateValueMetadata, u64)>,
     events: Vec<(ContractEvent, Option<MoveTypeLayout>)>,
 }
@@ -284,7 +285,9 @@ impl ExpandedVMChangeSetBuilder {
 
     pub(crate) fn with_resource_write_set(
         mut self,
-        resource_write_set: impl IntoIterator<Item = (StateKey, (WriteOp, Option<Arc<MoveTypeLayout>>))>,
+        resource_write_set: impl IntoIterator<
+            Item = (StateKey, (WriteOp, Option<TriompheArc<MoveTypeLayout>>)),
+        >,
     ) -> Self {
         assert!(self.resource_write_set.is_empty());
         self.resource_write_set.extend(resource_write_set);
@@ -334,7 +337,10 @@ impl ExpandedVMChangeSetBuilder {
     pub(crate) fn with_reads_needing_delayed_field_exchange(
         mut self,
         reads_needing_delayed_field_exchange: impl IntoIterator<
-            Item = (StateKey, (StateValueMetadata, u64, Arc<MoveTypeLayout>)),
+            Item = (
+                StateKey,
+                (StateValueMetadata, u64, TriompheArc<MoveTypeLayout>),
+            ),
         >,
     ) -> Self {
         assert!(self.reads_needing_delayed_field_exchange.is_empty());

@@ -76,13 +76,8 @@ fn resource_access_control(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>
     }
 }
 
-#[rstest(enabled, disabled,
-    case(vec![], vec![FeatureFlag::ENABLE_FUNCTION_VALUES]),
-    case(vec![FeatureFlag::ENABLE_FUNCTION_VALUES], vec![]),
-)]
-fn function_values(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
-    let positive_test = !enabled.is_empty();
-
+#[test]
+fn function_values() {
     let sources = &[
         r#"
             module 0x815::m {
@@ -108,17 +103,13 @@ fn function_values(enabled: Vec<FeatureFlag>, disabled: Vec<FeatureFlag>) {
         let mut builder = PackageBuilder::new("Package");
         builder.add_source("m.move", source);
         let path = builder.write_to_temp().unwrap();
-        let mut h = MoveHarness::new_with_features(enabled.clone(), disabled.clone());
+        let mut h = MoveHarness::new();
         let acc = h.new_account_at(AccountAddress::from_hex_literal("0x815").unwrap());
         let result = h.publish_package_with_options(
             &acc,
             path.path(),
             BuildOptions::move_2().set_latest_language(),
         );
-        if positive_test {
-            assert_success!(result);
-        } else {
-            assert_vm_status!(result, StatusCode::FEATURE_NOT_ENABLED);
-        }
+        assert_success!(result);
     }
 }

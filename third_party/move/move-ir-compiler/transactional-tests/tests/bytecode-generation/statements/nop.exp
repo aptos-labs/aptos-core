@@ -1,6 +1,6 @@
 processed 1 task
 task 0 lines 1-14:  print-bytecode --input=module [module 0xcafe.Nop {]
-// Bytecode version v7
+// Bytecode version v8
 module 0xcafe::Nop
 // Function definition at index 0
 fun nop_valid()

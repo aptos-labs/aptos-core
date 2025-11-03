@@ -14,28 +14,24 @@ cargo build --locked --profile=$PROFILE \
     -p aptos \
     -p aptos-backup-cli \
     -p aptos-faucet-service \
-    -p aptos-fn-check-client \
-    -p aptos-node-checker \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p aptos-keyless-pepper-service \
     -p aptos-debugger \
     -p aptos-transaction-emitter \
-    -p aptos-api-tester \
+    -p aptos-release-builder \
     "$@"
 
 # After building, copy the binaries we need to `dist` since the `target` directory is used as docker cache mount and only available during the RUN step
 BINS=(
     aptos
     aptos-faucet-service
-    aptos-node-checker
     aptos-openapi-spec-generator
     aptos-telemetry-service
     aptos-keyless-pepper-service
-    aptos-fn-check-client
     aptos-debugger
     aptos-transaction-emitter
-    aptos-api-tester
+    aptos-release-builder
 )
 
 mkdir dist

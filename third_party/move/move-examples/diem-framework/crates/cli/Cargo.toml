@@ -5,7 +5,7 @@ description = "CLI frontend for the Move compiler and VM (with Diem Framework)"
 authors = ["Diem Association <opensource@diem.com>"]
 license = "Apache-2.0"
 publish = false
-edition = "2021"
+edition = { workspace = true }
 
 [dependencies]
 anyhow = { workspace = true }

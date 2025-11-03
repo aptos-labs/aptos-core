@@ -142,7 +142,7 @@ impl<'a> HotStateLRU<'a> {
         Some(old_slot)
     }
 
-    fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
+    pub(crate) fn get_slot(&self, key: &StateKey) -> Option<StateSlot> {
         if let Some(slot) = self.pending.get(key) {
             return Some(slot.clone());
         }
@@ -172,7 +172,7 @@ impl<'a> HotStateLRU<'a> {
     }
 
     #[cfg(test)]
-    fn iter(&self) -> Iter {
+    fn iter(&self) -> Iter<'_, '_> {
         Iter {
             current_key: self.head.clone(),
             lru: self,

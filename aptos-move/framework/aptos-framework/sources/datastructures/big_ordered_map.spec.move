@@ -97,7 +97,7 @@ spec aptos_std::big_ordered_map {
         pragma verify = false;
     }
 
-    spec lower_bound {
+    spec internal_lower_bound {
         pragma opaque;
         pragma verify = false;
     }
@@ -155,6 +155,7 @@ spec aptos_std::big_ordered_map {
         ensures [abstract] spec_contains_key(old(self), key) ==> spec_len(old(self)) == spec_len(self);
         ensures [abstract] forall k: K: spec_contains_key(old(self), k) && k != key ==> spec_get(old(self), k) == spec_get(self, k);
         ensures [abstract] forall k: K: spec_contains_key(old(self), k) ==> spec_contains_key(self, k);
+        ensures [abstract] forall k: K: spec_contains_key(self, k) ==> (k == key || spec_contains_key(old(self), k));
     }
 
     spec add_all {
@@ -220,17 +221,17 @@ spec aptos_std::big_ordered_map {
     }
 
 
-    spec find {
+    spec internal_find {
         pragma opaque;
         pragma verify = false;
     }
 
-    spec new_begin_iter {
+    spec internal_new_begin_iter {
         pragma opaque;
         pragma verify = false;
     }
 
-    spec new_end_iter {
+    spec internal_new_end_iter {
         pragma opaque;
         pragma verify = false;
     }
@@ -251,5 +252,8 @@ spec aptos_std::big_ordered_map {
         ensures [abstract] result == spec_len(self);
     }
 
-
+    spec iter_modify {
+        pragma opaque;
+        pragma verify = false;
+    }
 }

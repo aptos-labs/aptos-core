@@ -107,7 +107,7 @@ pub fn prepare_executed_blocks_with_ledger_info(
         consensus_hash,
     );
 
-    let li_sig = generate_ledger_info_with_sig(&[signer.clone()], li);
+    let li_sig = generate_ledger_info_with_sig(std::slice::from_ref(signer), li);
 
     let executed_blocks: Vec<Arc<PipelinedBlock>> = proposals
         .iter()

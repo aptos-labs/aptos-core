@@ -194,7 +194,7 @@ where
         }
         generator
             .output(&mut self.out, &script_registry)
-            .map_err(|err| std::io::Error::new(std::io::ErrorKind::Other, format!("{}", err)))?;
+            .map_err(|err| std::io::Error::other(format!("{}", err)))?;
         Ok(())
     }
 
@@ -471,13 +471,10 @@ func DecodeEntryFunctionPayload(script aptostypes.TransactionPayload) (EntryFunc
                 None => {
                     let vec_string_tag =
                         TypeTag::from_str("vector<0x1::string::String>").map_err(|err| {
-                            io::Error::new(
-                                io::ErrorKind::Other,
-                                format!(
-                                    "Failed to construct a type tag for vector of strings: {:?}",
-                                    err
-                                ),
-                            )
+                            io::Error::other(format!(
+                                "Failed to construct a type tag for vector of strings: {:?}",
+                                err
+                            ))
                         })?;
                     if arg.type_tag() == &vec_string_tag {
                         format!(
@@ -682,7 +679,10 @@ func encode_{}_argument(arg {}) []byte {{
                 U8 => ("U8Vector", default_stmt),
                 _ => common::type_not_allowed(type_tag),
             },
-            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
+            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
+                // TODO(#17645): support for signed integers?
+                common::type_not_allowed(type_tag)
+            },
         };
         writeln!(
             self.out,
@@ -803,7 +803,10 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 tag if &**tag == Lazy::force(&str_tag) => "[]uint8".into(),
                 _ => common::type_not_allowed(type_tag),
             },
-            Signer | Function(..) => common::type_not_allowed(type_tag),
+            // TODO(#17645): signed integers
+            Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
+                common::type_not_allowed(type_tag)
+            },
         }
     }
 
@@ -830,7 +833,10 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 U8 => format!("(*aptostypes.TransactionArgument__U8Vector)(&{})", name),
                 _ => common::type_not_allowed(type_tag),
             },
-            Struct(_) | Signer | Function(..) => common::type_not_allowed(type_tag),
+            // TODO(#17645): signed integers
+            Struct(_) | Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
+                common::type_not_allowed(type_tag)
+            },
         }
     }
 
@@ -864,7 +870,10 @@ func decode_{0}_argument(arg aptostypes.TransactionArgument) (value {1}, err err
                 tag if &**tag == Lazy::force(&str_tag) => Some("Bytes"),
                 _ => common::type_not_allowed(type_tag),
             },
-            Signer | Function(..) => common::type_not_allowed(type_tag),
+            // TODO(#17645): signed integers
+            Signer | Function(..) | I8 | I16 | I32 | I64 | I128 | I256 => {
+                common::type_not_allowed(type_tag)
+            },
         }
     }
 }

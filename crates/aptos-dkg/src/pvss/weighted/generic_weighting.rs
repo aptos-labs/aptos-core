@@ -7,7 +7,7 @@
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
     traits::{transcript::MalleableTranscript, Reconstructable, SecretSharingConfig, Transcript},
-    Player, ThresholdConfig, WeightedConfig,
+    Player, ThresholdConfigBlstrs, WeightedConfig,
 };
 use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -24,7 +24,7 @@ pub struct GenericWeighting<T> {
 
 /// Implements weighted reconstruction of a secret `SK` through the existing unweighted reconstruction
 /// implementation of `SK`.
-impl<SK: Reconstructable<ThresholdConfig>> Reconstructable<WeightedConfig> for SK {
+impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig> for SK {
     type Share = Vec<SK::Share>;
 
     fn reconstruct(sc: &WeightedConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
@@ -90,7 +90,9 @@ impl<T: Transcript> GenericWeighting<T> {
     }
 }
 
-impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for GenericWeighting<T> {
+impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
+    for GenericWeighting<T>
+{
     type DealtPubKey = T::DealtPubKey;
     type DealtPubKeyShare = Vec<T::DealtPubKeyShare>;
     type DealtSecretKey = T::DealtSecretKey;
@@ -104,6 +106,12 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Generi
     type SecretSharingConfig = WeightedConfig;
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
+
+    fn dst() -> Vec<u8> {
+        let mut result = b"WEIGHTED_".to_vec();
+        result.extend(T::dst());
+        result
+    }
 
     fn scheme_name() -> String {
         format!("generic_weighted_{}", T::scheme_name())
@@ -223,7 +231,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfig>> Transcript for Generi
     }
 }
 
-impl<T: MalleableTranscript<SecretSharingConfig = ThresholdConfig>> MalleableTranscript
+impl<T: MalleableTranscript<SecretSharingConfig = ThresholdConfigBlstrs>> MalleableTranscript
     for GenericWeighting<T>
 {
     fn maul_signature<A: Serialize + Clone>(

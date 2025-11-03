@@ -78,9 +78,10 @@ impl InitializedState {
             panic!("ICE: num_locals must be >= num_params");
         }
         Self(Vector::from_iter(
-            std::iter::repeat(Initialized::Yes)
-                .take(num_params)
-                .chain(std::iter::repeat(Initialized::No).take(num_locals - num_params)),
+            std::iter::repeat_n(Initialized::Yes, num_params).chain(std::iter::repeat_n(
+                Initialized::No,
+                num_locals - num_params,
+            )),
         ))
     }
 

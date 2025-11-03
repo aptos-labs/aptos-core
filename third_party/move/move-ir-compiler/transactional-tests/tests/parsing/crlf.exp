@@ -1,6 +1,6 @@
 processed 6 tasks
 task 0 lines 1-6:  print-bytecode [main() {]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -8,7 +8,7 @@ entry public fun main()
 
 
 task 1 lines 8-14:  print-bytecode [main() {]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -16,7 +16,7 @@ entry public fun main()
 
 
 task 2 lines 16-20:  print-bytecode [main() {]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -24,7 +24,7 @@ entry public fun main()
 
 
 task 3 lines 22-27:  print-bytecode [main() {]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -34,7 +34,7 @@ entry public fun main()
 task 4 lines 29-36:  print-bytecode [// In Move, /* */ are block comment delimiters. Not so in Move IR, so the `/*` below]
 Error: ParserError: Invalid Token: invalid token kind for statement Slash
 task 5 lines 38-46:  print-bytecode [// Since /* */ are not block comment delimiters, they do not behave in any unique way when]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()

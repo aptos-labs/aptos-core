@@ -2,11 +2,14 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{assert_success, tests::common, MoveHarness};
+use aptos_framework::{BuildOptions, BuiltPackage};
+use aptos_language_e2e_tests::executor::{ExecutorMode, FakeExecutor};
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::vm_status::StatusCode;
+use std::collections::HashSet;
 use test_case::test_case;
 
 fn assert_dependency_limit_reached(status: TransactionStatus) {
@@ -36,7 +39,7 @@ fn exceeding_max_num_dependencies_on_publish(
     } else {
         // Enough to cover for 2 modules combined: p1 and p2 or p2 and p3.
         h.modify_gas_schedule(|gas_params| {
-            gas_params.vm.txn.max_total_dependency_size = 320.into();
+            gas_params.vm.txn.max_total_dependency_size = 330.into();
         });
     }
 
@@ -143,4 +146,53 @@ fn exceeding_max_num_dependencies(enable_lazy_loading: bool, change_max_num_depe
         vec![],
     );
     assert_dependency_limit_reached(res);
+}
+
+#[test]
+fn test_script_with_dependencies() {
+    let executor =
+        FakeExecutor::from_head_genesis().set_executor_mode(ExecutorMode::BothComparison);
+    let mut h = MoveHarness::new_with_executor(executor);
+    let acc = h.new_account_at(AccountAddress::from_hex_literal("0xcafe").unwrap());
+    assert_success!(
+        h.publish_package_cache_building(&acc, &common::test_dir_path("dependencies.data/p4"))
+    );
+
+    // Extract the script from the package to run in multiple times in the block.
+    let p3 = BuiltPackage::build(
+        common::test_dir_path("dependencies.data/p4"),
+        BuildOptions::default(),
+    )
+    .expect("Building a package must succeed");
+    let script = p3.extract_script_code().pop().expect("Script exists");
+
+    // Scale up to see gas difference.
+    h.modify_gas_scaling(100);
+
+    for _ in 0..1 {
+        let mut txns = vec![];
+        let account = h.new_account_at(AccountAddress::random());
+        let txn = h.create_entry_function(
+            &account,
+            str::parse("0xcafe::a3::increment_counter").unwrap(),
+            vec![],
+            vec![],
+        );
+        txns.push(txn);
+
+        for _ in 0..3 {
+            let account = h.new_account_at(AccountAddress::random());
+            let txn = h.create_script(&account, script.clone(), vec![], vec![]);
+            txns.push(txn);
+        }
+
+        let mut gas_used = HashSet::new();
+        let outputs = h.run_block_get_output(txns);
+        for output in &outputs[1..] {
+            let status = output.status().clone();
+            assert_success!(status);
+            gas_used.insert(output.gas_used());
+        }
+        assert_eq!(gas_used.len(), 1);
+    }
 }

@@ -369,7 +369,7 @@ fn check_for_cycles<T: Ord + Copy + Debug>(
     let mut cycles: BTreeSet<Vec<T>> = BTreeSet::new();
     let mut reachable_from_map: BTreeMap<T, BTreeSet<Vec<T>>> = call_graph
         .iter()
-        .map(|(node, set)| (*node, iter::repeat(vec![*node]).take(set.len()).collect()))
+        .map(|(node, set)| (*node, std::iter::repeat_n(vec![*node], set.len()).collect()))
         .collect();
 
     let mut changed = true;
@@ -757,13 +757,13 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
         let mut sym_param_map: BTreeMap<Symbol, usize> = BTreeMap::new();
         let mut function_value_spec_map = BTreeMap::new();
 
-        if lift_inline_funs && target_qualified_fun_id_opt.is_some() {
+        if lift_inline_funs && let Some(target_qualified_fun_id) = target_qualified_fun_id_opt {
             let mut lifted_lambda_funs: BTreeMap<usize, move_model::model::FunctionData> =
                 BTreeMap::new();
             let options = LambdaLiftingOptions {
                 include_inline_functions: true,
             };
-            let fun_env = env.get_function(target_qualified_fun_id_opt.unwrap());
+            let fun_env = env.get_function(target_qualified_fun_id);
             for (para, lambda) in lambda_args_matched.iter().copied() {
                 let mut lifter = LambdaLifter::new(
                     &options,
@@ -784,7 +784,7 @@ impl<'env, 'rewriter> InlinedRewriter<'env, 'rewriter> {
             }
             function_value_spec_map = run_spec_rewriter_inline(
                 env,
-                target_qualified_fun_id_opt.unwrap().module_id,
+                target_qualified_fun_id.module_id,
                 lifted_lambda_funs,
             );
         }
@@ -1471,7 +1471,7 @@ impl ExpRewriterFunctions for InlinedRewriter<'_, '_> {
                     pattern_vec.clone(),
                 ))
             },
-            Pattern::Wildcard(_) => None,
+            Pattern::Wildcard(_) => Some(Pattern::Wildcard(new_id)),
             Pattern::Error(_) => None,
         }
     }

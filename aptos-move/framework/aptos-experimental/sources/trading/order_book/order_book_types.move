@@ -1,21 +1,22 @@
 /// Order book type definitions
 module aptos_experimental::order_book_types {
+    friend aptos_experimental::order_book;
+    friend aptos_experimental::single_order_book;
+    friend aptos_experimental::bulk_order_book;
+    friend aptos_experimental::price_time_index;
+    friend aptos_experimental::pending_order_book_index;
+    friend aptos_experimental::order_placement;
+    friend aptos_experimental::order_operations;
+    friend aptos_experimental::market_types;
+    friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::single_order_types;
+    friend aptos_experimental::bulk_order_book_types;
+    #[test_only] friend aptos_experimental::bulk_order_book_tests;
+    #[test_only] friend aptos_experimental::order_book_client_order_id;
     use std::option;
     use std::option::Option;
+    use std::string::String;
     use aptos_framework::big_ordered_map::{Self, BigOrderedMap};
-
-    friend aptos_experimental::price_time_index;
-    friend aptos_experimental::single_order_book;
-    friend aptos_experimental::pending_order_book_index;
-    friend aptos_experimental::market;
-    friend aptos_experimental::order_book;
-    friend aptos_experimental::single_order_types;
-    friend aptos_experimental::bulk_order_book;
-    friend aptos_experimental::bulk_order_book_types;
-    #[test_only]
-    friend aptos_experimental::bulk_order_book_tests;
-    #[test_only]
-    friend aptos_experimental::order_book_client_order_id;
 
     const U128_MAX: u128 = 0xffffffffffffffffffffffffffffffff;
 
@@ -29,34 +30,32 @@ module aptos_experimental::order_book_types {
 
     struct AccountClientOrderId has store, copy, drop {
         account: address,
-        client_order_id: u64
+        client_order_id: String
     }
 
-    // Internal type representing order in which trades are placed. Unique per instance of AscendingIdGenerator.
+    // Internal type representing order in which trades are placed.
     struct UniqueIdxType has store, copy, drop {
         idx: u128
     }
 
-    enum OrderBookType has store, drop, copy {
-        SingleOrderBook,
-        BulkOrderBook
+    enum OrderType has store, drop, copy {
+        SingleOrder,
+        BulkOrder
     }
 
-    // Struct providing ascending ids, to be able to be used as tie-breaker to respect FIFO order of trades.
-    // Returned ids are ascending and unique within a single instance of AscendingIdGenerator.
-    enum AscendingIdGenerator has store, drop {
-        FromCounter {
-            value: u64
+    public fun single_order_type(): OrderType {
+        OrderType::SingleOrder
+    }
+
+    public fun bulk_order_type(): OrderType {
+        OrderType::BulkOrder
+    }
+
+    public fun is_single_order_type(order_type: &OrderType): bool {
+        match (order_type) {
+            OrderType::SingleOrder => true,
+            OrderType::BulkOrder => false,
         }
-        // TODO: add stateless (and with that fully parallel) support for id creation via native function
-    }
-
-    public fun single_order_book_type(): OrderBookType {
-        OrderBookType::SingleOrderBook
-    }
-
-    public fun bulk_order_book_type(): OrderBookType {
-        OrderBookType::BulkOrderBook
     }
 
     public(friend) fun new_default_big_ordered_map<K: store, V: store>(): BigOrderedMap<K, V> {
@@ -72,18 +71,9 @@ module aptos_experimental::order_book_types {
     }
 
     public fun new_account_client_order_id(
-        account: address, client_order_id: u64
+        account: address, client_order_id: String
     ): AccountClientOrderId {
         AccountClientOrderId { account, client_order_id }
-    }
-
-    public(friend) fun new_ascending_id_generator(): AscendingIdGenerator {
-        AscendingIdGenerator::FromCounter { value: 0 }
-    }
-
-    public(friend) fun next_ascending_id(self: &mut AscendingIdGenerator): u128 {
-        self.value += 1;
-        self.value as u128
     }
 
     public(friend) fun new_unique_idx_type(idx: u128): UniqueIdxType {
@@ -99,6 +89,7 @@ module aptos_experimental::order_book_types {
     }
 
     const EINVALID_TIME_IN_FORCE: u64 = 5;
+    const E_REINSERT_ORDER_MISMATCH: u64 = 8;
 
     /// Order time in force
     enum TimeInForce has drop, copy, store {
@@ -150,8 +141,9 @@ module aptos_experimental::order_book_types {
         TimeBased(u64)
     }
 
-    public fun new_time_based_trigger_condition(time: u64): TriggerCondition {
-        TriggerCondition::TimeBased(time)
+    // The time should be seconds since unix epoch
+    public fun new_time_based_trigger_condition(time_secs: u64): TriggerCondition {
+        TriggerCondition::TimeBased(time_secs)
     }
 
     public fun price_move_up_condition(price: u64): TriggerCondition {
@@ -163,7 +155,7 @@ module aptos_experimental::order_book_types {
     }
 
     // Returns the price move down index and price move up index for a particular trigger condition
-    public fun index(self: &TriggerCondition):
+    public(friend) fun index(self: &TriggerCondition):
         (option::Option<u64>, option::Option<u64>, option::Option<u64>) {
         match(self) {
             TriggerCondition::PriceMoveAbove(price) => {
@@ -192,18 +184,27 @@ module aptos_experimental::order_book_types {
     /// - `remaining_size`: Remaining size after the match
     /// - `is_bid`: True if this was a bid order, false if ask order
     enum OrderMatchDetails<M: store + copy + drop> has copy, drop {
-        V1 {
+        SingleOrder {
             order_id: OrderIdType,
             account: address,
-            client_order_id: Option<u64>, // for client to track orders
+            client_order_id: Option<String>, // for client to track orders
             unique_priority_idx: UniqueIdxType,
             price: u64,
             orig_size: u64,
             remaining_size: u64,
             is_bid: bool,
             time_in_force: TimeInForce,
-            metadata: Option<M>,
-            order_book_type: OrderBookType
+            metadata: M,
+        },
+        BulkOrder {
+            order_id: OrderIdType,
+            account: address,
+            unique_priority_idx: UniqueIdxType,
+            price: u64,
+            remaining_size: u64,
+            is_bid: bool,
+            sequence_number: u64,
+            metadata: M,
         }
     }
 
@@ -229,10 +230,10 @@ module aptos_experimental::order_book_types {
         (order, matched_size)
     }
 
-    public(friend) fun destroy_order_match_details<M: store + copy + drop>(
+    public(friend) fun destroy_single_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, Option<u64>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, Option<M>, OrderBookType) {
-        let OrderMatchDetails::V1 {
+    ): (OrderIdType, address, Option<String>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, M) {
+        let OrderMatchDetails::SingleOrder {
             order_id,
             account,
             client_order_id,
@@ -243,9 +244,24 @@ module aptos_experimental::order_book_types {
             is_bid,
             time_in_force,
             metadata,
-            order_book_type
         } = self;
-        (order_id, account, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force,  metadata, order_book_type)
+        (order_id, account, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, metadata)
+    }
+
+    public(friend) fun destroy_bulk_order_match_details<M: store + copy + drop>(
+        self: OrderMatchDetails<M>,
+    ): (OrderIdType, address, UniqueIdxType, u64, u64, bool, u64, M) {
+        let OrderMatchDetails::BulkOrder {
+            order_id,
+            account,
+            unique_priority_idx,
+            price,
+            remaining_size,
+            is_bid,
+            sequence_number,
+            metadata,
+        } = self;
+        (order_id, account, unique_priority_idx, price, remaining_size, is_bid, sequence_number, metadata)
     }
 
     public fun get_matched_size<M: store + copy + drop>(
@@ -256,8 +272,6 @@ module aptos_experimental::order_book_types {
 
     /// Validates that a reinsertion request is valid for the given original order.
     ///
-
-
     public(friend) fun get_account_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
     ): address {
@@ -297,48 +311,75 @@ module aptos_experimental::order_book_types {
     public(friend) fun get_time_in_force_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
     ): TimeInForce {
-        self.time_in_force
+        if (self is OrderMatchDetails::SingleOrder) {
+            self.time_in_force
+        } else {
+            good_till_cancelled()
+        }
     }
 
     public(friend) fun get_metadata_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): Option<M> {
+    ): M {
         self.metadata
     }
 
     public(friend) fun get_client_order_id_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): Option<u64> {
-        self.client_order_id
+    ): Option<String> {
+        if (self is OrderMatchDetails::SingleOrder) {
+            self.client_order_id
+        } else {
+            option::none()
+        }
     }
 
     public(friend) fun is_bid_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
     ): bool {
-        self.is_bid
+        if (self is OrderMatchDetails::SingleOrder) {
+            let OrderMatchDetails::SingleOrder { is_bid, .. } = self;
+            *is_bid
+        } else {
+            let OrderMatchDetails::BulkOrder { is_bid, .. } = self;
+            *is_bid
+        }
     }
 
     public(friend) fun get_book_type_from_match_details<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
-    ): OrderBookType {
-        self.order_book_type
+    ): OrderType {
+        if (self is OrderMatchDetails::SingleOrder) {
+            single_order_type()
+        } else {
+            bulk_order_type()
+        }
+    }
+
+    public(friend) fun get_sequence_number_from_match_details<M: store + copy + drop>(
+        self: &OrderMatchDetails<M>,
+    ): u64 {
+        if (self is OrderMatchDetails::BulkOrder) {
+            self.sequence_number
+        } else {
+            abort 1 // This should only be called on bulk orders
+        }
     }
 
 
-    public(friend) fun new_order_match_details<M: store + copy + drop>(
+    public(friend) fun new_single_order_match_details<M: store + copy + drop>(
         order_id: OrderIdType,
         account: address,
-        client_order_id: Option<u64>,
+        client_order_id: Option<String>,
         unique_priority_idx: UniqueIdxType,
         price: u64,
         orig_size: u64,
         remaining_size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
-        metadata: Option<M>,
-        order_book_type: OrderBookType
+        metadata: M
     ): OrderMatchDetails<M> {
-        OrderMatchDetails::V1 {
+        OrderMatchDetails::SingleOrder {
             order_id,
             account,
             client_order_id,
@@ -349,26 +390,81 @@ module aptos_experimental::order_book_types {
             is_bid,
             time_in_force,
             metadata,
-            order_book_type
         }
     }
 
-    public fun new_order_match_details_with_modified_size<M: store + copy + drop>(
+    public(friend) fun new_bulk_order_match_details<M: store + copy + drop>(
+        order_id: OrderIdType,
+        account: address,
+        unique_priority_idx: UniqueIdxType,
+        price: u64,
+        remaining_size: u64,
+        is_bid: bool,
+        sequence_number: u64,
+        metadata: M
+    ): OrderMatchDetails<M> {
+        OrderMatchDetails::BulkOrder {
+            order_id,
+            account,
+            unique_priority_idx,
+            price,
+            remaining_size,
+            is_bid,
+            sequence_number,
+            metadata,
+        }
+    }
+
+    public(friend) fun new_order_match_details_with_modified_size<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
         remaining_size: u64
     ): OrderMatchDetails<M> {
-        OrderMatchDetails::V1 {
-            order_id: self.order_id,
-            account: self.account,
-            client_order_id: self.client_order_id,
-            unique_priority_idx: self.unique_priority_idx,
-            price: self.price,
-            orig_size: self.orig_size,
-            remaining_size,
-            is_bid: self.is_bid,
-            time_in_force: self.time_in_force,
-            metadata: self.metadata,
-            order_book_type: self.order_book_type
+        if (self is OrderMatchDetails::SingleOrder) {
+            let OrderMatchDetails::SingleOrder {
+                order_id,
+                account,
+                client_order_id,
+                unique_priority_idx,
+                price,
+                orig_size,
+                remaining_size: _,
+                is_bid,
+                time_in_force,
+                metadata,
+            } = self;
+            OrderMatchDetails::SingleOrder {
+                order_id: *order_id,
+                account: *account,
+                client_order_id: *client_order_id,
+                unique_priority_idx: *unique_priority_idx,
+                price: *price,
+                orig_size: *orig_size,
+                remaining_size,
+                is_bid: *is_bid,
+                time_in_force: *time_in_force,
+                metadata: *metadata,
+            }
+        } else {
+            let OrderMatchDetails::BulkOrder {
+                order_id,
+                account,
+                unique_priority_idx,
+                price,
+                remaining_size: _,
+                is_bid,
+                sequence_number,
+                metadata,
+            } = self;
+            OrderMatchDetails::BulkOrder {
+                order_id: *order_id,
+                account: *account,
+                unique_priority_idx: *unique_priority_idx,
+                price: *price,
+                remaining_size,
+                is_bid: *is_bid,
+                sequence_number: *sequence_number,
+                metadata: *metadata,
+            }
         }
     }
 
@@ -382,10 +478,13 @@ module aptos_experimental::order_book_types {
         }
     }
 
-    public(friend) fun validate_reinsertion_request<M: store + copy + drop>(
+    public(friend) fun validate_single_order_reinsertion_request<M: store + copy + drop>(
         self: &OrderMatchDetails<M>,
         other: &OrderMatchDetails<M>,
     ): bool {
+        assert!(self is OrderMatchDetails::SingleOrder, E_REINSERT_ORDER_MISMATCH);
+        assert!(other is OrderMatchDetails::SingleOrder, E_REINSERT_ORDER_MISMATCH);
+
         self.order_id == other.order_id &&
         self.account == other.account &&
         self.unique_priority_idx == other.unique_priority_idx &&
@@ -394,23 +493,38 @@ module aptos_experimental::order_book_types {
         self.is_bid == other.is_bid
     }
 
+    public(friend) fun validate_bulk_order_reinsertion_request<M: store + copy + drop>(
+        self: &OrderMatchDetails<M>,
+        other: &OrderMatchDetails<M>,
+    ): bool {
+        assert!(self is OrderMatchDetails::BulkOrder, E_REINSERT_ORDER_MISMATCH);
+        assert!(other is OrderMatchDetails::BulkOrder, E_REINSERT_ORDER_MISMATCH);
+
+        self.order_id == other.order_id &&
+        self.account == other.account &&
+        self.unique_priority_idx == other.unique_priority_idx &&
+        self.price == other.price &&
+        self.is_bid == other.is_bid &&
+        self.sequence_number == other.sequence_number
+    }
+
     struct ActiveMatchedOrder has copy, drop {
         order_id: OrderIdType,
         matched_size: u64,
         /// Remaining size of the maker order
         remaining_size: u64,
-        order_book_type: OrderBookType,
+        order_book_type: OrderType,
     }
 
     public(friend) fun new_active_matched_order(
-        order_id: OrderIdType, matched_size: u64, remaining_size: u64, order_book_type: OrderBookType
+        order_id: OrderIdType, matched_size: u64, remaining_size: u64, order_book_type: OrderType
     ): ActiveMatchedOrder {
         ActiveMatchedOrder { order_id, matched_size, remaining_size, order_book_type }
     }
 
     public(friend) fun destroy_active_matched_order(
         self: ActiveMatchedOrder
-    ): (OrderIdType, u64, u64, OrderBookType) {
+    ): (OrderIdType, u64, u64, OrderType) {
         (self.order_id, self.matched_size, self.remaining_size, self.order_book_type)
     }
 
@@ -420,11 +534,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun get_active_matched_book_type(
         self: &ActiveMatchedOrder
-    ): OrderBookType {
+    ): OrderType {
         self.order_book_type
-    }
-
-    public fun destroy_active_match_order(self: ActiveMatchedOrder): (OrderIdType, u64, u64) {
-        (self.order_id, self.matched_size, self.remaining_size)
     }
 }

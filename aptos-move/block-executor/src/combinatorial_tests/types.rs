@@ -27,6 +27,7 @@ use move_core_types::{
     language_storage::ModuleId,
 };
 use move_vm_runtime::Module;
+use move_vm_types::module_id_interner::InternedModuleIdPool;
 use proptest::{arbitrary::Arbitrary, collection::vec, prelude::*, proptest, sample::Index};
 use proptest_derive::Arbitrary;
 use std::{
@@ -600,15 +601,15 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
     fn writes_and_deltas_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         // TODO: disentangle writes and deltas.
         universe: &[K],
-        gen: Vec<Vec<(Index, V)>>,
+        r#gen: Vec<Vec<(Index, V)>>,
         allow_deletes: bool,
         delta_threshold: Option<usize>,
     ) -> Vec<(
         /* writes = */ Vec<(KeyType<K>, ValueType, bool)>,
         /* deltas = */ Vec<(KeyType<K>, DeltaOp)>,
     )> {
-        let mut ret = Vec::with_capacity(gen.len());
-        for write_gen in gen.into_iter() {
+        let mut ret = Vec::with_capacity(r#gen.len());
+        for write_gen in r#gen.into_iter() {
             let mut keys_modified = BTreeSet::new();
             let mut incarnation_writes = vec![];
             let mut incarnation_deltas = vec![];
@@ -641,11 +642,11 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
     fn reads_from_gen<K: Clone + Hash + Debug + Eq + Ord>(
         universe: &[K],
-        gen: Vec<Vec<Index>>,
+        r#gen: Vec<Vec<Index>>,
         delta_threshold: Option<usize>,
     ) -> Vec<Vec<(KeyType<K>, bool)>> {
         let mut ret = vec![];
-        for read_gen in gen.into_iter() {
+        for read_gen in r#gen.into_iter() {
             let mut incarnation_reads: Vec<(KeyType<K>, bool)> = vec![];
             for idx in read_gen.into_iter() {
                 let i = idx.index(universe.len());
@@ -747,6 +748,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
         E: Send + Sync + Debug + Clone + TransactionEvent,
     >(
         self,
+        module_id_pool: &InternedModuleIdPool,
         universe: &[K],
     ) -> MockTransaction<KeyType<K>, E> {
         let universe_len = universe.len();
@@ -762,7 +764,7 @@ impl<V: Into<Vec<u8>> + Arbitrary + Clone + Debug + Eq + Sync + Send> Transactio
 
             // Serialize a module and store it in bytes so deserialization can succeed.
             let mut serialized_bytes = vec![];
-            Module::new_for_test(module_id.clone())
+            Module::new_for_test(module_id_pool, module_id.clone())
                 .serialize(&mut serialized_bytes)
                 .expect("Failed to serialize compiled module");
             value.bytes = Some(serialized_bytes.into());

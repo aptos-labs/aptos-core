@@ -311,23 +311,16 @@ impl BufferManager {
         let round = commit_proof.commit_info().round();
         let block_id = commit_proof.commit_info().id();
         if self.highest_committed_round < round {
-            if self.pending_commit_proofs.len() < MAX_PENDING_COMMIT_PROOFS {
-                self.pending_commit_proofs.insert(round, commit_proof);
-
-                info!(
-                    round = round,
-                    block_id = block_id,
-                    "Added pending commit proof."
-                );
-                true
-            } else {
-                warn!(
-                    round = round,
-                    block_id = block_id,
-                    "Too many pending commit proofs, ignored."
-                );
-                false
+            info!(
+                round = round,
+                block_id = block_id,
+                "Added pending commit proof."
+            );
+            self.pending_commit_proofs.insert(round, commit_proof);
+            if self.pending_commit_proofs.len() == MAX_PENDING_COMMIT_PROOFS {
+                let _ = self.pending_commit_proofs.pop_first();
             }
+            true
         } else {
             debug!(
                 round = round,

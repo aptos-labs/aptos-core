@@ -1,0 +1,30 @@
+Move prover returns: exiting with condition generation errors
+error: signed integer cannot be turned into bit vector
+   ┌─ tests/sources/functional/signed_int/error.move:11:25
+   │
+11 │         invariant x >= (x ^ (1 as i64));
+   │                         ^
+
+error: signed integer cannot be turned into bit vector
+   ┌─ tests/sources/functional/signed_int/error.move:12:25
+   │
+12 │         invariant x >= (x | (1 as i64));
+   │                         ^
+
+error: signed integer cannot be turned into bit vector
+   ┌─ tests/sources/functional/signed_int/error.move:13:25
+   │
+13 │         invariant x >= (x & (1 as i64));
+   │                         ^
+
+error: [boogie translator] signed integer types not supported in operation $shl
+   ┌─ tests/sources/functional/signed_int/error.move:14:24
+   │
+14 │         invariant x >= (x << (1 as i64));
+   │                        ^^^^^^^^^^^^^^^^^
+
+error: [boogie translator] signed integer types not supported in operation $shr
+   ┌─ tests/sources/functional/signed_int/error.move:15:25
+   │
+15 │         invariant x >= (x >> (1 as i64));
+   │                         ^

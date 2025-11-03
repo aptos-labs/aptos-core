@@ -38,7 +38,7 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     config::VMConfig,
-    data_cache::TransactionDataCache,
+    data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
@@ -51,7 +51,8 @@ use move_vm_types::{
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::Value,
 };
-use std::{borrow::Borrow, collections::BTreeMap, sync::Arc};
+use std::{borrow::Borrow, collections::BTreeMap};
+use triomphe::Arc as TriompheArc;
 
 pub mod respawned_session;
 pub mod session_id;
@@ -66,7 +67,7 @@ pub(crate) enum ResourceGroupChangeSet {
 }
 type AccountChangeSet = AccountChanges<BytesWithResourceLayout>;
 type ChangeSet = Changes<BytesWithResourceLayout>;
-pub type BytesWithResourceLayout = (Bytes, Option<Arc<MoveTypeLayout>>);
+pub type BytesWithResourceLayout = (Bytes, Option<TriompheArc<MoveTypeLayout>>);
 
 pub struct SessionExt<'r, R> {
     data_cache: TransactionDataCache,
@@ -87,35 +88,13 @@ where
         maybe_user_transaction_context: Option<UserTransactionContext>,
         resolver: &'r R,
     ) -> Self {
-        let mut extensions = NativeContextExtensions::default();
-        let session_counter = session_id.session_counter();
-        let txn_hash: [u8; 32] = session_id
-            .as_uuid()
-            .to_vec()
-            .try_into()
-            .expect("HashValue should convert to [u8; 32]");
-
-        extensions.add(NativeTableContext::new(txn_hash, resolver));
-        extensions.add(NativeRistrettoPointContext::new());
-        extensions.add(AlgebraContext::new());
-        extensions.add(NativeAggregatorContext::new(
-            txn_hash,
+        let extensions = make_aptos_extensions(
             resolver,
-            vm_config.delayed_field_optimization_enabled,
-            resolver,
-        ));
-        extensions.add(RandomnessContext::new());
-        extensions.add(NativeTransactionContext::new(
-            txn_hash.to_vec(),
-            session_id.into_script_hash(),
-            chain_id.id(),
+            chain_id,
+            vm_config,
+            session_id,
             maybe_user_transaction_context,
-            session_counter,
-        ));
-        extensions.add(NativeCodeContext::new());
-        extensions.add(NativeStateStorageContext::new(resolver));
-        extensions.add(NativeEventContext::default());
-        extensions.add(NativeObjectContext::default());
+        );
 
         let is_storage_slot_metadata_enabled = features.is_storage_slot_metadata_enabled();
         Self {
@@ -148,12 +127,11 @@ where
             MoveVM::execute_loaded_function(
                 func,
                 args,
-                &mut self.data_cache,
+                &mut MoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, &loader),
                 gas_meter,
                 traversal_context,
                 &mut self.extensions,
                 &loader,
-                self.resolver,
             )
         })
     }
@@ -169,12 +147,11 @@ where
         MoveVM::execute_loaded_function(
             func,
             args,
-            &mut self.data_cache,
+            &mut MoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, loader),
             gas_meter,
             traversal_context,
             &mut self.extensions,
             loader,
-            self.resolver,
         )
     }
 
@@ -183,10 +160,15 @@ where
         configs: &ChangeSetConfigs,
         module_storage: &impl ModuleStorage,
     ) -> VMResult<VMChangeSet> {
+        // Note: enabled by 1.38 gas feature version.
+        let is_1_38_release = module_storage
+            .runtime_environment()
+            .vm_config()
+            .propagate_dependency_limit_error;
         let function_extension = module_storage.as_function_value_extension();
 
         let resource_converter = |value: Value,
-                                  layout: MoveTypeLayout,
+                                  layout: TriompheArc<MoveTypeLayout>,
                                   has_aggregator_lifting: bool|
          -> PartialVMResult<BytesWithResourceLayout> {
             let serialization_result = if has_aggregator_lifting {
@@ -197,7 +179,7 @@ where
                     .with_delayed_fields_serde()
                     .with_func_args_deserialization(&function_extension)
                     .serialize(&value, &layout)?
-                    .map(|bytes| (bytes.into(), Some(Arc::new(layout))))
+                    .map(|bytes| (bytes.into(), Some(layout)))
             } else {
                 // Otherwise, there should be no native values so ensure
                 // serialization fails here if there are any.
@@ -207,7 +189,12 @@ where
                     .map(|bytes| (bytes.into(), None))
             };
             serialization_result.ok_or_else(|| {
-                PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
+                let status_code = if is_1_38_release {
+                    StatusCode::VALUE_SERIALIZATION_ERROR
+                } else {
+                    StatusCode::INTERNAL_TYPE_ERROR
+                };
+                PartialVMError::new(status_code)
                     .with_message(format!("Error when serializing resource {}.", value))
             })
         };
@@ -238,7 +225,7 @@ where
             .map_err(|e| e.finish(Location::Undefined))?;
 
         let event_context: NativeEventContext = extensions.remove();
-        let events = event_context.into_events();
+        let events = event_context.legacy_into_events();
 
         let woc = WriteOpConverter::new(resolver, is_storage_slot_metadata_enabled);
 
@@ -549,4 +536,43 @@ pub fn convert_modules_into_write_ops(
 ) -> PartialVMResult<BTreeMap<StateKey, ModuleWrite<WriteOp>>> {
     let woc = WriteOpConverter::new(resolver, features.is_storage_slot_metadata_enabled());
     woc.convert_modules_into_write_ops(module_storage, verified_module_bundle.into_iter())
+}
+
+/// Initializes and returns Aptos native extensions.
+pub(crate) fn make_aptos_extensions<'a, DataView>(
+    data_view: &'a DataView,
+    chain_id: ChainId,
+    vm_config: &VMConfig,
+    session_id: SessionId,
+    user_transaction_context: Option<UserTransactionContext>,
+) -> NativeContextExtensions<'a>
+where
+    DataView: AptosMoveResolver,
+{
+    let mut extensions = NativeContextExtensions::default();
+    let session_counter = session_id.session_counter();
+    let txn_hash = session_id.txn_hash();
+
+    extensions.add(NativeTableContext::new(txn_hash, data_view));
+    extensions.add(NativeRistrettoPointContext::new());
+    extensions.add(AlgebraContext::new());
+    extensions.add(NativeAggregatorContext::new(
+        txn_hash,
+        data_view,
+        vm_config.delayed_field_optimization_enabled,
+        data_view,
+    ));
+    extensions.add(RandomnessContext::new());
+    extensions.add(NativeTransactionContext::new(
+        txn_hash.to_vec(),
+        session_id.into_script_hash(),
+        chain_id.id(),
+        user_transaction_context,
+        session_counter,
+    ));
+    extensions.add(NativeCodeContext::new());
+    extensions.add(NativeStateStorageContext::new(data_view));
+    extensions.add(NativeEventContext::default());
+    extensions.add(NativeObjectContext::default());
+    extensions
 }

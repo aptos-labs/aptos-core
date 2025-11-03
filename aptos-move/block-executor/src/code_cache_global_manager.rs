@@ -4,8 +4,9 @@
 use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
-        GLOBAL_MODULE_CACHE_NUM_MODULES, GLOBAL_MODULE_CACHE_SIZE_IN_BYTES,
-        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
+        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
+        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -107,7 +108,7 @@ where
         let environment_requires_update = self.environment.as_ref() != Some(&storage_environment);
         if environment_requires_update {
             if storage_environment.gas_feature_version() >= RELEASE_V1_34 {
-                let flush_verifier_cache = self.environment.as_ref().map_or(true, |e| {
+                let flush_verifier_cache = self.environment.as_ref().is_none_or(|e| {
                     e.verifier_config_bytes() != storage_environment.verifier_config_bytes()
                 });
                 if flush_verifier_cache {
@@ -133,7 +134,27 @@ where
         // If the environment caches too many struct names, flush type caches. Also flush module
         // caches because they contain indices for struct names.
         if struct_name_index_map_size > config.max_struct_name_index_map_num_entries {
-            runtime_environment.flush_struct_name_and_tag_caches();
+            runtime_environment.flush_all_caches();
+            self.module_cache.flush();
+        }
+
+        let num_interned_tys = runtime_environment.ty_pool().num_interned_tys();
+        NUM_INTERNED_TYPES.set(num_interned_tys as i64);
+        let num_interned_ty_vecs = runtime_environment.ty_pool().num_interned_ty_vecs();
+        NUM_INTERNED_TYPE_VECS.set(num_interned_ty_vecs as i64);
+        let num_interned_module_ids = runtime_environment.module_id_pool().len();
+        NUM_INTERNED_MODULE_IDS.set(num_interned_module_ids as i64);
+
+        if num_interned_tys > config.max_interned_tys
+            || num_interned_ty_vecs > config.max_interned_ty_vecs
+        {
+            runtime_environment.ty_pool().flush();
+            self.module_cache.flush();
+        }
+
+        if num_interned_module_ids > config.max_interned_module_ids {
+            runtime_environment.module_id_pool().flush();
+            runtime_environment.struct_name_index_map().flush();
             self.module_cache.flush();
         }
 
@@ -144,6 +165,12 @@ where
         // If module cache stores too many modules, flush it as well.
         if module_cache_size_in_bytes > config.max_module_cache_size_in_bytes {
             self.module_cache.flush();
+        }
+
+        let num_non_generic_layout_entries = self.module_cache.num_cached_layouts();
+        GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES.set(num_non_generic_layout_entries as i64);
+        if num_non_generic_layout_entries > config.max_layout_cache_size {
+            self.module_cache.flush_layout_cache();
         }
 
         Ok(())
@@ -380,15 +407,17 @@ mod test {
         V: Deref<Target = Arc<D>>,
         E: WithSize,
     {
-        assert_ok!(manager
-            .environment
-            .as_mut()
-            .unwrap()
-            .runtime_environment()
-            .struct_name_to_idx_for_test(StructIdentifier {
-                module: ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap()),
-                name: Identifier::new(name).unwrap()
-            }));
+        let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
+
+        let module_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap());
+
+        assert_ok!(
+            runtime_environment.struct_name_to_idx_for_test(StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new(name).unwrap()
+            ))
+        );
     }
 
     fn assert_struct_name_index_map_size_eq<K, D, V, E>(
@@ -438,6 +467,10 @@ mod test {
             prefetch_framework_code: false,
             max_module_cache_size_in_bytes: 32,
             max_struct_name_index_map_num_entries: 2,
+            max_interned_tys: 100,
+            max_interned_ty_vecs: 100,
+            max_layout_cache_size: 10,
+            max_interned_module_ids: 100,
         };
 
         // Populate the cache for testing.

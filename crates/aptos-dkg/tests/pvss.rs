@@ -6,21 +6,20 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
-use aptos_crypto::hash::CryptoHash;
-use aptos_dkg::{
-    constants::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
-    pvss::{
-        das,
-        das::unweighted_protocol,
-        insecure_field, test_utils,
-        test_utils::{
-            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
-            reconstruct_dealt_secret_key_randomly, NoAux,
-        },
-        traits::{transcript::Transcript, SecretSharingConfig},
-        GenericWeighting, ThresholdConfig,
+use aptos_crypto::{
+    blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
+    hash::CryptoHash,
+};
+use aptos_dkg::pvss::{
+    das,
+    das::unweighted_protocol,
+    insecure_field, test_utils,
+    test_utils::{
+        get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+        reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    utils::random::random_scalar,
+    traits::{transcript::Transcript, SecretSharingConfig},
+    GenericWeighting, ThresholdConfigBlstrs,
 };
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
@@ -154,8 +153,8 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
     actual_size
 }
 
-fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
-    sc: &ThresholdConfig,
+fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>>(
+    sc: &ThresholdConfigBlstrs,
 ) -> usize {
     if T::scheme_name() == unweighted_protocol::DAS_SK_IN_G1 {
         G2_PROJ_NUM_BYTES

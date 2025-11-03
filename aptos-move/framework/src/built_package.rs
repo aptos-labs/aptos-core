@@ -4,7 +4,7 @@
 use crate::{
     docgen::DocgenOptions,
     extended_checks,
-    natives::code::{ModuleMetadata, MoveOption, PackageDep, PackageMetadata, UpgradePolicy},
+    natives::code::{ModuleMetadata, PackageDep, PackageMetadata, UpgradePolicy},
     zip_metadata, zip_metadata_str,
 };
 use anyhow::bail;
@@ -321,11 +321,11 @@ impl BuiltPackage {
             }
 
             if let Some(model_options) = model.get_extension::<Options>() {
-                if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && model.has_warnings()
-                {
+                let has_target_warnings = model.has_diag_in_primary_targets(Severity::Warning);
+                if model_options.experiment_on(Experiment::FAIL_ON_WARNING) && has_target_warnings {
                     bail!("found warning(s), and `--fail-on-warning` is set")
                 } else if model_options.experiment_on(Experiment::STOP_AFTER_EXTENDED_CHECKS) {
-                    std::process::exit(if model.has_warnings() { 1 } else { 0 })
+                    std::process::exit(if has_target_warnings { 1 } else { 0 })
                 }
             }
 
@@ -544,7 +544,7 @@ impl BuiltPackage {
                 name,
                 source,
                 source_map,
-                extension: MoveOption::default(),
+                extension: None,
             })
         }
         let deps = self
@@ -584,7 +584,7 @@ impl BuiltPackage {
             manifest,
             modules,
             deps,
-            extension: MoveOption::none(),
+            extension: None,
         })
     }
 

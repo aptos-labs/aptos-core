@@ -69,12 +69,11 @@ impl IndexWriter {
     pub fn new(root: &Path) -> Self {
         let create_file = |file_name: &str| -> File {
             let path = root.to_path_buf().join(file_name);
-            let file = if !path.exists() {
+            if !path.exists() {
                 File::create(path).expect("Error encountered while creating file!")
             } else {
                 OpenOptions::new().append(true).open(path).unwrap()
-            };
-            file
+            }
         };
         let index_file = create_file(INDEX_FILE);
         let err_log = create_file(ERR_LOG);
@@ -485,7 +484,7 @@ fn dump_and_compile_from_package_metadata(
             File::create(module_path.clone()).expect("Error encountered while creating file!");
         };
         let source_str = unzip_metadata_str(&module.source).unwrap();
-        std::fs::write(&module_path.clone(), source_str).unwrap();
+        std::fs::write(module_path.clone(), source_str).unwrap();
     }
 
     // step 2: unzip, parse the manifest file

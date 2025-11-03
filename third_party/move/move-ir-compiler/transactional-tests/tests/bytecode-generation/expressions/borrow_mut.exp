@@ -1,6 +1,6 @@
 processed 3 tasks
 task 0 lines 1-10:  print-bytecode [main() {]
-// Bytecode version v7
+// Bytecode version v8
 script
 // Function definition at index 0
 entry public fun main()
@@ -18,7 +18,7 @@ entry public fun main()
 
 
 task 1 lines 12-23:  print-bytecode --input=module [module 0x3d.Foobar {]
-// Bytecode version v7
+// Bytecode version v8
 module 0x3d::Foobar
 struct FooCoin
   value: u64
@@ -36,7 +36,7 @@ public fun borrow_mut_field(l0: &mut FooCoin)
 
 
 task 2 lines 25-36:  print-bytecode --input=module [module 0x4d.Foobar {]
-// Bytecode version v7
+// Bytecode version v8
 module 0x4d::Foobar
 struct FooCoin<T0>
   value: u64

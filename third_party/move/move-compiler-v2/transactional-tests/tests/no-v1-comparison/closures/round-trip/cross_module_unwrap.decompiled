@@ -6,15 +6,15 @@ module 0xc0ffee::m {
         _0: u64,
     }
     public fun apply(p0: |Wrapper|(u64)): u64 {
-        let _t2 = Wrapper{_0: 42};
-        p0(_t2)
+        let _v0 = Wrapper{_0: 42};
+        p0(_v0)
     }
     public fun unwrap_maker(): |Wrapper|(u64) {
         |arg0| lambda__1__unwrap_maker(arg0)
     }
     fun lambda__1__unwrap_maker(p0: Wrapper): u64 {
-        let Wrapper{_0: _t2} = p0;
-        _t2
+        let Wrapper{_0: _v0} = p0;
+        _v0
     }
 }
 
