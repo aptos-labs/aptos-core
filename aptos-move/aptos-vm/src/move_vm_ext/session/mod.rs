@@ -137,9 +137,7 @@ where
         })
     }
 
-    /// Called for user session payloads, executes Move function with an option to trace execution
-    /// and record the trace.
-    pub fn execute_loaded_function_with_tracing(
+    pub fn execute_loaded_function(
         &mut self,
         func: LoadedFunction,
         args: Vec<impl Borrow<[u8]>>,
@@ -157,25 +155,6 @@ where
             &mut self.extensions,
             loader,
             trace_recorder,
-        )
-    }
-
-    pub fn execute_loaded_function(
-        &mut self,
-        func: LoadedFunction,
-        args: Vec<impl Borrow<[u8]>>,
-        gas_meter: &mut impl GasMeter,
-        traversal_context: &mut TraversalContext,
-        loader: &impl Loader,
-    ) -> VMResult<SerializedReturnValues> {
-        MoveVM::execute_loaded_function(
-            func,
-            args,
-            &mut MoveVmDataCacheAdapter::new(&mut self.data_cache, self.resolver, loader),
-            gas_meter,
-            traversal_context,
-            &mut self.extensions,
-            loader,
         )
     }
 

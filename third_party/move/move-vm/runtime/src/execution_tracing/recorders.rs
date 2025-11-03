@@ -8,7 +8,10 @@ use crate::{
     LoadedFunction,
 };
 use bitvec::vec::BitVec;
+use fxhash::FxHasher64;
+use move_binary_format::file_format::Bytecode;
 use move_core_types::function::ClosureMask;
+use std::hash::{Hash, Hasher};
 
 /// Interface for recording the trace at runtime. It is sufficient to record branch decisions as
 /// well as dynamic function calls originating from closures.
@@ -21,10 +24,10 @@ pub trait TraceRecorder {
 
     /// Called after successful execution of a bytecode instruction. It is crucial that the trace
     /// records only successful instructions.
-    fn record_successful_instruction(&mut self);
+    fn record_successful_instruction(&mut self, instr: &Bytecode);
 
     /// Called for every successfully executed conditional branch.
-    fn record_branch(&mut self, taken: bool);
+    fn record_branch_outcome(&mut self, taken: bool);
 
     /// Called for every successful set-up of the entrypoint (entry function or script). That is,
     /// setting up frame, stack, and other structures before actually executing the bytecode.
@@ -35,11 +38,30 @@ pub trait TraceRecorder {
     fn record_call_closure(&mut self, function: &LoadedFunction, mask: ClosureMask);
 }
 
-/// Logger that collects the full trace of execution. Records the number of successfully executed
+/// Records the fingerprint of executed bytecode instructions to check trace replay integrity.
+#[derive(Default)]
+pub(crate) struct BytecodeFingerprintRecorder {
+    // Use fast hasher as we do not care about collisions but mostly about performance.
+    hasher: FxHasher64,
+}
+
+impl BytecodeFingerprintRecorder {
+    pub(crate) fn record(&mut self, instr: &Bytecode) {
+        instr.hash(&mut self.hasher);
+    }
+
+    pub(crate) fn finish(&self) -> u64 {
+        self.hasher.finish()
+    }
+}
+
+/// Recorder that collects the full trace of execution. Records the number of successfully executed
 /// instructions, branch outcomes and closure calls.
 pub struct FullTraceRecorder {
     /// Number of successfully executed instructions.
     ticks: u64,
+    /// Records the fingerprint of the trace, for extra security.
+    fingerprint_recorder: BytecodeFingerprintRecorder,
     /// Branch outcomes (taken or not taken), stored as a bit-vector.
     branch_outcomes: BitVec,
     /// Dynamic call outcomes.
@@ -52,6 +74,7 @@ impl FullTraceRecorder {
     pub fn new() -> Self {
         Self {
             ticks: 0,
+            fingerprint_recorder: BytecodeFingerprintRecorder::default(),
             branch_outcomes: BitVec::with_capacity(64),
             calls: vec![],
         }
@@ -65,16 +88,22 @@ impl TraceRecorder for FullTraceRecorder {
     }
 
     fn finish(self) -> Trace {
-        Trace::from_recorder(self.ticks, self.branch_outcomes, self.calls)
+        Trace::from_recorder(
+            self.ticks,
+            self.fingerprint_recorder.finish(),
+            self.branch_outcomes,
+            self.calls,
+        )
     }
 
     #[inline(always)]
-    fn record_successful_instruction(&mut self) {
+    fn record_successful_instruction(&mut self, instr: &Bytecode) {
         self.ticks += 1;
+        self.fingerprint_recorder.record(instr);
     }
 
     #[inline(always)]
-    fn record_branch(&mut self, taken: bool) {
+    fn record_branch_outcome(&mut self, taken: bool) {
         self.branch_outcomes.push(taken);
     }
 
@@ -104,10 +133,10 @@ impl TraceRecorder for NoOpTraceRecorder {
     }
 
     #[inline(always)]
-    fn record_successful_instruction(&mut self) {}
+    fn record_successful_instruction(&mut self, _instr: &Bytecode) {}
 
     #[inline(always)]
-    fn record_branch(&mut self, _taken: bool) {}
+    fn record_branch_outcome(&mut self, _taken: bool) {}
 
     #[inline(always)]
     fn record_entrypoint(&mut self, _function: &LoadedFunction) {}
@@ -136,11 +165,11 @@ mod testing {
         let mut recorder = FullTraceRecorder::new();
         assert_eq!(recorder.ticks, 0);
 
-        recorder.record_successful_instruction();
+        recorder.record_successful_instruction(&Bytecode::Nop);
         assert_eq!(recorder.ticks, 1);
 
         for _ in 0..10 {
-            recorder.record_successful_instruction();
+            recorder.record_successful_instruction(&Bytecode::Nop);
         }
         assert_eq!(recorder.ticks, 11);
     }
@@ -153,7 +182,7 @@ mod testing {
             true, true, false, true, false, false, false, true, false, false, true, true, true,
         ];
         for taken in expected {
-            recorder.record_branch(taken);
+            recorder.record_branch_outcome(taken);
         }
 
         let trace = recorder.finish();

@@ -197,7 +197,8 @@ where
                 ExitCode::CallClosure => {
                     let (callee, mask) = cursor
                         .consume_closure_call()
-                        .map_err(|err| err.finish(Location::Undefined))?;
+                        .map_err(|err| err.finish(Location::Undefined))
+                        .map(|(f, mask)| (Rc::new(f.clone()), mask))?;
                     let callee_frame_cache = FrameTypeCache::make_rc_for_function(&callee);
                     self.execute_closure_call::<RTTCheck>(
                         cursor,
@@ -222,23 +223,22 @@ where
         RTTCheck: RuntimeTypeCheck,
     {
         loop {
-            // Check if we need to execute this instruction, if so, decrement the number of
-            // remaining instructions to replay.
-            if cursor.no_instructions_remaining() {
-                return Ok(ExitCode::Done);
-            }
-            cursor.consume_instruction_unchecked();
-
             let pc = frame.pc as usize;
             if pc >= frame.function.function.code.len() {
                 return Err(PartialVMError::new_invariant_violation(
                     "PC cannot overflow when replaying the trace",
                 ));
             }
-
             let instr = &frame.function.function.code[pc];
-            let mut frame_cache = frame.frame_cache.borrow_mut();
 
+            // Check if we need to execute this instruction, if so, decrement the number of
+            // remaining instructions to replay.
+            if cursor.no_instructions_remaining() {
+                return Ok(ExitCode::Done);
+            }
+            cursor.consume_instruction_unchecked(instr);
+
+            let mut frame_cache = frame.frame_cache.borrow_mut();
             RTTCheck::pre_execution_type_stack_transition(
                 frame,
                 &mut self.type_stack,
@@ -539,7 +539,7 @@ where
         }
 
         if native.function.is_dispatchable_native {
-            let target_func = cursor.consume_entrypoint()?;
+            let target_func = cursor.consume_entrypoint().map(|f| Rc::new(f.clone()))?;
             let frame_cache = self.function_caches.get_or_create_frame_cache(&target_func);
             RTTCheck::check_call_visibility(native, &target_func, CallType::NativeDynamicDispatch)?;
 
@@ -580,7 +580,7 @@ where
     where
         RTTCheck: RuntimeTypeCheck,
     {
-        let function = cursor.consume_entrypoint()?;
+        let function = cursor.consume_entrypoint().map(|f| Rc::new(f.clone()))?;
         let frame_cache = self.function_caches.get_or_create_frame_cache(&function);
 
         let num_params = function.param_tys().len();

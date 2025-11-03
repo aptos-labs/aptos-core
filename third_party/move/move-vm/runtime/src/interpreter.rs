@@ -417,9 +417,9 @@ where
                         // Note: the caller will find the callee's return values at the top of the shared operand stack
                         current_frame = frame;
                         current_frame.pc += 1; // advance past the Call instruction in the caller
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder.record_successful_instruction(&Bytecode::Ret);
                     } else {
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder.record_successful_instruction(&Bytecode::Ret);
                         return Ok(self.operand_stack.value);
                     }
                 },
@@ -499,7 +499,7 @@ where
                             ClosureMask::empty(),
                             vec![],
                         )?;
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder.record_successful_instruction(&Bytecode::Call(fh_idx));
                         if dispatched {
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
@@ -515,7 +515,7 @@ where
                         ClosureMask::empty(),
                         vec![],
                     )?;
-                    trace_recorder.record_successful_instruction();
+                    trace_recorder.record_successful_instruction(&Bytecode::Call(fh_idx));
                 },
                 ExitCode::CallGeneric(idx) => {
                     let (function, frame_cache) = if self.vm_config.enable_function_caches {
@@ -600,7 +600,7 @@ where
                             ClosureMask::empty(),
                             vec![],
                         )?;
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder.record_successful_instruction(&Bytecode::CallGeneric(idx));
                         if dispatched {
                             trace_recorder.record_entrypoint(&current_frame.function)
                         }
@@ -616,9 +616,9 @@ where
                         ClosureMask::empty(),
                         vec![],
                     )?;
-                    trace_recorder.record_successful_instruction();
+                    trace_recorder.record_successful_instruction(&Bytecode::CallGeneric(idx));
                 },
-                ExitCode::CallClosure(_sig_idx) => {
+                ExitCode::CallClosure(sig_idx) => {
                     // Notice the closure is type-checked in runtime_type_checker
                     let (fun, captured) = self
                         .operand_stack
@@ -695,7 +695,8 @@ where
                         // If we call a dispatchable native, we need to record first the closure
                         // call, and then the target where it redirects to (which at this point
                         // has to be set as the current frame's function).
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder
+                            .record_successful_instruction(&Bytecode::CallClosure(sig_idx));
                         trace_recorder.record_call_closure(&callee, mask);
                         if dispatched {
                             trace_recorder.record_entrypoint(&current_frame.function)
@@ -716,7 +717,8 @@ where
                             mask,
                             captured_vec,
                         )?;
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder
+                            .record_successful_instruction(&Bytecode::CallClosure(sig_idx));
                         trace_recorder.record_call_closure(current_frame.function.as_ref(), mask);
                     }
                 },
@@ -1971,7 +1973,6 @@ impl Frame {
                     Bytecode::Pop => {
                         let popped_val = interpreter.operand_stack.pop()?;
                         gas_meter.charge_pop(popped_val)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Ret => {
                         gas_meter.charge_simple_instr(S::Ret)?;
@@ -1983,93 +1984,81 @@ impl Frame {
                         if interpreter.operand_stack.pop_as::<bool>()? {
                             gas_meter.charge_br_true(Some(*offset))?;
                             self.pc = *offset;
-                            trace_recorder.record_successful_instruction();
-                            trace_recorder.record_branch(true);
+                            trace_recorder.record_branch_outcome(true);
+                            trace_recorder.record_successful_instruction(instruction);
                             break;
                         } else {
                             gas_meter.charge_br_true(None)?;
-                            trace_recorder.record_successful_instruction();
-                            trace_recorder.record_branch(false);
+                            trace_recorder.record_branch_outcome(false);
+                            // Success of instruction is recorded when we exit the dispatch.
                         }
                     },
                     Bytecode::BrFalse(offset) => {
                         if !interpreter.operand_stack.pop_as::<bool>()? {
                             gas_meter.charge_br_false(Some(*offset))?;
                             self.pc = *offset;
-                            trace_recorder.record_successful_instruction();
-                            trace_recorder.record_branch(true);
+                            trace_recorder.record_branch_outcome(true);
+                            trace_recorder.record_successful_instruction(instruction);
                             break;
                         } else {
                             gas_meter.charge_br_false(None)?;
-                            trace_recorder.record_successful_instruction();
-                            trace_recorder.record_branch(false);
+                            trace_recorder.record_branch_outcome(false);
+                            // Success of instruction is recorded when we exit the dispatch.
                         }
                     },
                     Bytecode::Branch(offset) => {
                         gas_meter.charge_branch(*offset)?;
                         self.pc = *offset;
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder.record_successful_instruction(instruction);
                         break;
                     },
                     Bytecode::LdU8(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU8)?;
                         interpreter.operand_stack.push(Value::u8(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdU16(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU16)?;
                         interpreter.operand_stack.push(Value::u16(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdU32(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU32)?;
                         interpreter.operand_stack.push(Value::u32(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdU64(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU64)?;
                         interpreter.operand_stack.push(Value::u64(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdU128(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU128)?;
                         interpreter.operand_stack.push(Value::u128(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdU256(int_const) => {
                         gas_meter.charge_simple_instr(S::LdU256)?;
                         interpreter.operand_stack.push(Value::u256(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdI8(int_const) => {
                         gas_meter.charge_simple_instr(S::LdI8)?;
                         interpreter.operand_stack.push(Value::i8(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdI16(int_const) => {
                         gas_meter.charge_simple_instr(S::LdI16)?;
                         interpreter.operand_stack.push(Value::i16(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdI32(int_const) => {
                         gas_meter.charge_simple_instr(S::LdI32)?;
                         interpreter.operand_stack.push(Value::i32(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdI64(int_const) => {
                         gas_meter.charge_simple_instr(S::LdI64)?;
                         interpreter.operand_stack.push(Value::i64(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdI128(int_const) => {
                         gas_meter.charge_simple_instr(S::LdI128)?;
                         interpreter.operand_stack.push(Value::i128(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdI256(int_const) => {
                         gas_meter.charge_simple_instr(S::LdI256)?;
                         interpreter.operand_stack.push(Value::i256(*int_const))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdConst(idx) => {
                         let constant = self.constant_at(*idx);
@@ -2077,7 +2066,6 @@ impl Frame {
                         gas_meter.charge_create_ty(NumTypeNodes::new(
                             constant.type_.num_nodes() as u64,
                         ))?;
-
                         gas_meter.charge_ld_const(NumBytes::new(constant.data.len() as u64))?;
 
                         let val = Value::deserialize_constant(constant).ok_or_else(|| {
@@ -2089,39 +2077,31 @@ impl Frame {
                         })?;
 
                         gas_meter.charge_ld_const_after_deserialization(&val)?;
-
                         interpreter.operand_stack.push(val)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdTrue => {
                         gas_meter.charge_simple_instr(S::LdTrue)?;
                         interpreter.operand_stack.push(Value::bool(true))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::LdFalse => {
                         gas_meter.charge_simple_instr(S::LdFalse)?;
                         interpreter.operand_stack.push(Value::bool(false))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CopyLoc(idx) => {
                         // TODO(Gas): We should charge gas before copying the value.
                         let local = self.locals.copy_loc(*idx as usize)?;
                         gas_meter.charge_copy_loc(&local)?;
                         interpreter.operand_stack.push(local)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::MoveLoc(idx) => {
                         let local = self.locals.move_loc(*idx as usize)?;
                         gas_meter.charge_move_loc(&local)?;
-
                         interpreter.operand_stack.push(local)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
                         self.locals.store_loc(*idx as usize, value_to_store)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Call(idx) => {
                         // Frame will process call instruction outside the main dispatch loop, so
@@ -2147,7 +2127,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(self.locals.borrow_loc(*idx as usize)?)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::ImmBorrowField(fh_idx) | Bytecode::MutBorrowField(fh_idx) => {
                         let instr = match instruction {
@@ -2161,7 +2140,6 @@ impl Frame {
                         let offset = self.field_offset(*fh_idx);
                         let field_ref = reference.borrow_field(offset)?;
                         interpreter.operand_stack.push(field_ref)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::ImmBorrowFieldGeneric(fi_idx)
                     | Bytecode::MutBorrowFieldGeneric(fi_idx) => {
@@ -2187,7 +2165,6 @@ impl Frame {
                         let offset = self.field_instantiation_offset(*fi_idx);
                         let field_ref = reference.borrow_field(offset)?;
                         interpreter.operand_stack.push(field_ref)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::ImmBorrowVariantField(idx) | Bytecode::MutBorrowVariantField(idx) => {
                         let instr = if matches!(instruction, Bytecode::MutBorrowVariantField(_)) {
@@ -2209,7 +2186,6 @@ impl Frame {
                             },
                         )?;
                         interpreter.operand_stack.push(field_ref)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::ImmBorrowVariantFieldGeneric(fi_idx)
                     | Bytecode::MutBorrowVariantFieldGeneric(fi_idx) => {
@@ -2243,7 +2219,6 @@ impl Frame {
                             },
                         )?;
                         interpreter.operand_stack.push(field_ref)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = self.field_count(*sd_idx);
@@ -2262,7 +2237,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::PackVariant(idx) => {
                         let info = self.get_struct_variant_at(*idx);
@@ -2282,7 +2256,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::PackGeneric(si_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
@@ -2312,7 +2285,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::PackVariantGeneric(si_idx) => {
                         let field_tys =
@@ -2341,17 +2313,13 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::struct_(Struct::pack_variant(info.variant, args)))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Unpack(_sd_idx) => {
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
-
                         gas_meter.charge_unpack(false, struct_value.field_views())?;
-
                         for value in struct_value.unpack()? {
                             interpreter.operand_stack.push(value)?;
                         }
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::UnpackVariant(sd_idx) => {
                         let struct_value = interpreter.operand_stack.pop_as::<Struct>()?;
@@ -2364,7 +2332,6 @@ impl Frame {
                         })? {
                             interpreter.operand_stack.push(value)?;
                         }
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::UnpackGeneric(si_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
@@ -2383,14 +2350,9 @@ impl Frame {
 
                         let struct_ = interpreter.operand_stack.pop_as::<Struct>()?;
                         gas_meter.charge_unpack(true, struct_.field_views())?;
-
-                        // TODO: Whether or not we want this gas metering in the loop is
-                        // questionable.  However, if we don't have it in the loop we could wind up
-                        // doing a fair bit of work before charging for it.
                         for value in struct_.unpack()? {
                             interpreter.operand_stack.push(value)?;
                         }
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::UnpackVariantGeneric(si_idx) => {
                         let ty_and_field_counts =
@@ -2411,7 +2373,6 @@ impl Frame {
                         })? {
                             interpreter.operand_stack.push(value)?;
                         }
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::TestVariant(sd_idx) => {
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
@@ -2420,7 +2381,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(reference.test_variant(info.variant)?)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::TestVariantGeneric(sd_idx) => {
                         // TODO: Even though the types are not needed for execution, we still
@@ -2438,7 +2398,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(reference.test_variant(info.variant)?)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::PackClosure(fh_idx, mask) => {
                         gas_meter.charge_pack_closure(
@@ -2479,7 +2438,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::closure(Box::new(lazy_function), captured))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::PackClosureGeneric(fi_idx, mask) => {
                         gas_meter.charge_pack_closure(
@@ -2526,21 +2484,18 @@ impl Frame {
                                 *mask,
                             )?;
                         }
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::ReadRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         gas_meter.charge_read_ref(reference.value_view())?;
                         let value = reference.read_ref()?;
                         interpreter.operand_stack.push(value)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::WriteRef => {
                         let reference = interpreter.operand_stack.pop_as::<Reference>()?;
                         let value = interpreter.operand_stack.pop()?;
                         gas_meter.charge_write_ref(&value, reference.value_view())?;
                         reference.write_ref(value)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastU8 => {
                         gas_meter.charge_simple_instr(S::CastU8)?;
@@ -2548,7 +2503,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u8(integer_value.cast_u8()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastU16 => {
                         gas_meter.charge_simple_instr(S::CastU16)?;
@@ -2556,7 +2510,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u16(integer_value.cast_u16()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastU32 => {
                         gas_meter.charge_simple_instr(S::CastU32)?;
@@ -2564,7 +2517,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u32(integer_value.cast_u32()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastU64 => {
                         gas_meter.charge_simple_instr(S::CastU64)?;
@@ -2572,7 +2524,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u64(integer_value.cast_u64()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastU128 => {
                         gas_meter.charge_simple_instr(S::CastU128)?;
@@ -2580,7 +2531,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u128(integer_value.cast_u128()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastU256 => {
                         gas_meter.charge_simple_instr(S::CastU256)?;
@@ -2588,7 +2538,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::u256(integer_value.cast_u256()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastI8 => {
                         gas_meter.charge_simple_instr(S::CastI8)?;
@@ -2596,7 +2545,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::i8(integer_value.cast_i8()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastI16 => {
                         gas_meter.charge_simple_instr(S::CastI16)?;
@@ -2604,7 +2552,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::i16(integer_value.cast_i16()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastI32 => {
                         gas_meter.charge_simple_instr(S::CastI32)?;
@@ -2612,7 +2559,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::i32(integer_value.cast_i32()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastI64 => {
                         gas_meter.charge_simple_instr(S::CastI64)?;
@@ -2620,7 +2566,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::i64(integer_value.cast_i64()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastI128 => {
                         gas_meter.charge_simple_instr(S::CastI128)?;
@@ -2628,7 +2573,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::i128(integer_value.cast_i128()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::CastI256 => {
                         gas_meter.charge_simple_instr(S::CastI256)?;
@@ -2636,98 +2580,80 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::i256(integer_value.cast_i256()?))?;
-                        trace_recorder.record_successful_instruction();
                     },
 
                     // Arithmetic Operations
                     Bytecode::Add => {
                         gas_meter.charge_simple_instr(S::Add)?;
                         interpreter.binop(Value::add_checked)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Sub => {
                         gas_meter.charge_simple_instr(S::Sub)?;
                         interpreter.binop(Value::sub_checked)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Mul => {
                         gas_meter.charge_simple_instr(S::Mul)?;
                         interpreter.binop(Value::mul_checked)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Mod => {
                         gas_meter.charge_simple_instr(S::Mod)?;
                         interpreter.binop(Value::rem_checked)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Div => {
                         gas_meter.charge_simple_instr(S::Div)?;
                         interpreter.binop(Value::div_checked)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Negate => {
                         gas_meter.charge_simple_instr(S::Negate)?;
                         interpreter.unop(Value::negate_checked)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::BitOr => {
                         gas_meter.charge_simple_instr(S::BitOr)?;
                         interpreter.binop(Value::bit_or)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::BitAnd => {
                         gas_meter.charge_simple_instr(S::BitAnd)?;
                         interpreter.binop(Value::bit_and)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Xor => {
                         gas_meter.charge_simple_instr(S::Xor)?;
                         interpreter.binop(Value::bit_xor)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Shl => {
                         gas_meter.charge_simple_instr(S::Shl)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
                         let lhs = interpreter.operand_stack.pop()?;
                         interpreter.operand_stack.push(lhs.shl_checked(rhs)?)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Shr => {
                         gas_meter.charge_simple_instr(S::Shr)?;
                         let rhs = interpreter.operand_stack.pop_as::<u8>()?;
                         let lhs = interpreter.operand_stack.pop()?;
                         interpreter.operand_stack.push(lhs.shr_checked(rhs)?)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Or => {
                         gas_meter.charge_simple_instr(S::Or)?;
                         interpreter.binop_bool(|l, r| Ok(l || r))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::And => {
                         gas_meter.charge_simple_instr(S::And)?;
                         interpreter.binop_bool(|l, r| Ok(l && r))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Lt => {
                         gas_meter.charge_simple_instr(S::Lt)?;
                         interpreter.binop_rel(Value::lt)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Gt => {
                         gas_meter.charge_simple_instr(S::Gt)?;
                         interpreter.binop_rel(Value::gt)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Le => {
                         gas_meter.charge_simple_instr(S::Le)?;
                         interpreter.binop_rel(Value::le)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Ge => {
                         gas_meter.charge_simple_instr(S::Ge)?;
                         interpreter.binop_rel(Value::ge)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Abort => {
                         gas_meter.charge_simple_instr(S::Abort)?;
@@ -2750,7 +2676,7 @@ impl Frame {
 
                         // Before returning an abort error, ensure the instruction is recorded in
                         // the trace, so the trace is full.
-                        trace_recorder.record_successful_instruction();
+                        trace_recorder.record_successful_instruction(instruction);
                         return Err(error);
                     },
                     Bytecode::Eq => {
@@ -2760,7 +2686,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::bool(lhs.equals(&rhs)?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Neq => {
                         let lhs = interpreter.operand_stack.pop()?;
@@ -2769,7 +2694,6 @@ impl Frame {
                         interpreter
                             .operand_stack
                             .push(Value::bool(!lhs.equals(&rhs)?))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::MutBorrowGlobal(sd_idx) | Bytecode::ImmBorrowGlobal(sd_idx) => {
                         let is_mut = matches!(instruction, Bytecode::MutBorrowGlobal(_));
@@ -2784,7 +2708,6 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::MutBorrowGlobalGeneric(si_idx)
                     | Bytecode::ImmBorrowGlobalGeneric(si_idx) => {
@@ -2801,7 +2724,6 @@ impl Frame {
                             addr,
                             ty,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Exists(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2814,7 +2736,6 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::ExistsGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2828,7 +2749,6 @@ impl Frame {
                             addr,
                             ty,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::MoveFrom(sd_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2841,7 +2761,6 @@ impl Frame {
                             addr,
                             &ty,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::MoveFromGeneric(si_idx) => {
                         let addr = interpreter.operand_stack.pop_as::<AccountAddress>()?;
@@ -2855,7 +2774,6 @@ impl Frame {
                             addr,
                             ty,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::MoveTo(sd_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
@@ -2875,7 +2793,6 @@ impl Frame {
                             &ty,
                             resource,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::MoveToGeneric(si_idx) => {
                         let resource = interpreter.operand_stack.pop()?;
@@ -2896,23 +2813,19 @@ impl Frame {
                             ty,
                             resource,
                         )?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::FreezeRef => {
                         // FreezeRef should just be a null op as we don't distinguish between mut
                         // and immut ref at runtime.
                         gas_meter.charge_simple_instr(S::FreezeRef)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Not => {
                         gas_meter.charge_simple_instr(S::Not)?;
                         let value = !interpreter.operand_stack.pop_as::<bool>()?;
                         interpreter.operand_stack.push(Value::bool(value))?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::Nop => {
                         gas_meter.charge_simple_instr(S::Nop)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecPack(si, num) => {
                         let (ty, ty_count) = frame_cache.get_signature_index_type(*si, self)?;
@@ -2927,7 +2840,6 @@ impl Frame {
                         let elements = interpreter.operand_stack.popn(*num as u16)?;
                         let value = Vector::pack(ty, elements)?;
                         interpreter.operand_stack.push(value)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecLen(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
@@ -2936,7 +2848,6 @@ impl Frame {
                         gas_meter.charge_vec_len()?;
                         let value = vec_ref.len()?;
                         interpreter.operand_stack.push(value)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecImmBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
@@ -2946,7 +2857,6 @@ impl Frame {
                         gas_meter.charge_vec_borrow(false)?;
                         let elem = vec_ref.borrow_elem(idx)?;
                         interpreter.operand_stack.push(elem)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecMutBorrow(si) => {
                         let idx = interpreter.operand_stack.pop_as::<u64>()? as usize;
@@ -2956,7 +2866,6 @@ impl Frame {
                         gas_meter.charge_vec_borrow(true)?;
                         let elem = vec_ref.borrow_elem(idx)?;
                         interpreter.operand_stack.push(elem)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecPushBack(si) => {
                         let elem = interpreter.operand_stack.pop()?;
@@ -2965,7 +2874,6 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_push_back(&elem)?;
                         vec_ref.push_back(elem)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecPopBack(si) => {
                         let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
@@ -2974,7 +2882,6 @@ impl Frame {
                         let res = vec_ref.pop();
                         gas_meter.charge_vec_pop_back(res.as_ref().ok())?;
                         interpreter.operand_stack.push(res?)?;
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecUnpack(si, num) => {
                         let vec_val = interpreter.operand_stack.pop_as::<Vector>()?;
@@ -2985,7 +2892,6 @@ impl Frame {
                         for value in elements {
                             interpreter.operand_stack.push(value)?;
                         }
-                        trace_recorder.record_successful_instruction();
                     },
                     Bytecode::VecSwap(si) => {
                         let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
@@ -2995,9 +2901,9 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;
-                        trace_recorder.record_successful_instruction();
                     },
                 }
+                trace_recorder.record_successful_instruction(instruction);
 
                 RTTCheck::post_execution_type_stack_transition(
                     self,

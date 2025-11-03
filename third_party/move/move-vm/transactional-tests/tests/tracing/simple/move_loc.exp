@@ -2,7 +2,8 @@ processed 2 tasks
 task 0 lines 1-6:  publish [module 0x22::test]
 task 1 lines 8-8:  run --verbose 0x22::test::move_loc_instr --args 10u64 --display-trace
 instructions: 2
-branches: 
+fingerprint: 18311127620552854180
+branch_outcomes: 
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::move_loc_instr
 return values: 10

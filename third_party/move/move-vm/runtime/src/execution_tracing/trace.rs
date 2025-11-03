@@ -4,11 +4,13 @@
 //! Defines the trace data structure which is sufficient to replay Move program execution without
 //! requiring any data accesses (only access to code loader is needed).
 
-use crate::LoadedFunction;
+use crate::{execution_tracing::recorders::BytecodeFingerprintRecorder, LoadedFunction};
 use bitvec::vec::BitVec;
-use move_binary_format::errors::{PartialVMError, PartialVMResult};
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    file_format::Bytecode,
+};
 use move_core_types::function::ClosureMask;
-use std::rc::Rc;
 
 /// A non-static call record in the trace. Used for entry-points and closures.
 #[derive(Clone)]
@@ -26,6 +28,8 @@ pub(crate) enum DynamicCall {
 pub struct Trace {
     /// Number of successfully executed instructions.
     ticks: u64,
+    /// Fingerprint of all successfully executed instructions.
+    fingerprint: u64,
     /// Record of all outcomes of conditional branches (taken and not taken).
     branch_outcomes: BitVec,
     /// Record of all functions called via closures. Note that the static calls are not recorded to
@@ -45,6 +49,7 @@ impl Trace {
     pub fn empty() -> Self {
         Self {
             ticks: 0,
+            fingerprint: 0,
             branch_outcomes: BitVec::new(),
             calls: vec![],
         }
@@ -53,11 +58,13 @@ impl Trace {
     /// Returns a trace from recorded data.
     pub(crate) fn from_recorder(
         ticks: u64,
+        fingerprint: u64,
         branch_outcomes: BitVec,
         calls: Vec<DynamicCall>,
     ) -> Self {
         Self {
             ticks,
+            fingerprint,
             branch_outcomes,
             calls,
         }
@@ -91,7 +98,8 @@ impl Trace {
         let mut result = String::new();
 
         writeln!(result, "instructions: {}", self.ticks).unwrap();
-        write!(result, "branches: ").unwrap();
+        writeln!(result, "fingerprint: {}", self.fingerprint).unwrap();
+        write!(result, "branch_outcomes: ").unwrap();
         for bit in self.branch_outcomes.iter() {
             result.push(if *bit { '1' } else { '0' });
         }
@@ -141,6 +149,8 @@ pub struct TraceCursor<'a> {
     trace: &'a Trace,
     /// Number of instructions still left to replay.
     instructions_remaining: u64,
+    /// Fingerprint of the replayed trace.
+    fingerprint_recorder: BytecodeFingerprintRecorder,
     /// Index into next branch target to consume, initially 0.
     branch_cursor: usize,
     /// Index into next call target to consume, initially 0.
@@ -153,6 +163,7 @@ impl<'a> TraceCursor<'a> {
         Self {
             trace,
             instructions_remaining: trace.ticks,
+            fingerprint_recorder: BytecodeFingerprintRecorder::default(),
             branch_cursor: 0,
             call_cursor: 0,
         }
@@ -172,6 +183,7 @@ impl<'a> TraceCursor<'a> {
     /// prefer [Self::no_instructions_remaining] for a faster check.
     pub(crate) fn is_done(&self) -> bool {
         self.no_instructions_remaining()
+            && self.fingerprint_recorder.finish() == self.trace.fingerprint
             && self.branch_cursor == self.trace.branch_outcomes.len()
             && self.call_cursor == self.trace.calls.len()
     }
@@ -179,8 +191,9 @@ impl<'a> TraceCursor<'a> {
     /// Decrements a tick (equivalent to replay of an instruction). The caller must ensure it does
     /// not underflow.
     #[inline(always)]
-    pub(crate) fn consume_instruction_unchecked(&mut self) {
+    pub(crate) fn consume_instruction_unchecked(&mut self, instr: &Bytecode) {
         self.instructions_remaining -= 1;
+        self.fingerprint_recorder.record(instr);
     }
 
     /// Processes a conditional branch. Returns [None] if branch was not recorded.
@@ -199,7 +212,7 @@ impl<'a> TraceCursor<'a> {
 
     /// Processes an entrypoint. Returns [None] if entrypoint call was not recorded.
     #[inline(always)]
-    pub(crate) fn consume_entrypoint(&mut self) -> PartialVMResult<Rc<LoadedFunction>> {
+    pub(crate) fn consume_entrypoint(&mut self) -> PartialVMResult<&LoadedFunction> {
         let target = self
             .trace
             .calls
@@ -207,7 +220,7 @@ impl<'a> TraceCursor<'a> {
             .ok_or_else(|| PartialVMError::new_invariant_violation("Entrypoint not found"))?;
         self.call_cursor += 1;
         match target {
-            DynamicCall::Entrypoint(target) => Ok(Rc::new(target.clone())),
+            DynamicCall::Entrypoint(target) => Ok(target),
             DynamicCall::Closure(_, _) => Err(PartialVMError::new_invariant_violation(
                 "Expected to consume an entrypoint, but found a closure",
             )),
@@ -218,7 +231,7 @@ impl<'a> TraceCursor<'a> {
     #[inline(always)]
     pub(crate) fn consume_closure_call(
         &mut self,
-    ) -> PartialVMResult<(Rc<LoadedFunction>, ClosureMask)> {
+    ) -> PartialVMResult<(&LoadedFunction, ClosureMask)> {
         let target = self
             .trace
             .calls
@@ -226,7 +239,7 @@ impl<'a> TraceCursor<'a> {
             .ok_or_else(|| PartialVMError::new_invariant_violation("Closure not found"))?;
         self.call_cursor += 1;
         match target {
-            DynamicCall::Closure(target, mask) => Ok((Rc::new(target.clone()), *mask)),
+            DynamicCall::Closure(target, mask) => Ok((target, *mask)),
             DynamicCall::Entrypoint(_) => Err(PartialVMError::new_invariant_violation(
                 "Expected to consume a closure, but found an entrypoint",
             )),

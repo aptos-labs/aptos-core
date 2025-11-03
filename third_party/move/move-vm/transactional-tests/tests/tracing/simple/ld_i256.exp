@@ -2,7 +2,8 @@ processed 2 tasks
 task 0 lines 1-6:  publish [module 0x22::test]
 task 1 lines 8-8:  run --verbose 0x22::test::ld_i256_instr --display-trace
 instructions: 2
-branches: 
+fingerprint: 6590175103369006814
+branch_outcomes: 
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::ld_i256_instr
 return values: 256

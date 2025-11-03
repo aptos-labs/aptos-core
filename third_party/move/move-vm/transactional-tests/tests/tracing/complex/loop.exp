@@ -2,25 +2,29 @@ processed 5 tasks
 task 0 lines 1-14:  publish [module 0x22::test]
 task 1 lines 16-16:  run --verbose 0x22::test::loop --args 0u64 --display-trace
 instructions: 5
-branches: 1
+fingerprint: 12676503956122921955
+branch_outcomes: 1
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::loop
 
 task 2 lines 18-18:  run --verbose 0x22::test::loop --args 1u64 --display-trace
 instructions: 14
-branches: 01
+fingerprint: 15598697563584062608
+branch_outcomes: 01
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::loop
 
 task 3 lines 20-20:  run --verbose 0x22::test::loop --args 2u64 --display-trace
 instructions: 23
-branches: 001
+fingerprint: 2304894972410698519
+branch_outcomes: 001
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::loop
 
 task 4 lines 22-22:  run --verbose 0x22::test::loop --args 3u64 --display-trace
 instructions: 32
-branches: 0001
+fingerprint: 12331484389719535843
+branch_outcomes: 0001
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::loop
 

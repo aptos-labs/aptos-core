@@ -3,7 +3,8 @@ task 0 lines 1-20:  publish [module 0x22::test]
 task 1 lines 22-22:  run --verbose 0x22::test::store --signers 0x22
 task 2 lines 24-24:  run --verbose 0x22::test::mut_borrow_global_generic_instr --args @0x22 --display-trace
 instructions: 6
-branches: 
+fingerprint: 6452696320067385185
+branch_outcomes: 
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::mut_borrow_global_generic_instr
 

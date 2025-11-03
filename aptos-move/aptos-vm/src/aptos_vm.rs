@@ -938,7 +938,7 @@ impl AptosVM {
                 self.features().is_enabled(FeatureFlag::STRUCT_CONSTRUCTORS),
             )?;
 
-            session.execute_loaded_function_with_tracing(
+            session.execute_loaded_function(
                 func,
                 args,
                 gas_meter,
@@ -1011,7 +1011,7 @@ impl AptosVM {
 
             // Execute the function. The function also must be an entry function!
             function.is_entry_or_err()?;
-            session.execute_loaded_function_with_tracing(
+            session.execute_loaded_function(
                 function,
                 args,
                 gas_meter,
@@ -2773,6 +2773,8 @@ impl AptosVM {
                 gas_meter,
                 traversal_context,
                 &loader,
+                // No need to record any traces for view functions.
+                &mut NoOpTraceRecorder,
             )?;
 
             Ok(result

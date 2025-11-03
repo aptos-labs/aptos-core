@@ -2,7 +2,8 @@ processed 2 tasks
 task 0 lines 1-10:  publish [module 0x22::test]
 task 1 lines 12-12:  run --verbose 0x22::test::read_ref_instr --display-trace
 instructions: 5
-branches: 
+fingerprint: 5507979589667938683
+branch_outcomes: 
 calls:
   entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::read_ref_instr
 return values: 3
