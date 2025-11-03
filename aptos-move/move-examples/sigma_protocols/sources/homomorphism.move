@@ -1,35 +1,36 @@
-/// This module can be used to build sigma protocols for proving knowledge of a pre-image on a homomorphism $\psi$.
+/// This module can be used to build $\Sigma$-protocols for proving knowledge of a pre-image on a homomorphism $\psi$.
 ///
-/// Let $S = \mathbb{G}^{n_1} \times \mathbb{F}^{n_2}$ is the set of public statements.
+/// Let $\mathbb{G}^{n_1} \times \mathbb{F}^{n_2}$ denote the set of public statements.
 ///
 /// This module helps you convince a verifier with $X\in S$ that you know a secret $w\in \mathbb{F}^k$ such that
 /// $\psi(w) = f(X)$, where:
 ///
 ///    $\psi : \mathbb{F}^k \rightarrow \mathbb{G}^m$ is a *homomorphism*, and
-///    $f : S \rightarrow \mathbb{G}^m$ is a *transformation function*.
+///    $f : \mathbb{G}^{n_1} \times \mathbb{F}^{n_2} \rightarrow \mathbb{G}^m$ is a *transformation function*.
 ///
 /// Many useful statements can be proved in ZK by framing them as proving knowledge of a pre-image on a homomorphism:
 ///
-/// e.g., a Schnorr signature is just proving knowledge of $x$ such that $\psi(x) = x G$ where the public key is $x G$.
+///    e.g., a Schnorr signature is just proving knowledge of $x$ such that $\psi(x) = x G$, where the PK is $x G$.
 ///
-/// e.g., a proof that $C_1, C_2$ both Pedersen-commit to the same $m$ is proving knowledge of $(m, r_1, r_2)$ such that
-///        $\psi(m, r_1, r_2) = (m G + r_1 H, m G + r_2 H)$
+///    e.g., a proof that $C_1, C_2$ both Pedersen-commit to the same $m$ is proving knowledge of $(m, r_1, r_2)$ s.t.
+///          $\psi(m, r_1, r_2) = (m G + r_1 H, m G + r_2 H)$
 ///
 /// The sigma protocol is very simple:
 ///
 /// + ------------------  +                                         + ------------------------------------------------ +
-/// | Prover has $(X, w)$ |                                         |    Verifier has                                  |
+/// | Prover has $(X, w)$ |                                         | Verifier has                                     |
 /// + ------------------  +                                         | $X \in \mathbb{G}^{n_1} \times \mathbb{F}^{n_2}$ |
 ///                                                                 + ------------------------------------------------ +
 /// 1. Sample $\alpha \in \mathbb{F}^k
-/// 2. Compute commitment $A \gets \psi(\alpha)$
+/// 2. Compute *commitment* $A \gets \psi(\alpha)$
 ///
 ///                                 3. send commitment $A$
 ///                            ------------------------------->
 ///
 ///                                                                  4. Assert $A \in \mathbb{G}^m$
-///                                                                  5. Pick random challenge $e$
-///                                                                     (via Fiat-Shamir on $(X, A)$ and a domain-separator)
+///                                                                  5. Pick *random challenge* $e$
+///                                                                     (via Fiat-Shamir on: $(X, A)$ a protocol
+///                                                                      identifier and a session identifier)
 ///                                  6. send challenge $e$
 ///                            <-------------------------------
 ///
@@ -82,11 +83,41 @@ module sigma_protocols::homomorphism {
     /// The fast verification of the sigma protocol proof failed (instead of succeeding) in one of the tests.
     const E_FAST_VERIFICATION_FAILED: u64 = 5;
 
+    /// A domain separator prevents replay attacks in $\Sigma$ protocols and consists of 3 things.
+    ///
+    /// 1. A protocol identifier, which is typically split up into two things:
+    ///    - A higher-level protocol: "Confidential Assets v1 on Aptos"
+    ///    - A lower-level relation identifier (e.g., "PedEq", "Schnorr", "DLEQ", etc.)
+    ///
+    /// 2. Statement (i.e., the public statement in the NP relation being proved)
+    ///    - This is captured implicitly in our `prove` and `verify` functions ==> it is not part of this struct.
+    ///
+    /// 3. Session identifier
+    ///    - Chosen by user
+    ///    - specifies the "context" in which this proof is valid
+    ///    - e.g., "Alice (0x1) is paying Bob (0x2) at time `t`
+    ///    - together with the protocol identifier, prevents replay attacks across the same protocol or different protocols
+    ///
+    /// Note: The session identifier can be tricky, since in some settings the "session" accumulates implicitly in the
+    /// statement being proven. For confidential assets, it does not AFAICT: the "session" is represented at least by
+    /// the confidential balances of the users & their addresses.
+    struct DomainSeparator has drop, copy {
+        protocol_id: vector<u8>,
+        session_id: vector<u8>,
+    }
+
+    public fun new_domain_separator(protocol_id: vector<u8>, session_id: vector<u8>): DomainSeparator {
+        DomainSeparator {
+            protocol_id,
+            session_id
+        }
+    }
+
     /// Unfortunately, we cannot directly use the `PublicStatement` struct here because its `vector<RistrettoPoint>`
     /// will not serialize correctly via `bcs::to_bytes`, since a `RistrettoPoint` stores a Move VM "handle" rather than
     /// an actual point.
     struct FiatShamirInputs has drop {
-        dst: vector<u8>,
+        dst: DomainSeparator,
         k: u64,
         stmt_X: vector<CompressedRistretto>,
         stmt_x: vector<Scalar>,
@@ -95,7 +126,7 @@ module sigma_protocols::homomorphism {
 
     /// Returns the Sigma protocol challenge $e$ and $1,\beta,\beta^2,\ldots, \beta^{m-1}$
     public fun fiat_shamir(
-        dst: vector<u8>,
+        dst: DomainSeparator,
         stmt: &PublicStatement,
         _A: &vector<RistrettoPoint>,
         k: u64): (Scalar, vector<Scalar>)
@@ -171,7 +202,7 @@ module sigma_protocols::homomorphism {
     /// Creates a proof and additionally returns the randomness $\alpha \in \mathbb{F}^k$ used to
     /// create the sigma protocol commitment $A = \psi(\alpha) \in \mathbb{G}^m$.
     public inline fun prove(
-        dst: vector<u8>,
+        dst: DomainSeparator,
         psi: |&PublicStatement, &SecretWitness|RepresentationVec,
         stmt: &PublicStatement,
         witn: &SecretWitness,
@@ -221,7 +252,7 @@ module sigma_protocols::homomorphism {
     ///   );
     /// ```
     public inline fun verify_slow(
-        dst: vector<u8>,
+        dst: DomainSeparator,
         psi: |&PublicStatement, &SecretWitness|RepresentationVec,
         f: |&PublicStatement|RepresentationVec,
         stmt: &PublicStatement,
@@ -285,7 +316,7 @@ module sigma_protocols::homomorphism {
     ///
     /// Returns true if it succeeds and false otherwise.
     public inline fun verify(
-        dst: vector<u8>,
+        dst: DomainSeparator,
         psi: |&PublicStatement, &SecretWitness|RepresentationVec,
         f: |&PublicStatement|RepresentationVec,
         stmt: &PublicStatement,
@@ -349,7 +380,9 @@ module sigma_protocols::homomorphism {
     /// A generic correctness test that takes the DST, the public statement, the secret witness, and the $\psi$ and $f$
     /// lambdas.
     public inline fun assert_correctly_computed_proof_verifies(
-        dst: vector<u8>, stmt: PublicStatement, witn: SecretWitness,
+        dst: DomainSeparator,
+        stmt: PublicStatement,
+        witn: SecretWitness,
         psi: |&PublicStatement, &SecretWitness|RepresentationVec,
         f: |&PublicStatement|RepresentationVec,
     ): (Proof, SecretWitness) {
@@ -386,7 +419,7 @@ module sigma_protocols::homomorphism {
     #[test_only]
     /// Returns `true` if the empty proof does not verify for the specific statement. Otherwise, returns `false`.
     public inline fun empty_proof_verifies(
-        dst: vector<u8>,
+        dst: DomainSeparator,
         psi: |&PublicStatement, &SecretWitness|RepresentationVec,
         f: |&PublicStatement|RepresentationVec,
         stmt: PublicStatement,

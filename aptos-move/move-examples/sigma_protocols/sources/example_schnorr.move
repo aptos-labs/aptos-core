@@ -26,6 +26,7 @@ module sigma_protocols::example_schnorr {
     use aptos_std::ristretto255::{RistrettoPoint, Scalar};
 
     use aptos_std::ristretto255::scalar_one;
+    use sigma_protocols::homomorphism::{DomainSeparator, new_domain_separator};
     use sigma_protocols::secret_witness::{SecretWitness, new_secret_witness};
     use sigma_protocols::public_statement::{PublicStatement, new_public_statement};
     use sigma_protocols::representation::new_representation;
@@ -37,8 +38,8 @@ module sigma_protocols::example_schnorr {
     #[test_only]
     use sigma_protocols::utils::equal_vec_points;
 
-    /// Application-specific domain-separator
-    const DST : vector<u8> = b"My Schnorr test case app";
+    /// Protocol ID used for domain separation
+    const PROTOCOL_ID: vector<u8> = b"My Schnorr test case app";
 
     /// Index of $G$ in the `PublicStatement::points` vector.
     const IDX_G: u64 = 0;
@@ -56,6 +57,10 @@ module sigma_protocols::example_schnorr {
     const E_WRONG_K: u64 = 3;
     /// The expected number of points $m$ in the image of the PedEq homomorphism and transformation function is 2.
     const E_WRONG_M: u64 = 4;
+
+    fun new_session(session_id: vector<u8>): DomainSeparator {
+        new_domain_separator(PROTOCOL_ID, session_id)
+    }
 
     fun new_schnorr_statement(_G: RistrettoPoint, _Y: RistrettoPoint): PublicStatement {
         new_public_statement(vector[_G, _Y], vector[])
@@ -129,7 +134,7 @@ module sigma_protocols::example_schnorr {
         let (stmt, witn) = random_statement_witness_pair();
 
         homomorphism::assert_correctly_computed_proof_verifies(
-            DST,
+            new_session(b"session: test schnorr proving correctness"),
             stmt,
             witn,
             |_X, w| psi(_X, w),
@@ -142,7 +147,7 @@ module sigma_protocols::example_schnorr {
     fun empty_proof_for_random_statement_test() {
         assert!(
             !homomorphism::empty_proof_verifies(
-                DST,
+                new_session(b"session: test empty schnorr proof for random statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
                 new_schnorr_statement(random_point(), random_point())
@@ -154,7 +159,7 @@ module sigma_protocols::example_schnorr {
     fun empty_proof_for_empty_statement_test() {
         assert!(
             !homomorphism::empty_proof_verifies(
-                DST,
+                new_session(b"session: test empty schnorr proof for empty statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
                 new_public_statement(vector[], vector[])
