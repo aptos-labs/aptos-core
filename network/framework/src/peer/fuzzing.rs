@@ -25,8 +25,8 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 /// Generate a sequence of `MultiplexMessage`, bcs serialize them, and write them
 /// out to a buffer using our length-prefixed message codec.
-pub fn generate_corpus(gen: &mut ValueGenerator) -> Vec<u8> {
-    let network_msgs = gen.generate(vec(any::<MultiplexMessage>(), 1..20));
+pub fn generate_corpus(r#gen: &mut ValueGenerator) -> Vec<u8> {
+    let network_msgs = r#gen.generate(vec(any::<MultiplexMessage>(), 1..20));
 
     let (write_socket, mut read_socket) = MemorySocket::new_pair();
     let mut writer = MultiplexMessageSink::new(write_socket, constants::MAX_FRAME_SIZE);

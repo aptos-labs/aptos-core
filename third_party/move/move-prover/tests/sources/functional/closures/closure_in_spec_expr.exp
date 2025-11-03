@@ -1,0 +1,6 @@
+Move prover returns: exiting with condition generation errors
+error: [boogie translator] current restriction: a function value cannot be used in a specification expression.
+  ┌─ tests/sources/functional/closures/closure_in_spec_expr.move:6:27
+  │
+6 │         ensures result == p(v[0]);
+  │                           ^^^^^^^

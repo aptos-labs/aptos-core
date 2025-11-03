@@ -82,7 +82,7 @@ impl Collector for DiskMetricsCollector {
         system.refresh_disks_list();
         system.refresh_disks();
 
-        let mfs = system
+        system
             .disks()
             .iter()
             .flat_map(|disk| {
@@ -110,9 +110,7 @@ impl Collector for DiskMetricsCollector {
                 vec![total_space, available_space]
             })
             .flat_map(|metric| metric.collect())
-            .collect();
-
-        mfs
+            .collect()
     }
 }
 

@@ -144,7 +144,7 @@ impl<NetworkClient: NetworkClientInterface<ConsensusObserverMessage>>
         request_timeout_ms: u64,
     ) -> Result<ConsensusObserverResponse, Error> {
         // Generate a random request ID
-        let request_id = rand::thread_rng().gen();
+        let request_id = rand::thread_rng().r#gen();
 
         // Increment the request counter
         metrics::increment_counter(

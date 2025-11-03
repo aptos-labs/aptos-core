@@ -25,7 +25,8 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::collections::BTreeMap;
+use triomphe::Arc as TriompheArc;
 
 pub(crate) struct WriteOpConverter<'r> {
     remote: &'r dyn AptosMoveResolver,
@@ -131,7 +132,7 @@ impl<'r> WriteOpConverter<'r> {
         state_key: &StateKey,
         move_storage_op: MoveStorageOp<BytesWithResourceLayout>,
         legacy_creation_as_modification: bool,
-    ) -> PartialVMResult<(WriteOp, Option<Arc<MoveTypeLayout>>)> {
+    ) -> PartialVMResult<(WriteOp, Option<TriompheArc<MoveTypeLayout>>)> {
         let state_value_metadata = self
             .remote
             .as_executor_view()

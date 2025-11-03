@@ -1,0 +1,80 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i64.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 9223372036854775808 as i64;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 9223372036854775808u128 as i64;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 9223372036854775808u256 as i64;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 9223372036854775808i128 as i64;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 9223372036854775808i256 as i64;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -9223372036854775809i128 as i64;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -9223372036854775809i256 as i64;
+    }
+}

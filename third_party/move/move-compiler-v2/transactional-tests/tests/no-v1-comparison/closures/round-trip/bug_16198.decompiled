@@ -9,30 +9,30 @@ module 0xc0ffee::m {
         42
     }
     public fun test(p0: u64) {
-        let _t3: ||(||(u64) has drop) has copy + drop = || lambda__2__test(p0);
-        let _t4 = _t3();
-        if (!(_t4() == 42)) abort 14566554180833181696;
-        let _t1 = forty_two();
-        let _t10: ||(||(u64) has drop) has copy + drop = || lambda__4__test(_t1);
-        let _t11 = _t10();
-        if (!(_t11() == 42)) abort 14566554180833181696;
-        let _t16: ||(||(||(u64) has drop)) has copy + drop = || lambda__7__test(p0);
-        let _t17 = _t16();
-        let _t18 = _t17();
-        if (!(_t18() == 42)) abort 14566554180833181696;
-        let _t24: ||(||(||(||(u64) has drop))) has copy + drop = || lambda__12__test(p0, _t1);
-        let _t25 = _t24();
-        let _t26 = _t25();
-        let _t27 = _t26();
-        if (!(_t27() == 84)) abort 14566554180833181696;
-        let _t33: ||(||(||(||(u64) has drop))) has copy + drop = || lambda__17__test(p0, _t1);
-        let _t34 = _t33();
-        let _t35 = _t34();
-        let _t36 = _t35();
-        if (!(_t36() == 84)) abort 14566554180833181696;
-        let Func{_0: _t43} = Func{_0: || lambda__19__test(p0)};
-        let _t44 = _t43();
-        if (!(_t44() == 42)) abort 14566554180833181696;
+        let _v0: ||(||(u64) has drop) has copy + drop = || lambda__2__test(p0);
+        let _v1 = _v0();
+        assert!(_v1() == 42, 14566554180833181696);
+        let _v2 = forty_two();
+        let _v3: ||(||(u64) has drop) has copy + drop = || lambda__4__test(_v2);
+        let _v4 = _v3();
+        assert!(_v4() == 42, 14566554180833181696);
+        let _v5: ||(||(||(u64) has drop)) has copy + drop = || lambda__7__test(p0);
+        let _v6 = _v5();
+        let _v7 = _v6();
+        assert!(_v7() == 42, 14566554180833181696);
+        let _v8: ||(||(||(||(u64) has drop))) has copy + drop = || lambda__12__test(p0, _v2);
+        let _v9 = _v8();
+        let _v10 = _v9();
+        let _v11 = _v10();
+        assert!(_v11() == 84, 14566554180833181696);
+        let _v12: ||(||(||(||(u64) has drop))) has copy + drop = || lambda__17__test(p0, _v2);
+        let _v13 = _v12();
+        let _v14 = _v13();
+        let _v15 = _v14();
+        assert!(_v15() == 84, 14566554180833181696);
+        let Func{_0: _v16} = Func{_0: || lambda__19__test(p0)};
+        let _v17 = _v16();
+        assert!(_v17() == 42, 14566554180833181696);
     }
     fun lambda__2__test(p0: u64): ||(u64) has drop {
         || lambda__1__test(p0)
@@ -44,13 +44,13 @@ module 0xc0ffee::m {
         || lambda__6__test(p0)
     }
     fun lambda__12__test(p0: u64, p1: u64): ||(||(||(u64) has drop)) {
-        let _t3: ||u64 has copy + drop = || lambda__8__test(p0);
-        p0 = _t3();
+        let _v0: ||u64 has copy + drop = || lambda__8__test(p0);
+        p0 = _v0();
         || lambda__11__test(p1, p0)
     }
     fun lambda__17__test(p0: u64, p1: u64): ||(||(||(u64) has drop)) {
-        let _t3: ||u64 has copy + drop = || lambda__13__test(p1);
-        p1 = _t3();
+        let _v0: ||u64 has copy + drop = || lambda__13__test(p1);
+        p1 = _v0();
         || lambda__16__test(p0, p1)
     }
     fun lambda__19__test(p0: u64): ||(u64) {

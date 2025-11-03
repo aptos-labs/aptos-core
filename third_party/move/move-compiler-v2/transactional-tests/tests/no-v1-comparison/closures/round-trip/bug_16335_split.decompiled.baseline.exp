@@ -4,7 +4,7 @@ Error: compilation errors:
  error: cannot assign `&mut || has copy + drop` to left-hand side of type `&mut || has drop`
    ┌─ TEMPFILE:19:10
    │
-19 │         *_t4 = _t2;
+19 │         *_v2 = _v0;
    │          ^^^
 
 

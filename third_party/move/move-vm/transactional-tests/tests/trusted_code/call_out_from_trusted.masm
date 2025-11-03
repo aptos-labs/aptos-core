@@ -1,0 +1,26 @@
+//# publish
+module 0x9::trusted
+
+public fun apply(f: |u64|u64, x: u64): u64
+    ld_u32 33 // error
+    move_loc f
+    call_closure<|u64|u64>
+    ret
+
+//# publish
+module 0x99::not_trusted
+use 0x9::trusted
+
+fun call_apply(): u64
+    pack_closure increment, 0
+    ld_u64 22
+    call trusted::apply
+    ret
+
+fun increment(x: u64): u64
+    move_loc x
+    ld_u64 1
+    add
+    ret
+
+//# run --verbose 0x99::not_trusted::call_apply

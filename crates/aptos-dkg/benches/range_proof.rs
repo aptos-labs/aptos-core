@@ -1,69 +1,92 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_dkg::range_proof::{batch_prove, batch_verify, commit, setup};
-use blstrs::Scalar;
+use aptos_dkg::{
+    algebra::GroupGenerators,
+    range_proofs::{
+        dekart_univariate::Proof as UnivariateDeKART,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
+    },
+    utils::test_utils::{self},
+};
+use ark_ec::pairing::Pairing;
+use ark_std::rand::thread_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
-use rand::thread_rng;
-use rand_core::RngCore;
 
-pub fn bench_groups(c: &mut Criterion) {
-    let mut group = c.benchmark_group("range_proof");
+/// Generic benchmark function over any pairing curve and range proof
+fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
+    c: &mut Criterion,
+    curve_name: &str,
+    proof_name: &str,
+) {
+    let mut group = c.benchmark_group(format!("range_proof/{}/{}", proof_name, curve_name));
 
     let ell = std::env::var("L")
         .unwrap_or(std::env::var("ELL").unwrap_or_default())
         .parse::<usize>()
-        .unwrap_or(16);
+        .unwrap_or(48);
 
     let n = std::env::var("N")
         .unwrap_or_default()
         .parse::<usize>()
-        .unwrap_or(127);
+        .unwrap_or(2048 - 1);
 
-    group.bench_function(format!("prove/ell={ell}/n={n}").as_str(), move |b| {
+    group.bench_function(format!("prove/ell={ell}/n={n}"), move |b| {
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let pp = setup(ell, n);
-                let zz: Vec<Scalar> = (0..n)
-                    .map(|_| {
-                        let val = rng.next_u64() >> (64 - ell);
-                        Scalar::from(val)
-                    })
-                    .collect();
-                let (cc, r) = commit(&pp, &zz, &mut rng);
-                (pp, zz, cc, r)
+                let group_generators = GroupGenerators::sample(&mut rng);
+                let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
+                let (values, comm, r) =
+                    test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+                (pk, values, comm, r)
             },
-            |(pp, z_vals, com, prover_state)| {
+            |(pk, values, comm, r)| {
+                let mut fs_t = merlin::Transcript::new(B::DST);
                 let mut rng = thread_rng();
-                let _proof = batch_prove(&mut rng, &pp, &z_vals, &com, &prover_state);
+                let _proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
             },
         )
     });
-    group.bench_function(format!("verify/ell={ell}/n={n}").as_str(), |b| {
+
+    group.bench_function(format!("verify/ell={ell}/n={n}"), |b| {
         b.iter_with_setup(
             || {
                 let mut rng = thread_rng();
-                let pp = setup(ell, n);
-                let zz: Vec<Scalar> = (0..n)
-                    .map(|_| {
-                        let val = rng.next_u64() >> (64 - ell);
-                        Scalar::from(val)
-                    })
-                    .collect();
-                let (cc, r) = commit(&pp, &zz, &mut rng);
-                let proof = batch_prove(&mut rng, &pp, &zz, &cc, &r);
-                (pp, cc, proof)
+                let group_generators = GroupGenerators::sample(&mut rng);
+                let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
+                let (values, comm, r) =
+                    test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
+                let mut fs_t = merlin::Transcript::new(B::DST);
+                let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+                (vk, n, ell, comm, proof)
             },
-            |(pp, com, proof)| {
-                batch_verify(&pp, &com, &proof).unwrap();
+            |(vk, n, ell, comm, proof)| {
+                let mut fs_t = merlin::Transcript::new(B::DST);
+                proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
             },
         )
     });
 }
 
+fn bench_groups(c: &mut Criterion) {
+    use ark_bls12_381::Bls12_381;
+    use ark_bn254::Bn254;
+
+    // UnivariateDeKART benchmarks
+    let proof_name = "UnivariateDeKART";
+    bench_range_proof::<Bn254, UnivariateDeKART<Bn254>>(c, "BN254", proof_name);
+    bench_range_proof::<Bls12_381, UnivariateDeKART<Bls12_381>>(c, "BLS12-381", proof_name);
+
+    // UnivariateDeKARTv2 benchmarks
+    let proof_name = "UnivariateDeKARTv2";
+    bench_range_proof::<Bn254, UnivariateDeKARTv2<Bn254>>(c, "BN254", proof_name);
+    bench_range_proof::<Bls12_381, UnivariateDeKARTv2<Bls12_381>>(c, "BLS12-381", proof_name);
+}
+
 criterion_group!(
     name = benches;
     config = Criterion::default().sample_size(10);
-    targets = bench_groups);
+    targets = bench_groups
+);
 criterion_main!(benches);

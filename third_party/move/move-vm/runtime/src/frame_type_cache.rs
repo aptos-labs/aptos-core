@@ -14,34 +14,15 @@ use move_core_types::gas_algebra::NumTypeNodes;
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
-#[allow(dead_code)]
-pub(crate) trait RuntimeCacheTraits {
-    fn caches_enabled() -> bool;
-}
-
-pub(crate) struct NoRuntimeCaches;
-pub(crate) struct AllRuntimeCaches;
-
-impl RuntimeCacheTraits for NoRuntimeCaches {
-    fn caches_enabled() -> bool {
-        false
-    }
-}
-
-impl RuntimeCacheTraits for AllRuntimeCaches {
-    fn caches_enabled() -> bool {
-        true
-    }
-}
-
 /// Variants for each individual instruction cache. Should make sure
 /// that the memory footprint of each variant is small. This is an
 /// enum that is expected to grow in the future.
 #[derive(Clone)]
-#[allow(dead_code)]
 pub(crate) enum PerInstructionCache {
     Nothing,
+    #[allow(dead_code)]
     Pack(u16),
+    #[allow(dead_code)]
     PackGeneric(u16),
     Call(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
     CallGeneric(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>),
@@ -65,15 +46,6 @@ pub(crate) struct FrameTypeCache {
     variant_field_instantiation:
         BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
     single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
-    /// Recursive frame cache for a function that is called from the
-    /// current frame. It is indexed by FunctionInstantiationindex or
-    /// FunctionHandleIndex for non-generic functions. Note that
-    /// whenever a function with the same `index` is called, the
-    /// structures stored in that function's frame cache do not change.
-    pub(crate) generic_sub_frame_cache:
-        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
-    pub(crate) sub_frame_cache:
-        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
     /// small. The caches are indexed by the index of the given
@@ -85,9 +57,23 @@ pub(crate) struct FrameTypeCache {
     /// guaranteed that everything will be exactly the same as when we
     /// did the insertion.
     pub(crate) per_instruction_cache: Vec<PerInstructionCache>,
+
+    pub(crate) function_cache:
+        BTreeMap<FunctionHandleIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+    pub(crate) generic_function_cache:
+        BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
+
+    /// Cached instantiated local types for generic functions.
+    pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
+    /// Cached number of type nodes per instantiated local type for gas charging re-use.
+    pub(crate) instantiated_local_ty_counts: Option<Rc<[NumTypeNodes]>>,
 }
 
 impl FrameTypeCache {
+    // note(inline):
+    // needs to always be inlined, closure will be optimized out in this case. When it gets inlined,
+    // LLVM also inlines `BTreeMap::entry()` with it to optimize, so the final instruction count is pretty big -
+    // do not inline the dependent functions.
     #[inline(always)]
     fn get_or<K: Copy + Ord + Eq, V, F>(
         map: &mut BTreeMap<K, V>,
@@ -106,7 +92,7 @@ impl FrameTypeCache {
         }
     }
 
-    #[inline(always)]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_field_type_and_struct_type(
         &mut self,
         idx: FieldInstantiationIndex,
@@ -123,6 +109,7 @@ impl FrameTypeCache {
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_variant_field_type_and_struct_type(
         &mut self,
         idx: VariantFieldInstantiationIndex,
@@ -144,7 +131,7 @@ impl FrameTypeCache {
         Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
     }
 
-    #[inline(always)]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_type(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -158,7 +145,7 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
-    #[inline(always)]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_variant_type(
         &mut self,
         idx: StructVariantInstantiationIndex,
@@ -177,7 +164,7 @@ impl FrameTypeCache {
         Ok((ty, *ty_count))
     }
 
-    #[inline(always)]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_fields_types(
         &mut self,
         idx: StructDefInstantiationIndex,
@@ -199,7 +186,7 @@ impl FrameTypeCache {
         )?)
     }
 
-    #[inline(always)]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_struct_variant_fields_types(
         &mut self,
         idx: StructVariantInstantiationIndex,
@@ -221,7 +208,7 @@ impl FrameTypeCache {
         )?)
     }
 
-    #[inline(always)]
+    // note(inline): do not inline, increases size a lot, might even decrease the performance
     pub(crate) fn get_signature_index_type(
         &mut self,
         idx: SignatureIndex,

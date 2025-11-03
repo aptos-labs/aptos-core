@@ -1,5 +1,12 @@
 #[test_only]
 module aptos_experimental::clearinghouse_test {
+    #[test_only] friend aptos_experimental::market_single_order_tests;
+    #[test_only] friend aptos_experimental::pre_cancellation_tests;
+    #[test_only] friend aptos_experimental::market_tests_common;
+    #[test_only] friend aptos_experimental::market_test_utils;
+    #[test_only] friend aptos_experimental::market_bulk_order_tests;
+    #[test_only] friend aptos_experimental::market_mixed_order_tests;
+
     use std::error;
     use std::option;
     use std::signer;
@@ -11,7 +18,10 @@ module aptos_experimental::clearinghouse_test {
         SettleTradeResult,
         new_settle_trade_result,
         MarketClearinghouseCallbacks,
-        new_market_clearinghouse_callbacks
+        new_market_clearinghouse_callbacks,
+        new_callback_result_continue_matching,
+        new_callback_result_stop_matching, ValidationResult, new_validation_result, PlaceMakerOrderResult,
+        new_place_maker_order_result
     };
 
     const EINVALID_ADDRESS: u64 = 1;
@@ -46,7 +56,7 @@ module aptos_experimental::clearinghouse_test {
         maker_order_calls: Table<OrderIdType, bool>
     }
 
-    public(package) fun initialize(admin: &signer) {
+    public(friend) fun initialize(admin: &signer) {
         assert!(
             signer::address_of(admin) == @0x1,
             error::invalid_argument(EINVALID_ADDRESS)
@@ -63,17 +73,17 @@ module aptos_experimental::clearinghouse_test {
         );
     }
 
-    public(package) fun validate_order_placement(order_id: OrderIdType): bool acquires GlobalState {
+    public(friend) fun validate_order_placement(order_id: OrderIdType): ValidationResult acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             !open_orders.contains(order_id),
             error::invalid_argument(E_DUPLICATE_ORDER)
         );
         open_orders.add(order_id, true);
-        return true
+        return new_validation_result(option::none())
     }
 
-    public(package) fun validate_bulk_order_placement(account: address): bool acquires GlobalState {
+    public(friend) fun validate_bulk_order_placement(account: address): ValidationResult acquires GlobalState {
         let bulk_open_bids = &mut borrow_global_mut<GlobalState>(@0x1).bulk_open_bids;
         if (!bulk_open_bids.contains(account)) {
             bulk_open_bids.add(account, true);
@@ -82,10 +92,10 @@ module aptos_experimental::clearinghouse_test {
         if (!bulk_open_asks.contains(account)) {
             bulk_open_asks.add(account, true);
         };
-        return true
+        return new_validation_result(option::none())
     }
 
-    public(package) fun get_position_size(user: address): u64 acquires GlobalState {
+    public(friend) fun get_position_size(user: address): u64 acquires GlobalState {
         let user_positions = &borrow_global<GlobalState>(@0x1).user_positions;
         if (!user_positions.contains(user)) {
             return 0;
@@ -108,12 +118,12 @@ module aptos_experimental::clearinghouse_test {
         }
     }
 
-    public(package) fun settle_trade(
+    public(friend) fun settle_trade(
         taker: address,
         maker: address,
         size: u64,
         is_taker_long: bool
-    ): SettleTradeResult acquires GlobalState {
+    ): SettleTradeResult<u64> acquires GlobalState {
         let user_positions = &mut borrow_global_mut<GlobalState>(@0x1).user_positions;
         let taker_position =
             user_positions.borrow_mut_with_default(
@@ -125,10 +135,10 @@ module aptos_experimental::clearinghouse_test {
                 maker, Position { size: 0, is_long: true }
             );
         update_position(maker_position, size, !is_taker_long);
-        new_settle_trade_result(size, option::none(), option::none())
+        new_settle_trade_result(size, option::none(), option::none(), new_callback_result_continue_matching(size))
     }
 
-    public(package) fun place_maker_order(order_id: OrderIdType) acquires GlobalState {
+    public(friend) fun place_maker_order(order_id: OrderIdType): PlaceMakerOrderResult<u64> acquires GlobalState {
         let maker_order_calls =
             &mut borrow_global_mut<GlobalState>(@0x1).maker_order_calls;
         assert!(
@@ -136,14 +146,15 @@ module aptos_experimental::clearinghouse_test {
             error::invalid_argument(E_DUPLICATE_ORDER)
         );
         maker_order_calls.add(order_id, true);
+        new_place_maker_order_result(option::none(), option::none())
     }
 
-    public(package) fun is_maker_order_called(order_id: OrderIdType): bool acquires GlobalState {
+    public(friend) fun is_maker_order_called(order_id: OrderIdType): bool acquires GlobalState {
         let maker_order_calls = &borrow_global<GlobalState>(@0x1).maker_order_calls;
         maker_order_calls.contains(order_id)
     }
 
-    public(package) fun cleanup_order(order_id: OrderIdType) acquires GlobalState {
+    public(friend) fun cleanup_order(order_id: OrderIdType) acquires GlobalState {
         let open_orders = &mut borrow_global_mut<GlobalState>(@0x1).open_orders;
         assert!(
             open_orders.contains(order_id),
@@ -152,63 +163,64 @@ module aptos_experimental::clearinghouse_test {
         open_orders.remove(order_id);
     }
 
-    public(package) fun cleanup_bulk_order(account: address, is_bid: bool) acquires GlobalState {
-        let open_orders = if (is_bid) {
-             &mut borrow_global_mut<GlobalState>(@0x1).bulk_open_bids
-          } else {
-                &mut borrow_global_mut<GlobalState>(@0x1).bulk_open_asks
+    public(friend) fun cleanup_bulk_order(account: address) acquires GlobalState {
+        let global_state = borrow_global_mut<GlobalState>(@0x1);
+        let bulk_open_bids = &mut global_state.bulk_open_bids;
+        let bulk_open_asks = &mut global_state.bulk_open_asks;
+        if (!bulk_open_bids.contains(account)
+            && !bulk_open_asks.contains(account)) {
+            return
         };
-        assert!(
-            open_orders.contains(account),
-            error::invalid_argument(E_ORDER_NOT_FOUND)
-        );
-        open_orders.remove(account);
+        bulk_open_asks.remove(account);
+        bulk_open_bids.remove(account);
     }
 
-    public(package) fun order_exists(order_id: OrderIdType): bool acquires GlobalState {
+    public(friend) fun order_exists(order_id: OrderIdType): bool acquires GlobalState {
         let open_orders = &borrow_global<GlobalState>(@0x1).open_orders;
         open_orders.contains(order_id)
     }
 
-    public (package) fun bulk_order_exists(account: address): bool acquires GlobalState {
+    public(friend) fun bulk_order_exists(account: address): bool acquires GlobalState {
         let open_orders = &borrow_global<GlobalState>(@0x1).bulk_open_bids;
         open_orders.contains(account)
     }
 
-    public(package) fun settle_trade_with_taker_cancelled(
+    public(friend) fun settle_trade_with_taker_cancelled(
         _taker: address,
         _maker: address,
         size: u64,
         _is_taker_long: bool
-    ): SettleTradeResult {
+    ): SettleTradeResult<u64> {
         new_settle_trade_result(
             size / 2,
             option::none(),
-            option::some(std::string::utf8(b"Max open interest violation"))
+            option::some(std::string::utf8(b"Max open interest violation")),
+            new_callback_result_stop_matching(size)
         )
     }
 
-    public(package) fun test_market_callbacks():
-        MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
+    public(friend) fun test_market_callbacks():
+        MarketClearinghouseCallbacks<TestOrderMetadata, u64> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
-            | { settle_trade(taker, maker, size, is_taker_long) },
-            |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
-                validate_order_placement(order_id)
+            |_market, taker_order_info, maker_order_info, _fill_id, _price, size| {
+                settle_trade(taker_order_info.get_account(), maker_order_info.get_account(), size, taker_order_info.is_bid())
             },
-            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices| {
+            |order_info, _size| {
+                validate_order_placement(order_info.get_order_id())
+            },
+            |account, _bid_prices, _bid_sizes, _ask_prices, _ask_sizes, _order_metadata| {
                 validate_bulk_order_placement(account)
             },
-            |_account, order_id, _is_bid, _price, _size, _order_metadata| {
-                place_maker_order(order_id);
+            |order_info, _size| {
+                place_maker_order(order_info.get_order_id())
             },
-            |_account, _order_id, _is_bid, _remaining_size, _order_metadata| {
-                cleanup_order(_order_id);
+            |order_info, _remaining_size, _| {
+                cleanup_order(order_info.get_order_id());
             },
-            |account, is_bid, _remaining_size| {
-                cleanup_bulk_order(account, is_bid);
+            |account, _order_id, _is_bid, _price, _size| {
+                cleanup_bulk_order(account);
             },
-            |_account, _order_id, _is_bid, _price, _size| {
+            |_order_info, _size| {
                 // decrease order size is not used in this test
             },
             |order_metadata| {
@@ -217,29 +229,59 @@ module aptos_experimental::clearinghouse_test {
         )
     }
 
-    public(package) fun test_market_callbacks_with_taker_cancelled():
-        MarketClearinghouseCallbacks<TestOrderMetadata> acquires GlobalState {
+    public(friend) fun test_market_callbacks_with_taker_cancelled():
+        MarketClearinghouseCallbacks<TestOrderMetadata, u64> acquires GlobalState {
         new_market_clearinghouse_callbacks(
-            |taker, _taker_order_id, maker, _maker_order_id, _fill_id, is_taker_long, _price, size, _taker_metadata, _maker_metadata
-            | {
-                settle_trade_with_taker_cancelled(taker, maker, size, is_taker_long)
+            |_market, taker_order_info, maker_order_info, _fill_id, _price, size| {
+                settle_trade_with_taker_cancelled(taker_order_info.get_account(), maker_order_info.get_account(), size, taker_order_info.is_bid())
             },
-            |_account, order_id, _is_taker, _is_bid, _price, _time_in_force, _size, _order_metadata| {
-                validate_order_placement(order_id)
+            |order_info, _size| {
+                validate_order_placement(order_info.get_order_id())
             },
-            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices| {
+            |account, _bid_prices, _bid_sizes, _ask_prices, _ask_sizes, _order_metadata| {
                 validate_bulk_order_placement(account)
             },
-            |_account, _order_id, _is_bid, _price, _size, _order_metadata| {
+            |_order_info, _size| {
+                new_place_maker_order_result(option::none(), option::none())
                 // place_maker_order is not used in this test
             },
-            |_account, _order_id, _is_bid, _remaining_size, _order_metadata| {
-                cleanup_order(_order_id);
+            |order_info, _remaining_size, _| {
+                cleanup_order(order_info.get_order_id());
             },
-            |account, is_bid, _remaining_size| {
-                cleanup_bulk_order(account, is_bid);
+            |account, _order_id, _is_bid, _price, _size| {
+                cleanup_bulk_order(account);
             },
-            |_account, _order_id, _is_bid, _price, _size| {
+            |_order_info, _size| {
+                // decrease order size is not used in this test
+            },
+            |order_metadata| {
+                get_order_metadata_bytes(order_metadata)
+            }
+        )
+    }
+
+    public(friend) fun test_market_callbacks_with_maker_cancellled():
+    MarketClearinghouseCallbacks<TestOrderMetadata, u64> acquires GlobalState {
+        new_market_clearinghouse_callbacks(
+            |_market, taker_order_info, maker_order_info, _fill_id, _price, size| {
+                settle_trade(taker_order_info.get_account(), maker_order_info.get_account(), size, taker_order_info.is_bid())
+            },
+            |order_info, _size| {
+                validate_order_placement(order_info.get_order_id())
+            },
+            |account, _bid_sizes, _bid_prices, _ask_sizes, _ask_prices, _order_metadata| {
+                validate_bulk_order_placement(account)
+            },
+            |_order_info, _size| {
+                new_place_maker_order_result(option::some(std::string::utf8(b"cancelled")), option::none())
+            },
+            |order_info, _remaining_size, _| {
+                cleanup_order(order_info.get_order_id());
+            },
+            |account, _order_id, _is_bid, _price, _size| {
+                cleanup_bulk_order(account);
+            },
+            |_order_info, _size| {
                 // decrease order size is not used in this test
             },
             |order_metadata| {

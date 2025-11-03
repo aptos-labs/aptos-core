@@ -881,7 +881,7 @@ fn create_state_values_request_at_version(
 
 /// Generates a random u64
 fn get_random_u64() -> u64 {
-    thread_rng().gen()
+    thread_rng().r#gen()
 }
 
 /// Verifies the serviceability of the epoch ending request ranges against

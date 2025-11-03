@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 1-16:  publish [module 0xc0ffee::corner_cases]
+task 1 lines 18-18:  run 0xc0ffee::corner_cases::fun1 --verbose
+return values: 5

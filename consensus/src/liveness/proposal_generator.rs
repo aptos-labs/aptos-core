@@ -407,6 +407,8 @@ pub struct ProposalGenerator {
 
     allow_batches_without_pos_in_proposal: bool,
     opt_qs_payload_param_provider: Arc<dyn TOptQSPullParamsProvider>,
+
+    proposal_under_backpressure: Mutex<bool>,
 }
 
 impl ProposalGenerator {
@@ -449,6 +451,7 @@ impl ProposalGenerator {
             vtxn_config,
             allow_batches_without_pos_in_proposal,
             opt_qs_payload_param_provider,
+            proposal_under_backpressure: Mutex::new(false),
         }
     }
 
@@ -475,6 +478,10 @@ impl ProposalGenerator {
 
     pub fn can_propose_in_round(&self, round: Round) -> bool {
         *self.last_round_generated.lock() < round
+    }
+
+    pub fn is_proposal_under_backpressure(&self) -> bool {
+        *self.proposal_under_backpressure.lock()
     }
 
     /// The function generates a new proposal block: the returned future is fulfilled when the
@@ -587,7 +594,7 @@ impl ProposalGenerator {
             .path_from_ordered_root(parent_id)
             .ok_or_else(|| format_err!("Parent block {} already pruned", parent_id))?
             .iter()
-            .any(|block| !block.payload().map_or(true, |txns| txns.is_empty()));
+            .any(|block| !block.payload().is_none_or(|txns| txns.is_empty()));
 
         // All proposed blocks in a branch are guaranteed to have increasing timestamps
         // since their predecessor block will not be added to the BlockStore until
@@ -845,6 +852,8 @@ impl ProposalGenerator {
             round = round,
             "Proposal generation backpressure details",
         );
+
+        *self.proposal_under_backpressure.lock() = !proposal_delay.is_zero();
 
         (
             max_block_size,

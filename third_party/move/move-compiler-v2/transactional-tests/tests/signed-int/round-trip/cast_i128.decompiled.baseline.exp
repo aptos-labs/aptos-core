@@ -1,0 +1,44 @@
+processed 7 tasks
+task 0 lines 3-8:  run --verbose [script {]
+task 1 lines 11-16:  run --verbose [script {]
+task 2 lines 19-24:  run --verbose [script {]
+task 3 lines 27-32:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast u128(170141183460469231731687303715884105728) to i128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 4 lines 35-40:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast U256(170141183460469231731687303715884105728) to i128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 5 lines 43-48:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(170141183460469231731687303715884105728) to i128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}
+task 6 lines 51-56:  run --verbose [script {]
+Error: Script execution failed with VMError: {
+    message: Cannot cast I256(-170141183460469231731687303715884105729) to i128,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: script,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

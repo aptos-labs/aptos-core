@@ -168,13 +168,15 @@ fn test_unprocessed_error() {
 
 #[test]
 fn test_unset_env_var() {
-    std::env::remove_var("MYVAR2343u2");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::remove_var("MYVAR2343u2") };
     block_on(assert_commands_error(
         "echo $MYVAR2343u2 > /dev/null; echo okay; exec 1>&-; cat > /dev/null",
     ));
 
     // variable set
-    std::env::set_var("MYVAR2343u2", "hehe");
+    // TODO: Audit that the environment access only happens in single-threaded code.
+    unsafe { std::env::set_var("MYVAR2343u2", "hehe") };
     block_on(assert_commands_okay(
         "echo $MYVAR2343u2 > /dev/null; echo okay; exec 1>&-; cat > /dev/null",
     ));

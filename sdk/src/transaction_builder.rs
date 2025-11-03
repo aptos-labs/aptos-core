@@ -361,7 +361,7 @@ impl TransactionFactory {
                 payload.upgrade_payload_with_fn(
                     self.use_txn_payload_v2_format,
                     self.use_replay_protection_nonce
-                        .then_some(|| thread_rng().gen()),
+                        .then_some(|| thread_rng().r#gen()),
                 )
             } else {
                 payload

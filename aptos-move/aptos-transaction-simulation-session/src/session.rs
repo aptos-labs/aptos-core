@@ -7,14 +7,15 @@ use crate::{
     txn_output::{save_events, save_write_set},
 };
 use anyhow::Result;
-use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
 use aptos_rest_client::{AptosBaseUrl, Client};
 use aptos_transaction_simulation::{
     DeltaStateStore, EitherStateView, EmptyStateView, SimulationStateStore, GENESIS_CHANGE_SET_HEAD,
 };
 use aptos_types::{
-    account_address::AccountAddress,
+    account_address::{create_derived_object_address, AccountAddress},
     fee_statement::FeeStatement,
+    state_store::{state_key::StateKey, TStateView},
     transaction::{
         AuxiliaryInfo, PersistedAuxiliaryInfo, SignedTransaction, TransactionExecutable,
         TransactionOutput, TransactionPayload, TransactionPayloadInner, TransactionStatus,
@@ -25,14 +26,15 @@ use aptos_validator_interface::{DebuggerStateView, RestDebuggerInterface};
 use aptos_vm::{data_cache::AsMoveResolver, AptosVM};
 use aptos_vm_environment::environment::AptosEnvironment;
 use aptos_vm_logging::log_schema::AdapterLogSchema;
-use aptos_vm_types::{module_and_script_storage::AsAptosCodeStorage, resolver::StateStorageView};
+use aptos_vm_types::module_and_script_storage::AsAptosCodeStorage;
 use move_core_types::{
     identifier::Identifier,
-    language_storage::{ModuleId, TypeTag},
+    language_storage::{ModuleId, StructTag, TypeTag},
 };
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -40,23 +42,22 @@ use url::Url;
 
 type SessionStateStore = DeltaStateStore<EitherStateView<EmptyStateView, DebuggerStateView>>;
 
+/// Formats an account address for display.
+/// Truncates the address if it's more than 4 digits.
+fn format_address(address: &AccountAddress) -> String {
+    let address_str = address.to_hex_literal();
+    if address_str.len() > 6 {
+        format!("{}...", &address_str[..6])
+    } else {
+        address_str
+    }
+}
+
 /// Formats a module ID for display by adjusting the address for better readability.
 fn format_module_id(module_id: &ModuleId) -> String {
     let address = module_id.address();
     let name = module_id.name();
-
-    // Format address: add 0x prefix, trim leading zeros, limit to 4 digits
-    let address_str = format!("{:x}", address);
-    let trimmed = address_str.trim_start_matches('0');
-    let display_address = if trimmed.is_empty() {
-        "0".to_string()
-    } else if trimmed.len() > 4 {
-        format!("{}...", &trimmed[..4])
-    } else {
-        trimmed.to_string()
-    };
-
-    format!("0x{}::{}", display_address, name)
+    format!("{}::{}", format_address(address), name)
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -85,6 +86,14 @@ enum Summary {
         result: ViewResult,
         gas_used: u64,
     },
+    ViewResource {
+        resource_type: String,
+        resource_value: Option<serde_json::Value>,
+    },
+    ViewResourceGroup {
+        group_type: String,
+        group_value: Option<serde_json::Value>,
+    },
 }
 
 /// A session for simulating transactions, with data being persisted to a directory, allowing the session
@@ -99,7 +108,7 @@ pub struct Session {
 
 impl Session {
     /// Returns a reference to the underlying state store.
-    pub fn state_store(&self) -> &impl SimulationStateStore {
+    pub fn state_store(&self) -> &(impl SimulationStateStore + use<>) {
         &self.state_store
     }
 
@@ -414,7 +423,107 @@ impl Session {
         res
     }
 
-    // TODO: view resource
+    /// Views a Move resource.
+    pub fn view_resource(
+        &mut self,
+        account_addr: AccountAddress,
+        resource_tag: &StructTag,
+    ) -> Result<Option<serde_json::Value>> {
+        let state_key = StateKey::resource(&account_addr, resource_tag)?;
+
+        let json_val = match self.state_store.get_state_value_bytes(&state_key)? {
+            Some(bytes) => {
+                let annotator = AptosValueAnnotator::new(&self.state_store);
+                let annotated =
+                    AnnotatedMoveValue::Struct(annotator.view_resource(resource_tag, &bytes)?);
+                Some(aptos_api_types::MoveValue::try_from(annotated)?.json()?)
+            },
+            None => None,
+        };
+
+        let summary = Summary::ViewResource {
+            resource_type: resource_tag.to_canonical_string(),
+            resource_value: json_val.clone(),
+        };
+
+        let summary_path = self
+            .path
+            .join(format!(
+                "[{}] view resource {}::{}::{}::{}",
+                self.config.ops,
+                format_address(&account_addr),
+                format_address(&resource_tag.address),
+                resource_tag.module,
+                resource_tag.name,
+            ))
+            .join("summary.json");
+        std::fs::create_dir_all(summary_path.parent().unwrap())?;
+        std::fs::write(summary_path, serde_json::to_string_pretty(&summary)?)?;
+
+        self.config.ops += 1;
+        self.config.save_to_file(&self.path.join("config.json"))?;
+
+        Ok(json_val)
+    }
+
+    pub fn view_resource_group(
+        &mut self,
+        account_addr: AccountAddress,
+        resource_group_tag: &StructTag,
+        derived_object_address: Option<AccountAddress>,
+    ) -> Result<Option<serde_json::Value>> {
+        let account_addr = match derived_object_address {
+            Some(addr) => create_derived_object_address(account_addr, addr),
+            None => account_addr,
+        };
+
+        let state_key = StateKey::resource_group(&account_addr, resource_group_tag);
+
+        let json_val = match self.state_store.get_state_value_bytes(&state_key)? {
+            Some(bytes) => {
+                let group: BTreeMap<StructTag, Vec<u8>> = bcs::from_bytes(&bytes)?;
+
+                let annotator = AptosValueAnnotator::new(&self.state_store);
+
+                let mut group_deserialized = BTreeMap::new();
+                for (resource_tag, bytes) in group {
+                    let annotated =
+                        AnnotatedMoveValue::Struct(annotator.view_resource(&resource_tag, &bytes)?);
+                    group_deserialized.insert(
+                        resource_tag.to_canonical_string(),
+                        aptos_api_types::MoveValue::try_from(annotated)?.json()?,
+                    );
+                }
+
+                Some(json!(group_deserialized))
+            },
+            None => None,
+        };
+
+        let summary = Summary::ViewResourceGroup {
+            group_type: resource_group_tag.to_canonical_string(),
+            group_value: json_val.clone(),
+        };
+
+        let summary_path = self
+            .path
+            .join(format!(
+                "[{}] view resource group {}::{}::{}::{}",
+                self.config.ops,
+                format_address(&account_addr),
+                format_address(&resource_group_tag.address),
+                resource_group_tag.module,
+                resource_group_tag.name,
+            ))
+            .join("summary.json");
+        std::fs::create_dir_all(summary_path.parent().unwrap())?;
+        std::fs::write(summary_path, serde_json::to_string_pretty(&summary)?)?;
+
+        self.config.ops += 1;
+        self.config.save_to_file(&self.path.join("config.json"))?;
+
+        Ok(json_val)
+    }
 }
 
 #[test]

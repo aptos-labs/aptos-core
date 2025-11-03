@@ -343,10 +343,7 @@ module 0x3::OneToOneMarket {
         price: u64,
     }
     public fun borrow<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address, amount: u64): Token::Coin<Out>
-        acquires Price
-        acquires Pool
-        acquires DepositRecord
-        acquires BorrowRecord
+        acquires BorrowRecord, DepositRecord, Pool, Price
     {
         if (amount <= max_borrow_amount<In,Out>(account, pool_owner)) () else abort 1025;
         update_borrow_record<In,Out>(account, pool_owner, amount);
@@ -354,8 +351,7 @@ module 0x3::OneToOneMarket {
         Token::withdraw<Out>(&mut pool.coin, amount)
     }
     public fun deposit<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address, coin: Token::Coin<In>)
-        acquires Pool
-        acquires DepositRecord
+        acquires DepositRecord, Pool
     {
         let amount = Token::value<In>(&coin);
         update_deposit_record<In,Out>(account, pool_owner, amount);
@@ -384,10 +380,7 @@ module 0x3::OneToOneMarket {
         if (Map::contains_key<address,u64>(record, &pool_owner)) *Map::get<address,u64>(record, &pool_owner) else 0
     }
     fun max_borrow_amount<In: copy + drop + store, Out: copy + drop + store>(account: &signer, pool_owner: address): u64
-        acquires Price
-        acquires Pool
-        acquires DepositRecord
-        acquires BorrowRecord
+        acquires BorrowRecord, DepositRecord, Pool, Price
     {
         let input_deposited = deposited_amount<In,Out>(account, pool_owner);
         let output_deposited = borrowed_amount<In,Out>(account, pool_owner);

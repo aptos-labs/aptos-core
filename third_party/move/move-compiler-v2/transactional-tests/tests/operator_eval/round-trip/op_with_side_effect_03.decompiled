@@ -6,16 +6,16 @@ module 0xc0ffee::m {
         p0 + p1
     }
     public fun test(): u64 {
-        let _t0 = 1 - 1;
-        let _t6 = _t0 + 8;
-        _t0 = _t0 + 3;
-        let _t12 = _t0 - 3;
-        let _t13 = add(_t6, _t12);
-        _t0 = _t0 * 2;
-        let _t19 = _t0 * 2;
-        let _t22 = _t0 + 1;
-        let _t23 = add(_t19, _t22);
-        add(_t13, _t23)
+        let _v0 = 1 - 1;
+        let _v1 = _v0 + 8;
+        _v0 = _v0 + 3;
+        let _v2 = _v0 - 3;
+        let _v3 = add(_v1, _v2);
+        _v0 = _v0 * 2;
+        let _v4 = _v0 * 2;
+        let _v5 = _v0 + 1;
+        let _v6 = add(_v4, _v5);
+        add(_v3, _v6)
     }
 }
 

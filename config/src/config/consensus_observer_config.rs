@@ -13,6 +13,9 @@ const ENABLE_ON_VALIDATORS: bool = true;
 const ENABLE_ON_VALIDATOR_FULLNODES: bool = true;
 const ENABLE_ON_PUBLIC_FULLNODES: bool = false;
 
+// Maximum number of pending blocks for test networks (e.g., devnet)
+const MAX_NUM_PENDING_BLOCKS_FOR_TEST_NETWORKS: u64 = 300;
+
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct ConsensusObserverConfig {
@@ -66,17 +69,17 @@ impl Default for ConsensusObserverConfig {
             max_parallel_serialization_tasks: num_cpus::get(), // Default to the number of CPUs
             network_request_timeout_ms: 5_000,                 // 5 seconds
             garbage_collection_interval_ms: 60_000,            // 60 seconds
-            max_num_pending_blocks: 100,                       // 100 blocks
-            progress_check_interval_ms: 5_000,                 // 5 seconds
-            max_concurrent_subscriptions: 2,                   // 2 streams should be sufficient
-            max_subscription_sync_timeout_ms: 15_000,          // 15 seconds
-            max_subscription_timeout_ms: 15_000,               // 15 seconds
-            subscription_peer_change_interval_ms: 180_000,     // 3 minutes
-            subscription_refresh_interval_ms: 600_000,         // 10 minutes
-            observer_fallback_duration_ms: 600_000,            // 10 minutes
-            observer_fallback_startup_period_ms: 60_000,       // 60 seconds
-            observer_fallback_progress_threshold_ms: 10_000,   // 10 seconds
-            observer_fallback_sync_lag_threshold_ms: 15_000,   // 15 seconds
+            max_num_pending_blocks: 150, // 150 blocks (sufficient for existing production networks)
+            progress_check_interval_ms: 5_000, // 5 seconds
+            max_concurrent_subscriptions: 2, // 2 streams should be sufficient
+            max_subscription_sync_timeout_ms: 15_000, // 15 seconds
+            max_subscription_timeout_ms: 15_000, // 15 seconds
+            subscription_peer_change_interval_ms: 180_000, // 3 minutes
+            subscription_refresh_interval_ms: 600_000, // 10 minutes
+            observer_fallback_duration_ms: 600_000, // 10 minutes
+            observer_fallback_startup_period_ms: 60_000, // 60 seconds
+            observer_fallback_progress_threshold_ms: 10_000, // 10 seconds
+            observer_fallback_sync_lag_threshold_ms: 15_000, // 15 seconds
         }
     }
 }
@@ -93,7 +96,7 @@ impl ConfigOptimizer for ConsensusObserverConfig {
         node_config: &mut NodeConfig,
         local_config_yaml: &Value,
         node_type: NodeType,
-        _chain_id: Option<ChainId>,
+        chain_id: Option<ChainId>,
     ) -> Result<bool, Error> {
         let consensus_observer_config = &mut node_config.consensus_observer;
         let local_observer_config_yaml = &local_config_yaml["consensus_observer"];
@@ -134,6 +137,139 @@ impl ConfigOptimizer for ConsensusObserverConfig {
             },
         }
 
+        // Optimize the max number of pending blocks to accommodate increased block rates.
+        // Note: we currently only do this for test networks (e.g., devnet).
+        if let Some(chain_id) = chain_id {
+            if local_observer_config_yaml["max_num_pending_blocks"].is_null()
+                && !chain_id.is_testnet()
+                && !chain_id.is_mainnet()
+            {
+                consensus_observer_config.max_num_pending_blocks =
+                    MAX_NUM_PENDING_BLOCKS_FOR_TEST_NETWORKS;
+                modified_config = true;
+            }
+        }
+
         Ok(modified_config)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enable_on_validators() {
+        // Create a node config with consensus observer and publisher disabled
+        let mut node_config = create_observer_config(false, false);
+
+        // Optimize the config and verify modifications are made
+        let modified_config = ConsensusObserverConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::Validator,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify the optimized observer and publisher settings
+        assert!(!node_config.consensus_observer.observer_enabled);
+        assert!(node_config.consensus_observer.publisher_enabled);
+    }
+
+    #[test]
+    fn test_enable_on_validator_fullnodes() {
+        // Create a node config with consensus observer and publisher disabled
+        let mut node_config = create_observer_config(false, false);
+
+        // Optimize the config and verify modifications are made
+        let modified_config = ConsensusObserverConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::ValidatorFullnode,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify the optimized observer and publisher settings
+        assert!(node_config.consensus_observer.observer_enabled);
+        assert!(node_config.consensus_observer.publisher_enabled);
+    }
+
+    #[test]
+    fn test_enable_on_public_fullnodes() {
+        // Create a node config with consensus observer and publisher disabled
+        let mut node_config = create_observer_config(false, false);
+
+        // Optimize the config and verify no modifications are made
+        let modified_config = ConsensusObserverConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::PublicFullnode,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(!modified_config);
+
+        // Verify the optimized observer and publisher settings
+        assert!(!node_config.consensus_observer.observer_enabled);
+        assert!(!node_config.consensus_observer.publisher_enabled);
+    }
+
+    #[test]
+    fn test_max_num_pending_blocks_mainnet() {
+        // Create a node config with consensus observer and publisher enabled
+        let mut node_config = create_observer_config(true, true);
+        node_config.consensus_observer.max_num_pending_blocks = 112;
+
+        // Optimize the config and verify no modifications are made
+        let modified_config = ConsensusObserverConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::PublicFullnode,
+            Some(ChainId::mainnet()),
+        )
+        .unwrap();
+        assert!(!modified_config);
+
+        // Verify the max number of pending blocks remains unchanged
+        assert_eq!(node_config.consensus_observer.max_num_pending_blocks, 112);
+    }
+
+    #[test]
+    fn test_max_num_pending_blocks_devnet() {
+        // Create a node config with consensus observer and publisher enabled
+        let mut node_config = create_observer_config(true, true);
+        node_config.consensus_observer.max_num_pending_blocks = 112;
+
+        // Optimize the config and verify modifications are made
+        let modified_config = ConsensusObserverConfig::optimize(
+            &mut node_config,
+            &serde_yaml::from_str("{}").unwrap(), // An empty local config,
+            NodeType::PublicFullnode,
+            Some(ChainId::new(22)), // Test devnet chain ID
+        )
+        .unwrap();
+        assert!(modified_config);
+
+        // Verify the max number of pending blocks has been changed
+        assert_eq!(
+            node_config.consensus_observer.max_num_pending_blocks,
+            MAX_NUM_PENDING_BLOCKS_FOR_TEST_NETWORKS
+        );
+    }
+
+    /// Creates a node config with the given consensus observer settings
+    fn create_observer_config(enable_observer: bool, enable_publisher: bool) -> NodeConfig {
+        NodeConfig {
+            consensus_observer: ConsensusObserverConfig {
+                observer_enabled: enable_observer,
+                publisher_enabled: enable_publisher,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
     }
 }

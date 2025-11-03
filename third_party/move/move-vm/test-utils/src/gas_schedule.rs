@@ -25,8 +25,8 @@ use move_core_types::{
         InternalGasUnit, NumArgs, NumBytes, NumTypeNodes, ToUnit,
     },
     identifier::IdentStr,
+    int256,
     language_storage::ModuleId,
-    u256,
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -484,22 +484,16 @@ impl GasMeter for GasStatus {
 
     fn charge_vec_pack<'a>(
         &mut self,
-        _ty: impl TypeView + 'a,
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::VEC_PACK, (args.len() as u64).into())
     }
 
-    fn charge_vec_len(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_len(&mut self) -> PartialVMResult<()> {
         self.charge_instr(Opcodes::VEC_LEN)
     }
 
-    fn charge_vec_borrow(
-        &mut self,
-        is_mut: bool,
-        _ty: impl TypeView,
-        _is_success: bool,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_borrow(&mut self, is_mut: bool) -> PartialVMResult<()> {
         use Opcodes::*;
 
         self.charge_instr(
@@ -511,25 +505,16 @@ impl GasMeter for GasStatus {
         )
     }
 
-    fn charge_vec_push_back(
-        &mut self,
-        _ty: impl TypeView,
-        val: impl ValueView,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_push_back(&mut self, val: impl ValueView) -> PartialVMResult<()> {
         self.charge_instr_with_size(Opcodes::VEC_PUSH_BACK, val.legacy_abstract_memory_size())
     }
 
-    fn charge_vec_pop_back(
-        &mut self,
-        _ty: impl TypeView,
-        _val: Option<impl ValueView>,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(&mut self, _val: Option<impl ValueView>) -> PartialVMResult<()> {
         self.charge_instr(Opcodes::VEC_POP_BACK)
     }
 
     fn charge_vec_unpack(
         &mut self,
-        _ty: impl TypeView,
         expect_num_elements: NumArgs,
         _elems: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
@@ -539,7 +524,7 @@ impl GasMeter for GasStatus {
         )
     }
 
-    fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_swap(&mut self) -> PartialVMResult<()> {
         self.charge_instr(Opcodes::VEC_SWAP)
     }
 
@@ -740,10 +725,23 @@ pub fn zero_cost_instruction_table() -> Vec<(Bytecode, GasCost)> {
         (VecSwap(SignatureIndex::new(0)), GasCost::new(0, 0)),
         (LdU16(0), GasCost::new(0, 0)),
         (LdU32(0), GasCost::new(0, 0)),
-        (LdU256(u256::U256::zero()), GasCost::new(0, 0)),
+        (LdU256(int256::U256::ZERO), GasCost::new(0, 0)),
         (CastU16, GasCost::new(0, 0)),
         (CastU32, GasCost::new(0, 0)),
         (CastU256, GasCost::new(0, 0)),
+        (LdI8(0), GasCost::new(0, 0)),
+        (LdI16(0), GasCost::new(0, 0)),
+        (LdI32(0), GasCost::new(0, 0)),
+        (LdI64(0), GasCost::new(0, 0)),
+        (LdI128(0), GasCost::new(0, 0)),
+        (LdI256(int256::I256::ZERO), GasCost::new(0, 0)),
+        (CastI8, GasCost::new(0, 0)),
+        (CastI16, GasCost::new(0, 0)),
+        (CastI32, GasCost::new(0, 0)),
+        (CastI64, GasCost::new(0, 0)),
+        (CastI128, GasCost::new(0, 0)),
+        (CastI256, GasCost::new(0, 0)),
+        (Negate, GasCost::new(0, 0)),
     ]
 }
 
@@ -922,10 +920,23 @@ pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
         (VecSwap(SignatureIndex::new(0)), GasCost::new(1436, 1)),
         (LdU16(0), GasCost::new(1, 1)),
         (LdU32(0), GasCost::new(1, 1)),
-        (LdU256(u256::U256::zero()), GasCost::new(1, 1)),
+        (LdU256(int256::U256::ZERO), GasCost::new(1, 1)),
         (CastU16, GasCost::new(2, 1)),
         (CastU32, GasCost::new(2, 1)),
         (CastU256, GasCost::new(2, 1)),
+        (LdI8(0), GasCost::new(1, 1)),
+        (LdI16(0), GasCost::new(1, 1)),
+        (LdI32(0), GasCost::new(1, 1)),
+        (LdI64(0), GasCost::new(1, 1)),
+        (LdI128(0), GasCost::new(1, 1)),
+        (LdI256(int256::I256::ZERO), GasCost::new(1, 1)),
+        (CastI8, GasCost::new(2, 1)),
+        (CastI16, GasCost::new(2, 1)),
+        (CastI32, GasCost::new(2, 1)),
+        (CastI64, GasCost::new(2, 1)),
+        (CastI128, GasCost::new(2, 1)),
+        (CastI256, GasCost::new(2, 1)),
+        (Negate, GasCost::new(0, 1)),
     ]
 }
 

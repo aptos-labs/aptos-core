@@ -108,11 +108,16 @@ impl OptProposalMsg {
             sender
         );
 
-        self.block_data()
-            .payload()
-            .verify(validator, proof_cache, quorum_store_enabled)?;
-
-        self.block_data().grandparent_qc().verify(validator)?;
+        let (payload_verify_result, qc_verify_result) = rayon::join(
+            || {
+                self.block_data()
+                    .payload()
+                    .verify(validator, proof_cache, quorum_store_enabled)
+            },
+            || self.block_data().grandparent_qc().verify(validator),
+        );
+        payload_verify_result?;
+        qc_verify_result?;
 
         // Note that we postpone the verification of SyncInfo until it's being used.
         self.block_data.verify_well_formed()

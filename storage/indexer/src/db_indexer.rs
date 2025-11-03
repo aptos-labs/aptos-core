@@ -177,7 +177,7 @@ impl InternalIndexerDB {
         min_seq_num: u64,
         num_versions: u64,
         ledger_version: Version,
-    ) -> Result<AccountOrderedTransactionsIter> {
+    ) -> Result<AccountOrderedTransactionsIter<'_>> {
         let mut iter = self.db.iter::<OrderedTransactionByAccountSchema>()?;
         iter.seek(&(address, min_seq_num))?;
         Ok(AccountOrderedTransactionsIter::new(
@@ -616,7 +616,7 @@ impl DBIndexer {
         key_prefix: &StateKeyPrefix,
         cursor: Option<&StateKey>,
         ledger_version: Version,
-    ) -> Result<impl Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_> {
+    ) -> Result<impl Iterator<Item = anyhow::Result<(StateKey, StateValue)>> + '_ + use<'_>> {
         self.indexer_db
             .ensure_cover_ledger_version(ledger_version)?;
         PrefixedStateValueIterator::new(

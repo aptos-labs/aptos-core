@@ -4,6 +4,7 @@
 module 0x1::runtime_checks {
     use std::bcs;
     use std::string;
+    use std::option;
     use aptos_std::string_utils;
     use aptos_framework::aggregator_v2::{Self, Aggregator, AggregatorSnapshot, DerivedStringSnapshot};
 
@@ -141,6 +142,11 @@ module 0x1::runtime_checks {
     //   - debug_string
     //
     // TODO[agg_v2]: consider formats of lists?
+
+    public entry fun test_to_string_with_option_aggregators() {
+        let a = with_aggregator<u64>();
+        let _ = string_utils::to_string(&option::some(a));
+    }
 
     public entry fun test_to_string_with_aggregators() {
         let a = with_aggregator<u64>();

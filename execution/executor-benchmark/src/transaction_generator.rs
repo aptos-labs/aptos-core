@@ -6,7 +6,7 @@ use crate::{
     account_generator::{AccountCache, AccountGenerator},
     metrics::{NUM_TXNS, TIMER},
 };
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue, PrivateKey, Uniform};
 use aptos_logger::info;
 use aptos_metrics_core::{IntCounterVecHelper, TimerHelper};
 use aptos_sdk::{
@@ -19,17 +19,18 @@ use aptos_storage_interface::{
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{aptos_test_root_address, AccountResource},
+    block_metadata::BlockMetadata,
     chain_id::ChainId,
     state_store::MoveResourceExt,
-    transaction::{EntryFunction, Transaction, TransactionPayload},
+    transaction::{
+        authenticator::AuthenticationKey, EntryFunction, Transaction, TransactionPayload,
+    },
 };
 use chrono::Local;
 use indicatif::{ProgressBar, ProgressStyle};
 use itertools::Itertools;
 use move_core_types::{ident_str, language_storage::ModuleId};
-#[cfg(test)]
-use rand::SeedableRng;
-use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng};
+use rand::{rngs::StdRng, seq::SliceRandom, thread_rng, Rng, SeedableRng};
 use rayon::{
     iter::{IntoParallelRefIterator, ParallelIterator},
     ThreadPool, ThreadPoolBuilder,
@@ -52,6 +53,101 @@ use thread_local::ThreadLocal;
 
 const META_FILENAME: &str = "metadata.toml";
 pub const MAX_ACCOUNTS_INVOLVED_IN_P2P: usize = 1_000_000;
+
+fn validator_address() -> AccountAddress {
+    // Replicate the exact same logic as genesis creation in test_config_with_custom_onchain
+    // 1. Create StdRng with the same seed used in test_utils.rs
+    let mut genesis_rng = StdRng::from_seed([0; 32]);
+    // 2. Generate seed for validator index 0 (same as in builder.rs generate_validator_config)
+    let validator_seed: [u8; 32] = genesis_rng.r#gen();
+    // 3. Create another StdRng with that seed (same as KeyGen::from_seed)
+    let mut validator_rng = StdRng::from_seed(validator_seed);
+    // 4. Generate Ed25519 private key directly (same as KeyGen::generate_ed25519_private_key)
+    let private_key = Ed25519PrivateKey::generate(&mut validator_rng);
+    // 5. Get public key and derive account address (same as in keys.rs generate_key_objects line 44)
+    let public_key = private_key.public_key();
+    let address = AuthenticationKey::ed25519(&public_key).account_address();
+    eprintln!("DEBUG: Generated validator address: {:x}", address);
+    address
+}
+
+fn get_genesis_validator_address(db: &DbReaderWriter) -> AccountAddress {
+    // Read the actual validator address from the genesis validator set
+    // This ensures we use the same validator that was registered during genesis
+    use aptos_types::{
+        on_chain_config::ValidatorSet,
+        state_store::{state_key::StateKey, TStateView},
+    };
+
+    let state_view = db.reader.latest_state_checkpoint_view().unwrap();
+
+    // Try to get the ValidatorSet resource from @aptos_framework
+    if let Ok(Some(validator_set_bytes)) =
+        state_view.get_state_value(&StateKey::on_chain_config::<ValidatorSet>().unwrap())
+    {
+        if let Ok(validator_set) = bcs::from_bytes::<ValidatorSet>(validator_set_bytes.bytes()) {
+            if !validator_set.active_validators.is_empty() {
+                let validator_addr = validator_set.active_validators[0].account_address;
+                eprintln!(
+                    "DEBUG: Using genesis validator address: {:x}",
+                    validator_addr
+                );
+                return validator_addr;
+            }
+        }
+    }
+
+    // Fallback to generated address if we can't read the validator set
+    eprintln!("DEBUG: Could not read genesis validator set, falling back to generated address");
+    validator_address()
+}
+
+pub(crate) fn create_block_metadata_transaction(epoch: u64, db: &DbReaderWriter) -> Transaction {
+    // Use incremental timestamps to avoid triggering epoch reconfigurations
+    // Large real timestamps cause immediate epoch changes since last_reconfiguration_time is small
+    use std::sync::atomic::{AtomicU64, Ordering};
+    static ROUND_COUNTER: AtomicU64 = AtomicU64::new(0);
+    static LAST_TIMESTAMP: AtomicU64 = AtomicU64::new(0);
+    static LAST_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+    // Check if epoch has changed and reset round counter if needed
+    let last_epoch = LAST_EPOCH.load(Ordering::SeqCst);
+    if last_epoch != epoch {
+        ROUND_COUNTER.store(0, Ordering::SeqCst);
+        LAST_EPOCH.store(epoch, Ordering::SeqCst);
+    }
+
+    let round = ROUND_COUNTER.fetch_add(1, Ordering::SeqCst);
+
+    // Get current real time to keep blockchain time close to real time for orderless transactions
+    let current_time_usecs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_micros() as u64;
+
+    // Ensure strictly increasing timestamps by comparing with last used timestamp
+    let last_timestamp = LAST_TIMESTAMP.load(Ordering::SeqCst);
+    let timestamp_usecs = if current_time_usecs > last_timestamp {
+        current_time_usecs
+    } else {
+        // If current time is not greater, increment by 1 microsecond to maintain strict ordering
+        last_timestamp + 1
+    };
+
+    // Update the last timestamp atomically
+    LAST_TIMESTAMP.store(timestamp_usecs, Ordering::SeqCst);
+    info!("block metadata timestamp: {}", timestamp_usecs);
+
+    Transaction::BlockMetadata(BlockMetadata::new(
+        HashValue::random(),
+        epoch,                             // use provided epoch
+        round, // proper incrementing round number (resets on epoch change)
+        get_genesis_validator_address(db), // use actual validator from genesis
+        vec![],
+        vec![],
+        timestamp_usecs, // real time with strict ordering guarantee
+    ))
+}
 
 pub(crate) fn get_progress_bar(num_accounts: usize) -> ProgressBar {
     let bar = ProgressBar::new(num_accounts as u64);
@@ -116,6 +212,9 @@ pub struct TransactionGenerator {
     // TODO(grao): Use a different pool, and pin threads to dedicate cores to avoid affecting the
     // rest parts of benchmark.
     worker_pool: ThreadPool,
+
+    /// Database reader-writer for accessing validator information
+    db: DbReaderWriter,
 }
 
 impl TransactionGenerator {
@@ -217,14 +316,15 @@ impl TransactionGenerator {
                 .num_threads(num_workers)
                 .build()
                 .unwrap(),
+            db,
         }
     }
 
     pub fn create_transaction_factory() -> TransactionFactory {
         TransactionFactory::new(ChainId::test())
-            // executor benchmark doesn't have BlockMetadata txns, time doesn't pass for it
-            // so we need to use absolute timestamp (so orderless txns are not rejected as too far in the future)
-            .with_absolute_transaction_expiration_timestamp(30)
+            // Use relative expiration: current time + 60 seconds
+            // This ensures transactions have reasonable expiration window regardless of blockchain time
+            .with_transaction_expiration_time(60)
             .with_gas_unit_price(100)
     }
 
@@ -374,7 +474,7 @@ impl TransactionGenerator {
         // and re-mint seed accounts here.
         let num_seed_accounts = (num_new_accounts / 1000).clamp(1, 100000);
         let seed_accounts_cache =
-            Self::gen_seed_account_cache(reader, num_seed_accounts, is_keyless);
+            Self::gen_seed_account_cache(reader.clone(), num_seed_accounts, is_keyless);
 
         println!(
             "[{}] Generating {} seed account creation txns, with {} coins.",
@@ -390,6 +490,11 @@ impl TransactionGenerator {
             .collect::<Vec<_>>()
             .chunks(block_size)
         {
+            // Refresh root account sequence number once per block from database
+            // This ensures we stay in sync even if BlockMetadata or other transactions affected the account
+            let current_seq_num = get_sequence_number(self.root_account.address(), reader.clone());
+            self.root_account.set_sequence_number(current_seq_num);
+
             let transactions: Vec<_> = chunk
                 .iter()
                 .map(|new_account| {
@@ -404,7 +509,10 @@ impl TransactionGenerator {
                 .collect();
             bar.inc(transactions.len() as u64 - 1);
             if let Some(sender) = &self.block_sender {
-                sender.send(transactions).unwrap();
+                // Add BlockMetadata transaction at the beginning of the block
+                let mut block_transactions = vec![create_block_metadata_transaction(1, &self.db)];
+                block_transactions.extend(transactions);
+                sender.send(block_transactions).unwrap();
             }
         }
         bar.finish();
@@ -605,7 +713,7 @@ impl TransactionGenerator {
                 let conflicting_indices: Vec<_> = (0..num_txns_per_grp)
                     .map(|_| {
                         let index2 = accounts_pool[rng.gen_range(0, accounts_pool.len())];
-                        if rng.gen::<bool>() {
+                        if rng.r#gen::<bool>() {
                             (index1, index2)
                         } else {
                             (index2, index1)
@@ -712,13 +820,16 @@ impl TransactionGenerator {
         }
 
         let mut transactions = Vec::new();
+        transactions.push(create_block_metadata_transaction(1, &self.db));
+
+        let init_size = transactions.len();
         for i in 0..block_size {
             if let Some(txn) = transactions_by_index.get(&i) {
                 transactions.push(txn.clone());
             }
         }
 
-        if transactions.is_empty() {
+        if transactions.len() == init_size {
             let val = phase.fetch_add(1, Ordering::Relaxed);
             let last_generated_at = last_non_empty_phase.load(Ordering::Relaxed);
             if val > last_generated_at + 2 {

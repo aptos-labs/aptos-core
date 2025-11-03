@@ -67,7 +67,7 @@ async fn consensus_key_rotation() {
             let new_identity_path = PathBuf::from(
                 format!(
                     "/tmp/{}-new-validator-identity.yaml",
-                    thread_rng().gen::<u64>()
+                    thread_rng().r#gen::<u64>()
                 )
                 .as_str(),
             );

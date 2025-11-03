@@ -17,8 +17,11 @@ pub mod transaction_executor;
 pub mod transaction_generator;
 
 use crate::{
-    db_access::DbAccessUtil, pipeline::Pipeline, transaction_committer::TransactionCommitter,
-    transaction_executor::TransactionExecutor, transaction_generator::TransactionGenerator,
+    db_access::DbAccessUtil,
+    pipeline::Pipeline,
+    transaction_committer::TransactionCommitter,
+    transaction_executor::TransactionExecutor,
+    transaction_generator::{create_block_metadata_transaction, TransactionGenerator},
 };
 use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
@@ -37,6 +40,7 @@ use aptos_transaction_generator_lib::{
 };
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
+use aptos_vm_environment::prod_configs::set_layout_caches;
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
@@ -433,11 +437,33 @@ fn add_accounts_impl<V>(
 
     let start_version = db.reader.get_latest_ledger_info_version().unwrap();
 
-    let (pipeline, block_sender) = Pipeline::new(
-        executor,
+    // First BlockMetadata transaction (epoch=0 to trigger epoch change)
+    let executor1 = BlockExecutor::<V>::new(db.clone());
+    let (pipeline1, block_sender1) = Pipeline::new(
+        executor1,
         start_version,
         &pipeline_config,
-        Some(1 + num_new_accounts / block_size * 101 / 100),
+        Some(1), // Only 1 block
+    );
+
+    info!("Sending the first block metadata transaction to start a new epoch");
+    block_sender1
+        .send(vec![create_block_metadata_transaction(0, &db)])
+        .unwrap();
+    drop(block_sender1); // Close the sender to indicate no more transactions
+
+    pipeline1.start_pipeline_processing();
+    let _ = pipeline1.join();
+
+    info!("Sent the first block metadata transaction to start a new epoch");
+
+    // Now create the main pipeline for account creation
+    let current_version = db.reader.get_latest_ledger_info_version().unwrap();
+    let (pipeline, block_sender) = Pipeline::new(
+        executor,
+        current_version,
+        &pipeline_config,
+        Some(num_new_accounts / block_size * 101 / 100),
     );
 
     let mut generator = TransactionGenerator::new_with_existing_db(
@@ -520,8 +546,11 @@ pub enum SingleRunMode {
     },
 }
 
-// Optional more detailed configuration.
+/// Optional more detailed configuration.
 pub struct SingleRunAdditionalConfigs {
+    /// If num_generator_workers=1 then order in which transactions are generated
+    /// is kept in the block, otherwise transactions from different workers are
+    /// stitched together in arbitrary order
     pub num_generator_workers: usize,
     pub split_stages: bool,
 }
@@ -530,12 +559,15 @@ pub fn run_single_with_default_params(
     transaction_type: TransactionType,
     test_folder: impl AsRef<Path>,
     concurrency_level: usize,
+    use_blockstm_v2: bool,
     mode: SingleRunMode,
 ) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
+    set_layout_caches(true);
     AptosVM::set_num_shards_once(1);
     AptosVM::set_concurrency_level_once(concurrency_level);
+    AptosVM::set_blockstm_v2_enabled_once(use_blockstm_v2);
     AptosVM::set_processed_transactions_detailed_counters();
 
     rayon::ThreadPoolBuilder::new()
@@ -575,8 +607,8 @@ pub fn run_single_with_default_params(
         },
     };
     let num_generator_workers = match mode {
-        SingleRunMode::TEST
-        | SingleRunMode::BENCHMARK {
+        SingleRunMode::TEST => 1,
+        SingleRunMode::BENCHMARK {
             additional_configs: None,
             ..
         } => 4,
@@ -725,27 +757,7 @@ mod tests {
     }
 
     fn test_compare_prod_and_another_all_types<E: VMBlockExecutor>(values_match: bool) {
-        let mut non_fa_features = default_benchmark_features();
-        non_fa_features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
-        non_fa_features.disable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
-        non_fa_features.disable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE);
-        // non_fa_features.disable(FeatureFlag::MODULE_EVENT_MIGRATION);
-        // non_fa_features.disable(FeatureFlag::COIN_TO_FUNGIBLE_ASSET_MIGRATION);
-
-        test_compare_prod_and_another::<E>(values_match, non_fa_features.clone(), |address| {
-            aptos_stdlib::aptos_account_transfer(address, 1000)
-        });
-
-        test_compare_prod_and_another::<E>(
-            values_match,
-            non_fa_features,
-            aptos_stdlib::aptos_account_create_account,
-        );
-
         let mut fa_features = default_benchmark_features();
-        fa_features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
-        fa_features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
-        fa_features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_STORE);
         fa_features.disable(FeatureFlag::CONCURRENT_FUNGIBLE_BALANCE);
 
         test_compare_prod_and_another::<E>(values_match, fa_features.clone(), |address| {

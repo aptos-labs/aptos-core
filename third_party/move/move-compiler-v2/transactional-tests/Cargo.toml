@@ -3,7 +3,7 @@ name = "move-compiler-v2-transactional-tests"
 version = "0.1.0"
 authors = ["Diem Association <opensource@diem.com>"]
 publish = false
-edition = "2021"
+edition = { workspace = true }
 license = "Apache-2.0"
 
 [dev-dependencies]

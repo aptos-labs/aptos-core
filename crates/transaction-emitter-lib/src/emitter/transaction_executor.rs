@@ -327,7 +327,7 @@ impl ReliableTransactionSubmitter for RestApiReliableTransactionSubmitter {
         txns: &[SignedTransaction],
         counters: &CounterState,
     ) -> Result<()> {
-        let run_seed: u64 = thread_rng().gen();
+        let run_seed: u64 = thread_rng().r#gen();
 
         join_all(
             txns.iter()

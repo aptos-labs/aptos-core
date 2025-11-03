@@ -38,7 +38,7 @@ use aptos_temppath::TempPath;
 use aptos_types::{
     account_address::{create_multisig_account_address, AccountAddress},
     aggregate_signature::AggregateSignature,
-    block_executor::config::BlockExecutorConfigFromOnchain,
+    block_executor::{config::BlockExecutorConfigFromOnchain, partitioner::ExecutableBlock},
     block_info::BlockInfo,
     block_metadata::BlockMetadata,
     chain_id::ChainId,
@@ -46,8 +46,8 @@ use aptos_types::{
     indexer::indexer_db_reader::IndexerReader,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
     transaction::{
-        signature_verified_transaction::into_signature_verified_block, Transaction,
-        TransactionPayload, TransactionStatus, Version,
+        signature_verified_transaction::into_signature_verified_block, AuxiliaryInfo,
+        AuxiliaryInfoTrait, Transaction, TransactionPayload, TransactionStatus, Version,
     },
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
@@ -907,10 +907,20 @@ impl TestContext {
 
         // Check that txn execution was successful.
         let parent_id = self.executor.committed_block_id();
+
+        // Create proper auxiliary info with transaction indices
+        let sig_verified_txns = into_signature_verified_block(txns.clone());
+        let auxiliary_info: Vec<AuxiliaryInfo> = (0..sig_verified_txns.len())
+            .map(|i| AuxiliaryInfo::auxiliary_info_at_txn_index(i as u32))
+            .collect();
+
+        let executable_block =
+            ExecutableBlock::new(metadata.id(), sig_verified_txns.into(), auxiliary_info);
+
         let result = self
             .executor
             .execute_block(
-                (metadata.id(), into_signature_verified_block(txns.clone())).into(),
+                executable_block,
                 parent_id,
                 BlockExecutorConfigFromOnchain::on_but_large_for_test(),
             )
@@ -1120,7 +1130,7 @@ impl TestContext {
     ) {
         let mut request = if self.use_orderless_transactions {
             let mut rng = rand::thread_rng();
-            let replay_protection_nonce: u64 = rng.gen();
+            let replay_protection_nonce: u64 = rng.r#gen();
             json!({
                 "sender": account.address(),
                 "sequence_number": (u64::MAX).to_string(),
@@ -1205,7 +1215,7 @@ impl TestContext {
     ) -> Value {
         let mut request = if self.use_orderless_transactions {
             let mut rng = rand::thread_rng();
-            let replay_protection_nonce: u64 = rng.gen();
+            let replay_protection_nonce: u64 = rng.r#gen();
             json!({
                 "sender": sender.address(),
                 "sequence_number": (u64::MAX).to_string(),
@@ -1298,7 +1308,7 @@ impl TestContext {
     pub fn get_routes_with_poem(
         &self,
         poem_address: SocketAddr,
-    ) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
+    ) -> impl Filter<Extract = (impl Reply + use<>,), Error = Rejection> + Clone + use<> {
         warp::path!("v1" / ..).and(reverse_proxy_filter(
             "v1".to_string(),
             format!("http://{}/v1", poem_address),

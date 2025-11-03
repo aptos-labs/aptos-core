@@ -68,6 +68,8 @@ pub enum TransactionType {
         sender_use_account_pool: bool,
         non_conflicting: bool,
         use_fa_transfer: bool,
+        use_txn_payload_v2_format: bool,
+        use_orderless_transactions: bool,
     },
     AccountGeneration {
         add_created_accounts_to_pool: bool,
@@ -127,6 +129,8 @@ impl Default for TransactionType {
             sender_use_account_pool: false,
             non_conflicting: false,
             use_fa_transfer: true,
+            use_txn_payload_v2_format: false,
+            use_orderless_transactions: false,
         }
     }
 }
@@ -299,6 +303,8 @@ pub async fn create_txn_generator_creator(
                     sender_use_account_pool,
                     non_conflicting,
                     use_fa_transfer,
+                    use_txn_payload_v2_format,
+                    use_orderless_transactions,
                 } => wrap_accounts_pool(
                     Box::new(P2PTransactionGeneratorCreator::new(
                         txn_factory.clone(),
@@ -311,6 +317,8 @@ pub async fn create_txn_generator_creator(
                         } else {
                             SamplingMode::Basic
                         },
+                        use_txn_payload_v2_format,
+                        use_orderless_transactions,
                     )),
                     sender_use_account_pool,
                     &accounts_pool,

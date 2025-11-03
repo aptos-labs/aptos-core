@@ -15,6 +15,7 @@ use aptos_storage_interface::state_store::{
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
+    state_store::hot_state::HotStateConfig,
     transaction::{
         block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionStatus, Version,
     },
@@ -94,7 +95,7 @@ impl ExecutionOutput {
             to_commit: TransactionsToKeep::new_dummy_success(txns),
             to_discard: TransactionsWithOutput::new_empty(),
             to_retry: TransactionsWithOutput::new_empty(),
-            result_state: LedgerState::new_empty(),
+            result_state: LedgerState::new_empty(HotStateConfig::default()),
             state_reads: ShardedStateCache::new_empty(None),
             block_end_info: None,
             next_epoch_state: None,

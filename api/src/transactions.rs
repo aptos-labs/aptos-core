@@ -22,12 +22,12 @@ use crate::{
 };
 use anyhow::Context as AnyhowContext;
 use aptos_api_types::{
-    transaction::TransactionSummary, verify_function_identifier, verify_module_identifier, Address,
-    AptosError, AptosErrorCode, AsConverter, EncodeSubmissionRequest, GasEstimation,
-    GasEstimationBcs, HashValue, HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction,
-    SubmitTransactionRequest, Transaction, TransactionData, TransactionOnChainData,
-    TransactionsBatchSingleSubmissionFailure, TransactionsBatchSubmissionResult, UserTransaction,
-    VerifyInput, VerifyInputWithRecursion, U64,
+    transaction::{PersistedAuxiliaryInfo, TransactionSummary},
+    verify_function_identifier, verify_module_identifier, Address, AptosError, AptosErrorCode,
+    AsConverter, EncodeSubmissionRequest, GasEstimation, GasEstimationBcs, HashValue,
+    HexEncodedBytes, LedgerInfo, MoveType, PendingTransaction, SubmitTransactionRequest,
+    Transaction, TransactionData, TransactionOnChainData, TransactionsBatchSingleSubmissionFailure,
+    TransactionsBatchSubmissionResult, UserTransaction, VerifyInput, VerifyInputWithRecursion, U64,
 };
 use aptos_crypto::{hash::CryptoHash, signing_message};
 use aptos_logger::error;
@@ -305,6 +305,42 @@ impl TransactionsApi {
             api.get_transaction_by_version_inner(&accept_type, txn_version.0)
         })
         .await
+    }
+
+    /// Get transactions auxiliary info
+    ///
+    /// Retrieves persisted auxiliary information (such as transaction indices within blocks) for
+    /// transactions in a given version range.
+    ///
+    /// If the version range has been pruned, a 410 will be returned.
+    #[oai(
+        path = "/transactions/auxiliary_info",
+        method = "get",
+        operation_id = "get_transactions_auxiliary_info",
+        tag = "ApiTags::Transactions"
+    )]
+    async fn get_transactions_auxiliary_info(
+        &self,
+        accept_type: AcceptType,
+        /// Starting ledger version to retrieve auxiliary info for
+        start_version: Query<U64>,
+        /// Max number of transactions to retrieve auxiliary info for.
+        ///
+        /// If not provided, defaults to default page size
+        limit: Query<Option<u16>>,
+    ) -> BasicResultWith404<Vec<PersistedAuxiliaryInfo>> {
+        fail_point_poem("endpoint_get_transactions_auxiliary_info")?;
+        self.context
+            .check_api_output_enabled("Get transactions auxiliary info", &accept_type)?;
+
+        let page = Page::new(
+            Some(start_version.0 .0),
+            limit.0,
+            self.context.max_transactions_page_size(),
+        );
+
+        let api = self.clone();
+        api_spawn_blocking(move || api.list_auxiliary_infos(&accept_type, page)).await
     }
 
     /// Get account transactions
@@ -1740,6 +1776,69 @@ impl TransactionsApi {
             &ledger_info,
             BasicResponseStatus::Ok,
         ))
+    }
+
+    fn list_auxiliary_infos(
+        &self,
+        accept_type: &AcceptType,
+        page: Page,
+    ) -> BasicResultWith404<Vec<PersistedAuxiliaryInfo>> {
+        let latest_ledger_info = self.context.get_latest_ledger_info()?;
+        let ledger_version = latest_ledger_info.ledger_version;
+
+        let limit = page.limit(&latest_ledger_info)?;
+        let start_version = page.compute_start(limit, ledger_version.0, &latest_ledger_info)?;
+
+        // Use iterator for more efficient batch retrieval
+        let iterator = self
+            .context
+            .db
+            .get_persisted_auxiliary_info_iterator(start_version, limit as usize)
+            .context("Failed to get auxiliary info iterator from storage")
+            .map_err(|err| {
+                BasicErrorWith404::internal_with_code(
+                    err,
+                    AptosErrorCode::InternalError,
+                    &latest_ledger_info,
+                )
+            })?;
+
+        let mut raw_auxiliary_infos = Vec::new();
+        for result in iterator {
+            let raw_aux_info = result
+                .context("Failed to read auxiliary info from iterator")
+                .map_err(|err| {
+                    BasicErrorWith404::internal_with_code(
+                        err,
+                        AptosErrorCode::InternalError,
+                        &latest_ledger_info,
+                    )
+                })?;
+            raw_auxiliary_infos.push(raw_aux_info);
+        }
+
+        match accept_type {
+            AcceptType::Json => {
+                // Transform to API types for JSON (user-friendly, extensible)
+                let api_auxiliary_infos: Vec<PersistedAuxiliaryInfo> = raw_auxiliary_infos
+                    .into_iter()
+                    .map(PersistedAuxiliaryInfo::from)
+                    .collect();
+                BasicResponse::try_from_json((
+                    api_auxiliary_infos,
+                    &latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            },
+            AcceptType::Bcs => {
+                // Use raw core types for BCS (backward compatible, versioned enum)
+                BasicResponse::try_from_bcs((
+                    raw_auxiliary_infos,
+                    &latest_ledger_info,
+                    BasicResponseStatus::Ok,
+                ))
+            },
+        }
     }
 }
 

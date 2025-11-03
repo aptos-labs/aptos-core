@@ -107,7 +107,7 @@ impl SchedulerWrapper<'_> {
         &self,
         txn_idx: TxnIndex,
         incarnation: Incarnation,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
     ) -> Result<(), PanicError>
     where
@@ -130,7 +130,7 @@ impl SchedulerWrapper<'_> {
     pub(crate) fn prepare_for_block_epilogue<T, E>(
         &self,
         block_epilogue_idx: TxnIndex,
-        last_input_output: &TxnLastInputOutput<T, E::Output, E::Error>,
+        last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
     ) -> Result<Incarnation, PanicError>
     where

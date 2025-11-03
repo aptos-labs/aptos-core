@@ -4,16 +4,16 @@ Error: compilation errors:
  error: cannot select field `_0` since it has different types in variants of enum `Mapper<u64, u64>`
    ┌─ TEMPFILE:64:24
    │
-64 │             let _t3 = &_t2._0;
+64 │             let _v4 = &_v3._0;
    │                        ^^^
    │
    = field `_0` has type `Version<u64, u64>` in variant `Twice` and type `|u64|u64 has copy + store` in variant `Id`
 
 error: cannot select field `_0` since it has different types in variants of enum `Mapper<u64, u64>`
-   ┌─ TEMPFILE:70:26
+   ┌─ TEMPFILE:70:25
    │
-70 │             let _t38 = *&_t2._0;
-   │                          ^^^
+70 │             let _v8 = *&_v3._0;
+   │                         ^^^
    │
    = field `_0` has type `Version<u64, u64>` in variant `Twice` and type `|u64|u64 has copy + store` in variant `Id`
 

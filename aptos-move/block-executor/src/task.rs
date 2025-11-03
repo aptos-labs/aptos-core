@@ -11,7 +11,10 @@ use aptos_types::{
     error::PanicError,
     fee_statement::FeeStatement,
     state_store::{state_value::StateValueMetadata, TStateView},
-    transaction::{AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction},
+    transaction::{
+        AuxiliaryInfoTrait, BlockExecutableTransaction as Transaction,
+        TransactionOutput as TypesTransactionOutput,
+    },
     write_set::WriteOp,
 };
 use aptos_vm_environment::environment::AptosEnvironment;
@@ -24,11 +27,12 @@ use aptos_vm_types::{
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
+use once_cell::sync::OnceCell;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
     fmt::Debug,
-    sync::Arc,
 };
+use triomphe::Arc as TriompheArc;
 
 /// The execution result of a transaction
 #[derive(Debug)]
@@ -101,7 +105,9 @@ pub trait ExecutorTask {
 pub trait BeforeMaterializationOutput<Txn: Transaction> {
     /// Get the writes of a transaction from its output, separately for resources,
     /// modules and aggregator_v1.
-    fn resource_write_set(&self) -> Vec<(Txn::Key, Arc<Txn::Value>, Option<Arc<MoveTypeLayout>>)>;
+    fn resource_write_set(
+        &self,
+    ) -> HashMap<Txn::Key, (TriompheArc<Txn::Value>, Option<TriompheArc<MoveTypeLayout>>)>;
 
     fn module_write_set(&self) -> &BTreeMap<Txn::Key, ModuleWrite<Txn::Value>>;
 
@@ -115,7 +121,7 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
 
     fn reads_needing_delayed_field_exchange(
         &self,
-    ) -> Vec<(Txn::Key, StateValueMetadata, Arc<MoveTypeLayout>)>;
+    ) -> Vec<(Txn::Key, StateValueMetadata, TriompheArc<MoveTypeLayout>)>;
 
     fn group_reads_needing_delayed_field_exchange(&self) -> Vec<(Txn::Key, StateValueMetadata)>;
 
@@ -129,9 +135,14 @@ pub trait BeforeMaterializationOutput<Txn: Transaction> {
         (
             Txn::Value,
             ResourceGroupSize,
-            BTreeMap<Txn::Tag, (Txn::Value, Option<Arc<MoveTypeLayout>>)>,
+            BTreeMap<Txn::Tag, (Txn::Value, Option<TriompheArc<MoveTypeLayout>>)>,
         ),
     >;
+
+    fn for_each_resource_key_no_aggregator_v1(
+        &self,
+        callback: &mut dyn FnMut(&Txn::Key) -> Result<(), PanicError>,
+    ) -> Result<(), PanicError>;
 
     fn for_each_resource_group_key_and_tags(
         &self,
@@ -179,7 +190,7 @@ pub trait AfterMaterializationOutput<Txn: Transaction> {
     fn has_new_epoch_event(&self) -> bool;
 }
 
-pub trait TransactionOutput: Send + Sync + Debug {
+pub trait TransactionOutput: Send + Debug {
     /// Type of transaction and its associated key and value.
     type Txn: Transaction;
     type BeforeMaterializationGuard<'a>: BeforeMaterializationOutput<Self::Txn> + 'a
@@ -188,6 +199,9 @@ pub trait TransactionOutput: Send + Sync + Debug {
     type AfterMaterializationGuard<'a>: AfterMaterializationOutput<Self::Txn> + 'a
     where
         Self: 'a;
+
+    // Used by transaction commit listener (for sharded executor).
+    fn committed_output(&self) -> &OnceCell<TypesTransactionOutput>;
 
     /// Execution output for transactions that comes after SkipRest signal.
     fn skip_output() -> Self;
@@ -230,7 +244,7 @@ pub trait TransactionOutput: Send + Sync + Debug {
     /// !!! [CAUTION] !!!: This method must be called in quiescence, i.e. may not be
     /// concurrent with any other method that accesses the output.
     fn incorporate_materialized_txn_output(
-        &self,
+        &mut self,
         aggregator_v1_writes: Vec<(<Self::Txn as Transaction>::Key, WriteOp)>,
         patched_resource_write_set: Vec<(
             <Self::Txn as Transaction>::Key,
@@ -239,11 +253,11 @@ pub trait TransactionOutput: Send + Sync + Debug {
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
     ) -> Result<(), PanicError>;
 
-    fn set_txn_output_for_non_dynamic_change_set(&self);
+    fn set_txn_output_for_non_dynamic_change_set(&mut self);
 
     // !!![CAUTION]!!! These methods should never be used in parallel execution.
     fn legacy_sequential_materialize_agg_v1(
-        &self,
+        &mut self,
         view: &impl TAggregatorV1View<Identifier = <Self::Txn as Transaction>::Key>,
     );
 }

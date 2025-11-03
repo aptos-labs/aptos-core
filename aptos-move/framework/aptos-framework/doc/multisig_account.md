@@ -4149,7 +4149,7 @@ Add new owners, remove owners to remove, update signatures required.
 <b>aborts_if</b> !<b>exists</b>&lt;<a href="multisig_account.md#0x1_multisig_account_MultisigAccount">MultisigAccount</a>&gt;(<a href="multisig_account.md#0x1_multisig_account">multisig_account</a>);
 <b>aborts_if</b> multisig_account_resource.last_executed_sequence_number + 1 &gt; MAX_U64;
 <b>aborts_if</b> !<a href="../../aptos-stdlib/doc/table.md#0x1_table_spec_contains">table::spec_contains</a>(multisig_account_resource.transactions, sequence_number);
-<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_is_none">option::spec_is_none</a>(transaction.payload) ==&gt; result == provided_payload;
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(transaction.payload) ==&gt; result == provided_payload;
 </code></pre>
 
 

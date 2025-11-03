@@ -16,6 +16,7 @@ pub mod cyclic_instantiation_checker;
 pub mod flow_insensitive_checkers;
 pub mod function_checker;
 pub mod inliner;
+pub mod inlining_optimization;
 pub mod lambda_lifter;
 pub mod model_ast_lints;
 pub mod recursive_struct_checker;

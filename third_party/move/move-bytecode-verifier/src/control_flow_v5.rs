@@ -62,7 +62,7 @@ struct ControlFlowVerifier<'a> {
 }
 
 impl<'a> ControlFlowVerifier<'a> {
-    fn code(&self) -> impl Iterator<Item = (CodeOffset, &'a Bytecode)> {
+    fn code(&self) -> impl Iterator<Item = (CodeOffset, &'a Bytecode)> + use<'a> {
         self.code
             .iter()
             .enumerate()
@@ -72,7 +72,7 @@ impl<'a> ControlFlowVerifier<'a> {
     fn labeled_code<'b: 'a>(
         &self,
         labels: &'b [Label],
-    ) -> impl Iterator<Item = (CodeOffset, &'a Bytecode, &'b Label)> {
+    ) -> impl Iterator<Item = (CodeOffset, &'a Bytecode, &'b Label)> + use<'a, 'b> {
         self.code()
             .zip(labels)
             .map(|((i, instr), lbl)| (i, instr, lbl))

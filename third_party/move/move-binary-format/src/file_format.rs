@@ -954,6 +954,13 @@ pub enum SignatureToken {
     U32,
     /// Unsigned integers, 256 bits length.
     U256,
+    /// Signed integers
+    I8,
+    I16,
+    I32,
+    I64,
+    I128,
+    I256,
 }
 
 /// An iterator to help traverse the `SignatureToken` in a non-recursive fashion to avoid
@@ -986,8 +993,8 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIter<'a> {
                         self.stack.extend(args.iter().rev());
                     },
 
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
-                    | TypeParameter(_) => (),
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16
+                    | I32 | I64 | I128 | I256 | Struct(_) | TypeParameter(_) => (),
                 }
                 Some(tok)
             },
@@ -1026,8 +1033,8 @@ impl<'a> Iterator for SignatureTokenPreorderTraversalIterWithDepth<'a> {
                             .extend(args.iter().map(|tok| (tok, depth + 1)).rev());
                     },
 
-                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | Struct(_)
-                    | TypeParameter(_) => (),
+                    Signer | Bool | Address | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16
+                    | I32 | I64 | I128 | I256 | Struct(_) | TypeParameter(_) => (),
                 }
                 Some((tok, depth))
             },
@@ -1083,6 +1090,12 @@ impl std::fmt::Debug for SignatureToken {
             SignatureToken::U64 => write!(f, "U64"),
             SignatureToken::U128 => write!(f, "U128"),
             SignatureToken::U256 => write!(f, "U256"),
+            SignatureToken::I8 => write!(f, "I8"),
+            SignatureToken::I16 => write!(f, "I16"),
+            SignatureToken::I32 => write!(f, "I32"),
+            SignatureToken::I64 => write!(f, "I64"),
+            SignatureToken::I128 => write!(f, "I128"),
+            SignatureToken::I256 => write!(f, "I256"),
             SignatureToken::Address => write!(f, "Address"),
             SignatureToken::Signer => write!(f, "Signer"),
             SignatureToken::Vector(boxed) => write!(f, "Vector({:?})", boxed),
@@ -1105,8 +1118,56 @@ impl SignatureToken {
     pub fn is_integer(&self) -> bool {
         use SignatureToken::*;
         match self {
+            U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256 => true,
+            Bool
+            | Address
+            | Signer
+            | Vector(_)
+            | Function(..)
+            | Struct(_)
+            | StructInstantiation(_, _)
+            | Reference(_)
+            | MutableReference(_)
+            | TypeParameter(_) => false,
+        }
+    }
+
+    /// Returns true if the token is a signed integer type.
+    pub fn is_signed_integer(&self) -> bool {
+        use SignatureToken::*;
+        match self {
+            I8 | I16 | I32 | I64 | I128 | I256 => true,
+            Bool
+            | U8
+            | U16
+            | U32
+            | U64
+            | U128
+            | U256
+            | Address
+            | Signer
+            | Vector(_)
+            | Function(..)
+            | Struct(_)
+            | StructInstantiation(_, _)
+            | Reference(_)
+            | MutableReference(_)
+            | TypeParameter(_) => false,
+        }
+    }
+
+    /// Returns true if the token is a signed integer type.
+    pub fn is_unsigned_integer(&self) -> bool {
+        use SignatureToken::*;
+        match self {
             U8 | U16 | U32 | U64 | U128 | U256 => true,
             Bool
+            | I8
+            | I16
+            | I32
+            | I64
+            | I128
+            | I256
             | Address
             | Signer
             | Vector(_)
@@ -1146,7 +1207,8 @@ impl SignatureToken {
         use SignatureToken::*;
 
         match self {
-            Bool | U8 | U16 | U32 | U64 | U128 | U256 | Address => true,
+            Bool | U8 | U16 | U32 | U64 | U128 | U256 | I8 | I16 | I32 | I64 | I128 | I256
+            | Address => true,
             Vector(inner) => inner.is_valid_for_constant(),
             Signer
             | Function(..)
@@ -1181,10 +1243,11 @@ impl SignatureToken {
     /// Panics if this token doesn't contain a struct handle.
     pub fn debug_set_sh_idx(&mut self, sh_idx: StructHandleIndex) {
         match self {
-            SignatureToken::Struct(ref mut wrapped) => *wrapped = sh_idx,
-            SignatureToken::StructInstantiation(ref mut wrapped, _) => *wrapped = sh_idx,
-            SignatureToken::Reference(ref mut token)
-            | SignatureToken::MutableReference(ref mut token) => token.debug_set_sh_idx(sh_idx),
+            SignatureToken::Struct(wrapped) => *wrapped = sh_idx,
+            SignatureToken::StructInstantiation(wrapped, _) => *wrapped = sh_idx,
+            SignatureToken::Reference(token) | SignatureToken::MutableReference(token) => {
+                token.debug_set_sh_idx(sh_idx)
+            },
             other => panic!(
                 "debug_set_sh_idx (to {}) called for non-struct token {:?}",
                 sh_idx, other
@@ -1221,6 +1284,12 @@ impl SignatureToken {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I8 => I8,
+            I16 => I16,
+            I32 => I32,
+            I64 => I64,
+            I128 => I128,
+            I256 => I256,
             Address => Address,
             Signer => Signer,
             Vector(ty) => Vector(Box::new(ty.instantiate(subst_mapping))),
@@ -1387,7 +1456,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u8::MAX:
+        if int_val < 0 || int_val > u8::MAX:
             arithmetic error
         else:
             stack << int_val as u8
@@ -1405,7 +1474,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u64::MAX:
+        if int_val < 0 || int_val > u64::MAX:
             arithmetic error
         else:
             stack << int_val as u64
@@ -1423,7 +1492,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u128::MAX:
+        if int_val < 0 || int_val > u128::MAX:
             arithmetic error
         else:
             stack << int_val as u128
@@ -1688,7 +1757,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << bool
     "#]
     TestVariant(StructVariantHandleIndex),
@@ -1821,7 +1890,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &mut struct_ty
         ty_stack << &mut field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1863,7 +1932,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << &field_ty
     "#]
     ImmBorrowField(FieldHandleIndex),
@@ -1886,8 +1955,8 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &mut struct_ty
-        ty_stack << &mut field_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
     "#]
     ImmBorrowVariantField(VariantFieldHandleIndex),
 
@@ -1904,7 +1973,7 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &struct_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
         ty_stack << &field_ty
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
@@ -1929,8 +1998,8 @@ pub enum Bytecode {
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> ty
-        assert ty == &mut struct_ty
-        ty_stack << &mut field_ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
     "#]
     ImmBorrowVariantFieldGeneric(VariantFieldInstantiationIndex),
 
@@ -2086,12 +2155,12 @@ pub enum Bytecode {
     #[description = r#"
         Divide the two integer values at the top of the stack and push the result on the stack.
 
-        This operation aborts the transaction in case the right hand side is zero.
+        This operation aborts the transaction in case the right hand side is zero or overflow happens.
     "#]
     #[semantics = r#"
         stack >> rhs
         stack >> lhs
-        if rhs == 0
+        if rhs == 0 || (lhs == i<N>::MIN && rhs == -1)
             arithmetic error
         else
             stack << (lhs / rhs)
@@ -2435,7 +2504,7 @@ pub enum Bytecode {
     #[runtime_check_epilogue = r#"
         ty_stack >> ty1
         ty_stack >> ty2
-        assert ty2 == signer
+        assert ty2 == &signer
         assert ty1 == struct_ty
         assert struct_ty has key
     "#]
@@ -2532,7 +2601,7 @@ pub enum Bytecode {
     #[runtime_check_epilogue = r#"
         elem_ty = instantiate elem_ty
         ty_stack >> ty
-        assert ty == &elem_ty
+        assert ty == &vector<elem_ty> or ty == &mut vector<elem_ty>
         ty_stack << u64
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2553,7 +2622,7 @@ pub enum Bytecode {
         ty_stack >> idx_ty
         assert idx_ty == u64
         ty_stack >> ref_ty
-        assert ref_ty == &vector<elem_ty>
+        assert ref_ty == &vector<elem_ty> or ref_ty == &mut vector<elem_ty>
         ty_stack << &elem_ty
     "#]
     #[gas_type_creation_tier_0 = "elem_ty"]
@@ -2651,7 +2720,7 @@ pub enum Bytecode {
         ty_stack >> ty3
         assert ty1 == u64
         assert ty2 == u64
-        assert ty3 == &vector<elem_ty>
+        assert ty3 == &mut vector<elem_ty>
     "#]
     VecSwap(SignatureIndex),
 
@@ -2752,7 +2821,7 @@ pub enum Bytecode {
     #[static_operands = "[u256_value]"]
     #[semantics = "stack << u256_value"]
     #[runtime_check_epilogue = "ty_stack << u256"]
-    LdU256(move_core_types::u256::U256),
+    LdU256(move_core_types::int256::U256),
 
     #[group = "casting"]
     #[description = r#"
@@ -2761,7 +2830,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u16::MAX:
+        if int_val < 0 || int_val > u16::MAX:
             arithmetic error
         else:
             stack << int_val as u16
@@ -2779,7 +2848,7 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        if int_val > u32::MAX:
+        if int_val < 0 || int_val > u32::MAX:
             arithmetic error
         else:
             stack << int_val as u32
@@ -2796,13 +2865,184 @@ pub enum Bytecode {
     "#]
     #[semantics = r#"
         stack >> int_val
-        stack << int_val as u256
+        if int_val < 0:
+            arithmetic error
+        else:
+            stack << int_val as u256
     "#]
     #[runtime_check_epilogue = r#"
         ty_stack >> _
         ty_stack << u256
     "#]
     CastU256,
+
+    #[group = "stack_and_local"]
+    #[description = "Push a i8 constant onto the stack."]
+    #[static_operands = "[i8_value]"]
+    #[semantics = "stack << i8_value"]
+    #[runtime_check_epilogue = "ty_stack << i8"]
+    LdI8(i8),
+
+    #[group = "stack_and_local"]
+    #[description = "Push a i16 constant onto the stack."]
+    #[static_operands = "[i16_value]"]
+    #[semantics = "stack << i16_value"]
+    #[runtime_check_epilogue = "ty_stack << i16"]
+    LdI16(i16),
+
+    #[group = "stack_and_local"]
+    #[description = "Push a i32 constant onto the stack."]
+    #[static_operands = "[i32_value]"]
+    #[semantics = "stack << i32_value"]
+    #[runtime_check_epilogue = "ty_stack << i32"]
+    LdI32(i32),
+
+    #[group = "stack_and_local"]
+    #[description = "Push a i64 constant onto the stack."]
+    #[static_operands = "[i64_value]"]
+    #[semantics = "stack << i64_value"]
+    #[runtime_check_epilogue = "ty_stack << i64"]
+    LdI64(i64),
+
+    #[group = "stack_and_local"]
+    #[description = "Push a i128 constant onto the stack."]
+    #[static_operands = "[i128_value]"]
+    #[semantics = "stack << i128_value"]
+    #[runtime_check_epilogue = "ty_stack << i128"]
+    LdI128(i128),
+
+    #[group = "stack_and_local"]
+    #[description = "Push a i256 constant onto the stack."]
+    #[static_operands = "[i256_value]"]
+    #[semantics = "stack << i256_value"]
+    #[runtime_check_epilogue = "ty_stack << i256"]
+    LdI256(move_core_types::int256::I256),
+
+    #[group = "casting"]
+    #[description = r#"
+        Convert the integer value at the top of the stack into a i8.
+        An arithmetic error will be raised if the value cannot be represented as a i8.
+    "#]
+    #[semantics = r#"
+        stack >> int_val
+        if int_val < i8::MIN || int_val > i8::MAX:
+            arithmetic error
+        else:
+            stack << int_val as i8
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> _
+        ty_stack << i8
+    "#]
+    CastI8,
+
+    #[group = "casting"]
+    #[description = r#"
+        Convert the integer value at the top of the stack into a i16.
+        An arithmetic error will be raised if the value cannot be represented as a i16.
+    "#]
+    #[semantics = r#"
+        stack >> int_val
+        if int_val < i16::MIN || int_val > i16::MAX:
+            arithmetic error
+        else:
+            stack << int_val as i16
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> _
+        ty_stack << i16
+    "#]
+    CastI16,
+
+    #[group = "casting"]
+    #[description = r#"
+        Convert the integer value at the top of the stack into a i32.
+        An arithmetic error will be raised if the value cannot be represented as a i32.
+    "#]
+    #[semantics = r#"
+        stack >> int_val
+        if int_val < i32::MIN || int_val > i32::MAX:
+            arithmetic error
+        else:
+            stack << int_val as i32
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> _
+        ty_stack << i32
+    "#]
+    CastI32,
+
+    #[group = "casting"]
+    #[description = r#"
+        Convert the integer value at the top of the stack into a i64.
+        An arithmetic error will be raised if the value cannot be represented as a i64.
+    "#]
+    #[semantics = r#"
+        stack >> int_val
+        if int_val < i64::MIN || int_val > i64::MAX:
+            arithmetic error
+        else:
+            stack << int_val as i64
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> _
+        ty_stack << i64
+    "#]
+    CastI64,
+
+    #[group = "casting"]
+    #[description = r#"
+        Convert the integer value at the top of the stack into a i128.
+        An arithmetic error will be raised if the value cannot be represented as a i128.
+    "#]
+    #[semantics = r#"
+        stack >> int_val
+        if int_val < i128::MIN || int_val > i128::MAX:
+            arithmetic error
+        else:
+            stack << int_val as i128
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> _
+        ty_stack << i128
+    "#]
+    CastI128,
+
+    #[group = "casting"]
+    #[description = r#"
+        Convert the integer value at the top of the stack into a i256.
+    "#]
+    #[semantics = r#"
+        stack >> int_val
+        if int_val > i256::MAX:
+            arithmetic error
+        else:
+            stack << int_val as i256
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> _
+        ty_stack << i256
+    "#]
+    CastI256,
+
+    #[group = "arithmetic"]
+    #[description = r#"
+        Negate the signed integer on top of the stack.
+        An arithmetic error will be raised if the value cannot be negated, as is the
+        case for the minimum of a given signed integer type
+    "#]
+    #[semantics = r#"
+        stack >> num
+        if num == i<N>::MIN
+            arithmetic error
+        else
+            stack << -num
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        ty_stack << ty
+    "#]
+    Negate,
 }
 
 impl ::std::fmt::Debug for Bytecode {
@@ -2825,6 +3065,18 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::CastU64 => write!(f, "CastU64"),
             Bytecode::CastU128 => write!(f, "CastU128"),
             Bytecode::CastU256 => write!(f, "CastU256"),
+            Bytecode::LdI8(a) => write!(f, "LdI8({})", a),
+            Bytecode::LdI16(a) => write!(f, "LdI16({})", a),
+            Bytecode::LdI32(a) => write!(f, "LdI32({})", a),
+            Bytecode::LdI64(a) => write!(f, "LdI64({})", a),
+            Bytecode::LdI128(a) => write!(f, "LdI128({})", a),
+            Bytecode::LdI256(a) => write!(f, "LdI256({})", a),
+            Bytecode::CastI8 => write!(f, "CastI8"),
+            Bytecode::CastI16 => write!(f, "CastI16"),
+            Bytecode::CastI32 => write!(f, "CastI32"),
+            Bytecode::CastI64 => write!(f, "CastI64"),
+            Bytecode::CastI128 => write!(f, "CastI128"),
+            Bytecode::CastI256 => write!(f, "CastI256"),
             Bytecode::LdConst(a) => write!(f, "LdConst({})", a),
             Bytecode::LdTrue => write!(f, "LdTrue"),
             Bytecode::LdFalse => write!(f, "LdFalse"),
@@ -2874,6 +3126,7 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::Mul => write!(f, "Mul"),
             Bytecode::Mod => write!(f, "Mod"),
             Bytecode::Div => write!(f, "Div"),
+            Bytecode::Negate => write!(f, "Negate"),
             Bytecode::BitOr => write!(f, "BitOr"),
             Bytecode::BitAnd => write!(f, "BitAnd"),
             Bytecode::Xor => write!(f, "Xor"),
@@ -3004,6 +3257,18 @@ impl Bytecode {
             | CastU64
             | CastU128
             | CastU256
+            | LdI8(_)
+            | LdI16(_)
+            | LdI32(_)
+            | LdI64(_)
+            | LdI128(_)
+            | LdI256(_)
+            | CastI8
+            | CastI16
+            | CastI32
+            | CastI64
+            | CastI128
+            | CastI256
             | LdConst(_)
             | LdTrue
             | LdFalse
@@ -3040,6 +3305,7 @@ impl Bytecode {
             | Mul
             | Mod
             | Div
+            | Negate
             | BitOr
             | BitAnd
             | Xor

@@ -177,28 +177,28 @@ fn script_strategy() -> impl Strategy<Value = Script> {
 }
 
 #[cfg(test)]
-fn gen_u64(gen: &mut ValueGenerator) -> u64 {
-    gen.generate(any::<u64>())
+fn gen_u64(r#gen: &mut ValueGenerator) -> u64 {
+    r#gen.generate(any::<u64>())
 }
 
 #[cfg(test)]
-fn gen_chain_id(gen: &mut ValueGenerator) -> u8 {
-    gen.generate(chain_id_strategy())
+fn gen_chain_id(r#gen: &mut ValueGenerator) -> u8 {
+    r#gen.generate(chain_id_strategy())
 }
 
 #[cfg(test)]
-fn gen_address(gen: &mut ValueGenerator) -> AccountAddress {
-    gen.generate(any::<AccountAddress>())
+fn gen_address(r#gen: &mut ValueGenerator) -> AccountAddress {
+    r#gen.generate(any::<AccountAddress>())
 }
 
 #[cfg(test)]
-fn gen_entry_function(gen: &mut ValueGenerator) -> EntryFunction {
-    gen.generate(entry_function_strategy())
+fn gen_entry_function(r#gen: &mut ValueGenerator) -> EntryFunction {
+    r#gen.generate(entry_function_strategy())
 }
 
 #[cfg(test)]
-fn gen_script(gen: &mut ValueGenerator) -> Script {
-    gen.generate(script_strategy())
+fn gen_script(r#gen: &mut ValueGenerator) -> Script {
+    r#gen.generate(script_strategy())
 }
 
 #[cfg(test)]

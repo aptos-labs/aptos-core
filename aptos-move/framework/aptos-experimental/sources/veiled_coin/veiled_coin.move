@@ -489,7 +489,7 @@ module aptos_experimental::veiled_coin {
             error::not_found(EVEILED_COIN_STORE_NOT_PUBLISHED)
         );
 
-        borrow_global_mut<VeiledCoinStore<CoinType>>(addr).pk
+        borrow_global<VeiledCoinStore<CoinType>>(addr).pk
     }
 
     /// Returns the total supply of veiled coins

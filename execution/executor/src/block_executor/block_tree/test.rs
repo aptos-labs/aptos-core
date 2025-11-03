@@ -9,7 +9,10 @@ use crate::{
 use aptos_crypto::{hash::PRE_GENESIS_BLOCK_ID, HashValue};
 use aptos_infallible::Mutex;
 use aptos_storage_interface::LedgerSummary;
-use aptos_types::{block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo};
+use aptos_types::{
+    block_info::BlockInfo, epoch_state::EpochState, ledger_info::LedgerInfo,
+    state_store::hot_state::HotStateConfig,
+};
 use std::sync::Arc;
 
 impl BlockTree {
@@ -39,7 +42,7 @@ fn id(index: u64) -> HashValue {
 }
 
 fn empty_block() -> PartialStateComputeResult {
-    PartialStateComputeResult::new_empty(LedgerSummary::new_empty())
+    PartialStateComputeResult::new_empty(LedgerSummary::new_empty(HotStateConfig::default()))
 }
 
 fn gen_ledger_info(block_id: HashValue, reconfig: bool) -> LedgerInfo {

@@ -397,6 +397,12 @@ fn signature_token_to_move_type_string_for_wrapper(
         SignatureToken::U64 => Ok("u64".to_string()),
         SignatureToken::U128 => Ok("u128".to_string()),
         SignatureToken::U256 => Ok("u256".to_string()),
+        SignatureToken::I8 => Ok("i8".to_string()),
+        SignatureToken::I16 => Ok("i16".to_string()),
+        SignatureToken::I32 => Ok("i32".to_string()),
+        SignatureToken::I64 => Ok("i64".to_string()),
+        SignatureToken::I128 => Ok("i128".to_string()),
+        SignatureToken::I256 => Ok("i256".to_string()),
         SignatureToken::Address => Ok("address".to_string()),
         SignatureToken::Signer => Ok("signer".to_string()),
         SignatureToken::Vector(inner_token) => Ok(format!(
@@ -489,10 +495,7 @@ fn generate_script_wrapper_for_non_entry_function(
     let parameters_sig = target_module.signature_at(target_func_handle.parameters);
     let return_sig = target_module.signature_at(target_func_handle.return_);
 
-    let has_signer_by_value = parameters_sig
-        .0
-        .iter()
-        .any(|t| *t == SignatureToken::Signer);
+    let has_signer_by_value = parameters_sig.0.contains(&SignatureToken::Signer);
     let script_signer_param = if has_signer_by_value {
         "s: signer"
     } else {

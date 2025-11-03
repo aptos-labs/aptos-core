@@ -151,7 +151,7 @@ impl<K: ArcAsyncDrop, V: ArcAsyncDrop> MapLayer<K, V> {
         Self::new(self.inner.spawn(child_peak, base_layer))
     }
 
-    pub(crate) fn peak(&self) -> FptRef<K, V> {
+    pub(crate) fn peak(&self) -> FptRef<'_, K, V> {
         self.inner.peak.get_ref()
     }
 }

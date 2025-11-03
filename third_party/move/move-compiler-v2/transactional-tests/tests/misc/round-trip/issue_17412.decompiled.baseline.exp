@@ -1,0 +1,9 @@
+processed 1 task
+task 0 lines 3-30:  publish [module 0xcafe::Module0 {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:12:26
+   │
+12 │     public fun function3(p0: bool, p1: bool) {
+   │                          ^^
+
+

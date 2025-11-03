@@ -60,9 +60,7 @@ impl ChainHealthBackoff {
         let voting_power_ratio = self
             .commit_history
             .get_voting_power_participation_ratio(round);
-        let chain_health_backoff = self.config.get_backoff(voting_power_ratio);
-
-        chain_health_backoff
+        self.config.get_backoff(voting_power_ratio)
     }
 }
 

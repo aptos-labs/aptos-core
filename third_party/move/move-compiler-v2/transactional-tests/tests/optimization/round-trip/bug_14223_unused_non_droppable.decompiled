@@ -5,7 +5,7 @@ module 0xcafe::m {
     struct S {
     }
     public fun f() {
-        let _t0 = S{};
+        let _v0 = S{};
         abort 1
     }
 }

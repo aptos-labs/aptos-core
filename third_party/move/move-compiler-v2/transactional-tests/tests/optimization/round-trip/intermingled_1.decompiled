@@ -3,10 +3,10 @@
 //# publish
 module 0xc0ffee::m {
     public fun main() {
-        if (!(test() == 4)) abort 0;
+        assert!(test() == 4, 0);
     }
     fun test(): u64 {
-        let _t2 = 1 + 2;
+        let _v0 = 1 + 2;
         4
     }
 }

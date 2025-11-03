@@ -1,0 +1,37 @@
+processed 4 tasks
+task 0 lines 1-11:  publish [module 0x9::trusted]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000009::trusted'. Got VMError: {
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: 0x9::trusted,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 1 lines 13-13:  run --verbose 0x9::trusted::f
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000009::trusted doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 2 lines 15-25:  publish [module 0x99::not_trusted]
+Error: Unable to publish module '0000000000000000000000000000000000000000000000000000000000000099::not_trusted'. Got VMError: {
+    major_status: CALL_TYPE_MISMATCH_ERROR,
+    sub_status: None,
+    location: 0x99::not_trusted,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 1)],
+}
+task 3 lines 27-27:  run --verbose 0x99::not_trusted::f
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::not_trusted doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

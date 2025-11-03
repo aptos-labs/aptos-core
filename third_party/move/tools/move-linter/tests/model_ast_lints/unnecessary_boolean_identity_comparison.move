@@ -9,6 +9,7 @@ module 0xc0ffee::m {
 
     fun bar() {}
 
+    #[lint::skip(cyclomatic_complexity)]
     public fun test1(x: u64) {
         if (foo(x) == true) { bar() };
         if (foo(x) == false) { bar() };

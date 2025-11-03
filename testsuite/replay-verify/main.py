@@ -101,7 +101,7 @@ class ReplayConfig:
             self.timeout_secs = 9000
         else:
             self.concurrent_replayer = 35
-            self.pvc_number = 49
+            self.pvc_number = 10
             self.min_range_size = 10_000
             self.range_size = 2_000_000
             self.timeout_secs = 9000
@@ -233,7 +233,7 @@ class WorkerPod:
             "--timeout-secs",
             f"{self.config.timeout_secs}",
             "--block-cache-size",
-            "10737418240",
+            f"{36 * 1024 * 1024 * 1024}",
         ]
         # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
         if (
@@ -323,8 +323,9 @@ class TaskStats:
         self.succeeded: bool = False
 
     def set_end_time(self) -> None:
-        self.end_time = time.time()
-        self.durations.append(self.end_time - self.start_time)
+        if self.end_time is None:
+            self.end_time = time.time()
+            self.durations.append(self.end_time - self.start_time)
 
     def increment_retry_count(self) -> None:
         self.retry_count += 1
@@ -479,8 +480,8 @@ class ReplayScheduler:
         )
         # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
         # would be computed from the number of shards and the expected run time of the replay-verify
-        # run. However, for simplicity, we set the TTL to 3 hours.
-        pvc_ttl = 5 * 60 * 60  # 3 hours
+        # run. However, for simplicity, we set the TTL to 9 hours.
+        pvc_ttl = 9 * 60 * 60  # 9 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
@@ -512,7 +513,7 @@ class ReplayScheduler:
         # Because PVCs can be shared among multiple replay-verify runs, a more correct TTL
         # would be computed from the number of shards and the expected run time of the replay-verify
         # run. However, for simplicity, we set the TTL to 3 hours.
-        pvc_ttl = 5 * 60 * 60  # 3 hours
+        pvc_ttl = 8 * 60 * 60  # 8 hours
         pvcs = create_replay_verify_pvcs_from_snapshot(
             self.id,
             snapshot_name,
@@ -526,7 +527,7 @@ class ReplayScheduler:
 
     # Creates a pvc by cloning an existing pvc
     def create_pvc_from_existing(self, original_snapshot_name: str, existing_pvc: str):
-        pvc_ttl = 5 * 60 * 60
+        pvc_ttl = 8 * 60 * 60
         pvcs = create_replay_verify_pvcs_from_existing(
             self.id,
             original_snapshot_name,
@@ -758,7 +759,7 @@ if __name__ == "__main__":
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
-    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number
+    worker_cnt = args.worker_cnt if args.worker_cnt else config.pvc_number * 10
     range_size = args.range_size if args.range_size else config.range_size
 
     if args.start is not None:

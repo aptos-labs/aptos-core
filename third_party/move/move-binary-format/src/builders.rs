@@ -226,6 +226,12 @@ impl CompiledScriptBuilder {
             U64 => U64,
             U128 => U128,
             U256 => U256,
+            I8 => I8,
+            I16 => I16,
+            I32 => I32,
+            I64 => I64,
+            I128 => I128,
+            I256 => I256,
             Bool => Bool,
             Address => Address,
             Signer => Signer,
@@ -312,9 +318,9 @@ impl CompiledScriptBuilder {
         name: &IdentStr,
         module: &CompiledModule,
     ) -> PartialVMResult<FunctionHandleIndex> {
-        for (idx, handle) in module.function_handles().iter().enumerate() {
-            if module.identifier_at(handle.name) == name {
-                return self.import_function_by_handle(module, FunctionHandleIndex(idx as u16));
+        for def in module.function_defs().iter() {
+            if module.identifier_at(module.function_handle_at(def.function).name) == name {
+                return self.import_function_by_handle(module, def.function);
             }
         }
         Err(PartialVMError::new(StatusCode::LOOKUP_FAILED))

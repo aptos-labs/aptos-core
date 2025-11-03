@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    error::StateSyncError, payload_manager::TPayloadManager,
+    error::StateSyncError, network::NetworkSender, payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper, transaction_shuffler::TransactionShuffler,
 };
 use anyhow::Result;
@@ -48,6 +48,7 @@ pub trait StateComputer: Send + Sync {
         randomness_enabled: bool,
         consensus_onchain_config: OnChainConsensusConfig,
         persisted_auxiliary_info_version: u8,
+        network_sender: Arc<NetworkSender>,
     );
 
     // Reconfigure to clear epoch state at end of epoch.

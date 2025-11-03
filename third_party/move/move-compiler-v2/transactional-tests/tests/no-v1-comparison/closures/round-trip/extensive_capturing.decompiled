@@ -6,24 +6,24 @@ module 0xc0ffee::m {
         p0 + p1 + p2
     }
     public fun test() {
-        let _t6: ||u8 has copy + drop = || add3(0u8, 1u8, 2u8);
-        if (!(_t6() == 3u8)) abort 14566554180833181696;
-        let _t0 = |arg0| add3(arg0, 0u8, 1u8);
-        if (!(_t0(2u8) == 3u8)) abort 14566554180833181696;
-        _t0 = |arg0| add3(0u8, arg0, 1u8);
-        if (!(_t0(2u8) == 3u8)) abort 14566554180833181696;
-        _t0 = |arg0| add3(0u8, 1u8, arg0);
-        if (!(_t0(2u8) == 3u8)) abort 14566554180833181696;
-        let _t1 = |arg0,arg1| add3(0u8, arg0, arg1);
-        if (!(_t1(2u8, 1u8) == 3u8)) abort 14566554180833181696;
-        _t1 = |arg0,arg1| add3(arg0, arg1, 0u8);
-        if (!(_t1(2u8, 1u8) == 3u8)) abort 14566554180833181696;
-        _t1 = |arg0,arg1| add3(arg0, 0u8, arg1);
-        if (!(_t1(2u8, 1u8) == 3u8)) abort 14566554180833181696;
-        let _t2 = |arg0,arg1,arg2| add3(arg0, arg1, arg2);
-        if (!(_t2(2u8, 0u8, 1u8) == 3u8)) abort 14566554180833181696;
-        _t0 = |arg0| lambda__1__test(arg0);
-        if (!(_t0(2u8) == 4u8)) abort 14566554180833181696;
+        let _v0: ||u8 has copy + drop = || add3(0u8, 1u8, 2u8);
+        assert!(_v0() == 3u8, 14566554180833181696);
+        let _v1 = |arg0| add3(arg0, 0u8, 1u8);
+        assert!(_v1(2u8) == 3u8, 14566554180833181696);
+        _v1 = |arg0| add3(0u8, arg0, 1u8);
+        assert!(_v1(2u8) == 3u8, 14566554180833181696);
+        _v1 = |arg0| add3(0u8, 1u8, arg0);
+        assert!(_v1(2u8) == 3u8, 14566554180833181696);
+        let _v2 = |arg0,arg1| add3(0u8, arg0, arg1);
+        assert!(_v2(2u8, 1u8) == 3u8, 14566554180833181696);
+        _v2 = |arg0,arg1| add3(arg0, arg1, 0u8);
+        assert!(_v2(2u8, 1u8) == 3u8, 14566554180833181696);
+        _v2 = |arg0,arg1| add3(arg0, 0u8, arg1);
+        assert!(_v2(2u8, 1u8) == 3u8, 14566554180833181696);
+        let _v3 = |arg0,arg1,arg2| add3(arg0, arg1, arg2);
+        assert!(_v3(2u8, 0u8, 1u8) == 3u8, 14566554180833181696);
+        _v1 = |arg0| lambda__1__test(arg0);
+        assert!(_v1(2u8) == 4u8, 14566554180833181696);
     }
     fun lambda__1__test(p0: u8): u8 {
         add3(p0, 0u8, p0)

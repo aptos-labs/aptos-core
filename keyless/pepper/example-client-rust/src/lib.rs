@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
+use aptos_crypto::{blstrs::g2_proj_from_bytes, ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_infallible::duration_since_epoch;
 use aptos_keyless_pepper_common::{
     account_recovery_db::AccountRecoveryDbEntry,
@@ -10,8 +10,7 @@ use aptos_keyless_pepper_common::{
     PepperInput, PepperRequest, PepperResponse, PepperV0VufPubKey, SignatureResponse,
 };
 use aptos_types::{keyless::OpenIdSig, transaction::authenticator::EphemeralPublicKey};
-use ark_bls12_381::G2Projective;
-use ark_serialize::CanonicalDeserialize;
+use blstrs::G2Projective;
 use firestore::{path, paths, FirestoreDb, FirestoreDbOptions};
 use rand::RngCore;
 use reqwest::{Client, StatusCode};
@@ -64,8 +63,8 @@ type Blinder = [u8; 31];
 /// Runs the example client that interacts with the pepper service
 pub async fn run_client_example(
     pepper_service_url: String,
-    firestore_google_project_id: String,
-    firestore_database_id: String,
+    firestore_google_project_id: Option<String>,
+    firestore_database_id: Option<String>,
 ) {
     utils::print(
         "Starting the example client that interacts with the Aptos OIDB Pepper Service.",
@@ -144,9 +143,7 @@ async fn fetch_verification_public_key(
     );
 
     // Deserialize the verification key
-    ark_bls12_381::G2Affine::deserialize_compressed(verification_key.public_key.as_slice())
-        .unwrap()
-        .into()
+    g2_proj_from_bytes(verification_key.public_key.as_slice()).unwrap()
 }
 
 /// Step 2: Generate a blinder, an ephemeral key pair, and an expiry time for the ephemeral key
@@ -410,13 +407,26 @@ fn verify_pepper_signature(
 /// (Optional) Step 8: Verify that a firestore entry exists for the given pepper input
 async fn verify_firestore_pepper_entry(
     pepper_input: PepperInput,
-    google_project_id: String,
-    database_id: String,
+    google_project_id: Option<String>,
+    database_id: Option<String>,
 ) {
-    utils::print(
-        &format!("(Optional) Step 8: Verifying that a firestore entry exists for the given pepper input. Project ID: {}, Database: {}", google_project_id, database_id),
-        true,
-    );
+    // Check if the Google project ID and database ID are provided
+    let (google_project_id, database_id) = match (google_project_id, database_id) {
+        (Some(google_project_id), Some(database_id)) => {
+            utils::print(
+                &format!("(Optional) Step 8: Verifying that a firestore entry exists for the given pepper input. Project ID: {}, Database: {}", google_project_id, database_id),
+                true,
+            );
+            (google_project_id, database_id)
+        },
+        _ => {
+            utils::print(
+                "Skipping the verification of the firestore entry since the Google project ID and database ID are not provided!",
+                true,
+            );
+            return;
+        },
+    };
 
     // Create the firestore DB client
     let firestore_db_options = FirestoreDbOptions {
@@ -428,6 +438,14 @@ async fn verify_firestore_pepper_entry(
     let firestore_db = FirestoreDb::with_options(firestore_db_options)
         .await
         .unwrap();
+
+    // Wait for a short duration to ensure the firestore entry is available.
+    // This is required because firestore writes may be asynchronous.
+    utils::print(
+        "Waiting for 2 seconds to ensure the firestore entry is available...",
+        false,
+    );
+    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
 
     // Query the firestore DB for the pepper input entry
     let docs: Vec<AccountRecoveryDbEntry> = firestore_db

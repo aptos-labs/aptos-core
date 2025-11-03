@@ -1,12 +1,12 @@
 //**** Cross-compiled for `masm` syntax from `tests/assembler/friends.masm`
 
 //# publish --print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test1
 
 
 //# publish --print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test2
 friend 0x66::test1
 // Function definition at index 0
@@ -17,7 +17,7 @@ friend fun friend_fun(): u8
 
 
 //# publish --print-bytecode
-// Bytecode version v7
+// Bytecode version v8
 module 0x66::test1
 use 0x66::test2
 // Function definition at index 0

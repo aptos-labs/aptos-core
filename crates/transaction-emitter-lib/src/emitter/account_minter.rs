@@ -612,7 +612,7 @@ pub async fn bulk_create_accounts(
 
     let seed = config.seed.unwrap_or_else(|| {
         let mut rng = StdRng::from_entropy();
-        rng.gen()
+        rng.r#gen()
     });
     info!(
         "AccountMinter Seed (reuse accounts by passing into --account-minter-seed): {:?}",
@@ -651,7 +651,7 @@ pub async fn bulk_create_accounts(
         .all(|account| account.sequence_number() > 0);
     let all_source_accounts_exist = secondary_source_account
         .as_ref()
-        .map_or(true, |v| v.sequence_number() > 0);
+        .is_none_or(|v| v.sequence_number() > 0);
 
     info!(
         "Accounts exist: {}, seed accounts exist: {}, source account exists: {}",

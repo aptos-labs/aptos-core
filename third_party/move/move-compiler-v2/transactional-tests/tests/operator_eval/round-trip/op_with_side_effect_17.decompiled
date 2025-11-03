@@ -3,8 +3,8 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(): u8 {
-        let _t2 = 1 - 10;
-        abort _t2
+        let _v0 = 1 - 10;
+        abort _v0
     }
 }
 

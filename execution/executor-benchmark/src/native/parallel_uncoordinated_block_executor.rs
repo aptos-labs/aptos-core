@@ -429,6 +429,7 @@ impl<T: CommonNativeRawTransactionExecutor> RawTransactionExecutor for T {
                 }
             },
             NativeTransaction::BlockEpilogue => return output.into_success_output(0),
+            NativeTransaction::BlockMetadata => return output.into_success_output(0),
         };
 
         self.reduce_apt_supply(fa_migration_complete, gas, state_view, &mut output)?;
@@ -923,11 +924,10 @@ impl CommonNativeRawTransactionExecutor for NativeValueCacheRawTransactionExecut
                     )
                 });
 
-            let total_supply_state_key = match entry.value() {
+            match entry.value() {
                 CachedResource::AptCoinInfo(coin_info) => coin_info.supply_aggregator_state_key(),
                 _ => panic!("wrong type"),
-            };
-            total_supply_state_key
+            }
         });
 
         if USE_THREAD_LOCAL_SUPPLY {
@@ -1242,6 +1242,7 @@ impl RawTransactionExecutor for NativeNoStorageRawTransactionExecutor {
                 (sender, sequence_number)
             },
             NativeTransaction::BlockEpilogue => return output.into_success_output(0),
+            NativeTransaction::BlockMetadata => return output.into_success_output(0),
         };
 
         self.seq_nums.insert(sender, sequence_number);

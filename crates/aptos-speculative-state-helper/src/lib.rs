@@ -101,6 +101,7 @@ impl<E: Send + SpeculativeEvent + 'static> SpeculativeEvents<E> {
 
     /// Flush the first num_to_flush stored events asynchronously by spawning global rayon threads.
     pub fn flush(mut self, num_to_flush: usize) {
+        let num_to_flush = num_to_flush.min(self.events.len());
         let to_flush = self.events.drain(..num_to_flush).collect::<Vec<_>>();
         rayon::spawn(move || {
             to_flush

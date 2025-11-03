@@ -173,6 +173,12 @@ impl<'a> LimitsVerifier<'a> {
                 | SignatureToken::U64
                 | SignatureToken::U128
                 | SignatureToken::U256
+                | SignatureToken::I8
+                | SignatureToken::I16
+                | SignatureToken::I32
+                | SignatureToken::I64
+                | SignatureToken::I128
+                | SignatureToken::I256
                 | SignatureToken::Address
                 | SignatureToken::Signer
                 | SignatureToken::Vector(_)

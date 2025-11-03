@@ -44,7 +44,7 @@ impl PFNPerformance {
         config_override_fn: Option<OverrideNodeConfigFn>,
     ) -> Self {
         // Create a random seed for the shuffle RNG
-        let shuffle_rng_seed: [u8; 32] = OsRng.gen();
+        let shuffle_rng_seed: [u8; 32] = OsRng.r#gen();
 
         Self {
             num_pfns,

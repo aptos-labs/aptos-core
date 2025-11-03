@@ -3,13 +3,13 @@
 //# run
 script {
     fun main() {
-        let _t0 = 0;
-        let _t1 = 0;
-        while (_t0 < 10) {
-            _t0 = _t0 + 1;
-            if (_t0 % 2 == 0) continue;
-            _t1 = _t1 + _t0
+        let _v0 = 0;
+        let _v1 = 0;
+        while (_v0 < 10) {
+            _v0 = _v0 + 1;
+            if (_v0 % 2 == 0) continue;
+            _v1 = _v1 + _v0
         };
-        if (!(_t1 == 25)) abort 42;
+        assert!(_v1 == 25, 42);
     }
 }

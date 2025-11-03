@@ -44,9 +44,9 @@ fn native_create_signers_for_testing(
     debug_assert!(args.len() == 1);
 
     let num_signers = pop_arg!(args, u64);
-    let signers = Value::vector_for_testing_only(
+    let signers = Value::vector_unchecked(
         (0..num_signers).map(|i| Value::master_signer(AccountAddress::new(to_le_bytes(i)))),
-    );
+    )?;
 
     let cost = gas_params.base_cost + gas_params.unit_cost * NumArgs::new(num_signers);
 

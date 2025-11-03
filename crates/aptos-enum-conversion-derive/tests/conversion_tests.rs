@@ -5,12 +5,19 @@ use aptos_enum_conversion_derive::EnumConversion;
 
 #[test]
 fn test_enum_conversion_derive_valid() {
-    struct TestMessage {}
+    #[derive(Debug, Eq, PartialEq)]
+    struct TestMessage {
+        x: u32,
+    }
 
-    #[derive(EnumConversion)]
+    #[derive(Debug, Eq, PartialEq, EnumConversion)]
     enum Messages {
         Test(TestMessage),
     }
+
+    let message = TestMessage { x: 123 };
+    let messages = Messages::from(message);
+    assert_eq!(messages, Messages::Test(TestMessage { x: 123 }));
 }
 
 #[test]

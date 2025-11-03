@@ -4,7 +4,28 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
-##[7.8.0]
+## [7.10.2]
+- Fix backward compatibility issue of enum-based option module
+
+## [7.10.1]
+- Add support into Move 2.2 for builtin constant `__COMPILE_FOR_TESTING__` 
+- Update the default version of move formatter to 1.3.7
+- Update the default version of move mutation test tool to 2.0.0
+
+## [7.10.0]
+- Add support into Move 2.3 for signed integer types and builtin constants (`MAX_U8`, ..., `MIN_U8`, ..., `__COMPILE_FOR_TESTING__`). Move 2.3 is not yet supported on testnet or mainnet, but can be used for local development by providing `--language-version 2.3` to the CLI.
+
+## [7.9.1]
+- Add mem as pre-compiled module to avoid compatibility issue when using aptos-framework
+
+## [7.9.0]
+- Set language version 2.2 and bytecode version v8 as default
+- Set Move disassembler v2 and decompiler v2 as default
+
+## [7.8.1]
+- Transaction Simulatiom Session: fixed resource deserialization bug
+
+## [7.8.0]
 - New beta feature: Transaction Simulation Session
 
 ## [7.7.0]

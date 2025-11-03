@@ -30,6 +30,8 @@ pub const TXN_COMMIT_SUCCESS_LABEL: &str = "success";
 pub const TXN_COMMIT_FAILED_LABEL: &str = "failed";
 /// Transaction commit failed (will not be retried) because of a duplicate
 pub const TXN_COMMIT_FAILED_DUPLICATE_LABEL: &str = "failed_duplicate";
+/// Transaction commit failed because the sequence number is too new (out of order)
+pub const TXN_COMMIT_SEQNUM_TOO_NEW_LABEL: &str = "failed_seqnum_too_new";
 /// Transaction commit failed (will not be retried) because it expired
 pub const TXN_COMMIT_FAILED_EXPIRED_LABEL: &str = "failed_expired";
 /// Transaction commit failed (will not be retried) because the nonce is already used in a previous transaction
@@ -1339,7 +1341,7 @@ pub fn update_counters_for_compute_result(compute_result: &StateComputeResult) {
             TransactionStatus::Keep(_) => TXN_COMMIT_SUCCESS_LABEL,
             TransactionStatus::Discard(reason) => {
                 if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_NEW {
-                    TXN_COMMIT_RETRY_LABEL
+                    TXN_COMMIT_SEQNUM_TOO_NEW_LABEL
                 } else if *reason == DiscardedVMStatus::SEQUENCE_NUMBER_TOO_OLD {
                     TXN_COMMIT_FAILED_DUPLICATE_LABEL
                 } else if *reason == DiscardedVMStatus::TRANSACTION_EXPIRED {

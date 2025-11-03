@@ -186,6 +186,7 @@ impl UnitTestingConfig {
         genesis_state: Option<ChangeSet>,
         writer: W,
         factory: F,
+        enable_enum_option: bool,
     ) -> Result<(W, bool)> {
         let shared_writer = Mutex::new(writer);
         let shared_options = Mutex::new(factory);
@@ -213,6 +214,7 @@ impl UnitTestingConfig {
             native_function_table,
             genesis_state,
             self.verbose,
+            enable_enum_option,
         )
         .unwrap();
 

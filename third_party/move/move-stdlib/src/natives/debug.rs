@@ -179,8 +179,11 @@ mod testing {
         ty: &Type,
     ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
-        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) = annotated_type_layout {
-            Ok(annotated_struct_layout)
+        if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) =
+            annotated_type_layout.as_ref().map(|l| l.as_ref())
+        {
+            // Note: this stdlib is not used in production, so cloning here is acceptable.
+            Ok(annotated_struct_layout.clone())
         } else {
             Err(
                 PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
@@ -265,14 +268,14 @@ mod testing {
         //  2. Not called in block-execution context where delayed fields are relevant.
         let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
 
-        match &ty_layout {
+        match ty_layout.as_ref() {
             MoveTypeLayout::Vector(_) => {
                 // Get the inner type T of a vector<T>. Again, we should not see any delayed fields
                 // in the debug context.
                 let inner_ty = get_vector_inner_type(&ty)?;
                 let inner_tyl = context.type_to_type_layout_check_no_delayed_fields(inner_ty)?;
 
-                match inner_tyl {
+                match inner_tyl.as_ref() {
                     // We cannot simply convert a `Value` (of type vector) to a `MoveValue` because
                     // there might be a struct in the vector that needs to be "decorated" using the
                     // logic in this function. Instead, we recursively "unpack" the vector until we
@@ -418,6 +421,42 @@ mod testing {
                 write!(out, "{}", u256).map_err(fmt_error_to_partial_vm_error)?;
                 if include_int_types {
                     write!(out, "u256").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I8(i8) => {
+                write!(out, "{}", i8).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i8").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I16(i16) => {
+                write!(out, "{}", i16).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i16").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I32(i32) => {
+                write!(out, "{}", i32).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i32").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I64(i64) => {
+                write!(out, "{}", i64).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i64").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I128(i128) => {
+                write!(out, "{}", i128).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i128").map_err(fmt_error_to_partial_vm_error)?;
+                }
+            },
+            MoveValue::I256(i256) => {
+                write!(out, "{}", i256).map_err(fmt_error_to_partial_vm_error)?;
+                if include_int_types {
+                    write!(out, "i256").map_err(fmt_error_to_partial_vm_error)?;
                 }
             },
             MoveValue::Bool(b) => {

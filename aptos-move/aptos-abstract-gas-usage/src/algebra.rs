@@ -7,7 +7,9 @@ use aptos_gas_algebra::{
 };
 use aptos_gas_meter::GasAlgebra;
 use aptos_gas_schedule::VMGasParameters;
-use aptos_vm_types::storage::{io_pricing::IoPricing, space_pricing::DiskSpacePricing};
+use aptos_vm_types::storage::{
+    io_pricing::IoPricing, space_pricing::DiskSpacePricing, StorageGasParameters,
+};
 use move_binary_format::errors::PartialVMResult;
 use std::sync::{Arc, Mutex};
 
@@ -28,6 +30,10 @@ impl<A: GasAlgebra> GasAlgebra for CalibrationAlgebra<A> {
 
     fn vm_gas_params(&self) -> &VMGasParameters {
         self.base.vm_gas_params()
+    }
+
+    fn storage_gas_params(&self) -> &StorageGasParameters {
+        self.base.storage_gas_params()
     }
 
     fn io_pricing(&self) -> &IoPricing {

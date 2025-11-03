@@ -286,7 +286,7 @@ impl Collector for LinuxDiskMetricsCollector {
 
         for mount in mounts {
             if let Some(disk_stat) = disk_stats.get(&mount.majmin) {
-                let labels = &[disk_stat.name.clone()];
+                let labels = std::slice::from_ref(&disk_stat.name);
                 disk_stats_counter!(mfs, num_reads, disk_stat.reads, labels);
                 disk_stats_counter!(mfs, num_merged_reads, disk_stat.merged, labels);
                 disk_stats_counter!(mfs, num_sectors_read, disk_stat.sectors_read, labels);

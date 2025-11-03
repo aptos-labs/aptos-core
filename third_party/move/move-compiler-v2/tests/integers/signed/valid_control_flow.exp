@@ -1,0 +1,1885 @@
+// -- Model dump before first bytecode pipeline
+module 0x42::valid_control_flow {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test1(x: i64,y: i64): i64 {
+        if Or(Gt<i64>(x, y), Eq<i64>(x, y)) {
+          x
+        } else {
+          y
+        }
+    }
+    private fun test2(x: i128,y: i128): i128 {
+        if Or(Gt<i128>(x, y), Eq<i128>(x, y)) {
+          x
+        } else {
+          y
+        }
+    }
+    private fun test3(x: i64,y: i64): i64 {
+        loop {
+          if Not(Eq<i64>(x, 0)) {
+            {
+              let y: i64 = Add<i64>(x, 1);
+              {
+                let z: i64 = Sub<i64>(x, 1);
+                {
+                  let res: i64 = if Lt<i64>(y, z) {
+                    y
+                  } else {
+                    if Lt<i64>(z, y) {
+                      z
+                    } else {
+                      break
+                    }
+                  };
+                  x: i64 = Mul<i64>(x, 2);
+                  Tuple()
+                }
+              }
+            }
+          } else {
+            break
+          }
+        };
+        x
+    }
+    private fun test4(x: i128,y: i128): i128 {
+        loop {
+          if Not(Eq<i128>(x, 0)) {
+            {
+              let y: i128 = Add<i128>(x, 1);
+              {
+                let z: i128 = Sub<i128>(x, 1);
+                {
+                  let res: i128 = if Lt<i128>(y, z) {
+                    y
+                  } else {
+                    if Lt<i128>(z, y) {
+                      z
+                    } else {
+                      break
+                    }
+                  };
+                  x: i128 = Mul<i128>(x, 2);
+                  Tuple()
+                }
+              }
+            }
+          } else {
+            break
+          }
+        };
+        x
+    }
+} // end 0x42::valid_control_flow
+
+// -- Sourcified model before first bytecode pipeline
+module 0x42::valid_control_flow {
+    enum E1 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> has copy, drop {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 has copy, drop {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 has copy, drop {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> has copy, drop {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    fun test1(x: i64, y: i64): i64 {
+        if (x > y || x == y) x else y
+    }
+    fun test2(x: i128, y: i128): i128 {
+        if (x > y || x == y) x else y
+    }
+    fun test3(x: i64, y: i64): i64 {
+        while (!(x == 0i64)) {
+            let y = x + 1i64;
+            let z = x - 1i64;
+            let res = if (y < z) y else if (z < y) z else break;
+            x = x * 2i64;
+        };
+        x
+    }
+    fun test4(x: i128, y: i128): i128 {
+        while (!(x == 0i128)) {
+            let y = x + 1i128;
+            let z = x - 1i128;
+            let res = if (y < z) y else if (z < y) z else break;
+            x = x * 2i128;
+        };
+        x
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_control_flow::test1($t0: i64, $t1: i64): i64 {
+     var $t2: i64
+     var $t3: bool
+     var $t4: bool
+     var $t5: i64
+     var $t6: i64
+  0: $t5 := infer($t0)
+  1: $t4 := >($t5, $t1)
+  2: if ($t4) goto 3 else goto 6
+  3: label L0
+  4: $t3 := true
+  5: goto 9
+  6: label L1
+  7: $t6 := infer($t0)
+  8: $t3 := ==($t6, $t1)
+  9: label L2
+ 10: if ($t3) goto 11 else goto 14
+ 11: label L3
+ 12: $t2 := infer($t0)
+ 13: goto 16
+ 14: label L4
+ 15: $t2 := infer($t1)
+ 16: label L5
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test2($t0: i128, $t1: i128): i128 {
+     var $t2: i128
+     var $t3: bool
+     var $t4: bool
+     var $t5: i128
+     var $t6: i128
+  0: $t5 := infer($t0)
+  1: $t4 := >($t5, $t1)
+  2: if ($t4) goto 3 else goto 6
+  3: label L0
+  4: $t3 := true
+  5: goto 9
+  6: label L1
+  7: $t6 := infer($t0)
+  8: $t3 := ==($t6, $t1)
+  9: label L2
+ 10: if ($t3) goto 11 else goto 14
+ 11: label L3
+ 12: $t2 := infer($t0)
+ 13: goto 16
+ 14: label L4
+ 15: $t2 := infer($t1)
+ 16: label L5
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test3($t0: i64, $t1: i64): i64 {
+     var $t2: i64
+     var $t3: bool
+     var $t4: bool
+     var $t5: i64
+     var $t6: i64
+     var $t7: i64
+     var $t8: i64
+     var $t9: i64
+     var $t10: i64
+     var $t11: i64
+     var $t12: i64
+     var $t13: i64
+     var $t14: bool
+     var $t15: i64
+     var $t16: bool
+     var $t17: i64
+     var $t18: i64
+     var $t19: i64
+     var $t20: i64
+  0: label L0
+  1: $t5 := infer($t0)
+  2: $t6 := 0
+  3: $t4 := ==($t5, $t6)
+  4: $t3 := !($t4)
+  5: if ($t3) goto 6 else goto 35
+  6: label L2
+  7: $t8 := infer($t0)
+  8: $t9 := 1
+  9: $t7 := +($t8, $t9)
+ 10: $t11 := infer($t0)
+ 11: $t12 := 1
+ 12: $t10 := -($t11, $t12)
+ 13: $t15 := infer($t7)
+ 14: $t14 := <($t15, $t10)
+ 15: if ($t14) goto 16 else goto 19
+ 16: label L5
+ 17: $t13 := infer($t7)
+ 18: goto 29
+ 19: label L6
+ 20: $t17 := infer($t10)
+ 21: $t16 := <($t17, $t7)
+ 22: if ($t16) goto 23 else goto 26
+ 23: label L8
+ 24: $t13 := infer($t10)
+ 25: goto 28
+ 26: label L9
+ 27: goto 39
+ 28: label L10
+ 29: label L7
+ 30: $t19 := infer($t0)
+ 31: $t20 := 2
+ 32: $t18 := *($t19, $t20)
+ 33: $t0 := infer($t18)
+ 34: goto 37
+ 35: label L3
+ 36: goto 39
+ 37: label L4
+ 38: goto 0
+ 39: label L1
+ 40: $t2 := infer($t0)
+ 41: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test4($t0: i128, $t1: i128): i128 {
+     var $t2: i128
+     var $t3: bool
+     var $t4: bool
+     var $t5: i128
+     var $t6: i128
+     var $t7: i128
+     var $t8: i128
+     var $t9: i128
+     var $t10: i128
+     var $t11: i128
+     var $t12: i128
+     var $t13: i128
+     var $t14: bool
+     var $t15: i128
+     var $t16: bool
+     var $t17: i128
+     var $t18: i128
+     var $t19: i128
+     var $t20: i128
+  0: label L0
+  1: $t5 := infer($t0)
+  2: $t6 := 0
+  3: $t4 := ==($t5, $t6)
+  4: $t3 := !($t4)
+  5: if ($t3) goto 6 else goto 35
+  6: label L2
+  7: $t8 := infer($t0)
+  8: $t9 := 1
+  9: $t7 := +($t8, $t9)
+ 10: $t11 := infer($t0)
+ 11: $t12 := 1
+ 12: $t10 := -($t11, $t12)
+ 13: $t15 := infer($t7)
+ 14: $t14 := <($t15, $t10)
+ 15: if ($t14) goto 16 else goto 19
+ 16: label L5
+ 17: $t13 := infer($t7)
+ 18: goto 29
+ 19: label L6
+ 20: $t17 := infer($t10)
+ 21: $t16 := <($t17, $t7)
+ 22: if ($t16) goto 23 else goto 26
+ 23: label L8
+ 24: $t13 := infer($t10)
+ 25: goto 28
+ 26: label L9
+ 27: goto 39
+ 28: label L10
+ 29: label L7
+ 30: $t19 := infer($t0)
+ 31: $t20 := 2
+ 32: $t18 := *($t19, $t20)
+ 33: $t0 := infer($t18)
+ 34: goto 37
+ 35: label L3
+ 36: goto 39
+ 37: label L4
+ 38: goto 0
+ 39: label L1
+ 40: $t2 := infer($t0)
+ 41: return $t2
+}
+
+
+Diagnostics:
+warning: Unused value of parameter `y`. Consider removing the parameter, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+   ┌─ tests/integers/signed/valid_control_flow.move:42:23
+   │
+42 │     fun test3(x: i64, y: i64) : i64 {
+   │                       ^
+
+warning: This assignment/binding to the left-hand-side variable `res` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_res`), or renaming to `_`
+   ┌─ tests/integers/signed/valid_control_flow.move:47:26
+   │
+47 │             if (y < z) { y }
+   │                          ^
+
+warning: This assignment/binding to the left-hand-side variable `res` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_res`), or renaming to `_`
+   ┌─ tests/integers/signed/valid_control_flow.move:48:31
+   │
+48 │             else if (z < y) { z }
+   │                               ^
+
+warning: Unused value of parameter `y`. Consider removing the parameter, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+   ┌─ tests/integers/signed/valid_control_flow.move:55:24
+   │
+55 │     fun test4(x: i128, y: i128) : i128 {
+   │                        ^
+
+warning: This assignment/binding to the left-hand-side variable `res` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_res`), or renaming to `_`
+   ┌─ tests/integers/signed/valid_control_flow.move:60:26
+   │
+60 │             if (y < z) { y }
+   │                          ^
+
+warning: This assignment/binding to the left-hand-side variable `res` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_res`), or renaming to `_`
+   ┌─ tests/integers/signed/valid_control_flow.move:61:31
+   │
+61 │             else if (z < y) { z }
+   │                               ^
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_control_flow::test1($t0: i64, $t1: i64): i64 {
+     var $t2: i64
+     var $t3: bool
+     var $t4: bool
+     var $t5: i64
+     var $t6: i64
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+  1: $t4 := >($t5, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  2: if ($t4) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  4: $t3 := true
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  5: goto 9
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  7: $t6 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t6
+     # refs: []
+     #
+  8: $t3 := ==($t6, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+ 10: if ($t3) goto 11 else goto 14
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 11: label L3
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 13: goto 16
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 14: label L4
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 15: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 16: label L5
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test2($t0: i128, $t1: i128): i128 {
+     var $t2: i128
+     var $t3: bool
+     var $t4: bool
+     var $t5: i128
+     var $t6: i128
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t5
+     # refs: []
+     #
+  1: $t4 := >($t5, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t4
+     # refs: []
+     #
+  2: if ($t4) goto 3 else goto 6
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  3: label L0
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  4: $t3 := true
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  5: goto 9
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  6: label L1
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  7: $t6 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t6
+     # refs: []
+     #
+  8: $t3 := ==($t6, $t1)
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+  9: label L2
+     # abort state: {returns}
+     # live vars: $t0, $t1, $t3
+     # refs: []
+     #
+ 10: if ($t3) goto 11 else goto 14
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 11: label L3
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 12: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 13: goto 16
+     # abort state: {returns}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+ 14: label L4
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 15: $t2 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 16: label L5
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test3($t0: i64, $t1: i64): i64 {
+     var $t2: i64
+     var $t3: bool
+     var $t4: bool
+     var $t5: i64
+     var $t6: i64
+     var $t7: i64
+     var $t8: i64
+     var $t9: i64
+     var $t10: i64
+     var $t11: i64
+     var $t12: i64
+     var $t13: i64
+     var $t14: bool
+     var $t15: i64
+     var $t16: bool
+     var $t17: i64
+     var $t18: i64
+     var $t19: i64
+     var $t20: i64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  2: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5, $t6
+     # refs: []
+     #
+  3: $t4 := ==($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+  4: $t3 := !($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  5: if ($t3) goto 6 else goto 35
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  6: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  7: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t8
+     # refs: []
+     #
+  8: $t9 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t8, $t9
+     # refs: []
+     #
+  9: $t7 := +($t8, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 10: $t11 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t11
+     # refs: []
+     #
+ 11: $t12 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t11, $t12
+     # refs: []
+     #
+ 12: $t10 := -($t11, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 13: $t15 := infer($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10, $t15
+     # refs: []
+     #
+ 14: $t14 := <($t15, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10, $t14
+     # refs: []
+     #
+ 15: if ($t14) goto 16 else goto 19
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 16: label L5
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 17: $t13 := infer($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 18: goto 29
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 19: label L6
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 20: $t17 := infer($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10, $t17
+     # refs: []
+     #
+ 21: $t16 := <($t17, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10, $t16
+     # refs: []
+     #
+ 22: if ($t16) goto 23 else goto 26
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 23: label L8
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 24: $t13 := infer($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 25: goto 28
+     # abort state: {returns}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 26: label L9
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 27: goto 39
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 28: label L10
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 29: label L7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 30: $t19 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t19
+     # refs: []
+     #
+ 31: $t20 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t19, $t20
+     # refs: []
+     #
+ 32: $t18 := *($t19, $t20)
+     # abort state: {returns,aborts}
+     # live vars: $t18
+     # refs: []
+     #
+ 33: $t0 := infer($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 34: goto 37
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 35: label L3
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 36: goto 39
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 37: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 38: goto 0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 39: label L1
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 40: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 41: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test4($t0: i128, $t1: i128): i128 {
+     var $t2: i128
+     var $t3: bool
+     var $t4: bool
+     var $t5: i128
+     var $t6: i128
+     var $t7: i128
+     var $t8: i128
+     var $t9: i128
+     var $t10: i128
+     var $t11: i128
+     var $t12: i128
+     var $t13: i128
+     var $t14: bool
+     var $t15: i128
+     var $t16: bool
+     var $t17: i128
+     var $t18: i128
+     var $t19: i128
+     var $t20: i128
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: []
+     #
+  0: label L0
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  2: $t6 := 0
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5, $t6
+     # refs: []
+     #
+  3: $t4 := ==($t5, $t6)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t4
+     # refs: []
+     #
+  4: $t3 := !($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: []
+     #
+  5: if ($t3) goto 6 else goto 35
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  6: label L2
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  7: $t8 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t8
+     # refs: []
+     #
+  8: $t9 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t8, $t9
+     # refs: []
+     #
+  9: $t7 := +($t8, $t9)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 10: $t11 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t11
+     # refs: []
+     #
+ 11: $t12 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t11, $t12
+     # refs: []
+     #
+ 12: $t10 := -($t11, $t12)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 13: $t15 := infer($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10, $t15
+     # refs: []
+     #
+ 14: $t14 := <($t15, $t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10, $t14
+     # refs: []
+     #
+ 15: if ($t14) goto 16 else goto 19
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 16: label L5
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7
+     # refs: []
+     #
+ 17: $t13 := infer($t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 18: goto 29
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 19: label L6
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10
+     # refs: []
+     #
+ 20: $t17 := infer($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t7, $t10, $t17
+     # refs: []
+     #
+ 21: $t16 := <($t17, $t7)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10, $t16
+     # refs: []
+     #
+ 22: if ($t16) goto 23 else goto 26
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 23: label L8
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 24: $t13 := infer($t10)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 25: goto 28
+     # abort state: {returns}
+     # live vars: $t0, $t10
+     # refs: []
+     #
+ 26: label L9
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 27: goto 39
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 28: label L10
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 29: label L7
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 30: $t19 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t19
+     # refs: []
+     #
+ 31: $t20 := 2
+     # abort state: {returns,aborts}
+     # live vars: $t19, $t20
+     # refs: []
+     #
+ 32: $t18 := *($t19, $t20)
+     # abort state: {returns,aborts}
+     # live vars: $t18
+     # refs: []
+     #
+ 33: $t0 := infer($t18)
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 34: goto 37
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 35: label L3
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 36: goto 39
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 37: label L4
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+ 38: goto 0
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 39: label L1
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+ 40: $t2 := infer($t0)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+ 41: return $t2
+}
+
+// -- Model dump before second bytecode pipeline
+module 0x42::valid_control_flow {
+    enum E1 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i64>,
+        }
+    }
+    enum E2 {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<i128>,
+        }
+    }
+    enum E3<T> {
+        V1 {
+            s: S1,
+        }
+        V2 {
+            s: S2,
+        }
+        V3 {
+            s: S3<T>,
+        }
+    }
+    struct S1 {
+        x: u64,
+        y: i64,
+        z: i128,
+    }
+    struct S2 {
+        x: S1,
+        y: i64,
+        z: i128,
+    }
+    struct S3<T> {
+        x: T,
+        y: S1,
+        z: S2,
+    }
+    private fun test1(x: i64,y: i64): i64 {
+        if Or(Gt<i64>(x, y), Eq<i64>(x, y)) {
+          x
+        } else {
+          y
+        }
+    }
+    private fun test2(x: i128,y: i128): i128 {
+        if Or(Gt<i128>(x, y), Eq<i128>(x, y)) {
+          x
+        } else {
+          y
+        }
+    }
+    private fun test3(x: i64,y: i64): i64 {
+        loop {
+          if Not(Eq<i64>(x, 0)) {
+            {
+              let y: i64 = Add<i64>(x, 1);
+              {
+                let z: i64 = Sub<i64>(x, 1);
+                {
+                  let res: i64 = if Lt<i64>(y, z) {
+                    y
+                  } else {
+                    if Lt<i64>(z, y) {
+                      z
+                    } else {
+                      break
+                    }
+                  };
+                  x: i64 = Mul<i64>(x, 2);
+                  Tuple()
+                }
+              }
+            }
+          } else {
+            break
+          }
+        };
+        x
+    }
+    private fun test4(x: i128,y: i128): i128 {
+        loop {
+          if Not(Eq<i128>(x, 0)) {
+            {
+              let y: i128 = Add<i128>(x, 1);
+              {
+                let z: i128 = Sub<i128>(x, 1);
+                {
+                  let res: i128 = if Lt<i128>(y, z) {
+                    y
+                  } else {
+                    if Lt<i128>(z, y) {
+                      z
+                    } else {
+                      break
+                    }
+                  };
+                  x: i128 = Mul<i128>(x, 2);
+                  Tuple()
+                }
+              }
+            }
+          } else {
+            break
+          }
+        };
+        x
+    }
+} // end 0x42::valid_control_flow
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun valid_control_flow::test1($t0: i64, $t1: i64): i64 {
+     var $t2: i64
+     var $t3: bool
+     var $t4: bool
+     var $t5: i64
+     var $t6: i64
+  0: $t5 := infer($t0)
+  1: $t4 := >($t5, $t1)
+  2: if ($t4) goto 3 else goto 6
+  3: label L0
+  4: $t3 := true
+  5: goto 9
+  6: label L1
+  7: $t6 := infer($t0)
+  8: $t3 := ==($t6, $t1)
+  9: label L2
+ 10: if ($t3) goto 11 else goto 14
+ 11: label L3
+ 12: $t2 := infer($t0)
+ 13: goto 16
+ 14: label L4
+ 15: $t2 := infer($t1)
+ 16: label L5
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test2($t0: i128, $t1: i128): i128 {
+     var $t2: i128
+     var $t3: bool
+     var $t4: bool
+     var $t5: i128
+     var $t6: i128
+  0: $t5 := infer($t0)
+  1: $t4 := >($t5, $t1)
+  2: if ($t4) goto 3 else goto 6
+  3: label L0
+  4: $t3 := true
+  5: goto 9
+  6: label L1
+  7: $t6 := infer($t0)
+  8: $t3 := ==($t6, $t1)
+  9: label L2
+ 10: if ($t3) goto 11 else goto 14
+ 11: label L3
+ 12: $t2 := infer($t0)
+ 13: goto 16
+ 14: label L4
+ 15: $t2 := infer($t1)
+ 16: label L5
+ 17: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test3($t0: i64, $t1: i64): i64 {
+     var $t2: i64
+     var $t3: bool
+     var $t4: bool
+     var $t5: i64
+     var $t6: i64
+     var $t7: i64
+     var $t8: i64
+     var $t9: i64
+     var $t10: i64
+     var $t11: i64
+     var $t12: i64
+     var $t13: i64
+     var $t14: bool
+     var $t15: i64
+     var $t16: bool
+     var $t17: i64
+     var $t18: i64
+     var $t19: i64
+     var $t20: i64
+  0: label L0
+  1: $t5 := infer($t0)
+  2: $t6 := 0
+  3: $t4 := ==($t5, $t6)
+  4: $t3 := !($t4)
+  5: if ($t3) goto 6 else goto 35
+  6: label L2
+  7: $t8 := infer($t0)
+  8: $t9 := 1
+  9: $t7 := +($t8, $t9)
+ 10: $t11 := infer($t0)
+ 11: $t12 := 1
+ 12: $t10 := -($t11, $t12)
+ 13: $t15 := infer($t7)
+ 14: $t14 := <($t15, $t10)
+ 15: if ($t14) goto 16 else goto 19
+ 16: label L5
+ 17: $t13 := infer($t7)
+ 18: goto 29
+ 19: label L6
+ 20: $t17 := infer($t10)
+ 21: $t16 := <($t17, $t7)
+ 22: if ($t16) goto 23 else goto 26
+ 23: label L8
+ 24: $t13 := infer($t10)
+ 25: goto 28
+ 26: label L9
+ 27: goto 39
+ 28: label L10
+ 29: label L7
+ 30: $t19 := infer($t0)
+ 31: $t20 := 2
+ 32: $t18 := *($t19, $t20)
+ 33: $t0 := infer($t18)
+ 34: goto 37
+ 35: label L3
+ 36: goto 39
+ 37: label L4
+ 38: goto 0
+ 39: label L1
+ 40: $t2 := infer($t0)
+ 41: return $t2
+}
+
+
+[variant baseline]
+fun valid_control_flow::test4($t0: i128, $t1: i128): i128 {
+     var $t2: i128
+     var $t3: bool
+     var $t4: bool
+     var $t5: i128
+     var $t6: i128
+     var $t7: i128
+     var $t8: i128
+     var $t9: i128
+     var $t10: i128
+     var $t11: i128
+     var $t12: i128
+     var $t13: i128
+     var $t14: bool
+     var $t15: i128
+     var $t16: bool
+     var $t17: i128
+     var $t18: i128
+     var $t19: i128
+     var $t20: i128
+  0: label L0
+  1: $t5 := infer($t0)
+  2: $t6 := 0
+  3: $t4 := ==($t5, $t6)
+  4: $t3 := !($t4)
+  5: if ($t3) goto 6 else goto 35
+  6: label L2
+  7: $t8 := infer($t0)
+  8: $t9 := 1
+  9: $t7 := +($t8, $t9)
+ 10: $t11 := infer($t0)
+ 11: $t12 := 1
+ 12: $t10 := -($t11, $t12)
+ 13: $t15 := infer($t7)
+ 14: $t14 := <($t15, $t10)
+ 15: if ($t14) goto 16 else goto 19
+ 16: label L5
+ 17: $t13 := infer($t7)
+ 18: goto 29
+ 19: label L6
+ 20: $t17 := infer($t10)
+ 21: $t16 := <($t17, $t7)
+ 22: if ($t16) goto 23 else goto 26
+ 23: label L8
+ 24: $t13 := infer($t10)
+ 25: goto 28
+ 26: label L9
+ 27: goto 39
+ 28: label L10
+ 29: label L7
+ 30: $t19 := infer($t0)
+ 31: $t20 := 2
+ 32: $t18 := *($t19, $t20)
+ 33: $t0 := infer($t18)
+ 34: goto 37
+ 35: label L3
+ 36: goto 39
+ 37: label L4
+ 38: goto 0
+ 39: label L1
+ 40: $t2 := infer($t0)
+ 41: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun valid_control_flow::test1($t0: i64, $t1: i64): i64 {
+     var $t2: i64 [unused]
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: i64
+     var $t6: i64 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t4 := >($t5, $t1)
+     # live vars: $t0, $t1, $t4
+  2: if ($t4) goto 3 else goto 14
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0, $t1
+  4: $t4 := true
+     # live vars: $t0, $t1, $t4
+  5: label L2
+     # live vars: $t0, $t1, $t4
+  6: if ($t4) goto 7 else goto 11
+     # live vars: $t0, $t1
+  7: label L3
+     # live vars: $t0
+  8: $t5 := move($t0)
+     # live vars: $t5
+  9: label L5
+     # live vars: $t5
+ 10: return $t5
+     # live vars: $t0, $t1
+ 11: label L4
+     # live vars: $t1
+ 12: $t5 := move($t1)
+     # live vars: $t5
+ 13: goto 9
+     # live vars: $t0, $t1
+ 14: label L1
+     # live vars: $t0, $t1
+ 15: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 16: $t4 := ==($t5, $t1)
+     # live vars: $t0, $t1, $t4
+ 17: goto 5
+}
+
+
+[variant baseline]
+fun valid_control_flow::test2($t0: i128, $t1: i128): i128 {
+     var $t2: i128 [unused]
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: i128
+     var $t6: i128 [unused]
+     # live vars: $t0, $t1
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+  1: $t4 := >($t5, $t1)
+     # live vars: $t0, $t1, $t4
+  2: if ($t4) goto 3 else goto 14
+     # live vars: $t0, $t1
+  3: label L0
+     # live vars: $t0, $t1
+  4: $t4 := true
+     # live vars: $t0, $t1, $t4
+  5: label L2
+     # live vars: $t0, $t1, $t4
+  6: if ($t4) goto 7 else goto 11
+     # live vars: $t0, $t1
+  7: label L3
+     # live vars: $t0
+  8: $t5 := move($t0)
+     # live vars: $t5
+  9: label L5
+     # live vars: $t5
+ 10: return $t5
+     # live vars: $t0, $t1
+ 11: label L4
+     # live vars: $t1
+ 12: $t5 := move($t1)
+     # live vars: $t5
+ 13: goto 9
+     # live vars: $t0, $t1
+ 14: label L1
+     # live vars: $t0, $t1
+ 15: $t5 := copy($t0)
+     # live vars: $t0, $t1, $t5
+ 16: $t4 := ==($t5, $t1)
+     # live vars: $t0, $t1, $t4
+ 17: goto 5
+}
+
+
+[variant baseline]
+fun valid_control_flow::test3($t0: i64, $t1: i64): i64 {
+     var $t2: i64 [unused]
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: i64 [unused]
+     var $t6: i64
+     var $t7: i64 [unused]
+     var $t8: i64 [unused]
+     var $t9: i64 [unused]
+     var $t10: i64 [unused]
+     var $t11: i64 [unused]
+     var $t12: i64
+     var $t13: i64 [unused]
+     var $t14: bool [unused]
+     var $t15: i64 [unused]
+     var $t16: bool [unused]
+     var $t17: i64 [unused]
+     var $t18: i64 [unused]
+     var $t19: i64 [unused]
+     var $t20: i64
+     # live vars: $t0, $t1
+  0: label L0
+     # live vars: $t0
+  1: $t1 := copy($t0)
+     # live vars: $t0, $t1
+  2: $t6 := 0
+     # live vars: $t0, $t1, $t6
+  3: $t4 := ==($t1, $t6)
+     # live vars: $t0, $t4
+  4: $t4 := !($t4)
+     # live vars: $t0, $t4
+  5: if ($t4) goto 8 else goto 6
+     # live vars: $t0
+  6: label L9
+     # live vars: $t0
+  7: goto 33
+     # live vars: $t0
+  8: label L2
+     # live vars: $t0
+  9: $t1 := copy($t0)
+     # live vars: $t0, $t1
+ 10: $t6 := 1
+     # live vars: $t0, $t1, $t6
+ 11: $t1 := +($t1, $t6)
+     # live vars: $t0, $t1
+ 12: $t6 := copy($t0)
+     # live vars: $t0, $t1, $t6
+ 13: $t12 := 1
+     # live vars: $t0, $t1, $t6, $t12
+ 14: $t6 := -($t6, $t12)
+     # live vars: $t0, $t1, $t6
+ 15: $t12 := copy($t1)
+     # live vars: $t0, $t1, $t6, $t12
+ 16: $t4 := <($t12, $t6)
+     # live vars: $t0, $t1, $t4, $t6
+ 17: if ($t4) goto 18 else goto 25
+     # live vars: $t0, $t1, $t6
+ 18: label L5
+     # live vars: $t0
+ 19: label L7
+     # live vars: $t0
+ 20: $t12 := move($t0)
+     # live vars: $t12
+ 21: $t20 := 2
+     # live vars: $t12, $t20
+ 22: $t12 := *($t12, $t20)
+     # live vars: $t12
+ 23: $t0 := move($t12)
+     # live vars: $t0
+ 24: goto 0
+     # live vars: $t0, $t1, $t6
+ 25: label L6
+     # live vars: $t0, $t1, $t6
+ 26: $t6 := copy($t6)
+     # live vars: $t0, $t1, $t6
+ 27: $t4 := <($t6, $t1)
+     # live vars: $t0, $t4
+ 28: if ($t4) goto 31 else goto 29
+     # live vars: $t0
+ 29: label L10
+     # live vars: $t0
+ 30: goto 33
+     # live vars: $t0
+ 31: label L8
+     # live vars: $t0
+ 32: goto 19
+     # live vars: $t0
+ 33: label L1
+     # live vars: $t0
+ 34: return $t0
+}
+
+
+[variant baseline]
+fun valid_control_flow::test4($t0: i128, $t1: i128): i128 {
+     var $t2: i128 [unused]
+     var $t3: bool [unused]
+     var $t4: bool
+     var $t5: i128 [unused]
+     var $t6: i128
+     var $t7: i128 [unused]
+     var $t8: i128 [unused]
+     var $t9: i128 [unused]
+     var $t10: i128 [unused]
+     var $t11: i128 [unused]
+     var $t12: i128
+     var $t13: i128 [unused]
+     var $t14: bool [unused]
+     var $t15: i128 [unused]
+     var $t16: bool [unused]
+     var $t17: i128 [unused]
+     var $t18: i128 [unused]
+     var $t19: i128 [unused]
+     var $t20: i128
+     # live vars: $t0, $t1
+  0: label L0
+     # live vars: $t0
+  1: $t1 := copy($t0)
+     # live vars: $t0, $t1
+  2: $t6 := 0
+     # live vars: $t0, $t1, $t6
+  3: $t4 := ==($t1, $t6)
+     # live vars: $t0, $t4
+  4: $t4 := !($t4)
+     # live vars: $t0, $t4
+  5: if ($t4) goto 8 else goto 6
+     # live vars: $t0
+  6: label L9
+     # live vars: $t0
+  7: goto 33
+     # live vars: $t0
+  8: label L2
+     # live vars: $t0
+  9: $t1 := copy($t0)
+     # live vars: $t0, $t1
+ 10: $t6 := 1
+     # live vars: $t0, $t1, $t6
+ 11: $t1 := +($t1, $t6)
+     # live vars: $t0, $t1
+ 12: $t6 := copy($t0)
+     # live vars: $t0, $t1, $t6
+ 13: $t12 := 1
+     # live vars: $t0, $t1, $t6, $t12
+ 14: $t6 := -($t6, $t12)
+     # live vars: $t0, $t1, $t6
+ 15: $t12 := copy($t1)
+     # live vars: $t0, $t1, $t6, $t12
+ 16: $t4 := <($t12, $t6)
+     # live vars: $t0, $t1, $t4, $t6
+ 17: if ($t4) goto 18 else goto 25
+     # live vars: $t0, $t1, $t6
+ 18: label L5
+     # live vars: $t0
+ 19: label L7
+     # live vars: $t0
+ 20: $t12 := move($t0)
+     # live vars: $t12
+ 21: $t20 := 2
+     # live vars: $t12, $t20
+ 22: $t12 := *($t12, $t20)
+     # live vars: $t12
+ 23: $t0 := move($t12)
+     # live vars: $t0
+ 24: goto 0
+     # live vars: $t0, $t1, $t6
+ 25: label L6
+     # live vars: $t0, $t1, $t6
+ 26: $t6 := copy($t6)
+     # live vars: $t0, $t1, $t6
+ 27: $t4 := <($t6, $t1)
+     # live vars: $t0, $t4
+ 28: if ($t4) goto 31 else goto 29
+     # live vars: $t0
+ 29: label L10
+     # live vars: $t0
+ 30: goto 33
+     # live vars: $t0
+ 31: label L8
+     # live vars: $t0
+ 32: goto 19
+     # live vars: $t0
+ 33: label L1
+     # live vars: $t0
+ 34: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Move bytecode v9
+module 42.valid_control_flow {
+enum E1 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<i64>
+ }
+}
+enum E2 has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<i128>
+ }
+}
+enum E3<T> has copy, drop {
+ V1{
+	s: S1
+ },
+ V2{
+	s: S2
+ },
+ V3{
+	s: S3<T>
+ }
+}
+struct S1 has copy, drop {
+	x: u64,
+	y: i64,
+	z: i128
+}
+struct S2 has copy, drop {
+	x: S1,
+	y: i64,
+	z: i128
+}
+struct S3<T> has copy, drop {
+	x: T,
+	y: S1,
+	z: S2
+}
+
+test1(x: i64, y: i64): i64 /* def_idx: 0 */ {
+L2:	$t4: bool
+L3:	$t5: i64
+B0:
+	0: CopyLoc[0](x: i64)
+	1: CopyLoc[1](y: i64)
+	2: Gt
+	3: BrFalse(15)
+B1:
+	4: LdTrue
+	5: StLoc[2]($t4: bool)
+B2:
+	6: MoveLoc[2]($t4: bool)
+	7: BrFalse(12)
+B3:
+	8: MoveLoc[0](x: i64)
+	9: StLoc[3]($t5: i64)
+B4:
+	10: MoveLoc[3]($t5: i64)
+	11: Ret
+B5:
+	12: MoveLoc[1](y: i64)
+	13: StLoc[3]($t5: i64)
+	14: Branch(10)
+B6:
+	15: CopyLoc[0](x: i64)
+	16: CopyLoc[1](y: i64)
+	17: Eq
+	18: StLoc[2]($t4: bool)
+	19: Branch(6)
+}
+test2(x: i128, y: i128): i128 /* def_idx: 1 */ {
+L2:	$t4: bool
+L3:	$t5: i128
+B0:
+	0: CopyLoc[0](x: i128)
+	1: CopyLoc[1](y: i128)
+	2: Gt
+	3: BrFalse(15)
+B1:
+	4: LdTrue
+	5: StLoc[2]($t4: bool)
+B2:
+	6: MoveLoc[2]($t4: bool)
+	7: BrFalse(12)
+B3:
+	8: MoveLoc[0](x: i128)
+	9: StLoc[3]($t5: i128)
+B4:
+	10: MoveLoc[3]($t5: i128)
+	11: Ret
+B5:
+	12: MoveLoc[1](y: i128)
+	13: StLoc[3]($t5: i128)
+	14: Branch(10)
+B6:
+	15: CopyLoc[0](x: i128)
+	16: CopyLoc[1](y: i128)
+	17: Eq
+	18: StLoc[2]($t4: bool)
+	19: Branch(6)
+}
+test3(x: i64, y: i64): i64 /* def_idx: 2 */ {
+L2:	$t6: i64
+B0:
+	0: CopyLoc[0](x: i64)
+	1: LdI64(0)
+	2: Eq
+	3: BrFalse(5)
+B1:
+	4: Branch(28)
+B2:
+	5: CopyLoc[0](x: i64)
+	6: LdI64(1)
+	7: Add
+	8: StLoc[1](y: i64)
+	9: CopyLoc[0](x: i64)
+	10: LdI64(1)
+	11: Sub
+	12: StLoc[2]($t6: i64)
+	13: CopyLoc[1](y: i64)
+	14: CopyLoc[2]($t6: i64)
+	15: Lt
+	16: BrFalse(22)
+B3:
+	17: MoveLoc[0](x: i64)
+	18: LdI64(2)
+	19: Mul
+	20: StLoc[0](x: i64)
+	21: Branch(0)
+B4:
+	22: CopyLoc[2]($t6: i64)
+	23: MoveLoc[1](y: i64)
+	24: Lt
+	25: BrTrue(27)
+B5:
+	26: Branch(28)
+B6:
+	27: Branch(17)
+B7:
+	28: MoveLoc[0](x: i64)
+	29: Ret
+}
+test4(x: i128, y: i128): i128 /* def_idx: 3 */ {
+L2:	$t6: i128
+B0:
+	0: CopyLoc[0](x: i128)
+	1: LdI128(0)
+	2: Eq
+	3: BrFalse(5)
+B1:
+	4: Branch(28)
+B2:
+	5: CopyLoc[0](x: i128)
+	6: LdI128(1)
+	7: Add
+	8: StLoc[1](y: i128)
+	9: CopyLoc[0](x: i128)
+	10: LdI128(1)
+	11: Sub
+	12: StLoc[2]($t6: i128)
+	13: CopyLoc[1](y: i128)
+	14: CopyLoc[2]($t6: i128)
+	15: Lt
+	16: BrFalse(22)
+B3:
+	17: MoveLoc[0](x: i128)
+	18: LdI128(2)
+	19: Mul
+	20: StLoc[0](x: i128)
+	21: Branch(0)
+B4:
+	22: CopyLoc[2]($t6: i128)
+	23: MoveLoc[1](y: i128)
+	24: Lt
+	25: BrTrue(27)
+B5:
+	26: Branch(28)
+B6:
+	27: Branch(17)
+B7:
+	28: MoveLoc[0](x: i128)
+	29: Ret
+}
+}
+============ bytecode verification succeeded ========

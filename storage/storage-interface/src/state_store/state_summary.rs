@@ -10,7 +10,10 @@ use crate::{
     DbReader,
 };
 use anyhow::Result;
-use aptos_crypto::{hash::CORRUPTION_SENTINEL, HashValue};
+use aptos_crypto::{
+    hash::{CryptoHash, CORRUPTION_SENTINEL},
+    HashValue,
+};
 use aptos_metrics_core::TimerHelper;
 use aptos_scratchpad::{ProofRead, SparseMerkleTree};
 use aptos_types::{proof::SparseMerkleProofExt, transaction::Version};
@@ -87,7 +90,13 @@ impl StateSummary {
             .flat_map(|shard| {
                 shard
                     .iter()
-                    .map(|(k, u)| (*k, u.value_hash_opt()))
+                    .filter_map(|(k, u)| {
+                        // Filter out `MakeHot` ops.
+                        u.state_op
+                            .as_state_value_opt()
+                            .map(|value_opt| (k, value_opt))
+                    })
+                    .map(|(k, value_opt)| (*k, value_opt.map(|v| v.hash())))
                     // The keys in the shard are already unique, and shards are ordered by the
                     // first nibble of the key hash. `batch_update_sorted_uniq` can be
                     // called if within each shard items are sorted by key hash.

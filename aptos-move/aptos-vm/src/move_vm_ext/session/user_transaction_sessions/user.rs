@@ -28,7 +28,7 @@ use move_core_types::{
 use move_vm_runtime::{
     dispatch_loader, module_traversal::TraversalContext, FunctionDefinitionLoader,
     InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction, LoadedFunctionOwner,
-    ModuleStorage, StagingModuleStorage,
+    ModuleStorage, StagingModuleStorage, WithRuntimeEnvironment,
 };
 
 #[derive(Deref, DerefMut)]
@@ -152,9 +152,12 @@ impl<'r> UserSession<'r> {
                         ) {
                             verifier::module_init::verify_init_module_function(&function)?;
 
+                            let ty_args_id =
+                                loader.runtime_environment().ty_pool().intern_ty_args(&[]);
                             let loaded_function = LoadedFunction {
                                 owner: LoadedFunctionOwner::Module(module),
                                 ty_args: vec![],
+                                ty_args_id,
                                 function,
                             };
                             session.execute_loaded_function(

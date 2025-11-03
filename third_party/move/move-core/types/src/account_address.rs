@@ -59,7 +59,7 @@ impl AccountAddress {
 
     pub fn random() -> Self {
         let mut rng = OsRng;
-        let buf: [u8; Self::LENGTH] = rng.gen();
+        let buf: [u8; Self::LENGTH] = rng.r#gen();
         Self(buf)
     }
 
@@ -96,6 +96,7 @@ impl AccountAddress {
     ///
     /// For more details see the v1 address standard defined as part of AIP-40:
     /// <https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-40.md>
+    #[inline(always)]
     pub fn is_special(&self) -> bool {
         self.0[..Self::LENGTH - 1].iter().all(|x| *x == 0) && self.0[Self::LENGTH - 1] < 0b10000
     }

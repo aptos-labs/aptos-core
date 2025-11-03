@@ -1,0 +1,5 @@
+{
+  "message": "Given start value (100) is higher than the current ledger version, it must be < 0",
+  "error_code": "invalid_input",
+  "vm_error_code": null
+}

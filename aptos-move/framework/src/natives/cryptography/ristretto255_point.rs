@@ -12,8 +12,7 @@ use crate::natives::cryptography::{
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{
-    safely_assert_eq, safely_pop_arg, safely_pop_type_arg, SafeNativeContext, SafeNativeError,
-    SafeNativeResult,
+    safely_assert_eq, safely_pop_arg, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use better_any::{Tid, TidAble};
 use curve25519_dalek::{
@@ -22,6 +21,7 @@ use curve25519_dalek::{
     traits::{Identity, VartimeMultiscalarMul},
 };
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
+use move_vm_runtime::native_extensions::SessionListener;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Reference, StructRef, Value, VectorRef},
@@ -35,7 +35,6 @@ use std::{
     fmt::Display,
     ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
 };
-
 //
 // Public Data Structures and Constants
 //
@@ -81,6 +80,20 @@ const HANDLE_FIELD_INDEX: usize = 0;
 //
 // Implementation of Native RistrettoPoint Context
 //
+
+impl SessionListener for NativeRistrettoPointContext {
+    fn start(&mut self, _session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.point_data.borrow_mut().points.clear();
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
+}
 
 impl NativeRistrettoPointContext {
     /// Create a new instance of a native RistrettoPoint context. This must be passed in via an
@@ -576,20 +589,16 @@ pub(crate) fn native_double_scalar_mul(
 /// function.
 pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    _ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    safely_assert_eq!(ty_args.len(), 2);
     safely_assert_eq!(args.len(), 2);
-
-    let scalar_type = safely_pop_type_arg!(ty_args);
-    let point_type = safely_pop_type_arg!(ty_args);
 
     let scalars_ref = safely_pop_arg!(args, VectorRef);
     let points_ref = safely_pop_arg!(args, VectorRef);
 
     // Invariant (enforced by caller): num > 0 and # of scalars = # of points
-    let num = scalars_ref.len(&scalar_type)?.value_as::<u64>()? as usize;
+    let num = scalars_ref.len()?.value_as::<u64>()? as usize;
 
     // Invariant: log2_floor(num + 1) > 0. This is because num >= 1, thanks to the invariant we enforce on
     // the caller of this native. Therefore, num + 1 >= 2, which implies log2_floor(num + 1) >= 1.
@@ -603,7 +612,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
     // parse scalars
     let mut scalars = Vec::with_capacity(num);
     for i in 0..num {
-        let move_scalar = scalars_ref.borrow_elem(i, &scalar_type)?;
+        let move_scalar = scalars_ref.borrow_elem(i)?;
         let scalar = scalar_from_struct(move_scalar)?;
 
         scalars.push(scalar);
@@ -619,7 +628,7 @@ pub(crate) fn safe_native_multi_scalar_mul_no_floating_point(
         // parse points
         let mut points = Vec::with_capacity(num);
         for i in 0..num {
-            let move_point = points_ref.borrow_elem(i, &point_type)?;
+            let move_point = points_ref.borrow_elem(i)?;
             let point_handle = get_point_handle_from_struct(move_point)?;
 
             points.push(point_data.get_point(&point_handle));
@@ -682,5 +691,23 @@ fn compressed_point_from_bytes(bytes: Vec<u8>) -> Option<CompressedRistretto> {
     match <[u8; COMPRESSED_POINT_NUM_BYTES]>::try_from(bytes) {
         Ok(slice) => Some(CompressedRistretto(slice)),
         Err(_) => None,
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extension_update() {
+        let mut ctx = NativeRistrettoPointContext::new();
+        ctx.point_data
+            .borrow_mut()
+            .points
+            .push(RistrettoPoint::identity());
+        ctx.start(&[0; 32], &[], 0);
+
+        let NativeRistrettoPointContext { point_data } = ctx;
+        assert!(point_data.into_inner().points.is_empty());
     }
 }

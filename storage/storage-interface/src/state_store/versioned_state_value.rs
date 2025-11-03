@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
     state_store::{hot_state::LRUEntry, state_slot::StateSlot},
     transaction::Version,
@@ -17,62 +16,21 @@ pub struct StateUpdateRef<'kv> {
 
 impl StateUpdateRef<'_> {
     /// NOTE: the lru_info in the result is not initialized yet.
-    pub fn to_result_slot(&self) -> StateSlot {
+    pub fn to_result_slot(&self) -> Option<StateSlot> {
         match self.state_op.clone() {
             BaseStateOp::Creation(value) | BaseStateOp::Modification(value) => {
-                StateSlot::HotOccupied {
+                Some(StateSlot::HotOccupied {
                     value_version: self.version,
                     value,
                     hot_since_version: self.version,
                     lru_info: LRUEntry::uninitialized(),
-                }
+                })
             },
-            BaseStateOp::Deletion(_) => StateSlot::HotVacant {
+            BaseStateOp::Deletion(_) => Some(StateSlot::HotVacant {
                 hot_since_version: self.version,
                 lru_info: LRUEntry::uninitialized(),
-            },
-            BaseStateOp::MakeHot { prev_slot } => match prev_slot {
-                StateSlot::ColdVacant => StateSlot::HotVacant {
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                StateSlot::HotVacant { .. } => StateSlot::HotVacant {
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-                StateSlot::ColdOccupied {
-                    value_version,
-                    value,
-                }
-                | StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    ..
-                } => StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    hot_since_version: self.version,
-                    lru_info: LRUEntry::uninitialized(),
-                },
-            },
-            BaseStateOp::Eviction { prev_slot } => match prev_slot {
-                StateSlot::HotVacant { .. } => StateSlot::ColdVacant,
-                StateSlot::HotOccupied {
-                    value_version,
-                    value,
-                    ..
-                } => StateSlot::ColdOccupied {
-                    value_version,
-                    value,
-                },
-                StateSlot::ColdVacant | StateSlot::ColdOccupied { .. } => {
-                    unreachable!("only hot slots can be evicted")
-                },
-            },
+            }),
+            BaseStateOp::MakeHot => None,
         }
-    }
-
-    pub fn value_hash_opt(&self) -> Option<HashValue> {
-        self.state_op.as_state_value_opt().map(|val| val.hash())
     }
 }

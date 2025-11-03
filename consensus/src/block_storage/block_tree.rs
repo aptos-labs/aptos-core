@@ -599,6 +599,13 @@ impl BlockTree {
         self.update_window_root(window_root_id);
         self.update_highest_commit_cert(commit_proof);
     }
+
+    pub fn get_all_blocks(&self) -> Vec<Arc<PipelinedBlock>> {
+        self.id_to_block
+            .values()
+            .map(|b| b.executed_block().clone())
+            .collect()
+    }
 }
 
 #[cfg(any(test, feature = "fuzzing"))]

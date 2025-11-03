@@ -546,7 +546,7 @@ impl RawTransaction {
         self.payload
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         self.payload.executable_ref()
     }
 
@@ -709,7 +709,7 @@ impl TransactionExecutable {
         matches!(self, Self::EntryFunction(_))
     }
 
-    pub fn as_ref(&self) -> TransactionExecutableRef {
+    pub fn as_ref(&self) -> TransactionExecutableRef<'_> {
         match self {
             TransactionExecutable::EntryFunction(entry_function) => {
                 TransactionExecutableRef::EntryFunction(entry_function)
@@ -796,7 +796,7 @@ impl TransactionPayload {
         }
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         match self {
             TransactionPayload::EntryFunction(entry_function) => {
                 Ok(TransactionExecutableRef::EntryFunction(entry_function))
@@ -857,7 +857,7 @@ impl TransactionPayload {
     ) -> Self {
         self.upgrade_payload_with_fn(
             use_txn_payload_v2_format,
-            use_orderless_transactions.then_some(|| rng.gen()),
+            use_orderless_transactions.then_some(|| rng.r#gen()),
         )
     }
 
@@ -1197,7 +1197,7 @@ impl SignedTransaction {
         &self.raw_txn.payload
     }
 
-    pub fn executable_ref(&self) -> Result<TransactionExecutableRef> {
+    pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         self.raw_txn.executable_ref()
     }
 
@@ -1536,10 +1536,17 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, features: &Features) -> Self {
+    pub fn from_vm_status(
+        vm_status: VMStatus,
+        features: &Features,
+        memory_limit_exceeded_as_miscellaneous_error: bool,
+    ) -> Self {
         let status_code = vm_status.status_code();
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard(features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES)) {
+        match vm_status.keep_or_discard(
+            features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES),
+            memory_limit_exceeded_as_miscellaneous_error,
+        ) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {
@@ -3186,7 +3193,6 @@ impl AuxiliaryInfoTrait for AuxiliaryInfo {
     Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, CryptoHasher, BCSCryptoHash,
 )]
 #[cfg_attr(any(test, feature = "fuzzing"), derive(Arbitrary))]
-
 pub enum PersistedAuxiliaryInfo {
     None,
     // The index of the transaction in a block (after shuffler, before execution).

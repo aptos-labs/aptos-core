@@ -228,7 +228,7 @@ fn create_epoch_ending_ledger_infos_using_sizes(
     // Generate random bytes of the given size
     let mut rng = rand::thread_rng();
     let random_bytes: Vec<u8> = (0..min_bytes_per_ledger_info)
-        .map(|_| rng.gen::<u8>())
+        .map(|_| rng.r#gen::<u8>())
         .collect();
 
     // Create the ledger infos with signatures

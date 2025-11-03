@@ -43,7 +43,7 @@ impl Errmap {
             language_version: LanguageVersion::default(),
         })?;
         let mut errmap_gen = move_errmapgen::ErrmapGen::new(&model, &errmap_options);
-        errmap_gen.gen();
+        errmap_gen.r#gen();
         errmap_gen.save_result();
         Ok(())
     }

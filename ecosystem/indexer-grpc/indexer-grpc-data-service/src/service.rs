@@ -612,8 +612,7 @@ fn ensure_sequential_transactions(mut batches: Vec<Vec<Transaction>>) -> Vec<Tra
     for mut batch in batches {
         let mut start_version = batch.first().unwrap().version;
         let end_version = batch.last().unwrap().version;
-        if prev_start.is_some() {
-            let prev_start = prev_start.unwrap();
+        if let Some(prev_start) = prev_start {
             let prev_end = prev_end.unwrap();
             // If this batch is fully contained within the previous batch, skip it
             if prev_start <= start_version && prev_end >= end_version {

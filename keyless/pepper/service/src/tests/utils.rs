@@ -1,39 +1,64 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_keyless_pepper_common::{
-    vuf::{bls12381_g1_bls::Bls12381G1Bls, slip_10::ed25519_dalek::Digest, VUF},
-    PepperV0VufPubKey,
+use crate::{
+    accounts::{
+        account_managers::AccountRecoveryManagers, account_recovery_db::AccountRecoveryDBInterface,
+    },
+    error::PepperServiceError,
+    vuf_keypair::{get_pepper_service_vuf_public_key_and_json, VUFKeypair},
 };
-use ark_ec::CurveGroup;
-use ark_ff::PrimeField;
-use ark_serialize::CanonicalSerialize;
-use std::sync::Arc;
+use aptos_crypto::blstrs::scalar_from_uniform_be_bytes;
+use aptos_keyless_pepper_common::{vuf::slip_10::ed25519_dalek::Digest, PepperInput};
+use aptos_time_service::TimeService;
+use std::{sync::Arc, time::Duration};
 
-/// Generates a random VUF public and private keypair for testing purposes
-pub fn create_vuf_public_private_keypair() -> Arc<(String, ark_bls12_381::Fr)> {
-    // Generate a random VUF seed
-    let private_key_seed = rand::random::<[u8; 32]>();
+/// A mock implementation of the account recovery DB that does nothing
+struct MockAccountRecoveryDB;
+
+#[async_trait::async_trait]
+impl AccountRecoveryDBInterface for MockAccountRecoveryDB {
+    async fn update_db_with_pepper_input(
+        &self,
+        _pepper_input: &PepperInput,
+    ) -> Result<(), PepperServiceError> {
+        Ok(()) // Do nothing
+    }
+}
+
+/// Advances the mock time service by the given number of seconds
+pub async fn advance_time_secs(time_service: TimeService, seconds: u64) {
+    let mock_time_service = time_service.into_mock();
+    mock_time_service
+        .advance_async(Duration::from_secs(seconds))
+        .await;
+}
+
+/// Generates a random VUF keypair for testing purposes
+pub fn create_vuf_keypair(private_key_seed: Option<[u8; 32]>) -> Arc<VUFKeypair> {
+    // Get or generate a seed for the private key
+    let private_key_seed = private_key_seed.unwrap_or(rand::random::<[u8; 32]>());
 
     // Derive the VUF private key from the seed
     let mut sha3_hasher = sha3::Sha3_512::new();
     sha3_hasher.update(private_key_seed);
-    let vuf_private_key =
-        ark_bls12_381::Fr::from_be_bytes_mod_order(sha3_hasher.finalize().as_slice());
+    let vuf_private_key = scalar_from_uniform_be_bytes(sha3_hasher.finalize().as_slice());
 
-    // Derive the VUF public key from the private key
-    let vuf_public_key = Bls12381G1Bls::pk_from_sk(&vuf_private_key).unwrap();
+    // Get the VUF public key and its JSON representation
+    let (vuf_public_key, vuf_public_key_json) =
+        get_pepper_service_vuf_public_key_and_json(&vuf_private_key);
 
-    // Create the pepper public key object
-    let mut public_key_buf = vec![];
-    vuf_public_key
-        .into_affine()
-        .serialize_compressed(&mut public_key_buf)
-        .unwrap();
-    let pepper_vuf_public_key = PepperV0VufPubKey::new(public_key_buf);
+    // Return the VUF keypair
+    let vuf_keypair = VUFKeypair::new(vuf_private_key, vuf_public_key, vuf_public_key_json);
+    Arc::new(vuf_keypair)
+}
 
-    // Transform the public key object to a pretty JSON string
-    let vuf_public_key_string = serde_json::to_string_pretty(&pepper_vuf_public_key).unwrap();
+/// Returns an empty account managers and overrides instance
+pub fn get_empty_account_recovery_managers() -> Arc<AccountRecoveryManagers> {
+    Arc::new(AccountRecoveryManagers::new_empty())
+}
 
-    Arc::new((vuf_public_key_string, vuf_private_key))
+/// Returns a mock account recovery DB instance
+pub fn get_mock_account_recovery_db() -> Arc<dyn AccountRecoveryDBInterface + Send + Sync> {
+    Arc::new(MockAccountRecoveryDB)
 }

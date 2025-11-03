@@ -303,7 +303,7 @@ impl InMemDag {
         &mut self,
         from: &Arc<CertifiedNode>,
         until: Option<Round>,
-    ) -> impl Iterator<Item = &mut NodeStatus> {
+    ) -> impl Iterator<Item = &mut NodeStatus> + use<'_> {
         let until = until.unwrap_or(self.lowest_round());
         let mut reachable_filter = Self::reachable_filter(vec![from.digest()]);
         self.nodes_by_round

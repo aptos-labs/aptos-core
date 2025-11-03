@@ -567,35 +567,35 @@ return _t1
 === Sourcified Output ============================================
 module 0x815::m {
     fun if_1(c: bool): u8 {
-        let _t1 = 0u8;
-        if (c) _t1 = 1u8;
-        _t1
+        let _v0 = 0u8;
+        if (c) _v0 = 1u8;
+        _v0
     }
     fun if_else_1(c: bool): u8 {
-        let _t1;
-        if (c) _t1 = 1u8 else _t1 = 2u8;
-        _t1
+        let _v0;
+        if (c) _v0 = 1u8 else _v0 = 2u8;
+        _v0
     }
     fun if_else_2(c: bool, d: bool): u8 {
-        let _t2;
-        if (c) if (d) _t2 = 1u8 else _t2 = 2u8 else _t2 = 3u8;
-        _t2
+        let _v0;
+        if (c) if (d) _v0 = 1u8 else _v0 = 2u8 else _v0 = 3u8;
+        _v0
     }
     fun if_else_3(c: bool): u64 {
-        let _t1;
-        if (c) _t1 = 1 else _t1 = 2;
-        _t1
+        let _v0;
+        if (c) _v0 = 1 else _v0 = 2;
+        _v0
     }
     fun if_else_if(c: bool, d: bool): u8 {
-        let _t2;
-        if (c) _t2 = 1u8 else if (d) _t2 = 2u8 else _t2 = 3u8;
-        _t2
+        let _v0;
+        if (c) _v0 = 1u8 else if (d) _v0 = 2u8 else _v0 = 3u8;
+        _v0
     }
     fun if_else_with_shared_exp(x: u64): u64 {
-        let _t1;
+        let _v0;
         x = x + x;
         x = x * x;
-        if (x > 0) _t1 = x + 1 else _t1 = x - 1;
-        _t1
+        if (x > 0) _v0 = x + 1 else _v0 = x - 1;
+        _v0
     }
 }

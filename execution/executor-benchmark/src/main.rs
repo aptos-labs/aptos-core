@@ -38,7 +38,7 @@ use aptos_transaction_generator_lib::WorkflowProgress;
 use aptos_transaction_workloads_lib::args::TransactionTypeArg;
 use aptos_types::on_chain_config::{FeatureFlag, Features};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
-use aptos_vm_environment::prod_configs::set_paranoid_type_checks;
+use aptos_vm_environment::prod_configs::{set_layout_caches, set_paranoid_type_checks};
 use clap::{Parser, Subcommand, ValueEnum};
 use once_cell::sync::Lazy;
 use std::{
@@ -323,6 +323,9 @@ struct Opt {
 
     #[clap(long)]
     skip_paranoid_checks: bool,
+
+    #[clap(long)]
+    use_blockstm_v2: bool,
 }
 
 impl Opt {
@@ -621,6 +624,7 @@ fn main() {
         execution_threads_per_shard = execution_threads;
     }
 
+    set_layout_caches(true);
     if opt.skip_paranoid_checks {
         set_paranoid_type_checks(false);
     }
@@ -628,6 +632,7 @@ fn main() {
     AptosVM::set_concurrency_level_once(execution_threads_per_shard);
     NativeConfig::set_concurrency_level_once(execution_threads_per_shard);
     AptosVM::set_processed_transactions_detailed_counters();
+    AptosVM::set_blockstm_v2_enabled_once(opt.use_blockstm_v2);
 
     let config = ProfilerConfig::new_with_defaults();
     let handler = ProfilerHandler::new(config);

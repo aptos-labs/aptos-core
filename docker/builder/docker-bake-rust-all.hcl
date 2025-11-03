@@ -49,7 +49,6 @@ variable "CARGO_TARGET_DIR" {
 group "all" {
   targets = flatten([
     "validator",
-    "node-checker",
     "tools",
     "faucet",
     "forge",
@@ -182,14 +181,6 @@ target "tools" {
   target     = "tools"
   tags       = generate_tags("tools")
 }
-
-target "node-checker" {
-  inherits   = ["_common"]
-  dockerfile = "docker/builder/node-checker.Dockerfile"
-  target     = "node-checker"
-  tags       = generate_tags("node-checker")
-}
-
 target "faucet" {
   inherits   = ["_common"]
   dockerfile = "docker/builder/faucet.Dockerfile"

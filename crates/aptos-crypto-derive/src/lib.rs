@@ -115,15 +115,15 @@ pub fn silent_display(source: TokenStream) -> TokenStream {
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
 
-    let gen = quote! {
+    quote! {
         // In order to ensure that secrets are never leaked, Display is elided
         impl #impl_generics ::std::fmt::Display for #name #ty_generics #where_clause {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 write!(f, "<elided secret for {}>", stringify!(#name))
             }
         }
-    };
-    gen.into()
+    }
+    .into()
 }
 
 #[proc_macro_derive(SilentDebug)]
@@ -132,15 +132,15 @@ pub fn silent_debug(source: TokenStream) -> TokenStream {
     let name = &ast.ident;
     let (impl_generics, ty_generics, where_clause) = ast.generics.split_for_impl();
 
-    let gen = quote! {
+    quote! {
         // In order to ensure that secrets are never leaked, Debug is elided
         impl #impl_generics ::std::fmt::Debug for #name #ty_generics #where_clause {
             fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
                 write!(f, "<elided secret for {}>", stringify!(#name))
             }
         }
-    };
-    gen.into()
+    }
+    .into()
 }
 
 #[proc_macro_attribute]
@@ -154,7 +154,7 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
     let name_string = find_key_name(&ast, name.to_string());
-    let gen = quote! {
+    quote! {
         impl<'de> ::serde::Deserialize<'de> for #name {
             fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
             where
@@ -179,8 +179,7 @@ pub fn deserialize_key(source: TokenStream) -> TokenStream {
                 }
             }
         }
-    };
-    gen.into()
+    }.into()
 }
 
 /// Serialize into a human readable format where applicable
@@ -189,7 +188,7 @@ pub fn serialize_key(source: TokenStream) -> TokenStream {
     let ast: DeriveInput = syn::parse(source).expect("Incorrect macro input");
     let name = &ast.ident;
     let name_string = find_key_name(&ast, name.to_string());
-    let gen = quote! {
+    quote! {
         impl ::serde::Serialize for #name {
             fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
             where
@@ -208,8 +207,8 @@ pub fn serialize_key(source: TokenStream) -> TokenStream {
                 }
             }
         }
-    };
-    gen.into()
+    }
+    .into()
 }
 
 fn find_key_name(ast: &DeriveInput, name: String) -> String {
@@ -371,9 +370,10 @@ pub fn hasher_dispatch(input: TokenStream) -> TokenStream {
     let param = if item.generics.params.is_empty() {
         quote!()
     } else {
-        let args = proc_macro2::TokenStream::from_iter(
-            std::iter::repeat(quote!((),)).take(item.generics.params.len()),
-        );
+        let args = proc_macro2::TokenStream::from_iter(std::iter::repeat_n(
+            quote!((),),
+            item.generics.params.len(),
+        ));
         quote!(<#args>)
     };
 
@@ -463,6 +463,54 @@ pub fn bcs_crypto_hash_dispatch(input: TokenStream) -> TokenStream {
         }
     );
     out.into()
+}
+
+/// Derive macro for structs acting as witnesses in Sigma protocols.
+///
+/// The generated implementation requires the following imports:
+/// - aptos_crypto_derive::SigmaProtocolWitness;
+/// - ark_std::rand::{RngCore, CryptoRng};
+///
+/// Applies to structs with named fields only.
+#[proc_macro_derive(SigmaProtocolWitness)]
+pub fn derive_sigma_protocol_witness(input: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(input as DeriveInput);
+    let name = &input.ident;
+
+    let fields = if let syn::Data::Struct(data) = &input.data {
+        match &data.fields {
+            syn::Fields::Named(fields_named) => &fields_named.named,
+            _ => panic!("SigmaProtocolWitness derive only supports named fields"),
+        }
+    } else {
+        panic!("SigmaProtocolWitness derive only supports structs");
+    };
+
+    let field_names: Vec<_> = fields.iter().map(|f| &f.ident).collect();
+
+    let expanded = quote! {
+        impl<E: Pairing> sigma_protocol::Witness<E> for #name<E> {
+            type Scalar = Scalar<E>;
+
+            fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
+                Self {
+                    #(
+                        #field_names: self.#field_names.scaled_add(&other.#field_names, c),
+                    )*
+                }
+            }
+
+            fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
+                Self {
+                    #(
+                        #field_names: self.#field_names.rand(rng),
+                    )*
+                }
+            }
+        }
+    };
+
+    TokenStream::from(expanded)
 }
 
 fn add_trait_bounds(mut generics: syn::Generics) -> syn::Generics {

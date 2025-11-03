@@ -102,8 +102,8 @@ impl NodeBroadcastHandler {
             .iter()
             .flat_map(|(r, peer_and_digest)| {
                 peer_and_digest
-                    .iter()
-                    .map(|(author, _)| NodeId::new(self.epoch_state.epoch, *r, *author))
+                    .keys()
+                    .map(|author| NodeId::new(self.epoch_state.epoch, *r, *author))
             })
             .collect();
         self.storage.delete_votes(to_delete)

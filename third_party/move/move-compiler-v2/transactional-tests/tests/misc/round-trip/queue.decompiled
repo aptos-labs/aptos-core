@@ -16,15 +16,15 @@ module 0x42::queue {
         vector::push_back<T0>(&mut p0.data, p1);
     }
     public fun test_queue_operations() {
-        let _t0 = create<u64>();
-        enqueue<u64>(&mut _t0, 40);
-        enqueue<u64>(&mut _t0, 41);
-        enqueue<u64>(&mut _t0, 42);
-        if (!(dequeue<u64>(&mut _t0) == 40)) abort 1;
-        enqueue<u64>(&mut _t0, 43);
-        if (!(dequeue<u64>(&mut _t0) == 41)) abort 2;
-        if (!(dequeue<u64>(&mut _t0) == 42)) abort 3;
-        if (!(dequeue<u64>(&mut _t0) == 43)) abort 4;
+        let _v0 = create<u64>();
+        enqueue<u64>(&mut _v0, 40);
+        enqueue<u64>(&mut _v0, 41);
+        enqueue<u64>(&mut _v0, 42);
+        assert!(dequeue<u64>(&mut _v0) == 40, 1);
+        enqueue<u64>(&mut _v0, 43);
+        assert!(dequeue<u64>(&mut _v0) == 41, 2);
+        assert!(dequeue<u64>(&mut _v0) == 42, 3);
+        assert!(dequeue<u64>(&mut _v0) == 43, 4);
     }
 }
 

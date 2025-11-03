@@ -34,6 +34,9 @@ async fn jwk_consensus_provider_change_mind() {
     let (swarm, mut cli, _faucet) = SwarmBuilder::new_local(4)
         .with_num_fullnodes(1)
         .with_aptos()
+        .with_init_genesis_stake(Arc::new(|_i, genesis_stake_amount| {
+            *genesis_stake_amount = 100_000_000_000_000;
+        }))
         .with_init_genesis_config(Arc::new(move |conf| {
             conf.epoch_duration_secs = epoch_duration_secs;
         }))

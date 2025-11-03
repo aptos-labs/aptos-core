@@ -17,9 +17,8 @@ aptos-crypto = { workspace = true }
 aptos-infallible = { workspace = true }
 aptos-keyless-pepper-common = { workspace = true }
 aptos-types = { workspace = true }
-ark-bls12-381 = { workspace = true }
-ark-serialize = { workspace = true }
 bcs = { workspace = true }
+blstrs =  { workspace = true }
 clap = { workspace = true }
 firestore = { workspace = true }
 hex = { workspace = true }

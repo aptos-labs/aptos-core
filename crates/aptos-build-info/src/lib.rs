@@ -125,9 +125,12 @@ mod tests {
         let build_branch = String::from("branch-1");
         let build_tag = String::from("release-1");
 
-        std::env::set_var("GIT_SHA", commit_hash.clone());
-        std::env::set_var("GIT_BRANCH", build_branch.clone());
-        std::env::set_var("GIT_TAG", build_tag.clone());
+        // TODO: Audit that the environment access only happens in single-threaded code.
+        unsafe {
+            std::env::set_var("GIT_SHA", commit_hash.clone());
+            std::env::set_var("GIT_BRANCH", build_branch.clone());
+            std::env::set_var("GIT_TAG", build_tag.clone());
+        }
 
         let info = get_build_information();
 

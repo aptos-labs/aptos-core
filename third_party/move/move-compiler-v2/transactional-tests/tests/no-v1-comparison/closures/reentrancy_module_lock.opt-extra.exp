@@ -1,0 +1,14 @@
+processed 4 tasks
+task 0 lines 1-6:  publish [module 0x42::callee {]
+task 1 lines 8-32:  publish [module 0x42::caller {]
+task 2 lines 35-35:  run 0x42::caller::init --signers 0x42
+task 3 lines 37-37:  run 0x42::caller::callback_not_ok --verbose
+Error: Function execution failed with VMError: {
+    message: Reentrancy disallowed: reentering `0000000000000000000000000000000000000000000000000000000000000042::caller` via function `do_something` (module lock is active),
+    major_status: RUNTIME_DISPATCH_ERROR,
+    sub_status: None,
+    location: 0x42::caller,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

@@ -2,6 +2,7 @@
 module aptos_experimental::market_mixed_order_tests {
     use std::option;
     use std::signer;
+    use aptos_experimental::market_bulk_order::cancel_bulk_order;
     use aptos_experimental::clearinghouse_test;
     use aptos_experimental::clearinghouse_test::{
         test_market_callbacks,
@@ -150,6 +151,7 @@ module aptos_experimental::market_mixed_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
 
@@ -233,6 +235,7 @@ module aptos_experimental::market_mixed_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            true,
             &test_market_callbacks()
         );
 
@@ -298,7 +301,7 @@ module aptos_experimental::market_mixed_order_tests {
         );
 
         // Cancel bulk order
-        market.cancel_bulk_order(bulk_maker, &test_market_callbacks());
+        cancel_bulk_order(&mut market, bulk_maker, &test_market_callbacks());
 
         // Verify bulk order is cancelled
         verify_bulk_order_cleanup(bulk_maker_addr);
@@ -326,6 +329,7 @@ module aptos_experimental::market_mixed_order_tests {
             false,
             option::none(),
             new_test_order_metadata(1),
+            false,
             &test_market_callbacks()
         );
 
