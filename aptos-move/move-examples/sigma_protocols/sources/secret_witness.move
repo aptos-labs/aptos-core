@@ -40,7 +40,7 @@ module sigma_protocols::secret_witness {
 
     #[test_only]
     /// Returns a size-$k$ random witness. Useful when creating a ZKP during testing.
-    public fun random_witness(k: u64): SecretWitness {
+    public fun random(k: u64): SecretWitness {
         let w = vector[];
 
         range(0, k).for_each(|_|

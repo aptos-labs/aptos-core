@@ -21,7 +21,7 @@
 ///        |
 ///      stmt.points
 ///
-module sigma_protocols::example_schnorr {
+module sigma_protocols::schnorr {
     use std::error;
     use aptos_std::ristretto255::{RistrettoPoint, Scalar};
 
@@ -34,7 +34,9 @@ module sigma_protocols::example_schnorr {
     #[test_only]
     use aptos_std::ristretto255::{point_mul, random_point, random_scalar, point_clone};
     #[test_only]
-    use sigma_protocols::homomorphism::{Self, evaluate_homomorphism};
+    use sigma_protocols::homomorphism::evaluate_homomorphism;
+    #[test_only]
+    use sigma_protocols::sigma_protocol;
     #[test_only]
     use sigma_protocols::utils::equal_vec_points;
 
@@ -133,7 +135,7 @@ module sigma_protocols::example_schnorr {
     fun proof_correctness() {
         let (stmt, witn) = random_statement_witness_pair();
 
-        homomorphism::assert_correctly_computed_proof_verifies(
+        sigma_protocol::assert_correctly_computed_proof_verifies(
             new_session(b"session: test schnorr proving correctness"),
             stmt,
             witn,
@@ -146,7 +148,7 @@ module sigma_protocols::example_schnorr {
     #[expected_failure(abort_code=65537, location=sigma_protocols::fiat_shamir)]
     fun empty_proof_for_random_statement_test() {
         assert!(
-            !homomorphism::empty_proof_verifies(
+            !sigma_protocol::empty_proof_verifies(
                 new_session(b"session: test empty schnorr proof for random statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
@@ -158,7 +160,7 @@ module sigma_protocols::example_schnorr {
     #[expected_failure(abort_code=65537, location=sigma_protocols::fiat_shamir)]
     fun empty_proof_for_empty_statement_test() {
         assert!(
-            !homomorphism::empty_proof_verifies(
+            !sigma_protocol::empty_proof_verifies(
                 new_session(b"session: test empty schnorr proof for empty statement does not verify"),
                 |_X, w| psi(_X, w),
                 |_X| f(_X),
