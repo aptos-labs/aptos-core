@@ -11,7 +11,7 @@ module sigma_protocols::proof {
     }
 
     /// Creates a new proof consisting of the commitment $A \in \mathbb{G}^m$ and the scalars $\sigma \in \mathbb{F}^k$.
-    public fun new_proof(_A: vector<RistrettoPoint>, sigma: vector<Scalar>): Proof {
+    public fun new(_A: vector<RistrettoPoint>, sigma: vector<Scalar>): Proof {
         Proof {
             A: _A,
             sigma,
@@ -37,7 +37,7 @@ module sigma_protocols::proof {
 
     #[test_only]
     /// Returns an empty proof. Used for testing.
-    public fun empty_proof(): Proof {
+    public fun empty(): Proof {
         Proof {
             A: vector[],
             sigma: vector[]
