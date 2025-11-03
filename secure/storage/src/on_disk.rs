@@ -61,7 +61,7 @@ impl OnDiskStorage {
             return Ok(HashMap::new());
         }
         let data = serde_json::from_str(&contents)?;
-        info!("OnDiskStorage::read: path {:?}, data {:?}", self.file_path, data);
+        aptos_logger::debug!("OnDiskStorage::read: path {:?}, data {:?}", self.file_path, data);
         Ok(data)
     }
 

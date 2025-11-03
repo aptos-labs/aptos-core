@@ -414,7 +414,6 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             //     match validation_result.status() {
             //         None => {
             //             let ranking_score = validation_result.score();
-                        info!("add txn to mempool");
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             0,
