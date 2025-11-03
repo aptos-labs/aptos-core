@@ -335,18 +335,13 @@ async fn get_sequence_numbers(
     receiver_address: AccountAddress,
 ) -> Result<(u64, Option<u64>), AptosTapError> {
     let funder_address = funder_account.read().await.address();
-    let f_request = client.get_account(funder_address);
-    let r_request = client.get_account(receiver_address);
-    let mut responses = futures::future::join_all([f_request, r_request]).await;
+    let (funder_response, receiver_response) = futures::future::join(
+        client.get_account(funder_address),
+        client.get_account(receiver_address),
+    )
+    .await;
 
-    let receiver_seq_num = responses
-        .remove(1)
-        .as_ref()
-        .ok()
-        .map(|account| account.inner().sequence_number);
-
-    let funder_seq_num = responses
-        .remove(0)
+    let funder_seq_num = funder_response
         .map_err(|e| {
             AptosTapError::new(
                 format!("funder account {} not found: {:#}", funder_address, e),
@@ -356,7 +351,24 @@ async fn get_sequence_numbers(
         .inner()
         .sequence_number;
 
-    Ok((funder_seq_num, receiver_seq_num))
+    let receiver_seq_num = receiver_response
+        .map_err(|e| {
+            AptosTapError::new(
+                format!("receiver account {} not found: {:#}", receiver_address, e),
+                AptosTapErrorCode::AccountDoesNotExist,
+            )
+        })?
+        .inner()
+        .sequence_number;
+
+    Ok((
+        funder_seq_num,
+        if receiver_seq_num == 0 {
+            None
+        } else {
+            Some(receiver_seq_num)
+        },
+    ))
 }
 
 /// Submit a transaction, potentially wait for it depending on `wait_for_transactions`

@@ -28,6 +28,24 @@ impl FirebaseJwtVerifier {
         Ok(Self { jwt_verifier })
     }
 
+    pub async fn validate_jwt_claims(
+        &self,
+        headers: Arc<HeaderMap>,
+    ) -> Result<JwtClaims, AptosTapError> {
+        let auth_token = jwt_sub(headers)?;
+        let verify = self.jwt_verifier.verify::<JwtClaims>(&auth_token);
+        let token_data = match verify.await {
+            Some(token_data) => token_data,
+            None => {
+                return Err(AptosTapError::new(
+                    "Failed to verify JWT token".to_string(),
+                    AptosTapErrorCode::AuthTokenInvalid,
+                ))
+            },
+        };
+        Ok(token_data.claims)
+    }
+
     /// First, we mandate that the caller indicated that they're including a JWT by
     /// checking for the presence of X_IS_JWT_HEADER. If they didn't include this
     /// header, we reject them immediately. We need this because we already have a
@@ -39,19 +57,7 @@ impl FirebaseJwtVerifier {
     /// it with Firebase. If the token is invalid, we reject them. If it is valid, we
     /// return the UID (from the sub field).
     pub async fn validate_jwt(&self, headers: Arc<HeaderMap>) -> Result<String, AptosTapError> {
-        let auth_token = jwt_sub(headers)?;
-
-        let verify = self.jwt_verifier.verify::<JwtClaims>(&auth_token);
-        let token_data = match verify.await {
-            Some(token_data) => token_data,
-            None => {
-                return Err(AptosTapError::new(
-                    "Failed to verify JWT token".to_string(),
-                    AptosTapErrorCode::AuthTokenInvalid,
-                ));
-            },
-        };
-        let claims = token_data.claims;
+        let claims = self.validate_jwt_claims(headers).await?;
 
         if !claims.email_verified {
             return Err(AptosTapError::new(

@@ -2,9 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod auth_token;
+mod firebase_jwt_domain;
 mod ip_allowlist;
 
-use self::{auth_token::AuthTokenBypasser, ip_allowlist::IpAllowlistBypasser};
+use self::{
+    auth_token::AuthTokenBypasser, firebase_jwt_domain::FirebaseJwtDomainBypasser,
+    ip_allowlist::IpAllowlistBypasser,
+};
 use crate::{
     checkers::CheckerData,
     common::{IpRangeManagerConfig, ListManagerConfig},
@@ -30,6 +34,7 @@ pub trait BypasserTrait: Sync + Send + 'static {
 #[serde(tag = "type")]
 pub enum BypasserConfig {
     AuthToken(ListManagerConfig),
+    FirebaseJwtDomain(firebase_jwt_domain::FirebaseJwtDomainBypasserConfig),
     IpAllowlist(IpRangeManagerConfig),
 }
 
@@ -37,6 +42,9 @@ impl BypasserConfig {
     pub fn build(self) -> Result<Bypasser> {
         Ok(match self {
             BypasserConfig::AuthToken(config) => Bypasser::from(AuthTokenBypasser::new(config)?),
+            BypasserConfig::FirebaseJwtDomain(config) => {
+                Bypasser::from(FirebaseJwtDomainBypasser::new(config)?)
+            },
 
             BypasserConfig::IpAllowlist(config) => {
                 Bypasser::from(IpAllowlistBypasser::new(config)?)
@@ -49,5 +57,6 @@ impl BypasserConfig {
 #[enum_dispatch(BypasserTrait)]
 pub enum Bypasser {
     AuthTokenBypasser,
+    FirebaseJwtDomainBypasser,
     IpAllowlistBypasser,
 }
