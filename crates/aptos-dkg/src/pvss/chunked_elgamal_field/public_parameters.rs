@@ -6,10 +6,7 @@
 use crate::{
     algebra::GroupGenerators,
     pvss::{
-        chunked_elgamal_field::{
-            chunked_elgamal,
-            dealt_keys::{DecryptPrivKey, EncryptPubKey},
-        },
+        chunked_elgamal_field::{chunked_elgamal, input_secret::InputSecret, keys},
         traits,
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
@@ -55,6 +52,12 @@ pub struct PublicParameters<E: Pairing> {
 
     #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
+}
+
+impl<E: Pairing> PublicParameters<E> {
+    pub fn get_commitment_base(&self) -> E::G2Affine {
+        self.G_2
+    }
 }
 
 #[allow(non_snake_case)]
@@ -127,12 +130,17 @@ impl<E: Pairing> traits::HasEncryptionPublicParams for PublicParameters<E> {
     }
 }
 
-impl<E: Pairing> traits::Convert<EncryptPubKey<E>, PublicParameters<E>> for DecryptPrivKey<E> {
-    /// Given a decryption key $dk$, computes its associated encryption key $H^{dk}$
-    fn to(&self, pp: &PublicParameters<E>) -> EncryptPubKey<E> {
-        EncryptPubKey::<E> {
-            ek: pp.pp_elgamal.pubkey_base().mul(self.dk).into_affine(),
-        }
+impl<E: Pairing> traits::Convert<keys::DealtPubKey<E>, PublicParameters<E>>
+    for InputSecret<E::ScalarField>
+{
+    /// Computes the public key associated with the given input secret.
+    /// NOTE: In the SCRAPE PVSS, a `DealtPublicKey` cannot be computed from a `DealtSecretKey` directly.
+    fn to(&self, pp: &PublicParameters<E>) -> keys::DealtPubKey<E> {
+        keys::DealtPubKey::new(
+            pp.get_commitment_base()
+                .mul(self.get_secret_a())
+                .into_affine(),
+        )
     }
 }
 

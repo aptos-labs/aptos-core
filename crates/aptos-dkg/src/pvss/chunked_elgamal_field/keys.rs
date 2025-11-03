@@ -1,15 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::{pvss::chunked_elgamal_field::chunked_elgamal, traits};
 use aptos_crypto::{
     arkworks::serialization::{ark_de, ark_se},
     CryptoMaterialError, Uniform, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
-use ark_ec::pairing::Pairing;
+use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
+use std::ops::Mul;
 
 /// The *encryption (public)* key used to encrypt shares of the dealt secret for each PVSS player.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -58,3 +60,32 @@ impl<E: Pairing> Uniform for DecryptPrivKey<E> {
         }
     }
 }
+
+impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParameters<E>>
+    for DecryptPrivKey<E>
+{
+    /// Given a decryption key $dk$, computes its associated encryption key $H^{dk}$
+    fn to(&self, pp_elgamal: &chunked_elgamal::PublicParameters<E>) -> EncryptPubKey<E> {
+        EncryptPubKey::<E> {
+            ek: pp_elgamal.pubkey_base().mul(self.dk).into_affine(),
+        }
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DealtPubKey<E: Pairing> {
+    /// A group element $G$ \in G_2$
+    G: E::G2Affine,
+}
+
+#[allow(non_snake_case)]
+impl<E: Pairing> DealtPubKey<E> {
+    pub fn new(G: E::G2Affine) -> Self {
+        Self { G }
+    }
+}
+
+#[allow(dead_code)]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>);

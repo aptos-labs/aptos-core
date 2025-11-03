@@ -66,7 +66,7 @@ pub trait Trait<E: Pairing>:
     }
 }
 
-pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone {
+pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {
     /// The scalar type associated with the domain.
     type Scalar: CanonicalSerialize + CanonicalDeserialize + Copy;
 
@@ -112,14 +112,28 @@ impl<T> Statement for T where T: CanonicalSerialize + CanonicalDeserialize + Clo
 /// - The first message of the protocol, which is the commitment from the prover. This leads to a more compact proof.
 /// - The second message of the protocol, which is the challenge from the verifier. This leads to a proof which is amenable to batch verification.
 /// TODO: Better name? In https://github.com/sigma-rs/sigma-proofs these would be called "compact" and "batchable" proofs
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq)]
 pub enum FirstProofItem<E: Pairing, H: homomorphism::Trait>
 where
-    H::Domain: Witness<E>,
     H::Codomain: Statement,
 {
     Commitment(H::Codomain),
-    Challenge(E::ScalarField),
+    Challenge(E::ScalarField), // In more generality, this should be H::Domain::Scalar
+}
+
+// Manual implementation of PartialEq is required here because deriving PartialEq would
+// automatically require `H` itself to implement PartialEq, which is undesirable.
+impl<E: Pairing, H: homomorphism::Trait> PartialEq for FirstProofItem<E, H>
+where
+    H::Codomain: Statement,
+{
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (FirstProofItem::Commitment(a), FirstProofItem::Commitment(b)) => a == b,
+            (FirstProofItem::Challenge(a), FirstProofItem::Challenge(b)) => a == b,
+            _ => false,
+        }
+    }
 }
 
 // The natural CanonicalSerialize/Deserialize implementations for `FirstProofItem`; we follow the usual approach for enums.
@@ -204,17 +218,38 @@ where
     }
 }
 
-#[derive(CanonicalSerialize, Debug, PartialEq, Eq, CanonicalDeserialize, Clone)]
+#[derive(CanonicalSerialize, Debug, CanonicalDeserialize, Clone)]
 pub struct Proof<E: Pairing, H: homomorphism::Trait>
 where
     H::Domain: Witness<E>,
     H::Codomain: Statement,
 {
-    /// The “first item” recorded in the proof: either the prover's commitment (H::Codomain)
-    /// or the verifier's challenge (H::Domain::Scalar)
+    /// The “first item” recorded in the proof, which can be either:
+    /// - the prover's commitment (H::Codomain)
+    /// - the verifier's challenge (E::ScalarField)
     pub first_proof_item: FirstProofItem<E, H>,
     /// Prover's second message (response)
     pub z: H::Domain,
+}
+
+// Manual implementation of PartialEq and Eq is required here because deriving PartialEq/Eq would
+// automatically require `H` itself to implement PartialEq and Eq, which is undesirable.
+// Workaround would be to make `Proof` generic over `H::Domain` and `H::Codomain` instead of `H`
+impl<E: Pairing, H: homomorphism::Trait> PartialEq for Proof<E, H>
+where
+    H::Domain: Witness<E>,
+    H::Codomain: Statement,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.first_proof_item == other.first_proof_item && self.z == other.z
+    }
+}
+
+impl<E: Pairing, H: homomorphism::Trait> Eq for Proof<E, H>
+where
+    H::Domain: Witness<E>,
+    H::Codomain: Statement,
+{
 }
 
 /// Computes the Fiat–Shamir challenge for a Σ-protocol instance.
