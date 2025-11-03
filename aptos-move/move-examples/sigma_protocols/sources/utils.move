@@ -4,7 +4,7 @@ module sigma_protocols::utils {
         point_compress, Scalar, point_mul, scalar_add, scalar_mul, scalar_neg
     };
 
-    friend sigma_protocols::homomorphism;
+    friend sigma_protocols::fiat_shamir;
 
     /// One of our internal invariants was broken. There is likely a logical error in the code.
     const E_INTERNAL_INVARIANT_FAILED: u64 = 0;
