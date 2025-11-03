@@ -33,7 +33,7 @@ module sigma_protocols::example_pedeq {
     use aptos_std::ristretto255::{RistrettoPoint, Scalar};
 
     use aptos_std::ristretto255::scalar_one;
-    use sigma_protocols::homomorphism::{DomainSeparator, new_domain_separator};
+    use sigma_protocols::fiat_shamir::{DomainSeparator, new_domain_separator};
     use sigma_protocols::secret_witness::{SecretWitness, new_secret_witness};
     use sigma_protocols::public_statement::{PublicStatement, new_public_statement};
     use sigma_protocols::representation::new_representation;
@@ -190,7 +190,7 @@ module sigma_protocols::example_pedeq {
     }
 
     #[test]
-    #[expected_failure(abort_code=65538, location=sigma_protocols::homomorphism)]
+    #[expected_failure(abort_code=65537, location=sigma_protocols::fiat_shamir)]
     fun empty_proof_for_random_statement_test() {
         assert!(
             !homomorphism::empty_proof_verifies(
@@ -202,7 +202,7 @@ module sigma_protocols::example_pedeq {
     }
 
     #[test]
-    #[expected_failure(abort_code=65538, location=sigma_protocols::homomorphism)]
+    #[expected_failure(abort_code=65537, location=sigma_protocols::fiat_shamir)]
     fun empty_proof_for_empty_statement_test() {
         assert!(
             !homomorphism::empty_proof_verifies(
