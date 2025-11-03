@@ -27,7 +27,7 @@ jobs:
       - name: Backport Action
         uses: sorenlouv/backport-github-action@ad888e978060bc1b2798690dd9d03c4036560947
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.APTOS_BOT_PAT }}
           add_original_reviewers: true 
 
       - name: Info log
