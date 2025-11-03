@@ -46,12 +46,12 @@ pub struct HkzgElgamalWitness<E: Pairing> {
 /// On the domain side, each component of this tuple homomorphism corresponds to one of the
 /// two steps: in each case, the witness omits (or “ignores”) one of its three fields. Thus,
 /// the overall homomorphism of the Σ-protocol can be viewed as a tuple of two *lifted* homomorphisms.
-type LiftedKZG<'a, E> =
+type LiftedHKZG<'a, E> =
     LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgElgamalWitness<E>>;
 type LiftedChunkedElGamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
 
-pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
+pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHKZG<'a, E>, LiftedChunkedElGamal<'a, E>>;
 
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> Homomorphism<'a, E> {
@@ -61,11 +61,11 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         pp: &'a chunked_elgamal::PublicParameters<E>,
         eks: &'a [E::G1Affine],
     ) -> Self {
-        let lifted_kzg = LiftedKZG::<E> {
+        let lifted_hkzg = LiftedHKZG::<E> {
             hom: univariate_hiding_kzg::CommitmentHomomorphism { lagr_g1, xi_1 },
             projection: |dom: &HkzgElgamalWitness<E>| {
                 let HkzgElgamalWitness {
-                    hkzg_randomness: kzg_randomness,
+                    hkzg_randomness,
                     chunked_plaintexts,
                     ..
                 } = dom;
@@ -75,7 +75,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
                         .collect();
                     Scalar::<E>::vec_into_inner(scalars)
                 };
-                (kzg_randomness.0, flattened)
+                (hkzg_randomness.0, flattened)
             },
         };
         let lifted_chunked_elgamal = LiftedChunkedElGamal::<E> {
@@ -94,7 +94,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         };
 
         Self {
-            hom1: lifted_kzg,
+            hom1: lifted_hkzg,
             hom2: lifted_chunked_elgamal,
         }
     }
