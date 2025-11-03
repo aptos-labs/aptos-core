@@ -3,8 +3,8 @@
 
 //! Defines trace types and ability to replay traces after execution.
 
-mod loggers;
-pub use loggers::{FullTraceLogger, NoOpTraceLogger, TraceLogger};
+mod recorders;
+pub use recorders::{FullTraceRecorder, NoOpTraceRecorder, TraceRecorder};
 
 mod trace;
 pub use trace::Trace;

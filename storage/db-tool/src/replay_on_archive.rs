@@ -185,9 +185,9 @@ impl Verifier {
         let (start, limit) =
             Self::get_start_and_limit(&arc_db, config.start_version, config.end_version)?;
         set_layout_caches(true);
+        set_paranoid_type_checks(config.paranoid_type_checks);
         // Paranoid checks are done async if enabled.
         set_async_runtime_checks(config.paranoid_type_checks);
-        set_paranoid_type_checks(config.paranoid_type_checks);
         info!(
             start_version = start,
             limit = limit,

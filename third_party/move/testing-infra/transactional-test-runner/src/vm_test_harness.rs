@@ -35,13 +35,13 @@ use move_vm_runtime::{
     config::VMConfig,
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
-    execution_tracing::{FullTraceLogger, Trace, TraceLogger},
+    execution_tracing::{FullTraceRecorder, Trace, TraceRecorder},
     module_traversal::*,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, AsyncRuntimeTypeCheck,
-    CodeStorage, InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
-    StagingModuleStorage,
+    AsFunctionValueExtension, AsUnsyncCodeStorage, AsUnsyncModuleStorage, CodeStorage,
+    InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment, ScriptLoader,
+    StagingModuleStorage, TypeChecker,
 };
 use move_vm_test_utils::{
     gas_schedule::{CostTable, Gas, GasStatus},
@@ -482,7 +482,7 @@ impl SimpleVMTestAdapter<'_> {
             let mut data_cache =
                 MoveVmDataCacheAdapter::new(&mut data_cache, &self.storage, &loader);
             if self.run_config.tracing {
-                let mut logger = FullTraceLogger::new();
+                let mut logger = FullTraceRecorder::new();
                 let result = MoveVM::execute_loaded_function_with_tracing(
                     function,
                     args,
@@ -494,12 +494,9 @@ impl SimpleVMTestAdapter<'_> {
                     &mut logger,
                 );
                 let trace = logger.finish();
-                let replay_result = AsyncRuntimeTypeCheck::new(code_storage).replay(&trace);
-                match replay_result {
-                    Ok(_) => match result {
-                        Ok(return_values) => (return_values, Some(trace)),
-                        Err(err) => return (Err(err), Some(trace)),
-                    },
+                let replay_result = TypeChecker::new(code_storage).replay(&trace);
+                match replay_result.and(result) {
+                    Ok(return_values) => (return_values, Some(trace)),
                     Err(err) => return (Err(err), Some(trace)),
                 }
             } else {

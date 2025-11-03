@@ -65,7 +65,7 @@ use core::panic;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{AsyncRuntimeTypeCheck, Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
 use rayon::ThreadPool;
@@ -1233,12 +1233,13 @@ where
         )?;
 
         if environment.async_runtime_checks_enabled() && !trace.is_empty() {
-            // Note that the trace may be empty (if block was small and Block-STM decides not to
-            // collect the trace and replay, but run runtime checks in-place), so we check it in
-            // advance.
+            // Note that the trace may be empty (if block was small and executor decides not to
+            // collect the trace and replay, or if the VM decides it is not profitable to do this
+            // check for this particular transaction), so we check it in advance.
             let result = {
+                counters::update_txn_trace_counters(&trace);
                 let _timer = TRACE_REPLAY_SECONDS.start_timer();
-                AsyncRuntimeTypeCheck::new(&latest_view).replay(&trace)
+                TypeChecker::new(&latest_view).replay(&trace)
             };
 
             // In case of runtime type check errors, fallback to sequential execution. There errors
@@ -1753,7 +1754,7 @@ where
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
         };
 
-        let async_runtime_checks_enabled = should_perform_async_runtime_checks(
+        let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
             module_cache_manager_guard.environment(),
             num_txns,
             num_workers,
@@ -1913,7 +1914,7 @@ where
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
         };
 
-        let async_runtime_checks_enabled = should_perform_async_runtime_checks(
+        let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
             module_cache_manager_guard.environment(),
             num_txns,
             worker_ids.len() as u32,
@@ -2698,7 +2699,14 @@ where
     }
 }
 
-fn should_perform_async_runtime_checks(
+/// Returns true if runtime checks for transactions in this block can be performed asynchronously.
+///
+/// The returned value is based on a heuristic that determines if the optimization will have
+/// performance benefits for the block and is currently the following:
+///   - Runtime checks are allowed to be performed done during post-commit hook, and
+///   - Block is large enough to contain some use transactions (should be at least 4 to have a pair
+///     of user transactions, block prologue and block epilogue).
+fn should_perform_async_runtime_checks_for_block(
     environment: &AptosEnvironment,
     num_txns: u32,
     _num_workers: u32,

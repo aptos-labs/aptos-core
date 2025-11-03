@@ -40,7 +40,7 @@ use move_vm_runtime::{
     config::VMConfig,
     data_cache::{MoveVmDataCacheAdapter, TransactionDataCache},
     dispatch_loader,
-    execution_tracing::TraceLogger,
+    execution_tracing::TraceRecorder,
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
@@ -146,7 +146,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         loader: &impl Loader,
-        trace_logger: &mut impl TraceLogger,
+        trace_recorder: &mut impl TraceRecorder,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function_with_tracing(
             func,
@@ -156,7 +156,7 @@ where
             traversal_context,
             &mut self.extensions,
             loader,
-            trace_logger,
+            trace_recorder,
         )
     }
 

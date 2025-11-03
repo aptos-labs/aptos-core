@@ -4,7 +4,7 @@
 
 use crate::{
     data_cache::MoveVmDataCache,
-    execution_tracing::{NoOpTraceLogger, TraceLogger},
+    execution_tracing::{NoOpTraceRecorder, TraceRecorder},
     interpreter::Interpreter,
     interpreter_caches::InterpreterFunctionCaches,
     module_traversal::TraversalContext,
@@ -61,7 +61,7 @@ impl MoveVM {
             traversal_context,
             extensions,
             loader,
-            &mut NoOpTraceLogger,
+            &mut NoOpTraceRecorder,
         )
     }
 
@@ -84,7 +84,7 @@ impl MoveVM {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         loader: &impl Loader,
-        trace_logger: &mut impl TraceLogger,
+        trace_recorder: &mut impl TraceRecorder,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = loader.runtime_environment().vm_config();
 
@@ -129,7 +129,7 @@ impl MoveVM {
                 gas_meter,
                 traversal_context,
                 extensions,
-                trace_logger,
+                trace_recorder,
             )?
         };
 

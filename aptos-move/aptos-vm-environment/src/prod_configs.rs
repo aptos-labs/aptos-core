@@ -27,8 +27,9 @@ static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
 
 /// Controls when additional checks (such as paranoid type checks) are performed. If set to true,
 /// the trace may be collected during execution and Block-STM may perform the checks during post
-/// commit processing. Note that there are other factors that influence if checks are done async,
-/// such as block size, available workers, etc. If not set - does checks at runtime.
+/// commit processing once (instead of for every speculative execution). Note that there are other
+/// factors that influence if checks are done async, such as block size, available workers, etc. If
+/// not set - always performs the checks in-place at runtime.
 static ASYNC_RUNTIME_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 

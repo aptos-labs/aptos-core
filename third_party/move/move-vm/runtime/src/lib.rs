@@ -32,7 +32,7 @@ mod reentrancy_checker;
 mod runtime_ref_checks;
 mod runtime_type_checks;
 mod runtime_type_checks_async;
-pub use runtime_type_checks_async::AsyncRuntimeTypeCheck;
+pub use runtime_type_checks_async::TypeChecker;
 mod storage;
 
 pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};

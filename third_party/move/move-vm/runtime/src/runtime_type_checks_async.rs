@@ -4,16 +4,20 @@
 //! Defines async type checker that abstractly interprets Move bytecode to perform type checks
 //! based on the execution trace.
 //!
-//! The type checker should ideally be run in parallel and as a post-execution hook. Otherwise,
-//! if there is no parallelism or not enough transactions, running checks in-place is preferred.
+//! The type checker should only be used (as opposed to just performing the checks synchronously)
+//! if it can provide performance improvements. For example, to avoid redundant type checking
+//! during speculative parallel execution of transactions that are aborted (and instead performing
+//! the checks async once, and still in parallel).
 //!
-//! The type checker can safely use [UnmeteredGasMeter], or other unmetered APIs (e.g., fpr module
+//! The type checker can safely use [UnmeteredGasMeter], or other unmetered APIs (e.g., for module
 //! loading) because trace records only successful execution of instructions, and so the gas must
 //! have been charged during execution.
 //!
 //! The type checker is also not expected to fail. Any type check violations must be caught by the
-//! bytecode verifier, so the runtime checks are an additional safety net. Because of this property
-//! it is safe to run these checks after the actual execution.
+//! bytecode verifier, so the runtime checks are an additional safety net. Also, because checks are
+//! done over fully-substituted types, it is important that type substitution cannot fail here and
+//! this has to be enforced at execution time. Otherwise, user-defined code can fail checks because
+//! of running into limits that were not done at regular execution time.
 
 use crate::{
     config::VMConfig,
@@ -70,7 +74,7 @@ enum ExitCode {
 }
 
 /// Runtime type checker based on tracing.
-pub struct AsyncRuntimeTypeCheck<'a, T> {
+pub struct TypeChecker<'a, T> {
     /// Stores type information for type checks.
     type_stack: Stack,
     /// Stores function frames of callers.
@@ -87,7 +91,7 @@ pub struct AsyncRuntimeTypeCheck<'a, T> {
     ty_builder: &'a TypeBuilder,
 }
 
-impl<'a, T> AsyncRuntimeTypeCheck<'a, T>
+impl<'a, T> TypeChecker<'a, T>
 where
     T: ModuleStorage,
 {
@@ -138,7 +142,7 @@ where
     }
 }
 
-impl<'a, T> AsyncRuntimeTypeCheck<'a, T>
+impl<'a, T> TypeChecker<'a, T>
 where
     T: ModuleStorage,
 {
@@ -191,10 +195,9 @@ where
                     )?;
                 },
                 ExitCode::CallClosure => {
-                    let (callee, mask) = cursor.consume_closure_call().ok_or_else(|| {
-                        PartialVMError::new_invariant_violation("Call closure should be recorded")
-                            .finish(Location::Undefined)
-                    })?;
+                    let (callee, mask) = cursor
+                        .consume_closure_call()
+                        .map_err(|err| err.finish(Location::Undefined))?;
                     let callee_frame_cache = FrameTypeCache::make_rc_for_function(&callee);
                     self.execute_closure_call::<RTTCheck>(
                         cursor,
@@ -272,12 +275,7 @@ where
                     continue;
                 },
                 Bytecode::BrTrue(target) | Bytecode::BrFalse(target) => {
-                    let taken = cursor.consume_cond_br().ok_or_else(|| {
-                        PartialVMError::new_invariant_violation(
-                            "All conditional branches must be recorded",
-                        )
-                    })?;
-
+                    let taken = cursor.consume_branch()?;
                     if taken {
                         frame.pc = *target;
                     } else {
@@ -541,9 +539,7 @@ where
         }
 
         if native.function.is_dispatchable_native {
-            let target_func = cursor.consume_entrypoint().ok_or_else(|| {
-                PartialVMError::new_invariant_violation("Call closure should be recorded")
-            })?;
+            let target_func = cursor.consume_entrypoint()?;
             let frame_cache = self.function_caches.get_or_create_frame_cache(&target_func);
             RTTCheck::check_call_visibility(native, &target_func, CallType::NativeDynamicDispatch)?;
 
@@ -584,9 +580,7 @@ where
     where
         RTTCheck: RuntimeTypeCheck,
     {
-        let function = cursor.consume_entrypoint().ok_or_else(|| {
-            PartialVMError::new_invariant_violation("Entry-point should be always recorded")
-        })?;
+        let function = cursor.consume_entrypoint()?;
         let frame_cache = self.function_caches.get_or_create_frame_cache(&function);
 
         let num_params = function.param_tys().len();

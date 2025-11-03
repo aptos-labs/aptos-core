@@ -212,9 +212,9 @@ impl Frame {
             pc: 0,
             ty_builder,
             locals,
-            local_tys,
             function,
             call_type,
+            local_tys,
             frame_cache,
         })
     }

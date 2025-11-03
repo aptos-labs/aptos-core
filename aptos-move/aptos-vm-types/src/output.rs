@@ -109,6 +109,8 @@ impl VMOutput {
 
     /// Sets the trace for this output. Should only be called once to replace the default empty
     /// trace with one recorded by the Move VM.
+    ///
+    /// Panics if current putput stores non-empty trace.
     pub fn set_trace(&mut self, trace: Trace) {
         let old = mem::replace(&mut self.trace, trace);
         assert!(old.is_empty());
@@ -192,10 +194,18 @@ impl VMOutput {
             module_write_set,
             fee_statement,
             status,
-            // When converting to transaction output, trace is either irrelevant or has already
-            // been taken out.
-            trace: _,
+            trace,
         } = self;
+
+        // INVARIANT:
+        //   When converting to transaction output, trace is either irrelevant or has already been
+        //   extracted.
+        if !trace.is_empty() {
+            return Err(PanicError::CodeInvariantError(
+                "Non-empty trace found when converting to transaction output".to_string(),
+            ));
+        }
+
         let (write_set, events) = change_set
             .try_combine_into_storage_change_set(module_write_set)?
             .into_inner();

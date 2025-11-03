@@ -4,17 +4,15 @@
 //! Interfaces and implementations for [Trace] collection.
 
 use crate::{
-    execution_tracing::{
-        trace::{CondBrTrace, DynamicCall},
-        Trace,
-    },
+    execution_tracing::{trace::DynamicCall, Trace},
     LoadedFunction,
 };
+use bitvec::vec::BitVec;
 use move_core_types::function::ClosureMask;
 
 /// Interface for recording the trace at runtime. It is sufficient to record branch decisions as
 /// well as dynamic function calls originating from closures.
-pub trait TraceLogger {
+pub trait TraceRecorder {
     /// Returns true if the trace is being collected.
     fn is_enabled(&self) -> bool;
 
@@ -39,35 +37,35 @@ pub trait TraceLogger {
 
 /// Logger that collects the full trace of execution. Records the number of successfully executed
 /// instructions, branch outcomes and closure calls.
-pub struct FullTraceLogger {
+pub struct FullTraceRecorder {
     /// Number of successfully executed instructions.
     ticks: u64,
-    /// Branch outcomes.
-    branches: CondBrTrace,
+    /// Branch outcomes (taken or not taken), stored as a bit-vector.
+    branch_outcomes: BitVec,
     /// Dynamic call outcomes.
     calls: Vec<DynamicCall>,
 }
 
-impl FullTraceLogger {
-    /// Returns a new empty logger ready for trace collection.
+impl FullTraceRecorder {
+    /// Returns a new empty recorder ready for trace collection.
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             ticks: 0,
-            branches: CondBrTrace::with_capacity(64),
+            branch_outcomes: BitVec::with_capacity(64),
             calls: vec![],
         }
     }
 }
 
-impl TraceLogger for FullTraceLogger {
+impl TraceRecorder for FullTraceRecorder {
     #[inline(always)]
     fn is_enabled(&self) -> bool {
         true
     }
 
     fn finish(self) -> Trace {
-        Trace::from_logger(self.ticks, self.branches, self.calls)
+        Trace::from_recorder(self.ticks, self.branch_outcomes, self.calls)
     }
 
     #[inline(always)]
@@ -77,7 +75,7 @@ impl TraceLogger for FullTraceLogger {
 
     #[inline(always)]
     fn record_branch(&mut self, taken: bool) {
-        self.branches.push(taken);
+        self.branch_outcomes.push(taken);
     }
 
     #[inline(always)]
@@ -92,10 +90,10 @@ impl TraceLogger for FullTraceLogger {
     }
 }
 
-/// No-op instance of logger in case there is no need to collect execution trace at runtime.
-pub struct NoOpTraceLogger;
+/// No-op instance of recorder in case there is no need to collect execution trace at runtime.
+pub struct NoOpTraceRecorder;
 
-impl TraceLogger for NoOpTraceLogger {
+impl TraceRecorder for NoOpTraceRecorder {
     #[inline(always)]
     fn is_enabled(&self) -> bool {
         false
@@ -122,51 +120,51 @@ impl TraceLogger for NoOpTraceLogger {
 mod testing {
     use super::*;
     use crate::execution_tracing::TraceCursor;
-    use claims::{assert_none, assert_some_eq};
+    use claims::assert_ok_eq;
 
     #[test]
-    fn test_full_loger_is_enabled() {
-        let logger = FullTraceLogger::new();
-        assert!(logger.is_enabled());
+    fn test_full_recorder_is_enabled() {
+        let recorder = FullTraceRecorder::new();
+        assert!(recorder.is_enabled());
 
-        let logger = NoOpTraceLogger;
-        assert!(!logger.is_enabled());
+        let recorder = NoOpTraceRecorder;
+        assert!(!recorder.is_enabled());
     }
 
     #[test]
     fn test_ticks_recorded() {
-        let mut logger = FullTraceLogger::new();
-        assert_eq!(logger.ticks, 0);
+        let mut recorder = FullTraceRecorder::new();
+        assert_eq!(recorder.ticks, 0);
 
-        logger.record_successful_instruction();
-        assert_eq!(logger.ticks, 1);
+        recorder.record_successful_instruction();
+        assert_eq!(recorder.ticks, 1);
 
         for _ in 0..10 {
-            logger.record_successful_instruction();
+            recorder.record_successful_instruction();
         }
-        assert_eq!(logger.ticks, 11);
+        assert_eq!(recorder.ticks, 11);
     }
 
     #[test]
     fn test_branches_recorded() {
-        let mut logger = FullTraceLogger::new();
+        let mut recorder = FullTraceRecorder::new();
 
         let expected = [
             true, true, false, true, false, false, false, true, false, false, true, true, true,
         ];
         for taken in expected {
-            logger.record_branch(taken);
+            recorder.record_branch(taken);
         }
 
-        let trace = logger.finish();
+        let trace = recorder.finish();
         assert!(!trace.is_empty());
 
         let mut cursor = TraceCursor::new(&trace);
         for taken in expected {
-            let recorded = cursor.consume_cond_br();
-            assert_some_eq!(recorded, taken);
+            let recorded = cursor.consume_branch();
+            assert_ok_eq!(recorded, taken);
         }
-        assert_none!(cursor.consume_cond_br());
+        assert!(cursor.consume_branch().is_err());
         assert!(cursor.is_done());
     }
 }

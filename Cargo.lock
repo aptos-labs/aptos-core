@@ -4945,6 +4945,7 @@ dependencies = [
  "once_cell",
  "serde",
  "sha3 0.9.1",
+ "triomphe",
 ]
 
 [[package]]
