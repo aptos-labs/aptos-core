@@ -20,7 +20,7 @@ use ark_ff::Field;
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::{
-    rand::{CryptoRng, RngCore},
+    rand::{CryptoRng, Rng, RngCore},
     UniformRand,
 };
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
@@ -31,6 +31,12 @@ pub struct Commitment<E: Pairing>(pub E::G1);
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
+
+impl<E: Pairing> UniformRand for CommitmentRandomness<E> {
+    fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
+        CommitmentRandomness(E::ScalarField::rand(rng))
+    }
+}
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {

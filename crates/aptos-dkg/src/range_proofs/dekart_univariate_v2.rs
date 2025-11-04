@@ -37,9 +37,6 @@ pub struct Proof<E: Pairing> {
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(pub(crate) E::G1);
-
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
@@ -53,7 +50,7 @@ pub struct ProverKey<E: Pairing> {
 pub struct PublicStatement<E: Pairing> {
     n: usize,
     ell: usize,
-    comm: Commitment<E>,
+    comm: univariate_hiding_kzg::Commitment<E>,
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -211,9 +208,9 @@ fn compute_h_denom_eval<E: Pairing>(
 }
 
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
-    type Commitment = Commitment<E>;
+    type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
-    type CommitmentRandomness = E::ScalarField;
+    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
@@ -277,27 +274,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ck_S: &Self::CommitmentKey,
         values: &[Self::Input],
         rho: &Self::CommitmentRandomness,
-    ) -> Commitment<E> {
+    ) -> Self::Commitment {
         let mut values_shifted = vec![E::ScalarField::ZERO]; // start with 0,
         values_shifted.extend(values); // then append all values from the original vector
 
-        Commitment(
-            univariate_hiding_kzg::commit_with_randomness(
-                ck_S,
-                &values_shifted,
-                &univariate_hiding_kzg::CommitmentRandomness(*rho),
-            )
-            .0,
-        )
-
-        // let hiding_kzg_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-        //     lagr_g1: &ck_S.lagr_g1,
-        //     xi_1: ck_S.xi_1,
-        // };
-
-        // let hiding_kzg_input = (*rho, values_shifted);
-
-        // Commitment(hiding_kzg_hom.apply(&hiding_kzg_input).0)
+        univariate_hiding_kzg::commit_with_randomness(ck_S, &values_shifted, rho)
     }
 
     #[allow(non_snake_case)]
@@ -330,7 +311,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             n,
             max_n
         );
-        // TODO: Use a subdomain to make the FFTs smaller
+        // TODO: Use a subdomain to make the FFTs smaller, when n is much smaller than max_n
         assert!(
             ell <= max_ell,
             "ell (got {}) must be ≤ max_ell (which is {})",
@@ -583,7 +564,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 10
         let s = E::ScalarField::rand(rng);
 
-        let rho_u = mu * (*rho + delta_rho)
+        let rho_u = mu * (rho.0 + delta_rho)
             + mu_h * rho_h
             + mus
                 .iter()

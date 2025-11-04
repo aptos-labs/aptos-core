@@ -79,11 +79,8 @@ impl<E: Pairing> Scalar<E> {
     }
 
     /// Converts a `&[E::ScalarField]` into a `Vec<Scalar<E>>` safely.
-    pub fn vec_from_inner_slice(slice: &[E::ScalarField]) -> Vec<Self>
-    where
-        E::ScalarField: Clone,
-    {
-        slice.iter().cloned().map(Self).collect()
+    pub fn vec_from_inner_slice(slice: &[E::ScalarField]) -> Vec<Self> {
+        slice.iter().copied().map(Self).collect()
     }
 }
 
