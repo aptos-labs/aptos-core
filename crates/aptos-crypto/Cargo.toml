@@ -107,6 +107,10 @@ name = "ark_bn254"
 harness = false
 
 [[bench]]
+name = "ark_rand"
+harness = false
+
+[[bench]]
 name = "bls12381"
 harness = false
 

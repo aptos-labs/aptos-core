@@ -8,13 +8,13 @@ use crate::{
 use anyhow::anyhow;
 use rand::{seq::IteratorRandom, Rng};
 use rand_core::{CryptoRng, RngCore};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Encodes the *threshold configuration* for a normal/unweighted PVSS: i.e., the threshold $t$ and
 /// the number of players $n$ such that any $t$ or more players can reconstruct a dealt secret given
 /// a PVSS transcript. Due to the last fields, this struct should only be used in the context of `blstrs`
-#[derive(Clone, PartialEq, Deserialize, Serialize, Debug, Eq)]
+#[derive(Clone, PartialEq, Serialize, Debug, Eq)]
 pub struct ThresholdConfigBlstrs {
     /// The reconstruction threshold $t$ that must be exceeded in order to reconstruct the dealt
     /// secret; i.e., $t$ or more shares are needed
@@ -23,10 +23,31 @@ pub struct ThresholdConfigBlstrs {
     pub(crate) n: usize,
     /// Evaluation domain consisting of the $N$th root of unity and other auxiliary information
     /// needed to compute an FFT of size $N$.
+    #[serde(skip)]
     dom: EvaluationDomain,
     /// Batch evaluation domain, consisting of all the $N$th roots of unity (in the scalar field),
     /// where N is the smallest power of two such that n <= N.
+    #[serde(skip)]
     batch_dom: BatchEvaluationDomain,
+}
+
+impl<'de> Deserialize<'de> for ThresholdConfigBlstrs {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        // Deserialize only the serializable fields (t, n)
+        #[derive(Deserialize)]
+        struct SerializedFields {
+            t: usize,
+            n: usize,
+        }
+
+        let serialized = SerializedFields::deserialize(deserializer)?;
+
+        // Rebuild the skipped fields using `new`
+        ThresholdConfigBlstrs::new(serialized.t, serialized.n).map_err(serde::de::Error::custom)
+    }
 }
 
 impl ThresholdConfigBlstrs {
@@ -55,11 +76,6 @@ impl ThresholdConfigBlstrs {
             dom,
             batch_dom,
         })
-    }
-
-    /// Returns the threshold $t$. Recall that $\ge t$ shares are needed to reconstruct.
-    pub fn get_threshold(&self) -> usize {
-        self.t
     }
 
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
@@ -106,6 +122,13 @@ impl traits::SecretSharingConfig for ThresholdConfigBlstrs {
 
     fn get_total_num_shares(&self) -> usize {
         self.n
+    }
+}
+
+impl traits::ThresholdConfig for ThresholdConfigBlstrs {
+    /// Returns the threshold $t$. Recall that $\ge t$ shares are needed to reconstruct.
+    fn get_threshold(&self) -> usize {
+        self.t
     }
 }
 

@@ -3,16 +3,20 @@
 
 use crate::{
     fiat_shamir,
-    pvss::{traits, ThresholdConfigBlstrs},
+    pvss::traits::{self, SecretSharingConfig},
+    traits::ThresholdConfig,
 };
 use serde::Serialize;
 
 /// Securely derives a Fiat-Shamir challenge via Merlin.
 /// Returns (n+1-t) random scalars for the SCRAPE LDT test (i.e., the random polynomial itself).
 /// Additionally returns `num_scalars` random scalars for some linear combinations.
-pub(crate) fn derive_challenge_scalars<T: traits::Transcript, A: Serialize>(
+pub(crate) fn derive_challenge_scalars<
+    T: traits::Transcript<SecretSharingConfig: ThresholdConfig>,
+    A: Serialize,
+>(
     trx: &T,
-    sc: &ThresholdConfigBlstrs,
+    sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     spks: &Vec<T::SigningPubKey>,
     eks: &Vec<T::EncryptPubKey>,
@@ -29,8 +33,8 @@ pub(crate) fn derive_challenge_scalars<T: traits::Transcript, A: Serialize>(
     (
         <merlin::Transcript as fiat_shamir::PVSS<T>>::challenge_dual_code_word_polynomial(
             &mut fs_t,
-            sc.t,
-            sc.n + 1,
+            sc.get_threshold(),
+            sc.get_total_num_shares() + 1,
         ),
         <merlin::Transcript as fiat_shamir::PVSS<T>>::challenge_linear_combination_scalars(
             &mut fs_t,

@@ -5,34 +5,36 @@
 
 pub mod differentiate;
 pub mod hashing;
+pub mod rand;
 pub mod serialization;
 pub mod shamir;
 pub mod vanishing_poly;
 
-use ark_ec::{pairing::Pairing, CurveGroup};
-use ark_ff::{BigInteger, PrimeField};
+use ark_ec::AffineRepr;
+use ark_ff::{BigInteger, FftField, Field, PrimeField};
 use ark_poly::EvaluationDomain;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]
-pub fn powers_of_two<E: Pairing>(ell: usize) -> Vec<E::ScalarField> {
-    (0..ell).map(|j| E::ScalarField::from(1u64 << j)).collect()
+pub fn powers_of_two<F: Field>(ell: usize) -> Vec<F> {
+    (0..ell).map(|j| F::from(1u64 << j)).collect()
 }
 
-/// Commit to scalars by multiplying a base group element with each scalar.
+/// Commit to scalars by multiplying a base group element (in affine representation)
+/// with each scalar.
 ///
 /// Equivalent to `[base * s for s in scalars]`.
-pub fn commit_to_scalars<G, F>(commitment_base: &G, scalars: &[F]) -> Vec<G>
-where
-    G: CurveGroup<ScalarField = F>,
-    F: PrimeField,
-{
+pub fn commit_to_scalars<P: AffineRepr>(
+    commitment_base: &P,
+    scalars: &[P::ScalarField],
+) -> Vec<P::Group> {
     scalars.iter().map(|s| *commitment_base * s).collect()
 }
 
 // TODO: There's probably a better way to do this?
-/// Converts a prime field scalar into a `u32`, if possible.
-pub fn scalar_to_u32<F: ark_ff::PrimeField>(scalar: &F) -> Option<u32> {
+/// Converts a prime field scalar into a `u32`, if possible. Using
+/// `PrimeField` because `into_bigint()` needs it for some reason.
+pub fn scalar_to_u32<F: PrimeField>(scalar: &F) -> Option<u32> {
     let mut bytes = scalar.into_bigint().to_bytes_le();
 
     while bytes.last() == Some(&0) {
@@ -52,8 +54,8 @@ pub fn scalar_to_u32<F: ark_ff::PrimeField>(scalar: &F) -> Option<u32> {
 }
 
 /// Computes all `num_omegas`-th roots of unity in the scalar field, where `num_omegas` must be a power of two.
-pub fn compute_roots_of_unity<E: Pairing>(num_omegas: usize) -> Vec<E::ScalarField> {
-    let eval_dom = ark_poly::Radix2EvaluationDomain::<E::ScalarField>::new(num_omegas)
+pub fn compute_roots_of_unity<F: FftField>(num_omegas: usize) -> Vec<F> {
+    let eval_dom = ark_poly::Radix2EvaluationDomain::<F>::new(num_omegas)
         .expect("Could not reconstruct evaluation domain");
     eval_dom.elements().collect()
 }

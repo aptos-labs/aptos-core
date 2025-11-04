@@ -202,7 +202,7 @@ impl traits::Transcript for Transcript {
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         let (f, extra) = fiat_shamir::derive_challenge_scalars(
             self,
-            sc.get_threshold_config(),
+            sc,
             pp,
             spks,
             eks,

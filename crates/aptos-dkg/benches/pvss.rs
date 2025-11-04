@@ -16,7 +16,7 @@ use aptos_dkg::{
         },
         traits::{
             transcript::{MalleableTranscript, Transcript},
-            SecretSharingConfig,
+            SecretSharingConfig, ThresholdConfig,
         },
         LowDegreeTest, WeightedConfig,
     },
