@@ -5,7 +5,7 @@
 //! corresponds to a polynomial of bounded degree. It implements the dual code word
 //! approach of the SCRAPE protocol [CD17e].
 
-use crate::{arkworks, arkworks::rand};
+use crate::{arkworks, arkworks::random};
 use anyhow::{bail, ensure, Context};
 use ark_ec::CurveGroup;
 use ark_ff::{FftField, PrimeField};
@@ -93,7 +93,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
     }
 
     /// Creates a new LDT by picking a random polynomial `f` of expected degree `n-t-1`.
-    pub fn random<R: rand_core::RngCore + rand_core::CryptoRng>(
+    pub fn random<R: rand::RngCore + rand::CryptoRng>(
         mut rng: &mut R,
         t: usize,
         n: usize,
@@ -101,7 +101,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
         batch_dom: &'a Radix2EvaluationDomain<F>,
     ) -> Self {
         Self::new(
-            rand::sample_field_elements(n - t, &mut rng),
+            random::sample_field_elements(n - t, &mut rng),
             t,
             n,
             includes_zero,
@@ -197,5 +197,73 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
                 tmp
             })
             .collect::<Vec<F>>()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::arkworks::shamir::ThresholdConfig;
+    use ark_bn254::Fr;
+    use ark_ff::{FftField, PrimeField};
+    use ark_poly::domain::Radix2EvaluationDomain;
+    use ark_std::vec::Vec;
+    use rand::{rngs::mock::StepRng, thread_rng};
+
+    // Helper to generate a mock evaluation domain for testing
+    fn get_batch_domain<F: FftField>(size: usize) -> Radix2EvaluationDomain<F> {
+        Radix2EvaluationDomain::new(size).unwrap()
+    }
+
+    // Helper to simulate sampling random elements
+    fn sample_random_polynomial<F: PrimeField, R: rand::Rng>(degree: usize, rng: &mut R) -> Vec<F> {
+        random::sample_field_elements(degree + 1, rng)
+    }
+
+    #[test]
+    fn test_ldt_correctness() {
+        let mut rng = StepRng::new(0, 1);
+        let t = 3;
+        let n = 5;
+        let batch_dom = get_batch_domain::<Fr>(n);
+
+        let f = sample_random_polynomial::<Fr, _>(n - t - 1, &mut rng);
+
+        let ldt = LowDegreeTest::new(f.clone(), t, n, false, &batch_dom).unwrap();
+
+        // Generate mock evaluations of the polynomial (e.g., at roots of unity)
+        let mut evals = batch_dom.fft(&f);
+        evals.truncate(n);
+
+        // Run the low degree test
+        assert!(ldt.low_degree_test(&evals).is_ok());
+    }
+
+    #[test]
+    fn test_ldt_soundness() {
+        let mut rng = thread_rng();
+
+        for t in 1..8 {
+            for n in (t + 1)..(3 * t + 1) {
+                let sc = ThresholdConfig::new(t, n);
+
+                // A degree t polynomial f(X), higher by 1 than what the LDT expects
+                let p = sample_random_polynomial::<Fr, _>(t, &mut rng);
+
+                let mut evals = sc.domain.fft(&p);
+                evals.truncate(n);
+
+                // Test deg(p) < t, given evals at roots of unity
+                // This should fail, since deg(p) = t
+                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, false, &sc.domain);
+                assert!(ldt.low_degree_test(&evals).is_err());
+
+                // // Test deg(p) < t, given evals at roots of unity and given p(0)
+                // // This should fail, since deg(p) = t
+                // evals.push(p[0]);
+                // let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, true, &sc.domain);
+                // assert!(ldt.low_degree_test(&evals).is_err());
+            }
+        }
     }
 }

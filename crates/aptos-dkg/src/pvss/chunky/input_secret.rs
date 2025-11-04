@@ -24,7 +24,7 @@ impl<F: ark_ff::PrimeField> Uniform for InputSecret<F> {
         R: rand::RngCore + rand::CryptoRng,
     {
         Self {
-            a: arkworks::rand::sample_field_element(rng),
+            a: arkworks::random::sample_field_element(rng),
         }
     }
 }
