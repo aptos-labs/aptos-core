@@ -6,7 +6,8 @@
 //! approach of the SCRAPE protocol [CD17e].
 
 use crate::{arkworks, arkworks::rand};
-use anyhow::{bail, Context};
+use anyhow::{bail, ensure, Context};
+use ark_ec::CurveGroup;
 use ark_ff::{FftField, PrimeField};
 use ark_poly::domain::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::vec::Vec;
@@ -66,6 +67,29 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
             n,
             batch_dom,
         })
+    }
+
+    /// Performs the LDT given group elements
+    pub fn low_degree_test_group<C: CurveGroup<ScalarField = F>>(
+        self,
+        evals: &Vec<C>,
+    ) -> anyhow::Result<()> {
+        if evals.len() != self.n {
+            bail!("Expected {} evaluations; got {}", self.n, evals.len())
+        }
+
+        if self.t == self.n {
+            return Ok(());
+        }
+
+        let v_times_f = self.dual_code_word();
+
+        debug_assert_eq!(evals.len(), v_times_f.len());
+        let msm_result = C::msm(&C::normalize_batch(evals), v_times_f.as_slice()).unwrap();
+
+        ensure!(msm_result == C::ZERO);
+
+        Ok(())
     }
 
     /// Creates a new LDT by picking a random polynomial `f` of expected degree `n-t-1`.
