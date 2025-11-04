@@ -3,7 +3,7 @@
 
 mod function_generator;
 pub mod module_generator;
-mod peephole_optimizer;
+pub mod peephole_optimizer;
 
 use crate::{file_format_generator::module_generator::ModuleContext, options::Options, Experiment};
 use legacy_move_compiler::compiled_unit as CU;

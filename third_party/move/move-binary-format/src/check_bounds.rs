@@ -545,6 +545,23 @@ impl<'a> BoundsChecker<'a> {
                         )?;
                     }
                 },
+                BorrowGetField(local_idx, field_idx) => {
+                    let local_idx = *local_idx as usize;
+                    if local_idx >= locals_count {
+                        return Err(self.offset_out_of_bounds(
+                            StatusCode::INDEX_OUT_OF_BOUNDS,
+                            IndexKind::LocalPool,
+                            local_idx,
+                            locals_count,
+                            bytecode_offset as CodeOffset,
+                        ));
+                    }
+                    self.check_code_unit_bounds_impl_opt(
+                        &self.view.field_handles(),
+                        *field_idx,
+                        bytecode_offset,
+                    )?;
+                },
                 Call(idx) | PackClosure(idx, _) => self.check_code_unit_bounds_impl(
                     self.view.function_handles(),
                     *idx,
@@ -647,6 +664,19 @@ impl<'a> BoundsChecker<'a> {
                         ));
                     }
                 },
+
+                DropLoc(idx) => {
+                    let idx = *idx as usize;
+                    if idx >= locals_count {
+                        return Err(self.offset_out_of_bounds(
+                            StatusCode::INDEX_OUT_OF_BOUNDS,
+                            IndexKind::LocalPool,
+                            idx,
+                            locals_count,
+                            bytecode_offset as CodeOffset,
+                        ));
+                    }
+                }
 
                 // Instructions that refer to a signature
                 CallClosure(idx)

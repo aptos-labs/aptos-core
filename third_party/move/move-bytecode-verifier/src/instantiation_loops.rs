@@ -252,6 +252,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                     | Bytecode::LdFalse
                     | Bytecode::CopyLoc(_)
                     | Bytecode::MoveLoc(_)
+                    | Bytecode::DropLoc(_)
                     | Bytecode::StLoc(_)
                     | Bytecode::FreezeRef
                     | Bytecode::MutBorrowLoc(_)
@@ -260,6 +261,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                     | Bytecode::ImmBorrowField(_)
                     | Bytecode::MutBorrowFieldGeneric(_)
                     | Bytecode::ImmBorrowFieldGeneric(_)
+                    | Bytecode::BorrowGetField(_, _)
                     | Bytecode::Call(_)
                     | Bytecode::Pack(_)
                     | Bytecode::Unpack(_)

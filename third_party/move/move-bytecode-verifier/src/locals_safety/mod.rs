@@ -61,6 +61,15 @@ fn execute_inner(
             LocalState::Available => (),
         },
 
+        Bytecode::DropLoc(idx) => {
+            match state.local_state(*idx) {
+                LocalState::MaybeAvailable | LocalState::Unavailable => {
+                    return Err(state.error(StatusCode::DROPLOC_UNAVAILABLE_ERROR, offset))
+                },
+                LocalState::Available => state.set_unavailable(*idx),
+            }
+        },
+
         Bytecode::MutBorrowLoc(idx) | Bytecode::ImmBorrowLoc(idx) => {
             match state.local_state(*idx) {
                 LocalState::Unavailable | LocalState::MaybeAvailable => {
@@ -86,6 +95,15 @@ fn execute_inner(
                     },
                     _ => (),
                 }
+            }
+        },
+
+        Bytecode::BorrowGetField(local_idx, _) => {
+            match state.local_state(*local_idx) {
+                LocalState::Unavailable | LocalState::MaybeAvailable => {
+                    return Err(state.error(StatusCode::BORROWLOC_UNAVAILABLE_ERROR, offset))
+                },
+                LocalState::Available => (),
             }
         },
 

@@ -1561,6 +1561,24 @@ pub enum Bytecode {
 
     #[group = "stack_and_local"]
     #[description = r#"
+        Drop the local identified by the local index.
+
+        Once dropped, the local becomes invalid to use, unless a store operation writes
+        to the local before any read to that local.
+    "#]
+    #[static_operands = "[local_idx]"]
+    #[semantics = r#"
+        stack << locals[local_idx]
+        locals[local_idx] = invalid
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty = clone local_ty
+        ty_stack << ty
+    "#]
+    DropLoc(LocalIndex),
+
+    #[group = "stack_and_local"]
+    #[description = r#"
         Pop value from the top of the stack and store it into the local identified by the local index.
 
         If the local contains an old value, then that value is dropped.
@@ -2002,6 +2020,26 @@ pub enum Bytecode {
         ty_stack << &field_ty
     "#]
     ImmBorrowVariantFieldGeneric(VariantFieldInstantiationIndex),
+
+    #[group = "struct"]
+    #[static_operands = "[field_inst_idx]"]
+    #[description = r#"
+        Consume the reference to a generic struct at the top of the stack,
+        and load an immutable reference to the field identified by the
+        field handle index.
+    "#]
+    #[semantics = r#"
+        stack >> struct_ref
+        stack << &(*struct_ref).field(field_index)
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
+    "#]
+    #[gas_type_creation_tier_0 = "struct_ty"]
+    #[gas_type_creation_tier_1 = "field_ty"]
+    BorrowGetField(LocalIndex, FieldHandleIndex),
 
     #[group = "global"]
     #[static_operands = "[struct_def_idx]"]
@@ -3083,6 +3121,7 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::CopyLoc(a) => write!(f, "CopyLoc({})", a),
             Bytecode::MoveLoc(a) => write!(f, "MoveLoc({})", a),
             Bytecode::StLoc(a) => write!(f, "StLoc({})", a),
+            Bytecode::DropLoc(a) => write!(f, "DropLoc({})", a),
             Bytecode::Call(a) => write!(f, "Call({})", a),
             Bytecode::CallGeneric(a) => write!(f, "CallGeneric({})", a),
             Bytecode::Pack(a) => write!(f, "Pack({})", a),
@@ -3116,6 +3155,9 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::ImmBorrowVariantField(a) => write!(f, "ImmBorrowVariantField({:?})", a),
             Bytecode::ImmBorrowVariantFieldGeneric(a) => {
                 write!(f, "ImmBorrowVariantFieldGeneric({:?})", a)
+            },
+            Bytecode::BorrowGetField(local_idx, field_idx) => {
+                write!(f, "BorrowGetField({:?}, {:?})", local_idx, field_idx)
             },
             Bytecode::MutBorrowGlobal(a) => write!(f, "MutBorrowGlobal({:?})", a),
             Bytecode::MutBorrowGlobalGeneric(a) => write!(f, "MutBorrowGlobalGeneric({:?})", a),
@@ -3274,6 +3316,7 @@ impl Bytecode {
             | LdFalse
             | CopyLoc(_)
             | MoveLoc(_)
+            | DropLoc(_)
             | StLoc(_)
             | MutBorrowLoc(_)
             | ImmBorrowLoc(_)
@@ -3281,6 +3324,7 @@ impl Bytecode {
             | ImmBorrowField(_)
             | MutBorrowFieldGeneric(_)
             | ImmBorrowFieldGeneric(_)
+            | BorrowGetField(_, _)
             | Call(_)
             | CallGeneric(_)
             | Pack(_)

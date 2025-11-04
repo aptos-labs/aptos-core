@@ -5,10 +5,13 @@
 //! Peephole optimizations assume that the bytecode is valid, and all user-facing
 //! error checks have already been performed.
 
+mod collapse_ops;
 pub mod inefficient_loads;
 pub mod optimizers;
 pub mod reducible_pairs;
 
+use crate::file_format_generator::peephole_optimizer::optimizers::WindowOptimizer;
+use crate::{Experiment, Options};
 use inefficient_loads::InefficientLoads;
 use move_binary_format::{
     control_flow_graph::{ControlFlowGraph, VMControlFlowGraph},
@@ -17,6 +20,7 @@ use move_binary_format::{
 use optimizers::{BasicBlockOptimizer, TransformedCodeChunk, WindowProcessor};
 use reducible_pairs::ReduciblePairs;
 use std::collections::BTreeMap;
+use std::rc::Rc;
 
 /// Pre-requisite: `code` should not have spec block associations.
 /// Run peephole optimizers on the given `code`, possibly modifying it.
@@ -24,6 +28,26 @@ use std::collections::BTreeMap;
 /// in `code`.
 pub fn optimize(code: &[Bytecode]) -> TransformedCodeChunk {
     BasicBlockOptimizerPipeline::default().optimize(code)
+}
+
+/// Pre-requisite: `code` should not have spec block associations.
+/// Run peephole optimizers on the given `code`, possibly modifying it.
+/// Returns the optimized code, along with mapping to original offsets
+/// in `code`.
+pub fn optimize_extended(code: &[Bytecode], options: Rc<Options>) -> TransformedCodeChunk {
+    let mut optimizers: Vec<Box<dyn BasicBlockOptimizer>> = vec![
+        Box::new(WindowProcessor::new(ReduciblePairs)),
+        Box::new(WindowProcessor::new(InefficientLoads)),
+    ];
+    if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION_DROP_LOC) {
+        optimizers.push(Box::new(WindowProcessor::new(collapse_ops::CollapseToDrop)));
+    }
+    if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION_BORROW_GET_FIELD) {
+        optimizers.push(Box::new(WindowProcessor::new(collapse_ops::CollapseToBorrowGetField)));
+    }
+
+    let pipeline = BasicBlockOptimizerPipeline { optimizers };
+    pipeline.optimize(code)
 }
 
 /// A pipeline of basic block optimizers.

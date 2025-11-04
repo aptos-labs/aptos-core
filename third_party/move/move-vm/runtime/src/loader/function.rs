@@ -614,6 +614,12 @@ impl Function {
             Some(code) => code.code.clone(),
             None => vec![],
         };
+
+        // Hacky peephole optimizer
+        // let optimized_chunk =
+        //     move_compiler_v2::file_format_generator::peephole_optimizer::optimize(&code);
+        // let code = optimized_chunk.code;
+
         let ty_param_abilities = handle.type_parameters.clone();
 
         let return_tys = signature_table[handle.return_.0 as usize].clone();

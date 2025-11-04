@@ -1865,6 +1865,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::COPY_LOC => Bytecode::CopyLoc(load_local_index(cursor)?),
             Opcodes::MOVE_LOC => Bytecode::MoveLoc(load_local_index(cursor)?),
             Opcodes::ST_LOC => Bytecode::StLoc(load_local_index(cursor)?),
+            Opcodes::DROP_LOC => Bytecode::DropLoc(load_local_index(cursor)?),
             Opcodes::MUT_BORROW_LOC => Bytecode::MutBorrowLoc(load_local_index(cursor)?),
             Opcodes::IMM_BORROW_LOC => Bytecode::ImmBorrowLoc(load_local_index(cursor)?),
             Opcodes::MUT_BORROW_FIELD => Bytecode::MutBorrowField(load_field_handle_index(cursor)?),
@@ -1886,6 +1887,11 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             },
             Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC => {
                 Bytecode::ImmBorrowVariantFieldGeneric(load_variant_field_inst_index(cursor)?)
+            },
+            Opcodes::BORROW_GET_FIELD => {
+                let local_idx = load_local_index(cursor)?;
+                let field_idx = load_field_handle_index(cursor)?;
+                Bytecode::BorrowGetField(local_idx, field_idx)
             },
             Opcodes::CALL => Bytecode::Call(load_function_handle_index(cursor)?),
             Opcodes::CALL_GENERIC => Bytecode::CallGeneric(load_function_inst_index(cursor)?),
@@ -2226,6 +2232,10 @@ impl Opcodes {
             0x65 => Ok(Opcodes::CAST_I128),
             0x66 => Ok(Opcodes::CAST_I256),
             0x67 => Ok(Opcodes::NEGATE),
+            // Experiments
+            0x69 => Ok(Opcodes::DROP_LOC),
+            0x70 => Ok(Opcodes::BORROW_GET_FIELD),
+            0x71 => Ok(Opcodes::BORROW_GET_FIELD_GENERIC),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
                 .with_message(format!("code {:X}", value))),
         }

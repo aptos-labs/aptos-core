@@ -43,6 +43,7 @@ use move_core_types::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
 };
+use move_vm_types::values::{Container, DEFAULT_MAX_VM_VALUE_NESTED_DEPTH};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
@@ -2068,6 +2069,15 @@ impl Frame {
 
                         interpreter.operand_stack.push(local)?;
                     },
+                    Bytecode::DropLoc(idx) => {
+                        // MoveLoc
+                        let local = self.locals.move_loc(*idx as usize)?;
+                        gas_meter.charge_move_loc(&local)?;
+                        // interpreter.operand_stack.push(local)?;
+                        // Pop
+                        // let local = interpreter.operand_stack.pop()?;
+                        gas_meter.charge_pop(local)?;
+                    },
                     Bytecode::StLoc(idx) => {
                         let value_to_store = interpreter.operand_stack.pop()?;
                         gas_meter.charge_store_loc(&value_to_store)?;
@@ -2086,9 +2096,8 @@ impl Frame {
                             _ => S::ImmBorrowLoc,
                         };
                         gas_meter.charge_simple_instr(instr)?;
-                        interpreter
-                            .operand_stack
-                            .push(self.locals.borrow_loc(*idx as usize)?)?;
+                        let local_ref = self.locals.borrow_loc(*idx as usize)?;
+                        interpreter.operand_stack.push(local_ref)?;
                     },
                     Bytecode::ImmBorrowField(fh_idx) | Bytecode::MutBorrowField(fh_idx) => {
                         let instr = match instruction {
@@ -2181,6 +2190,14 @@ impl Frame {
                             },
                         )?;
                         interpreter.operand_stack.push(field_ref)?;
+                    },
+                    Bytecode::BorrowGetField(local_idx, field_idx) => {
+                        let local_idx = *local_idx as usize;
+                        let field_offset = self.field_offset(*field_idx);
+
+                        let field_value = self.locals.get_field(local_idx, field_offset)?;
+
+                        interpreter.operand_stack.push(field_value)?;
                     },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = self.field_count(*sd_idx);

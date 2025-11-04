@@ -334,12 +334,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::LdConst(_)
             | Bytecode::CopyLoc(_)
             | Bytecode::MoveLoc(_)
+            | Bytecode::DropLoc(_)
             | Bytecode::MutBorrowLoc(_)
             | Bytecode::ImmBorrowLoc(_)
             | Bytecode::ImmBorrowField(_)
             | Bytecode::MutBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
             | Bytecode::MutBorrowFieldGeneric(_)
+            | Bytecode::BorrowGetField(_, _)
             | Bytecode::PackClosure(..)
             | Bytecode::PackClosureGeneric(..)
             | Bytecode::Pack(_)
@@ -513,6 +515,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let ty = frame.local_ty_at(*idx as usize).clone();
                 operand_stack.push_ty(ty)?;
             },
+            Bytecode::DropLoc(idx) => {
+                let ty = frame.local_ty_at(*idx as usize).clone();
+                // operand_stack.push_ty(ty)?;
+                // let ty = operand_stack.pop_ty()?;
+                ty.paranoid_check_has_ability(Ability::Drop)?;
+            },
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
                 let ty = frame.local_ty_at(*idx as usize);
@@ -582,6 +590,25 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::PackClosure(..) | Bytecode::PackClosureGeneric(..) => {
                 // Skip: runtime checks are implemented in interpreter loop!
+            },
+
+            Bytecode::BorrowGetField(local_idx, field_handle_idx) => {
+                // ImmBorrowLoc
+                let ty = frame.local_ty_at(*local_idx as usize);
+                let ref_ty = ty_builder.create_ref_ty(ty, false)?;
+                operand_stack.push_ty(ref_ty)?;
+                // ImmBorrowField
+                let ty = operand_stack.pop_ty()?;
+                let expected_ty = frame.field_handle_to_struct(*field_handle_idx);
+                ty.paranoid_check_ref_eq(&expected_ty, false)?;
+
+                let field_ty = frame.get_field_ty(*field_handle_idx)?;
+                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                operand_stack.push_ty(field_ref_ty)?;
+                // ReadRef
+                let ref_ty = operand_stack.pop_ty()?;
+                let inner_ty = ref_ty.paranoid_read_ref()?;
+                operand_stack.push_ty(inner_ty)?;
             },
 
             Bytecode::Pack(idx) => {

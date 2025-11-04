@@ -143,6 +143,7 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::LdConst(_)
             | Bytecode::CopyLoc(_)
             | Bytecode::MoveLoc(_)
+            | Bytecode::BorrowGetField(_, _)
             | Bytecode::MutBorrowLoc(_)
             | Bytecode::ImmBorrowLoc(_) => (0, 1),
 
@@ -221,7 +222,7 @@ impl<'a> StackUsageVerifier<'a> {
             Bytecode::VecSwap(_) => (3, 0),
 
             // Branch and Nop neither pops nor pushes
-            Bytecode::Branch(_) | Bytecode::Nop => (0, 0),
+            Bytecode::Branch(_) | Bytecode::Nop | Bytecode::DropLoc(_) => (0, 0),
 
             // Return performs `return_count` pops
             Bytecode::Ret => {

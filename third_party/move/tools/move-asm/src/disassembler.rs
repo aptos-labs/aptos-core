@@ -376,9 +376,9 @@ impl<T: fmt::Write> Disassembler<T> {
             }
             // Emit code
             for (offs, bc) in unit.code.iter().enumerate() {
-                if offs != 0 && offs % 5 == 0 {
-                    writeln!(self.out, "    // @{}", offs)?
-                }
+                // if offs != 0 && offs % 5 == 0 {
+                //     writeln!(self.out, "    // @{}", offs)?
+                // }
                 if let Some(label) = label_map.get(&(offs as CodeOffset)) {
                     write!(self.out, "{:>2}: ", label)?;
                 } else {
@@ -456,6 +456,7 @@ impl<T: fmt::Write> Disassembler<T> {
             CopyLoc(loc) => write!(self.out, "copy_loc {}", local_name(*loc))?,
             MoveLoc(loc) => write!(self.out, "move_loc {}", local_name(*loc))?,
             StLoc(loc) => write!(self.out, "st_loc {}", local_name(*loc))?,
+            DropLoc(loc) => write!(self.out, "drop_loc {}", local_name(*loc))?,
             Call(idx) => {
                 let view = FunctionHandleView::new(module, module.function_handle_at(*idx));
                 write!(
@@ -568,6 +569,21 @@ impl<T: fmt::Write> Disassembler<T> {
                     inst_handle.handle,
                     Some(inst_handle.type_parameters),
                 )?
+            },
+            BorrowGetField(local_idx, field_handle_idx) => {
+                write!(self.out, "borrow_get_field {}", local_name(*local_idx))?;
+                let handle = module.field_handle_at(*field_handle_idx);
+                let view = StructDefinitionView::new(module, module.struct_def_at(handle.owner));
+                let field_name = view
+                    .fields_optional_variant(None)
+                    .nth(handle.field as usize)
+                    .map_or("<index-error>".to_string(), |f| f.name().to_string());
+                write!(self.out, " {}", view.name())?;
+                // if let Some(inst) = inst_opt {
+                //     self.ty_args(module, inst)?
+                // }
+                write!(self.out, ", {}", field_name)?;
+                // self.borrow_field(module, false, *field_handle_idx, None)?;
             },
             MutBorrowGlobal(idx) | ImmBorrowGlobal(idx) | Exists(idx) | MoveFrom(idx)
             | MoveTo(idx) => {

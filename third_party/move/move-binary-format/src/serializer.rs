@@ -1043,6 +1043,10 @@ fn serialize_instruction_inner(
             binary.push(Opcodes::ST_LOC as u8)?;
             serialize_local_index(binary, *local_idx)
         },
+        Bytecode::DropLoc(local_idx) => {
+            binary.push(Opcodes::DROP_LOC as u8)?;
+            serialize_local_index(binary, *local_idx)
+        },
         Bytecode::MutBorrowLoc(local_idx) => {
             binary.push(Opcodes::MUT_BORROW_LOC as u8)?;
             serialize_local_index(binary, *local_idx)
@@ -1082,6 +1086,11 @@ fn serialize_instruction_inner(
         Bytecode::ImmBorrowVariantFieldGeneric(field_idx) => {
             binary.push(Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC as u8)?;
             serialize_variant_field_inst_index(binary, field_idx)
+        },
+        Bytecode::BorrowGetField(local_idx, field_idx) => {
+            binary.push(Opcodes::BORROW_GET_FIELD as u8)?;
+            serialize_local_index(binary, *local_idx)?;
+            serialize_field_handle_index(binary, field_idx)
         },
         Bytecode::Call(method_idx) => {
             binary.push(Opcodes::CALL as u8)?;
