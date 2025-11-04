@@ -104,9 +104,9 @@ else:
     BUILD_FOLDER = "target/release"
 
 if os.environ.get("PROD_DB_FLAGS"):
-    DB_CONFIG_FLAGS = ""
+    DB_CONFIG_FLAGS = "--enable-indexer-grpc"
 else:
-    DB_CONFIG_FLAGS = "--enable-storage-sharding"
+    DB_CONFIG_FLAGS = "--enable-storage-sharding --enable-indexer-grpc"
 
 if os.environ.get("DISABLE_FA_APT"):
     FEATURE_FLAGS = ""
