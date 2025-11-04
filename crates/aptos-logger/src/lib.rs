@@ -154,8 +154,11 @@ mod metadata;
 pub mod sample;
 pub mod telemetry_log_writer;
 pub mod tracing_adapter;
+pub mod tracing_writer;
 
 mod security;
+
+pub use tracing_appender::rolling::Rotation;
 
 pub use crate::aptos_logger::{
     AptosData as Logger, AptosDataBuilder, LoggerFilterUpdater, Writer, CHANNEL_SIZE,

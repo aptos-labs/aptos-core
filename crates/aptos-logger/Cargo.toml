@@ -15,6 +15,7 @@ rust-version = { workspace = true }
 # Do NOT add any inter-project dependencies.
 # This is to avoid ever having a circular dependency with the aptos-logger crate.
 [dependencies]
+anyhow = "1.0.57"
 aptos-infallible = { workspace = true }
 aptos-log-derive = { workspace = true }
 aptos-node-identity = { workspace = true, optional = true }
@@ -30,10 +31,11 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
-tokio = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-
+tokio = { version = "1.21.0", features = ["full"] }
+tracing = "0.1.37"
+tracing-appender = "0.2.2"
+tracing-subscriber = { version = "0.3.15", features = ["json", "chrono"] }
+tokio-stream = "0.1.8"
 [dev-dependencies]
 pretty_assertions = { workspace = true }
 
