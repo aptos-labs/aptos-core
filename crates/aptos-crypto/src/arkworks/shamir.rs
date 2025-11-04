@@ -140,8 +140,8 @@ pub fn all_lagrange_denominators<F: FftField>(
     // If `include_zero`, need to:
     if include_zero {
         // 1. Augment A'(\omega_i) = A'(\omega_i) * \omega^i, for all i\ in [0, n)
-        for i in 0..n {
-            denoms[i] *= F::get_root_of_unity(i as u64).unwrap();
+        for (i, denom) in denoms.iter_mut().enumerate().take(n) {
+            *denom *= F::get_root_of_unity(i as u64).unwrap();
         }
 
         // 2. Compute A'(0) = \prod_{j \in [0, n)} (0 - \omega^j)
