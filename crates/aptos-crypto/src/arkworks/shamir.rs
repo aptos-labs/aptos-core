@@ -77,10 +77,10 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
 
     // Step 1: Collect denominators for all i
     let mut denominators = Vec::with_capacity(n);
-    for i in 0..n {
-        let xi = xs_vec[i];
+
+    for (i, &xi) in xs_vec.iter().enumerate() {
         let mut denom = F::one();
-        for (j, xj) in xs_vec.iter().enumerate() {
+        for (j, &xj) in xs_vec.iter().enumerate() {
             if i == j {
                 continue;
             }
@@ -88,7 +88,6 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
         }
         denominators.push(denom);
     }
-
     // Step 2: Invert all denominators at once
     let mut denom_invs = denominators.clone();
     batch_inversion(&mut denom_invs);

@@ -72,7 +72,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
     /// Performs the LDT given group elements
     pub fn low_degree_test_group<C: CurveGroup<ScalarField = F>>(
         self,
-        evals: &Vec<C>,
+        evals: &[C],
     ) -> anyhow::Result<()> {
         if evals.len() != self.n {
             bail!("Expected {} evaluations; got {}", self.n, evals.len())
@@ -116,7 +116,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
     /// When `include_zero` is true, checks if the evaluations $p(0)$ in `evals[n-1]` and
     /// $p(\omega^i)$ in `evals[i]` encode a degree $\le t-1$ polynomial (i.e., there are only $n-1$
     /// evaluations at the roots of unity).
-    pub fn low_degree_test(&self, evals: &Vec<F>) -> anyhow::Result<()> {
+    pub fn low_degree_test(&self, evals: &[F]) -> anyhow::Result<()> {
         // This includes the extra evaluation at zero when `includes_zero` is true.
         if evals.len() != self.n {
             bail!("Expected {} evaluations; got {}", self.n, evals.len());
@@ -245,7 +245,7 @@ mod tests {
 
         for t in 1..8 {
             for n in (t + 1)..(3 * t + 1) {
-                let sc = ThresholdConfig::new(t, n);
+                let sc = ThresholdConfig::new(n, t);
 
                 // A degree t polynomial f(X), higher by 1 than what the LDT expects
                 let p = sample_random_polynomial::<Fr, _>(t, &mut rng);
@@ -256,13 +256,23 @@ mod tests {
                 // Test deg(p) < t, given evals at roots of unity
                 // This should fail, since deg(p) = t
                 let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, false, &sc.domain);
-                assert!(ldt.low_degree_test(&evals).is_err());
+                assert!(
+                    ldt.low_degree_test(&evals).is_err(),
+                    "LDT unexpectedly passed. n: {}, t: {}",
+                    n,
+                    t
+                );
 
-                // // Test deg(p) < t, given evals at roots of unity and given p(0)
-                // // This should fail, since deg(p) = t
-                // evals.push(p[0]);
-                // let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, true, &sc.domain);
-                // assert!(ldt.low_degree_test(&evals).is_err());
+                // Test deg(p) < t, given evals at roots of unity and given p(0)
+                // This should fail, since deg(p) = t
+                evals.push(p[0]);
+                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, true, &sc.domain);
+                assert!(
+                    ldt.low_degree_test(&evals).is_err(),
+                    "LDT unexpectedly passed. n: {}, t: {}",
+                    n,
+                    t
+                );
             }
         }
     }
