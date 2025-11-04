@@ -64,6 +64,7 @@ pub(crate) struct FatFunctionType {
     pub abilities: AbilitySet,
 }
 
+// INVARIANT: this type need to stay crate local. See discussion at `FatStructRef`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
 pub(crate) enum FatType {
     Bool,
