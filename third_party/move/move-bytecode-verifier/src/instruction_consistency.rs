@@ -146,6 +146,10 @@ impl<'a> InstructionConsistency<'a> {
                     self.check_field_op(offset, *field_idx, /* generic */ false)?;
                 },
 
+                GetField(field_idx) => {
+                    self.check_field_op(offset, *field_idx, /* generic */ false)?;
+                },
+
                 // List out the other options explicitly so there's a compile error if a new
                 // bytecode gets added.
                 CallClosure(_) | FreezeRef | Pop | Ret | Branch(_) | BrTrue(_) | BrFalse(_)

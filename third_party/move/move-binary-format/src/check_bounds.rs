@@ -562,6 +562,13 @@ impl<'a> BoundsChecker<'a> {
                         bytecode_offset,
                     )?;
                 },
+                GetField(field_idx) => {
+                    self.check_code_unit_bounds_impl_opt(
+                        &self.view.field_handles(),
+                        *field_idx,
+                        bytecode_offset,
+                    )?;
+                },
                 Call(idx) | PackClosure(idx, _) => self.check_code_unit_bounds_impl(
                     self.view.function_handles(),
                     *idx,

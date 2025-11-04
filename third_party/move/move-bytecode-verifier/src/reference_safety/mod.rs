@@ -361,6 +361,24 @@ fn execute_inner(
             let value = state.read_ref(offset, id)?;
             verifier.stack.push(value);
         }
+        Bytecode::GetField(field_handle_idx) => {
+            // let value = state.borrow_loc(offset, false, *local_idx)?;
+            // verifier.stack.push(value);
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.borrow_field(
+                offset,
+                false,
+                id,
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::FieldIndex(*field_handle_idx),
+                )?,
+            )?;
+            verifier.stack.push(value);
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.read_ref(offset, id)?;
+            verifier.stack.push(value);
+        }
         Bytecode::ImmBorrowFieldGeneric(field_inst_index) => {
             let field_inst = verifier
                 .resolver

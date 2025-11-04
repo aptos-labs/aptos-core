@@ -179,14 +179,20 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
             default: Inherited(Experiment::OPTIMIZE.to_string()),
         },
         Experiment {
-            name: Experiment::PEEPHOLE_OPTIMIZATION_DROP_LOC.to_string(),
+            name: Experiment::PEEPHOLE_OPT_DROP_LOC.to_string(),
             description: "Peephole Droploc"
                 .to_string(),
             default: Given(false),
         },
         Experiment {
-            name: Experiment::PEEPHOLE_OPTIMIZATION_BORROW_GET_FIELD.to_string(),
+            name: Experiment::PEEPHOLE_OPT_BORROW_GET_FIELD.to_string(),
             description: "Peephole BorrowGetField"
+                .to_string(),
+            default: Given(false),
+        },
+        Experiment {
+            name: Experiment::PEEPHOLE_OPT_GET_FIELD.to_string(),
+            description: "Peephole GetField"
                 .to_string(),
             default: Given(false),
         },
@@ -349,8 +355,9 @@ impl Experiment {
     pub const OPTIMIZE_WAITING_FOR_COMPARE_TESTS: &'static str =
         "optimize-waiting-for-compare-tests";
     pub const PEEPHOLE_OPTIMIZATION: &'static str = "peephole-optimization";
-    pub const PEEPHOLE_OPTIMIZATION_DROP_LOC: &'static str = "peephole-opt-drop-loc";
-    pub const PEEPHOLE_OPTIMIZATION_BORROW_GET_FIELD: &'static str = "peephole-opt-borrow-get-field";
+    pub const PEEPHOLE_OPT_DROP_LOC: &'static str = "peephole-drop-loc";
+    pub const PEEPHOLE_OPT_BORROW_GET_FIELD: &'static str = "peephole-borrow-get-field";
+    pub const PEEPHOLE_OPT_GET_FIELD: &'static str = "peephole-get-field";
     pub const RECURSIVE_TYPE_CHECK: &'static str = "recursive-type-check";
     pub const REFERENCE_SAFETY: &'static str = "reference-safety";
     pub const REFERENCE_SAFETY_V3: &'static str = "reference-safety-v3";

@@ -1893,6 +1893,10 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
                 let field_idx = load_field_handle_index(cursor)?;
                 Bytecode::BorrowGetField(local_idx, field_idx)
             },
+            Opcodes::GET_FIELD => {
+                let field_idx = load_field_handle_index(cursor)?;
+                Bytecode::GetField(field_idx)
+            },
             Opcodes::CALL => Bytecode::Call(load_function_handle_index(cursor)?),
             Opcodes::CALL_GENERIC => Bytecode::CallGeneric(load_function_inst_index(cursor)?),
             Opcodes::PACK => Bytecode::Pack(load_struct_def_index(cursor)?),
@@ -2233,9 +2237,9 @@ impl Opcodes {
             0x66 => Ok(Opcodes::CAST_I256),
             0x67 => Ok(Opcodes::NEGATE),
             // Experiments
+            0x68 => Ok(Opcodes::GET_FIELD),
             0x69 => Ok(Opcodes::DROP_LOC),
             0x70 => Ok(Opcodes::BORROW_GET_FIELD),
-            0x71 => Ok(Opcodes::BORROW_GET_FIELD_GENERIC),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
                 .with_message(format!("code {:X}", value))),
         }

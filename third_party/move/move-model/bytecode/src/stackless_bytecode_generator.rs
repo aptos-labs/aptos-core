@@ -474,6 +474,82 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                     .push(mk_unary(Operation::ReadRef, temp_index, operand_index));
             },
 
+            MoveBytecode::GetField(field_handle_idx) => {
+                // ImmBorrowField
+                let struct_ref_index = self.temp_stack.pop().unwrap();
+                let (struct_id, field_offset, field_type) =
+                    self.get_field_info(*field_handle_idx);
+                let field_ref_index = self.temp_count;
+                self.temp_stack.push(field_ref_index);
+
+                self.code.push(mk_call(
+                    Operation::BorrowField(
+                        self.func_env.module_env.get_id(),
+                        struct_id,
+                        vec![],
+                        field_offset,
+                    ),
+                    vec![field_ref_index],
+                    vec![struct_ref_index],
+                ));
+                self.temp_count += 1;
+                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowField(..));
+                self.local_types.push(Type::Reference(
+                    ReferenceKind::from_is_mut(is_mut),
+                    Box::new(field_type),
+                ));
+
+                // ReadRef
+                let operand_index = self.temp_stack.pop().unwrap();
+                let operand_sig = self.local_types[operand_index].clone();
+                let temp_index = self.temp_count;
+                if let Type::Reference(_, signature) = operand_sig {
+                    self.local_types.push(*signature);
+                }
+                self.temp_stack.push(temp_index);
+                self.temp_count += 1;
+                self.code
+                    .push(mk_unary(Operation::ReadRef, temp_index, operand_index));
+            },
+
+            MoveBytecode::GetField(field_handle_idx) => {
+                // ImmBorrowField
+                let struct_ref_index = self.temp_stack.pop().unwrap();
+                let (struct_id, field_offset, field_type) =
+                    self.get_field_info(*field_handle_idx);
+                let field_ref_index = self.temp_count;
+                self.temp_stack.push(field_ref_index);
+
+                self.code.push(mk_call(
+                    Operation::BorrowField(
+                        self.func_env.module_env.get_id(),
+                        struct_id,
+                        vec![],
+                        field_offset,
+                    ),
+                    vec![field_ref_index],
+                    vec![struct_ref_index],
+                ));
+                self.temp_count += 1;
+                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowField(..));
+                self.local_types.push(Type::Reference(
+                    ReferenceKind::from_is_mut(is_mut),
+                    Box::new(field_type),
+                ));
+
+                // ReadRef
+                let operand_index = self.temp_stack.pop().unwrap();
+                let operand_sig = self.local_types[operand_index].clone();
+                let temp_index = self.temp_count;
+                if let Type::Reference(_, signature) = operand_sig {
+                    self.local_types.push(*signature);
+                }
+                self.temp_stack.push(temp_index);
+                self.temp_count += 1;
+                self.code
+                    .push(mk_unary(Operation::ReadRef, temp_index, operand_index));
+            },
+
             MoveBytecode::ImmBorrowFieldGeneric(field_inst_index)
             | MoveBytecode::MutBorrowFieldGeneric(field_inst_index) => {
                 let field_inst = self.module.field_instantiation_at(*field_inst_index);

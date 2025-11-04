@@ -428,6 +428,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | TestVariant(_)
             | TestVariantGeneric(_)
             | BorrowGetField(_, _)
+            | GetField(_)
             | MutBorrowVariantField(_)
             | MutBorrowVariantFieldGeneric(_)
             | ImmBorrowVariantField(_)
@@ -589,6 +590,11 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             BorrowGetField(local_idx, field_handle_idx) => {
                 ref_state.borrow_loc(*local_idx, false)?;
+                let label = frame.field_offset(*field_handle_idx);
+                ref_state.borrow_child_with_label::<false>(label)?;
+                ref_state.pop_ref_push_non_ref()?;
+            },
+            GetField(field_handle_idx) => {
                 let label = frame.field_offset(*field_handle_idx);
                 ref_state.borrow_child_with_label::<false>(label)?;
                 ref_state.pop_ref_push_non_ref()?;

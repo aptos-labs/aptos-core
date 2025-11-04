@@ -27,7 +27,7 @@ impl WindowOptimizer for CollapseToDrop {
 pub struct CollapseToBorrowGetField;
 
 impl CollapseToBorrowGetField {
-    const WINDOW_SIZE: usize = 3;
+    const WINDOW_SIZE: usize = 2;
 }
 
 impl WindowOptimizer for CollapseToBorrowGetField {
@@ -37,15 +37,33 @@ impl WindowOptimizer for CollapseToBorrowGetField {
             return None;
         }
         // See module documentation for the reasoning behind these optimizations.
-        let optimized = match (&window[0], &window[1], &window[2]) {
-            (
-                ImmBorrowLoc(loc_idx),
-                ImmBorrowField(field_idx) | MutBorrowField(field_idx),
-                ReadRef,
-            ) => TransformedCodeChunk::new(
-                vec![BorrowGetField(*loc_idx, *field_idx)],
-                vec![0],
-            ),
+        let optimized = match (&window[0], &window[1]) {
+            (ImmBorrowLoc(loc_idx), GetField(field_idx)) => {
+                TransformedCodeChunk::new(vec![BorrowGetField(*loc_idx, *field_idx)], vec![0])
+            },
+            _ => return None,
+        };
+        Some((optimized, Self::WINDOW_SIZE))
+    }
+}
+
+pub struct CollapseToGetField;
+
+impl CollapseToGetField {
+    const WINDOW_SIZE: usize = 2;
+}
+
+impl WindowOptimizer for CollapseToGetField {
+    fn optimize_window(&self, window: &[Bytecode]) -> Option<(TransformedCodeChunk, usize)> {
+        use Bytecode::*;
+        if window.len() < Self::WINDOW_SIZE {
+            return None;
+        }
+        // See module documentation for the reasoning behind these optimizations.
+        let optimized = match (&window[0], &window[1]) {
+            (ImmBorrowField(field_idx) | MutBorrowField(field_idx), ReadRef) => {
+                TransformedCodeChunk::new(vec![GetField(*field_idx)], vec![0])
+            },
             _ => return None,
         };
         Some((optimized, Self::WINDOW_SIZE))

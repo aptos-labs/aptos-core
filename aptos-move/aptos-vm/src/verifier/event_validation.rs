@@ -198,6 +198,7 @@ pub(crate) fn validate_emit_calls(
                     | MutBorrowFieldGeneric(_)
                     | ImmBorrowFieldGeneric(_)
                     | BorrowGetField(_, _)
+                    | GetField(_)
                     | Call(_)
                     | Pack(_)
                     | PackGeneric(_)

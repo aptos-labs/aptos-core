@@ -503,6 +503,9 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                     BorrowGetField(_, _) => {
                         unimplemented!()
                     }
+                    GetField(_) => {
+                        unimplemented!()
+                    }
                     PackClosure(..) | PackClosureGeneric(..) | CallClosure(..) => {
                         // TODO(#15664): implement
                         panic!("Closure bytecode NYI: {:?}", code[bytecode_idx])
@@ -586,5 +589,6 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
         },
 
         BorrowGetField(_, _) => false,
+        GetField(_) => false,
     }
 }

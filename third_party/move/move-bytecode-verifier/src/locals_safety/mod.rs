@@ -106,6 +106,7 @@ fn execute_inner(
                 LocalState::Available => (),
             }
         },
+        Bytecode::GetField(_) => (),
 
         Bytecode::Pop
         | Bytecode::BrTrue(_)

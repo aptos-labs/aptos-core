@@ -585,6 +585,21 @@ impl<T: fmt::Write> Disassembler<T> {
                 write!(self.out, ", {}", field_name)?;
                 // self.borrow_field(module, false, *field_handle_idx, None)?;
             },
+            GetField(field_handle_idx) => {
+                write!(self.out, "get_field")?;
+                let handle = module.field_handle_at(*field_handle_idx);
+                let view = StructDefinitionView::new(module, module.struct_def_at(handle.owner));
+                let field_name = view
+                    .fields_optional_variant(None)
+                    .nth(handle.field as usize)
+                    .map_or("<index-error>".to_string(), |f| f.name().to_string());
+                write!(self.out, " {}", view.name())?;
+                // if let Some(inst) = inst_opt {
+                //     self.ty_args(module, inst)?
+                // }
+                write!(self.out, ", {}", field_name)?;
+                // self.borrow_field(module, false, *field_handle_idx, None)?;
+            },
             MutBorrowGlobal(idx) | ImmBorrowGlobal(idx) | Exists(idx) | MoveFrom(idx)
             | MoveTo(idx) => {
                 let op = match bc {

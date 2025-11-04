@@ -342,6 +342,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::ImmBorrowFieldGeneric(_)
             | Bytecode::MutBorrowFieldGeneric(_)
             | Bytecode::BorrowGetField(_, _)
+            | Bytecode::GetField(_)
             | Bytecode::PackClosure(..)
             | Bytecode::PackClosureGeneric(..)
             | Bytecode::Pack(_)
@@ -596,7 +597,22 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // ImmBorrowLoc
                 let ty = frame.local_ty_at(*local_idx as usize);
                 let ref_ty = ty_builder.create_ref_ty(ty, false)?;
-                operand_stack.push_ty(ref_ty)?;
+                // operand_stack.push_ty(ref_ty)?;
+                // ImmBorrowField
+                // let ref_ty = operand_stack.pop_ty()?;
+                let expected_ty = frame.field_handle_to_struct(*field_handle_idx);
+                ref_ty.paranoid_check_ref_eq(&expected_ty, false)?;
+
+                let field_ty = frame.get_field_ty(*field_handle_idx)?;
+                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                // operand_stack.push_ty(field_ref_ty)?;
+                // ReadRef
+                // let field_ref_ty = operand_stack.pop_ty()?;
+                let inner_ty = field_ref_ty.paranoid_read_ref()?;
+                operand_stack.push_ty(inner_ty)?;
+            },
+
+            Bytecode::GetField(field_handle_idx) => {
                 // ImmBorrowField
                 let ty = operand_stack.pop_ty()?;
                 let expected_ty = frame.field_handle_to_struct(*field_handle_idx);
@@ -604,10 +620,10 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
 
                 let field_ty = frame.get_field_ty(*field_handle_idx)?;
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
-                operand_stack.push_ty(field_ref_ty)?;
+                // operand_stack.push_ty(field_ref_ty)?;
                 // ReadRef
-                let ref_ty = operand_stack.pop_ty()?;
-                let inner_ty = ref_ty.paranoid_read_ref()?;
+                // let field_ref_ty = operand_stack.pop_ty()?;
+                let inner_ty = field_ref_ty.paranoid_read_ref()?;
                 operand_stack.push_ty(inner_ty)?;
             },
 

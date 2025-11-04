@@ -2041,6 +2041,26 @@ pub enum Bytecode {
     #[gas_type_creation_tier_1 = "field_ty"]
     BorrowGetField(LocalIndex, FieldHandleIndex),
 
+    #[group = "struct"]
+    #[static_operands = "[field_inst_idx]"]
+    #[description = r#"
+        Consume the reference to a generic struct at the top of the stack,
+        and load an immutable reference to the field identified by the
+        field handle index.
+    "#]
+    #[semantics = r#"
+        stack >> struct_ref
+        stack << &(*struct_ref).field(field_index)
+    "#]
+    #[runtime_check_epilogue = r#"
+        ty_stack >> ty
+        assert ty == &struct_ty or ty == &mut struct_ty
+        ty_stack << &field_ty
+    "#]
+    #[gas_type_creation_tier_0 = "struct_ty"]
+    #[gas_type_creation_tier_1 = "field_ty"]
+    GetField(FieldHandleIndex),
+
     #[group = "global"]
     #[static_operands = "[struct_def_idx]"]
     #[description = r#"
@@ -3159,6 +3179,9 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::BorrowGetField(local_idx, field_idx) => {
                 write!(f, "BorrowGetField({:?}, {:?})", local_idx, field_idx)
             },
+            Bytecode::GetField(field_idx) => {
+                write!(f, "GetField({:?})", field_idx)
+            },
             Bytecode::MutBorrowGlobal(a) => write!(f, "MutBorrowGlobal({:?})", a),
             Bytecode::MutBorrowGlobalGeneric(a) => write!(f, "MutBorrowGlobalGeneric({:?})", a),
             Bytecode::ImmBorrowGlobal(a) => write!(f, "ImmBorrowGlobal({:?})", a),
@@ -3325,6 +3348,7 @@ impl Bytecode {
             | MutBorrowFieldGeneric(_)
             | ImmBorrowFieldGeneric(_)
             | BorrowGetField(_, _)
+            | GetField(_)
             | Call(_)
             | CallGeneric(_)
             | Pack(_)

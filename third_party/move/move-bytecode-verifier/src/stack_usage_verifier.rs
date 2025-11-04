@@ -162,6 +162,7 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::MutBorrowFieldGeneric(_)
             | Bytecode::ImmBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
+            | Bytecode::GetField(_)
             | Bytecode::MutBorrowVariantField(_)
             | Bytecode::MutBorrowVariantFieldGeneric(_)
             | Bytecode::ImmBorrowVariantField(_)

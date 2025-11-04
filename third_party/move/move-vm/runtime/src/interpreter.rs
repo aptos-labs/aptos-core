@@ -2199,6 +2199,26 @@ impl Frame {
 
                         interpreter.operand_stack.push(field_value)?;
                     },
+                    Bytecode::GetField(field_idx) => {
+                        // BorrowField
+                        // let instr = match instruction {
+                        //     Bytecode::MutBorrowField(_) => S::MutBorrowField,
+                        //     _ => S::ImmBorrowField,
+                        // };
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let offset = self.field_offset(*field_idx);
+
+                        let field = reference.get_field(offset)?;
+
+                        // let field_ref = reference.borrow_field(offset)?;
+                        // interpreter.operand_stack.push(field_ref)?;
+                        // ReadRef
+                        // let reference = interpreter.operand_stack.pop_as::<Reference>()?;
+                        // gas_meter.charge_read_ref(reference.value_view())?;
+                        // let value = reference.read_ref()?;
+                        interpreter.operand_stack.push(field)?;
+                    },
                     Bytecode::Pack(sd_idx) => {
                         let field_count = self.field_count(*sd_idx);
                         let struct_type = self.get_struct_ty(*sd_idx);

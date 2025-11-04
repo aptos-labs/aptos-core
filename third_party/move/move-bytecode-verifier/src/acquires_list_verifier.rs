@@ -131,6 +131,7 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::ImmBorrowVariantField(_)
             | Bytecode::ImmBorrowVariantFieldGeneric(_)
             | Bytecode::BorrowGetField(_, _)
+            | Bytecode::GetField(_)
             | Bytecode::LdU8(_)
             | Bytecode::LdU16(_)
             | Bytecode::LdU32(_)

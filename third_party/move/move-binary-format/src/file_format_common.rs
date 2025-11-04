@@ -336,9 +336,9 @@ pub enum Opcodes {
     CAST_I128                   = 0x65,
     CAST_I256                   = 0x66,
     NEGATE                      = 0x67,
+    GET_FIELD    = 0x68,
     DROP_LOC                      = 0x69,
     BORROW_GET_FIELD                      = 0x70,
-    BORROW_GET_FIELD_GENERIC                      = 0x71,
 }
 
 /// Upper limit on the binary size
@@ -853,6 +853,7 @@ pub fn instruction_key(instruction: &Bytecode) -> u8 {
         CastI256 => Opcodes::CAST_I256,
         Negate => Opcodes::NEGATE,
         BorrowGetField(_, _) => Opcodes::BORROW_GET_FIELD,
+        GetField(_) => Opcodes::GET_FIELD,
 
     };
     opcode as u8

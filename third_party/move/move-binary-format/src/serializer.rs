@@ -1092,6 +1092,10 @@ fn serialize_instruction_inner(
             serialize_local_index(binary, *local_idx)?;
             serialize_field_handle_index(binary, field_idx)
         },
+        Bytecode::GetField(field_idx) => {
+            binary.push(Opcodes::GET_FIELD as u8)?;
+            serialize_field_handle_index(binary, field_idx)
+        },
         Bytecode::Call(method_idx) => {
             binary.push(Opcodes::CALL as u8)?;
             serialize_function_handle_index(binary, method_idx)

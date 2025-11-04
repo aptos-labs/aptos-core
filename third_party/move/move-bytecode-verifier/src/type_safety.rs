@@ -785,6 +785,28 @@ fn verify_instr(
                 _ => return Err(verifier.error(StatusCode::READREF_TYPE_MISMATCH_ERROR, offset)),
             };
         },
+        Bytecode::GetField(field_handle_idx) => {
+            borrow_field(
+                verifier,
+                meter,
+                offset,
+                false,
+                FieldOrVariantIndex::FieldIndex(*field_handle_idx),
+                &Signature(vec![]),
+            )?;
+            let operand = safe_unwrap!(verifier.stack.pop());
+            match operand {
+                ST::Reference(inner) | ST::MutableReference(inner) => {
+                    if !verifier.abilities(&inner)?.has_copy() {
+                        return Err(
+                            verifier.error(StatusCode::READREF_WITHOUT_COPY_ABILITY, offset)
+                        );
+                    }
+                    verifier.push(meter, *inner)?;
+                },
+                _ => return Err(verifier.error(StatusCode::READREF_TYPE_MISMATCH_ERROR, offset)),
+            };
+        },
 
         Bytecode::LdU8(_) => {
             verifier.push(meter, ST::U8)?;

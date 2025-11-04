@@ -39,10 +39,15 @@ pub fn optimize_extended(code: &[Bytecode], options: Rc<Options>) -> Transformed
         Box::new(WindowProcessor::new(ReduciblePairs)),
         Box::new(WindowProcessor::new(InefficientLoads)),
     ];
-    if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION_DROP_LOC) {
+    if options.experiment_on(Experiment::PEEPHOLE_OPT_DROP_LOC) {
         optimizers.push(Box::new(WindowProcessor::new(collapse_ops::CollapseToDrop)));
     }
-    if options.experiment_on(Experiment::PEEPHOLE_OPTIMIZATION_BORROW_GET_FIELD) {
+
+    if options.experiment_on(Experiment::PEEPHOLE_OPT_GET_FIELD) {
+        optimizers.push(Box::new(WindowProcessor::new(collapse_ops::CollapseToGetField)));
+    }
+
+    if options.experiment_on(Experiment::PEEPHOLE_OPT_BORROW_GET_FIELD) {
         optimizers.push(Box::new(WindowProcessor::new(collapse_ops::CollapseToBorrowGetField)));
     }
 
