@@ -9,6 +9,11 @@
 use ark_ff::PrimeField;
 use rand::Rng;
 
+/// Samples `n` uniformly random elements from the prime field `F`.
+pub fn sample_field_elements<F: PrimeField, R: Rng>(n: usize, rng: &mut R) -> Vec<F> {
+    (0..n).map(|_| sample_field_element::<F, R>(rng)).collect()
+}
+
 /// Samples a uniformly random element from the prime field `F`, using rejection sampling.
 /// Benchmarks suggest it is 10x faster than the function below.
 pub fn sample_field_element<F: PrimeField, R: Rng>(rng: &mut R) -> F {

@@ -9,7 +9,7 @@ use crate::arkworks::{
     vanishing_poly,
 };
 use anyhow::{anyhow, Result};
-use ark_ff::{batch_inversion, Field, PrimeField};
+use ark_ff::{batch_inversion, FftField, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
 use serde::{Deserialize, Deserializer, Serialize};
@@ -62,7 +62,7 @@ impl<'de, F: PrimeField> Deserialize<'de> for ThresholdConfig<F> {
 
         let BasicFields { n, t } = BasicFields::deserialize(deserializer)?;
 
-        let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` does `n.next_power_of_two()`
+        let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` internally does `n.next_power_of_two()`
             .ok_or_else(|| serde::de::Error::custom(format!("Invalid domain size: {}", n)))?;
 
         Ok(ThresholdConfig { n, t, domain })
@@ -110,6 +110,52 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     }
 
     results
+}
+
+// TODO: maybe move this elsewhere?
+/// Computes the Lagrange denominators for a set of evaluation points in a Radix-2 FFT domain.
+///
+/// Specifically, for a polynomial evaluated at points `\omega^0, \dots, \omega^{n-1}` in `dom`,
+/// the Lagrange denominators are given by:
+///
+/// ```text
+/// v_i = 1 / \prod_{j \ne i} (\omega^i - \omega^j)
+/// ```
+#[allow(non_snake_case)]
+pub fn all_lagrange_denominators<F: FftField>(
+    dom: &Radix2EvaluationDomain<F>,
+    n: usize,
+    include_zero: bool,
+) -> Vec<F> {
+    // A(X) = \prod_{i \in [0, n-1]} (X - \omega^i)
+    let omegas: Vec<F> = dom.elements().take(n).collect();
+    let mut A = vanishing_poly::from_roots(&omegas);
+    // A'(X) = \sum_{i \in [0, n-1]} \prod_{j \ne i, j \in [0, n-1]} (X - \omega^j)
+    A.differentiate_in_place();
+    let A_prime = A;
+
+    // A'(\omega^i) = \prod_{j\ne i, j \in [n] } (\omega^i - \omega^j)
+    let mut denoms = dom.fft(&A_prime);
+    denoms.truncate(n);
+
+    // If `include_zero`, need to:
+    if include_zero {
+        // 1. Augment A'(\omega_i) = A'(\omega_i) * \omega^i, for all i\ in [0, n)
+        for i in 0..n {
+            denoms[i] *= F::get_root_of_unity(i as u64).unwrap();
+        }
+
+        // 2. Compute A'(0) = \prod_{j \in [0, n)} (0 - \omega^j)
+        denoms.push(
+            (0..n)
+                .map(|i| -F::get_root_of_unity(i as u64).unwrap())
+                .product(),
+        );
+    }
+
+    batch_inversion(&mut denoms);
+
+    denoms
 }
 
 impl<F: PrimeField> ThresholdConfig<F> {
