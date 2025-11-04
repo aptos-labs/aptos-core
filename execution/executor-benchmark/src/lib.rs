@@ -1075,7 +1075,7 @@ mod tests {
 
     #[test]
     fn test_fibonacci_recursive() {
-        test_generic_benchmark::<AptosVMBlockExecutor>(Some(TransactionTypeArg::FibonacciRecursive10), true);
+        test_generic_benchmark::<AptosVMBlockExecutor>(Some(TransactionTypeArg::FibonacciRecursive20), true);
     }
         
     #[test]
@@ -1085,6 +1085,6 @@ mod tests {
 
     #[test]
     fn test_fibonacci_iterative() {
-        test_generic_benchmark::<AptosVMBlockExecutor>(Some(TransactionTypeArg::FibonacciIterative30), true);
+        test_generic_benchmark::<AptosVMBlockExecutor>(Some(TransactionTypeArg::FibonacciIterative20), true);
     }
 }

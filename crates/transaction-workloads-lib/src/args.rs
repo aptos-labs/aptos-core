@@ -108,9 +108,9 @@ pub enum TransactionTypeArg {
     MonotonicCounterMultiple1000,
 
     // Fibonacci tests
-    FibonacciRecursive10,
+    FibonacciRecursive20,
     FibonacciTailRecursive20,
-    FibonacciIterative30,
+    FibonacciIterative20,
 }
 
 impl TransactionTypeArg {
@@ -492,9 +492,9 @@ impl TransactionTypeArg {
                     counter_type: MonotonicCounterType::Multiple { count: 1000 },
                 })
             },
-            TransactionTypeArg::FibonacciRecursive10 => {
+            TransactionTypeArg::FibonacciRecursive20 => {
                 call_custom_module(EntryPoints::Fibonacci {
-                    n: 10,
+                    n: 20,
                     function_type: FibonacciFunctionType::Recursive,
                 })
             },
@@ -504,9 +504,9 @@ impl TransactionTypeArg {
                     function_type: FibonacciFunctionType::TailRecursive,
                 })
             },
-            TransactionTypeArg::FibonacciIterative30 => {
+            TransactionTypeArg::FibonacciIterative20 => {
                 call_custom_module(EntryPoints::Fibonacci {
-                    n: 30,
+                    n: 20,
                     function_type: FibonacciFunctionType::Iterative,
                 })
             },
