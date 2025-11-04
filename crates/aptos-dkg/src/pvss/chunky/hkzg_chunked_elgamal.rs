@@ -71,13 +71,14 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
                     chunked_plaintexts,
                     ..
                 } = dom;
-                let flattened_chunked_plaintexts: Vec<E::ScalarField> = {
-                    let scalars: Vec<Scalar<E>> = std::iter::once(Scalar(E::ScalarField::ZERO))
+                let flattened_chunked_plaintexts: Vec<Scalar<E>> =
+                    std::iter::once(Scalar(E::ScalarField::ZERO))
                         .chain(chunked_plaintexts.iter().flatten().cloned())
                         .collect();
-                    Scalar::<E>::vec_into_inner(scalars) // This is slightly inefficient; better to extract the scalars during the iter()
-                };
-                (hkzg_randomness.0, flattened_chunked_plaintexts)
+                univariate_hiding_kzg::Witness::<E> {
+                    hiding_randomness: Scalar(hkzg_randomness.0),
+                    values: flattened_chunked_plaintexts,
+                }
             },
         };
         // Set up the chunked_elgamal homomorphism, and use a projection map to lift it to HkzgElgamalWitness

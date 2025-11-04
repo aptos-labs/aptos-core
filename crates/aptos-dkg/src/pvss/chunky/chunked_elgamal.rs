@@ -2,15 +2,20 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    sigma_protocol,
     sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
     Scalar,
 };
 use aptos_crypto::arkworks::hashing;
+use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
-use ark_std::fmt::Debug;
+use ark_std::{
+    fmt::Debug,
+    rand::{CryptoRng, RngCore},
+};
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
@@ -106,7 +111,9 @@ pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
 // Witness shape happens to be identical to CodomainShape, this is mostly coincidental
 // Setting `type Witness = CodomainShape<Scalar<E>>` would later require deriving SigmaProtocolWitness for CodomainShape<T>
 // (and would be overkill anyway), but this leads to issues as it expects T to be a Pairing, so we'll simply redefine it:
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(
+    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
+)]
 pub struct Witness<E: Pairing> {
     pub plaintext_chunks: Vec<Vec<Scalar<E>>>,
     pub plaintext_randomness: Vec<Scalar<E>>,
@@ -203,5 +210,11 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
         E::G1::msm(bases, scalars).expect("MSM failed in ChunkedElgamal")
+    }
+}
+
+impl<'a, E: Pairing> sigma_protocol::Trait<E> for Homomorphism<'a, E> {
+    fn dst(&self) -> Vec<u8> {
+        b"APTOS_CHUNKED_ELGAMAL_SIGMA_PROTOCOL_DST".to_vec()
     }
 }

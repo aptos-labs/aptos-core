@@ -281,14 +281,23 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let mut values_shifted = vec![E::ScalarField::ZERO]; // start with 0,
         values_shifted.extend(values); // then append all values from the original vector
 
-        let hiding_kzg_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-            lagr_g1: &ck_S.lagr_g1,
-            xi_1: ck_S.xi_1,
-        };
+        Commitment(
+            univariate_hiding_kzg::commit_with_randomness(
+                ck_S,
+                &values_shifted,
+                &univariate_hiding_kzg::CommitmentRandomness(*rho),
+            )
+            .0,
+        )
 
-        let hiding_kzg_input = (*rho, values_shifted);
+        // let hiding_kzg_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
+        //     lagr_g1: &ck_S.lagr_g1,
+        //     xi_1: ck_S.xi_1,
+        // };
 
-        Commitment(hiding_kzg_hom.apply(&hiding_kzg_input).0)
+        // let hiding_kzg_input = (*rho, values_shifted);
+
+        // Commitment(hiding_kzg_hom.apply(&hiding_kzg_input).0)
     }
 
     #[allow(non_snake_case)]
@@ -413,7 +422,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .iter()
             .zip(rhos.iter())
             .map(|(f_j, rho)| {
-                let hkzg_commit_input = (*rho, f_j.clone());
+                let hkzg_commit_input = univariate_hiding_kzg::Witness {
+                    hiding_randomness: Scalar(*rho),
+                    values: Scalar::vec_from_inner_slice(f_j),
+                };
                 hkzg_commitment_hom.apply(&hkzg_commit_input).0
             })
             .collect();
@@ -518,8 +530,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let rho_h = E::ScalarField::rand(rng);
-        let D = hkzg_commitment_hom.apply(&(rho_h, h_evals.clone())).0;
-
+        let D = hkzg_commitment_hom
+            .apply(&univariate_hiding_kzg::Witness {
+                hiding_randomness: Scalar(rho_h),
+                values: Scalar::vec_from_inner_slice(&h_evals),
+            })
+            .0;
         // Step 7b
         fiat_shamir::append_h_commitment::<E>(fs_t, &D);
 
