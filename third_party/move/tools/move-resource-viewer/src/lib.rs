@@ -103,6 +103,10 @@ pub struct MoveValueAnnotator<V> {
     module_viewer: V,
     /// A cache for fat type info for structs. For a generic struct, the uninstantiated
     /// FatStructType of the base definition will be stored here as well.
+    ///
+    /// Notice that this cache (and the next one) effect the computation `Limit`: no-cached
+    /// annotation may hit limits which cached ones don't. Since limits aren't precise metering,
+    /// this effect is expected and OK.
     fat_struct_def_cache: RefCell<BTreeMap<StructName, FatStructRef>>,
     /// A cache for fat type info for struct instantiations. This cache is build from
     /// substituting parameters for the uninstantiated types in `fat_struct_def_cache`.

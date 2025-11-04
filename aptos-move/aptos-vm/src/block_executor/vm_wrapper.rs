@@ -80,9 +80,7 @@ impl ExecutorTask for AptosExecutorTask {
                         vm_status.message().cloned().unwrap_or_default(),
                     )
                 } else if AptosVM::should_restart_execution(vm_output.events()) {
-                    println!("SKIP_REST: txn: {:?}", txn);
-                    println!("SKIP_REST: vm_status: {:?}", vm_status);
-                    println!("SKIP_REST: vm_output: {:?}", vm_output);
+                    println!("SKIP_REST: txn: {:?}", txn.borrow_into_inner().type_name());
                     speculative_info!(
                         &log_context,
                         "Reconfiguration occurred: restart required".into()
