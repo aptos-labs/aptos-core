@@ -266,7 +266,7 @@ mod tests {
                 // Test deg(p) < t, given evals at roots of unity and given p(0)
                 // This should fail, since deg(p) = t
                 evals.push(p[0]);
-                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, true, &sc.domain);
+                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // Here using n+1 because p(0) is added
                 assert!(
                     ldt.low_degree_test(&evals).is_err(),
                     "LDT unexpectedly passed. n: {}, t: {}",
