@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{stream_coordinator::IndexerStreamCoordinator, ServiceContext};
+use aptos_indexer_grpc_utils::filter_utils::parse_transaction_filter;
 use aptos_logger::{error, info};
 use aptos_protos::{
     indexer::v1::{raw_data_server::RawData, GetTransactionsRequest, TransactionsResponse},
@@ -52,6 +53,16 @@ impl RawData for LocalnetDataService {
         let output_batch_size = self.service_context.output_batch_size;
         let ledger_chain_id = context.chain_id().id();
         let transactions_count = r.transactions_count;
+
+        // Parse transaction filter if present.
+        let filter = if let Some(proto_filter) = r.transaction_filter {
+            Some(parse_transaction_filter(
+                proto_filter,
+                self.service_context.max_transaction_filter_size_bytes,
+            )?)
+        } else {
+            None
+        };
         // Creates a channel to send the stream to the client
         let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
         let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
@@ -68,6 +79,7 @@ impl RawData for LocalnetDataService {
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
+                filter,
             );
             while coordinator.current_version < coordinator.end_version {
                 // Processes and sends batch of transactions to client

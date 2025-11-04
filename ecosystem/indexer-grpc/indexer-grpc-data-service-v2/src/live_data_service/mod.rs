@@ -12,6 +12,7 @@ use crate::{
     live_data_service::in_memory_cache::InMemoryCache,
     metrics::{COUNTER, TIMER},
 };
+use aptos_indexer_grpc_utils::filter_utils;
 use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
 use std::{sync::Arc, time::Duration};
@@ -90,17 +91,14 @@ impl<'a> LiveDataService<'a> {
                 }
 
                 let filter = if let Some(proto_filter) = request.transaction_filter {
-                    match BooleanTransactionFilter::new_from_proto(
+                    match filter_utils::parse_transaction_filter(
                         proto_filter,
-                        Some(self.max_transaction_filter_size_bytes),
+                        self.max_transaction_filter_size_bytes,
                     ) {
                         Ok(filter) => Some(filter),
-                        Err(e) => {
-                            let err = Err(Status::invalid_argument(format!(
-                                "Invalid transaction_filter: {e:?}."
-                            )));
+                        Err(err) => {
                             info!("Client error: {err:?}.");
-                            let _ = response_sender.blocking_send(err);
+                            let _ = response_sender.blocking_send(Err(err));
                             COUNTER
                                 .with_label_values(&["live_data_service_invalid_filter"])
                                 .inc();

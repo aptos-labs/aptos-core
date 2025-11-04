@@ -6,7 +6,9 @@ use crate::{
     connection_manager::ConnectionManager,
     metrics::{COUNTER, TIMER},
 };
-use aptos_indexer_grpc_utils::file_store_operator_v2::file_store_reader::FileStoreReader;
+use aptos_indexer_grpc_utils::{
+    file_store_operator_v2::file_store_reader::FileStoreReader, filter_utils,
+};
 use aptos_protos::indexer::v1::{GetTransactionsRequest, ProcessedRange, TransactionsResponse};
 use aptos_transaction_filter::BooleanTransactionFilter;
 use futures::executor::block_on;
@@ -76,17 +78,14 @@ impl HistoricalDataService {
                 let starting_version = request.starting_version.unwrap();
 
                 let filter = if let Some(proto_filter) = request.transaction_filter {
-                    match BooleanTransactionFilter::new_from_proto(
+                    match filter_utils::parse_transaction_filter(
                         proto_filter,
-                        Some(self.max_transaction_filter_size_bytes),
+                        self.max_transaction_filter_size_bytes,
                     ) {
                         Ok(filter) => Some(filter),
-                        Err(e) => {
-                            let err = Err(Status::invalid_argument(format!(
-                                "Invalid transaction_filter: {e:?}."
-                            )));
+                        Err(err) => {
                             info!("Client error: {err:?}.");
-                            let _ = response_sender.blocking_send(err);
+                            let _ = response_sender.blocking_send(Err(err));
                             COUNTER
                                 .with_label_values(&["historical_data_service_invalid_filter"])
                                 .inc();
