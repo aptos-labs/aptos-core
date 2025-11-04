@@ -3,16 +3,14 @@ module sigma_protocols::sigma_protocol {
     use aptos_std::ristretto255::{point_identity, multi_scalar_mul, point_equals};
     use sigma_protocols::utils::{neg_scalars, points_clone};
     use sigma_protocols::proof::Proof;
-    use sigma_protocols::representation_vec::RepresentationVec;
-    use sigma_protocols::secret_witness::SecretWitness;
     use sigma_protocols::public_statement::PublicStatement;
     use sigma_protocols::fiat_shamir::{DomainSeparator, fiat_shamir};
     #[test_only]
-    use sigma_protocols::homomorphism::{evaluate_f, evaluate_homomorphism, Homomorphism};
+    use sigma_protocols::homomorphism::{evaluate_f, evaluate_homomorphism, Homomorphism, TransformationFunction};
     #[test_only]
     use sigma_protocols::proof;
     #[test_only]
-    use sigma_protocols::secret_witness;
+    use sigma_protocols::secret_witness::{Self, SecretWitness};
     #[test_only]
     use sigma_protocols::utils::{equal_vec_points, add_vec_points, mul_points, mul_scalars, add_vec_scalars};
 
@@ -80,8 +78,8 @@ module sigma_protocols::sigma_protocol {
     /// ```
     public inline fun verify_slow(
         dst: DomainSeparator,
-        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
-        f: |&PublicStatement|RepresentationVec,
+        psi: Homomorphism,
+        f: TransformationFunction,
         stmt: &PublicStatement,
         proof: &Proof,
     ): bool {
@@ -144,8 +142,8 @@ module sigma_protocols::sigma_protocol {
     /// Returns true if it succeeds and false otherwise.
     public inline fun verify(
         dst: DomainSeparator,
-        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
-        f: |&PublicStatement|RepresentationVec,
+        psi: Homomorphism,
+        f: TransformationFunction,
         stmt: &PublicStatement,
         proof: &Proof,
     ): bool {
@@ -221,8 +219,8 @@ module sigma_protocols::sigma_protocol {
         dst: DomainSeparator,
         stmt: PublicStatement,
         witn: SecretWitness,
-        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
-        f: |&PublicStatement|RepresentationVec,
+        psi: Homomorphism,
+        f: TransformationFunction,
     ): (Proof, SecretWitness) {
         let (proof, alpha) = prove(
             dst,
@@ -258,8 +256,8 @@ module sigma_protocols::sigma_protocol {
     /// Returns `true` if the empty proof does not verify for the specific statement. Otherwise, returns `false`.
     public inline fun empty_proof_verifies(
         dst: DomainSeparator,
-        psi: |&PublicStatement, &SecretWitness|RepresentationVec,
-        f: |&PublicStatement|RepresentationVec,
+        psi: Homomorphism,
+        f: TransformationFunction,
         stmt: PublicStatement,
     ): bool {
         let proof = proof::empty();
