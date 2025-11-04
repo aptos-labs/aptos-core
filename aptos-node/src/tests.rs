@@ -70,6 +70,7 @@ fn test_create_single_node_test_config() {
             processor_task_count: 10
             processor_batch_size: 100
             output_batch_size: 100
+            transaction_channel_size: 100
         api:
             address: 0.0.0.0:8081
         execution:
