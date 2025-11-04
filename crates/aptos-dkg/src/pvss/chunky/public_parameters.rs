@@ -194,6 +194,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
 }
 
 impl<E: Pairing> Default for PublicParameters<E> {
+    // TODO: is this only used for testing?
     fn default() -> Self {
         let mut rng = thread_rng();
         Self::new(1, CHUNK_SIZE as usize, &mut rng)

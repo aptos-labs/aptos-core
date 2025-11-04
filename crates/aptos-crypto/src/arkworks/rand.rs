@@ -31,28 +31,3 @@ pub fn sample_field_element<F: PrimeField, R: Rng + ?Sized>(rng: &mut R) -> F {
         }
     }
 }
-
-// fn sample<F: ark_ff::PrimeField, R: rand::Rng + ?Sized>(&self, rng: &mut R) -> F {
-//     loop {
-//         let mut tmp = Fp(
-//             rng.sample(rand::distributions::Standard),
-//             PhantomData,
-//         );
-//         let shave_bits = F::FpConfig::num_bits_to_shave();
-//         // Mask away the unused bits at the beginning.
-//         assert!(shave_bits <= 64);
-//         let mask = if shave_bits == 64 {
-//             0
-//         } else {
-//             u64::MAX >> shave_bits
-//         };
-
-//         if let Some(val) = tmp.0 .0.last_mut() {
-//             *val &= mask
-//         }
-
-//         if !tmp.is_geq_modulus() {
-//             return tmp;
-//         }
-//     }
-// }
