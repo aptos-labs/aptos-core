@@ -8,8 +8,10 @@ use crate::{
         homomorphism,
         homomorphism::{fixed_base_msms, fixed_base_msms::Trait as FixedBaseMsmsTrait, Trait},
     },
+    Scalar,
 };
 use anyhow::ensure;
+use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
@@ -133,7 +135,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
     )
 }
 
-fn commit_with_randomness<E: Pairing>(
+pub fn commit_with_randomness<E: Pairing>(
     ck: &CommitmentKey<E>,
     values: &[E::ScalarField],
     r: &CommitmentRandomness<E>,
@@ -143,7 +145,10 @@ fn commit_with_randomness<E: Pairing>(
         xi_1: ck.xi_1,
     };
 
-    let input = (r.0, values.to_vec());
+    let input = Witness {
+        hiding_randomness: Scalar(r.0),
+        values: Scalar::vec_from_inner_slice(values),
+    };
 
     Commitment(commitment_hom.apply(&input).0)
 }
@@ -252,9 +257,17 @@ pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub xi_1: E::G1Affine,
 }
 
+#[derive(
+    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
+)]
+pub struct Witness<E: Pairing> {
+    pub hiding_randomness: Scalar<E>,
+    pub values: Vec<Scalar<E>>,
+}
+
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
-    type Domain = (E::ScalarField, Vec<E::ScalarField>);
+    type Domain = Witness<E>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
@@ -273,25 +286,31 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         assert!(
-            self.lagr_g1.len() >= input.1.len(),
+            self.lagr_g1.len() >= input.values.len(),
             "Not enough Lagrange basis elements for univariate hiding KZG: required {}, got {}",
-            input.1.len(),
+            input.values.len(),
             self.lagr_g1.len()
         );
 
-        let mut scalars = Vec::with_capacity(input.1.len() + 1);
-        scalars.push(input.0);
-        scalars.extend_from_slice(&input.1);
+        let mut scalars = Vec::with_capacity(input.values.len() + 1);
+        scalars.push(input.hiding_randomness.0);
+        scalars.extend(input.values.iter().map(|s| s.0.clone()));
 
-        let mut bases = Vec::with_capacity(input.1.len() + 1);
+        let mut bases = Vec::with_capacity(input.values.len() + 1);
         bases.push(self.xi_1);
-        bases.extend(&self.lagr_g1[..input.1.len()]);
+        bases.extend(&self.lagr_g1[..input.values.len()]);
 
         CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
         E::G1::msm(bases, &scalars).expect("MSM computation failed in univariate KZG")
+    }
+}
+
+impl<'a, E: Pairing> sigma_protocol::Trait<E> for CommitmentHomomorphism<'a, E> {
+    fn dst(&self) -> Vec<u8> {
+        b"APTOS_HIDING_KZG_SIGMA_PROTOCOL_DST".to_vec()
     }
 }
 
