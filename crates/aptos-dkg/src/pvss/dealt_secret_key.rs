@@ -13,7 +13,7 @@ macro_rules! dealt_secret_key_impl {
         use crate::{
             algebra::lagrange::lagrange_coefficients,
             pvss::{
-                dealt_secret_key_share::$gt::DealtSecretKeyShare, player::Player,
+                dealt_secret_key_share::$gt::DealtSecretKeyShare, Player,
                 threshold_config::ThresholdConfigBlstrs, traits, traits::SecretSharingConfig,
             },
             utils::{$gt_multi_exp},

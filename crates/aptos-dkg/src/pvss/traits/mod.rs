@@ -3,7 +3,7 @@
 
 pub mod transcript;
 
-use crate::pvss::player::Player;
+use crate::pvss::Player;
 use aptos_crypto::arkworks;
 use more_asserts::assert_lt;
 use rand::{seq::IteratorRandom, Rng};
