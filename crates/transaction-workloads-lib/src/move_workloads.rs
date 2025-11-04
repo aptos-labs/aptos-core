@@ -515,10 +515,7 @@ impl EntryPointTrait for EntryPoints {
                 };
                 get_payload(module_id, ident_str!(method).to_owned(), args)
             },
-            EntryPoints::Fibonacci {
-                n,
-                function_type,
-            } => {
+            EntryPoints::Fibonacci { n, function_type } => {
                 let method = match function_type {
                     FibonacciFunctionType::Recursive => "fibonacci_recursive",
                     FibonacciFunctionType::TailRecursive => "fibonacci_tail_recursive",
