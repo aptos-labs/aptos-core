@@ -911,6 +911,12 @@ move-vm-types = { path = "third_party/move/move-vm/types" }
 debug = true
 overflow-checks = true
 
+# For [build-dependencies], cargo sets `opt-level=0` independent of the actual profile used.
+# In `aptos-cached-packages` crate, we have `aptos-framework` as a build dependency. Which in a `--release` mode,
+# results in a 335 crates more being compiled, completely unnecessary.
+# In addition to that, the same `aptos-cached-packages` build has a very compute intensive step to compile
+# the whole Aptos Framework with the Move Compiler - which with the `opt-level=0` slows down compilation a lot.
+# For the explanation, see https://github.com/rust-lang/cargo/pull/8500
 [profile.release.build-override]
 opt-level = 3
 
