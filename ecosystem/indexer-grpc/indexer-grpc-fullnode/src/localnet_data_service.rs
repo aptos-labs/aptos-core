@@ -16,7 +16,6 @@ use tonic::{Request, Response, Status};
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
-const TRANSACTION_CHANNEL_SIZE: usize = 100;
 
 type TransactionResponseStream =
     Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
@@ -50,11 +49,12 @@ impl RawData for LocalnetDataService {
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
+        let transaction_channel_size = self.service_context.transaction_channel_size;
         let ledger_chain_id = context.chain_id().id();
         let transactions_count = r.transactions_count;
-        // Creates a channel to send the stream to the client
-        let (tx, mut rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
-        let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+        // Creates a channel to send the stream to the client.
+        let (tx, mut rx) = mpsc::channel(transaction_channel_size);
+        let (external_service_tx, external_service_rx) = mpsc::channel(transaction_channel_size);
 
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions.
