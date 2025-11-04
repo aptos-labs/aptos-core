@@ -23,7 +23,9 @@ ark-ec = { workspace = true }
 ark-ff = { workspace = true }
 ark-groth16 = { workspace = true }
 ark-poly = { workspace = true }
+ark-relations = { workspace = true }
 ark-serialize = { workspace = true }
+ark-snark = { workspace = true }
 ark-std = { workspace = true }
 base64 = { workspace = true }
 bcs = { workspace = true }
@@ -104,6 +106,10 @@ harness = false
 
 [[bench]]
 name = "ark_bn254"
+harness = false
+
+[[bench]]
+name = "ark_groth16"
 harness = false
 
 [[bench]]
