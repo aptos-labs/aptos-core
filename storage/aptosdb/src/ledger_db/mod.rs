@@ -324,7 +324,7 @@ impl LedgerDb {
             rocksdb_configs,
             env,
             block_cache,
-            /*readonly=*/ false,
+            /*readonly=*/ true,
         )?;
         let cp_ledger_db_folder = cp_root_path.as_ref().join(LEDGER_DB_FOLDER_NAME);
 

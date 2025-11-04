@@ -7,6 +7,7 @@ pub mod block_preparation;
 pub mod db_access;
 pub mod db_generator;
 mod db_reliable_submitter;
+mod indexer_grpc_waiter;
 mod ledger_update_stage;
 pub mod measurements;
 mod metrics;
@@ -23,13 +24,21 @@ use crate::{
     transaction_executor::TransactionExecutor,
     transaction_generator::{create_block_metadata_transaction, TransactionGenerator},
 };
+use aptos_api::context::Context;
 use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
 use aptos_db::AptosDB;
+use aptos_db_indexer::{db_ops::open_db, db_v2::IndexerAsyncV2, indexer_reader::IndexerReaders};
 use aptos_executor::block_executor::BlockExecutor;
+use aptos_indexer_grpc_fullnode::{fullnode_data_service::FullnodeDataService, ServiceContext};
+use aptos_indexer_grpc_table_info::table_info_service::TableInfoService;
 use aptos_jellyfish_merkle::metrics::{
     APTOS_JELLYFISH_INTERNAL_ENCODED_BYTES, APTOS_JELLYFISH_LEAF_ENCODED_BYTES,
 };
 use aptos_logger::{info, warn};
+use aptos_protos::internal::fullnode::v1::{
+    fullnode_data_server::FullnodeData, transactions_from_node_response::Response,
+    GetTransactionsFromNodeRequest,
+};
 use aptos_sdk::types::LocalAccount;
 use aptos_storage_interface::{
     state_store::state_view::db_state_view::LatestDbStateCheckpointView, DbReader, DbReaderWriter,
@@ -43,15 +52,44 @@ use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
 use aptos_vm_environment::prod_configs::set_layout_caches;
 use db_generator::create_db_with_accounts;
 use db_reliable_submitter::DbReliableTransactionSubmitter;
+use futures::StreamExt;
 use measurements::{EventMeasurements, OverallMeasurement, OverallMeasuring};
 use pipeline::PipelineConfig;
 use std::{
     fs,
     path::Path,
-    sync::{atomic::AtomicUsize, Arc},
+    sync::{
+        atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 use tokio::runtime::Runtime;
+use tonic::IntoRequest;
+
+const TABLE_INFO_DB_NAME: &str = "index_async_v2_db";
+
+#[derive(Clone, Copy, Debug)]
+pub struct StorageTestConfig {
+    pub pruner_config: PrunerConfig,
+    pub enable_storage_sharding: bool,
+    pub enable_indexer_grpc: bool,
+}
+
+impl StorageTestConfig {
+    pub fn init_storage_config(&self, node_config: &mut NodeConfig) {
+        node_config.storage.storage_pruner_config = self.pruner_config;
+        node_config.storage.rocksdb_configs.enable_storage_sharding = self.enable_storage_sharding;
+        if self.enable_indexer_grpc {
+            node_config.indexer_grpc.enabled = true;
+            node_config.indexer_table_info.table_info_service_mode =
+                aptos_config::config::TableInfoServiceMode::IndexingOnly;
+
+            node_config.indexer_table_info.parser_task_count = 10;
+            node_config.indexer_table_info.parser_batch_size = 100;
+        }
+    }
+}
 
 pub struct SingleRunResults {
     pub measurements: OverallMeasurement,
@@ -81,19 +119,133 @@ pub fn init_db(config: &NodeConfig) -> DbReaderWriter {
     )
 }
 
+fn init_indexer_wrapper(
+    config: &NodeConfig,
+    db: &DbReaderWriter,
+    storage_test_config: &StorageTestConfig,
+    start_version: u64,
+) -> Option<(Arc<TableInfoService>, Arc<AtomicU64>, Arc<AtomicBool>)> {
+    if !storage_test_config.enable_indexer_grpc {
+        return None;
+    }
+
+    let db_path = config
+        .storage
+        .get_dir_paths()
+        .default_root_path()
+        .join(TABLE_INFO_DB_NAME);
+    let rocksdb_config = config.storage.rocksdb_configs.index_db_config;
+    let indexer_db = open_db(db_path, &rocksdb_config, /*readonly=*/ false)
+        .expect("Failed to open indexer async v2 db");
+    let indexer_async_v2 =
+        Arc::new(IndexerAsyncV2::new(indexer_db).expect("Failed to initialize indexer async v2"));
+
+    // Create API context for table_info_service
+    let (mp_sender, _mp_receiver) = futures::channel::mpsc::channel(1);
+    // Use ChainId::test() for benchmark
+    let chain_id = aptos_types::chain_id::ChainId::test();
+    let context = Arc::new(Context::new(
+        chain_id,
+        db.reader.clone(),
+        mp_sender,
+        config.clone(),
+        Some(Arc::new(
+            IndexerReaders::new(Some(indexer_async_v2.clone()), None).unwrap(),
+        )),
+    ));
+    let service_context = ServiceContext {
+        context: context.clone(),
+        processor_task_count: config.indexer_grpc.processor_task_count,
+        processor_batch_size: config.indexer_grpc.processor_batch_size,
+        output_batch_size: config.indexer_grpc.output_batch_size,
+    };
+
+    // Spawn table_info_service in tokio runtime
+    let indexer_async_v2_clone = indexer_async_v2.clone();
+    let config_clone = config.clone();
+    let indexer_runtime = tokio::runtime::Runtime::new().unwrap();
+    let table_info_service = Arc::new(TableInfoService::new(
+        context,
+        indexer_async_v2_clone.next_version(),
+        config_clone.indexer_table_info.parser_task_count,
+        config_clone.indexer_table_info.parser_batch_size,
+        None, // No backup/restore for benchmark
+        indexer_async_v2_clone,
+    ));
+    let table_info_service_clone = table_info_service.clone();
+    indexer_runtime.spawn(async move {
+        table_info_service_clone.run().await;
+    });
+    let grpc_version = Arc::new(AtomicU64::new(0));
+    let grpc_version_clone = grpc_version.clone();
+    let abort_handle = Arc::new(AtomicBool::new(false));
+    let abort_handle_clone = abort_handle.clone();
+    indexer_runtime.spawn(async move {
+        let grpc_service = FullnodeDataService {
+            service_context,
+            abort_handle,
+        };
+        let request = GetTransactionsFromNodeRequest {
+            starting_version: Some(start_version),
+            transactions_count: None,
+        };
+        let mut response = grpc_service
+            .get_transactions_from_node(request.into_request())
+            .await
+            .unwrap()
+            .into_inner();
+        while let Some(item) = response.next().await {
+            match item {
+                Ok(r) => {
+                    if let Some(response) = r.response {
+                        match response {
+                            Response::Data(data) => {
+                                if let Some(txn) = data.transactions.last().as_ref() {
+                                    grpc_version_clone.store(txn.version, Ordering::SeqCst);
+                                }
+                            },
+                            _ => {},
+                        }
+                    }
+                },
+                Err(_) => {},
+            }
+        }
+        // TODO(grao): We need a way to cleanly shutdown this.
+    });
+
+    // Keep runtime alive - it will be dropped when the function scope ends
+    std::mem::forget(indexer_runtime);
+
+    Some((table_info_service, grpc_version, abort_handle_clone))
+}
+
 fn create_checkpoint(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     enable_storage_sharding: bool,
+    enable_indexer_grpc: bool,
 ) {
+    println!("Creating checkpoint for DBs.");
     // Create rocksdb checkpoint.
     if checkpoint_dir.as_ref().exists() {
         fs::remove_dir_all(checkpoint_dir.as_ref()).unwrap_or(());
     }
     std::fs::create_dir_all(checkpoint_dir.as_ref()).unwrap();
 
+    if enable_indexer_grpc {
+        let db_path = source_dir.as_ref().join(TABLE_INFO_DB_NAME);
+        let indexer_db = open_db(db_path, &Default::default(), /*readonly=*/ true)
+            .expect("Failed to open table info db.");
+        indexer_db
+            .create_checkpoint(checkpoint_dir.as_ref().join(TABLE_INFO_DB_NAME))
+            .expect("Table info db checkpoint creation fails.");
+    }
+
     AptosDB::create_checkpoint(source_dir, checkpoint_dir, enable_storage_sharding)
         .expect("db checkpoint creation fails.");
+
+    println!("Checkpoint for DBs is done.");
 }
 
 pub enum BenchmarkWorkload {
@@ -130,8 +282,7 @@ pub fn run_benchmark<V>(
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
     verify_sequence_numbers: bool,
-    pruner_config: PrunerConfig,
-    enable_storage_sharding: bool,
+    storage_test_config: StorageTestConfig,
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
@@ -142,13 +293,13 @@ where
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        enable_storage_sharding,
+        storage_test_config.enable_storage_sharding,
+        storage_test_config.enable_indexer_grpc,
     );
     let (mut config, genesis_key) =
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = checkpoint_dir.as_ref().to_path_buf();
-    config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
+    storage_test_config.init_storage_config(&mut config);
     let db = init_db(&config);
     let root_account = TransactionGenerator::read_root_account(genesis_key, &db);
     let root_account = Arc::new(root_account);
@@ -236,9 +387,18 @@ where
     };
 
     let start_version = db.reader.expect_synced_version();
+
+    // Initialize table_info_service and grpc stream if indexer_grpc is enabled
+    let indexer_wrapper = init_indexer_wrapper(&config, &db, &storage_test_config, start_version);
+
     let executor = BlockExecutor::<V>::new(db.clone());
-    let (pipeline, block_sender) =
-        Pipeline::new(executor, start_version, &pipeline_config, Some(num_blocks));
+    let (pipeline, block_sender) = Pipeline::new(
+        executor,
+        start_version,
+        &pipeline_config,
+        Some(num_blocks),
+        indexer_wrapper,
+    );
 
     let root_account = Arc::into_inner(root_account).unwrap();
     let mut generator = TransactionGenerator::new_with_existing_db(
@@ -341,6 +501,7 @@ where
         start_version,
         pipeline_config,
         None,
+        None, // No indexer for init workload
     );
 
     let runtime = Runtime::new().unwrap();
@@ -382,9 +543,8 @@ pub fn add_accounts<V>(
     block_size: usize,
     source_dir: impl AsRef<Path>,
     checkpoint_dir: impl AsRef<Path>,
-    pruner_config: PrunerConfig,
+    storage_test_config: StorageTestConfig,
     verify_sequence_numbers: bool,
-    enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
@@ -395,7 +555,8 @@ pub fn add_accounts<V>(
     create_checkpoint(
         source_dir.as_ref(),
         checkpoint_dir.as_ref(),
-        enable_storage_sharding,
+        storage_test_config.enable_storage_sharding,
+        storage_test_config.enable_indexer_grpc,
     );
     add_accounts_impl::<V>(
         num_new_accounts,
@@ -403,9 +564,8 @@ pub fn add_accounts<V>(
         block_size,
         source_dir,
         checkpoint_dir,
-        pruner_config,
+        storage_test_config,
         verify_sequence_numbers,
-        enable_storage_sharding,
         pipeline_config,
         init_features,
         is_keyless,
@@ -418,9 +578,8 @@ fn add_accounts_impl<V>(
     block_size: usize,
     source_dir: impl AsRef<Path>,
     output_dir: impl AsRef<Path>,
-    pruner_config: PrunerConfig,
+    storage_test_config: StorageTestConfig,
     verify_sequence_numbers: bool,
-    enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
@@ -430,12 +589,15 @@ fn add_accounts_impl<V>(
     let (mut config, genesis_key) =
         aptos_genesis::test_utils::test_config_with_custom_features(init_features);
     config.storage.dir = output_dir.as_ref().to_path_buf();
-    config.storage.storage_pruner_config = pruner_config;
-    config.storage.rocksdb_configs.enable_storage_sharding = enable_storage_sharding;
+    storage_test_config.init_storage_config(&mut config);
     let db = init_db(&config);
-    let executor = BlockExecutor::<V>::new(db.clone());
 
     let start_version = db.reader.get_latest_ledger_info_version().unwrap();
+
+    // Initialize indexer if enabled
+    let indexer_wrapper = init_indexer_wrapper(&config, &db, &storage_test_config, start_version);
+
+    let executor = BlockExecutor::<V>::new(db.clone());
 
     // First BlockMetadata transaction (epoch=0 to trigger epoch change)
     let executor1 = BlockExecutor::<V>::new(db.clone());
@@ -444,6 +606,7 @@ fn add_accounts_impl<V>(
         start_version,
         &pipeline_config,
         Some(1), // Only 1 block
+        None,
     );
 
     info!("Sending the first block metadata transaction to start a new epoch");
@@ -464,6 +627,7 @@ fn add_accounts_impl<V>(
         current_version,
         &pipeline_config,
         Some(num_new_accounts / block_size * 101 / 100),
+        indexer_wrapper,
     );
 
     let mut generator = TransactionGenerator::new_with_existing_db(
@@ -553,6 +717,7 @@ pub struct SingleRunAdditionalConfigs {
     /// stitched together in arbitrary order
     pub num_generator_workers: usize,
     pub split_stages: bool,
+    pub enable_indexer_grpc: bool,
 }
 
 pub fn run_single_with_default_params(
@@ -632,6 +797,21 @@ pub fn run_single_with_default_params(
             ..
         } => split_stages,
     };
+    let enable_indexer_grpc = match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::BENCHMARK {
+            additional_configs: None,
+            ..
+        } => false,
+        SingleRunMode::BENCHMARK {
+            additional_configs:
+                Some(SingleRunAdditionalConfigs {
+                    enable_indexer_grpc,
+                    ..
+                }),
+            ..
+        } => enable_indexer_grpc,
+    };
 
     let num_main_signer_accounts = num_accounts / 5;
     let num_dst_pool_accounts = num_accounts / 2;
@@ -648,7 +828,14 @@ pub fn run_single_with_default_params(
     let init_pipeline_config = PipelineConfig {
         num_sig_verify_threads: std::cmp::max(1, num_cpus::get() / 3),
         print_transactions,
+        wait_for_indexer_grpc: enable_indexer_grpc,
         ..Default::default()
+    };
+
+    let storage_test_config = StorageTestConfig {
+        pruner_config: NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
+        enable_storage_sharding: true,
+        enable_indexer_grpc,
     };
 
     create_db_with_accounts::<AptosVMBlockExecutor>(
@@ -656,9 +843,8 @@ pub fn run_single_with_default_params(
         100000 * 100000000, /* init_account_balance */
         10000,              /* block_size */
         &storage_dir,
-        NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
+        storage_test_config,
         verify_sequence_numbers,
-        true,
         init_pipeline_config,
         features.clone(),
         is_keyless,
@@ -672,6 +858,7 @@ pub fn run_single_with_default_params(
         print_transactions,
         num_generator_workers,
         split_stages,
+        wait_for_indexer_grpc: enable_indexer_grpc,
         ..Default::default()
     };
 
@@ -685,8 +872,7 @@ pub fn run_single_with_default_params(
         &storage_dir,
         checkpoint_dir,
         verify_sequence_numbers,
-        NO_OP_STORAGE_PRUNER_CONFIG,
-        true,
+        storage_test_config,
         execute_pipeline_config,
         features,
         is_keyless,
@@ -710,7 +896,7 @@ mod tests {
         pipeline::PipelineConfig,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::TransactionGenerator,
-        BenchmarkWorkload,
+        BenchmarkWorkload, StorageTestConfig,
     };
     use aptos_config::config::NO_OP_STORAGE_PRUNER_CONFIG;
     use aptos_crypto::HashValue;
@@ -793,9 +979,10 @@ mod tests {
         config.storage.dir = db_dir.as_ref().to_path_buf();
         config.storage.storage_pruner_config = NO_OP_STORAGE_PRUNER_CONFIG;
         config.storage.rocksdb_configs.enable_storage_sharding = false;
+        config.indexer_grpc.enabled = false; // Disable indexer for tests
 
         let (txn, vm_result) = {
-            let vm_db = init_db(&config);
+            let (vm_db, _) = init_db(&config);
             let vm_executor = BlockExecutor::<AptosVMBlockExecutor>::new(vm_db.clone());
 
             let root_account = TransactionGenerator::read_root_account(genesis_key, &vm_db);
@@ -824,7 +1011,8 @@ mod tests {
             (txn, result)
         };
 
-        let other_db = init_db(&config);
+        config.indexer_grpc.enabled = false; // Disable indexer for tests
+        let (other_db, _) = init_db(&config);
         let other_executor = BlockExecutor::<E>::new(other_db.clone());
 
         let parent_block_id = other_executor.committed_block_id();
@@ -955,15 +1143,20 @@ mod tests {
         features.enable(FeatureFlag::NEW_ACCOUNTS_DEFAULT_TO_FA_APT_STORE);
         features.enable(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
 
+        let storage_test_config = StorageTestConfig {
+            pruner_config: NO_OP_STORAGE_PRUNER_CONFIG,
+            enable_storage_sharding: false,
+            enable_indexer_grpc: true,
+        };
+
         crate::db_generator::create_db_with_accounts::<AptosVMBlockExecutor>(
             100, /* num_accounts */
             // TODO(Gas): double check if this is correct
             100_000_000_000, /* init_account_balance */
             5,               /* block_size */
             storage_dir.as_ref(),
-            NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
+            storage_test_config,
             verify_sequence_numbers,
-            false,
             PipelineConfig::default(),
             features.clone(),
             false,
@@ -993,8 +1186,7 @@ mod tests {
             storage_dir.as_ref(),
             checkpoint_dir,
             verify_sequence_numbers,
-            NO_OP_STORAGE_PRUNER_CONFIG,
-            false,
+            storage_test_config,
             PipelineConfig::default(),
             features,
             false,

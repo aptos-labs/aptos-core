@@ -15,7 +15,14 @@ use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
 use aptos_types::write_set::WriteSet;
 use itertools::Itertools;
-use std::{cmp::Ordering, sync::Arc, time::Duration};
+use std::{
+    cmp::Ordering as CmpOrdering,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 type EndVersion = u64;
 const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
@@ -25,7 +32,6 @@ const SERVICE_TYPE: &str = "table_info_service";
 /// TableInfoService is responsible for parsing table info from transactions and writing them to rocksdb.
 /// Not thread safe.
 pub struct TableInfoService {
-    pub current_version: u64,
     pub parser_task_count: u16,
     pub parser_batch_size: u16,
     pub context: Arc<ApiContext>,
@@ -33,6 +39,9 @@ pub struct TableInfoService {
 
     // Backup and restore service. If not enabled, this will be None.
     pub backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
+
+    current_version: AtomicU64,
+    aborted: AtomicBool,
 }
 
 impl TableInfoService {
@@ -45,13 +54,18 @@ impl TableInfoService {
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Self {
         Self {
-            current_version: request_start_version,
+            current_version: AtomicU64::new(request_start_version),
             parser_task_count,
             parser_batch_size,
             context,
             backup_restore_operator,
             indexer_async_v2,
+            aborted: AtomicBool::new(false),
         }
+    }
+
+    pub fn abort(&self) {
+        self.aborted.store(true, Ordering::SeqCst);
     }
 
     /// Start table info service and backup service is optional.
@@ -59,7 +73,7 @@ impl TableInfoService {
     /// 1. Table info parsing loop: fetching raw txns from db, processing, and writing to rocksdb.
     ///        If backup service is enabled, it will also snapshot the rocksdb at the end of each epoch.
     /// 2. Optional backup service loop: it monitors if new snapshots are available to backup and uploads them to GCS.
-    pub async fn run(&mut self) {
+    pub async fn run(&self) {
         // TODO: fix the restore logic.
         let backup_is_enabled = match self.backup_restore_operator.clone() {
             Some(backup_restore_operator) => {
@@ -85,6 +99,10 @@ impl TableInfoService {
 
         let mut current_epoch: Option<u64> = None;
         loop {
+            if self.aborted.load(Ordering::SeqCst) {
+                info!("table info service aborted");
+                break;
+            }
             let start_time = std::time::Instant::now();
             let ledger_version = self.get_highest_known_version().await.unwrap_or_default();
             let batches = self.get_batches(ledger_version).await;
@@ -149,7 +167,7 @@ impl TableInfoService {
             .await;
 
             let versions_processed = num_transactions as i64;
-            let start_version = self.current_version;
+            let start_version = self.current_version.load(Ordering::SeqCst);
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::TableInfoProcessed,
@@ -163,9 +181,14 @@ impl TableInfoService {
                 None,
             );
 
-            self.current_version = last_version + 1;
+            self.current_version
+                .store(last_version + 1, Ordering::SeqCst);
             current_epoch = Some(epoch);
         }
+    }
+
+    pub fn next_version(&self) -> u64 {
+        self.current_version.load(Ordering::SeqCst)
     }
 
     async fn fetch_batches(
@@ -329,16 +352,16 @@ impl TableInfoService {
     /// Retrieves transaction batches based on the provided ledger version.
     /// The function prepares to fetch transactions by determining the start version,
     /// the number of fetches, and the size of each batch.
-    async fn get_batches(&mut self, ledger_version: u64) -> Vec<TransactionBatchInfo> {
+    async fn get_batches(&self, ledger_version: u64) -> Vec<TransactionBatchInfo> {
+        let mut start_version = self.current_version.load(Ordering::SeqCst);
         info!(
-            current_version = self.current_version,
+            current_version = start_version,
             highest_known_version = ledger_version,
             parser_batch_size = self.parser_batch_size,
             parser_task_count = self.parser_task_count,
             "[Table Info] Preparing to fetch transactions"
         );
 
-        let mut start_version = self.current_version;
         let mut num_fetches = 0;
         let mut batches = vec![];
 
@@ -469,7 +492,7 @@ impl TableInfoService {
         let mut ledger_version = info.unwrap().ledger_version.0;
         let mut empty_loops = 0;
 
-        while ledger_version == 0 || self.current_version > ledger_version {
+        while ledger_version == 0 || self.current_version.load(Ordering::SeqCst) > ledger_version {
             if empty_loops > 0 {
                 tokio::time::sleep(Duration::from_millis(LEDGER_VERSION_RETRY_TIME_MILLIS)).await;
             }
@@ -613,12 +636,12 @@ fn transactions_in_epochs(
     let current_epoch = current_epoch.unwrap();
 
     let split_off_index = match current_epoch.cmp(&block_epoch.epoch()) {
-        Ordering::Equal => {
+        CmpOrdering::Equal => {
             // All transactions are in the this epoch.
             // Previous epoch is empty, i.e., [0, 0), and this epoch is [first_version, last_version].
             0
         },
-        Ordering::Less => {
+        CmpOrdering::Less => {
             // Try the best to split the transactions into two epochs.
             epoch_first_version - first_version
         },

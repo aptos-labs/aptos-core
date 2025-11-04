@@ -179,7 +179,7 @@ impl StateMerkleDb {
             rocksdb_configs,
             /*env=*/ None,
             /*block_cache=*/ None,
-            /*readonly=*/ false,
+            /*readonly=*/ true,
             /*max_nodes_per_lru_cache_shard=*/ 0,
         )?;
         let cp_state_merkle_db_path = cp_root_path.as_ref().join(STATE_MERKLE_DB_FOLDER_NAME);

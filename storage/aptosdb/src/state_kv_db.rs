@@ -231,7 +231,7 @@ impl StateKvDb {
             RocksdbConfig::default(),
             None,
             None,
-            false,
+            true,
         )?;
         let cp_state_kv_db_path = cp_root_path.as_ref().join(STATE_KV_DB_FOLDER_NAME);
 
