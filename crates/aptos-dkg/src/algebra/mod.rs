@@ -8,10 +8,10 @@ pub mod polynomials;
 
 use ark_ec::pairing::Pairing;
 use ark_ff::UniformRand;
-use ark_serialize::CanonicalSerialize;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::rand::{CryptoRng, RngCore};
 
-#[derive(CanonicalSerialize, Default, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Default, Debug, Clone, PartialEq, Eq)]
 pub struct GroupGenerators<E: Pairing> {
     pub g1: E::G1Affine,
     pub g2: E::G2Affine,

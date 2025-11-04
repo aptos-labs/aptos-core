@@ -7,6 +7,7 @@ mod aborting_overflow_checks;
 mod almost_swapped;
 mod assert_const;
 mod blocks_in_conditions;
+mod collapsible_if;
 mod cyclomatic_complexity;
 mod empty_if;
 mod equal_operands_in_bin_op;
@@ -36,6 +37,7 @@ pub fn get_default_linter_pipeline(config: &BTreeMap<String, String>) -> Vec<Box
         Box::<almost_swapped::AlmostSwapped>::default(),
         Box::<assert_const::AssertConst>::default(),
         Box::<blocks_in_conditions::BlocksInConditions>::default(),
+        Box::<collapsible_if::CollapsibleIf>::default(),
         Box::<empty_if::EmptyIf>::default(),
         Box::<equal_operands_in_bin_op::EqualOperandsInBinOp>::default(),
         Box::<find_unnecessary_casts::FindUnnecessaryCasts>::default(),

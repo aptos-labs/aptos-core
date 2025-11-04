@@ -3,7 +3,7 @@
 
 use crate::pvss::{
     traits::{transcript::Transcript, Convert, HasEncryptionPublicParams, SecretSharingConfig},
-    Player, ThresholdConfig, WeightedConfig,
+    Player, ThresholdConfigBlstrs, WeightedConfig,
 };
 use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
 use num_traits::Zero;
@@ -103,8 +103,8 @@ pub fn print_type_of<T>(_: &T) {
     println!("{}", std::any::type_name::<T>())
 }
 
-pub fn get_threshold_config_and_rng(t: usize, n: usize) -> (ThresholdConfig, ThreadRng) {
-    let sc = ThresholdConfig::new(t, n).unwrap();
+pub fn get_threshold_config_and_rng(t: usize, n: usize) -> (ThresholdConfigBlstrs, ThreadRng) {
+    let sc = ThresholdConfigBlstrs::new(t, n).unwrap();
 
     (sc, thread_rng())
 }
@@ -123,12 +123,12 @@ use crate::pvss::traits::Reconstructable;
 #[allow(unused)]
 pub(crate) use vec_to_str;
 
-pub fn get_threshold_configs_for_testing() -> Vec<ThresholdConfig> {
+pub fn get_threshold_configs_for_testing() -> Vec<ThresholdConfigBlstrs> {
     let mut tcs = vec![];
 
     for t in 1..8 {
         for n in t..8 {
-            let tc = ThresholdConfig::new(t, n).unwrap();
+            let tc = ThresholdConfigBlstrs::new(t, n).unwrap();
             tcs.push(tc)
         }
     }
@@ -171,16 +171,16 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
     wcs
 }
 
-pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfig> {
+pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfigBlstrs> {
     // [XDL+24] The Latency Price of Threshold Cryptosystem in Blockchains; by Zhuolun Xiang et al; 2024
     vec![
-        ThresholdConfig::new(143, 254).unwrap(), // from XDL+24
-        ThresholdConfig::new(184, 254).unwrap(), // from XDL+24
-        ThresholdConfig::new(548, 821).unwrap(), // from initial deployment
-        ThresholdConfig::new(333, 1_000).unwrap(),
-        ThresholdConfig::new(666, 1_000).unwrap(),
-        ThresholdConfig::new(3_333, 10_000).unwrap(),
-        ThresholdConfig::new(6_666, 10_000).unwrap(),
+        ThresholdConfigBlstrs::new(143, 254).unwrap(), // from XDL+24
+        ThresholdConfigBlstrs::new(184, 254).unwrap(), // from XDL+24
+        ThresholdConfigBlstrs::new(548, 821).unwrap(), // from initial deployment
+        ThresholdConfigBlstrs::new(333, 1_000).unwrap(),
+        ThresholdConfigBlstrs::new(666, 1_000).unwrap(),
+        ThresholdConfigBlstrs::new(3_333, 10_000).unwrap(),
+        ThresholdConfigBlstrs::new(6_666, 10_000).unwrap(),
     ]
 }
 

@@ -7,6 +7,7 @@ use crate::sigma_protocol::{
 };
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use std::fmt::Debug;
 
 /// Homomorphism for univariate KZG commitments using a Lagrange basis.
 ///
@@ -18,6 +19,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 /// - Uses `lagr_g1` because the input represents **evaluations**, not coefficients.
 ///
 /// For the sake of modularity, we might refactor this in the future to have this homomorphism feed into a homomorphism whose input are only values (by concatenating the inputs into one Vec).
+#[derive(CanonicalSerialize)]
 pub struct Homomorphism<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
 }
@@ -37,7 +39,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;

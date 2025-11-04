@@ -1,6 +1,6 @@
 /// ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
 /// book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
-/// The orders are matched based on time-price priority.
+/// The orders are matched based on price-time priority.
 ///
 /// This is internal module, which cannot be used directly, use OrderBook instead.
 module aptos_experimental::price_time_index {
@@ -77,7 +77,7 @@ module aptos_experimental::price_time_index {
     }
 
     /// Picks the best (i.e. highest) bid (i.e. buy) price from the active order book.
-    /// aborts if there are no buys
+    /// Returns None if there are no buys
     public(friend) fun best_bid_price(self: &PriceTimeIndex): Option<u64> {
         if (self.buys.is_empty()) {
             option::none()
@@ -88,7 +88,7 @@ module aptos_experimental::price_time_index {
     }
 
     /// Picks the best (i.e. lowest) ask (i.e. sell) price from the active order book.
-    /// aborts if there are no sells
+    /// Returns None if there are no sells
     public(friend) fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
         if (self.sells.is_empty()) {
             option::none()
@@ -98,7 +98,7 @@ module aptos_experimental::price_time_index {
         }
     }
 
-    public(friend) fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
+    fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
         let best_bid = self.best_bid_price();
         let best_ask = self.best_ask_price();
         if (best_bid.is_none() || best_ask.is_none()) {
@@ -128,70 +128,13 @@ module aptos_experimental::price_time_index {
         }
     }
 
-    // TODO check if keeping depth book is more efficient than computing impact prices manually
-
-    fun get_impact_bid_price(self: &PriceTimeIndex, impact_size: u64): Option<u64> {
-        let total_value = (0 as u128);
-        let total_size = 0;
-        let orders = &self.buys;
-        if (orders.is_empty()) {
-            return option::none();
-        };
-        let (front_key, front_value) = orders.borrow_back();
-        while (total_size < impact_size) {
-            let matched_size =
-                if (total_size + front_value.size > impact_size) {
-                    impact_size - total_size
-                } else {
-                    front_value.size
-                };
-            total_value +=(matched_size as u128) * (front_key.price as u128);
-            total_size += matched_size;
-            let next_key = orders.prev_key(&front_key);
-            if (next_key.is_none()) {
-                // TODO maybe we should return none if there is not enough depth?
-                break;
-            };
-            front_key = next_key.destroy_some();
-            front_value = orders.borrow(&front_key);
-        };
-        option::some((total_value / (total_size as u128)) as u64)
-    }
-
-    fun get_impact_ask_price(self: &PriceTimeIndex, impact_size: u64): Option<u64> {
-        let total_value = 0 as u128;
-        let total_size = 0;
-        let orders = &self.sells;
-        if (orders.is_empty()) {
-            return option::none();
-        };
-        let (front_key, front_value) = orders.borrow_front();
-        while (total_size < impact_size) {
-            let matched_size =
-                if (total_size + front_value.size > impact_size) {
-                    impact_size - total_size
-                } else {
-                    front_value.size
-                };
-            total_value +=(matched_size as u128) * (front_key.price as u128);
-            total_size += matched_size;
-            let next_key = orders.next_key(&front_key);
-            if (next_key.is_none()) {
-                break;
-            };
-            front_key = next_key.destroy_some();
-            front_value = orders.borrow(&front_key);
-        };
-        option::some((total_value / (total_size as u128)) as u64)
-    }
-
     inline fun get_tie_breaker(
         unique_priority_idx: UniqueIdxType, is_bid: bool
     ): UniqueIdxType {
         if (is_bid) {
-            unique_priority_idx
-        } else {
             unique_priority_idx.descending_idx()
+        } else {
+            unique_priority_idx
         }
     }
 
@@ -228,7 +171,7 @@ module aptos_experimental::price_time_index {
     }
 
     /// Check if the order is a taker order - i.e. if it can be immediately matched with the order book fully or partially.
-    public fun is_taker_order(
+    public(friend) fun is_taker_order(
         self: &PriceTimeIndex, price: u64, is_bid: bool
     ): bool {
         if (is_bid) {
@@ -547,118 +490,127 @@ module aptos_experimental::price_time_index {
         active_order_book.destroy_price_time_idx();
     }
 
-    #[test]
-    fun test_get_impact_sell_price() {
+    #[test_only]
+    fun test_time_based_priority_helper(maker_is_bid: bool) {
         let active_order_book = new_price_time_idx();
 
-        // Add sell orders at different prices
-        active_order_book.place_test_order(
-            TestOrder {
-                account: @0xAA,
-                order_id: new_order_id_type(1),
-                price: 100,
-                size: 50,
-                unique_idx: new_unique_idx_type(1),
-                is_bid: false
-            }
+        assert!(active_order_book.best_bid_price().is_none());
+        assert!(active_order_book.best_ask_price().is_none());
+
+        // $200 - 10000
+        // --
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xAA,
+                    order_id: new_order_id_type(0),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(0),
+                    is_bid: maker_is_bid
+                }
+            );
+        assert!(match_result.is_empty());
+
+        // Another order at same price, later timestamp
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xBB,
+                    order_id: new_order_id_type(1),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(1),
+                    is_bid: maker_is_bid
+                }
+            );
+        assert!(match_result.is_empty());
+
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xDD,
+                    order_id: new_order_id_type(2),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(2),
+                    is_bid: maker_is_bid
+                }
+            );
+        assert!(match_result.is_empty());
+
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xCC,
+                    order_id: new_order_id_type(3),
+                    price: 200,
+                    size: 500,
+                    unique_idx: new_unique_idx_type(3),
+                    is_bid: !maker_is_bid
+                }
+            );
+        assert!(match_result.length() == 1);
+        // TODO - seems like we have no match price in ActiveMatchResult any more
+        // we need to add it back, and assert?
+        // Maker order was partially filled 100 -> 900 remaining
+        assert!(
+            match_result
+                == vector[
+                new_active_matched_order(
+                    new_order_id_type(0),
+                    500, // matched size
+                    500, // remaining size
+                    single_order_type()
+                )
+            ]
         );
 
-        active_order_book.place_test_order(
-            TestOrder {
-                account: @0xAA,
-                order_id: new_order_id_type(2),
-                price: 150,
-                size: 100,
-                unique_idx: new_unique_idx_type(2),
-                is_bid: false
-            }
+        let match_result =
+            active_order_book.place_test_order(
+                TestOrder {
+                    account: @0xCC,
+                    order_id: new_order_id_type(4),
+                    price: 200,
+                    size: 1000,
+                    unique_idx: new_unique_idx_type(4),
+                    is_bid: !maker_is_bid
+                }
+            );
+
+        assert!(match_result.length() == 2);
+        // First maker order fully filled
+        assert!(
+            match_result[0]
+                == new_active_matched_order(
+                    new_order_id_type(0),
+                    500, // matched size
+                    0, // remaining size
+                    single_order_type()
+                )
         );
-
-        active_order_book.place_test_order(
-            TestOrder {
-                account: @0xAA,
-                order_id: new_order_id_type(3),
-                price: 200,
-                size: 150,
-                unique_idx: new_unique_idx_type(3),
-                is_bid: false
-            }
+        // Second maker order partially filled
+        assert!(
+            match_result[1]
+                == new_active_matched_order(
+                    new_order_id_type(1),
+                    500, // matched size
+                    500, // remaining size
+                    single_order_type()
+                )
         );
-
-        // Test impact price calculations
-        // Impact size 50 should give price of lowest order (100)
-        assert!(active_order_book.get_impact_ask_price(50).destroy_some() == 100, 1);
-
-        // Impact size 100 should give weighted average of first two orders
-        // (50 * 100 + 50 * 150) / 100 = 125
-        assert!(active_order_book.get_impact_ask_price(100).destroy_some() == 125, 2);
-
-        // Impact size 200 should give weighted average of all orders
-        // (50 * 100 + 100 * 150 + 50 * 200) / 200 = 150
-        assert!(active_order_book.get_impact_ask_price(200).destroy_some() == 150, 3);
-
-        // Impact size larger than total available should still use all orders
-        // (50 * 100 + 100 * 150 + 150 * 200) / 300 = 166
-        assert!(active_order_book.get_impact_ask_price(1000).destroy_some() == 166, 4);
 
         active_order_book.destroy_price_time_idx();
     }
 
     #[test]
-    fun test_get_impact_bid_price() {
-        let active_order_book = new_price_time_idx();
+    fun test_time_based_priority_for_bid() {
+        test_time_based_priority_helper(true);
+    }
 
-        // Place test buy orders at different prices
-        active_order_book.place_test_order(
-            TestOrder {
-                account: @0xAA,
-                order_id: new_order_id_type(1),
-                price: 200,
-                size: 50,
-                unique_idx: new_unique_idx_type(1),
-                is_bid: true
-            }
-        );
-
-        active_order_book.place_test_order(
-            TestOrder {
-                account: @0xAA,
-                order_id: new_order_id_type(2),
-                price: 150,
-                size: 100,
-                unique_idx: new_unique_idx_type(2),
-                is_bid: true
-            }
-        );
-
-        active_order_book.place_test_order(
-            TestOrder {
-                account: @0xAA,
-                order_id: new_order_id_type(3),
-                price: 100,
-                size: 150,
-                unique_idx: new_unique_idx_type(3),
-                is_bid: true
-            }
-        );
-
-        // Test impact price calculations
-        // Impact size 50 should give price of first order (200)
-        assert!(active_order_book.get_impact_bid_price(50).destroy_some() == 200, 1);
-
-        // Impact size 100 should give weighted average of first two orders
-        // (50 * 200 + 50 * 150) / 100 = 175
-        assert!(active_order_book.get_impact_bid_price(100).destroy_some() == 175, 2);
-
-        // Impact size 200 should give weighted average of all orders
-        // (50 * 200 + 100 * 150 + 50 * 100) / 200 = 150
-        assert!(active_order_book.get_impact_bid_price(200).destroy_some() == 150, 3);
-
-        // Impact size larger than total available should still use all orders
-        // (50 * 200 + 100 * 150 + 150 * 100) / 300 = 133
-        assert!(active_order_book.get_impact_bid_price(1000).destroy_some() == 133, 4);
-
-        active_order_book.destroy_price_time_idx();
+    #[test]
+    fun test_time_based_priority_for_sell() {
+        test_time_based_priority_helper(false);
     }
 
     #[test]

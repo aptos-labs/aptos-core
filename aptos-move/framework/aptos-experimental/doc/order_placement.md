@@ -3,18 +3,18 @@
 
 # Module `0x7::order_placement`
 
-This module provides a generic trading engine implementation for a market. On a high level, its a data structure,
+This module provides a generic trading engine implementation for a market. On a high level, it's a data structure,
 that stores an order book and provides APIs to place orders, cancel orders, and match orders. The market also acts
 as a wrapper around the order book and pluggable clearinghouse implementation.
 A clearing house implementation is expected to implement the following APIs
 - settle_trade(taker, taker_order_id, maker, maker_order_id, fill_id, is_taker_long, price, size): SettleTradeResult ->
-Called by the market when there is an match between taker and maker. The clearinghouse is expected to settle the trade
-and return the result. Please note that the clearing house settlment size might not be the same as the order match size and
+Called by the market when there is a match between taker and maker. The clearinghouse is expected to settle the trade
+and return the result. Please note that the clearing house settlement size might not be the same as the order match size and
 the settlement might also fail. The fill_id is an incremental counter for matched orders and can be used to track specific fills
 - validate_order_placement(account, is_taker, is_long, price, size): bool -> Called by the market to validate
-an order when its placed. The clearinghouse is expected to validate the order and return true if the order is valid.
+an order when it's placed. The clearinghouse is expected to validate the order and return true if the order is valid.
 This API is called for both maker and taker order placements.
-Checkout clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
+Check out clearinghouse_test as an example of the simplest form of clearing house implementation that just tracks
 the position size of the user and does not do any validation.
 
 - place_maker_order(account, order_id, is_bid, price, size, metadata) -> Called by the market before placing the
@@ -51,11 +51,11 @@ GTC orders are orders that are valid until they are cancelled or filled. Post On
 taker orders. IOC orders are orders that are valid only if they are taker orders.
 
 In addition, the market also supports trigger conditions for orders. An order with trigger condition is not put
-on the order book until its trigger conditions are met. Following trigger conditions are supported:
-TakeProfit(price): If its a buy order its triggered when the market price is greater than or equal to the price. If
-its a sell order its triggered when the market price is less than or equal to the price.
-StopLoss(price): If its a buy order its triggered when the market price is less than or equal to the price. If its
-a sell order its triggered when the market price is greater than or equal to the price.
+on the order book until its trigger conditions are met. The following trigger conditions are supported:
+TakeProfit(price): If it's a buy order it's triggered when the market price is greater than or equal to the price. If
+it's a sell order it's triggered when the market price is less than or equal to the price.
+StopLoss(price): If it's a buy order it's triggered when the market price is less than or equal to the price. If it's
+a sell order it's triggered when the market price is greater than or equal to the price.
 TimeBased(time): The order is triggered when the current time is greater than or equal to the time.
 
 
@@ -566,7 +566,7 @@ Includes fills and cancels
 
 ## Function `place_limit_order`
 
-Places a limt order - If its a taker order, it will be matched immediately and if its a maker order, it will simply
+Places a limit order - If it's a taker order, it will be matched immediately and if it's a maker order, it will simply
 be placed in the order book. An order id is generated when the order is placed and this id can be used to
 uniquely identify the order for this market and can also be used to get the status of the order or cancel the order.
 The order is placed with the following parameters:
@@ -588,7 +588,7 @@ is not be inspected by the orderbook internally.
 This knob is present to configure maximum amount of gas any order placement transaction might consume and avoid
 hitting the maximum has limit of the blockchain.
 - cancel_on_match_limit: bool: Whether to cancel the given order when the match limit is reached.
-This is used ful as the caller might not want to cancel the order when the limit is reached and can continue
+This is useful as the caller might not want to cancel the order when the limit is reached and can continue
 that order in a separate transaction.
 - callbacks: The callbacks for the market clearinghouse. This is a struct that implements the MarketClearinghouseCallbacks
 interface. This is used to validate the order and settle the trade.
@@ -749,6 +749,32 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         );
     };
 
+    <b>if</b> (trigger_condition.is_some()) {
+        // Do not emit an open <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for orders <b>with</b> trigger conditions <b>as</b> they are not live in the order book yet
+        market.get_order_book_mut().place_maker_order(
+            new_single_order_request(
+                user_addr,
+                order_id,
+                client_order_id,
+                limit_price,
+                orig_size,
+                remaining_size,
+                is_bid,
+                trigger_condition,
+                time_in_force,
+                metadata
+            )
+        );
+        <b>return</b> <a href="order_placement.md#0x7_order_placement_OrderMatchResult">OrderMatchResult</a> {
+            order_id,
+            remaining_size,
+            cancel_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+            callback_results,
+            fill_sizes,
+            match_count
+        }
+    };
+
     <b>let</b> result = callbacks.place_maker_order(
         new_clearinghouse_order_info(
             user_addr,
@@ -864,7 +890,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
     // Get the order state before cancellation <b>to</b> track what's being cancelled
     <b>let</b> order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
-    <b>let</b> (_, _, _, sequence_number, cancelled_bid_sizes, cancelled_bid_prices, cancelled_ask_sizes, cancelled_ask_prices, _ ) = order_before_cancel.destroy_bulk_order();
+    <b>let</b> (_, _, _, sequence_number, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _ ) = order_before_cancel.destroy_bulk_order();
 
     <b>if</b> (maker_order.get_remaining_size_from_match_details() != 0) {
             // For bulk orders, we cancel all orders for the user
@@ -876,19 +902,19 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     );
 
     <b>let</b> modified_order = market.get_order_book().get_bulk_order(maker_address);
-    <b>let</b> (_, _, _, _, bid_sizes, bid_prices, ask_sizes, ask_prices, _ ) = modified_order.destroy_bulk_order();
+    <b>let</b> (_, _, _, _, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = modified_order.destroy_bulk_order();
     market.emit_event_for_bulk_order_modified(
         order_id,
         sequence_number,
         maker_address,
-        bid_sizes,
         bid_prices,
-        ask_sizes,
+        bid_sizes,
         ask_prices,
-        cancelled_bid_sizes,
+        ask_sizes,
         cancelled_bid_prices,
-        cancelled_ask_sizes,
-        cancelled_ask_prices
+        cancelled_bid_sizes,
+        cancelled_ask_prices,
+        cancelled_ask_sizes
     );
 }
 </code></pre>
@@ -1093,7 +1119,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>package</b>) <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     user_addr: <b>address</b>,
     order_id: OrderIdType,
     client_order_id: Option&lt;String&gt;,
@@ -1341,7 +1367,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 ## Function `place_order_with_order_id`
 
 Core function to place an order with a given order id. If the order id is not provided, a new order id is generated.
-The function itself doesn't do any validation of the user_address, it is up to the caller to ensure that signer validation
+The function itself doesn't do any validation of the user_address, it's up to the caller to ensure that signer validation
 is done before calling this function if needed.
 
 
@@ -1375,6 +1401,8 @@ is done before calling this function if needed.
         orig_size &gt; 0 && remaining_size &gt; 0,
         <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>
     );
+    <b>assert</b>!(max_match_limit &gt; 0, <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>);
+    <b>assert</b>!(limit_price &gt; 0, <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>);
     <b>if</b> (order_id.is_none()) {
         // If order id is not provided, generate a new order id
         order_id = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(market.next_order_id());
@@ -1408,7 +1436,7 @@ is done before calling this function if needed.
             is_bid,
             <b>true</b>, // is_taker
             OrderCancellationReason::PositionUpdateViolation,
-            validation_result.get_validation_cancellation_reason().destroy_some(),
+            validation_result.get_validation_failure_reason().destroy_some(),
             metadata,
             time_in_force,
             <b>true</b>, // emit_order_open

@@ -20,6 +20,7 @@ bcs = { workspace = true }
 blst = { workspace = true }
 blstrs = { workspace = true }
 criterion = { workspace = true }
+derive_more = { workspace = true }
 ff = { workspace = true }
 group = { workspace = true }
 hex = { workspace = true }
