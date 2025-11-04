@@ -4823,6 +4823,17 @@ impl<'env> FunctionEnv<'env> {
         }
     }
 
+    /// If this Move function has an associated specification function, return it.
+    pub fn get_spec_fun(&self) -> Option<SpecFunId> {
+        self.module_env.get_spec_funs().find_map(|(id, decl)| {
+            if decl.name == self.data.name {
+                Some(*id)
+            } else {
+                None
+            }
+        })
+    }
+
     /// Returns true if this function has the pragma intrinsic set to true.
     pub fn is_intrinsic(&self) -> bool {
         self.is_pragma_true(INTRINSIC_PRAGMA, || {

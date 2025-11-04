@@ -33,6 +33,7 @@ use move_model::{
         FunId, FunctionData, GlobalEnv, ModuleId, NodeId, Parameter, QualifiedId, SpecFunId,
         StructEnv,
     },
+    pureness_checker::{FunctionPurenessChecker, FunctionPurenessCheckerMode},
     symbol::Symbol,
     ty::ReferenceKind,
 };
@@ -95,9 +96,30 @@ pub fn run_spec_rewriter(env: &mut GlobalEnv) {
         }
     }
 
-    // For compatibility reasons with the v1 way how to compile spec
-    // blocks of inline functions, we also need to add all 'lambda'
-    // lifted functions.
+    // Also collect pure functions which are used for closure construction. We need spec
+    // functions if available to reason about the closures.
+    let mut pureness_checker = FunctionPurenessChecker::new(
+        FunctionPurenessCheckerMode::Specification,
+        |_, _, _| {}, // empty error reporter
+    );
+    for target in targets.keys().collect_vec() {
+        if let RewriteState::Def(def) = target.get_env_state(env) {
+            def.visit_pre_order(&mut |e| {
+                if let ExpData::Call(_, Operation::Closure(mid, fid, _), _) = e {
+                    let qid = mid.qualified(*fid);
+                    if pureness_checker.check_fun(env, qid) {
+                        called_funs.insert(qid);
+                        called_funs.append(
+                            &mut env
+                                .get_function(qid)
+                                .get_transitive_closure_of_used_functions(),
+                        )
+                    }
+                }
+                true // continue
+            })
+        }
+    }
 
     // Derive spec functions for all called Move functions,
     // building a mapping between function ids. Also add
@@ -355,7 +377,8 @@ struct SpecConverter<'a> {
     /// reasons nodes which fetch temporaries should not be stripped as the reference
     /// info is needed for correct treatment of the `old(..)` expression.
     reference_strip_exempted: BTreeSet<NodeId>,
-    /// Set true if the expression contains imperative expressions that currently cannot be translated into a spec function
+    /// Set true if the expression contains imperative expressions that currently cannot
+    /// be translated into a spec function
     contains_imperative_expression: bool,
     /// Set to true when rewriting spec during inlining phase
     for_inline: bool,
@@ -553,8 +576,8 @@ impl ExpRewriterFunctions for SpecConverter<'_> {
                     }
                 },
                 Invoke(id, call, args) => {
-                    // Rewrite invoke into a spec function call
-                    // this is for general function value
+                    // Rewrite special case Invoke(Closure(fun, ...), args) into direct call.
+                    // Note this kind of expression is typically left over from inlining.
                     if let ExpData::Call(_, Closure(mid, fid, mask), captured) = call.as_ref() {
                         let spec_fun_id = self
                             .function_mapping

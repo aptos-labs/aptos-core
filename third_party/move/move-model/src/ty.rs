@@ -1314,14 +1314,11 @@ impl Type {
             Type::Vector(e) => e.can_be_type_argument(),
             Type::Struct(_, _, insts) => insts.iter().all(|e| e.can_be_type_argument()),
             Type::TypeParameter(..) => true,
+            Type::Fun(..) => true,
             // references cannot be a type argument
             Type::Reference(..) => false,
             // spec types cannot be a type argument
-            Type::Fun(..)
-            | Type::TypeDomain(..)
-            | Type::ResourceDomain(..)
-            | Type::Var(..)
-            | Type::Error => false,
+            Type::TypeDomain(..) | Type::ResourceDomain(..) | Type::Var(..) | Type::Error => false,
         }
     }
 

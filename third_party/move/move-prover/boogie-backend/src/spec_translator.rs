@@ -6,14 +6,14 @@
 
 use crate::{
     boogie_helpers::{
-        boogie_address, boogie_address_blob, boogie_bv_type, boogie_byte_blob,
-        boogie_choice_fun_name, boogie_declare_global, boogie_field_sel, boogie_inst_suffix,
-        boogie_modifies_memory_name, boogie_num_type_base, boogie_num_type_base_bv,
-        boogie_reflection_type_info, boogie_reflection_type_is_struct, boogie_reflection_type_name,
-        boogie_resource_memory_name, boogie_spec_fun_name, boogie_spec_var_name,
-        boogie_struct_name, boogie_struct_variant_name, boogie_type, boogie_type_suffix,
-        boogie_type_suffix_bv, boogie_value_blob, boogie_well_formed_expr,
-        boogie_well_formed_expr_bv,
+        boogie_address, boogie_address_blob, boogie_arbitrary_value, boogie_bv_type,
+        boogie_byte_blob, boogie_choice_fun_name, boogie_declare_global, boogie_field_sel,
+        boogie_fun_spec_apply_name, boogie_inst_suffix, boogie_modifies_memory_name,
+        boogie_num_type_base, boogie_num_type_base_bv, boogie_reflection_type_info,
+        boogie_reflection_type_is_struct, boogie_reflection_type_name, boogie_resource_memory_name,
+        boogie_spec_fun_name, boogie_spec_var_name, boogie_struct_name, boogie_struct_variant_name,
+        boogie_type, boogie_type_suffix, boogie_type_suffix_bv, boogie_value_blob,
+        boogie_well_formed_expr, boogie_well_formed_expr_bv,
     },
     options::BoogieOptions,
 };
@@ -43,6 +43,7 @@ use move_prover_bytecode_pipeline::{
 use std::{
     cell::RefCell,
     collections::{BTreeSet, HashMap},
+    iter,
     rc::Rc,
 };
 
@@ -229,16 +230,21 @@ impl SpecTranslator<'_> {
 
 impl SpecTranslator<'_> {
     pub fn translate_spec_funs(&self, module_env: &ModuleEnv<'_>, mono_info: &MonoInfo) {
-        let empty = &BTreeSet::new();
+        let empty_inst = &mut BTreeSet::new();
+        empty_inst.insert(vec![]);
         let mut translated = BTreeSet::new();
         for (id, fun) in module_env.get_spec_funs() {
             for type_inst in mono_info
                 .spec_funs
                 .get(&module_env.get_id().qualified(*id))
-                .unwrap_or(empty)
+                .unwrap_or(empty_inst) // ensure without mono, we visit basic def
                 .iter()
                 .cloned()
             {
+                if fun.type_params.len() != type_inst.len() {
+                    // Skip non-matching instance. This can be created by `empty_inst`.
+                    continue;
+                }
                 let name = boogie_spec_fun_name(module_env, *id, &type_inst, false);
                 if !translated.insert(name) {
                     continue;
@@ -813,12 +819,9 @@ impl SpecTranslator<'_> {
                 self.set_writer_location(*node_id);
                 self.translate_call(*node_id, oper, args);
             },
-            ExpData::Invoke(node_id, ..) => {
-                self.error(
-                    &self.env.get_node_loc(*node_id),
-                    "current restriction: a function \
-                           value cannot be used in a specification expression.",
-                );
+            ExpData::Invoke(node_id, fun, args) => {
+                self.set_writer_location(*node_id);
+                self.translate_invoke(*node_id, fun, args);
             },
             ExpData::Lambda(node_id, ..) => self.error(
                 &self.env.get_node_loc(*node_id),
@@ -1143,10 +1146,8 @@ impl SpecTranslator<'_> {
                 let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
                 emit!(
                     self.writer,
-                    &format!(
-                        "$Arbitrary_value_of'{}'()",
-                        boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
-                    )
+                    "{}",
+                    boogie_arbitrary_value(self.env, &self.get_node_type(node_id), exp_bv_flag)
                 );
             },
             Operation::MoveFunction(_, _)
@@ -1246,6 +1247,22 @@ impl SpecTranslator<'_> {
             sep = ", ";
         }
         emit!(self.writer, ")");
+    }
+
+    fn translate_invoke(&self, _node_id: NodeId, fun: &Exp, args: &[Exp]) {
+        let fun_type = self.inst(&self.env.get_node_type(fun.node_id()));
+        emit!(
+            self.writer,
+            "{}(",
+            boogie_fun_spec_apply_name(self.env, &fun_type)
+        );
+        let mut sep = "";
+        for arg in args.iter().chain(iter::once(fun)) {
+            emit!(self.writer, sep);
+            self.translate_exp(arg);
+            sep = ", ";
+        }
+        emit!(self.writer, ")")
     }
 
     fn translate_spec_fun_call(
@@ -1442,10 +1459,8 @@ impl SpecTranslator<'_> {
         let exp_bv_flag = global_state.get_node_num_oper(node_id) == Bitwise;
         emit!(
             self.writer,
-            &format!(
-                "$Arbitrary_value_of'{}'()",
-                boogie_type_suffix_bv(self.env, &self.get_node_type(node_id), exp_bv_flag)
-            )
+            "{}",
+            boogie_arbitrary_value(self.env, &self.get_node_type(node_id), exp_bv_flag)
         );
         emit!(self.writer, ")");
     }

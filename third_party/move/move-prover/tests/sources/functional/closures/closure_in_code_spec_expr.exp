@@ -1,0 +1,41 @@
+Move prover returns: exiting with verification errors
+error: post-condition does not hold
+   ┌─ tests/sources/functional/closures/closure_in_code_spec_expr.move:39:9
+   │
+39 │         ensures result;
+   │         ^^^^^^^^^^^^^^^
+   │
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:35: call_find
+   =         <redacted> = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:35: call_find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:4: find
+   =         s = <redacted>
+   =         f = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:5: find
+   =         find = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:6: find
+   =         found_index = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:7: find
+   =         i = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:8: find
+   =         len = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:10: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:11: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:12: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:13: find
+   =     enter loop, variable(s) i havocked and reassigned
+   =         i = <redacted>
+   =     loop invariant holds at current state
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:11: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:12: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:13: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:15: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:9: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:4: find
+   =         result_1 = <redacted>
+   =         result_2 = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:25: find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:36: call_find
+   =         result = <redacted>
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:37: call_find
+   =     at tests/sources/functional/closures/closure_in_code_spec_expr.move:39: call_find (spec)

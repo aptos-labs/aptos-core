@@ -79,6 +79,16 @@ where
     pub fn check_exp(&mut self, env: &GlobalEnv, exp: &Exp) -> bool {
         // Reset before start of traversal
         self.is_impure = false;
+        let exp_id = exp.node_id();
+        if env
+            .get_node_type_opt(exp_id)
+            .map(|ty| ty.is_tuple())
+            .unwrap_or(false)
+        {
+            (self.impure_action)(exp_id, "returns tuple expression", &self.visiting);
+            self.is_impure = true;
+            return false;
+        }
         exp.visit_post_order(&mut |e| {
             use ExpData::*;
             use Operation::*;
@@ -126,7 +136,7 @@ where
                     if !self.pureness.contains_key(&qid) {
                         self.visiting.push((qid, *id));
                         let old_impure = mem::take(&mut self.is_impure);
-                        self.check_function(env, qid);
+                        self.check_fun(env, qid);
                         self.pureness.insert(qid, !self.is_impure);
                         self.visiting.pop();
                         self.is_impure |= old_impure;
@@ -156,7 +166,8 @@ where
         self.check_exp(env, &spec_exp.into_exp());
     }
 
-    fn check_function(&mut self, env: &GlobalEnv, qid: QualifiedId<FunId>) {
+    /// Checks whether the given function is pure.
+    pub fn check_fun(&mut self, env: &GlobalEnv, qid: QualifiedId<FunId>) -> bool {
         let fun = env.get_function(qid);
         if let Some(def) = fun.get_def() {
             // For breaking cycles, assume initially function is pure
@@ -175,5 +186,6 @@ where
                     .iter()
                     .any(|ty| ty.is_mutable_reference());
         }
+        !self.is_impure
     }
 }

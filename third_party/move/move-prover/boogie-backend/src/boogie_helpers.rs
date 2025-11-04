@@ -189,6 +189,16 @@ pub fn boogie_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> String 
     )
 }
 
+/// Return derived spec function name of given function.
+pub fn boogie_derived_spec_function_name(fun_env: &FunctionEnv<'_>, inst: &[Type]) -> String {
+    format!(
+        "${}_${}{}",
+        boogie_module_name(&fun_env.module_env),
+        fun_env.get_name().display(fun_env.symbol_pool()),
+        boogie_inst_suffix(fun_env.module_env.env, inst)
+    )
+}
+
 /// Reverse map mangled function name to source level function name.
 pub fn boogie_reverse_function_name(_env: &GlobalEnv, s: &str) -> Option<String> {
     // TODO: in order to make this actually reversible, we can't use ${}_{}{} above
@@ -1209,6 +1219,11 @@ pub fn boogie_fun_apply_name(env: &GlobalEnv, ty: &Type) -> String {
     format!("$apply'{}'", boogie_type_suffix(env, ty))
 }
 
+/// Return name of generated function for applying a function value.
+pub fn boogie_fun_spec_apply_name(env: &GlobalEnv, ty: &Type) -> String {
+    format!("$spec_apply'{}'", boogie_type_suffix(env, ty))
+}
+
 /// Return name of generated function for constructing a closure based on given function and mask.
 pub fn boogie_closure_pack_name(
     env: &GlobalEnv,
@@ -1218,4 +1233,14 @@ pub fn boogie_closure_pack_name(
     let fun_env = env.get_function(fun.to_qualified_id());
     let fun_name = boogie_function_name(&fun_env, &fun.inst);
     format!("$closure'{}'_{}", fun_name, mask)
+}
+
+/// Returns an arbitrary (havoced) value of a given type.
+/// TODO(#17911): need to distinguish different instances, for example by using source
+///    location. Currently an unknown but fixed constant is described for the entire VC.
+pub fn boogie_arbitrary_value(env: &GlobalEnv, ty: &Type, exp_bv_flag: bool) -> String {
+    format!(
+        "$Arbitrary_value_of'{}'()",
+        boogie_type_suffix_bv(env, ty, exp_bv_flag)
+    )
 }

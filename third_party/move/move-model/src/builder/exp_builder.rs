@@ -3421,6 +3421,7 @@ impl ExpTranslator<'_, '_, '_> {
 
             // Check whether this is an Invoke on a function value.
             if let Some(entry) = self.lookup_local(sym, false) {
+                let temp_index = entry.temp_index;
                 // Add constraint on expected function type of local.
                 let sym_ty = entry.type_.clone();
                 // Check whether this is the parameter of an inline function. Depending on this,
@@ -3437,9 +3438,13 @@ impl ExpTranslator<'_, '_, '_> {
                 );
 
                 let local_id = self.new_node_id_with_type_loc(&sym_ty, &self.to_loc(&n.loc));
-                let local_var = ExpData::LocalVar(local_id, sym);
+                let fun_exp = if let Some(index) = temp_index {
+                    ExpData::Temporary(local_id, index)
+                } else {
+                    ExpData::LocalVar(local_id, sym)
+                };
                 let id = self.new_node_id_with_type_loc(expected_type, loc);
-                return Some(ExpData::Invoke(id, local_var.into_exp(), args));
+                return Some(ExpData::Invoke(id, fun_exp.into_exp(), args));
             }
 
             if self.is_spec_mode() {
