@@ -17,7 +17,6 @@ script {
             74, // EnumTypes
             80, // NativeMemoryOperation
             223, // new GGP
-            224, // STAKE_REWARD_USING_TREASURY
         ];
 
         let disabled_blob: vector<u64> = vector[
@@ -32,5 +31,6 @@ script {
         ];
 
         features::change_feature_flags_for_next_epoch(&core_signer, enabled_blob, disabled_blob);
+        aptos_governance::force_end_epoch(&core_signer);
     }
 }

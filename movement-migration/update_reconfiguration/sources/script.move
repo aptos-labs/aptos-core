@@ -5,8 +5,8 @@ script {
     /// Script to update the epoch and timestamp in the Configuration resource
     /// and trigger a reconfiguration event.
     /// This script must be executed with the core resource signer
-    /// 
-    /// @param core_resources - The core resource signer 
+    ///
+    /// @param core_resources - The core resource signer
     /// @param new_epoch - The new epoch number to set
     /// @param new_timestamp - The new timestamp to set (in microseconds)
     fun main(

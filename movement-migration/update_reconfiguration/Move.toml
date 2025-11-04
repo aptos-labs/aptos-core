@@ -1,0 +1,8 @@
+[package]
+name = "UpdateReconfiguration"
+version = "0.0.0"
+
+[dependencies.AptosFramework]
+git = "https://github.com/movementlabsxyz/aptos-core.git"
+rev = "movement"
+subdir = "aptos-move/framework/aptos-framework"

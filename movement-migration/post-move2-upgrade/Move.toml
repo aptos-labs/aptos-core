@@ -1,5 +1,5 @@
 [package]
-name = "ggp"
+name = "post-move2-upgrade"
 version = "0.0.0"
 
 [addresses]
@@ -7,5 +7,5 @@ admin = "0x1"
 
 [dependencies.AptosFramework]
 git = "https://github.com/movementlabsxyz/aptos-core.git"
-rev = "movement"
+rev = "l1-migration"
 subdir = "aptos-move/framework/aptos-framework"
