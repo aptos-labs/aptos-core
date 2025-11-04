@@ -43,7 +43,7 @@ pub struct Commitment<E: Pairing>(pub(crate) E::G1);
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
-    vk: VerificationKey<E>,
+    pub(crate) vk: VerificationKey<E>,
     pub(crate) ck_S: univariate_hiding_kzg::CommitmentKey<E>,
     pub(crate) max_n: usize,
     pub(crate) prover_precomputed: ProverPrecomputed<E>,

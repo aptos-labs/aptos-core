@@ -12,7 +12,7 @@ use ark_serialize::{
 };
 use ark_std::fmt::Debug;
 
-pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST";
+pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
 // TODO: Change this to PublicParameters<E: CurveGroup>. Would first require changing Scalar<E: Pairing> to Scalar<F: PrimeField>, which would be a bit of work
 #[derive(CanonicalSerialize, CanonicalDeserialize, PartialEq, Clone, Eq, Debug)]
@@ -97,18 +97,23 @@ impl<'a, E: Pairing> CanonicalSerialize for Homomorphism<'a, E> {
 }
 
 /// This struct is used as `CodomainShape<T>`, but the same layout also applies to the `Witness` type.
-/// Hence, for brevity, we reuse this struct for both purposes.
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
-pub struct ChunksAndRandomness<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
-    pub chunks: Vec<Vec<T>>, // Depending on T these can be chunked ciphertexts, or their MSM representations, but also chunked plaintexts (see Witness below)
+pub struct CodomainShape<T: CanonicalSerialize + CanonicalDeserialize + Clone> {
+    pub chunks: Vec<Vec<T>>, // Depending on T these can be chunked ciphertexts, or their MSM representations
     pub randomness: Vec<T>,  // Same story, depending on T
 }
 
-// Witness shape happens to be identical to CodomainShape, this is mostly coincidental; hence for brevity:
-pub type Witness<E> = ChunksAndRandomness<Scalar<E>>;
+// Witness shape happens to be identical to CodomainShape, this is mostly coincidental
+// Setting `type Witness = CodomainShape<Scalar<E>>` would later require deriving SigmaProtocolWitness for CodomainShape<T>
+// (and would be overkill anyway), but this leads to issues as it expects T to be a Pairing, so we'll simply redefine it:
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct Witness<E: Pairing> {
+    pub plaintext_chunks: Vec<Vec<Scalar<E>>>,
+    pub plaintext_randomness: Vec<Scalar<E>>,
+}
 
 impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
-    type Codomain = ChunksAndRandomness<E::G1>;
+    type Codomain = CodomainShape<E::G1>;
     type Domain = Witness<E>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
@@ -118,10 +123,10 @@ impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
 
 // TODO: Can problably do EntrywiseMap with another derive macro
 impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
-    for ChunksAndRandomness<T>
+    for CodomainShape<T>
 {
     type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
-        ChunksAndRandomness<U>;
+        CodomainShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
@@ -136,12 +141,12 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
 
         let randomness = self.randomness.into_iter().map(f).collect();
 
-        ChunksAndRandomness { chunks, randomness }
+        CodomainShape { chunks, randomness }
     }
 }
 
 // TODO: Use a derive macro?
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for ChunksAndRandomness<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for CodomainShape<T> {
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 
@@ -156,25 +161,25 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for Chun
 impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
-        = ChunksAndRandomness<T>
+        = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
-    type Scalar = Scalar<E>;
+    type Scalar = E::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         // C_i,j = G_1 * z_i,j + ek[i] * r_j
         let Cs = input
-            .chunks
+            .plaintext_chunks
             .iter()
             .enumerate()
             .map(|(i, z_i)| {
                 z_i.iter()
-                    .zip(input.randomness.iter())
+                    .zip(input.plaintext_randomness.iter())
                     .map(|(&z_ij, &r_j)| fixed_base_msms::MsmInput {
                         bases: vec![self.pp.G, self.eks[i]],
-                        scalars: vec![z_ij, r_j],
+                        scalars: vec![z_ij.0, r_j.0],
                     })
                     .collect()
             })
@@ -182,21 +187,21 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 
         //  R_j = H_1 * r_j
         let Rs = input
-            .randomness
+            .plaintext_randomness
             .iter()
             .map(|&r_j| fixed_base_msms::MsmInput {
                 bases: vec![self.pp.H],
-                scalars: vec![r_j],
+                scalars: vec![r_j.0],
             })
             .collect();
 
-        ChunksAndRandomness {
+        CodomainShape {
             chunks: Cs,
             randomness: Rs,
         }
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {
-        E::G1::msm(bases, &Scalar::slice_as_inner(scalars)).expect("MSM failed in ChunkedElGamal")
+        E::G1::msm(bases, scalars).expect("MSM failed in ChunkedElgamal")
     }
 }

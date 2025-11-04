@@ -68,7 +68,7 @@ pub trait Trait<E: Pairing>:
 
 pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {
     /// The scalar type associated with the domain.
-    type Scalar: CanonicalSerialize + CanonicalDeserialize + Copy;
+    type Scalar: CanonicalSerialize + CanonicalDeserialize + Copy; // Not using this atm...
 
     /// Computes a scaled addition: `self + c * other`. Can take ownership because the randomness is discarded by the prover afterwards
     fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self;

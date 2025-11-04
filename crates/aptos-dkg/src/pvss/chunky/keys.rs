@@ -1,14 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pvss::chunked_elgamal_field::chunked_elgamal, traits};
+use crate::{pvss::chunky::chunked_elgamal, traits};
 use aptos_crypto::{
+    arkworks,
     arkworks::serialization::{ark_de, ark_se},
     CryptoMaterialError, Uniform, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use ark_ec::{pairing::Pairing, CurveGroup};
-use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
@@ -51,12 +51,12 @@ pub struct DecryptPrivKey<E: Pairing> {
 }
 
 impl<E: Pairing> Uniform for DecryptPrivKey<E> {
-    fn generate<R>(_rng: &mut R) -> Self
+    fn generate<R>(rng: &mut R) -> Self
     where
         R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
     {
         DecryptPrivKey::<E> {
-            dk: E::ScalarField::rand(&mut ark_std::rand::thread_rng()), // Workaround because the `rand` versions differ
+            dk: arkworks::rand::sample_field_element(rng),
         }
     }
 }

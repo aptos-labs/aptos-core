@@ -6,7 +6,7 @@
 use crate::{
     algebra::GroupGenerators,
     pvss::{
-        chunked_elgamal_field::{chunked_elgamal, input_secret::InputSecret, keys},
+        chunky::{chunked_elgamal, input_secret::InputSecret, keys},
         traits,
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
@@ -27,7 +27,7 @@ use ark_std::rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 
-const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST";
+const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 
 pub const CHUNK_SIZE: u8 = 16; // Will probably move this elsewhere in the next PR. Maybe it becomes a run-time variable...
 

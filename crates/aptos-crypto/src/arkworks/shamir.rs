@@ -11,10 +11,7 @@ use crate::arkworks::{
 use anyhow::{anyhow, Result};
 use ark_ff::{batch_inversion, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
-use ark_std::{
-    fmt,
-    rand::{Rng, RngCore},
-};
+use ark_std::fmt;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -158,7 +155,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
         batch_inversion(&mut neg_xs);
         let numerators: Vec<F> = neg_xs
             .iter()
-            .map(|inv_neg_x| vanishing_poly_at_0 * *inv_neg_x)
+            .map(|&inv_neg_x| vanishing_poly_at_0 * inv_neg_x)
             .collect();
 
         // Step 3a (denominators): Compute derivative of poly from step 1, and its evaluations
@@ -182,35 +179,14 @@ impl<F: PrimeField> ThresholdConfig<F> {
 
     /// This method creates `n` shares of the secret `val_to_share` using
     /// a `(t, n)` Shamir Secret Sharing scheme:
-    /// 1. A random polynomial of degree `t-1` is generated with `val_to_share`
-    ///    as the constant term.
-    /// 2. The polynomial is evaluated over the `domain` using FFT to produce `y` values.
-    /// 3. Each share is represented as a `(x, y)` pair (`ShamirShare<F>`).  TODO: not used atm
-    pub fn share<R: Rng + RngCore>(&self, val_to_share: F, rng: &mut R) -> Vec<ShamirShare<F>> {
-        let mut coeffs = vec![val_to_share]; // constant term of polynomial
-        coeffs.extend((0..(self.t - 1)).map(|_| F::rand(rng)));
-
-        self.share_with_coeffs(&coeffs)
-    }
-
-    /// `Lightweight` version that only returns the evaluations
-    pub fn share_with_coeffs_only_evals(&self, coeffs: &[F]) -> Vec<F> {
-        // Evaluate the polynomial over the domain
-        let y_pts = self.domain.fft(coeffs);
-        y_pts[..self.n].to_vec()
-    }
-
-    /// Generates ShamirShares from given polynomial coefficients. TODO: not used atm
-    pub fn share_with_coeffs(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
-        // Evaluate the polynomial over the domain
-        let y_pts = self.share_with_coeffs_only_evals(coeffs);
-
-        self.domain
-            .elements()
-            .zip(y_pts.iter())
-            .map(|(x, &y)| ShamirShare { x, y })
-            .take(self.n)
-            .collect()
+    /// 1. A random polynomial of degree `t-1` is given as input. We are deliberately generating
+    /// it outside of this file so it won't depend on the `rand` crate.
+    /// 2. The polynomial is evaluated over the `domain` using FFT to produce all evaluations,
+    ///    which are subsequently trunked.
+    pub fn share(&self, coeffs: &[F]) -> Vec<F> {
+        debug_assert_eq!(coeffs.len(), self.t);
+        let evals = self.domain.fft(coeffs);
+        evals[..self.n].to_vec()
     }
 
     /// This method uses Lagrange interpolation to recover the original secret
@@ -292,14 +268,24 @@ mod shamir_tests {
                 let mut rng = thread_rng();
                 let params = ThresholdConfig::new(n, t);
 
-                let val = Fr::rand(&mut rng);
-                let shares: Vec<ShamirShare<Fr>> = params.share(val, &mut rng);
+                let secret = Fr::rand(&mut rng);
+                let mut coeffs = vec![secret];
+                coeffs.extend((1..t).map(|_| Fr::rand(&mut rng)));
+
+                let evals = params.share(&coeffs);
+
+                let xs: Vec<Fr> = params.domain.elements().take(n).collect();
+                let shares: Vec<ShamirShare<Fr>> = xs
+                    .iter()
+                    .zip(evals.iter())
+                    .map(|(&x, &y)| ShamirShare { x, y })
+                    .collect();
 
                 for reconstruct_shares in shares.iter().combinations(t) {
                     let reconstruct_shares_vec: Vec<ShamirShare<Fr>> =
                         reconstruct_shares.into_iter().cloned().collect();
 
-                    assert_eq!(params.reconstruct(&reconstruct_shares_vec).unwrap(), val);
+                    assert_eq!(params.reconstruct(&reconstruct_shares_vec).unwrap(), secret);
                 }
             }
         }

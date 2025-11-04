@@ -1,10 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    pvss::chunked_elgamal_field::public_parameters::PublicParameters, traits::Convert, Scalar,
-};
-use aptos_crypto::Uniform;
+use crate::{pvss::chunky::public_parameters::PublicParameters, traits::Convert, Scalar};
+use aptos_crypto::{arkworks, Uniform};
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use ark_ec::pairing::Pairing;
 use derive_more::Add;
@@ -20,14 +18,14 @@ pub struct InputSecret<F: ark_ff::Field> {
 #[cfg(feature = "assert-private-keys-not-cloneable")]
 static_assertions::assert_not_impl_any!(InputSecret: Clone);
 
-impl<F: ark_ff::Field> Uniform for InputSecret<F> {
-    fn generate<R>(_rng: &mut R) -> Self
+impl<F: ark_ff::PrimeField> Uniform for InputSecret<F> {
+    fn generate<R>(rng: &mut R) -> Self
     where
         R: rand::RngCore + rand::CryptoRng,
     {
         Self {
-            a: F::rand(&mut ark_std::rand::thread_rng()),
-        } // Workaround because rand versions differ
+            a: arkworks::rand::sample_field_element(rng),
+        }
     }
 }
 

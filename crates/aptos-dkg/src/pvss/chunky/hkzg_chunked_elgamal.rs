@@ -3,7 +3,7 @@
 
 use crate::{
     pcs::univariate_hiding_kzg,
-    pvss::chunked_elgamal_field::chunked_elgamal,
+    pvss::chunky::chunked_elgamal,
     sigma_protocol,
     sigma_protocol::homomorphism::{tuple::TupleHomomorphism, LiftHomomorphism},
     Scalar,
@@ -61,25 +61,29 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         pp: &'a chunked_elgamal::PublicParameters<E>,
         eks: &'a [E::G1Affine],
     ) -> Self {
+        // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
         let lifted_hkzg = LiftedHkzg::<E> {
             hom: univariate_hiding_kzg::CommitmentHomomorphism { lagr_g1, xi_1 },
+            // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunks into one long vector
             projection: |dom: &HkzgElgamalWitness<E>| {
                 let HkzgElgamalWitness {
                     hkzg_randomness,
                     chunked_plaintexts,
                     ..
                 } = dom;
-                let flattened: Vec<E::ScalarField> = {
+                let flattened_chunked_plaintexts: Vec<E::ScalarField> = {
                     let scalars: Vec<Scalar<E>> = std::iter::once(Scalar(E::ScalarField::ZERO))
                         .chain(chunked_plaintexts.iter().flatten().cloned())
                         .collect();
-                    Scalar::<E>::vec_into_inner(scalars)
+                    Scalar::<E>::vec_into_inner(scalars) // This is slightly inefficient; better to extract the scalars during the iter()
                 };
-                (hkzg_randomness.0, flattened)
+                (hkzg_randomness.0, flattened_chunked_plaintexts)
             },
         };
+        // Set up the chunked_elgamal homomorphism, and use a projection map to lift it to HkzgElgamalWitness
         let lifted_chunked_elgamal = LiftedChunkedElgamal::<E> {
             hom: chunked_elgamal::Homomorphism { pp, eks },
+            // The projection map simply ignores the `hkzg_randomness` component
             projection: |dom: &HkzgElgamalWitness<E>| {
                 let HkzgElgamalWitness {
                     chunked_plaintexts,
@@ -87,12 +91,13 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
                     ..
                 } = dom;
                 chunked_elgamal::Witness {
-                    chunks: chunked_plaintexts.clone(),
-                    randomness: elgamal_randomness.clone(),
+                    plaintext_chunks: chunked_plaintexts.clone(),
+                    plaintext_randomness: elgamal_randomness.clone(),
                 }
             },
         };
 
+        // Combine the two lifted homomorphisms, into the required TupleHomomorphism
         Self {
             hom1: lifted_hkzg,
             hom2: lifted_chunked_elgamal,

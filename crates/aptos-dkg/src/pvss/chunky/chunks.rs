@@ -5,7 +5,7 @@ use ark_ff::{BigInteger, PrimeField};
 
 /// Converts a field element into little-endian chunks of `num_bits` bits.
 #[allow(dead_code)]
-pub(crate) fn chunk_field_elt<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec<F> {
+pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec<F> {
     assert!(
         num_bits % 8 == 0 && num_bits > 0 && num_bits <= 64,
         "Invalid chunk size"
@@ -18,7 +18,7 @@ pub(crate) fn chunk_field_elt<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec
     let mut chunks = Vec::with_capacity(num_chunks);
 
     for bytes_chunk in bytes.chunks(num_bytes) {
-        let mut padded = [0u8; 8];
+        let mut padded = [0u8; 8]; // The last chunk might be shorter, so this guarantee a fixed 8-byte buffer
         padded[..bytes_chunk.len()].copy_from_slice(bytes_chunk);
 
         let chunk_val = u64::from_le_bytes(padded);
@@ -31,7 +31,7 @@ pub(crate) fn chunk_field_elt<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec
 
 /// Reconstructs a field element from `num_bits`-bit chunks (little-endian order).
 #[allow(dead_code)]
-pub(crate) fn unchunk_field_elt<F: PrimeField>(num_bits: usize, chunks: &[F]) -> F {
+pub(crate) fn le_chunks_to_scalar<F: PrimeField>(num_bits: usize, chunks: &[F]) -> F {
     assert!(
         num_bits % 8 == 0 && num_bits > 0 && num_bits <= 64,
         "Invalid chunk size"
@@ -64,8 +64,8 @@ mod tests {
         for &num_bits in &num_bits_list {
             for _ in 0..100 {
                 let original: Fr = Fr::rand(&mut rng);
-                let chunks = chunk_field_elt(num_bits, &original);
-                let reconstructed = unchunk_field_elt(num_bits, &chunks);
+                let chunks = scalar_to_le_chunks(num_bits, &original);
+                let reconstructed = le_chunks_to_scalar(num_bits, &chunks);
 
                 assert_eq!(
                     original, reconstructed,
