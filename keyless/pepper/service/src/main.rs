@@ -171,8 +171,8 @@ async fn main() {
     // Fetch the VUF public and private keypair (this will load the private key into memory)
     info!("Fetching the VUF public and private keypair for the pepper service...");
     let vuf_keypair = Arc::new(vuf_keypair::get_pepper_service_vuf_keypair(
-        args.vuf_private_key_hex,
-        args.vuf_private_key_seed_hex,
+        args.vuf_private_key_hex.clone(),
+        args.vuf_private_key_seed_hex.clone(),
     ));
     info!(
         "Retrieved the VUF public key: {:?}",
@@ -181,11 +181,7 @@ async fn main() {
 
     // Verify the critical service invariants
     info!("Verifying critical service invariants...");
-    verify_critical_service_invariants(
-        &args,
-        vuf_keypair.clone(),
-        deployment_information.clone(),
-    );
+    verify_critical_service_invariants(&args, vuf_keypair.clone(), deployment_information.clone());
 
     // Collect the account recovery managers
     info!("Collecting the account recovery managers...");
@@ -399,7 +395,9 @@ fn verify_critical_service_invariants(
 ) {
     // Verify constant-time scalar multiplication if in production.
     if args.local_development_mode {
-        info!("Constant-time scalar multiplication verification skipped in local development mode.");
+        info!(
+            "Constant-time scalar multiplication verification skipped in local development mode."
+        );
     } else {
         info!("Verifying constant-time scalar multiplication...");
         verify_constant_time_scalar_multiplication();
