@@ -16,7 +16,7 @@ use tonic::{Request, Response, Status};
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
-const TRANSACTION_CHANNEL_SIZE: usize = 35;
+const TRANSACTION_CHANNEL_SIZE: usize = 100;
 
 type TransactionResponseStream =
     Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
@@ -25,8 +25,7 @@ pub struct LocalnetDataService {
     pub service_context: ServiceContext,
 }
 
-/// External service on the fullnode is for testing/local development only.
-/// Performance is not optimized, e.g., single-threaded.
+/// External service on the fullnode for raw data access.
 /// NOTE: code is duplicated from fullnode_data_service.rs with some minor changes.
 #[tonic::async_trait]
 impl RawData for LocalnetDataService {
@@ -48,6 +47,7 @@ impl RawData for LocalnetDataService {
         } else {
             u64::MAX
         };
+        let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
         let ledger_chain_id = context.chain_id().id();
@@ -57,14 +57,12 @@ impl RawData for LocalnetDataService {
         let (external_service_tx, external_service_rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
 
         tokio::spawn(async move {
-            // Initialize the coordinator that tracks starting version and processes transactions
+            // Initialize the coordinator that tracks starting version and processes transactions.
             let mut coordinator = IndexerStreamCoordinator::new(
                 context,
                 starting_version,
                 ending_version,
-                // Performance is not important for raw data, and to make sure data is in order,
-                // single thread is used.
-                1,
+                processor_task_count,
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
@@ -99,10 +97,9 @@ impl RawData for LocalnetDataService {
                     }
                 }
 
-                let response = response.map(|t| TransactionsResponse {
-                    chain_id: Some(ledger_chain_id as u64),
-                    transactions: match t.response.expect("Response must be set") {
-                        transactions_from_node_response::Response::Data(transaction_output) => {
+                let response = response.and_then(|t| {
+                    match t.response {
+                        Some(transactions_from_node_response::Response::Data(transaction_output)) => {
                             let mut transactions = transaction_output.transactions;
                             let current_transactions_count = transactions.len() as u64;
                             if let Some(count) = response_transactions_count.as_mut() {
@@ -110,11 +107,14 @@ impl RawData for LocalnetDataService {
                                     transactions.into_iter().take(*count as usize).collect();
                                 *count = count.saturating_sub(current_transactions_count);
                             }
-                            transactions
+                            Ok(TransactionsResponse {
+                                chain_id: Some(ledger_chain_id as u64),
+                                transactions,
+                                processed_range: None,
+                            })
                         },
-                        _ => panic!("Unexpected response type."),
-                    },
-                    processed_range: None,
+                        _ => Err(Status::internal("Unexpected response type")),
+                    }
                 });
                 match external_service_tx.send(response).await {
                     Ok(_) => {},
