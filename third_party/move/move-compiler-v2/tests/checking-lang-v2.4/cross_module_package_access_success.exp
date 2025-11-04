@@ -315,10 +315,7 @@ fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
      var $t2: &0xc0ffee::m::Wrapper
   0: $t2 := borrow_local($t0)
   1: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
-  2: if ($t1) goto 4 else goto 3
-  3: label L1
-  4: label L0
-  5: return $t1
+  2: return $t1
 }
 
 
@@ -596,10 +593,7 @@ fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
      var $t2: &0xc0ffee::m::Wrapper
   0: $t2 := borrow_local($t0)
   1: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
-  2: if ($t1) goto 4 else goto 3
-  3: label L1
-  4: label L0
-  5: return $t1
+  2: return $t1
 }
 
 
@@ -684,7 +678,7 @@ fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
 
 Diagnostics:
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:35:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:35:9
    │
 35 │     fun test() {
    │         ^^^^
@@ -692,7 +686,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:44:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:44:9
    │
 44 │     fun test_pack() {
    │         ^^^^^^^^^
@@ -700,7 +694,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:52:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:52:9
    │
 52 │     fun test_unpack(w: Wrapper) {
    │         ^^^^^^^^^^^
@@ -708,7 +702,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:60:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:60:9
    │
 60 │     fun test_select_variant(w: Wrapper): u64 {
    │         ^^^^^^^^^^^^^^^^^^^
@@ -716,7 +710,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:68:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:68:9
    │
 68 │     fun test_test_variant(w: Wrapper): bool {
    │         ^^^^^^^^^^^^^^^^^
@@ -724,7 +718,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:76:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:76:9
    │
 76 │     fun test_match(w: Wrapper): bool {
    │         ^^^^^^^^^^
@@ -732,7 +726,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:87:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:87:9
    │
 87 │     fun test_pack_struct(): S {
    │         ^^^^^^^^^^^^^^^^
@@ -740,7 +734,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:95:9
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:95:9
    │
 95 │     fun test_pack_friend_struct(): T {
    │         ^^^^^^^^^^^^^^^^^^^^^^^
@@ -748,7 +742,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-    ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:107:9
+    ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:107:9
     │
 107 │     fun test_pack_struct(): S {
     │         ^^^^^^^^^^^^^^^^
@@ -756,7 +750,7 @@ bug: compiler internal error: struct not defined
     = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-    ┌─ tests/checking-lang-v2.3/cross_module_package_access_success.move:120:9
+    ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:120:9
     │
 120 │     fun test_pack_unpack_struct_in_lambda() {
     │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

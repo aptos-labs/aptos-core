@@ -1021,9 +1021,9 @@ impl Generator<'_> {
         }
     }
 
-    /// Check whether we can pack/unpack a wrapper struct, if not, return true
+    /// Check whether we can pack/unpack a wrapper struct
     /// if public struct is not supported, pack/unpack can only happen in the module that defines the wrapper struct
-    /// otherwise, return true when either the struct is private or the struct is package/friend
+    /// otherwise, error is raised when either the struct is private or the struct is package/friend
     /// and pack/unpack happens in modules that are not a friend of the module that defines the wrapper struct
     fn check_pack_unpack_wrapper(
         &mut self,

@@ -3077,9 +3077,9 @@ fn parse_address_specifier(context: &mut Context) -> Result<AddressSpecifier, Bo
 // Parse a struct definition:
 //      StructDecl =
 //          native struct <StructDefName> <Abilities>? ";"
-//        | "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}" (<Abilities> ";")?
-//        | "struct" <StructDefName> ( "(" Comma<Type> ")" )? <Abilities>?";"
-//        | "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}" (<Abilities> ";")?
+//        | <Visibility> "struct" <StructDefName> <Abilities>? "{" Comma<FieldAnnot> "}" (<Abilities> ";")?
+//        | <Visibility> "struct" <StructDefName> ( "(" Comma<Type> ")" )? <Abilities>?";"
+//        | <Visibility> "enum" <StructDefName> <Abilities>? "{" Comma<EnumVariant> "}" (<Abilities> ";")?
 //      StructDefName =
 //          <Identifier> <StructTypeParameter>
 //      EnumVariant =

@@ -376,7 +376,7 @@ impl<'env> ModelBuilder<'env> {
         {
             self.env.error(
                 &loc,
-                &format!("structs/enums with key ability cannot have public, package or friend visibility but `{}` has key ability", name.display(self.env)),
+                "structs/enums with key ability cannot have public, package or friend visibility",
             );
         }
         let entry = StructEntry {

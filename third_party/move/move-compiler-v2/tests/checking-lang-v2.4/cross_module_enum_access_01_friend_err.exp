@@ -1,7 +1,7 @@
 
 Diagnostics:
 error: Invalid operation: access of the field `0` on enum type `m::Wrapper` can only be done within the defining module `0xc0ffee::m` or friend modules
-   ┌─ tests/checking-lang-v2.3/cross_module_enum_access_01_friend_err.move:15:9
+   ┌─ tests/checking-lang-v2.4/cross_module_enum_access_01_friend_err.move:15:9
    │
 15 │     fun test() {
    │         ^^^^

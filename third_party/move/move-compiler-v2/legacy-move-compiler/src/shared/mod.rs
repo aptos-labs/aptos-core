@@ -568,6 +568,8 @@ pub enum LanguageVersion {
     V2_3,
     #[value(name = "2.4")]
     V2_4,
+    #[value(name = "2.5")]
+    V2_5,
 }
 
 impl LanguageVersion {
@@ -580,6 +582,7 @@ impl LanguageVersion {
             V2_2 => 3,
             V2_3 => 4,
             V2_4 => 5,
+            V2_5 => 6,
         }
     }
 }
@@ -614,6 +617,7 @@ impl std::fmt::Display for LanguageVersion {
             LanguageVersion::V2_2 => "2.2",
             LanguageVersion::V2_3 => "2.3",
             LanguageVersion::V2_4 => "2.4",
+            LanguageVersion::V2_5 => "2.5",
         })
     }
 }

@@ -448,7 +448,7 @@ fun n::test_no_err() {
 
 Diagnostics:
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_borrow_field_err.move:16:9
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:16:9
    │
 16 │     fun test_1() {
    │         ^^^^^^
@@ -456,7 +456,7 @@ bug: compiler internal error: struct not defined
    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
 
 bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.3/cross_module_borrow_field_err.move:41:9
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:41:9
    │
 41 │     fun test_match() {
    │         ^^^^^^^^^^

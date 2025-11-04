@@ -1,7 +1,0 @@
-
-Diagnostics:
-error: not supported before language version `2.4-unstable`: read/write access specifiers.
-  ┌─ tests/checking-lang-v2.4/access_specifiers/acquires_list_generic.move:6:21
-  │
-6 │     fun foo() reads B<CupC<R>> {
-  │                     ^^^^^^^^^^^
