@@ -2,15 +2,17 @@
 // SPDX-License-Identifier: Apache-2.0
 
 //! This module provides functions to sample random elements from cryptographic
-//! structures such as prime fields and elliptic curve groups.
+//! structures such as prime fields and elliptic curve groups; `arkworks`` can
+//! do this by itself but the point here is to do it with our version of the
+//! `rand`` crate.
 
 use ark_ff::PrimeField;
 use rand::Rng;
 
 /// Samples a uniformly random element from the prime field `F`.
-pub fn sample_field_element<F: PrimeField, R: Rng + ?Sized>(rng: &mut R) -> F {
+pub fn sample_field_element<F: PrimeField, R: Rng>(rng: &mut R) -> F {
     loop {
-        // Number of bits needed for F
+        // Number of bytes needed for F
         let num_bits = F::MODULUS_BIT_SIZE as usize;
         let num_bytes = num_bits.div_ceil(8);
 
