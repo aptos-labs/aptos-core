@@ -52,12 +52,48 @@ type LiftedHkzg<'a, E> =
 type LiftedChunkedElgamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
 
+//                         ┌───────────────────────────────┐
+//                         │     HkzgElgamalWitness<E>     │
+//                         │-------------------------------│
+//                         │ hkzg_randomness               │
+//                         │ chunked_plaintexts            │
+//                         │ elgamal_randomness            │
+//                         └───────────────┬───────────────┘
+//                                         │
+//              ┌────────────────────────┬─┼─┬──────────────────────┐
+//              │                        ║ ╫ ║                      │
+//   projection │    lifted HKZG hom ╔═══╝ ╫ ╚══════╗ lifted        │ projection
+//              │                    ║     ╫        ║ Chunked EG    │
+//              ▼                    ║     ╫        ║               ▼
+//  ┌──────────────────────────────┐ ║     ╫        ║  ┌──────────────────────────────┐
+//  │ univariate_hiding_kzg::      │ ║     ╫        ║  │ chunked_elgamal::            │
+//  │ Witness<E>                   │ ║     ╫        ║  │ Witness<E>                   │
+//  │------------------------------│ ║     ╫        ║  │------------------------------│
+//  │ hkzg_randomness              │ ║     ╫        ║  │ chunked_plaintexts           │
+//  │ flattened_chunked_plaintexts │ ║     ╫        ║  │ elgamal_randomness           │
+//  └──────────────┬───────────────┘ ║     ╫        ║  └──────────────┬───────────────┘
+//                 │ ╔═══════════════╝     ╫        ╚═══════════════╗ │
+//       HKZG hom  │ ║                     ╫                        ║ │ Chunked ElGamal hom
+//                 │ ║                     ╫ TupleHomomorphism      ║ │
+//                 ▼ ▼                     ╫                        ▼ ▼
+//   ┌──────────────────────────┐          ╫         ┌──────────────────────────┐
+//   │ HKZG output (commitment) │          ╫         │ Chunked ElGamal output   │
+//   └──────────────┬───────────┘          ╫         └──────────────┬───────────┘
+//                  │                      ╫                        │
+//                  └─────────────────────►╫◄───────────────────────┘
+//                                         ╫
+//                                         ▼
+//                       ┌──────────────────────────────────┐
+//                       │   TupleHomomorphism output       │
+//                       │   (pair of HKZG image and        │
+//                       │    Chunked ElGamal image)        │
+//                       └──────────────────────────────────┘
 pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>>;
 
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
-        lagr_g1: &'a [E::G1Affine], // TODO: could combine lagr_g1 and xi_1 into hkzg::PublicParamaters<E>?
+        lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
         pp: &'a chunked_elgamal::PublicParameters<E>,
         eks: &'a [E::G1Affine],
