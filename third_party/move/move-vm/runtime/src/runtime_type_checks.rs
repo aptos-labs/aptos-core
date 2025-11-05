@@ -604,11 +604,24 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 ref_ty.paranoid_check_ref_eq(&expected_ty, false)?;
 
                 let field_ty = frame.get_field_ty(*field_handle_idx)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
-                // operand_stack.push_ty(field_ref_ty)?;
-                // ReadRef
-                // let field_ref_ty = operand_stack.pop_ty()?;
-                let inner_ty = field_ref_ty.paranoid_read_ref()?;
+
+                let inner_ty = ty_builder.clone_checking_ty_size(field_ty, 2)
+                    .map_err(|e| {
+                        e.append_message_with_separator(
+                            '.',
+                            format!(
+                                "Failed to create a (mutable: {}) reference type with inner type {}",
+                                false, field_ty
+                            ),
+                        )
+                    })?;
+                inner_ty.paranoid_check_has_ability(Ability::Copy)?;
+
+                // let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                // // operand_stack.push_ty(field_ref_ty)?;
+                // // ReadRef
+                // // let field_ref_ty = operand_stack.pop_ty()?;
+                // let inner_ty = field_ref_ty.paranoid_read_ref()?;
                 operand_stack.push_ty(inner_ty)?;
             },
 
@@ -619,11 +632,26 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 ty.paranoid_check_ref_eq(&expected_ty, false)?;
 
                 let field_ty = frame.get_field_ty(*field_handle_idx)?;
-                let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+
+                // let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+
+                let inner_ty = ty_builder.clone_checking_ty_size(field_ty, 2)
+                    .map_err(|e| {
+                        e.append_message_with_separator(
+                            '.',
+                            format!(
+                                "Failed to create a (mutable: {}) reference type with inner type {}",
+                                false, field_ty
+                            ),
+                        )
+                    })?;
+                inner_ty.paranoid_check_has_ability(Ability::Copy)?;
+                // let inner_ty = inner_ty.as_ref().clone();
+
                 // operand_stack.push_ty(field_ref_ty)?;
                 // ReadRef
                 // let field_ref_ty = operand_stack.pop_ty()?;
-                let inner_ty = field_ref_ty.paranoid_read_ref()?;
+                // let inner_ty = field_ref_ty.paranoid_read_ref()?;
                 operand_stack.push_ty(inner_ty)?;
             },
 
