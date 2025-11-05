@@ -973,7 +973,10 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     &config.local.module_cache_config,
                     metadata,
                 );
-                assert!(snapshot.is_some(), "snapshot should be Some if mode is BothComparison");
+                assert!(
+                    snapshot.is_some(),
+                    "snapshot should be Some if mode is BothComparison"
+                );
             }
         }
 
@@ -1000,8 +1003,8 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         }
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            config.local.concurrency_level =
-                usize::min(config.local.concurrency_level, num_cpus::get());
+            // use the number of threads specified in the executor thread pool as specified at construction time
+            config.local.concurrency_level = self.executor_thread_pool.current_num_threads();
             Some(self.execute_transaction_block_impl_with_state_view(
                 sig_verified_block,
                 state_view,
