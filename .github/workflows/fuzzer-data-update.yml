@@ -76,4 +76,4 @@ jobs:
           gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_seed_corpus.zip --canned-acl=publicRead
           zip -r move_aptosvm_publish_and_run_transactional_seed_corpus.zip move_aptosvm_publish_and_run_transactional_seed_corpus
           gcloud storage cp move_aptosvm_publish_and_run_transactional_seed_corpus.zip gs://aptos-core-corpora/move_aptosvm_publish_and_run_transactional_seed_corpus.zip
-          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_transactional_seed_corpus.zip--canned-acl=publicRead
+          gcloud storage objects update gs://aptos-core-corpora/move_aptosvm_publish_and_run_transactional_seed_corpus.zip --canned-acl=publicRead
