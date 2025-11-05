@@ -2623,26 +2623,6 @@ impl Frame {
                         gas_meter.charge_simple_instr(S::Ge)?;
                         interpreter.binop_rel(Value::ge)?
                     },
-                    Bytecode::Abort => {
-                        gas_meter.charge_simple_instr(S::Abort)?;
-                        let error_code = interpreter.operand_stack.pop_as::<u64>()?;
-                        if is_tracing_for!(TraceCategory::Abort(error_code)) {
-                            let mut str = String::new();
-                            interpreter.debug_print_stack_trace(
-                                &mut str,
-                                interpreter.loader.runtime_environment(),
-                            )?;
-                            eprintln!("trace abort({}): {}", error_code, str);
-                        }
-                        let error = PartialVMError::new(StatusCode::ABORTED)
-                            .with_sub_status(error_code)
-                            .with_message(format!(
-                                "{} at offset {}",
-                                self.function.name_as_pretty_string(),
-                                self.pc,
-                            ));
-                        return Err(error);
-                    },
                     Bytecode::Eq => {
                         let lhs = interpreter.operand_stack.pop()?;
                         let rhs = interpreter.operand_stack.pop()?;
@@ -2866,6 +2846,10 @@ impl Frame {
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;
                     },
+                    Bytecode::Abort => {
+                        gas_meter.charge_simple_instr(S::Abort)?;
+                        return self.abort_error(interpreter);
+                    },
                 }
 
                 RTTCheck::post_execution_type_stack_transition(
@@ -2901,6 +2885,28 @@ impl Frame {
                 }
             }
         }
+    }
+
+    #[inline(never)]
+    fn abort_error(
+        &self,
+        interpreter: &mut InterpreterImpl<impl Loader>,
+    ) -> PartialVMResult<ExitCode> {
+        let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+        if is_tracing_for!(TraceCategory::Abort(error_code)) {
+            let mut str = String::new();
+            interpreter
+                .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())?;
+            eprintln!("trace abort({}): {}", error_code, str);
+        }
+        let error = PartialVMError::new(StatusCode::ABORTED)
+            .with_sub_status(error_code)
+            .with_message(format!(
+                "{} at offset {}",
+                self.function.name_as_pretty_string(),
+                self.pc,
+            ));
+        Err(error)
     }
 
     fn location(&self) -> Location {
