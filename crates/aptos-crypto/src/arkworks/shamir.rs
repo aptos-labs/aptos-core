@@ -126,8 +126,7 @@ pub fn all_lagrange_denominators<F: FftField>(
     include_zero: bool,
 ) -> Vec<F> {
     // A(X) = \prod_{i \in [0, n-1]} (X - \omega^i)
-    let omegas: Vec<F> = dom.elements().collect();
-    debug_assert_eq!(omegas.len(), n.next_power_of_two());
+    let omegas: Vec<F> = dom.elements().take(n).collect();
     debug_assert_eq!(F::ONE, omegas[0]);
     let mut A = vanishing_poly::from_roots(&omegas);
 
