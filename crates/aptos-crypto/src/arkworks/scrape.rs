@@ -205,15 +205,9 @@ mod tests {
     use super::*;
     use crate::arkworks::shamir::ThresholdConfig;
     use ark_bn254::Fr;
-    use ark_ff::{FftField, PrimeField};
-    use ark_poly::domain::Radix2EvaluationDomain;
+    use ark_ff::PrimeField;
     use ark_std::vec::Vec;
-    use rand::{rngs::mock::StepRng, thread_rng};
-
-    // Helper to generate a mock evaluation domain for testing
-    fn get_batch_domain<F: FftField>(size: usize) -> Radix2EvaluationDomain<F> {
-        Radix2EvaluationDomain::new(size).unwrap()
-    }
+    use rand::thread_rng;
 
     // Helper to simulate sampling random elements
     fn sample_random_polynomial<F: PrimeField, R: rand::Rng>(degree: usize, rng: &mut R) -> Vec<F> {
@@ -222,21 +216,35 @@ mod tests {
 
     #[test]
     fn test_ldt_correctness() {
-        let mut rng = StepRng::new(0, 1);
-        let t = 3;
-        let n = 5;
-        let batch_dom = get_batch_domain::<Fr>(n);
+        let mut rng = thread_rng();
 
-        let f = sample_random_polynomial::<Fr, _>(n - t - 1, &mut rng);
+        // TODO: Move get_threshold_configs_for_testing() and the ThresholdConfig trait to aptos-crypto
+        for t in 1..8 {
+            for n in (t + 1)..(3 * t + 1) {
+                let sc = ThresholdConfig::new(t, n);
 
-        let ldt = LowDegreeTest::new(f.clone(), t, n, false, &batch_dom).unwrap();
+                // A degree t-1 polynomial p(X)
+                let p = sample_random_polynomial::<Fr, _>(t, &mut rng);
 
-        // Generate mock evaluations of the polynomial (e.g., at roots of unity)
-        let mut evals = batch_dom.fft(&f);
-        evals.truncate(n);
+                let mut evals = sc.domain.fft(&p);
+                evals.truncate(n);
 
-        // Run the low degree test
-        assert!(ldt.low_degree_test(&evals).is_ok());
+                // Test deg(p) < t, given evals at roots of unity
+                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, false, &sc.domain);
+                assert!(ldt.low_degree_test(&evals).is_ok());
+
+                if sc.t < sc.n {
+                    // Test deg(p) < t + 1, given evals at roots of unity
+                    let ldt = LowDegreeTest::random(&mut rng, sc.t + 1, sc.n, false, &sc.domain);
+                    assert!(ldt.low_degree_test(&evals).is_ok());
+                }
+
+                // Test deg(p) < t, given evals at roots of unity and given p(0)
+                evals.push(p[0]);
+                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain);
+                assert!(ldt.low_degree_test(&evals).is_ok());
+            }
+        }
     }
 
     #[test]
@@ -245,7 +253,7 @@ mod tests {
 
         for t in 1..8 {
             for n in (t + 1)..(3 * t + 1) {
-                let sc = ThresholdConfig::new(n, t);
+                let sc = ThresholdConfig::new(t, n);
 
                 // A degree t polynomial f(X), higher by 1 than what the LDT expects
                 let p = sample_random_polynomial::<Fr, _>(t, &mut rng);

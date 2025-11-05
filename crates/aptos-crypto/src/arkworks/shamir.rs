@@ -161,7 +161,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
     /// This initializes a `(t, n)` threshold scheme configuration.
     /// The `domain` is automatically computed as a radix-2 evaluation domain
     /// of size `n.next_power_of_two()` for use in FFT-based polynomial operations.
-    pub fn new(n: usize, t: usize) -> Self {
+    pub fn new(t: usize, n: usize) -> Self {
         let domain = Radix2EvaluationDomain::new(n).unwrap();
         ThresholdConfig { n, t, domain }
     }
@@ -284,7 +284,7 @@ mod shamir_tests {
 
         for n in 2..8 {
             for t in 1..=n {
-                let config = ThresholdConfig::new(n, t);
+                let config = ThresholdConfig::new(t, n);
 
                 let elements: Vec<Fr> = config.domain.elements().collect();
 
@@ -311,7 +311,7 @@ mod shamir_tests {
         for n in 2..8 {
             for t in 1..=n {
                 let mut rng = thread_rng();
-                let params = ThresholdConfig::new(n, t);
+                let params = ThresholdConfig::new(t, n);
 
                 let secret = Fr::rand(&mut rng);
                 let mut coeffs = vec![secret];
