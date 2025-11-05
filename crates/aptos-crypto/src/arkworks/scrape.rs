@@ -182,8 +182,11 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
         f_evals.truncate(fft_size);
 
         // Compute Lagrange denominators
-        let v =
-            arkworks::shamir::all_lagrange_denominators(self.batch_dom, self.n, self.includes_zero);
+        let v = arkworks::shamir::all_lagrange_denominators(
+            self.batch_dom,
+            fft_size,
+            self.includes_zero,
+        );
 
         // Append f(0), if `include_zero` is true
         let mut extra = Vec::with_capacity(1);
@@ -211,7 +214,7 @@ mod tests {
     use ark_std::vec::Vec;
     use rand::thread_rng;
 
-    // Helper to simulate sampling random elements
+    /// Helper to simulate sampling a random polynomial, by sampling its coefficients
     fn sample_random_polynomial<F: PrimeField, R: rand::Rng>(degree: usize, rng: &mut R) -> Vec<F> {
         random::sample_field_elements(degree + 1, rng)
     }
@@ -226,12 +229,12 @@ mod tests {
                 let sc = ThresholdConfig::new(t, n);
 
                 // A degree t-1 polynomial p(X)
-                let p = sample_random_polynomial::<Fr, _>(t, &mut rng);
+                let p = sample_random_polynomial::<Fr, _>(t - 1, &mut rng);
 
                 let mut evals = sc.domain.fft(&p);
                 evals.truncate(n);
 
-                // Test deg(p) < t, given evals at roots of unity
+                // Test deg(p) < t, given evals at n roots of unity over a domain with N = n.next_power_of_two() roots of unity
                 let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n, false, &sc.domain);
                 assert!(ldt.low_degree_test(&evals).is_ok());
 
@@ -241,11 +244,10 @@ mod tests {
                     assert!(ldt.low_degree_test(&evals).is_ok());
                 }
 
-                // HMMMM I think the FFT domain needs to shrink if p(0) is given!!!
                 // Test deg(p) < t, given evals at roots of unity and given p(0)
-                // evals.push(p[0]);
-                // let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain);
-                // assert!(ldt.low_degree_test(&evals).is_ok());
+                evals.push(p[0]);
+                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain);
+                assert!(ldt.low_degree_test(&evals).is_ok());
             }
         }
     }
@@ -276,14 +278,14 @@ mod tests {
 
                 // Test deg(p) < t, given evals at roots of unity and given p(0)
                 // This should fail, since deg(p) = t
-                // evals.push(p[0]);
-                // let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // Here using n+1 because p(0) is added
-                // assert!(
-                //     ldt.low_degree_test(&evals).is_err(),
-                //     "LDT unexpectedly passed. n: {}, t: {}",
-                //     n,
-                //     t
-                // );
+                evals.push(p[0]);
+                let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // Here using n+1 because p(0) is added
+                assert!(
+                    ldt.low_degree_test(&evals).is_err(),
+                    "LDT unexpectedly passed. n: {}, t: {}",
+                    n,
+                    t
+                );
             }
         }
     }
