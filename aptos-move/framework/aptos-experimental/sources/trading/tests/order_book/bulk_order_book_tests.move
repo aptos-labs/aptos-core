@@ -4,8 +4,20 @@ module aptos_experimental::bulk_order_book_tests {
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use std::vector;
     use aptos_experimental::bulk_order_book_types::{
+<<<<<<< HEAD
         BulkOrderRequest, new_bulk_order_request,
         destroy_bulk_order_place_response,
+=======
+        BulkOrderRequest, new_bulk_order_request, destroy_bulk_order_request_response,
+        is_success, destroy_bulk_order_place_success_response, destroy_bulk_order_place_reject_response,
+        get_bid_size_zero_rejection,
+        get_bid_order_invalid_rejection,
+        get_ask_order_invalid_rejection,
+        get_ask_size_zero_rejection,
+        get_bid_length_mismatch_rejection,
+        get_ask_length_mismatch_rejection,
+        get_price_crossing_rejection
+>>>>>>> 86368a42b7 ([move] Various bytecode optimizations)
     };
     use aptos_experimental::price_time_index;
 
@@ -1208,7 +1220,16 @@ module aptos_experimental::bulk_order_book_tests {
         );
         let response2 = order_book.place_bulk_order(&mut price_time_index, order_request_2);
 
+<<<<<<< HEAD
         let (_order2, cancelled_bid_prices2, cancelled_bid_sizes2, cancelled_ask_prices2, cancelled_ask_sizes2, _previous_seq_num_option2) = destroy_bulk_order_place_response(response2);
+=======
+        // Validate that the order was placed successfully
+        assert!(is_success(&response2));
+
+        // Extract the cancelled levels from the success response
+        assert!(is_success(&response2));
+        let (_order2, cancelled_bid_prices2, cancelled_bid_sizes2, cancelled_ask_prices2, cancelled_ask_sizes2, _previous_seq_num_option2) = destroy_bulk_order_place_success_response(response2);
+>>>>>>> 86368a42b7 ([move] Various bytecode optimizations)
 
         // Validate cancelled bid levels (106 and 105 should be cancelled as they cross 105)
         assert!(cancelled_bid_prices2.length() == 2);
@@ -1525,7 +1546,12 @@ module aptos_experimental::bulk_order_book_tests {
             TEST_ACCOUNT_1, 10, vector[100], vector[10], vector[200], vector[10]
         );
         let response1 = order_book.place_bulk_order(&mut price_time_index, order_req1);
+<<<<<<< HEAD
         let (_order1, _cancelled_bid_prices1, _cancelled_bid_sizes1, _cancelled_ask_prices1, _cancelled_ask_sizes1, previous_seq_num_option1) = destroy_bulk_order_place_response(response1);
+=======
+        assert!(is_success(&response1));
+        let (_order1, _cancelled_bid_prices1, _cancelled_bid_sizes1, _cancelled_ask_prices1, _cancelled_ask_sizes1, previous_seq_num_option1) = destroy_bulk_order_place_success_response(response1);
+>>>>>>> 86368a42b7 ([move] Various bytecode optimizations)
         // First order should have previous sequence number of 1 (from setup_test order)
         assert!(previous_seq_num_option1.is_some());
         let previous_seq_num1 = previous_seq_num_option1.destroy_some();
@@ -1539,7 +1565,12 @@ module aptos_experimental::bulk_order_book_tests {
             TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
         );
         let response2 = order_book.place_bulk_order(&mut price_time_index, order_req2);
+<<<<<<< HEAD
         let (_order2, _cancelled_bid_prices2, _cancelled_bid_sizes2, _cancelled_ask_prices2, _cancelled_ask_sizes2, previous_seq_num_option2) = destroy_bulk_order_place_response(response2);
+=======
+        assert!(is_success(&response2));
+        let (_order2, _cancelled_bid_prices2, _cancelled_bid_sizes2, _cancelled_ask_prices2, _cancelled_ask_sizes2, previous_seq_num_option2) = destroy_bulk_order_place_success_response(response2);
+>>>>>>> 86368a42b7 ([move] Various bytecode optimizations)
         // Second order should have previous sequence number of 10 (from first order)
         assert!(previous_seq_num_option2.is_some());
         let previous_seq_num2 = previous_seq_num_option2.destroy_some();
@@ -1552,7 +1583,17 @@ module aptos_experimental::bulk_order_book_tests {
         let order_req3 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1, 12, vector[100], vector[10], vector[200], vector[10]
         );
+<<<<<<< HEAD
         let _response3 = order_book.place_bulk_order(&mut price_time_index, order_req3);
+=======
+        let response3 = order_book.place_bulk_order(&mut price_time_index, order_req3);
+        assert!(!is_success(&response3));
+        let (_rejection_type, _rejection_reason) = destroy_bulk_order_place_reject_response(response3);
+
+        let bulk_order3 = order_book.get_bulk_order(TEST_ACCOUNT_1);
+        // Sequence number should remain 15
+        assert!(bulk_order3.get_sequence_number() == 15);
+>>>>>>> 86368a42b7 ([move] Various bytecode optimizations)
 
         price_time_index.destroy_price_time_idx();
         order_book.destroy_bulk_order_book();

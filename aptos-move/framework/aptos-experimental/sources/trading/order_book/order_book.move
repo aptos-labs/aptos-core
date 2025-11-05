@@ -197,11 +197,10 @@ module aptos_experimental::order_book {
         is_bid: bool
     ): OrderMatch<M> {
         let result = self.price_time_idx.get_single_match_result(price, size, is_bid);
-        let book_type = result.get_active_matched_book_type();
-        if (book_type == single_order_type()) {
-            self.single_order_book.get_single_match_for_taker(result)
+        if (result.is_active_matched_book_type_single_order()) {
+            return self.single_order_book.get_single_match_for_taker(result)
         } else {
-            self.bulk_order_book.get_single_match_for_taker(&mut self.price_time_idx, result, is_bid)
+            return self.bulk_order_book.get_single_match_for_taker(&mut self.price_time_idx, result, is_bid)
         }
     }
 

@@ -213,18 +213,14 @@ module aptos_experimental::market_types {
 
     public fun extract_results<R: store + copy + drop>(self: CallbackResult<R>): Option<R> {
         match (self) {
-            CallbackResult::NOT_AVAILABLE => option::none(),
-            CallbackResult::CONTINUE_MATCHING { result } => option::some(result),
-            CallbackResult::STOP_MATCHING { result } => option::some(result),
+            CallbackResult::NOT_AVAILABLE => return option::none(),
+            CallbackResult::CONTINUE_MATCHING { result } => return option::some(result),
+            CallbackResult::STOP_MATCHING { result } => return option::some(result),
         }
     }
 
     public fun should_stop_matching<R: store + copy + drop>(self: &CallbackResult<R>): bool {
-        match (self) {
-            CallbackResult::CONTINUE_MATCHING { result: _ } => false,
-            CallbackResult::STOP_MATCHING { result: _ } => true,
-            CallbackResult::NOT_AVAILABLE => false,
-        }
+        self is CallbackResult::STOP_MATCHING
     }
 
     public fun new_callback_result_continue_matching<R: store + copy + drop>(result: R): CallbackResult<R> {

@@ -716,11 +716,9 @@ with the same order ID in the future.
     self: &<a href="bulk_order_book.md#0x7_bulk_order_book_BulkOrderBook">BulkOrderBook</a>&lt;M&gt;,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>
 ): BulkOrder&lt;M&gt; {
-    <b>if</b> (!self.orders.contains(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>)) {
-        <b>abort</b> <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>;
-    };
-
-    self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>).destroy_some()
+    <b>let</b> result = self.orders.get(&<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
+    <b>assert</b>!(result.is_some(), <a href="bulk_order_book.md#0x7_bulk_order_book_EORDER_NOT_FOUND">EORDER_NOT_FOUND</a>);
+    result.destroy_some()
 }
 </code></pre>
 

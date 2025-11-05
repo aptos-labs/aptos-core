@@ -48,7 +48,7 @@ module aptos_experimental::bulk_order_book {
 
     use aptos_framework::big_ordered_map::BigOrderedMap;
     use aptos_framework::transaction_context;
-    use aptos_experimental::order_book_types::ActiveMatchedOrder;
+    use aptos_experimental::order_book_types::{ActiveMatchedOrder};
     use aptos_experimental::order_book_types;
     use aptos_experimental::bulk_order_book_types::{
         BulkOrder, BulkOrderPlaceResponse, BulkOrderRequest,
@@ -291,11 +291,9 @@ module aptos_experimental::bulk_order_book {
         self: &BulkOrderBook<M>,
         account: address
     ): BulkOrder<M> {
-        if (!self.orders.contains(&account)) {
-            abort EORDER_NOT_FOUND;
-        };
-
-        self.orders.get(&account).destroy_some()
+        let result = self.orders.get(&account);
+        assert!(result.is_some(), EORDER_NOT_FOUND);
+        result.destroy_some()
     }
 
     public(friend) fun get_remaining_size<M: store + copy + drop>(
