@@ -206,7 +206,7 @@ fn accumulator_poly_helper(dom: &BatchEvaluationDomain, T: &[usize]) -> Vec<Scal
     //
     // We handle a nasty edge case here: when doing N out of N interpolation, with N = 2^k, the batch
     // evaluation domain will have N roots of unity, but the degree of the accumulator poly will be
-    // N+1. // Does it? Perhaps what's meant is that the FFTs can only accommodate up to deg N -1
+    // N as well which would require N + 1 roots of unity to do FFT.
     // This will trigger an error inside `accumulator_poly` when doing the last FFT-based
     // multiplication, which would require an FFT evaluation domain of size 2N which is not available.
     //

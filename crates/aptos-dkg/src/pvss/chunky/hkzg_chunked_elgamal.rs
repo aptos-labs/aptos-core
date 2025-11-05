@@ -62,7 +62,7 @@ type LiftedChunkedElgamal<'a, E> =
 //                                         │
 //              ┌────────────────────────┬─┼─┬──────────────────────┐
 //              │                        ║ ╫ ║                      │
-//   projection │    lifted HKZG hom ╔═══╝ ╫ ╚══════╗ lifted        │ projection
+// projection_1 │    lifted HKZG hom ╔═══╝ ╫ ╚══════╗ lifted        │ projection_2
 //              │                    ║     ╫        ║ Chunked EG    │
 //              ▼                    ║     ╫        ║               ▼
 //  ┌──────────────────────────────┐ ║     ╫        ║  ┌──────────────────────────────┐
@@ -88,6 +88,13 @@ type LiftedChunkedElgamal<'a, E> =
 //                       │   (pair of HKZG image and        │
 //                       │    Chunked ElGamal image)        │
 //                       └──────────────────────────────────┘
+//
+// In other words, the tuple homomorphism is roughly given as follows:
+//
+// ( rho, z_{i,j} , r_j ) │----> ( HKZG(rho, z_{i,j} ) , chunked_elgamal( z_{i,j} , r_j )
+//
+// hang on!!! should we be doing DeKART commitment hom here? so with a zero at the start?? yes!!
+// or write DeKARTv2CommitmentWitness?
 pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>>;
 
 #[allow(non_snake_case)]

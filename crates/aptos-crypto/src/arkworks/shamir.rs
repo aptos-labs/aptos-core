@@ -111,7 +111,6 @@ fn naive_all_lagrange_coefficients<F: Field>(xs: &HashSet<F>) -> Vec<(F, F)> {
     results
 }
 
-// TODO: maybe move this elsewhere?
 /// Computes the Lagrange denominators for a set of evaluation points in a Radix-2 FFT domain.
 ///
 /// Specifically, for a polynomial evaluated at points `\omega^0, \dots, \omega^{n-1}` in `dom`,
@@ -127,8 +126,11 @@ pub fn all_lagrange_denominators<F: FftField>(
     include_zero: bool,
 ) -> Vec<F> {
     // A(X) = \prod_{i \in [0, n-1]} (X - \omega^i)
-    let omegas: Vec<F> = dom.elements().take(n).collect();
+    let omegas: Vec<F> = dom.elements().collect();
+    debug_assert_eq!(omegas.len(), n.next_power_of_two());
+    debug_assert_eq!(F::ONE, omegas[0]);
     let mut A = vanishing_poly::from_roots(&omegas);
+
     // A'(X) = \sum_{i \in [0, n-1]} \prod_{j \ne i, j \in [0, n-1]} (X - \omega^j)
     A.differentiate_in_place();
     let A_prime = A;
@@ -141,15 +143,11 @@ pub fn all_lagrange_denominators<F: FftField>(
     if include_zero {
         // 1. Augment A'(\omega_i) = A'(\omega_i) * \omega^i, for all i\ in [0, n)
         for (i, denom) in denoms.iter_mut().enumerate().take(n) {
-            *denom *= F::get_root_of_unity(i as u64).unwrap();
+            *denom *= omegas[i];
         }
 
         // 2. Compute A'(0) = \prod_{j \in [0, n)} (0 - \omega^j)
-        denoms.push(
-            (0..n)
-                .map(|i| -F::get_root_of_unity(i as u64).unwrap())
-                .product(),
-        );
+        denoms.push((0..n).map(|i| -omegas[i]).product());
     }
 
     batch_inversion(&mut denoms);
@@ -162,6 +160,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
     /// The `domain` is automatically computed as a radix-2 evaluation domain
     /// of size `n.next_power_of_two()` for use in FFT-based polynomial operations.
     pub fn new(t: usize, n: usize) -> Self {
+        debug_assert!(t <= n, "Expected t <= n, but t = {} and n = {}", t, n);
         let domain = Radix2EvaluationDomain::new(n).unwrap();
         ThresholdConfig { n, t, domain }
     }
@@ -333,6 +332,47 @@ mod shamir_tests {
                     assert_eq!(params.reconstruct(&reconstruct_shares_vec).unwrap(), secret);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_all_lagrange_denominators_no_zero() {
+        for n in [4, 8, 16] {
+            let dom = Radix2EvaluationDomain::<Fr>::new(n).unwrap();
+
+            // Compute denominators
+            let denoms = all_lagrange_denominators(&dom, n, false);
+            assert_eq!(denoms.len(), n);
+
+            // Manual check: for small n, v_i = 1 / Π_{j≠i} (ω^i - ω^j)
+            let omegas: Vec<Fr> = dom.elements().collect();
+            for i in 0..n {
+                let mut expected = Fr::one();
+                for j in 0..n {
+                    if i != j {
+                        expected *= omegas[i] - omegas[j];
+                    }
+                }
+                expected = expected.inverse().unwrap();
+                assert_eq!(denoms[i], expected, "Mismatch at index {}", i);
+            }
+        }
+    }
+
+    #[test]
+    fn test_all_lagrange_denominators_with_zero() {
+        for n in [4, 8, 16] {
+            let dom = Radix2EvaluationDomain::<Fr>::new(n).unwrap();
+
+            let denoms = all_lagrange_denominators(&dom, n, true);
+            assert_eq!(denoms.len(), n + 1); // should include the zero term
+
+            let omegas: Vec<Fr> = dom.elements().collect();
+
+            // Check last element corresponds to point at zero
+            let expected_zero_term_inv: Fr = (0..n).map(|i| -omegas[i]).product();
+            let expected_zero_term = expected_zero_term_inv.inverse().unwrap();
+            assert_eq!(denoms[n], expected_zero_term);
         }
     }
 }
