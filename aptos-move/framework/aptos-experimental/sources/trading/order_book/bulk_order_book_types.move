@@ -58,7 +58,6 @@ module aptos_experimental::bulk_order_book_types {
     const EPRICE_CROSSING: u64 = 5;
     const E_BID_LENGTH_MISMATCH: u64 = 6;
     const E_ASK_LENGTH_MISMATCH: u64 = 7;
-    const E_SEQUENCE_NUMBER_OUT_OF_ORDER: u64 = 8;
     const E_EMPTY_ORDER: u64 = 9;
     const E_BID_SIZE_ZERO: u64 = 10;
     const E_ASK_SIZE_ZERO: u64 = 11;
@@ -205,7 +204,7 @@ module aptos_experimental::bulk_order_book_types {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
         metadata: M
-    ): BulkOrderRequestResponse<M> {
+    ): BulkOrderRequest<M> {
         // Basic length validation
         assert!(bid_prices.length() == bid_sizes.length(), E_BID_LENGTH_MISMATCH);
         assert!(ask_prices.length() == ask_sizes.length(), E_ASK_LENGTH_MISMATCH);
@@ -225,7 +224,7 @@ module aptos_experimental::bulk_order_book_types {
             ask_sizes,
             metadata
         };
-        new_bulk_order_request_response(req)
+        req
     }
 
     public fun get_account_from_order_request<M: store + copy + drop>(
@@ -286,21 +285,6 @@ module aptos_experimental::bulk_order_book_types {
     ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, option::Option<u64>) {
         let BulkOrderPlaceResponse { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
         (order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
-    }
-
-    public(friend) fun new_bulk_order_request_response<M: store + copy + drop>(
-        request: BulkOrderRequest<M>
-    ): BulkOrderRequestResponse<M> {
-        BulkOrderRequestResponse {
-            request,
-        }
-    }
-
-    public(friend) fun destroy_bulk_order_request_response<M: store + copy + drop>(
-        response: BulkOrderRequestResponse<M>
-    ): BulkOrderRequest<M> {
-        let BulkOrderRequestResponse { request } = response;
-        request
     }
 
     /// Validates that all sizes in the vector are greater than 0.

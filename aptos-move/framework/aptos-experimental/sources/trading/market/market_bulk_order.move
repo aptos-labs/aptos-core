@@ -4,7 +4,7 @@
 module aptos_experimental::market_bulk_order {
     use std::signer;
     use aptos_experimental::bulk_order_book_types::{
-        new_bulk_order_request, destroy_bulk_order_request_response, destroy_bulk_order_place_response
+        new_bulk_order_request, destroy_bulk_order_place_response
     };
     use aptos_experimental::market_types::{
         MarketClearinghouseCallbacks,
@@ -50,7 +50,7 @@ module aptos_experimental::market_bulk_order {
             metadata,
         );
         assert!(validation_result.is_validation_result_valid(), E_CLEARINGHOUSE_VALIDATION_FAILED);
-        let request_response = new_bulk_order_request(
+        let request = new_bulk_order_request(
             account,
             sequence_number,
             bid_prices,
@@ -59,8 +59,7 @@ module aptos_experimental::market_bulk_order {
             ask_sizes,
             metadata,
         );
-        let bulk_order_request = destroy_bulk_order_request_response(request_response);
-        let response = market.get_order_book_mut().place_bulk_order(bulk_order_request);
+        let response = market.get_order_book_mut().place_bulk_order(request);
         let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_response(response);
         let (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
         assert!(sequence_number == order_sequence_number, E_SEQUENCE_NUMBER_MISMATCH);
