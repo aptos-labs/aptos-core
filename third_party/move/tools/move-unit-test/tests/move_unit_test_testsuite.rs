@@ -148,6 +148,11 @@ fn fail_fast(path: &Path) -> datatest_stable::Result<()> {
     Ok(())
 }
 
+fn fail_fast_unexpected(path: &Path) -> datatest_stable::Result<()> {
+    run_test_impl(path, true)?;
+    Ok(())
+}
+
 fn no_fail_fast(path: &Path) -> datatest_stable::Result<()> {
     run_test_impl(path, false)?;
     Ok(())
@@ -163,4 +168,7 @@ datatest_stable::harness!(
     no_fail_fast,
     "tests/fail_fast",
     r"unittest\.move$",
+    fail_fast_unexpected,
+    "tests/fail_fast",
+    r"unittest-fast-unexpected-success\.move$",
 );

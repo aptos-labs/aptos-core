@@ -499,7 +499,10 @@ impl SharedTestingConfig {
                                 save_session_state(),
                             ),
                             test_plan,
-                        )
+                        );
+                        if self.fail_fast {
+                            return Err(FailFast(stats).into());
+                        }
                     } else {
                         // Expected the test to execute fully and it did
                         output.pass(function_name);
