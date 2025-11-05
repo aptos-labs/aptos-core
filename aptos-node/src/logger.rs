@@ -45,7 +45,11 @@ pub fn create_logger(
         logger_builder.enable_backtrace();
     }
     if let Some(log_file) = log_file {
-        logger_builder.printer(Box::new(aptos_logger::tracing_writer::TracingWriter::new(log_file, aptos_logger::Rotation::NEVER)));
+        logger_builder.printer(Box::new(aptos_logger::tracing_writer::TracingWriter::new(
+            log_file,
+            node_config.logger.max_log_file_size_mbs,
+            node_config.logger.max_log_files,
+        )));
     }
     if node_config.logger.enable_telemetry_remote_log {
         let (tx, rx) = mpsc::channel(TELEMETRY_LOG_INGEST_BUFFER_SIZE);
