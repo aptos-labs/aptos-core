@@ -97,7 +97,7 @@ Returns:
         metadata,
     );
     <b>assert</b>!(validation_result.is_validation_result_valid(), <a href="market_bulk_order.md#0x7_market_bulk_order_E_CLEARINGHOUSE_VALIDATION_FAILED">E_CLEARINGHOUSE_VALIDATION_FAILED</a>);
-    <b>let</b> request_response = new_bulk_order_request(
+    <b>let</b> request = new_bulk_order_request(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         sequence_number,
         bid_prices,
@@ -106,8 +106,7 @@ Returns:
         ask_sizes,
         metadata,
     );
-    <b>let</b> bulk_order_request = destroy_bulk_order_request_response(request_response);
-    <b>let</b> response = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(bulk_order_request);
+    <b>let</b> response = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(request);
     <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_response(response);
     <b>let</b> (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
     <b>assert</b>!(sequence_number == order_sequence_number, <a href="market_bulk_order.md#0x7_market_bulk_order_E_SEQUENCE_NUMBER_MISMATCH">E_SEQUENCE_NUMBER_MISMATCH</a>);
