@@ -74,7 +74,7 @@ fn exchange_e2e_test() {
     );
 
     // verify that exchange_to() and exchange_from() are working properly
-    let test_user_account = h.new_account_with_balance_and_sequence_number(20, 10);
+    let test_user_account = h.new_account_with_balance_and_sequence_number(20, Some(10));
     assert_coin_balance(
         &mut h,
         test_user_account.address(),

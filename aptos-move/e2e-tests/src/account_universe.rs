@@ -93,6 +93,8 @@ pub trait AUTransactionGen: fmt::Debug {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        enable_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64));
 
     /// Creates an arced version of this transaction, suitable for dynamic dispatch.
@@ -108,8 +110,14 @@ impl AUTransactionGen for Arc<dyn AUTransactionGen> {
     fn apply(
         &self,
         universe: &mut AccountUniverse,
+        use_txn_payload_v2_format: bool,
+        enable_orderless_transactions: bool,
     ) -> (SignedTransaction, (TransactionStatus, u64)) {
-        (**self).apply(universe)
+        (**self).apply(
+            universe,
+            use_txn_payload_v2_format,
+            enable_orderless_transactions,
+        )
     }
 }
 
@@ -119,7 +127,7 @@ impl AUTransactionGen for Arc<dyn AUTransactionGen> {
 pub struct AccountCurrent {
     initial_data: AccountData,
     balance: u64,
-    sequence_number: u64,
+    sequence_number: Option<u64>,
     // creation of event counter affects gas usage in create account. This tracks it
     event_counter_created: bool,
 }
@@ -149,7 +157,7 @@ impl AccountCurrent {
 
     /// Returns the current sequence number for this account, assuming all transactions seen so far
     /// are applied.
-    pub fn sequence_number(&self) -> u64 {
+    pub fn sequence_number(&self) -> Option<u64> {
         self.sequence_number
     }
 
@@ -220,6 +228,7 @@ pub fn txn_one_account_result(
     gas_price: u64,
     gas_used: u64,
     low_gas_used: u64,
+    orderless_txn: bool,
 ) -> (TransactionStatus, bool) {
     // The transactions set the gas cost to 1 microaptos.
     let enough_max_gas = sender.balance >= gas_costs::TXN_RESERVED * gas_price;
@@ -233,7 +242,9 @@ pub fn txn_one_account_result(
     match (enough_max_gas, enough_to_transfer, enough_to_succeed) {
         (true, true, true) => {
             // Success!
-            sender.sequence_number += 1;
+            if !orderless_txn {
+                sender.sequence_number = Some(sender.sequence_number.map_or(1, |seq| seq + 1));
+            }
             sender.balance -= to_deduct;
             (TransactionStatus::Keep(ExecutionStatus::Success), true)
         },
@@ -241,7 +252,9 @@ pub fn txn_one_account_result(
             // Enough gas to pass validation and to do the transfer, but not enough to succeed
             // in the epilogue. The transaction will be run and gas will be deducted from the
             // sender, but no other changes will happen.
-            sender.sequence_number += 1;
+            if !orderless_txn {
+                sender.sequence_number = Some(sender.sequence_number.map_or(1, |seq| seq + 1));
+            }
             sender.balance -= gas_used * gas_price;
             (
                 TransactionStatus::Keep(ExecutionStatus::MoveAbort {
@@ -256,7 +269,9 @@ pub fn txn_one_account_result(
             // Enough gas to pass validation but not enough to succeed. The transaction will
             // be run and gas will be deducted from the sender, but no other changes will
             // happen.
-            sender.sequence_number += 1;
+            if !orderless_txn {
+                sender.sequence_number = Some(sender.sequence_number.map_or(1, |seq| seq + 1));
+            }
             sender.balance -= low_gas_used * gas_price;
             (
                 TransactionStatus::Keep(ExecutionStatus::MoveAbort {
@@ -323,7 +338,7 @@ pub fn run_and_assert_gas_cost_stability(
     let mut universe = universe.setup_gas_cost_stability(executor.state_store());
     let (transactions, expected_values): (Vec<_>, Vec<_>) = transaction_gens
         .iter()
-        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe))
+        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe, false, false))
         .unzip();
     let outputs = executor.execute_block(transactions).unwrap();
 
@@ -352,7 +367,7 @@ pub fn run_and_assert_universe(
     let mut universe = universe.setup(&mut executor);
     let (transactions, expected_values): (Vec<_>, Vec<_>) = transaction_gens
         .iter()
-        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe))
+        .map(|transaction_gen| transaction_gen.clone().apply(&mut universe, false, false))
         .unzip();
     let outputs = executor.execute_block(transactions).unwrap();
 
@@ -378,19 +393,19 @@ pub fn assert_accounts_match(
     executor: &FakeExecutor,
 ) -> Result<(), TestCaseError> {
     for (idx, account) in universe.accounts().iter().enumerate() {
-        let resource = executor
-            .read_account_resource(account.account())
-            .expect("account resource must exist");
+        let resource = executor.read_account_resource(account.account());
         let fungible_store_resource = executor
             .read_apt_fungible_store_resource(account.account())
             .expect("account balance resource must exist");
         let auth_key = account.account().auth_key();
-        prop_assert_eq!(
-            auth_key.as_slice(),
-            resource.authentication_key(),
-            "account {} should have correct auth key",
-            idx
-        );
+        if let Some(resource) = &resource {
+            prop_assert_eq!(
+                auth_key.as_slice(),
+                resource.authentication_key(),
+                "account {} should have correct auth key",
+                idx
+            );
+        }
         prop_assert_eq!(
             account.balance(),
             fungible_store_resource.balance(),
@@ -412,7 +427,7 @@ pub fn assert_accounts_match(
         //        );
         prop_assert_eq!(
             account.sequence_number(),
-            resource.sequence_number(),
+            resource.map(|resource| resource.sequence_number()),
             "account {} should have correct sequence number",
             idx
         );
