@@ -1,0 +1,10 @@
+processed 3 tasks
+task 0 lines 1-19:  publish [module 0x22::test]
+task 1 lines 21-21:  run --verbose 0x22::test::store --signers 0x22
+task 2 lines 23-23:  run --verbose 0x22::test::borrow_global_instr --args @0x22 --display-trace
+instructions: 5
+fingerprint: 2512929311643023099
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::borrow_global_instr
+return values: 42

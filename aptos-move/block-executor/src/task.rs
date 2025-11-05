@@ -26,6 +26,7 @@ use aptos_vm_types::{
     },
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
+use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use std::{
@@ -77,6 +78,12 @@ pub trait ExecutorTask {
     fn init(
         environment: &AptosEnvironment,
         state_view: &impl TStateView<Key = <Self::Txn as Transaction>::Key>,
+        // If true, runtime checks for user payloads may not be performed during execution time.
+        // Instead, the execution trace will be collected, for later async replay with extra
+        // checks during Block-STM's post-commit parallel processing.
+        //
+        // Note: for each transaction, based on entrypoint, VM may decide not to delay the checks.
+        async_runtime_checks_enabled: bool,
     ) -> Self;
 
     /// Execute a single transaction given the view of the current state.
@@ -251,7 +258,7 @@ pub trait TransactionOutput: Send + Debug {
             <Self::Txn as Transaction>::Value,
         )>,
         patched_events: Vec<<Self::Txn as Transaction>::Event>,
-    ) -> Result<(), PanicError>;
+    ) -> Result<Trace, PanicError>;
 
     fn set_txn_output_for_non_dynamic_change_set(&mut self);
 

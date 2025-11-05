@@ -9,7 +9,8 @@ use crate::{
     counters::{
         self, BLOCKSTM_VERSION_NUMBER, BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK,
         PARALLEL_EXECUTION_SECONDS, PARALLEL_FINALIZE_SECONDS, RAYON_EXECUTION_SECONDS,
-        TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, VM_INIT_SECONDS, WORK_WITH_TASK_SECONDS,
+        TASK_EXECUTE_SECONDS, TASK_VALIDATE_SECONDS, TRACE_REPLAY_SECONDS, VM_INIT_SECONDS,
+        WORK_WITH_TASK_SECONDS,
     },
     errors::*,
     executor_utilities::*,
@@ -64,7 +65,7 @@ use core::panic;
 use fail::fail_point;
 use move_binary_format::CompiledModule;
 use move_core_types::{language_storage::ModuleId, value::MoveTypeLayout, vm_status::StatusCode};
-use move_vm_runtime::{Module, RuntimeEnvironment, WithRuntimeEnvironment};
+use move_vm_runtime::{Module, RuntimeEnvironment, TypeChecker, WithRuntimeEnvironment};
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use num_cpus;
 use rayon::ThreadPool;
@@ -1132,7 +1133,7 @@ where
         &self,
         txn_idx: TxnIndex,
         scheduler: SchedulerWrapper,
-        runtime_environment: &RuntimeEnvironment,
+        environment: &AptosEnvironment,
         shared_sync_params: &SharedSyncParams<T, E, S>,
     ) -> Result<(), PanicError> {
         let last_input_output = shared_sync_params.last_input_output;
@@ -1170,7 +1171,7 @@ where
         let latest_view = LatestView::new(
             shared_sync_params.base_view,
             shared_sync_params.global_module_cache,
-            runtime_environment,
+            environment.runtime_environment(),
             ViewState::Sync(parallel_state),
             txn_idx,
         );
@@ -1221,7 +1222,7 @@ where
         // This call finalizes the output and may not be concurrent with any other
         // accesses to the output (e.g. querying the write-set, events, etc), as
         // these read accesses are not synchronized and assumed to have terminated.
-        last_input_output.record_materialized_txn_output(
+        let trace = last_input_output.record_materialized_txn_output(
             txn_idx,
             aggregator_v1_delta_writes,
             materialized_resource_write_set
@@ -1229,7 +1230,35 @@ where
                 .chain(serialized_groups)
                 .collect(),
             materialized_events,
-        )
+        )?;
+
+        if environment.async_runtime_checks_enabled() && !trace.is_empty() {
+            // Note that the trace may be empty (if block was small and executor decides not to
+            // collect the trace and replay, or if the VM decides it is not profitable to do this
+            // check for this particular transaction), so we check it in advance.
+            let result = {
+                counters::update_txn_trace_counters(&trace);
+                let _timer = TRACE_REPLAY_SECONDS.start_timer();
+                TypeChecker::new(&latest_view).replay(&trace)
+            };
+
+            // In case of runtime type check errors, fallback to sequential execution. There errors
+            // are supposed to be unlikely so this fallback is fine, and is mostly needed to make
+            // sure transaction epilogue runs after failure, etc.
+            if let Err(err) = result {
+                alert!(
+                    "Runtime type check failed during replay of transaction {}: {:?}",
+                    txn_idx,
+                    err
+                );
+                return Err(PanicError::CodeInvariantError(format!(
+                    "Sequential fallback on type check failure for transaction {}: {:?}",
+                    txn_idx, err
+                )));
+            }
+        }
+
+        Ok(())
     }
 
     fn record_finalized_output(
@@ -1285,7 +1314,7 @@ where
                 self.materialize_txn_commit(
                     txn_idx,
                     scheduler_wrapper,
-                    runtime_environment,
+                    environment,
                     shared_sync_params,
                 )?;
                 self.record_finalized_output(txn_idx, txn_idx, shared_sync_params)?;
@@ -1480,7 +1509,7 @@ where
                     self.materialize_txn_commit(
                         txn_idx,
                         scheduler_wrapper,
-                        runtime_environment,
+                        environment,
                         shared_sync_params,
                     )?;
                     self.record_finalized_output(txn_idx, txn_idx, shared_sync_params)?;
@@ -1646,7 +1675,7 @@ where
                 self.materialize_txn_commit(
                     epilogue_txn_idx,
                     scheduler,
-                    runtime_environment,
+                    environment,
                     shared_sync_params,
                 )?;
                 self.record_finalized_output(
@@ -1725,6 +1754,12 @@ where
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
         };
 
+        let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
+            module_cache_manager_guard.environment(),
+            num_txns,
+            num_workers,
+        );
+
         let timer = RAYON_EXECUTION_SECONDS.start_timer();
         let worker_ids: Vec<u32> = (0..num_workers).collect();
         let maybe_executor = ExplicitSyncWrapper::new(None);
@@ -1734,7 +1769,11 @@ where
                     let environment = module_cache_manager_guard.environment();
                     let executor = {
                         let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(&environment.clone(), shared_sync_params.base_view)
+                        E::init(
+                            &environment.clone(),
+                            shared_sync_params.base_view,
+                            async_runtime_checks_enabled,
+                        )
                     };
 
                     if let Err(err) = self.worker_loop_v2(
@@ -1875,13 +1914,23 @@ where
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
         };
 
+        let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
+            module_cache_manager_guard.environment(),
+            num_txns,
+            worker_ids.len() as u32,
+        );
+
         self.executor_thread_pool.scope(|s| {
             for worker_id in &worker_ids {
                 s.spawn(|_| {
                     let environment = module_cache_manager_guard.environment();
                     let executor = {
                         let _init_timer = VM_INIT_SECONDS.start_timer();
-                        E::init(&environment.clone(), base_view)
+                        E::init(
+                            &environment.clone(),
+                            base_view,
+                            async_runtime_checks_enabled,
+                        )
                     };
 
                     if let Err(err) = self.worker_loop(
@@ -2148,7 +2197,7 @@ where
 
         let init_timer = VM_INIT_SECONDS.start_timer();
         let environment = module_cache_manager_guard.environment();
-        let executor = E::init(environment, base_view);
+        let executor = E::init(environment, base_view, false);
         drop(init_timer);
 
         let runtime_environment = environment.runtime_environment();
@@ -2413,7 +2462,7 @@ where
                         // output which needs a write lock.
                         drop(output_before_guard);
 
-                        output.incorporate_materialized_txn_output(
+                        let trace = output.incorporate_materialized_txn_output(
                             // No aggregator v1 delta writes are needed for sequential execution.
                             // They are already handled because we passed materialize_deltas=true
                             // to execute_transaction.
@@ -2424,6 +2473,14 @@ where
                                 .collect(),
                             materialized_events,
                         )?;
+
+                        // Sequential execution never collects any traces.
+                        if !trace.is_empty() {
+                            let err = code_invariant_error(
+                                "Sequential execution should not record any traces",
+                            );
+                            return Err(err.into());
+                        }
                     }
                     // If dynamic change set is disabled, this can be used to assert nothing needs patching instead:
                     //   output.set_txn_output_for_non_dynamic_change_set();
@@ -2640,4 +2697,19 @@ where
             Ok(None)
         }
     }
+}
+
+/// Returns true if runtime checks for transactions in this block can be performed asynchronously.
+///
+/// The returned value is based on a heuristic that determines if the optimization will have
+/// performance benefits for the block and is currently the following:
+///   - Runtime checks are allowed to be performed done during post-commit hook, and
+///   - Block is large enough to contain some use transactions (should be at least 4 to have a pair
+///     of user transactions, block prologue and block epilogue).
+fn should_perform_async_runtime_checks_for_block(
+    environment: &AptosEnvironment,
+    num_txns: u32,
+    _num_workers: u32,
+) -> bool {
+    environment.async_runtime_checks_enabled() && num_txns > 3
 }

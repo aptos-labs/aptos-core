@@ -4948,6 +4948,7 @@ dependencies = [
  "once_cell",
  "serde",
  "sha3 0.9.1",
+ "triomphe",
 ]
 
 [[package]]
@@ -5031,6 +5032,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
+ "derivative",
  "either",
  "move-binary-format",
  "move-core-types",
@@ -13058,6 +13060,7 @@ dependencies = [
  "ambassador",
  "anyhow",
  "better_any",
+ "bitvec",
  "bytes",
  "cfg-if",
  "claims",

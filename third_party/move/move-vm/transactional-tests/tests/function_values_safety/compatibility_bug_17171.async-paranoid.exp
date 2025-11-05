@@ -1,0 +1,15 @@
+processed 5 tasks
+task 0 lines 1-14:  publish --verbose [module 0x66::m]
+task 1 lines 16-29:  publish [module 0x66::test]
+task 2 lines 30-30:  run 0x66::test::call_it
+task 3 lines 32-51:  publish --verbose [module 0x66::m]
+task 4 lines 52-52:  run --verbose 0x66::test::call_it
+Error: Function execution failed with VMError: {
+    message: Expected type |s#8|, got |s#7| has copy + drop which is not assignable ,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: Some(1),
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

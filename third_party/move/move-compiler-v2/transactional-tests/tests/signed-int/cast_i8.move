@@ -116,7 +116,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128u8;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -124,7 +124,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128u16;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -132,7 +132,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128u32;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -140,7 +140,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128u64;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -148,7 +148,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128u128;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -156,7 +156,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128u256;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -166,7 +166,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128i16;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -174,7 +174,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128i32;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -182,7 +182,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128i64;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -190,7 +190,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128i128;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -198,7 +198,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 128i256;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -208,7 +208,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -129i16;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -216,7 +216,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -129i32;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -224,7 +224,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -129i64;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -232,7 +232,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -129i128;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
 
@@ -240,6 +240,6 @@ fun main() {
 script {
 fun main() {
    let v0 = -129i256;
-   let v2 = v0 as i8; // expect to abort
+   let _v2 = v0 as i8; // expect to abort
 }
 }
