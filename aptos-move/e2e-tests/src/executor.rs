@@ -13,9 +13,8 @@ use aptos_bitvec::BitVec;
 #[cfg(fuzzing)]
 use aptos_block_executor::code_cache_global_manager::ModuleHotCacheSnapshot;
 use aptos_block_executor::{
-    code_cache_global_manager::AptosModuleCacheManager,
-    txn_commit_hook::NoOpTransactionCommitHook,
-    txn_provider::{default::DefaultTxnProvider, TxnProvider},
+    code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
+    txn_provider::default::DefaultTxnProvider,
 };
 use aptos_crypto::HashValue;
 use aptos_framework::ReleaseBundle;
@@ -825,10 +824,9 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         txn_block: Vec<SignatureVerifiedTransaction>,
         state_view: &(impl StateView + Sync),
         config: BlockExecutorConfig,
-        metadata: Option<TransactionSliceMetadata>,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
         let txn_provider = DefaultTxnProvider::new_without_info(txn_block);
-        let requested = txn_provider.num_txns();
+        let metadata = self.get_txn_slice_metadata();
         let result = {
             AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
                 _,
@@ -841,16 +839,12 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 self.module_cache_manager_opt()
                     .unwrap_or(&AptosModuleCacheManager::new()),
                 config,
-                metadata.unwrap_or_else(TransactionSliceMetadata::unknown),
+                metadata,
                 None,
             )
             .map(BlockOutput::into_transaction_outputs_forced)
         };
-        let mut outputs = result?;
-        // Trim any appended BlockEpilogue output to preserve empty metadata behavior.
-        if outputs.len() > requested {
-            outputs.truncate(requested);
-        }
+        let outputs = result?;
         Ok(outputs)
     }
 
@@ -865,17 +859,17 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
     /// Generates a [TransactionSliceMetadata::Block] when running with a shared cache (fuzzing/test)
     /// to enable cache reuse across calls. For normal runs, returns [None].
-    fn get_txn_slice_metadata(&self, _mode: ExecutorMode) -> Option<TransactionSliceMetadata> {
+    fn get_txn_slice_metadata(&self) -> TransactionSliceMetadata {
         match &self.block_state {
             BlockState::Fuzzing(shared) => {
                 let child = shared.next_block_id.get();
                 shared.next_block_id.set(child + 1);
-                Some(TransactionSliceMetadata::block(
+                TransactionSliceMetadata::block(
                     HashValue::from_u64(child - 1),
                     HashValue::from_u64(child),
-                ))
+                )
             },
-            BlockState::None => None,
+            BlockState::None => TransactionSliceMetadata::unknown(),
         }
     }
 
@@ -922,6 +916,9 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         txn_block: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        // Note: When executing with TransactionSliceMetadata::Block (e.g., in fuzzing/shared-cache
+        // modes), the block executor may append a synthetic BlockEpilogue at the end of the block.
+        // Callers that require outputs.len() == txns.len() must trim this themselves.
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
         #[cfg(fuzzing)]
         let mut snapshot: Option<ModuleHotCacheSnapshot> = None;
@@ -951,11 +948,13 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         // TODO fetch values from state?
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
+        #[cfg(fuzzing)]
         // Generate consecutive block metadata when using a shared cache (fuzzing/test).
         // The same metadata is reused across sequential and parallel runs in comparison mode.
-        let metadata: Option<TransactionSliceMetadata> = self.get_txn_slice_metadata(mode);
+        let metadata = self.get_txn_slice_metadata();
 
-        let config = BlockExecutorConfig {
+        #[allow(unused_mut)]
+        let mut config: BlockExecutorConfig = BlockExecutorConfig {
             local: BlockExecutorLocalConfig {
                 blockstm_v2: false,
                 concurrency_level: 1,
@@ -972,8 +971,9 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 snapshot = self.maybe_snapshot_hot_cache(
                     state_view,
                     &config.local.module_cache_config,
-                    metadata.unwrap(),
+                    metadata,
                 );
+                assert!(snapshot.is_some(), "snapshot should be Some if mode is BothComparison");
             }
         }
 
@@ -982,7 +982,6 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 sig_verified_block.clone(),
                 state_view,
                 config.clone(),
-                metadata,
             ))
         } else {
             None
@@ -994,28 +993,19 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 self.maybe_rollback_hot_cache(
                     state_view,
                     &config.local.module_cache_config,
-                    metadata.unwrap(),
+                    metadata,
                     snapshot.take(),
                 );
             }
         }
 
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
-            let config = BlockExecutorConfig {
-                local: BlockExecutorLocalConfig {
-                    blockstm_v2: false,
-                    concurrency_level: usize::min(4, num_cpus::get()),
-                    allow_fallback: self.allow_block_executor_fallback,
-                    discard_failed_blocks: false,
-                    module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
-                },
-                onchain: onchain_config,
-            };
+            config.local.concurrency_level =
+                usize::min(config.local.concurrency_level, num_cpus::get());
             Some(self.execute_transaction_block_impl_with_state_view(
                 sig_verified_block,
                 state_view,
-                config,
-                metadata,
+                config.clone(),
             ))
         } else {
             None

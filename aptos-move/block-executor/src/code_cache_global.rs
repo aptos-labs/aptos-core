@@ -68,6 +68,7 @@ where
     }
 }
 
+#[cfg(fuzzing)]
 impl<Deserialized, Verified, Extension> Entry<Deserialized, Verified, Extension>
 where
     Verified: Deref<Target = Arc<Deserialized>>,
@@ -246,6 +247,7 @@ where
     }
 }
 
+#[cfg(fuzzing)]
 impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
 where
     K: Hash + Eq + Clone,

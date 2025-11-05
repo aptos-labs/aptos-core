@@ -9,8 +9,8 @@ use aptos_types::{
     chain_id::ChainId,
     on_chain_config::Features,
     transaction::{
-        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionPayload,
-        TransactionStatus,
+        EntryFunction, ExecutionStatus, Script, TransactionArgument, TransactionOutput,
+        TransactionPayload, TransactionStatus,
     },
     write_set::WriteSet,
 };
@@ -27,8 +27,8 @@ mod utils;
 use fuzzer::{Authenticator, ExecVariant, RunnableState};
 use move_vm_runtime::RuntimeEnvironment;
 use utils::vm::{
-    check_for_invariant_violation, group_modules_by_address_topo, publish_group,
-    resolve_function_name, verify_module_fast, verify_script_fast, BYTECODE_VERSION,
+    group_modules_by_address_topo, publish_group, resolve_function_name, verify_module_fast,
+    verify_script_fast, BYTECODE_VERSION,
 };
 
 // genesis write set generated once for each fuzzing session
@@ -107,6 +107,8 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let packages = group_modules_by_address_topo(input.dep_modules.clone())?;
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
+    // Enable runtime reference-safety checks for the Move VM
+    // prod_configs::set_paranoid_ref_checks(true);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
         &VM_WRITE_SET,
         ChainId::mainnet(),
@@ -243,32 +245,27 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
 
     // exec tx
     tdbg!("exec start");
-    let mut old_res = None;
+    let mut old_outputs: Option<Vec<TransactionOutput>> = None;
     const N_EXTRA_RERUNS: usize = 0;
     #[allow(clippy::reversed_empty_ranges)]
     for _ in 0..N_EXTRA_RERUNS {
-        let res = vm.execute_block(vec![tx.clone()]);
-        if let Some(old_res) = old_res {
-            assert!(old_res == res);
+        let outputs = utils::vm::execute_block_or_keep(&vm, vec![tx.clone()])?;
+        if let Some(old) = &old_outputs {
+            assert_eq!(old, &outputs);
         }
-        old_res = Some(res);
+        old_outputs = Some(outputs);
     }
 
     let now = Instant::now();
-    let res = vm.execute_block(vec![tx.clone()]);
+    let mut outputs = utils::vm::execute_block_or_keep(&vm, vec![tx.clone()])?;
     let elapsed = now.elapsed();
 
     // check main execution as well
-    if let Some(old_res) = old_res {
-        assert!(old_res == res);
+    if let Some(old) = &old_outputs {
+        assert_eq!(old, &outputs);
     }
-    let res = res
-        .map_err(|e| {
-            check_for_invariant_violation(e);
-            Corpus::Keep
-        })?
-        .pop()
-        .expect("expect 1 output");
+    assert_eq!(outputs.len(), 1, "expect 1 output");
+    let res = outputs.pop().expect("expect 1 output");
     tdbg!("exec end");
 
     // if error exit gracefully

@@ -51,8 +51,12 @@ macro_rules! alert_or_println {
 }
 
 #[cfg(fuzzing)]
+/// This snapshot of the global module cache for fuzzing allows comparison of parallel and sequential
+/// executions of the same block. It captures the cache state before the block is executed for the first
+/// time and rolls it back afterwards.
 pub type ModuleHotCacheSnapshot =
     GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>;
+
 /// Manages module caches and the execution environment, possibly across multiple blocks.
 pub struct ModuleCacheManager<K, D, V, E> {
     /// Records the last observed metadata associated with a batch of executed transactions. When a

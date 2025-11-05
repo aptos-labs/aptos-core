@@ -282,7 +282,11 @@ pub struct RunCommand<ExtraValueArgs: ParsableValue> {
     pub name: Option<(ParsedAddress, Identifier, Identifier)>,
     #[clap(long = "print-bytecode")]
     pub print_bytecode: bool,
-    #[clap(long = "exec-group", alias = "exec_group")]
+    #[clap(
+        long = "exec-group",
+        alias = "exec_group",
+        help = "Allow to group transactions into the same block."
+    )]
     pub exec_group: Option<u64>,
 }
 

@@ -530,6 +530,7 @@ where
         module.code().deserialized().clone(),
         runtime_environment.struct_name_index_map(),
         runtime_environment.ty_pool(),
+        runtime_environment.module_id_pool(),
     )
     .map_err(|e| e.finish(Location::Undefined))?;
 

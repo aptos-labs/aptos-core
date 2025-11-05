@@ -333,10 +333,19 @@ pub(crate) fn execute_block_or_keep(
     vm: &FakeExecutor,
     block: Vec<aptos_types::transaction::SignedTransaction>,
 ) -> Result<Vec<TransactionOutput>, Corpus> {
-    vm.execute_block(block).map_err(|e| {
-        check_for_invariant_violation(e);
-        Corpus::Keep
-    })
+    let requested = block.len();
+    vm.execute_block(block)
+        .map(|mut outputs| {
+            // Trim any appended BlockEpilogue to preserve outputs.len() == requested.
+            if outputs.len() > requested {
+                outputs.truncate(requested);
+            }
+            outputs
+        })
+        .map_err(|e| {
+            check_for_invariant_violation(e);
+            Corpus::Keep
+        })
 }
 
 #[inline]
@@ -395,14 +404,8 @@ pub(crate) fn publish_group(
         .payload(publish_transaction_payload(group))
         .sign();
 
-    let res = vm
-        .execute_block(vec![tx])
-        .map_err(|e| {
-            check_for_invariant_violation(e);
-            Corpus::Keep
-        })?
-        .pop()
-        .expect("expected 1 output");
+    let outputs = execute_block_or_keep(vm, vec![tx])?;
+    let res = outputs.into_iter().next().expect("expected 1 output");
     // if error exit gracefully
     tdbg!(&res);
     let status = match tdbg!(res.status()) {
