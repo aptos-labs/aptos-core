@@ -6,6 +6,7 @@ use crate::{
     reentrancy_checker::CallType, Function, LoadedFunction,
 };
 use move_binary_format::{errors::*, file_format::Bytecode};
+use move_binary_format::file_format::UseLoc;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
@@ -341,7 +342,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::MutBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
             | Bytecode::MutBorrowFieldGeneric(_)
-            | Bytecode::BorrowGetField(_, _)
+            | Bytecode::GetFieldLoc(_, _)
             | Bytecode::GetField(_)
             | Bytecode::PackClosure(..)
             | Bytecode::PackClosureGeneric(..)
@@ -593,11 +594,27 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // Skip: runtime checks are implemented in interpreter loop!
             },
 
-            Bytecode::BorrowGetField(local_idx, field_handle_idx) => {
+            Bytecode::GetFieldLoc((idx, use_loc), field_handle_idx) => {
                 // ImmBorrowLoc
-                let ty = frame.local_ty_at(*local_idx as usize);
-                let ref_ty = ty_builder.create_ref_ty(ty, false)?;
-                // operand_stack.push_ty(ref_ty)?;
+                let ref_ty = match use_loc {
+                    UseLoc::Borrow => {
+                        let ty = frame.local_ty_at(*idx as usize);
+                        let ref_ty = ty_builder.create_ref_ty(ty, false)?;
+                        ref_ty
+                        // operand_stack.push_ty(ref_ty)?;
+                    },
+                    UseLoc::Move => {
+                        let ty = frame.local_ty_at(*idx as usize).clone();
+                        ty
+                        // operand_stack.push_ty(ty)?;
+                    },
+                    UseLoc::Copy => {
+                        let ty = frame.local_ty_at(*idx as usize).clone();
+                        ty.paranoid_check_has_ability(Ability::Copy)?;
+                        ty
+                        // operand_stack.push_ty(ty)?;
+                    }
+                };
                 // ImmBorrowField
                 // let ref_ty = operand_stack.pop_ty()?;
                 let expected_ty = frame.field_handle_to_struct(*field_handle_idx);
@@ -623,7 +640,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 // // let field_ref_ty = operand_stack.pop_ty()?;
                 // let inner_ty = field_ref_ty.paranoid_read_ref()?;
                 operand_stack.push_ty(inner_ty)?;
-            },
+            }
 
             Bytecode::GetField(field_handle_idx) => {
                 // ImmBorrowField

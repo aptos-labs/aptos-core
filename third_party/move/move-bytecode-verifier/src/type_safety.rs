@@ -19,6 +19,7 @@ use move_binary_format::{
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
 };
+use move_binary_format::file_format::UseLoc;
 use move_core_types::{ability::AbilitySet, function::ClosureMask, vm_status::StatusCode};
 
 struct Locals<'a> {
@@ -762,8 +763,27 @@ fn verify_instr(
             )?
         },
 
-        Bytecode::BorrowGetField(local_idx, field_handle_idx) => {
-            borrow_loc(verifier, meter, offset, false, *local_idx)?;
+        Bytecode::GetFieldLoc((local_idx, use_loc), field_handle_idx) => {
+            match use_loc {
+                UseLoc::Borrow => {
+                    borrow_loc(verifier, meter, offset, false, *local_idx)?;
+                },
+                UseLoc::Copy => {
+                    let local_signature = verifier.local_at(*local_idx).clone();
+                    if !verifier
+                        .resolver
+                        .abilities(&local_signature, verifier.function_view.type_parameters())?
+                        .has_copy()
+                    {
+                        return Err(verifier.error(StatusCode::COPYLOC_WITHOUT_COPY_ABILITY, offset));
+                    }
+                    verifier.push(meter, local_signature)?
+                },
+                UseLoc::Move => {
+                    let local_signature = verifier.local_at(*local_idx).clone();
+                    verifier.push(meter, local_signature)?;
+                }
+            }
             borrow_field(
                 verifier,
                 meter,

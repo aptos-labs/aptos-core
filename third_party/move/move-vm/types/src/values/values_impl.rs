@@ -659,6 +659,7 @@ impl ContainerRef {
 
 #[cfg(test)]
 impl Value {
+    #[inline]
     pub fn copy_value_with_depth(&self, max_depth: u64) -> PartialVMResult<Self> {
         self.copy_value(1, Some(max_depth))
     }
@@ -2234,22 +2235,9 @@ impl Locals {
         }
     }
 
-    // #[cfg_attr(feature = "inline-locals", inline(always))]
-    // pub fn ref_loc(&self, idx: usize) -> PartialVMResult<&Value> {
-    //     let locals = self.0.borrow();
-    //     match locals.get(idx) {
-    //         Some(Value::Invalid) => Err(PartialVMError::new(
-    //             StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-    //         )
-    //         .with_message(format!("cannot copy invalid value at index {}", idx))),
-    //         Some(v) => Ok(v),
-    //         None => Err(Self::local_index_out_of_bounds(idx, locals.len())),
-    //     }
-    // }
-
     #[cfg_attr(feature = "inline-locals", inline(always))]
-    pub fn get_field(&self, idx: usize, field_offset: usize) -> PartialVMResult<Value> {
-        let locals = self.0.borrow();
+    pub fn get_field_loc(&self, idx: usize, field_offset: usize) -> PartialVMResult<Value> {
+        let mut locals = self.0.borrow();
         let local = match locals.get(idx) {
             Some(Value::Invalid) => {
                 return Err(PartialVMError::new(
@@ -2264,7 +2252,48 @@ impl Locals {
         };
         let struct_fields = match local {
             Value::Container(Container::Struct(fields)) => fields.borrow(),
-            _ => unreachable!("not a struct"),
+            Value::ContainerRef(container_ref) => {
+                let container = container_ref.container();
+                match container {
+                    Container::Struct(fields) => fields.borrow(),
+                    _ => panic!("not a struct, {:?}", container),
+                }
+            },
+            _ => panic!("not a struct, {:?}", local),
+        };
+        struct_fields[field_offset].copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+    }
+
+    #[cfg_attr(feature = "inline-locals", inline(always))]
+    pub fn get_field_loc_and_destroy(&self, idx: usize, field_offset: usize) -> PartialVMResult<Value> {
+        let mut locals = self.0.borrow_mut();
+        let local = match locals.get_mut(idx) {
+            Some(Value::Invalid) => {
+                return Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                )
+                    .with_message(format!("cannot copy invalid value at index {}", idx)));
+            },
+            Some(v) => mem::replace(v, Value::Invalid),
+            None => {
+                return Err(Self::local_index_out_of_bounds(idx, locals.len()));
+            },
+        };
+        // let local = if destroy_local {
+        //     &mem::replace(local, Value::Invalid)
+        // } else {
+        //     local
+        // };
+        let struct_fields = match &local {
+            Value::Container(Container::Struct(fields)) => fields.borrow(),
+            Value::ContainerRef(container_ref) => {
+                let container = container_ref.container();
+                match container {
+                    Container::Struct(fields) => fields.borrow(),
+                    _ => panic!("not a struct, {:?}", container),
+                }
+            },
+            _ => panic!("not a struct, {:?}", local),
         };
         struct_fields[field_offset].copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }

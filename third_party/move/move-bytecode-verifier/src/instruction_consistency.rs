@@ -142,7 +142,7 @@ impl<'a> InstructionConsistency<'a> {
                     }
                 },
 
-                BorrowGetField(_, field_idx) => {
+                GetFieldLoc(_, field_idx) => {
                     self.check_field_op(offset, *field_idx, /* generic */ false)?;
                 },
 

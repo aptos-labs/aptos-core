@@ -13,6 +13,7 @@ use crate::{
 };
 use codespan_reporting::diagnostic::Severity;
 use itertools::Itertools;
+use move_binary_format::file_format::UseLoc;
 use move_binary_format::{
     access::ModuleAccess,
     file_format::{
@@ -418,29 +419,64 @@ impl<'a> StacklessBytecodeGenerator<'a> {
                 ));
             },
 
-            MoveBytecode::BorrowGetField(local_idx, field_handle_idx) => {
+            MoveBytecode::GetFieldLoc((idx, use_loc), field_handle_idx) => {
                 // BorrowLoc
-                let signature = self
-                    .func_env
-                    .get_local_type(*local_idx as usize)
-                    .expect(COMPILED_MODULE_AVAILABLE);
-                let temp_index = self.temp_count;
-                self.temp_stack.push(temp_index);
-                self.local_types.push(Type::Reference(
-                    ReferenceKind::Immutable,
-                    Box::new(signature),
-                ));
-                self.code.push(mk_unary(
-                    Operation::BorrowLoc,
-                    temp_index,
-                    *local_idx as TempIndex,
-                ));
-                self.temp_count += 1;
+                match use_loc {
+                    UseLoc::Borrow => {
+                        let signature = self
+                            .func_env
+                            .get_local_type(*idx as usize)
+                            .expect(COMPILED_MODULE_AVAILABLE);
+                        let temp_index = self.temp_count;
+                        self.temp_stack.push(temp_index);
+                        self.local_types.push(Type::Reference(
+                            ReferenceKind::Immutable,
+                            Box::new(signature),
+                        ));
+                        self.code.push(mk_unary(
+                            Operation::BorrowLoc,
+                            temp_index,
+                            *idx as TempIndex,
+                        ));
+                        self.temp_count += 1;
+                    },
+                    UseLoc::Move => {
+                        let signature = self
+                            .func_env
+                            .get_local_type(*idx as usize)
+                            .expect(COMPILED_MODULE_AVAILABLE);
+                        let temp_index = self.temp_count;
+                        self.temp_stack.push(temp_index);
+                        self.local_types.push(signature); // same type as the value copied
+                        self.code.push(Bytecode::Assign(
+                            attr_id,
+                            temp_index,
+                            *idx as TempIndex,
+                            AssignKind::Move,
+                        ));
+                        self.temp_count += 1;
+                    },
+                    UseLoc::Copy => {
+                        let signature = self
+                            .func_env
+                            .get_local_type(*idx as usize)
+                            .expect(COMPILED_MODULE_AVAILABLE);
+                        let temp_index = self.temp_count;
+                        self.temp_stack.push(temp_index);
+                        self.local_types.push(signature); // same type as the value copied
+                        self.code.push(Bytecode::Assign(
+                            attr_id,
+                            temp_index,
+                            *idx as TempIndex,
+                            AssignKind::Copy,
+                        ));
+                        self.temp_count += 1;
+                    },
+                }
 
                 // ImmBorrowField
                 let struct_ref_index = self.temp_stack.pop().unwrap();
-                let (struct_id, field_offset, field_type) =
-                    self.get_field_info(*field_handle_idx);
+                let (struct_id, field_offset, field_type) = self.get_field_info(*field_handle_idx);
                 let field_ref_index = self.temp_count;
                 self.temp_stack.push(field_ref_index);
 
@@ -477,46 +513,7 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             MoveBytecode::GetField(field_handle_idx) => {
                 // ImmBorrowField
                 let struct_ref_index = self.temp_stack.pop().unwrap();
-                let (struct_id, field_offset, field_type) =
-                    self.get_field_info(*field_handle_idx);
-                let field_ref_index = self.temp_count;
-                self.temp_stack.push(field_ref_index);
-
-                self.code.push(mk_call(
-                    Operation::BorrowField(
-                        self.func_env.module_env.get_id(),
-                        struct_id,
-                        vec![],
-                        field_offset,
-                    ),
-                    vec![field_ref_index],
-                    vec![struct_ref_index],
-                ));
-                self.temp_count += 1;
-                let is_mut = matches!(bytecode, MoveBytecode::MutBorrowField(..));
-                self.local_types.push(Type::Reference(
-                    ReferenceKind::from_is_mut(is_mut),
-                    Box::new(field_type),
-                ));
-
-                // ReadRef
-                let operand_index = self.temp_stack.pop().unwrap();
-                let operand_sig = self.local_types[operand_index].clone();
-                let temp_index = self.temp_count;
-                if let Type::Reference(_, signature) = operand_sig {
-                    self.local_types.push(*signature);
-                }
-                self.temp_stack.push(temp_index);
-                self.temp_count += 1;
-                self.code
-                    .push(mk_unary(Operation::ReadRef, temp_index, operand_index));
-            },
-
-            MoveBytecode::GetField(field_handle_idx) => {
-                // ImmBorrowField
-                let struct_ref_index = self.temp_stack.pop().unwrap();
-                let (struct_id, field_offset, field_type) =
-                    self.get_field_info(*field_handle_idx);
+                let (struct_id, field_offset, field_type) = self.get_field_info(*field_handle_idx);
                 let field_ref_index = self.temp_count;
                 self.temp_stack.push(field_ref_index);
 
@@ -1379,10 +1376,11 @@ impl<'a> StacklessBytecodeGenerator<'a> {
             MoveBytecode::WriteRef => {
                 let ref_operand_index = self.temp_stack.pop().unwrap();
                 let val_operand_index = self.temp_stack.pop().unwrap();
-                self.code.push(mk_call(Operation::WriteRef, vec![], vec![
-                    ref_operand_index,
-                    val_operand_index,
-                ]));
+                self.code.push(mk_call(
+                    Operation::WriteRef,
+                    vec![],
+                    vec![ref_operand_index, val_operand_index],
+                ));
             },
 
             MoveBytecode::Add

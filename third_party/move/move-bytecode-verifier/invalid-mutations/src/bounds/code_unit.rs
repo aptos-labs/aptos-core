@@ -500,7 +500,7 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         // TODO(#13806): implement
                         panic!("Enum types bytecode NYI: {:?}", code[bytecode_idx])
                     },
-                    BorrowGetField(_, _) => {
+                    GetFieldLoc(_, _) => {
                         unimplemented!()
                     }
                     GetField(_) => {
@@ -588,7 +588,7 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
             false
         },
 
-        BorrowGetField(_, _) => false,
+        GetFieldLoc(_, _) => false,
         GetField(_) => false,
     }
 }

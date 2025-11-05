@@ -1,7 +1,8 @@
 use crate::file_format_generator::peephole_optimizer::optimizers::{
     TransformedCodeChunk, WindowOptimizer,
 };
-use move_binary_format::file_format::Bytecode;
+use move_binary_format::file_format::{Bytecode, UseLoc};
+use move_ir_types::ast::Bytecode_::{CopyLoc, MoveLoc};
 
 pub struct CollapseToDrop;
 
@@ -38,9 +39,18 @@ impl WindowOptimizer for CollapseToBorrowGetField {
         }
         // See module documentation for the reasoning behind these optimizations.
         let optimized = match (&window[0], &window[1]) {
-            (ImmBorrowLoc(loc_idx), GetField(field_idx)) => {
-                TransformedCodeChunk::new(vec![BorrowGetField(*loc_idx, *field_idx)], vec![0])
-            },
+            (ImmBorrowLoc(loc_idx), GetField(field_idx)) => TransformedCodeChunk::new(
+                vec![GetFieldLoc((*loc_idx, UseLoc::Borrow), *field_idx)],
+                vec![0],
+            ),
+            (MoveLoc(loc_idx), GetField(field_idx)) => TransformedCodeChunk::new(
+                vec![GetFieldLoc((*loc_idx, UseLoc::Move), *field_idx)],
+                vec![0],
+            ),
+            (CopyLoc(loc_idx), GetField(field_idx)) => TransformedCodeChunk::new(
+                vec![GetFieldLoc((*loc_idx, UseLoc::Copy), *field_idx)],
+                vec![0],
+            ),
             _ => return None,
         };
         Some((optimized, Self::WINDOW_SIZE))

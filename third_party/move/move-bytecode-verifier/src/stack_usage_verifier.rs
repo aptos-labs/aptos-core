@@ -143,7 +143,7 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::LdConst(_)
             | Bytecode::CopyLoc(_)
             | Bytecode::MoveLoc(_)
-            | Bytecode::BorrowGetField(_, _)
+            | Bytecode::GetFieldLoc(_, _)
             | Bytecode::MutBorrowLoc(_)
             | Bytecode::ImmBorrowLoc(_) => (0, 1),
 

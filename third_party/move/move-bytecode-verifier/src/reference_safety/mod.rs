@@ -31,6 +31,7 @@ use move_binary_format::{
 };
 use move_core_types::{function::ClosureMask, vm_status::StatusCode};
 use std::collections::{BTreeSet, HashMap};
+use move_binary_format::file_format::UseLoc;
 
 struct ReferenceSafetyAnalysis<'a> {
     resolver: &'a BinaryIndexedView<'a>,
@@ -343,9 +344,21 @@ fn execute_inner(
             )?;
             verifier.stack.push(value)
         },
-        Bytecode::BorrowGetField(local_idx, field_handle_idx) => {
-            let value = state.borrow_loc(offset, false, *local_idx)?;
-            verifier.stack.push(value);
+        Bytecode::GetFieldLoc((local, use_loc), field_handle_idx) => {
+            match use_loc {
+                UseLoc::Borrow => {
+                    let value = state.borrow_loc(offset, false, *local)?;
+                    verifier.stack.push(value);
+                },
+                UseLoc::Move => {
+                    let value = state.move_loc(offset, *local)?;
+                    verifier.stack.push(value);
+                },
+                UseLoc::Copy => {
+                    let value = state.copy_loc(offset, *local)?;
+                    verifier.stack.push(value);
+                }
+            };
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let value = state.borrow_field(
                 offset,

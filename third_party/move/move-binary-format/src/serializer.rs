@@ -241,6 +241,10 @@ fn serialize_local_index(binary: &mut BinaryData, idx: u8) -> Result<()> {
     write_as_uleb128(binary, idx, LOCAL_INDEX_MAX)
 }
 
+fn serialize_use_loc(binary: &mut BinaryData, use_loc: UseLoc) -> Result<()> {
+    write_u64_as_uleb128(binary, use_loc as u64)
+}
+
 fn serialize_option<T>(
     binary: &mut BinaryData,
     option: &Option<T>,
@@ -1087,9 +1091,10 @@ fn serialize_instruction_inner(
             binary.push(Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC as u8)?;
             serialize_variant_field_inst_index(binary, field_idx)
         },
-        Bytecode::BorrowGetField(local_idx, field_idx) => {
-            binary.push(Opcodes::BORROW_GET_FIELD as u8)?;
+        Bytecode::GetFieldLoc((local_idx, use_loc), field_idx) => {
+            binary.push(Opcodes::GET_FIELD_LOC as u8)?;
             serialize_local_index(binary, *local_idx)?;
+            serialize_use_loc(binary, *use_loc)?;
             serialize_field_handle_index(binary, field_idx)
         },
         Bytecode::GetField(field_idx) => {

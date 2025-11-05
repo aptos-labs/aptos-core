@@ -49,7 +49,8 @@ use move_core_types::{
 use proptest::{collection::vec, prelude::*, strategy::BoxedStrategy};
 use ref_cast::RefCast;
 use serde::{Deserialize, Serialize};
-use std::{fmt, fmt::Formatter};
+use std::{fmt, fmt::Formatter, mem};
+use std::fmt::Display;
 use variant_count::VariantCount;
 
 /// Generic index into one of the tables in the binary format.
@@ -1338,6 +1339,45 @@ pub struct CodeUnit {
     pub code: Vec<Bytecode>,
 }
 
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq)]
+#[repr(u64)]
+pub enum UseLoc {
+    Move,
+    Copy,
+    Borrow,
+}
+
+impl From<u64> for UseLoc {
+    fn from(value: u64) -> Self {
+        match value {
+            0 => UseLoc::Move,
+            1 => UseLoc::Copy,
+            2 => UseLoc::Borrow,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl From<UseLoc> for u64 {
+    fn from(value: UseLoc) -> Self {
+        match value {
+            UseLoc::Move => 0,
+            UseLoc::Copy => 1,
+            UseLoc::Borrow => 2,
+        }
+    }
+}
+
+impl Display for UseLoc {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            UseLoc::Copy => f.write_str("copy"),
+            UseLoc::Move => f.write_str("move"),
+            UseLoc::Borrow => f.write_str("borrow"),
+        }
+    }
+}
+
 // Note: custom attributes are used to specify the bytecode instructions.
 //
 // Please refer to the `move-bytecode-spec` crate for
@@ -2039,7 +2079,7 @@ pub enum Bytecode {
     "#]
     #[gas_type_creation_tier_0 = "struct_ty"]
     #[gas_type_creation_tier_1 = "field_ty"]
-    BorrowGetField(LocalIndex, FieldHandleIndex),
+    GetFieldLoc((LocalIndex, UseLoc), FieldHandleIndex),
 
     #[group = "struct"]
     #[static_operands = "[field_inst_idx]"]
@@ -3176,8 +3216,12 @@ impl ::std::fmt::Debug for Bytecode {
             Bytecode::ImmBorrowVariantFieldGeneric(a) => {
                 write!(f, "ImmBorrowVariantFieldGeneric({:?})", a)
             },
-            Bytecode::BorrowGetField(local_idx, field_idx) => {
-                write!(f, "BorrowGetField({:?}, {:?})", local_idx, field_idx)
+            Bytecode::GetFieldLoc((local_idx, use_loc), field_idx) => {
+                write!(
+                    f,
+                    "BorrowGetField(({:?}, {:?}), {:?})",
+                    local_idx, use_loc, field_idx
+                )
             },
             Bytecode::GetField(field_idx) => {
                 write!(f, "GetField({:?})", field_idx)
@@ -3347,7 +3391,7 @@ impl Bytecode {
             | ImmBorrowField(_)
             | MutBorrowFieldGeneric(_)
             | ImmBorrowFieldGeneric(_)
-            | BorrowGetField(_, _)
+            | GetFieldLoc(_, _)
             | GetField(_)
             | Call(_)
             | CallGeneric(_)

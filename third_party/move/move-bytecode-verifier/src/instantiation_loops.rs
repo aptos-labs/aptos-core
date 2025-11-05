@@ -261,7 +261,7 @@ impl<'a> InstantiationLoopChecker<'a> {
                     | Bytecode::ImmBorrowField(_)
                     | Bytecode::MutBorrowFieldGeneric(_)
                     | Bytecode::ImmBorrowFieldGeneric(_)
-                    | Bytecode::BorrowGetField(_, _)
+                    | Bytecode::GetFieldLoc(_, _)
                     | Bytecode::GetField(_)
                     | Bytecode::Call(_)
                     | Bytecode::Pack(_)

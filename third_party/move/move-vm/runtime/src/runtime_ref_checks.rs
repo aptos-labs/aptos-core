@@ -92,6 +92,7 @@ use move_core_types::{
 };
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::{collections::BTreeSet, slice};
+use move_binary_format::file_format::UseLoc;
 
 /// A deterministic hash map (used in the Rust compiler), expected to perform well.
 /// Not resistant to hash collision attacks, nor is it cryptographically secure.
@@ -427,7 +428,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | UnpackVariantGeneric(_)
             | TestVariant(_)
             | TestVariantGeneric(_)
-            | BorrowGetField(_, _)
+            | GetFieldLoc(_, _)
             | GetField(_)
             | MutBorrowVariantField(_)
             | MutBorrowVariantFieldGeneric(_)
@@ -588,12 +589,22 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 let label = field_info.offset;
                 ref_state.borrow_child_with_label::<false>(label)?;
             },
-            BorrowGetField(local_idx, field_handle_idx) => {
-                ref_state.borrow_loc(*local_idx, false)?;
+            GetFieldLoc((index, use_loc), field_handle_idx) => {
+                match use_loc {
+                    UseLoc::Borrow => {
+                        ref_state.borrow_loc(*index, false)?;
+                    },
+                    UseLoc::Copy => {
+                        ref_state.copy_loc(*index)?;
+                    },
+                    UseLoc::Move => {
+                        ref_state.move_loc(*index)?;
+                    }
+                }
                 let label = frame.field_offset(*field_handle_idx);
                 ref_state.borrow_child_with_label::<false>(label)?;
                 ref_state.pop_ref_push_non_ref()?;
-            },
+            }
             GetField(field_handle_idx) => {
                 let label = frame.field_offset(*field_handle_idx);
                 ref_state.borrow_child_with_label::<false>(label)?;

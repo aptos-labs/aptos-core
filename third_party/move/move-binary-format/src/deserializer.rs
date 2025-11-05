@@ -423,6 +423,11 @@ fn load_local_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
     read_uleb_internal(cursor, LOCAL_INDEX_MAX)
 }
 
+fn load_use_loc(cursor: &mut VersionedCursor) -> BinaryLoaderResult<UseLoc> {
+    let de_value: u64 = read_uleb_internal(cursor, LOCAL_INDEX_MAX)?;
+    Ok(de_value.into())
+}
+
 /// Module internal function that manages deserialization of transactions.
 fn deserialize_compiled_script(
     binary: &[u8],
@@ -1888,10 +1893,11 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC => {
                 Bytecode::ImmBorrowVariantFieldGeneric(load_variant_field_inst_index(cursor)?)
             },
-            Opcodes::BORROW_GET_FIELD => {
+            Opcodes::GET_FIELD_LOC => {
                 let local_idx = load_local_index(cursor)?;
+                let use_loc = load_use_loc(cursor)?;
                 let field_idx = load_field_handle_index(cursor)?;
-                Bytecode::BorrowGetField(local_idx, field_idx)
+                Bytecode::GetFieldLoc((local_idx, use_loc), field_idx)
             },
             Opcodes::GET_FIELD => {
                 let field_idx = load_field_handle_index(cursor)?;
@@ -2239,7 +2245,7 @@ impl Opcodes {
             // Experiments
             0x68 => Ok(Opcodes::GET_FIELD),
             0x69 => Ok(Opcodes::DROP_LOC),
-            0x70 => Ok(Opcodes::BORROW_GET_FIELD),
+            0x70 => Ok(Opcodes::GET_FIELD_LOC),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
                 .with_message(format!("code {:X}", value))),
         }

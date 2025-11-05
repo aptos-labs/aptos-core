@@ -545,7 +545,7 @@ impl<'a> BoundsChecker<'a> {
                         )?;
                     }
                 },
-                BorrowGetField(local_idx, field_idx) => {
+                GetFieldLoc((local_idx, _), field_idx) => {
                     let local_idx = *local_idx as usize;
                     if local_idx >= locals_count {
                         return Err(self.offset_out_of_bounds(

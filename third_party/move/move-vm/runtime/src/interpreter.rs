@@ -27,6 +27,7 @@ use crate::{
 };
 use fail::fail_point;
 use itertools::Itertools;
+use move_binary_format::file_format::UseLoc;
 use move_binary_format::{
     errors,
     errors::*,
@@ -2191,11 +2192,21 @@ impl Frame {
                         )?;
                         interpreter.operand_stack.push(field_ref)?;
                     },
-                    Bytecode::BorrowGetField(local_idx, field_idx) => {
+                    Bytecode::GetFieldLoc((local_idx, use_loc), field_idx) => {
                         let local_idx = *local_idx as usize;
                         let field_offset = self.field_offset(*field_idx);
 
-                        let field_value = self.locals.get_field(local_idx, field_offset)?;
+                        let destroy_local = matches!(use_loc, UseLoc::Move);
+                        let field_value = if destroy_local {
+                            self.locals
+                                .get_field_loc_and_destroy(local_idx, field_offset)?
+                        } else {
+                            self.locals
+                                .get_field_loc(local_idx, field_offset)?
+                        };
+                        // let field_value =
+                        //     self.locals
+                        //         .get_field_loc(local_idx, field_offset)?;
 
                         interpreter.operand_stack.push(field_value)?;
                     },

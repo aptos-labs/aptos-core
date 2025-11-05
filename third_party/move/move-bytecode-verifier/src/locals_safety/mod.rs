@@ -19,6 +19,7 @@ use move_binary_format::{
     errors::PartialVMResult,
     file_format::{Bytecode, CodeOffset},
 };
+use move_binary_format::file_format::UseLoc;
 use move_core_types::vm_status::StatusCode;
 
 pub(crate) fn verify<'a>(
@@ -98,14 +99,34 @@ fn execute_inner(
             }
         },
 
-        Bytecode::BorrowGetField(local_idx, _) => {
-            match state.local_state(*local_idx) {
-                LocalState::Unavailable | LocalState::MaybeAvailable => {
-                    return Err(state.error(StatusCode::BORROWLOC_UNAVAILABLE_ERROR, offset))
+        Bytecode::GetFieldLoc((idx, use_loc), _) => {
+            match use_loc {
+                UseLoc::Copy => {
+                    match state.local_state(*idx) {
+                        LocalState::MaybeAvailable | LocalState::Unavailable => {
+                            return Err(state.error(StatusCode::COPYLOC_UNAVAILABLE_ERROR, offset))
+                        },
+                        LocalState::Available => (),
+                    }
                 },
-                LocalState::Available => (),
+                UseLoc::Move => {
+                    match state.local_state(*idx) {
+                        LocalState::MaybeAvailable | LocalState::Unavailable => {
+                            return Err(state.error(StatusCode::MOVELOC_UNAVAILABLE_ERROR, offset))
+                        },
+                        LocalState::Available => state.set_unavailable(*idx),
+                    }
+                },
+                UseLoc::Borrow => {
+                    match state.local_state(*idx) {
+                        LocalState::Unavailable | LocalState::MaybeAvailable => {
+                            return Err(state.error(StatusCode::BORROWLOC_UNAVAILABLE_ERROR, offset))
+                        },
+                        LocalState::Available => (),
+                    }
+                }
             }
-        },
+        }
         Bytecode::GetField(_) => (),
 
         Bytecode::Pop

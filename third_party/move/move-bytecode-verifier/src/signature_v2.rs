@@ -1029,7 +1029,7 @@ impl<'a, const N: usize> SignatureChecker<'a, N> {
                 | ImmBorrowVariantField(_)
                 | MutBorrowGlobal(_)
                 | ImmBorrowGlobal(_)
-                | BorrowGetField(_, _)
+                | GetFieldLoc(_, _)
                 | GetField(_)
                 | Exists(_)
                 | MoveTo(_)

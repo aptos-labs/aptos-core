@@ -570,8 +570,13 @@ impl<T: fmt::Write> Disassembler<T> {
                     Some(inst_handle.type_parameters),
                 )?
             },
-            BorrowGetField(local_idx, field_handle_idx) => {
-                write!(self.out, "borrow_get_field {}", local_name(*local_idx))?;
+            GetFieldLoc((local_idx, use_loc), field_handle_idx) => {
+                write!(
+                    self.out,
+                    "get_field_loc {}::{}",
+                    use_loc,
+                    local_name(*local_idx)
+                )?;
                 let handle = module.field_handle_at(*field_handle_idx);
                 let view = StructDefinitionView::new(module, module.struct_def_at(handle.owner));
                 let field_name = view

@@ -285,7 +285,7 @@ impl BinaryComplexityMeter<'_> {
                 ImmBorrowVariantFieldGeneric(idx) | MutBorrowVariantFieldGeneric(idx) => {
                     self.meter_variant_field_instantiation(*idx)?;
                 },
-                BorrowGetField(_, _) => (),
+                GetFieldLoc(_, _) => (),
                 GetField(_) => (),
                 CallClosure(idx)
                 | VecPack(idx, _)
