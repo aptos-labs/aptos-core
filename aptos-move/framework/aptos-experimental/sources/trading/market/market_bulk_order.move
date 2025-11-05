@@ -5,8 +5,9 @@ module aptos_experimental::market_bulk_order {
     use std::option;
     use std::signer;
     use aptos_experimental::bulk_order_book_types::{
-        new_bulk_order_request, destroy_bulk_order_request_response, is_bulk_order_success_response, destroy_bulk_order_place_success_response, destroy_bulk_order_place_reject_response,
-        get_validation_failed_rejection
+        new_bulk_order_request, destroy_bulk_order_request_response, destroy_bulk_order_place_success_response, destroy_bulk_order_place_reject_response,
+        get_validation_failed_rejection,
+        is_success as is_bulk_order_success_response
     };
     use aptos_experimental::market_types::{
         MarketClearinghouseCallbacks,
@@ -96,11 +97,7 @@ module aptos_experimental::market_bulk_order {
             let (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
             assert!(sequence_number == order_sequence_number, E_SEQUENCE_NUMBER_MISMATCH);
             // Extract previous_seq_num from option, defaulting to 0 if none
-            let previous_seq_num = if (previous_seq_num_option.is_some()) {
-                previous_seq_num_option.destroy_some()
-            } else {
-                0
-            };
+            let previous_seq_num = previous_seq_num_option.destroy_with_default(0);
             // Emit an event for the placed bulk order
             market.emit_event_for_bulk_order_placed(order_id,
                 order_sequence_number, account, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num);

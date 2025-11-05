@@ -393,13 +393,8 @@ module aptos_experimental::single_order_book {
         };
 
         let (order, is_active) = order_with_state.destroy_order_from_state();
-        if (remaining_size == 0 && order.get_client_order_id().is_some()) {
-            self.client_order_ids.remove(
-                &new_account_client_order_id(
-                    order.get_account(), order.get_client_order_id().destroy_some()
-                )
-            );
-        };
+        assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
+
         let (
             account,
             order_id,
@@ -409,11 +404,14 @@ module aptos_experimental::single_order_book {
             orig_size,
             size,
             is_bid,
-            _trigger_condition,
+            _,
             time_in_force,
             metadata
         ) = order.destroy_single_order();
-        assert!(is_active, EINVALID_INACTIVE_ORDER_STATE);
+
+        if (remaining_size == 0 && client_order_id.is_some()) {
+            self.client_order_ids.remove(&new_account_client_order_id(account, client_order_id.destroy_some()));
+        };
         new_order_match(new_single_order_match_details(order_id, account, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata), matched_size)
     }
 

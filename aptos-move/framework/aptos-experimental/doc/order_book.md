@@ -710,11 +710,10 @@ Checks if the order is a taker order i.e., matched immediately with the active o
     is_bid: bool
 ): OrderMatch&lt;M&gt; {
     <b>let</b> result = self.price_time_idx.get_single_match_result(price, size, is_bid);
-    <b>let</b> book_type = result.get_active_matched_book_type();
-    <b>if</b> (book_type == single_order_type()) {
-        self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(result)
+    <b>if</b> (result.is_active_matched_book_type_single_order()) {
+        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(result)
     } <b>else</b> {
-        self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(&<b>mut</b> self.price_time_idx, result, is_bid)
+        <b>return</b> self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(&<b>mut</b> self.price_time_idx, result, is_bid)
     }
 }
 </code></pre>

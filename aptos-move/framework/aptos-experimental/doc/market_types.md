@@ -1657,9 +1657,9 @@
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_extract_results">extract_results</a>&lt;R: store + <b>copy</b> + drop&gt;(self: <a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt;): Option&lt;R&gt; {
     match (self) {
-        CallbackResult::NOT_AVAILABLE =&gt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-        CallbackResult::CONTINUE_MATCHING { result } =&gt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(result),
-        CallbackResult::STOP_MATCHING { result } =&gt; <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(result),
+        CallbackResult::NOT_AVAILABLE =&gt; <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
+        CallbackResult::CONTINUE_MATCHING { result } =&gt; <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(result),
+        CallbackResult::STOP_MATCHING { result } =&gt; <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(result),
     }
 }
 </code></pre>
@@ -1684,11 +1684,7 @@
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_should_stop_matching">should_stop_matching</a>&lt;R: store + <b>copy</b> + drop&gt;(self: &<a href="market_types.md#0x7_market_types_CallbackResult">CallbackResult</a>&lt;R&gt;): bool {
-    match (self) {
-        CallbackResult::CONTINUE_MATCHING { result: _ } =&gt; <b>false</b>,
-        CallbackResult::STOP_MATCHING { result: _ } =&gt; <b>true</b>,
-        CallbackResult::NOT_AVAILABLE =&gt; <b>false</b>,
-    }
+    self is CallbackResult::STOP_MATCHING
 }
 </code></pre>
 
