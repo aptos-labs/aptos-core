@@ -7,6 +7,7 @@
 use crate::{
     loaded_data::struct_name_indexing::StructNameIndex,
     module_id_interner::{InternedModuleId, InternedModuleIdPool},
+    ty_interner::{InternedTypePool, TypeId, TypeRepr},
 };
 use derivative::Derivative;
 use itertools::Itertools;
@@ -261,9 +262,9 @@ impl StructType {
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
-    module: ModuleId,
+    pub module: ModuleId,
     interned_module_id: InternedModuleId,
-    name: Identifier,
+    pub name: Identifier,
 }
 
 impl StructIdentifier {
@@ -394,7 +395,7 @@ pub struct AbilityInfo {
         Ord = "ignore",
         PartialOrd = "ignore"
     )]
-    base_ability_set: AbilitySet,
+    pub base_ability_set: AbilitySet,
 
     #[derivative(
         PartialEq = "ignore",
@@ -402,7 +403,7 @@ pub struct AbilityInfo {
         Ord = "ignore",
         PartialOrd = "ignore"
     )]
-    phantom_ty_args_mask: SmallBitVec,
+    pub phantom_ty_args_mask: SmallBitVec,
 }
 
 impl AbilityInfo {
@@ -1529,14 +1530,14 @@ impl TypeBuilder {
 /// constructor functions, e.g., when an empty vector can be treated as None via option::none()
 /// function, which return type can be matched against the intended type of the argument.
 #[derive(Default)]
-pub struct TypeParamMap<'a> {
-    map: BTreeMap<u16, &'a Type>,
+pub struct TypeParamMap {
+    map: BTreeMap<u16, TypeId>,
 }
 
-impl<'a> TypeParamMap<'a> {
+impl TypeParamMap {
     /// Returns the type from parameter map if it exists, and [None] otherwise.
-    pub fn get_ty_param(&self, idx: u16) -> Option<Type> {
-        self.map.get(&idx).map(|ty| (*ty).clone())
+    pub fn get_ty_param(&self, idx: u16) -> Option<TypeId> {
+        self.map.get(&idx).copied()
     }
 
     /// Matches the actual type to the expected type, binding any type args to the necessary type
@@ -1545,90 +1546,74 @@ impl<'a> TypeParamMap<'a> {
     /// Returns true if a successful match is made.
     // TODO: is this really needed in presence of paranoid mode? This does a deep structural
     //       comparison and is expensive.
-    pub fn match_ty(&mut self, ty: &Type, expected_ty: &'a Type) -> bool {
+    pub fn match_ty(&mut self, pool: &InternedTypePool, ty: &Type, expected_ty: TypeId) -> bool {
+        if let Type::TyParam(idx) = ty {
+            use btree_map::Entry::*;
+            return match self.map.entry(*idx) {
+                Occupied(occupied_entry) => *occupied_entry.get() == expected_ty,
+                Vacant(vacant_entry) => {
+                    vacant_entry.insert(expected_ty);
+                    true
+                },
+            };
+        }
+
+        let expected_ty = pool.type_repr(expected_ty);
         match (ty, expected_ty) {
-            // The important case, deduce the type params.
-            (Type::TyParam(idx), _) => {
-                use btree_map::Entry::*;
-                match self.map.entry(*idx) {
-                    Occupied(occupied_entry) => *occupied_entry.get() == expected_ty,
-                    Vacant(vacant_entry) => {
-                        vacant_entry.insert(expected_ty);
-                        true
-                    },
-                }
-            },
+            // checked above
+            (Type::TyParam(_), _) => unreachable!(),
             // Recursive types we need to recurse the matching types.
-            (Type::Reference(inner), Type::Reference(expected_inner))
-            | (Type::MutableReference(inner), Type::MutableReference(expected_inner)) => {
-                self.match_ty(inner, expected_inner)
+            (Type::Reference(inner), TypeRepr::Reference(expected_inner))
+            | (Type::MutableReference(inner), TypeRepr::MutableReference(expected_inner)) => {
+                self.match_ty(pool, inner, expected_inner)
             },
-            (Type::Vector(inner), Type::Vector(expected_inner)) => {
-                self.match_ty(inner, expected_inner)
+            (Type::Vector(inner), TypeRepr::Vector(expected_inner)) => {
+                self.match_ty(pool, inner, expected_inner)
             },
             // Function types, the expected abilities need to be equal to the provided ones,
             // and recursively argument and result types need to match.
-            (
-                Type::Function {
-                    args,
-                    results,
-                    abilities,
-                },
-                Type::Function {
-                    args: exp_args,
-                    results: exp_results,
-                    abilities: exp_abilities,
-                },
-            ) if abilities == exp_abilities
-                && args.len() == exp_args.len()
-                && results.len() == exp_results.len() =>
-            {
-                args.iter().zip(exp_args).all(|(t, e)| self.match_ty(t, e))
-                    && results
-                        .iter()
-                        .zip(exp_results)
-                        .all(|(t, e)| self.match_ty(t, e))
-            },
+            (Type::Function { .. }, TypeRepr::Function { .. }) => false, // TODO: fine for now
             // Abilities should not contribute to the equality check as they just serve for caching
             // computations. For structs the both need to be the same struct.
             (
                 Type::Struct { idx, .. },
-                Type::Struct {
+                TypeRepr::Struct {
                     idx: expected_idx, ..
                 },
-            ) => *idx == *expected_idx,
+            ) => *idx == expected_idx,
             // For struct instantiations we need to additionally match all type arguments.
             (
                 Type::StructInstantiation { idx, ty_args, .. },
-                Type::StructInstantiation {
+                TypeRepr::Struct {
                     idx: expected_idx,
                     ty_args: expected_ty_args,
                     ..
                 },
             ) => {
-                *idx == *expected_idx
+                let expected_ty_args = pool.get_type_vec(expected_ty_args);
+                *idx == expected_idx
                     && ty_args.len() == expected_ty_args.len()
                     && ty_args
                         .iter()
                         .zip(expected_ty_args.iter())
-                        .all(|types| self.match_ty(types.0, types.1))
+                        .all(|(t, e)| self.match_ty(pool, t, *e))
             },
             // For primitive types we need to assure the types match.
-            (Type::U8, Type::U8)
-            | (Type::U16, Type::U16)
-            | (Type::U32, Type::U32)
-            | (Type::U64, Type::U64)
-            | (Type::U128, Type::U128)
-            | (Type::U256, Type::U256)
-            | (Type::I8, Type::I8)
-            | (Type::I16, Type::I16)
-            | (Type::I32, Type::I32)
-            | (Type::I64, Type::I64)
-            | (Type::I128, Type::I128)
-            | (Type::I256, Type::I256)
-            | (Type::Bool, Type::Bool)
-            | (Type::Address, Type::Address)
-            | (Type::Signer, Type::Signer) => true,
+            (Type::U8, TypeRepr::U8)
+            | (Type::U16, TypeRepr::U16)
+            | (Type::U32, TypeRepr::U32)
+            | (Type::U64, TypeRepr::U64)
+            | (Type::U128, TypeRepr::U128)
+            | (Type::U256, TypeRepr::U256)
+            | (Type::I8, TypeRepr::I8)
+            | (Type::I16, TypeRepr::I16)
+            | (Type::I32, TypeRepr::I32)
+            | (Type::I64, TypeRepr::I64)
+            | (Type::I128, TypeRepr::I128)
+            | (Type::I256, TypeRepr::I256)
+            | (Type::Bool, TypeRepr::Bool)
+            | (Type::Address, TypeRepr::Address)
+            | (Type::Signer, TypeRepr::Signer) => true,
             // Otherwise the types do not match, and we can't match return type to the expected type.
             // Note we don't use the _ pattern but spell out all cases, so that the compiler will
             // bark when a case is missed upon future updates to the types.

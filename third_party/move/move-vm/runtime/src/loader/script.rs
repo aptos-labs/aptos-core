@@ -119,6 +119,24 @@ impl Script {
             .collect::<PartialVMResult<Vec<_>>>()?;
         let ty_param_abilities = script.type_parameters.clone();
 
+        // Compute TypeIds for non-generic scripts
+        let (return_type_ids, local_type_ids, param_type_ids) = if ty_param_abilities.is_empty() {
+            // Non-generic: compute TypeIds by interning the types
+            let return_type_ids = vec![]; // Scripts don't return values
+            let local_type_ids = local_tys
+                .iter()
+                .map(|ty| ty_pool.instantiate_and_intern(ty, &[]))
+                .collect();
+            let param_type_ids = param_tys
+                .iter()
+                .map(|ty| ty_pool.instantiate_and_intern(ty, &[]))
+                .collect();
+            (return_type_ids, local_type_ids, param_type_ids)
+        } else {
+            // Generic: leave empty, will be computed at instantiation time
+            (vec![], vec![], vec![])
+        };
+
         let main: Arc<Function> = Arc::new(Function {
             file_format_version: script.version(),
             index: FunctionDefinitionIndex(0),
@@ -134,6 +152,9 @@ impl Script {
             return_tys: vec![],
             local_tys,
             param_tys,
+            return_type_ids,
+            local_type_ids,
+            param_type_ids,
             access_specifier: AccessSpecifier::Any,
             is_persistent: false,
             has_module_reentrancy_lock: false,
