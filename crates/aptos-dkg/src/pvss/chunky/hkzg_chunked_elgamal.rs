@@ -64,7 +64,7 @@ type LiftedChunkedElgamal<'a, E> =
 //              │                        ║ ╫ ║                      │
 // projection_1 │    lifted HKZG hom ╔═══╝ ╫ ╚══════╗ lifted        │ projection_2
 //              │                    ║     ╫        ║ Chunked EG    │
-//              ▼                    ║     ╫        ║               ▼
+//              ▼                    ║     ╫        ║ hom           ▼
 //  ┌──────────────────────────────┐ ║     ╫        ║  ┌──────────────────────────────┐
 //  │ univariate_hiding_kzg::      │ ║     ╫        ║  │ chunked_elgamal::            │
 //  │ Witness<E>                   │ ║     ╫        ║  │ Witness<E>                   │
@@ -91,10 +91,11 @@ type LiftedChunkedElgamal<'a, E> =
 //
 // In other words, the tuple homomorphism is roughly given as follows:
 //
-// ( rho, z_{i,j} , r_j ) │----> ( HKZG(rho, z_{i,j} ) , chunked_elgamal( z_{i,j} , r_j )
+// ( rho, z_{i,j} , r_j ) │----> ( HKZG(rho, (0, z_{i,j}) ) , chunked_elgamal( z_{i,j} , r_j )
 //
-// hang on!!! should we be doing DeKART commitment hom here? so with a zero at the start?? yes!!
-// or write DeKARTv2CommitmentWitness?
+// TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
+// it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
+// DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
 pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>>;
 
 #[allow(non_snake_case)]
@@ -108,7 +109,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
         let lifted_hkzg = LiftedHkzg::<E> {
             hom: univariate_hiding_kzg::CommitmentHomomorphism { lagr_g1, xi_1 },
-            // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunked plaintexts
+            // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunked plaintexts after adding a zero
             projection: |dom: &HkzgElgamalWitness<E>| {
                 let HkzgElgamalWitness {
                     hkzg_randomness,
@@ -142,7 +143,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             },
         };
 
-        // Combine the two lifted homomorphisms, into the required TupleHomomorphism
+        // Combine the two lifted homomorphisms just constructed, into the required TupleHomomorphism
         Self {
             hom1: lifted_hkzg,
             hom2: lifted_chunked_elgamal,
