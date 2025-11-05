@@ -484,20 +484,44 @@ macro_rules! impl_vm_value_ref {
     };
 }
 
+macro_rules! impl_vm_value_ref_boxed {
+    ($ty:ty, $tc:ident) => {
+        impl VMValueRef<$ty> for Value {
+            #[cfg_attr(feature = "inline-vm-casts", inline)]
+            fn value_ref(&self) -> PartialVMResult<&$ty> {
+                return match self {
+                    Value::$tc(x) => Ok(x.as_ref()),
+                    _ => __cannot_ref_cast(self),
+                };
+                #[cold]
+                fn __cannot_ref_cast(v: &Value) -> PartialVMResult<&$ty> {
+                    Err(
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                            "cannot take {:?} as &{}",
+                            v,
+                            stringify!($ty)
+                        )),
+                    )
+                }
+            }
+        }
+    };
+}
+
 impl_vm_value_ref!(u8, U8);
 impl_vm_value_ref!(u16, U16);
 impl_vm_value_ref!(u32, U32);
 impl_vm_value_ref!(u64, U64);
 impl_vm_value_ref!(u128, U128);
-impl_vm_value_ref!(int256::U256, U256);
+impl_vm_value_ref_boxed!(int256::U256, U256);
 impl_vm_value_ref!(i8, I8);
 impl_vm_value_ref!(i16, I16);
 impl_vm_value_ref!(i32, I32);
 impl_vm_value_ref!(i64, I64);
 impl_vm_value_ref!(i128, I128);
-impl_vm_value_ref!(int256::I256, I256);
+impl_vm_value_ref_boxed!(int256::I256, I256);
 impl_vm_value_ref!(bool, Bool);
-impl_vm_value_ref!(AccountAddress, Address);
+impl_vm_value_ref_boxed!(AccountAddress, Address);
 
 impl Value {
     fn as_value_ref<T>(&self) -> PartialVMResult<&T>
