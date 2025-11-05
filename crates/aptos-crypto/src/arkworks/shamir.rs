@@ -128,6 +128,16 @@ pub fn all_lagrange_denominators<F: FftField>(
     // A(X) = \prod_{i \in [0, n-1]} (X - \omega^i)
     let omegas: Vec<F> = dom.elements().take(n).collect();
     debug_assert_eq!(F::ONE, omegas[0]);
+    for i in 1..n {
+        debug_assert_eq!(
+            omegas[i - 1] * omegas[1],
+            omegas[i],
+            "omegas are not in sequence at index {}",
+            i
+        );
+    }
+
+    // This is **not** X^n - 1, because the \omega^i are not n-th roots of unity, they are N-th roots of unity where N is some power of 2
     let mut A = vanishing_poly::from_roots(&omegas);
 
     // A'(X) = \sum_{i \in [0, n-1]} \prod_{j \ne i, j \in [0, n-1]} (X - \omega^j)
@@ -256,7 +266,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
 #[cfg(test)]
 mod shamir_tests {
     use super::*;
-    use ark_bn254::Fr;
+    use ark_bls12_381::Fr;
     use ark_ff::{One, UniformRand};
     use ark_std::rand::thread_rng;
     use itertools::Itertools;
