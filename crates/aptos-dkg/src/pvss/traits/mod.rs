@@ -52,7 +52,9 @@ pub trait SecretSharingConfig: Display {
 /// This trait is required because some operations (such as those in SCRAPE LDT) need access to `t`,
 /// but not all secret sharing schemes are threshold secret sharing schemes; they can have more
 /// general access structures.
-pub trait ThresholdConfig: SecretSharingConfig {
+pub trait ThresholdConfig: SecretSharingConfig + Sized {
+    fn new(t: usize, n: usize) -> anyhow::Result<Self>;
+
     fn get_threshold(&self) -> usize;
 }
 

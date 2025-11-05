@@ -1,9 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::pvss::{
-    traits::{transcript::Transcript, Convert, HasEncryptionPublicParams, SecretSharingConfig},
-    Player, ThresholdConfigBlstrs, WeightedConfig,
+use crate::{
+    pvss::{
+        traits::{
+            transcript::Transcript, Convert, HasEncryptionPublicParams, Reconstructable,
+            SecretSharingConfig,
+        },
+        Player, ThresholdConfigBlstrs, WeightedConfig,
+    },
+    traits::ThresholdConfig,
 };
 use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
 use num_traits::Zero;
@@ -119,16 +125,15 @@ macro_rules! vec_to_str {
     };
 }
 
-use crate::pvss::traits::Reconstructable;
 #[allow(unused)]
 pub(crate) use vec_to_str;
 
-pub fn get_threshold_configs_for_testing() -> Vec<ThresholdConfigBlstrs> {
+pub fn get_threshold_configs_for_testing<T: ThresholdConfig>() -> Vec<T> {
     let mut tcs = vec![];
 
     for t in 1..8 {
         for n in t..8 {
-            let tc = ThresholdConfigBlstrs::new(t, n).unwrap();
+            let tc = T::new(t, n).unwrap();
             tcs.push(tc)
         }
     }
