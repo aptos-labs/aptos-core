@@ -68,6 +68,21 @@ where
     }
 }
 
+#[cfg(fuzzing)]
+impl<Deserialized, Verified, Extension> Entry<Deserialized, Verified, Extension>
+where
+    Verified: Deref<Target = Arc<Deserialized>>,
+    Extension: WithSize,
+{
+    pub fn clone_for_fuzzing(&self) -> Self {
+        let overridden = self.overridden.load(Ordering::Relaxed);
+        Self {
+            overridden: AtomicBool::new(overridden),
+            module: Arc::clone(&self.module),
+        }
+    }
+}
+
 /// A global module cache for verified code that is read-only and concurrently accessed during the
 /// block execution. Modified safely only at block boundaries.
 pub struct GlobalModuleCache<K, D, V, E> {
@@ -228,6 +243,26 @@ where
             true
         } else {
             false
+        }
+    }
+}
+
+#[cfg(fuzzing)]
+impl<K, D, V, E> GlobalModuleCache<K, D, V, E>
+where
+    K: Hash + Eq + Clone,
+    V: Deref<Target = Arc<D>>,
+    E: WithSize,
+{
+    pub fn clone_for_fuzzing(&self) -> Self {
+        let mut module_cache: HashMap<K, Entry<D, V, E>> = HashMap::new();
+        for (k, v) in self.module_cache.iter() {
+            module_cache.insert(k.clone(), v.clone_for_fuzzing());
+        }
+        Self {
+            module_cache,
+            size: self.size,
+            struct_layouts: self.struct_layouts.clone(),
         }
     }
 }

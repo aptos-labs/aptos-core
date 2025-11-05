@@ -473,6 +473,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     syntax,
                     name: None,
                     print_bytecode,
+                    exec_group: _,
                 },
                 extra_args,
             ) => {
@@ -513,6 +514,7 @@ pub trait MoveTestAdapter<'a>: Sized {
                     syntax,
                     name: Some((raw_addr, module_name, name)),
                     print_bytecode: _,
+                    exec_group: _,
                 },
                 extra_args,
             ) => {

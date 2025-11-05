@@ -9601,6 +9601,7 @@ dependencies = [
 name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-consensus",
  "aptos-crypto",
@@ -9619,6 +9620,7 @@ dependencies = [
  "move-bytecode-verifier",
  "move-core-types",
  "move-transactional-test-runner",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "rayon",
