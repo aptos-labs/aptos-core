@@ -20,7 +20,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
-    metadata::Metadata,
     vm_status::StatusCode,
 };
 use move_vm_types::{code::ModuleBytesStorage, module_linker_error, sha3_256};

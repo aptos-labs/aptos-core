@@ -61,12 +61,12 @@ fn get_resource_on_chain_at_addr<T: MoveStructType + for<'a> Deserialize<'a>>(
     // INVARIANT:
     //   The struct should be defined at core (0x1) address, so we do not require metering for any
     //   module loading.
-    let metadata = module_storage
-        .unmetered_get_existing_module_metadata(&struct_tag.address, &struct_tag.module)
+    let module = module_storage
+        .unmetered_get_existing_deserialized_module(&struct_tag.address, &struct_tag.module)
         .map_err(|e| e.into_vm_status())?;
 
     let bytes = resolver
-        .get_resource_bytes_with_metadata_and_layout(addr, &struct_tag, &metadata, None)
+        .get_resource_bytes_with_metadata_and_layout(addr, &struct_tag, &module.metadata, None)
         .map_err(|e| e.finish(Location::Undefined).into_vm_status())?
         .0
         .ok_or_else(|| {
