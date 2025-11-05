@@ -25,11 +25,9 @@ const BN254: &'static str = "bn254";
 const BLS12_381: &'static str = "bls12-381";
 
 /// WARNING: These are the relevant batch sizes we want benchmarked to compare against Bulletproofs
-// const BATCH_SIZES: [usize; 4] = [1, 3, 7, 15]; //, 31, 2047];
-const BATCH_SIZES : [usize; 6] = [1, 3, 7, 15, 31, 2047];
+const BATCH_SIZES : [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against Bulletproofs
-// const BIT_WIDTHS: [usize; 2] = [8, 16];
 const BIT_WIDTHS: [usize; 4] = [8, 16, 32, 64];
 
 fn bench_groups(c: &mut Criterion) {

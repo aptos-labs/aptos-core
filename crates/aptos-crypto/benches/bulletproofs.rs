@@ -27,11 +27,9 @@ fn get_benchmark_subid(batch_size: usize, num_bits: usize) -> String {
 }
 
 /// WARNING: These are the relevant batch sizes we want benchmarked to compare against DeKART
-// const BATCH_SIZES : [usize; 4] = [2, 4, 8, 16]; //, 32, 2048];
-const BATCH_SIZES : [usize; 6] = [2, 4, 8, 16, 32, 2048];
+const BATCH_SIZES : [usize; 11] = [2, 4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against DeKART
-// const BIT_WIDTHS: [usize; 2] = [8, 16];
 const BIT_WIDTHS: [usize; 4] = [8, 16, 32, 64];
 
 fn get_values(num_bits: usize, batch_size: usize) -> (Vec<u64>, Vec<Scalar>) {
