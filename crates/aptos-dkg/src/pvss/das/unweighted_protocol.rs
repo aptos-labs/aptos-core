@@ -7,7 +7,6 @@ use crate::{
     pvss::{
         contribution::{batch_verify_soks, Contribution, SoK},
         das,
-        das::fiat_shamir,
         encryption_dlog, schnorr, traits,
         traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
         LowDegreeTest, Player, ThresholdConfigBlstrs,

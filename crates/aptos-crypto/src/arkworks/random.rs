@@ -22,7 +22,7 @@ pub trait UniformRand {
 }
 
 /// Returns a random element given an older RNG as input. Not very secure since the
-/// hash function is vulneralbe to timing attacks
+/// hash function is vulnerable to timing attacks. Probably alright if only used for setups etc?
 /// TODO: benchmark this
 pub fn less_insecure_random_point<P: AffineRepr, R>(rng: &mut R) -> P
 where
