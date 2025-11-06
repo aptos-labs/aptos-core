@@ -19,13 +19,13 @@ use criterion::{
 
 /// WARNING: Do not change this, since our range proof benchmark instructions in
 /// `crates/aptos-crypto/README.md` rely on it.
-const BROKEN_DEKART_RS_SCHEME_NAME: &'static str = "dekart-rs-broken";
-const DEKART_RS_SCHEME_NAME: &'static str = "dekart-rs";
-const BN254: &'static str = "bn254";
-const BLS12_381: &'static str = "bls12-381";
+const BROKEN_DEKART_RS_SCHEME_NAME: &str = "dekart-rs-broken";
+const DEKART_RS_SCHEME_NAME: &str = "dekart-rs";
+const BN254: &str = "bn254";
+const BLS12_381: &str = "bls12-381";
 
 /// WARNING: These are the relevant batch sizes we want benchmarked to compare against Bulletproofs
-const BATCH_SIZES : [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
+const BATCH_SIZES: [usize; 11] = [1, 3, 7, 15, 31, 63, 127, 255, 511, 1023, 2047];
 
 /// WARNING: These are the relevant bit widths we want benchmarked to compare against Bulletproofs
 const BIT_WIDTHS: [usize; 4] = [8, 16, 32, 64];
@@ -63,8 +63,6 @@ fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(
 
     match (l, n) {
         (Some(ell), Some(n)) => {
-            let ell = ell; // already parsed; fallbacks not needed here
-            let n = n; // but if you still want fallbacks on parse fail:
             bench_prove::<E, B>(&mut group, ell, n);
             bench_verify::<E, B>(&mut group, ell, n);
         },

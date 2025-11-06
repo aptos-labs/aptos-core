@@ -9,7 +9,7 @@ repo_root=$(readlink -f $scriptdir/../../../)
 
 read -p "Delete past benchmark results and re-run? (Otherwise, will use extant data in $repo_root/target/criterion) [y/N]: " ANS
 
-if [ "$ans" == "y" ]; then
+if [ "$ANS" == "y" ]; then
     echo "Cleaning previous Bulletproof criterion benchmark results..."
     rm -r $repo_root/target/criterion/bulletproofs
 
