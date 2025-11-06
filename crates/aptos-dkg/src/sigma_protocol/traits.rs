@@ -33,7 +33,7 @@ pub trait Trait<E: Pairing>:
 {
     fn dst(&self) -> Vec<u8>;
 
-    fn prove<R: RngCore + CryptoRng>(
+    fn prove<R: rand_core::RngCore + rand_core::CryptoRng>(
         &self,
         witness: &Self::Domain,
         statement: &Self::Codomain,
@@ -44,12 +44,14 @@ pub trait Trait<E: Pairing>:
     }
 
     #[allow(non_snake_case)]
-    fn verify(
+    fn verify<H>(
         &self,
         public_statement: &Self::Codomain,
-        proof: &Proof<E, Self>,
+        proof: &Proof<E, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         transcript: &mut merlin::Transcript,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()> 
+    where H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+    {
         verify_msm_hom::<E, Self>(
             self,
             public_statement,
