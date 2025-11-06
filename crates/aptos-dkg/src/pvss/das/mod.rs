@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod enc;
-mod fiat_shamir;
 mod input_secret;
 pub mod public_parameters;
 pub mod unweighted_protocol;

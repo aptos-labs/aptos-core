@@ -6,8 +6,7 @@ use crate::{
     pvss::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das::{self, fiat_shamir},
-        encryption_dlog, schnorr,
+        das, encryption_dlog, schnorr,
         traits::{
             self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
         },
@@ -199,17 +198,10 @@ impl traits::Transcript for Transcript {
         }
         let W = sc.get_total_weight();
 
-        // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::derive_challenge_scalars(
-            self,
-            sc,
-            pp,
-            spks,
-            eks,
-            auxs,
-            &Self::dst(),
-            2 + W * 3, // 3W+1 for encryption check, 1 for SoK verification.
-        );
+        use crate::pvss::traits::ThresholdConfig;
+        let mut rng = rand::thread_rng();
+        let f = random_scalars(sc.get_total_num_shares() + 1 - sc.get_threshold(), &mut rng);
+        let extra = random_scalars(2 + W * 3, &mut rng);
 
         let sok_vrfy_challenge = &extra[W * 3 + 1];
         let g_2 = pp.get_commitment_base();

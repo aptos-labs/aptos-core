@@ -52,12 +52,6 @@ impl<E: Pairing> UniformRand for CommitmentRandomness<E> {
     }
 }
 
-impl<E: Pairing> UniformRand for CommitmentRandomness<E> {
-    fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        CommitmentRandomness(E::ScalarField::rand(rng))
-    }
-}
-
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
     pub(crate) pi_1: Commitment<E>,

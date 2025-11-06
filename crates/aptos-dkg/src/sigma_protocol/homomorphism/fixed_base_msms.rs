@@ -154,11 +154,11 @@ where
     }
 }
 
-use crate::sigma_protocol;
+use crate::{sigma_protocol, sigma_protocol::Witness};
 use ark_ec::pairing::Pairing;
-use crate::sigma_protocol::Witness;
 
-impl<E: Pairing, H, LargerDomain> sigma_protocol::Trait<E> for homomorphism::LiftHomomorphism<H, LargerDomain>
+impl<E: Pairing, H, LargerDomain> sigma_protocol::Trait<E>
+    for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
     H: sigma_protocol::Trait<E>,
     LargerDomain: Witness<E>,
