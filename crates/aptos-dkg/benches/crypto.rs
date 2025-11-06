@@ -48,13 +48,7 @@ pub fn crypto_group(c: &mut Criterion) {
         batch_evaluation_domain_new(thresh, &mut group);
         fft_assign_bench(thresh, &mut group);
 
-        gt_multiexp_naive(thresh, &mut group);
-        g1_multiexp_naive(thresh, &mut group);
-        g2_multiexp_naive(thresh, &mut group);
-
-        g1_multiexp(thresh, &mut group);
         n_g1_double_exp(thresh, &mut group);
-        g2_multiexp(thresh, &mut group);
 
         accumulator_poly(thresh, &mut group);
         accumulator_poly_slow(thresh, &mut group);
@@ -81,9 +75,15 @@ pub fn crypto_group(c: &mut Criterion) {
         }
     }
 
-    for n in LARGE_SIZES {
+    let mut n = 1;
+    for _ in 0..22 {
         g1_multiexp(n, &mut group);
+        g1_multiexp_naive(n, &mut group);
+        g2_multiexp(n, &mut group);
+        g2_multiexp_naive(n, &mut group);
+        gt_multiexp_naive(n, &mut group);
         fft_assign_bench(n, &mut group);
+        n *= 2;
     }
 
     for n in SMALL_SIZES {
