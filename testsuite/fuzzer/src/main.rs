@@ -67,6 +67,22 @@ fn main() {
                 )
         )
         .subcommand(
+            Command::new("generate_transactional_runnable_states_recursive")
+                .about("Recursively generates transactional runnable states from all .move files under a directory.")
+                .arg(
+                    Arg::new("base_dir")
+                        .help("Base directory to search for .move files under")
+                        .required(true)
+                        .index(1),
+                )
+                .arg(
+                    Arg::new("destination_path")
+                        .help("Path to write the transactional runnable states to")
+                        .required(true)
+                        .index(2),
+                )
+        )
+        .subcommand(
             Command::new("generate_runnable_states_from_all_tests")
                 .about("Generates runnable states from all test sources (e2e, transactional, and compiler v2 tests).")
                 .arg(
@@ -130,6 +146,24 @@ fn main() {
                 std::process::exit(1);
             } else {
                 println!("Runnable states generated successfully.");
+            }
+        },
+        Some(("generate_transactional_runnable_states_recursive", sub_m)) => {
+            let base_dir = sub_m.get_one::<String>("base_dir").unwrap();
+            let destination_path = sub_m.get_one::<String>("destination_path").unwrap();
+
+            // Call the function with the provided arguments
+            if let Err(e) = fuzzer::utils::cli::generate_transactional_runnable_states_recursive(
+                base_dir,
+                destination_path,
+            ) {
+                eprintln!(
+                    "Error generating transactional runnable states recursively: {}",
+                    e
+                );
+                std::process::exit(1);
+            } else {
+                println!("Transactional runnable states generated successfully.");
             }
         },
         Some(("generate_runnable_states_from_all_tests", sub_m)) => {

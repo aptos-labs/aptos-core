@@ -1,0 +1,19 @@
+//# publish
+module 0x22::test
+
+enum E has drop
+  V1
+    a: u64
+  V2
+    b: u32
+
+public fun test_variant_instr(): bool
+    local a: E
+    ld_u64 3
+    pack_variant E, V1
+    st_loc a
+    borrow_loc a
+    test_variant E, V2
+    ret
+
+//# run --verbose 0x22::test::test_variant_instr --display-trace

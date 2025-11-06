@@ -269,6 +269,7 @@ module aptos_experimental::order_placement {
                 true, // is_taker is true as this order hasn't been placed in the book yet
                 OrderCancellationReason::IOCViolation,
                 std::string::utf8(b"IOC Violation"),
+                trigger_condition,
                 metadata,
                 time_in_force,
                 emit_open_for_cancellation,
@@ -312,6 +313,7 @@ module aptos_experimental::order_placement {
                 limit_price,
                 time_in_force,
                 single_order_type(),
+                option::none(),
                 metadata
             ),
             remaining_size,
@@ -331,6 +333,7 @@ module aptos_experimental::order_placement {
                 true, // is_taker is true as this order hasn't been placed in the book yet
                 OrderCancellationReason::PlaceMakerOrderViolation,
                 result.get_place_maker_order_cancellation_reason().destroy_some(),
+                option::none(), // trigger_condition
                 metadata,
                 time_in_force,
                 emit_open_for_cancellation,
@@ -480,6 +483,7 @@ module aptos_experimental::order_placement {
             time_in_force,
             maker_cancel_size,
             maker_order.get_price_from_match_details(),
+            option::none(), // trigger_condition
             metadata,
             callbacks,
             false // is_taker is false as this is a maker order
@@ -501,6 +505,7 @@ module aptos_experimental::order_placement {
         is_taker: bool,
         cancel_reason: OrderCancellationReason,
         cancel_details: String,
+        trigger_condition: Option<TriggerCondition>,
         metadata: M,
         time_in_force: TimeInForce,
         emit_order_open: bool,
@@ -552,6 +557,7 @@ module aptos_experimental::order_placement {
                 limit_price,
                 time_in_force,
                 single_order_type(),
+                trigger_condition,
                 metadata
             ),
             size_delta,
@@ -576,6 +582,7 @@ module aptos_experimental::order_placement {
         time_in_force: TimeInForce,
         cleanup_size: u64,
         price: u64,
+        trigger_condition: Option<TriggerCondition>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>,
         is_taker: bool
@@ -590,6 +597,7 @@ module aptos_experimental::order_placement {
                     price,
                     time_in_force,
                     single_order_type(),
+                    trigger_condition,
                     metadata
                 ),
                 cleanup_size,
@@ -647,6 +655,7 @@ module aptos_experimental::order_placement {
                 price,
                 time_in_force,
                 single_order_type(),
+                option::none(), // trigger_condition
                 metadata,
             ),
             new_clearinghouse_order_info(
@@ -657,6 +666,7 @@ module aptos_experimental::order_placement {
                 maker_order.get_price_from_match_details(),
                 maker_order.get_time_in_force_from_match_details(),
                 maker_order.get_book_type_from_match_details(),
+                option::none(), // trigger_condition
                 maker_order.get_metadata_from_match_details()
             ),
             fill_id,
@@ -737,6 +747,7 @@ module aptos_experimental::order_placement {
                 true, // is_taker
                 OrderCancellationReason::ClearinghouseSettleViolation,
                 taker_cancellation_reason.destroy_some(),
+                option::none(), // trigger_condition
                 metadata,
                 time_in_force,
                 false, // emit_order_open is false as the order was already open
@@ -777,6 +788,7 @@ module aptos_experimental::order_placement {
                 maker_order.get_time_in_force_from_match_details(),
                 0, // 0 because the order is fully filled
                 maker_order.get_price_from_match_details(),
+                option::none(), // trigger_condition
                 maker_order.get_metadata_from_match_details(),
                 callbacks,
                 false // is_taker is false for maker orders
@@ -826,6 +838,7 @@ module aptos_experimental::order_placement {
                 limit_price,
                 time_in_force,
                 single_order_type(),
+                trigger_condition,
                 metadata
             ),
             remaining_size,
@@ -845,6 +858,7 @@ module aptos_experimental::order_placement {
                 true, // is_taker
                 OrderCancellationReason::PositionUpdateViolation,
                 validation_result.get_validation_failure_reason().destroy_some(),
+                trigger_condition,
                 metadata,
                 time_in_force,
                 true, // emit_order_open
@@ -870,6 +884,7 @@ module aptos_experimental::order_placement {
                     true, // is_taker
                     OrderCancellationReason::DuplicateClientOrderIdViolation,
                     std::string::utf8(b"Duplicate client order id"),
+                    trigger_condition,
                     metadata,
                     time_in_force,
                     true, // emit_order_open
@@ -897,6 +912,7 @@ module aptos_experimental::order_placement {
                     true, // is_taker
                     OrderCancellationReason::OrderPreCancelled,
                     std::string::utf8(b"Order pre cancelled"),
+                    trigger_condition,
                     metadata,
                     time_in_force,
                     true, // emit_order_open
@@ -946,6 +962,7 @@ module aptos_experimental::order_placement {
                 true, // is_taker
                 OrderCancellationReason::PostOnlyViolation,
                 std::string::utf8(b"Post Only violation"),
+                option::none(), // trigger_condition
                 metadata,
                 time_in_force,
                 true, // emit_order_open
@@ -1022,7 +1039,7 @@ module aptos_experimental::order_placement {
             };
             if (remaining_size == 0) {
                 cleanup_order_internal(
-                    user_addr, order_id, client_order_id, single_order_type(), is_bid, time_in_force, 0, limit_price, metadata, callbacks, true
+                    user_addr, order_id, client_order_id, single_order_type(), is_bid, time_in_force, 0, limit_price, trigger_condition, metadata, callbacks, true
                 );
                 break;
             };
@@ -1046,6 +1063,7 @@ module aptos_experimental::order_placement {
                         true, // is_taker
                         OrderCancellationReason::IOCViolation,
                         std::string::utf8(b"IOC_VIOLATION"),
+                        option::none(), // trigger_condition
                         metadata,
                         time_in_force,
                         false, // emit_order_open is false as the order was already open
@@ -1064,7 +1082,7 @@ module aptos_experimental::order_placement {
                         match_count,
                         is_bid,
                         time_in_force,
-                        trigger_condition,
+                        option::none(), // trigger_condition
                         metadata,
                         order_id,
                         client_order_id,
@@ -1091,6 +1109,7 @@ module aptos_experimental::order_placement {
                         true, // is_taker
                         OrderCancellationReason::MaxFillLimitViolation,
                         std::string::utf8(b"Max fill limit reached"),
+                        option::none(), // trigger_condition
                         metadata,
                         time_in_force,
                         false, // emit_order_open is false as the order was already open

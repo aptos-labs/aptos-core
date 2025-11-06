@@ -741,6 +741,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             <b>true</b>, // is_taker is <b>true</b> <b>as</b> this order hasn't been placed in the book yet
             OrderCancellationReason::IOCViolation,
             std::string::utf8(b"IOC Violation"),
+            trigger_condition,
             metadata,
             time_in_force,
             emit_open_for_cancellation,
@@ -784,6 +785,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             limit_price,
             time_in_force,
             single_order_type(),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
             metadata
         ),
         remaining_size,
@@ -803,6 +805,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             <b>true</b>, // is_taker is <b>true</b> <b>as</b> this order hasn't been placed in the book yet
             OrderCancellationReason::PlaceMakerOrderViolation,
             result.get_place_maker_order_cancellation_reason().destroy_some(),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
             metadata,
             time_in_force,
             emit_open_for_cancellation,
@@ -992,6 +995,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         time_in_force,
         maker_cancel_size,
         maker_order.get_price_from_match_details(),
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
         metadata,
         callbacks,
         <b>false</b> // is_taker is <b>false</b> <b>as</b> this is a maker order
@@ -1010,7 +1014,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 <pre><code>#[lint::skip(#[needless_mutable_reference])]
-<b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, orig_size: u64, size_delta: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, is_taker: bool, cancel_reason: <a href="order_placement.md#0x7_order_placement_OrderCancellationReason">order_placement::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, emit_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
+<b>fun</b> <a href="order_placement.md#0x7_order_placement_cancel_single_order_internal">cancel_single_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user_addr: <b>address</b>, limit_price: u64, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, orig_size: u64, size_delta: u64, fill_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, match_count: u32, is_bid: bool, is_taker: bool, cancel_reason: <a href="order_placement.md#0x7_order_placement_OrderCancellationReason">order_placement::OrderCancellationReason</a>, cancel_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, emit_order_open: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, callback_results: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;R&gt;): <a href="order_placement.md#0x7_order_placement_OrderMatchResult">order_placement::OrderMatchResult</a>&lt;R&gt;
 </code></pre>
 
 
@@ -1033,6 +1037,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     is_taker: bool,
     cancel_reason: <a href="order_placement.md#0x7_order_placement_OrderCancellationReason">OrderCancellationReason</a>,
     cancel_details: String,
+    trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
     time_in_force: TimeInForce,
     emit_order_open: bool,
@@ -1084,6 +1089,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             limit_price,
             time_in_force,
             single_order_type(),
+            trigger_condition,
             metadata
         ),
         size_delta,
@@ -1110,7 +1116,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(user_addr: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, order_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, cleanup_size: u64, price: u64, metadata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, is_taker: bool)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(user_addr: <b>address</b>, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, order_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, cleanup_size: u64, price: u64, trigger_condition: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>&gt;, metadata: M, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;, is_taker: bool)
 </code></pre>
 
 
@@ -1128,6 +1134,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     time_in_force: TimeInForce,
     cleanup_size: u64,
     price: u64,
+    trigger_condition: Option&lt;TriggerCondition&gt;,
     metadata: M,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;,
     is_taker: bool
@@ -1142,6 +1149,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
                 price,
                 time_in_force,
                 single_order_type(),
+                trigger_condition,
                 metadata
             ),
             cleanup_size,
@@ -1219,6 +1227,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             price,
             time_in_force,
             single_order_type(),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
             metadata,
         ),
         new_clearinghouse_order_info(
@@ -1229,6 +1238,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             maker_order.get_price_from_match_details(),
             maker_order.get_time_in_force_from_match_details(),
             maker_order.get_book_type_from_match_details(),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
             maker_order.get_metadata_from_match_details()
         ),
         fill_id,
@@ -1309,6 +1319,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             <b>true</b>, // is_taker
             OrderCancellationReason::ClearinghouseSettleViolation,
             taker_cancellation_reason.destroy_some(),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
             metadata,
             time_in_force,
             <b>false</b>, // emit_order_open is <b>false</b> <b>as</b> the order was already open
@@ -1349,6 +1360,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             maker_order.get_time_in_force_from_match_details(),
             0, // 0 because the order is fully filled
             maker_order.get_price_from_match_details(),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
             maker_order.get_metadata_from_match_details(),
             callbacks,
             <b>false</b> // is_taker is <b>false</b> for maker orders
@@ -1418,6 +1430,7 @@ is done before calling this function if needed.
             limit_price,
             time_in_force,
             single_order_type(),
+            trigger_condition,
             metadata
         ),
         remaining_size,
@@ -1437,6 +1450,7 @@ is done before calling this function if needed.
             <b>true</b>, // is_taker
             OrderCancellationReason::PositionUpdateViolation,
             validation_result.get_validation_failure_reason().destroy_some(),
+            trigger_condition,
             metadata,
             time_in_force,
             <b>true</b>, // emit_order_open
@@ -1462,6 +1476,7 @@ is done before calling this function if needed.
                 <b>true</b>, // is_taker
                 OrderCancellationReason::DuplicateClientOrderIdViolation,
                 std::string::utf8(b"Duplicate client order id"),
+                trigger_condition,
                 metadata,
                 time_in_force,
                 <b>true</b>, // emit_order_open
@@ -1489,6 +1504,7 @@ is done before calling this function if needed.
                 <b>true</b>, // is_taker
                 OrderCancellationReason::OrderPreCancelled,
                 std::string::utf8(b"Order pre cancelled"),
+                trigger_condition,
                 metadata,
                 time_in_force,
                 <b>true</b>, // emit_order_open
@@ -1538,6 +1554,7 @@ is done before calling this function if needed.
             <b>true</b>, // is_taker
             OrderCancellationReason::PostOnlyViolation,
             std::string::utf8(b"Post Only violation"),
+            <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
             metadata,
             time_in_force,
             <b>true</b>, // emit_order_open
@@ -1614,7 +1631,7 @@ is done before calling this function if needed.
         };
         <b>if</b> (remaining_size == 0) {
             <a href="order_placement.md#0x7_order_placement_cleanup_order_internal">cleanup_order_internal</a>(
-                user_addr, order_id, client_order_id, single_order_type(), is_bid, time_in_force, 0, limit_price, metadata, callbacks, <b>true</b>
+                user_addr, order_id, client_order_id, single_order_type(), is_bid, time_in_force, 0, limit_price, trigger_condition, metadata, callbacks, <b>true</b>
             );
             <b>break</b>;
         };
@@ -1638,6 +1655,7 @@ is done before calling this function if needed.
                     <b>true</b>, // is_taker
                     OrderCancellationReason::IOCViolation,
                     std::string::utf8(b"IOC_VIOLATION"),
+                    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
                     metadata,
                     time_in_force,
                     <b>false</b>, // emit_order_open is <b>false</b> <b>as</b> the order was already open
@@ -1656,7 +1674,7 @@ is done before calling this function if needed.
                     match_count,
                     is_bid,
                     time_in_force,
-                    trigger_condition,
+                    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
                     metadata,
                     order_id,
                     client_order_id,
@@ -1683,6 +1701,7 @@ is done before calling this function if needed.
                     <b>true</b>, // is_taker
                     OrderCancellationReason::MaxFillLimitViolation,
                     std::string::utf8(b"Max fill limit reached"),
+                    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), // trigger_condition
                     metadata,
                     time_in_force,
                     <b>false</b>, // emit_order_open is <b>false</b> <b>as</b> the order was already open

@@ -17,7 +17,6 @@
 -  [Struct `BulkOrderPlacedEvent`](#0x7_market_types_BulkOrderPlacedEvent)
 -  [Struct `BulkOrderModifiedEvent`](#0x7_market_types_BulkOrderModifiedEvent)
 -  [Struct `BulkOrderFilledEvent`](#0x7_market_types_BulkOrderFilledEvent)
--  [Struct `BulkRejectedEvent`](#0x7_market_types_BulkRejectedEvent)
 -  [Constants](#@Constants_0)
 -  [Function `order_status_open`](#0x7_market_types_order_status_open)
 -  [Function `order_status_filled`](#0x7_market_types_order_status_filled)
@@ -73,7 +72,6 @@
 -  [Function `emit_event_for_bulk_order_cancelled`](#0x7_market_types_emit_event_for_bulk_order_cancelled)
 -  [Function `emit_event_for_bulk_order_filled`](#0x7_market_types_emit_event_for_bulk_order_filled)
 -  [Function `emit_event_for_bulk_order_modified`](#0x7_market_types_emit_event_for_bulk_order_modified)
--  [Function `emit_event_for_bulk_order_rejected`](#0x7_market_types_emit_event_for_bulk_order_rejected)
 -  [Function `get_order_book_mut`](#0x7_market_types_get_order_book_mut)
 -  [Function `get_pre_cancellation_tracker_mut`](#0x7_market_types_get_pre_cancellation_tracker_mut)
 
@@ -84,7 +82,6 @@
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
 <b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
-<b>use</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types">0x7::bulk_order_book_types</a>;
 <b>use</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info">0x7::market_clearinghouse_order_info</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
@@ -1029,88 +1026,6 @@
 </dd>
 <dt>
 <code>is_bid: bool</code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-<a id="0x7_market_types_BulkRejectedEvent"></a>
-
-## Struct `BulkRejectedEvent`
-
-
-
-<pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="market_types.md#0x7_market_types_BulkRejectedEvent">BulkRejectedEvent</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>parent: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>market: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>sequence_number: u64</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>user: <b>address</b></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
 </dt>
 <dd>
 
@@ -2763,56 +2678,6 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
                 cancelled_ask_prices,
                 cancelled_ask_sizes,
                 previous_seq_num: sequence_number,
-            }
-        );
-    };
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_market_types_emit_event_for_bulk_order_rejected"></a>
-
-## Function `emit_event_for_bulk_order_rejected`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_rejected">emit_event_for_bulk_order_rejected</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, sequence_number: u64, user: <b>address</b>, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>, details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_rejected">emit_event_for_bulk_order_rejected</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="market_types.md#0x7_market_types_Market">Market</a>&lt;M&gt;,
-    sequence_number: u64,
-    user: <b>address</b>,
-    bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
-    reason: BulkOrderRejection,
-    details: std::string::String,
-) {
-    // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
-    <b>if</b> (self.config.allow_events_emission) {
-        <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market_types.md#0x7_market_types_BulkRejectedEvent">BulkRejectedEvent</a> {
-                parent: self.parent,
-                market: self.market,
-                sequence_number,
-                user,
-                bid_prices,
-                bid_sizes,
-                ask_prices,
-                ask_sizes,
-                reason,
-                details,
             }
         );
     };

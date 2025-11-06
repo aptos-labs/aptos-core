@@ -44,6 +44,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::{StatusCode, VMStatus},
 };
+use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::{Lazy, OnceCell};
 use std::{
@@ -441,23 +442,28 @@ impl BlockExecutorTransactionOutput for AptosTransactionOutput {
         aggregator_v1_writes: Vec<(StateKey, WriteOp)>,
         materialized_resource_write_set: Vec<(StateKey, WriteOp)>,
         materialized_events: Vec<ContractEvent>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<Trace, PanicError> {
+        // Before creating the output, extract the trace for replay.
+        let mut vm_output = self
+            .vm_output
+            .take()
+            .expect("Output must be set to incorporate materialized data");
+        let trace = vm_output.take_trace();
+
         self.committed_output
             .set(
-                self.vm_output
-                    .take()
-                    .expect("Output must be set to incorporate materialized data")
-                    .into_transaction_output_with_materialized_write_set(
-                        aggregator_v1_writes,
-                        materialized_resource_write_set,
-                        materialized_events,
-                    )?,
+                vm_output.into_transaction_output_with_materialized_write_set(
+                    aggregator_v1_writes,
+                    materialized_resource_write_set,
+                    materialized_events,
+                )?,
             )
             .map_err(|_| {
                 code_invariant_error(
                     "Could not combine VMOutput with the materialized resource and event data",
                 )
-            })
+            })?;
+        Ok(trace)
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&mut self) {

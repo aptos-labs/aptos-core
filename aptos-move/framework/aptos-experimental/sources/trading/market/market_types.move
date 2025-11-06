@@ -11,7 +11,6 @@ module aptos_experimental::market_types {
     use aptos_std::table::Table;
     use aptos_framework::event;
     use aptos_framework::transaction_context;
-    use aptos_experimental::bulk_order_book_types::BulkOrderRejection;
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
     use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
@@ -422,19 +421,6 @@ module aptos_experimental::market_types {
         is_bid: bool,
     }
 
-    #[event]
-    struct BulkRejectedEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        sequence_number: u64,
-        user: address,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-        reason: BulkOrderRejection,
-        details: std::string::String,
-    }
 
     // ============================= Public APIs ====================================
     public fun new_market_config(
@@ -751,35 +737,6 @@ module aptos_experimental::market_types {
         };
     }
 
-    public fun emit_event_for_bulk_order_rejected<M: store + copy + drop>(
-        self: &Market<M>,
-        sequence_number: u64,
-        user: address,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-        reason: BulkOrderRejection,
-        details: std::string::String,
-    ) {
-        // Final check whether event sending is enabled
-        if (self.config.allow_events_emission) {
-            event::emit(
-                BulkRejectedEvent {
-                    parent: self.parent,
-                    market: self.market,
-                    sequence_number,
-                    user,
-                    bid_prices,
-                    bid_sizes,
-                    ask_prices,
-                    ask_sizes,
-                    reason,
-                    details,
-                }
-            );
-        };
-    }
 
     // ============================= Public Package APIs ====================================
     public(friend) fun get_order_book_mut<M: store + copy + drop>(self: &mut Market<M>): &mut OrderBook<M> {
