@@ -27,6 +27,7 @@ use crate::{
     interpreter::{CallStack, Stack},
     interpreter_caches::InterpreterFunctionCaches,
     loader::FunctionHandle,
+    ops::Instruction,
     reentrancy_checker::CallType,
     runtime_type_checks::{
         verify_pack_closure, FullRuntimeTypeCheck, RuntimeTypeCheck, UntrustedOnlyRuntimeTypeCheck,
@@ -35,7 +36,7 @@ use crate::{
 };
 use move_binary_format::{
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{Bytecode, FunctionHandleIndex, FunctionInstantiationIndex},
+    file_format::{FunctionHandleIndex, FunctionInstantiationIndex},
 };
 use move_core_types::function::ClosureMask;
 use move_vm_types::{
@@ -255,26 +256,26 @@ where
             //     type checks. Another example is local handling: we need to invalidate locals,
             //     which is done via dummy values.
             match instr {
-                Bytecode::Ret => {
+                Instruction::Ret => {
                     return Ok(ExitCode::Return);
                 },
-                Bytecode::Abort => {
+                Instruction::Abort => {
                     return Ok(ExitCode::Done);
                 },
-                Bytecode::Call(idx) => {
+                Instruction::Call(idx) => {
                     return Ok(ExitCode::Call(*idx));
                 },
-                Bytecode::CallGeneric(idx) => {
+                Instruction::CallGeneric(idx) => {
                     return Ok(ExitCode::CallGeneric(*idx));
                 },
-                Bytecode::CallClosure(_) => {
+                Instruction::CallClosure(_) => {
                     return Ok(ExitCode::CallClosure);
                 },
-                Bytecode::Branch(target) => {
+                Instruction::Branch(target) => {
                     frame.pc = *target;
                     continue;
                 },
-                Bytecode::BrTrue(target) | Bytecode::BrFalse(target) => {
+                Instruction::BrTrue(target) | Instruction::BrFalse(target) => {
                     let taken = cursor.consume_branch()?;
                     if taken {
                         frame.pc = *target;
@@ -283,16 +284,16 @@ where
                     }
                     continue;
                 },
-                Bytecode::StLoc(idx) => {
+                Instruction::StLoc(idx) => {
                     // Store dummy value - these are not needed for type checks, as we only need to
                     // know if the value is valid or not.
                     frame.locals.store_loc(*idx as usize, dummy_local())?;
                 },
-                Bytecode::MoveLoc(idx) => {
+                Instruction::MoveLoc(idx) => {
                     frame.locals.move_loc(*idx as usize)?;
                 },
                 // Pack closure is not checked in pre- or post-execution type transition.
-                Bytecode::PackClosure(idx, mask) => {
+                Instruction::PackClosure(idx, mask) => {
                     let function = self.idx_to_loaded_function(frame, *idx)?;
                     RTTCheck::check_pack_closure_visibility(&frame.function, &function)?;
                     if RTTCheck::should_perform_checks(&frame.function.function) {
@@ -305,7 +306,7 @@ where
                     }
                 },
                 // Pack closure generic is not checked in pre- or post-execution type transition.
-                Bytecode::PackClosureGeneric(idx, mask) => {
+                Instruction::PackClosureGeneric(idx, mask) => {
                     let function = self.instantiation_idx_to_loaded_function(frame, *idx)?;
                     RTTCheck::check_pack_closure_visibility(&frame.function, &function)?;
                     if RTTCheck::should_perform_checks(&frame.function.function) {
@@ -317,97 +318,97 @@ where
                         )?;
                     }
                 },
-                Bytecode::Pop
-                | Bytecode::LdU8(_)
-                | Bytecode::LdU64(_)
-                | Bytecode::LdU128(_)
-                | Bytecode::CastU8
-                | Bytecode::CastU64
-                | Bytecode::CastU128
-                | Bytecode::LdConst(_)
-                | Bytecode::LdTrue
-                | Bytecode::LdFalse
-                | Bytecode::CopyLoc(_)
-                | Bytecode::Pack(_)
-                | Bytecode::PackGeneric(_)
-                | Bytecode::PackVariant(_)
-                | Bytecode::PackVariantGeneric(_)
-                | Bytecode::Unpack(_)
-                | Bytecode::UnpackGeneric(_)
-                | Bytecode::UnpackVariant(_)
-                | Bytecode::UnpackVariantGeneric(_)
-                | Bytecode::TestVariant(_)
-                | Bytecode::TestVariantGeneric(_)
-                | Bytecode::ReadRef
-                | Bytecode::WriteRef
-                | Bytecode::FreezeRef
-                | Bytecode::MutBorrowLoc(_)
-                | Bytecode::ImmBorrowLoc(_)
-                | Bytecode::MutBorrowField(_)
-                | Bytecode::MutBorrowVariantField(_)
-                | Bytecode::MutBorrowFieldGeneric(_)
-                | Bytecode::MutBorrowVariantFieldGeneric(_)
-                | Bytecode::ImmBorrowField(_)
-                | Bytecode::ImmBorrowVariantField(_)
-                | Bytecode::ImmBorrowFieldGeneric(_)
-                | Bytecode::ImmBorrowVariantFieldGeneric(_)
-                | Bytecode::MutBorrowGlobal(_)
-                | Bytecode::MutBorrowGlobalGeneric(_)
-                | Bytecode::ImmBorrowGlobal(_)
-                | Bytecode::ImmBorrowGlobalGeneric(_)
-                | Bytecode::Add
-                | Bytecode::Sub
-                | Bytecode::Mul
-                | Bytecode::Mod
-                | Bytecode::Div
-                | Bytecode::BitOr
-                | Bytecode::BitAnd
-                | Bytecode::Xor
-                | Bytecode::Or
-                | Bytecode::And
-                | Bytecode::Not
-                | Bytecode::Eq
-                | Bytecode::Neq
-                | Bytecode::Lt
-                | Bytecode::Gt
-                | Bytecode::Le
-                | Bytecode::Ge
-                | Bytecode::Nop
-                | Bytecode::Exists(_)
-                | Bytecode::ExistsGeneric(_)
-                | Bytecode::MoveFrom(_)
-                | Bytecode::MoveFromGeneric(_)
-                | Bytecode::MoveTo(_)
-                | Bytecode::MoveToGeneric(_)
-                | Bytecode::Shl
-                | Bytecode::Shr
-                | Bytecode::VecPack(_, _)
-                | Bytecode::VecLen(_)
-                | Bytecode::VecImmBorrow(_)
-                | Bytecode::VecMutBorrow(_)
-                | Bytecode::VecPushBack(_)
-                | Bytecode::VecPopBack(_)
-                | Bytecode::VecUnpack(_, _)
-                | Bytecode::VecSwap(_)
-                | Bytecode::LdU16(_)
-                | Bytecode::LdU32(_)
-                | Bytecode::LdU256(_)
-                | Bytecode::LdI8(_)
-                | Bytecode::LdI16(_)
-                | Bytecode::LdI32(_)
-                | Bytecode::LdI64(_)
-                | Bytecode::LdI128(_)
-                | Bytecode::LdI256(_)
-                | Bytecode::CastI8
-                | Bytecode::CastI16
-                | Bytecode::CastI32
-                | Bytecode::CastI64
-                | Bytecode::CastI128
-                | Bytecode::CastI256
-                | Bytecode::Negate
-                | Bytecode::CastU16
-                | Bytecode::CastU32
-                | Bytecode::CastU256 => (),
+                Instruction::Pop
+                | Instruction::LdU8(_)
+                | Instruction::LdU64(_)
+                | Instruction::LdU128(_)
+                | Instruction::CastU8
+                | Instruction::CastU64
+                | Instruction::CastU128
+                | Instruction::LdConst(_)
+                | Instruction::LdTrue
+                | Instruction::LdFalse
+                | Instruction::CopyLoc(_)
+                | Instruction::Pack(_)
+                | Instruction::PackGeneric(_)
+                | Instruction::PackVariant(_)
+                | Instruction::PackVariantGeneric(_)
+                | Instruction::Unpack(_)
+                | Instruction::UnpackGeneric(_)
+                | Instruction::UnpackVariant(_)
+                | Instruction::UnpackVariantGeneric(_)
+                | Instruction::TestVariant(_)
+                | Instruction::TestVariantGeneric(_)
+                | Instruction::ReadRef
+                | Instruction::WriteRef
+                | Instruction::FreezeRef
+                | Instruction::MutBorrowLoc(_)
+                | Instruction::ImmBorrowLoc(_)
+                | Instruction::MutBorrowField(_)
+                | Instruction::MutBorrowVariantField(_)
+                | Instruction::MutBorrowFieldGeneric(_)
+                | Instruction::MutBorrowVariantFieldGeneric(_)
+                | Instruction::ImmBorrowField(_)
+                | Instruction::ImmBorrowVariantField(_)
+                | Instruction::ImmBorrowFieldGeneric(_)
+                | Instruction::ImmBorrowVariantFieldGeneric(_)
+                | Instruction::MutBorrowGlobal(_)
+                | Instruction::MutBorrowGlobalGeneric(_)
+                | Instruction::ImmBorrowGlobal(_)
+                | Instruction::ImmBorrowGlobalGeneric(_)
+                | Instruction::Add
+                | Instruction::Sub
+                | Instruction::Mul
+                | Instruction::Mod
+                | Instruction::Div
+                | Instruction::BitOr
+                | Instruction::BitAnd
+                | Instruction::Xor
+                | Instruction::Or
+                | Instruction::And
+                | Instruction::Not
+                | Instruction::Eq
+                | Instruction::Neq
+                | Instruction::Lt
+                | Instruction::Gt
+                | Instruction::Le
+                | Instruction::Ge
+                | Instruction::Nop
+                | Instruction::Exists(_)
+                | Instruction::ExistsGeneric(_)
+                | Instruction::MoveFrom(_)
+                | Instruction::MoveFromGeneric(_)
+                | Instruction::MoveTo(_)
+                | Instruction::MoveToGeneric(_)
+                | Instruction::Shl
+                | Instruction::Shr
+                | Instruction::VecPack(_, _)
+                | Instruction::VecLen(_)
+                | Instruction::VecImmBorrow(_)
+                | Instruction::VecMutBorrow(_)
+                | Instruction::VecPushBack(_)
+                | Instruction::VecPopBack(_)
+                | Instruction::VecUnpack(_, _)
+                | Instruction::VecSwap(_)
+                | Instruction::LdU16(_)
+                | Instruction::LdU32(_)
+                | Instruction::LdU256(_)
+                | Instruction::LdI8(_)
+                | Instruction::LdI16(_)
+                | Instruction::LdI32(_)
+                | Instruction::LdI64(_)
+                | Instruction::LdI128(_)
+                | Instruction::LdI256(_)
+                | Instruction::CastI8
+                | Instruction::CastI16
+                | Instruction::CastI32
+                | Instruction::CastI64
+                | Instruction::CastI128
+                | Instruction::CastI256
+                | Instruction::Negate
+                | Instruction::CastU16
+                | Instruction::CastU32
+                | Instruction::CastU256 => (),
             }
 
             RTTCheck::post_execution_type_stack_transition(

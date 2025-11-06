@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack,
+    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack, ops::Instruction,
     reentrancy_checker::CallType, Function, LoadedFunction,
 };
-use move_binary_format::{errors::*, file_format::Bytecode};
+use move_binary_format::errors::*;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
@@ -18,7 +18,7 @@ pub(crate) trait RuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
@@ -26,7 +26,7 @@ pub(crate) trait RuntimeTypeCheck {
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
@@ -229,7 +229,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
-        _instruction: &Bytecode,
+        _instruction: &Instruction,
         _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         Ok(())
@@ -239,7 +239,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     fn post_execution_type_stack_transition(
         _frame: &Frame,
         _operand_stack: &mut Stack,
-        _instruction: &Bytecode,
+        _instruction: &Instruction,
         _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         Ok(())
@@ -280,16 +280,16 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         match instruction {
             // Call instruction will be checked at execute_main.
-            Bytecode::Call(_) | Bytecode::CallGeneric(_) => (),
-            Bytecode::BrFalse(_) | Bytecode::BrTrue(_) => {
+            Instruction::Call(_) | Instruction::CallGeneric(_) => (),
+            Instruction::BrFalse(_) | Instruction::BrTrue(_) => {
                 operand_stack.pop_ty()?;
             },
-            Bytecode::CallClosure(sig_idx) => {
+            Instruction::CallClosure(sig_idx) => {
                 // For closure, we need to check the type of the closure on
                 // top of the stack. The argument types are checked when the frame
                 // is constructed in the interpreter, using the same code as for regular
@@ -298,15 +298,15 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let given_ty = operand_stack.pop_ty()?;
                 given_ty.paranoid_check_assignable(expected_ty)?;
             },
-            Bytecode::Branch(_) => (),
-            Bytecode::Ret => {
+            Instruction::Branch(_) => (),
+            Instruction::Ret => {
                 frame.check_local_tys_have_drop_ability()?;
             },
-            Bytecode::Abort => {
+            Instruction::Abort => {
                 operand_stack.pop_ty()?;
             },
             // StLoc needs to check before execution as we need to check the drop ability of values.
-            Bytecode::StLoc(idx) => {
+            Instruction::StLoc(idx) => {
                 let expected_ty = frame.local_ty_at(*idx as usize);
                 let val_ty = operand_stack.pop_ty()?;
                 // For store, use assignability
@@ -316,102 +316,102 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 }
             },
             // We will check the rest of the instructions after execution phase.
-            Bytecode::Pop
-            | Bytecode::LdU8(_)
-            | Bytecode::LdU16(_)
-            | Bytecode::LdU32(_)
-            | Bytecode::LdU64(_)
-            | Bytecode::LdU128(_)
-            | Bytecode::LdU256(_)
-            | Bytecode::LdI8(_)
-            | Bytecode::LdI16(_)
-            | Bytecode::LdI32(_)
-            | Bytecode::LdI64(_)
-            | Bytecode::LdI128(_)
-            | Bytecode::LdI256(_)
-            | Bytecode::LdTrue
-            | Bytecode::LdFalse
-            | Bytecode::LdConst(_)
-            | Bytecode::CopyLoc(_)
-            | Bytecode::MoveLoc(_)
-            | Bytecode::MutBorrowLoc(_)
-            | Bytecode::ImmBorrowLoc(_)
-            | Bytecode::ImmBorrowField(_)
-            | Bytecode::MutBorrowField(_)
-            | Bytecode::ImmBorrowFieldGeneric(_)
-            | Bytecode::MutBorrowFieldGeneric(_)
-            | Bytecode::PackClosure(..)
-            | Bytecode::PackClosureGeneric(..)
-            | Bytecode::Pack(_)
-            | Bytecode::PackGeneric(_)
-            | Bytecode::Unpack(_)
-            | Bytecode::UnpackGeneric(_)
-            | Bytecode::ReadRef
-            | Bytecode::WriteRef
-            | Bytecode::CastU8
-            | Bytecode::CastU16
-            | Bytecode::CastU32
-            | Bytecode::CastU64
-            | Bytecode::CastU128
-            | Bytecode::CastU256
-            | Bytecode::CastI8
-            | Bytecode::CastI16
-            | Bytecode::CastI32
-            | Bytecode::CastI64
-            | Bytecode::CastI128
-            | Bytecode::CastI256
-            | Bytecode::Add
-            | Bytecode::Sub
-            | Bytecode::Mul
-            | Bytecode::Mod
-            | Bytecode::Div
-            | Bytecode::Negate
-            | Bytecode::BitOr
-            | Bytecode::BitAnd
-            | Bytecode::Xor
-            | Bytecode::Or
-            | Bytecode::And
-            | Bytecode::Shl
-            | Bytecode::Shr
-            | Bytecode::Lt
-            | Bytecode::Le
-            | Bytecode::Gt
-            | Bytecode::Ge
-            | Bytecode::Eq
-            | Bytecode::Neq
-            | Bytecode::MutBorrowGlobal(_)
-            | Bytecode::ImmBorrowGlobal(_)
-            | Bytecode::MutBorrowGlobalGeneric(_)
-            | Bytecode::ImmBorrowGlobalGeneric(_)
-            | Bytecode::Exists(_)
-            | Bytecode::ExistsGeneric(_)
-            | Bytecode::MoveTo(_)
-            | Bytecode::MoveToGeneric(_)
-            | Bytecode::MoveFrom(_)
-            | Bytecode::MoveFromGeneric(_)
-            | Bytecode::FreezeRef
-            | Bytecode::Nop
-            | Bytecode::Not
-            | Bytecode::VecPack(_, _)
-            | Bytecode::VecLen(_)
-            | Bytecode::VecImmBorrow(_)
-            | Bytecode::VecMutBorrow(_)
-            | Bytecode::VecPushBack(_)
-            | Bytecode::VecPopBack(_)
-            | Bytecode::VecUnpack(_, _)
-            | Bytecode::VecSwap(_) => (),
+            Instruction::Pop
+            | Instruction::LdU8(_)
+            | Instruction::LdU16(_)
+            | Instruction::LdU32(_)
+            | Instruction::LdU64(_)
+            | Instruction::LdU128(_)
+            | Instruction::LdU256(_)
+            | Instruction::LdI8(_)
+            | Instruction::LdI16(_)
+            | Instruction::LdI32(_)
+            | Instruction::LdI64(_)
+            | Instruction::LdI128(_)
+            | Instruction::LdI256(_)
+            | Instruction::LdTrue
+            | Instruction::LdFalse
+            | Instruction::LdConst(_)
+            | Instruction::CopyLoc(_)
+            | Instruction::MoveLoc(_)
+            | Instruction::MutBorrowLoc(_)
+            | Instruction::ImmBorrowLoc(_)
+            | Instruction::ImmBorrowField(_)
+            | Instruction::MutBorrowField(_)
+            | Instruction::ImmBorrowFieldGeneric(_)
+            | Instruction::MutBorrowFieldGeneric(_)
+            | Instruction::PackClosure(..)
+            | Instruction::PackClosureGeneric(..)
+            | Instruction::Pack(_)
+            | Instruction::PackGeneric(_)
+            | Instruction::Unpack(_)
+            | Instruction::UnpackGeneric(_)
+            | Instruction::ReadRef
+            | Instruction::WriteRef
+            | Instruction::CastU8
+            | Instruction::CastU16
+            | Instruction::CastU32
+            | Instruction::CastU64
+            | Instruction::CastU128
+            | Instruction::CastU256
+            | Instruction::CastI8
+            | Instruction::CastI16
+            | Instruction::CastI32
+            | Instruction::CastI64
+            | Instruction::CastI128
+            | Instruction::CastI256
+            | Instruction::Add
+            | Instruction::Sub
+            | Instruction::Mul
+            | Instruction::Mod
+            | Instruction::Div
+            | Instruction::Negate
+            | Instruction::BitOr
+            | Instruction::BitAnd
+            | Instruction::Xor
+            | Instruction::Or
+            | Instruction::And
+            | Instruction::Shl
+            | Instruction::Shr
+            | Instruction::Lt
+            | Instruction::Le
+            | Instruction::Gt
+            | Instruction::Ge
+            | Instruction::Eq
+            | Instruction::Neq
+            | Instruction::MutBorrowGlobal(_)
+            | Instruction::ImmBorrowGlobal(_)
+            | Instruction::MutBorrowGlobalGeneric(_)
+            | Instruction::ImmBorrowGlobalGeneric(_)
+            | Instruction::Exists(_)
+            | Instruction::ExistsGeneric(_)
+            | Instruction::MoveTo(_)
+            | Instruction::MoveToGeneric(_)
+            | Instruction::MoveFrom(_)
+            | Instruction::MoveFromGeneric(_)
+            | Instruction::FreezeRef
+            | Instruction::Nop
+            | Instruction::Not
+            | Instruction::VecPack(_, _)
+            | Instruction::VecLen(_)
+            | Instruction::VecImmBorrow(_)
+            | Instruction::VecMutBorrow(_)
+            | Instruction::VecPushBack(_)
+            | Instruction::VecPopBack(_)
+            | Instruction::VecUnpack(_, _)
+            | Instruction::VecSwap(_) => (),
 
             // Since bytecode version 7
-            Bytecode::PackVariant(_)
-            | Bytecode::PackVariantGeneric(_)
-            | Bytecode::UnpackVariant(_)
-            | Bytecode::UnpackVariantGeneric(_)
-            | Bytecode::TestVariant(_)
-            | Bytecode::TestVariantGeneric(_)
-            | Bytecode::MutBorrowVariantField(_)
-            | Bytecode::MutBorrowVariantFieldGeneric(_)
-            | Bytecode::ImmBorrowVariantField(_)
-            | Bytecode::ImmBorrowVariantFieldGeneric(_) => (),
+            Instruction::PackVariant(_)
+            | Instruction::PackVariantGeneric(_)
+            | Instruction::UnpackVariant(_)
+            | Instruction::UnpackVariantGeneric(_)
+            | Instruction::TestVariant(_)
+            | Instruction::TestVariantGeneric(_)
+            | Instruction::MutBorrowVariantField(_)
+            | Instruction::MutBorrowVariantFieldGeneric(_)
+            | Instruction::ImmBorrowVariantField(_)
+            | Instruction::ImmBorrowVariantFieldGeneric(_) => (),
         };
         Ok(())
     }
@@ -426,105 +426,105 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         let ty_builder = frame.ty_builder();
         match instruction {
-            Bytecode::BrTrue(_) | Bytecode::BrFalse(_) => (),
-            Bytecode::Branch(_)
-            | Bytecode::Ret
-            | Bytecode::Call(_)
-            | Bytecode::CallGeneric(_)
-            | Bytecode::CallClosure(_)
-            | Bytecode::Abort => {
+            Instruction::BrTrue(_) | Instruction::BrFalse(_) => (),
+            Instruction::Branch(_)
+            | Instruction::Ret
+            | Instruction::Call(_)
+            | Instruction::CallGeneric(_)
+            | Instruction::CallClosure(_)
+            | Instruction::Abort => {
                 // Invariants hold because all of the instructions
                 // above will force VM to break from the interpreter
                 // loop and thus not hit this code path.
                 unreachable!("control flow instruction encountered during type check")
             },
-            Bytecode::Pop => {
+            Instruction::Pop => {
                 let ty = operand_stack.pop_ty()?;
                 ty.paranoid_check_has_ability(Ability::Drop)?;
             },
-            Bytecode::LdU8(_) => {
+            Instruction::LdU8(_) => {
                 let u8_ty = ty_builder.create_u8_ty();
                 operand_stack.push_ty(u8_ty)?
             },
-            Bytecode::LdU16(_) => {
+            Instruction::LdU16(_) => {
                 let u16_ty = ty_builder.create_u16_ty();
                 operand_stack.push_ty(u16_ty)?
             },
-            Bytecode::LdU32(_) => {
+            Instruction::LdU32(_) => {
                 let u32_ty = ty_builder.create_u32_ty();
                 operand_stack.push_ty(u32_ty)?
             },
-            Bytecode::LdU64(_) => {
+            Instruction::LdU64(_) => {
                 let u64_ty = ty_builder.create_u64_ty();
                 operand_stack.push_ty(u64_ty)?
             },
-            Bytecode::LdU128(_) => {
+            Instruction::LdU128(_) => {
                 let u128_ty = ty_builder.create_u128_ty();
                 operand_stack.push_ty(u128_ty)?
             },
-            Bytecode::LdU256(_) => {
+            Instruction::LdU256(_) => {
                 let u256_ty = ty_builder.create_u256_ty();
                 operand_stack.push_ty(u256_ty)?
             },
-            Bytecode::LdI8(_) => {
+            Instruction::LdI8(_) => {
                 let i8_ty = ty_builder.create_i8_ty();
                 operand_stack.push_ty(i8_ty)?
             },
-            Bytecode::LdI16(_) => {
+            Instruction::LdI16(_) => {
                 let i16_ty = ty_builder.create_i16_ty();
                 operand_stack.push_ty(i16_ty)?
             },
-            Bytecode::LdI32(_) => {
+            Instruction::LdI32(_) => {
                 let i32_ty = ty_builder.create_i32_ty();
                 operand_stack.push_ty(i32_ty)?
             },
-            Bytecode::LdI64(_) => {
+            Instruction::LdI64(_) => {
                 let i64_ty = ty_builder.create_i64_ty();
                 operand_stack.push_ty(i64_ty)?
             },
-            Bytecode::LdI128(_) => {
+            Instruction::LdI128(_) => {
                 let i128_ty = ty_builder.create_i128_ty();
                 operand_stack.push_ty(i128_ty)?
             },
-            Bytecode::LdI256(_) => {
+            Instruction::LdI256(_) => {
                 let i256_ty = ty_builder.create_i256_ty();
                 operand_stack.push_ty(i256_ty)?
             },
-            Bytecode::LdTrue | Bytecode::LdFalse => {
+            Instruction::LdTrue | Instruction::LdFalse => {
                 let bool_ty = ty_builder.create_bool_ty();
                 operand_stack.push_ty(bool_ty)?
             },
-            Bytecode::LdConst(i) => {
+            Instruction::LdConst(i) => {
                 let constant = frame.constant_at(*i);
                 let ty = ty_builder.create_constant_ty(&constant.type_)?;
                 operand_stack.push_ty(ty)?;
             },
-            Bytecode::CopyLoc(idx) => {
+            Instruction::CopyLoc(idx) => {
                 let ty = frame.local_ty_at(*idx as usize).clone();
                 ty.paranoid_check_has_ability(Ability::Copy)?;
                 operand_stack.push_ty(ty)?;
             },
-            Bytecode::MoveLoc(idx) => {
+            Instruction::MoveLoc(idx) => {
                 let ty = frame.local_ty_at(*idx as usize).clone();
                 operand_stack.push_ty(ty)?;
             },
-            Bytecode::StLoc(_) => (),
-            Bytecode::MutBorrowLoc(idx) => {
+            Instruction::StLoc(_) => (),
+            Instruction::MutBorrowLoc(idx) => {
                 let ty = frame.local_ty_at(*idx as usize);
                 let mut_ref_ty = ty_builder.create_ref_ty(ty, true)?;
                 operand_stack.push_ty(mut_ref_ty)?;
             },
-            Bytecode::ImmBorrowLoc(idx) => {
+            Instruction::ImmBorrowLoc(idx) => {
                 let ty = frame.local_ty_at(*idx as usize);
                 let ref_ty = ty_builder.create_ref_ty(ty, false)?;
                 operand_stack.push_ty(ref_ty)?;
             },
-            Bytecode::ImmBorrowField(fh_idx) => {
+            Instruction::ImmBorrowField(fh_idx) => {
                 let ty = operand_stack.pop_ty()?;
                 let expected_ty = frame.field_handle_to_struct(*fh_idx);
                 ty.paranoid_check_ref_eq(&expected_ty, false)?;
@@ -533,7 +533,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
-            Bytecode::MutBorrowField(fh_idx) => {
+            Instruction::MutBorrowField(fh_idx) => {
                 let ref_ty = operand_stack.pop_ty()?;
                 let expected_inner_ty = frame.field_handle_to_struct(*fh_idx);
                 ref_ty.paranoid_check_ref_eq(&expected_inner_ty, true)?;
@@ -542,7 +542,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
                 operand_stack.push_ty(field_mut_ref_ty)?;
             },
-            Bytecode::ImmBorrowFieldGeneric(idx) => {
+            Instruction::ImmBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, frame)?;
@@ -551,7 +551,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
-            Bytecode::MutBorrowFieldGeneric(idx) => {
+            Instruction::MutBorrowFieldGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_field_type_and_struct_type(*idx, frame)?;
@@ -560,8 +560,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_mut_ref_ty = ty_builder.create_ref_ty(field_ty, true)?;
                 operand_stack.push_ty(field_mut_ref_ty)?;
             },
-            Bytecode::ImmBorrowVariantField(fh_idx) | Bytecode::MutBorrowVariantField(fh_idx) => {
-                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantField(..));
+            Instruction::ImmBorrowVariantField(fh_idx)
+            | Instruction::MutBorrowVariantField(fh_idx) => {
+                let is_mut = matches!(instruction, Instruction::MutBorrowVariantField(..));
                 let field_info = frame.variant_field_info_at(*fh_idx);
                 let ty = operand_stack.pop_ty()?;
                 let expected_ty = frame.create_struct_ty(&field_info.definition_struct_type);
@@ -570,9 +571,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
-            Bytecode::ImmBorrowVariantFieldGeneric(idx)
-            | Bytecode::MutBorrowVariantFieldGeneric(idx) => {
-                let is_mut = matches!(instruction, Bytecode::MutBorrowVariantFieldGeneric(..));
+            Instruction::ImmBorrowVariantFieldGeneric(idx)
+            | Instruction::MutBorrowVariantFieldGeneric(idx) => {
+                let is_mut = matches!(instruction, Instruction::MutBorrowVariantFieldGeneric(..));
                 let struct_ty = operand_stack.pop_ty()?;
                 let ((field_ty, _), (expected_struct_ty, _)) =
                     ty_cache.get_variant_field_type_and_struct_type(*idx, frame)?;
@@ -580,18 +581,18 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let field_ref_ty = ty_builder.create_ref_ty(field_ty, is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
             },
-            Bytecode::PackClosure(..) | Bytecode::PackClosureGeneric(..) => {
+            Instruction::PackClosure(..) | Instruction::PackClosureGeneric(..) => {
                 // Skip: runtime checks are implemented in interpreter loop!
             },
 
-            Bytecode::Pack(idx) => {
+            Instruction::Pack(idx) => {
                 let field_count = frame.field_count(*idx);
                 let args_ty = frame.get_struct(*idx);
                 let field_tys = args_ty.fields(None)?.iter().map(|(_, ty)| ty);
                 let output_ty = frame.get_struct_ty(*idx);
                 verify_pack(operand_stack, field_count, field_tys, output_ty)?;
             },
-            Bytecode::PackGeneric(idx) => {
+            Instruction::PackGeneric(idx) => {
                 let field_count = frame.field_instantiation_count(*idx);
                 let output_ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
                 let args_ty = ty_cache.get_struct_fields_types(*idx, frame)?;
@@ -614,7 +615,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     output_ty,
                 )?;
             },
-            Bytecode::Unpack(idx) => {
+            Instruction::Unpack(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
                 struct_ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
                 let struct_decl = frame.get_struct(*idx);
@@ -622,7 +623,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     operand_stack.push_ty(ty.clone())?;
                 }
             },
-            Bytecode::UnpackGeneric(idx) => {
+            Instruction::UnpackGeneric(idx) => {
                 let struct_ty = operand_stack.pop_ty()?;
 
                 struct_ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
@@ -632,7 +633,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     operand_stack.push_ty(ty.clone())?;
                 }
             },
-            Bytecode::PackVariant(idx) => {
+            Instruction::PackVariant(idx) => {
                 let info = frame.get_struct_variant_at(*idx);
                 let field_tys = info
                     .definition_struct_type
@@ -642,7 +643,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let output_ty = frame.create_struct_ty(&info.definition_struct_type);
                 verify_pack(operand_stack, info.field_count, field_tys, output_ty)?;
             },
-            Bytecode::PackVariantGeneric(idx) => {
+            Instruction::PackVariantGeneric(idx) => {
                 let info = frame.get_struct_variant_instantiation_at(*idx);
                 let output_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0.clone();
                 let args_ty = ty_cache.get_struct_variant_fields_types(*idx, frame)?;
@@ -653,7 +654,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     output_ty,
                 )?;
             },
-            Bytecode::UnpackVariant(idx) => {
+            Instruction::UnpackVariant(idx) => {
                 let info = frame.get_struct_variant_at(*idx);
                 let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
                 let actual_struct_ty = operand_stack.pop_ty()?;
@@ -666,7 +667,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     operand_stack.push_ty(ty.clone())?;
                 }
             },
-            Bytecode::UnpackVariantGeneric(idx) => {
+            Instruction::UnpackVariantGeneric(idx) => {
                 let expected_struct_type = ty_cache.get_struct_variant_type(*idx, frame)?.0;
                 let actual_struct_type = operand_stack.pop_ty()?;
                 actual_struct_type.paranoid_check_eq(expected_struct_type)?;
@@ -675,116 +676,116 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     operand_stack.push_ty(ty.clone())?;
                 }
             },
-            Bytecode::TestVariant(idx) => {
+            Instruction::TestVariant(idx) => {
                 let info = frame.get_struct_variant_at(*idx);
                 let expected_struct_ty = frame.create_struct_ty(&info.definition_struct_type);
                 let actual_struct_ty = operand_stack.pop_ty()?;
                 actual_struct_ty.paranoid_check_ref_eq(&expected_struct_ty, false)?;
                 operand_stack.push_ty(ty_builder.create_bool_ty())?;
             },
-            Bytecode::TestVariantGeneric(idx) => {
+            Instruction::TestVariantGeneric(idx) => {
                 let expected_struct_ty = ty_cache.get_struct_variant_type(*idx, frame)?.0;
                 let actual_struct_ty = operand_stack.pop_ty()?;
                 actual_struct_ty.paranoid_check_ref_eq(expected_struct_ty, false)?;
                 operand_stack.push_ty(ty_builder.create_bool_ty())?;
             },
-            Bytecode::ReadRef => {
+            Instruction::ReadRef => {
                 let ref_ty = operand_stack.pop_ty()?;
                 let inner_ty = ref_ty.paranoid_read_ref()?;
                 operand_stack.push_ty(inner_ty)?;
             },
-            Bytecode::WriteRef => {
+            Instruction::WriteRef => {
                 let mut_ref_ty = operand_stack.pop_ty()?;
                 let val_ty = operand_stack.pop_ty()?;
                 mut_ref_ty.paranoid_write_ref(&val_ty)?;
             },
-            Bytecode::CastU8 => {
+            Instruction::CastU8 => {
                 operand_stack.pop_ty()?;
                 let u8_ty = ty_builder.create_u8_ty();
                 operand_stack.push_ty(u8_ty)?;
             },
-            Bytecode::CastU16 => {
+            Instruction::CastU16 => {
                 operand_stack.pop_ty()?;
                 let u16_ty = ty_builder.create_u16_ty();
                 operand_stack.push_ty(u16_ty)?;
             },
-            Bytecode::CastU32 => {
+            Instruction::CastU32 => {
                 operand_stack.pop_ty()?;
                 let u32_ty = ty_builder.create_u32_ty();
                 operand_stack.push_ty(u32_ty)?;
             },
-            Bytecode::CastU64 => {
+            Instruction::CastU64 => {
                 operand_stack.pop_ty()?;
                 let u64_ty = ty_builder.create_u64_ty();
                 operand_stack.push_ty(u64_ty)?;
             },
-            Bytecode::CastU128 => {
+            Instruction::CastU128 => {
                 operand_stack.pop_ty()?;
                 let u128_ty = ty_builder.create_u128_ty();
                 operand_stack.push_ty(u128_ty)?;
             },
-            Bytecode::CastU256 => {
+            Instruction::CastU256 => {
                 operand_stack.pop_ty()?;
                 let u256_ty = ty_builder.create_u256_ty();
                 operand_stack.push_ty(u256_ty)?;
             },
-            Bytecode::CastI8 => {
+            Instruction::CastI8 => {
                 operand_stack.pop_ty()?;
                 let i8_ty = ty_builder.create_i8_ty();
                 operand_stack.push_ty(i8_ty)?;
             },
-            Bytecode::CastI16 => {
+            Instruction::CastI16 => {
                 operand_stack.pop_ty()?;
                 let i16_ty = ty_builder.create_i16_ty();
                 operand_stack.push_ty(i16_ty)?;
             },
-            Bytecode::CastI32 => {
+            Instruction::CastI32 => {
                 operand_stack.pop_ty()?;
                 let i32_ty = ty_builder.create_i32_ty();
                 operand_stack.push_ty(i32_ty)?;
             },
-            Bytecode::CastI64 => {
+            Instruction::CastI64 => {
                 operand_stack.pop_ty()?;
                 let i64_ty = ty_builder.create_i64_ty();
                 operand_stack.push_ty(i64_ty)?;
             },
-            Bytecode::CastI128 => {
+            Instruction::CastI128 => {
                 operand_stack.pop_ty()?;
                 let i128_ty = ty_builder.create_i128_ty();
                 operand_stack.push_ty(i128_ty)?;
             },
-            Bytecode::CastI256 => {
+            Instruction::CastI256 => {
                 operand_stack.pop_ty()?;
                 let i256_ty = ty_builder.create_i256_ty();
                 operand_stack.push_ty(i256_ty)?;
             },
-            Bytecode::Add
-            | Bytecode::Sub
-            | Bytecode::Mul
-            | Bytecode::Mod
-            | Bytecode::Div
-            | Bytecode::BitOr
-            | Bytecode::BitAnd
-            | Bytecode::Xor
-            | Bytecode::Or
-            | Bytecode::And => {
+            Instruction::Add
+            | Instruction::Sub
+            | Instruction::Mul
+            | Instruction::Mod
+            | Instruction::Div
+            | Instruction::BitOr
+            | Instruction::BitAnd
+            | Instruction::Xor
+            | Instruction::Or
+            | Instruction::And => {
                 let rhs_ty = operand_stack.pop_ty()?;
                 rhs_ty.paranoid_check_eq(operand_stack.top_ty()?)?;
                 // NO-OP, same as the two lines below when the types are indeed the same:
                 // let lhs_ty = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(rhs_ty)?;
             },
-            Bytecode::Negate => {
+            Instruction::Negate => {
                 operand_stack.top_ty()?.paranoid_check_is_sint_ty()?;
                 // NO-OP, leave stack as is
             },
-            Bytecode::Shl | Bytecode::Shr => {
+            Instruction::Shl | Instruction::Shr => {
                 let _rhs = operand_stack.pop_ty()?;
                 // NO-OP, same as the two lines below:
                 // let lhs = operand_stack.pop_ty()?;
                 // operand_stack.push_ty(lhs)?;
             },
-            Bytecode::Lt | Bytecode::Le | Bytecode::Gt | Bytecode::Ge => {
+            Instruction::Lt | Instruction::Le | Instruction::Gt | Instruction::Ge => {
                 let rhs_ty = operand_stack.pop_ty()?;
                 let lhs_ty = operand_stack.pop_ty()?;
                 rhs_ty.paranoid_check_eq(&lhs_ty)?;
@@ -792,7 +793,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let bool_ty = ty_builder.create_bool_ty();
                 operand_stack.push_ty(bool_ty)?;
             },
-            Bytecode::Eq | Bytecode::Neq => {
+            Instruction::Eq | Instruction::Neq => {
                 let rhs_ty = operand_stack.pop_ty()?;
                 let lhs_ty = operand_stack.pop_ty()?;
                 rhs_ty.paranoid_check_eq(&lhs_ty)?;
@@ -801,7 +802,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let bool_ty = ty_builder.create_bool_ty();
                 operand_stack.push_ty(bool_ty)?;
             },
-            Bytecode::MutBorrowGlobal(idx) => {
+            Instruction::MutBorrowGlobal(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
                 let struct_ty = frame.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
@@ -809,7 +810,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_mut_ref_ty = ty_builder.create_ref_ty(&struct_ty, true)?;
                 operand_stack.push_ty(struct_mut_ref_ty)?;
             },
-            Bytecode::ImmBorrowGlobal(idx) => {
+            Instruction::ImmBorrowGlobal(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
                 let struct_ty = frame.get_struct_ty(*idx);
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
@@ -817,7 +818,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_ref_ty = ty_builder.create_ref_ty(&struct_ty, false)?;
                 operand_stack.push_ty(struct_ref_ty)?;
             },
-            Bytecode::MutBorrowGlobalGeneric(idx) => {
+            Instruction::MutBorrowGlobalGeneric(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
                 let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
@@ -825,7 +826,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_mut_ref_ty = ty_builder.create_ref_ty(struct_ty, true)?;
                 operand_stack.push_ty(struct_mut_ref_ty)?;
             },
-            Bytecode::ImmBorrowGlobalGeneric(idx) => {
+            Instruction::ImmBorrowGlobalGeneric(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
                 let struct_ty = ty_cache.get_struct_type(*idx, frame)?.0;
                 struct_ty.paranoid_check_has_ability(Ability::Key)?;
@@ -833,49 +834,49 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let struct_ref_ty = ty_builder.create_ref_ty(struct_ty, false)?;
                 operand_stack.push_ty(struct_ref_ty)?;
             },
-            Bytecode::Exists(_) | Bytecode::ExistsGeneric(_) => {
+            Instruction::Exists(_) | Instruction::ExistsGeneric(_) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
 
                 let bool_ty = ty_builder.create_bool_ty();
                 operand_stack.push_ty(bool_ty)?;
             },
-            Bytecode::MoveTo(idx) => {
+            Instruction::MoveTo(idx) => {
                 let ty = operand_stack.pop_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
                 ty.paranoid_check_eq(&frame.get_struct_ty(*idx))?;
                 ty.paranoid_check_has_ability(Ability::Key)?;
             },
-            Bytecode::MoveToGeneric(idx) => {
+            Instruction::MoveToGeneric(idx) => {
                 let ty = operand_stack.pop_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_signer_ref_ty()?;
                 ty.paranoid_check_eq(ty_cache.get_struct_type(*idx, frame)?.0)?;
                 ty.paranoid_check_has_ability(Ability::Key)?;
             },
-            Bytecode::MoveFrom(idx) => {
+            Instruction::MoveFrom(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
                 let ty = frame.get_struct_ty(*idx);
                 ty.paranoid_check_has_ability(Ability::Key)?;
                 operand_stack.push_ty(ty)?;
             },
-            Bytecode::MoveFromGeneric(idx) => {
+            Instruction::MoveFromGeneric(idx) => {
                 operand_stack.pop_ty()?.paranoid_check_is_address_ty()?;
                 let ty = ty_cache.get_struct_type(*idx, frame)?.0.clone();
                 ty.paranoid_check_has_ability(Ability::Key)?;
                 operand_stack.push_ty(ty)?;
             },
-            Bytecode::FreezeRef => {
+            Instruction::FreezeRef => {
                 let mut_ref_ty = operand_stack.pop_ty()?;
                 let ref_ty = mut_ref_ty.paranoid_freeze_ref_ty()?;
                 operand_stack.push_ty(ref_ty)?;
             },
-            Bytecode::Nop => (),
-            Bytecode::Not => {
+            Instruction::Nop => (),
+            Instruction::Not => {
                 operand_stack.top_ty()?.paranoid_check_is_bool_ty()?;
                 // NO-OP,  same as the two lines below:
                 // let bool_ty = ty_builder.create_bool_ty();
                 // operand_stack.push_ty(bool_ty)?;
             },
-            Bytecode::VecPack(si, num) => {
+            Instruction::VecPack(si, num) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let elem_tys = operand_stack.popn_tys(*num as u16)?;
                 for elem_ty in elem_tys.iter() {
@@ -886,7 +887,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let vec_ty = ty_builder.create_vec_ty(ty)?;
                 operand_stack.push_ty(vec_ty)?;
             },
-            Bytecode::VecLen(si) => {
+            Instruction::VecLen(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack
                     .pop_ty()?
@@ -895,7 +896,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let u64_ty = ty_builder.create_u64_ty();
                 operand_stack.push_ty(u64_ty)?;
             },
-            Bytecode::VecImmBorrow(si) => {
+            Instruction::VecImmBorrow(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
@@ -904,7 +905,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
 
                 operand_stack.push_ty(elem_ref_ty)?;
             },
-            Bytecode::VecMutBorrow(si) => {
+            Instruction::VecMutBorrow(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 let elem_ref_ty = operand_stack
@@ -912,7 +913,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .paranoid_check_and_get_vec_elem_ref_ty::<true>(ty)?;
                 operand_stack.push_ty(elem_ref_ty)?;
             },
-            Bytecode::VecPushBack(si) => {
+            Instruction::VecPushBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 // For pushing an element to a vector, use assignability
                 operand_stack.pop_ty()?.paranoid_check_assignable(ty)?;
@@ -920,14 +921,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .pop_ty()?
                     .paranoid_check_is_vec_ref_ty::<true>(ty)?;
             },
-            Bytecode::VecPopBack(si) => {
+            Instruction::VecPopBack(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let elem_ty = operand_stack
                     .pop_ty()?
                     .paranoid_check_and_get_vec_elem_ty::<true>(ty)?;
                 operand_stack.push_ty(elem_ty)?;
             },
-            Bytecode::VecUnpack(si, num) => {
+            Instruction::VecUnpack(si, num) => {
                 let (expected_elem_ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 let vec_ty = operand_stack.pop_ty()?;
                 vec_ty.paranoid_check_is_vec_ty(expected_elem_ty)?;
@@ -935,7 +936,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     operand_stack.push_ty(expected_elem_ty.clone())?;
                 }
             },
-            Bytecode::VecSwap(si) => {
+            Instruction::VecSwap(si) => {
                 let (ty, _) = ty_cache.get_signature_index_type(*si, frame)?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
@@ -1010,7 +1011,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
     fn pre_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         if frame.untrusted_code() {
@@ -1029,7 +1030,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
     fn post_execution_type_stack_transition(
         frame: &Frame,
         operand_stack: &mut Stack,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         if frame.untrusted_code() {

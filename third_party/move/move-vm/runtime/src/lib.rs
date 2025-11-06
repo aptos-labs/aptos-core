@@ -20,6 +20,7 @@ pub mod native_functions;
 pub mod tracing;
 pub mod config;
 pub mod module_traversal;
+pub mod ops;
 
 // Only include debugging functionality in debug builds
 #[cfg(any(debug_assertions, feature = "debugging"))]

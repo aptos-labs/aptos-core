@@ -5,10 +5,11 @@
 #[cfg(feature = "debugging")]
 use crate::debug::DebugContext;
 #[cfg(feature = "debugging")]
+use crate::ops::Instruction;
+#[cfg(feature = "debugging")]
 use crate::{interpreter::InterpreterDebugInterface, loader::LoadedFunction, RuntimeEnvironment};
 #[cfg(feature = "debugging")]
 use ::{
-    move_binary_format::file_format::Bytecode,
     move_vm_types::values::Locals,
     once_cell::sync::Lazy,
     std::{
@@ -60,7 +61,7 @@ pub(crate) fn trace(
     function: &LoadedFunction,
     locals: &Locals,
     pc: u16,
-    instr: &Bytecode,
+    instr: &Instruction,
     runtime_environment: &RuntimeEnvironment,
     interpreter: &dyn InterpreterDebugInterface,
 ) {

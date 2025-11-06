@@ -6,6 +6,7 @@ use crate::{
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
+    ops::Instruction,
     storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
 };
 use better_any::{Tid, TidAble, TidExt};
@@ -14,9 +15,7 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{
-        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
-    },
+    file_format::{CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{
     ability::AbilitySet,
@@ -66,7 +65,7 @@ pub struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
-    pub(crate) code: Vec<Bytecode>,
+    pub(crate) code: Vec<Instruction>,
     pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
@@ -568,7 +567,7 @@ impl LoadedFunction {
         self.function.index
     }
 
-    pub(crate) fn code(&self) -> &[Bytecode] {
+    pub(crate) fn code(&self) -> &[Instruction] {
         &self.function.code
     }
 
@@ -632,7 +631,7 @@ impl Function {
 
         // Native functions do not have a code unit
         let code = match &def.code {
-            Some(code) => code.code.clone(),
+            Some(code) => code.code.iter().map(|b| b.clone().into()).collect(),
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();

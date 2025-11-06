@@ -2,8 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::InterpreterDebugInterface, LoadedFunction, RuntimeEnvironment};
-use move_binary_format::file_format::Bytecode;
+use crate::{
+    interpreter::InterpreterDebugInterface, ops::Instruction, LoadedFunction, RuntimeEnvironment,
+};
 use move_vm_types::values::{self, Locals};
 use std::{
     collections::BTreeSet,
@@ -145,7 +146,7 @@ impl DebugContext {
         function: &LoadedFunction,
         locals: &Locals,
         pc: u16,
-        instr: &Bytecode,
+        instr: &Instruction,
         runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
     ) {
