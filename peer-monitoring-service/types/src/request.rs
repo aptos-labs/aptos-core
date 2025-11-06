@@ -6,9 +6,10 @@ use serde::{Deserialize, Serialize};
 /// A peer monitoring service request
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub enum PeerMonitoringServiceRequest {
-    GetNetworkInformation,    // Returns relevant network information for the peer
-    GetNodeInformation,       // Returns relevant node information about the peer
-    GetServerProtocolVersion, // Fetches the protocol version run by the server
+    GetNetworkInformation,     // Returns relevant network information for the peer
+    GetNodeInformation,        // Returns relevant node information about the peer
+    GetServerProtocolVersion,  // Fetches the protocol version run by the server
+    GetTransactionInformation, // Returns relevant transaction information for the peer
     LatencyPing(LatencyPingRequest), // A simple message used by the client to ensure liveness and measure latency
 }
 
@@ -19,6 +20,7 @@ impl PeerMonitoringServiceRequest {
             Self::GetNetworkInformation => "get_network_information",
             Self::GetNodeInformation => "get_node_information",
             Self::GetServerProtocolVersion => "get_server_protocol_version",
+            Self::GetTransactionInformation => "get_transaction_information",
             Self::LatencyPing(_) => "latency_ping",
         }
     }

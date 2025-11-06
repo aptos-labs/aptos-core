@@ -4,6 +4,7 @@
 
 #![forbid(unsafe_code)]
 
+use aptos_crypto::HashValue;
 use aptos_types::{
     account_address::AccountAddress,
     transaction::{
@@ -85,6 +86,7 @@ impl MempoolNotificationSender for MempoolNotifier {
             .iter()
             .filter_map(|transaction| match transaction {
                 Transaction::UserTransaction(signed_txn) => Some(CommittedTransaction {
+                    committed_hash: signed_txn.committed_hash(),
                     sender: signed_txn.sender(),
                     replay_protector: signed_txn.replay_protector(),
                     use_case: signed_txn.parse_use_case(),
@@ -165,6 +167,7 @@ impl fmt::Display for MempoolCommitNotification {
 /// A successfully executed and committed user transaction.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct CommittedTransaction {
+    pub committed_hash: HashValue,
     pub sender: AccountAddress,
     pub replay_protector: ReplayProtector,
     pub use_case: UseCaseKey,
@@ -174,8 +177,8 @@ impl fmt::Display for CommittedTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}:{}:{:?}",
-            self.sender, self.replay_protector, self.use_case
+            "{}:{}:{}:{:?}",
+            self.committed_hash, self.sender, self.replay_protector, self.use_case
         )
     }
 }
@@ -290,6 +293,7 @@ mod tests {
                 Transaction::UserTransaction(signed_transaction) => {
                     assert_eq!(mempool_commit_notification.transactions, vec![
                         CommittedTransaction {
+                            committed_hash: signed_transaction.committed_hash(),
                             sender: signed_transaction.sender(),
                             replay_protector: signed_transaction.replay_protector(),
                             use_case: signed_transaction.parse_use_case(),

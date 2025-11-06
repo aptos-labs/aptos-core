@@ -37,6 +37,30 @@ impl Default for LoadBalancingThresholdConfig {
     }
 }
 
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct TransactionTracingConfig {
+    pub enable_transaction_tracing: bool,
+    pub max_num_active_transaction_traces: usize,
+    pub max_num_partial_peer_traces_per_transaction: usize,
+    pub max_time_to_collect_partial_traces_secs: u64,
+    pub max_time_to_trace_pending_transactions_secs: u64,
+    pub trace_logging_loop_interval_secs: u64,
+}
+
+impl Default for TransactionTracingConfig {
+    fn default() -> TransactionTracingConfig {
+        TransactionTracingConfig {
+            enable_transaction_tracing: true,
+            max_num_active_transaction_traces: 100_000, // Track up to 100_000 active traces
+            max_num_partial_peer_traces_per_transaction: 4, // Anything more than 4 is unlikely
+            max_time_to_collect_partial_traces_secs: 60, // Collect partial traces for up to 60 seconds
+            max_time_to_trace_pending_transactions_secs: 180, // Trace pending transactions for up to 3 minutes
+            trace_logging_loop_interval_secs: 15,             // Run the loop every 15 seconds
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct MempoolConfig {
@@ -104,6 +128,8 @@ pub struct MempoolConfig {
     pub enable_max_load_balancing_at_any_load: bool,
     /// Maximum number of orderless transactions allowed in the Mempool per user
     pub orderless_txn_capacity_per_user: usize,
+    /// Configuration for transaction tracing across mempool
+    pub transaction_tracing_config: TransactionTracingConfig,
 }
 
 impl Default for MempoolConfig {
@@ -122,7 +148,7 @@ impl Default for MempoolConfig {
             capacity: 2_000_000,
             capacity_bytes: 2 * 1024 * 1024 * 1024,
             capacity_per_user: 100,
-            default_failovers: 1,
+            default_failovers: 0, // Temporarily disable failovers to ensure only a single path
             enable_intelligent_peer_prioritization: true,
             shared_mempool_peer_update_interval_ms: 1_000,
             shared_mempool_priority_update_interval_secs: 600, // 10 minutes (frequent reprioritization is expensive)
@@ -170,6 +196,7 @@ impl Default for MempoolConfig {
             ],
             enable_max_load_balancing_at_any_load: false,
             orderless_txn_capacity_per_user: 1000,
+            transaction_tracing_config: TransactionTracingConfig::default(),
         }
     }
 }

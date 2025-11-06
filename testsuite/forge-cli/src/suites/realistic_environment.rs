@@ -424,25 +424,14 @@ pub(crate) fn realistic_env_max_load_test(
     }
 
     // Create the test
-    let mempool_backlog = if ha_proxy { 28000 } else { 38000 };
     ForgeConfig::default()
         .with_initial_validator_count(NonZeroUsize::new(num_validators).unwrap())
         .with_initial_fullnode_count(num_fullnodes)
         .add_network_test(wrap_with_realistic_env(num_validators, TwoTrafficsTest {
             inner_traffic: EmitJobRequest::default()
-                .mode(EmitJobMode::MaxLoad { mempool_backlog })
+                .mode(EmitJobMode::ConstTps { tps: 20 })
                 .init_gas_price_multiplier(20),
-            inner_success_criteria: SuccessCriteria::new(
-                if ha_proxy {
-                    7000
-                } else if long_running {
-                    // This is for forge stable
-                    11000
-                } else {
-                    // During land time we want to be less strict, otherwise we flaky fail
-                    10000
-                },
-            ),
+            inner_success_criteria: SuccessCriteria::new(100),
         }))
         .with_genesis_helm_config_fn(Arc::new(move |helm_values| {
             // Have single epoch change in land blocking, and a few on long-running

@@ -32,6 +32,7 @@ use aptos_network::{
     },
     protocols::network::Event,
 };
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     on_chain_config::{OnChainConfigPayload, OnChainConfigProvider},
     transaction::SignedTransaction,
@@ -149,6 +150,7 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
         .network_interface
         .num_committed_txns_received_since_peers_updated
         .clone();
+    let transaction_trace_collector = smp.transaction_trace_collector.clone();
 
     tokio::spawn(async move {
         while let Some(commit_notification) = mempool_listener.next().await {
@@ -158,6 +160,7 @@ fn spawn_commit_notification_handler<NetworkClient, TransactionValidator>(
                 &use_case_history,
                 commit_notification,
                 &num_committed_txns_received_since_peers_updated,
+                transaction_trace_collector.clone(),
             );
         }
     });
@@ -233,6 +236,7 @@ fn handle_commit_notification<TransactionValidator>(
     use_case_history: &Arc<Mutex<UseCaseHistory>>,
     msg: MempoolCommitNotification,
     num_committed_txns_received_since_peers_updated: &Arc<AtomicU64>,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 ) where
     TransactionValidator: TransactionValidation,
 {
@@ -241,6 +245,9 @@ fn handle_commit_notification<TransactionValidator>(
         num_committed_txns = msg.transactions.len(),
         LogSchema::event_log(LogEntry::StateSyncCommit, LogEvent::Received),
     );
+
+    // Mark the transactions as committed in the transaction trace collector
+    transaction_trace_collector.transactions_committed(&msg.transactions);
 
     // Process and time committed user transactions.
     let start_time = Instant::now();
@@ -443,7 +450,10 @@ async fn handle_update_peers<NetworkClient, TransactionValidator>(
 }
 
 /// Garbage collect all expired transactions by SystemTTL.
-pub(crate) async fn gc_coordinator(mempool: Arc<Mutex<CoreMempool>>, gc_interval_ms: u64) {
+pub(crate) async fn garbage_collection_coordinator(
+    mempool: Arc<Mutex<CoreMempool>>,
+    gc_interval_ms: u64,
+) {
     debug!(LogSchema::event_log(LogEntry::GCRuntime, LogEvent::Start));
     let mut interval = IntervalStream::new(interval(Duration::from_millis(gc_interval_ms)));
     while let Some(_interval) = interval.next().await {
@@ -451,7 +461,7 @@ pub(crate) async fn gc_coordinator(mempool: Arc<Mutex<CoreMempool>>, gc_interval
             SampleRate::Duration(Duration::from_secs(60)),
             debug!(LogSchema::event_log(LogEntry::GCRuntime, LogEvent::Live))
         );
-        mempool.lock().gc();
+        mempool.lock().garbage_collect();
     }
 
     error!(LogSchema::event_log(

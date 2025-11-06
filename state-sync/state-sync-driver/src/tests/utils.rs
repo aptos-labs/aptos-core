@@ -291,11 +291,12 @@ pub async fn verify_commit_notification(
     let committed_transactions: Vec<CommittedTransaction> = expected_transactions
         .into_iter()
         .map(|txn| {
-            let signed = txn.try_as_signed_user_txn().unwrap();
+            let signed_transaction = txn.try_as_signed_user_txn().unwrap();
             CommittedTransaction {
-                sender: signed.sender(),
+                committed_hash: signed_transaction.committed_hash(),
+                sender: signed_transaction.sender(),
                 replay_protector: ReplayProtector::SequenceNumber(0),
-                use_case: signed.parse_use_case(),
+                use_case: signed_transaction.parse_use_case(),
             }
         })
         .collect();

@@ -21,6 +21,7 @@ use aptos_config::config::NodeConfig;
 use aptos_consensus_types::common::{TransactionInProgress, TransactionSummary};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -29,7 +30,7 @@ use aptos_types::{
 };
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    sync::atomic::Ordering,
+    sync::{atomic::Ordering, Arc},
     time::{Duration, Instant, SystemTime},
 };
 
@@ -41,9 +42,25 @@ pub struct Mempool {
 }
 
 impl Mempool {
-    pub fn new(config: &NodeConfig) -> Self {
+    pub fn new(
+        config: &NodeConfig,
+        transaction_trace_collector: Arc<TransactionTraceCollector>,
+    ) -> Self {
         Mempool {
-            transactions: TransactionStore::new(&config.mempool),
+            transactions: TransactionStore::new(&config.mempool, transaction_trace_collector),
+            system_transaction_timeout: Duration::from_secs(
+                config.mempool.system_transaction_timeout_secs,
+            ),
+        }
+    }
+
+    /// Creates a mempool with an empty trace collector for testing purposes
+    pub fn new_for_testing(config: &NodeConfig) -> Self {
+        Mempool {
+            transactions: TransactionStore::new(
+                &config.mempool,
+                Arc::new(TransactionTraceCollector::new_empty()),
+            ),
             system_transaction_timeout: Duration::from_secs(
                 config.mempool.system_transaction_timeout_secs,
             ),
@@ -588,14 +605,15 @@ impl Mempool {
     /// Periodic core mempool garbage collection.
     /// Removes all expired transactions and clears expired entries in metrics
     /// cache and sequence number cache.
-    pub(crate) fn gc(&mut self) {
+    pub(crate) fn garbage_collect(&mut self) {
         let now = aptos_infallible::duration_since_epoch();
-        self.transactions.gc_by_system_ttl(now);
+        self.transactions.garbage_collect_by_system_ttl(now);
     }
 
     /// Garbage collection based on client-specified expiration time.
-    pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
-        self.transactions.gc_by_expiration_time(block_time);
+    pub(crate) fn garbage_collect_by_expiration_time(&mut self, block_time: Duration) {
+        self.transactions
+            .garbage_collect_by_expiration_time(block_time);
     }
 
     /// Returns block of transactions and new last_timeline_id. For each transaction, the output includes

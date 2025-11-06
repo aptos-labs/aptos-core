@@ -39,6 +39,7 @@ use aptos_peer_monitoring_service_types::{
 };
 use aptos_storage_interface::{DbReader, LedgerSummary, Order};
 use aptos_time_service::{MockTimeService, TimeService};
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     account_address::AccountAddress,
     aggregate_signature::AggregateSignature,
@@ -519,6 +520,7 @@ impl MockClient {
         let mock_time_service = TimeService::mock();
         let storage_reader =
             storage_reader.unwrap_or_else(|| StorageReader::new(Arc::new(create_mock_db_reader())));
+        let transaction_trace_collector = Arc::new(TransactionTraceCollector::new_empty());
         let peer_monitoring_server = PeerMonitoringServiceServer::new(
             node_config,
             executor,
@@ -526,6 +528,7 @@ impl MockClient {
             peers_and_metadata.clone(),
             storage_reader,
             mock_time_service.clone(),
+            transaction_trace_collector,
         );
 
         // Create the client

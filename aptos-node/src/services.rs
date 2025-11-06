@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{bootstrap_api, indexer, mpsc::Receiver, network::ApplicationNetworkInterfaces};
+use crate::{
+    bootstrap_api, indexer, mpsc::Receiver, network, network::ApplicationNetworkInterfaces,
+};
 use aptos_admin_service::AdminService;
 use aptos_build_info::build_information;
 use aptos_config::config::NodeConfig;
@@ -32,6 +34,9 @@ use aptos_peer_monitoring_service_server::{
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_interface::{DbReader, DbReaderWriter};
 use aptos_time_service::TimeService;
+use aptos_transaction_tracing::{
+    trace_collector::TransactionTraceCollector, trace_logger::TransactionTraceLogger,
+};
 use aptos_types::{
     chain_id::ChainId, indexer::indexer_db_reader::IndexerReader, transaction::Version,
 };
@@ -180,6 +185,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
     mempool_listener: MempoolNotificationListener,
     mempool_client_receiver: Receiver<MempoolClientRequest>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 ) -> (Runtime, Sender<QuorumStoreRequest>) {
     // Create a communication channel between consensus and mempool
     let (consensus_to_mempool_sender, consensus_to_mempool_receiver) =
@@ -197,6 +203,7 @@ pub fn start_mempool_runtime_and_get_consensus_sender(
         mempool_listener,
         mempool_reconfig_subscription,
         peers_and_metadata,
+        transaction_trace_collector,
     );
     debug!("Mempool started in {} ms", instant.elapsed().as_millis());
 
@@ -226,7 +233,7 @@ pub fn start_peer_monitoring_service(
     node_config: &NodeConfig,
     network_interfaces: ApplicationNetworkInterfaces<PeerMonitoringServiceMessage>,
     db_reader: Arc<dyn DbReader>,
-) -> Runtime {
+) -> (Runtime, Arc<TransactionTraceCollector>) {
     // Get the network client and events
     let network_client = network_interfaces.network_client;
     let network_service_events = network_interfaces.network_service_events;
@@ -234,6 +241,22 @@ pub fn start_peer_monitoring_service(
     // Create a new runtime for the monitoring service
     let peer_monitoring_service_runtime =
         aptos_runtimes::spawn_named_runtime("peer-mon".into(), None);
+
+    // Create a new transaction trace collector
+    let peer_network_ids = network::extract_peer_network_ids(node_config);
+    let transaction_tracing_config = node_config.mempool.transaction_tracing_config;
+    let transaction_trace_collector = Arc::new(TransactionTraceCollector::new(
+        peer_network_ids,
+        transaction_tracing_config,
+    ));
+
+    // Start the transaction trace logger
+    let transaction_trace_logger = TransactionTraceLogger::new(
+        TimeService::real(),
+        transaction_trace_collector.clone(),
+        transaction_tracing_config,
+    );
+    peer_monitoring_service_runtime.spawn(transaction_trace_logger.start());
 
     // Create and spawn the peer monitoring server
     let peer_monitoring_network_events =
@@ -245,6 +268,7 @@ pub fn start_peer_monitoring_service(
         network_client.get_peers_and_metadata(),
         StorageReader::new(db_reader),
         TimeService::real(),
+        transaction_trace_collector.clone(),
     );
     peer_monitoring_service_runtime.spawn(peer_monitoring_server.start());
 
@@ -258,12 +282,13 @@ pub fn start_peer_monitoring_service(
                 node_config.clone(),
                 network_client,
                 Some(peer_monitoring_service_runtime.handle().clone()),
+                transaction_trace_collector.clone(),
             ),
         );
     }
 
-    // Return the runtime
-    peer_monitoring_service_runtime
+    // Return the runtime and trace collector
+    (peer_monitoring_service_runtime, transaction_trace_collector)
 }
 
 pub fn start_netbench_service(

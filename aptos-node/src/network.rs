@@ -32,9 +32,12 @@ use aptos_network_builder::builder::NetworkBuilder;
 use aptos_peer_monitoring_service_types::PeerMonitoringServiceMessage;
 use aptos_storage_service_types::StorageServiceMessage;
 use aptos_time_service::TimeService;
-use aptos_types::chain_id::ChainId;
+use aptos_types::{chain_id::ChainId, PeerId};
 use serde::{Deserialize, Serialize};
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+};
 use tokio::runtime::Runtime;
 
 /// A simple struct that holds both the network client
@@ -233,6 +236,17 @@ fn extract_network_ids(node_config: &NodeConfig) -> Vec<NetworkId> {
         .into_iter()
         .map(|network_config| network_config.network_id)
         .collect()
+}
+
+/// Extracts all peer network ids from the given node config
+pub fn extract_peer_network_ids(node_config: &NodeConfig) -> BTreeMap<NetworkId, PeerId> {
+    let mut peer_network_ids = BTreeMap::new();
+    for network_config in extract_network_configs(node_config) {
+        let network_id = network_config.network_id;
+        let peer_id = network_config.peer_id();
+        peer_network_ids.insert(network_id, peer_id);
+    }
+    peer_network_ids
 }
 
 /// Creates the global peers and metadata struct

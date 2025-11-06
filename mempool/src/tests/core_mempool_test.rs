@@ -524,7 +524,7 @@ fn test_system_ttl() {
     // All transactions are supposed to be evicted on next gc run.
     let mut config = NodeConfig::generate_random_config();
     config.mempool.system_transaction_timeout_secs = 0;
-    let mut mempool = CoreMempool::new(&config);
+    let mut mempool = CoreMempool::new_for_testing(&config);
 
     add_txn(
         &mut mempool,
@@ -539,7 +539,7 @@ fn test_system_ttl() {
     add_txn(&mut mempool, transaction.clone()).unwrap();
 
     // GC routine should clear transaction from first insert but keep last one.
-    mempool.gc();
+    mempool.garbage_collect();
     let batch = mempool.get_batch(1, 1024, true, btreemap![]);
     assert_eq!(vec![transaction.make_signed_transaction()], batch);
 }
@@ -1011,7 +1011,7 @@ fn test_capacity() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 1;
     config.mempool.system_transaction_timeout_secs = 0;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
 
     // Error on exceeding limit.
     add_txn(
@@ -1042,7 +1042,7 @@ fn test_capacity() {
         TestTransaction::new(1, ReplayProtector::SequenceNumber(2), 1)
     )
     .is_err());
-    pool.gc();
+    pool.garbage_collect();
     assert!(add_txn(
         &mut pool,
         TestTransaction::new(1, ReplayProtector::SequenceNumber(2), 1)
@@ -1086,7 +1086,7 @@ fn test_capacity_bytes() {
     config.mempool.capacity = 1_000; // Won't hit this limit.
     config.mempool.capacity_bytes = capacity_bytes;
     config.mempool.system_transaction_timeout_secs = 0;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
 
     for _i in 0..2 {
         txns.clone().into_iter().for_each(|txn| {
@@ -1115,7 +1115,7 @@ fn test_capacity_bytes() {
             assert_eq!(status.code, MempoolStatusCode::MempoolIsFull);
         }
         // Check that GC returns size to zero.
-        pool.gc();
+        pool.garbage_collect();
     }
 }
 
@@ -1135,7 +1135,7 @@ fn signed_txn_to_mempool_transaction(txn: SignedTransaction) -> MempoolTransacti
 fn test_parking_lot_eviction() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 5;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
     // Add transactions with the following sequence numbers to Mempool.
     for seq in &[0, 1, 2, 9, 10] {
         add_txn(
@@ -1181,7 +1181,7 @@ fn test_parking_lot_eviction_bytes() {
     config.mempool.capacity = 100;
     // Fit 2 small transactions + one additional transaction (by overflowing the capacity bytes)
     config.mempool.capacity_bytes = 3 * small_txn_size + 1;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
     // Add 2 small transactions to parking lot
     for address in 0..2 {
         add_txn(
@@ -1223,7 +1223,7 @@ fn test_parking_lot_eviction_benchmark() {
     config.mempool.capacity = 4_000_000;
     // ~5 MB
     config.mempool.capacity_bytes = num_small_txns * small_txn_size + 1;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
 
     // // Add one huge transaction that will evict all transactions from parking lot
     // let huge_signed_txn = TestTransaction::new_with_huge_script(0, 1, 1).make_signed_transaction();
@@ -1288,7 +1288,7 @@ fn test_parking_lot_eviction_benchmark() {
 fn test_parking_lot_evict_only_for_ready_txn_insertion() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 6;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
     // Add transactions with the following sequence numbers to Mempool.
     for seq in &[0, 1, 2, 9, 10, 11] {
         add_txn(
@@ -1376,7 +1376,7 @@ fn test_gc_ready_transaction() {
     assert_eq!(timeline.len(), 4);
 
     // GC expired transaction.
-    pool.gc_by_expiration_time(Duration::from_secs(1));
+    pool.garbage_collect_by_expiration_time(Duration::from_secs(1));
 
     // Make sure txns 2 and 3 became not ready and we can't read them from any API.
     let block = pool.get_batch(1, 1024, true, btreemap![]);
@@ -1504,7 +1504,7 @@ fn test_get_transaction_by_hash_after_the_txn_is_updated() {
 fn test_bytes_limit() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
     // add 100 transacionts
     for seq in 0..100 {
         add_txn(
@@ -1529,7 +1529,7 @@ fn test_bytes_limit() {
 fn test_transaction_store_remove_account_if_empty() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
 
     assert_eq!(pool.get_transaction_store().get_transactions().len(), 0);
 
@@ -1583,7 +1583,7 @@ fn test_transaction_store_remove_account_if_empty() {
 fn test_sequence_number_behavior_at_capacity() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
 
     add_txn(
         &mut pool,
@@ -1617,7 +1617,7 @@ fn test_sequence_number_behavior_at_capacity() {
 fn test_sequence_number_stale_account_sequence_number() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
     pool.commit_transaction(
         &TestTransaction::get_address(0),
         ReplayProtector::SequenceNumber(1),
@@ -1637,7 +1637,7 @@ fn test_sequence_number_stale_account_sequence_number() {
 fn test_not_return_non_full() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 2;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
     let txn_0 = TestTransaction::new(0, ReplayProtector::SequenceNumber(0), 1);
     let txn_1 = TestTransaction::new(0, ReplayProtector::SequenceNumber(1), 1);
     let txn_num = 2;
@@ -1695,7 +1695,7 @@ fn test_not_return_non_full() {
 fn test_include_gas_upgraded() {
     let mut config = NodeConfig::generate_random_config();
     config.mempool.capacity = 100;
-    let mut pool = CoreMempool::new(&config);
+    let mut pool = CoreMempool::new_for_testing(&config);
 
     let sequence_number = 0;
     let address_index = 0;

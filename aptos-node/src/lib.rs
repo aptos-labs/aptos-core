@@ -753,11 +753,12 @@ pub fn setup_environment_and_start_node(
     );
 
     // Start the peer monitoring service
-    let peer_monitoring_service_runtime = services::start_peer_monitoring_service(
-        &node_config,
-        peer_monitoring_service_network_interfaces,
-        db_rw.reader.clone(),
-    );
+    let (peer_monitoring_service_runtime, transaction_trace_collector) =
+        services::start_peer_monitoring_service(
+            &node_config,
+            peer_monitoring_service_network_interfaces,
+            db_rw.reader.clone(),
+        );
 
     // Start state sync and get the notification endpoints for mempool and consensus
     let (aptos_data_client, state_sync_runtimes, mempool_listener, consensus_notifier) =
@@ -808,6 +809,7 @@ pub fn setup_environment_and_start_node(
             mempool_listener,
             mempool_client_receiver,
             peers_and_metadata,
+            transaction_trace_collector,
         );
 
     // Create the DKG runtime and get the VTxn pool

@@ -24,6 +24,7 @@ aptos-network = { workspace = true }
 aptos-peer-monitoring-service-types = { workspace = true }
 aptos-storage-interface = { workspace = true }
 aptos-time-service = { workspace = true }
+aptos-transaction-tracing = { workspace = true }
 aptos-types = { workspace = true }
 bcs = { workspace = true }
 bytes = { workspace = true }
@@ -38,6 +39,7 @@ anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-network = { workspace = true, features = ["fuzzing"] }
 aptos-time-service = { workspace = true, features = ["testing"] }
+aptos-transaction-tracing = { workspace = true }
 claims = { workspace = true }
 maplit = { workspace = true }
 mockall = { workspace = true }

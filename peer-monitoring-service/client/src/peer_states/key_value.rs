@@ -4,7 +4,7 @@
 use crate::{
     peer_states::{
         latency_info::LatencyInfoState, network_info::NetworkInfoState, node_info::NodeInfoState,
-        request_tracker::RequestTracker,
+        request_tracker::RequestTracker, transaction_info::TransactionInfoState,
     },
     Error,
 };
@@ -26,6 +26,7 @@ pub enum PeerStateKey {
     LatencyInfo,
     NetworkInfo,
     NodeInfo,
+    TransactionInfo,
 }
 
 impl PeerStateKey {
@@ -35,6 +36,7 @@ impl PeerStateKey {
             PeerStateKey::LatencyInfo,
             PeerStateKey::NetworkInfo,
             PeerStateKey::NodeInfo,
+            PeerStateKey::TransactionInfo,
         ]
     }
 
@@ -44,6 +46,7 @@ impl PeerStateKey {
             PeerStateKey::LatencyInfo => "latency_info",
             PeerStateKey::NetworkInfo => "network_info",
             PeerStateKey::NodeInfo => "node_info",
+            PeerStateKey::TransactionInfo => "transaction_info",
         }
     }
 
@@ -59,6 +62,9 @@ impl PeerStateKey {
                 PeerMonitoringServiceRequest::GetNetworkInformation.get_label()
             },
             PeerStateKey::NodeInfo => PeerMonitoringServiceRequest::GetNodeInformation.get_label(),
+            PeerStateKey::TransactionInfo => {
+                PeerMonitoringServiceRequest::GetTransactionInformation.get_label()
+            },
         }
     }
 }
@@ -104,6 +110,7 @@ pub enum PeerStateValue {
     LatencyInfoState,
     NetworkInfoState,
     NodeInfoState,
+    TransactionInfoState,
 }
 
 impl PeerStateValue {
@@ -123,6 +130,11 @@ impl PeerStateValue {
                 let node_monitoring_config = node_config.peer_monitoring_service.node_monitoring;
                 NodeInfoState::new(node_monitoring_config, time_service).into()
             },
+            PeerStateKey::TransactionInfo => {
+                let transaction_monitoring_config =
+                    node_config.peer_monitoring_service.transaction_monitoring;
+                TransactionInfoState::new(transaction_monitoring_config, time_service).into()
+            },
         }
     }
 }
@@ -134,6 +146,9 @@ impl Display for PeerStateValue {
             PeerStateValue::LatencyInfoState(state) => write!(f, "LatencyInfoState: {}", state),
             PeerStateValue::NetworkInfoState(state) => write!(f, "NetworkInfoState: {}", state),
             PeerStateValue::NodeInfoState(state) => write!(f, "NodeInfoState: {}", state),
+            PeerStateValue::TransactionInfoState(state) => {
+                write!(f, "TransactionInfoState: {}", state)
+            },
         }
     }
 }

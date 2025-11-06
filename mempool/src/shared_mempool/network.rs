@@ -642,15 +642,27 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
     ) -> Result<(), BroadcastError> {
         // Start timer for tracking broadcast latency.
         let start_time = Instant::now();
+
+        // Determine the batch to send
         let (message_id, transactions, metric_label) =
             self.determine_broadcast_batch(peer, scheduled_backoff, smp)?;
+        let transaction_hashes = transactions
+            .iter()
+            .map(|(txn, _, _)| txn.committed_hash())
+            .collect::<Vec<_>>();
         let num_txns = transactions.len();
+
+        // Send the batch to the peer
         let send_time = SystemTime::now();
         self.send_batch_to_peer(peer, message_id.clone(), transactions)
             .await?;
         let num_pending_broadcasts =
             self.update_broadcast_state(peer, message_id.clone(), send_time)?;
         notify_subscribers(SharedMempoolNotification::Broadcast, &smp.subscribers);
+
+        // Update the transaction trace collector
+        smp.transaction_trace_collector
+            .transactions_broadcast_via_mempool(peer, transaction_hashes);
 
         // Log all the metrics
         let latency = start_time.elapsed();

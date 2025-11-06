@@ -16,6 +16,7 @@ use aptos_network::application::{
 };
 use aptos_peer_monitoring_service_types::{PeerMonitoringMetadata, PeerMonitoringServiceMessage};
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use error::Error;
 use futures::StreamExt;
 use network::PeerMonitoringServiceClient;
@@ -60,6 +61,7 @@ pub async fn start_peer_monitor(
     node_config: NodeConfig,
     network_client: NetworkClient<PeerMonitoringServiceMessage>,
     runtime: Option<Handle>,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 ) {
     // Create a new monitoring client and peer monitor state
     let peer_monitoring_client = PeerMonitoringServiceClient::new(network_client);
@@ -71,6 +73,15 @@ pub async fn start_peer_monitor(
         node_config.peer_monitoring_service,
         peer_monitor_state.clone(),
         peer_monitoring_client.get_peers_and_metadata(),
+        time_service.clone(),
+        runtime.clone(),
+    );
+
+    // Spawn the transaction trace updater
+    spawn_transaction_trace_updater(
+        node_config.peer_monitoring_service,
+        transaction_trace_collector,
+        peer_monitor_state.clone(),
         time_service.clone(),
         runtime.clone(),
     );
@@ -266,5 +277,64 @@ pub(crate) fn spawn_peer_metadata_updater(
         runtime.spawn(metadata_updater)
     } else {
         tokio::spawn(metadata_updater)
+    }
+}
+
+/// Spawns a task that continuously updates the transaction
+/// trace collector with the latest peer transaction traces.
+pub(crate) fn spawn_transaction_trace_updater(
+    peer_monitoring_config: PeerMonitoringServiceConfig,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
+    peer_monitor_state: PeerMonitorState,
+    time_service: TimeService,
+    runtime: Option<Handle>,
+) -> JoinHandle<()> {
+    // Create the updater task for the transaction trace collector
+    let trace_collector_updater = async move {
+        // Create an interval ticker for the updater loop
+        let trace_collector_update_loop_duration =
+            Duration::from_millis(peer_monitoring_config.transaction_tracing_update_interval_ms);
+        let trace_collector_update_loop_ticker =
+            time_service.interval(trace_collector_update_loop_duration);
+        futures::pin_mut!(trace_collector_update_loop_ticker);
+
+        // Start the updater loop
+        info!(LogSchema::new(LogEntry::TraceCollectorUpdateLoop)
+            .event(LogEvent::StartedTraceCollectorUpdaterLoop)
+            .message("Starting the transaction trace collector updater!"));
+        loop {
+            // Wait for the next round before updating the trace collector
+            trace_collector_update_loop_ticker.next().await;
+
+            // Go through all peer states and collect their transaction traces
+            for (peer_network_id, peer_state) in peer_monitor_state.peer_states.read().iter() {
+                match peer_state.extract_transaction_traces() {
+                    Ok(Some(transaction_traces)) => {
+                        for (transaction_hash, transaction_trace) in transaction_traces {
+                            transaction_trace_collector.add_transaction_trace_from_peer(
+                                peer_network_id,
+                                transaction_hash,
+                                transaction_trace,
+                            );
+                        }
+                    },
+                    Ok(None) => { /* No transaction traces available for this peer */ },
+                    Err(error) => {
+                        warn!(LogSchema::new(LogEntry::TraceCollectorUpdateLoop)
+                            .event(LogEvent::UnexpectedErrorEncountered)
+                            .peer(peer_network_id)
+                            .error(&error)
+                            .message("Failed to extract transaction traces from a peer state!"));
+                    },
+                }
+            }
+        }
+    };
+
+    // Spawn the transaction trace collector updater task
+    if let Some(runtime) = runtime {
+        runtime.spawn(trace_collector_updater)
+    } else {
+        tokio::spawn(trace_collector_updater)
     }
 }

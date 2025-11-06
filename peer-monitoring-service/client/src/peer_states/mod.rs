@@ -20,6 +20,7 @@ pub mod network_info;
 pub mod node_info;
 pub mod peer_state;
 mod request_tracker;
+pub mod transaction_info;
 
 // Useful constants
 const LOGS_FREQUENCY_SECS: u64 = 180; // 3 minutes
@@ -40,6 +41,13 @@ pub fn refresh_peer_states(
     // need to be refreshed for each peer.
     for peer_state_key in PeerStateKey::get_all_keys() {
         let mut num_in_flight_requests = 0;
+
+        // If transaction info monitoring is disabled, skip sending requests
+        if peer_state_key == PeerStateKey::TransactionInfo
+            && !monitoring_service_config.transaction_info_monitoring_enabled()
+        {
+            continue;
+        }
 
         // Go through all connected peers and see if we should refresh the state
         for (peer_network_id, peer_metadata) in &connected_peers_and_metadata {

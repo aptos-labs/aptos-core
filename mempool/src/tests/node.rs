@@ -33,6 +33,7 @@ use aptos_network::{
     ProtocolId,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     on_chain_config::{InMemoryOnChainConfig, OnChainConfigPayload},
     transaction::ReplayProtector,
@@ -553,7 +554,7 @@ fn start_node_mempool(
     Runtime,
     UnboundedReceiver<SharedMempoolNotification>,
 ) {
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(&config)));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new_for_testing(&config)));
     let (sender, subscriber) = unbounded();
     let (_ac_endpoint_sender, ac_endpoint_receiver) = mpsc::channel(1_024);
     let (_quorum_store_sender, quorum_store_receiver) = mpsc::channel(1_024);
@@ -573,6 +574,7 @@ fn start_node_mempool(
         })
         .unwrap();
 
+    let transaction_trace_collector = Arc::new(TransactionTraceCollector::new_empty());
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
     start_shared_mempool(
         runtime.handle(),
@@ -588,6 +590,7 @@ fn start_node_mempool(
         Arc::new(RwLock::new(MockVMValidator)),
         vec![sender],
         peers_and_metadata,
+        transaction_trace_collector,
     );
 
     (mempool, runtime, subscriber)

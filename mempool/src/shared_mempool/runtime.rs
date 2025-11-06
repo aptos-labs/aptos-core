@@ -6,7 +6,7 @@ use crate::{
     core_mempool::CoreMempool,
     network::MempoolSyncMsg,
     shared_mempool::{
-        coordinator::{coordinator, gc_coordinator, snapshot_job},
+        coordinator::{coordinator, garbage_collection_coordinator, snapshot_job},
         types::{MempoolEventsReceiver, SharedMempool, SharedMempoolNotification},
     },
     QuorumStoreRequest,
@@ -21,6 +21,7 @@ use aptos_network::application::{
     storage::PeersAndMetadata,
 };
 use aptos_storage_interface::DbReader;
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::on_chain_config::OnChainConfigProvider;
 use aptos_vm_validator::vm_validator::{PooledVMValidator, TransactionValidation};
 use futures::channel::mpsc::{Receiver, UnboundedSender};
@@ -46,6 +47,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
     validator: Arc<RwLock<TransactionValidator>>,
     subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 ) where
     TransactionValidator: TransactionValidation + 'static,
     ConfigProvider: OnChainConfigProvider,
@@ -62,6 +64,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
             validator,
             subscribers,
             node_type,
+            transaction_trace_collector,
         );
 
     executor.spawn(coordinator(
@@ -76,7 +79,7 @@ pub(crate) fn start_shared_mempool<TransactionValidator, ConfigProvider>(
         peers_and_metadata,
     ));
 
-    executor.spawn(gc_coordinator(
+    executor.spawn(garbage_collection_coordinator(
         mempool.clone(),
         config.mempool.system_transaction_gc_interval_ms,
     ));
@@ -99,9 +102,13 @@ pub fn bootstrap(
     mempool_listener: MempoolNotificationListener,
     mempool_reconfig_events: ReconfigNotificationListener<DbBackedOnChainConfig>,
     peers_and_metadata: Arc<PeersAndMetadata>,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 ) -> Runtime {
     let runtime = aptos_runtimes::spawn_named_runtime("shared-mem".into(), None);
-    let mempool = Arc::new(Mutex::new(CoreMempool::new(config)));
+    let mempool = Arc::new(Mutex::new(CoreMempool::new(
+        config,
+        transaction_trace_collector.clone(),
+    )));
     let vm_validator = Arc::new(RwLock::new(PooledVMValidator::new(
         Arc::clone(&db),
         num_cpus::get(),
@@ -120,6 +127,7 @@ pub fn bootstrap(
         vm_validator,
         vec![],
         peers_and_metadata,
+        transaction_trace_collector,
     );
     runtime
 }
