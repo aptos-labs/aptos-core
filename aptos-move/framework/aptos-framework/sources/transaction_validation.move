@@ -71,6 +71,7 @@ module aptos_framework::transaction_validation {
     const PROLOGUE_PERMISSIONED_GAS_LIMIT_INSUFFICIENT: u64 = 1011;
     const PROLOGUE_ENONCE_ALREADY_USED: u64 = 1012;
     const PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE: u64 = 1013;
+    const EPILOGUE_ECANT_PAY_GAS_DEPOSIT: u64 = 1014;
 
     /// Permission management
     ///
@@ -609,12 +610,12 @@ module aptos_framework::transaction_validation {
             if (features::operations_default_to_fa_apt_store_enabled()) {
                 assert!(
                     aptos_account::is_fungible_balance_at_least(gas_payer, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+                    error::out_of_range(EPILOGUE_ECANT_PAY_GAS_DEPOSIT),
                 );
             } else {
                 assert!(
                     coin::is_balance_at_least<AptosCoin>(gas_payer, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+                    error::out_of_range(EPILOGUE_ECANT_PAY_GAS_DEPOSIT),
                 );
             };
 
@@ -829,12 +830,12 @@ module aptos_framework::transaction_validation {
             if (features::operations_default_to_fa_apt_store_enabled()) {
                 assert!(
                     aptos_account::is_fungible_balance_at_least(gas_payer_address, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+                    error::out_of_range(EPILOGUE_ECANT_PAY_GAS_DEPOSIT),
                 );
             } else {
                 assert!(
                     coin::is_balance_at_least<AptosCoin>(gas_payer_address, transaction_fee_amount),
-                    error::out_of_range(PROLOGUE_ECANT_PAY_GAS_DEPOSIT),
+                    error::out_of_range(EPILOGUE_ECANT_PAY_GAS_DEPOSIT),
                 );
             };
 
