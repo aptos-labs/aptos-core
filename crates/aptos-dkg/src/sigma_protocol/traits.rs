@@ -10,6 +10,7 @@ use crate::{
     utils, Scalar,
 };
 use anyhow::ensure;
+use aptos_crypto::arkworks::random::sample_field_element;
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::AdditiveGroup;
 use ark_serialize::{
@@ -17,7 +18,6 @@ use ark_serialize::{
 };
 use ark_std::{
     io::Read,
-    rand::{CryptoRng, RngCore},
     UniformRand,
 };
 use std::{fmt::Debug, io::Write};
@@ -76,7 +76,7 @@ pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone
     fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self;
 
     /// Samples a random element in the domain. The prover has a witness w and calls w.sample_randomness(rng) to get the prover's first nonce (of the same "size" as w, hence why this cannot be a static method), which it then uses to compute the prover's first message in the sigma protocol.
-    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self;
+    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self;
 }
 
 impl<E: Pairing> Witness<E> for Scalar<E> {
@@ -86,8 +86,8 @@ impl<E: Pairing> Witness<E> for Scalar<E> {
         Scalar(self.0 + (c) * other.0)
     }
 
-    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
-        Scalar(E::ScalarField::rand(rng))
+    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
+        Scalar(sample_field_element(rng))
     }
 }
 
@@ -101,7 +101,7 @@ impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
             .collect()
     }
 
-    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
+    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
         self.iter().map(|elem| elem.rand(rng)).collect()
     }
 }
@@ -343,7 +343,7 @@ pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait + CanonicalSerializ
 where
     H::Domain: Witness<E>,
     H::Codomain: Statement,
-    R: RngCore + CryptoRng,
+    R: rand_core::RngCore + rand_core::CryptoRng,
 {
     // Step 1: Sample randomness. Here the `witness` is used to make sure that `r` has the right dimension
     let r = witness.rand(rng);

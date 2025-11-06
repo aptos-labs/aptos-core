@@ -3,9 +3,9 @@
 
 use crate::algebra::GroupGenerators;
 use ark_ec::pairing::Pairing;
-use ark_ff::UniformRand;
+use aptos_crypto::arkworks::random::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize;
@@ -13,7 +13,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
     type Input: From<u64>; // TODO: slightly hacky
     type Commitment;
-    type CommitmentRandomness: Clone + ark_ff::UniformRand;
+    type CommitmentRandomness: Clone + UniformRand;
     type CommitmentKey;
 
     const DST: &[u8];
@@ -44,7 +44,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         r: &Self::CommitmentRandomness,
     ) -> Self::Commitment;
 
-    fn prove<R: RngCore + CryptoRng>(
+    fn prove<R: rand_core::RngCore + rand_core::CryptoRng>(
         pk: &Self::ProverKey,
         values: &[Self::Input],
         ell: usize,

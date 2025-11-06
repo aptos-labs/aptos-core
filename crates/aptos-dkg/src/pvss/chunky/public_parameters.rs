@@ -23,7 +23,7 @@ use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
 };
-use ark_std::rand::{thread_rng, CryptoRng, RngCore};
+use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 

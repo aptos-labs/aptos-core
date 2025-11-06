@@ -19,22 +19,20 @@ use ark_ec::{
 use ark_ff::Field;
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{
-    rand::{CryptoRng, Rng, RngCore},
-    UniformRand,
-};
+use rand::{CryptoRng, Rng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
+use aptos_crypto::arkworks::random::sample_field_element;
+use aptos_crypto::arkworks::random::UniformRand;
 
-pub type Commitment<E: Pairing> = CodomainShape<E::G1>;
+pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
 // #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 // pub struct Commitment<E: Pairing>(pub E::G1);
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
 // TODO: maybe make this an alias for Scalar<E> ?
-
 
 impl<E: Pairing> sigma_protocol::Witness<E> for CommitmentRandomness<E> {
     type Scalar = Scalar<E>;
@@ -43,21 +41,21 @@ impl<E: Pairing> sigma_protocol::Witness<E> for CommitmentRandomness<E> {
         CommitmentRandomness(self.0 + (c) * other.0)
     }
 
-    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
-        CommitmentRandomness(E::ScalarField::rand(rng))
+    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
+        CommitmentRandomness(sample_field_element(rng))
     }
 }
 
 impl<E: Pairing> UniformRand for CommitmentRandomness<E> {
-    fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        CommitmentRandomness(E::ScalarField::rand(rng))
+    fn rand<R: Rng>(rng: &mut R) -> Self {
+        CommitmentRandomness(sample_field_element(rng))
     }
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
-    pi_1: Commitment<E>,
-    pi_2: E::G1,
+    pub(crate) pi_1: Commitment<E>,
+    pub(crate) pi_2: E::G1,
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -88,8 +86,8 @@ pub struct Trapdoor<E: Pairing> {
 impl<E: Pairing> Trapdoor<E> {
     pub fn rand<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         Self {
-            xi: E::ScalarField::rand(rng),
-            tau: E::ScalarField::rand(rng),
+            xi: sample_field_element(rng),
+            tau: sample_field_element(rng),
         }
     }
 }
@@ -341,7 +339,8 @@ mod tests {
     use super::*;
     use ark_ec::pairing::Pairing;
     use ark_poly::{univariate::DensePolynomial, Polynomial};
-    use ark_std::{rand::thread_rng, UniformRand};
+    use rand::thread_rng;
+    use aptos_crypto::arkworks::random::{sample_field_element, sample_field_elements};
 
     // TODO: Should set up a PCS trait, then make these tests generic?
     fn assert_kzg_opening_correctness<E: Pairing>() {
@@ -351,11 +350,11 @@ mod tests {
         type Fr<E> = <E as Pairing>::ScalarField;
 
         let m = 64;
-        let xi = Fr::<E>::rand(&mut rng);
-        let tau = Fr::<E>::rand(&mut rng);
+        let xi = sample_field_element(&mut rng);
+        let tau = sample_field_element(&mut rng);
         let (vk, ck) = setup::<E, _>(m, group_data, Trapdoor { xi, tau }, &mut rng);
 
-        let f_coeffs: Vec<Fr<E>> = (0..m).map(|_| Fr::<E>::rand(&mut rng)).collect();
+        let f_coeffs: Vec<Fr<E>> = sample_field_elements(m, &mut rng);
         let poly = DensePolynomial::<Fr<E>> { coeffs: f_coeffs };
 
         // Polynomial values at the roots of unity
@@ -365,9 +364,9 @@ mod tests {
             .map(|&gamma| poly.evaluate(&gamma))
             .collect();
 
-        let rho = CommitmentRandomness::<E>(Fr::<E>::rand(&mut rng));
-        let s = CommitmentRandomness::<E>(Fr::<E>::rand(&mut rng));
-        let x = Fr::<E>::rand(&mut rng);
+        let rho = CommitmentRandomness::rand(&mut rng);
+        let s = CommitmentRandomness::rand(&mut rng);
+        let x = sample_field_element(&mut rng);
         let y =
             polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x, ck.m_inv);
 

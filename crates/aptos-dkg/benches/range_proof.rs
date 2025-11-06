@@ -10,7 +10,7 @@ use aptos_dkg::{
     utils::test_utils::{self},
 };
 use ark_ec::pairing::Pairing;
-use ark_std::rand::thread_rng;
+use rand::thread_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 
 /// Generic benchmark function over any pairing curve and range proof

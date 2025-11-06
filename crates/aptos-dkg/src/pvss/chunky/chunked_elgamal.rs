@@ -14,7 +14,6 @@ use ark_serialize::{
 };
 use ark_std::{
     fmt::Debug,
-    rand::{CryptoRng, RngCore},
 };
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below

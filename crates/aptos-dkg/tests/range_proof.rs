@@ -13,7 +13,7 @@ use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::thread_rng;
+use rand::thread_rng;
 use std::fmt::Debug;
 
 #[cfg(test)]

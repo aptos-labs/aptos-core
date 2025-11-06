@@ -11,7 +11,6 @@ use crate::{
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::{CryptoRng, RngCore};
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -52,47 +51,49 @@ type LiftedHkzg<'a, E> =
 type LiftedChunkedElgamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
 
-//                         ┌───────────────────────────────┐
-//                         │     HkzgElgamalWitness<E>     │
-//                         │-------------------------------│
-//                         │ hkzg_randomness               │
-//                         │ chunked_plaintexts            │
-//                         │ elgamal_randomness            │
-//                         └───────────────┬───────────────┘
-//                                         │
-//              ┌────────────────────────┬─┼─┬──────────────────────┐
-//              │                        ║ ╫ ║                      │
-// projection_1 │    lifted HKZG hom ╔═══╝ ╫ ╚══════╗ lifted        │ projection_2
-//              │                    ║     ╫        ║ Chunked EG    │
-//              ▼                    ║     ╫        ║ hom           ▼
-//  ┌──────────────────────────────┐ ║     ╫        ║  ┌──────────────────────────────┐
-//  │ univariate_hiding_kzg::      │ ║     ╫        ║  │ chunked_elgamal::            │
-//  │ Witness<E>                   │ ║     ╫        ║  │ Witness<E>                   │
-//  │------------------------------│ ║     ╫        ║  │------------------------------│
-//  │ hkzg_randomness              │ ║     ╫        ║  │ chunked_plaintexts           │
-//  │ flattened_chunked_plaintexts │ ║     ╫        ║  │ elgamal_randomness           │
-//  └──────────────┬───────────────┘ ║     ╫        ║  └──────────────┬───────────────┘
-//                 │ ╔═══════════════╝     ╫        ╚═══════════════╗ │
-//       HKZG hom  │ ║                     ╫                        ║ │ Chunked ElGamal hom
-//                 │ ║                     ╫ TupleHomomorphism      ║ │
-//                 ▼ ▼                     ╫                        ▼ ▼
-//   ┌──────────────────────────┐          ╫         ┌──────────────────────────┐
-//   │ HKZG output (commitment) │          ╫         │ Chunked ElGamal output   │
-//   └──────────────┬───────────┘          ╫         └──────────────┬───────────┘
-//                  │                      ╫                        │
-//                  └─────────────────────►╫◄───────────────────────┘
-//                                         ╫
-//                                         ▼
-//                       ┌──────────────────────────────────┐
-//                       │   TupleHomomorphism output       │
-//                       │   (pair of HKZG image and        │
-//                       │    Chunked ElGamal image)        │
-//                       └──────────────────────────────────┘
+//                              ┌───────────────────────────────┐
+//                              │     HkzgElgamalWitness<E>     │
+//                              │-------------------------------│
+//                              │ hkzg_randomness               │
+//                              │ chunked_plaintexts            │
+//                              │ elgamal_randomness            │
+//                              └───────────────┬───────────────┘
+//                                              │
+//              ┌─────────────────────────────┬─╫─┬──────────────────────────┐
+//              │                             ║ ╫ ║                          │
+// projection_1 │         lifted HKZG hom ╔═══╝ ╫ ╚══════╗ lifted Chunked    │ projection_2
+//              │                         ║     ╫        ║ ElGamal hom       │
+//              ▼                         ║     ╫        ║                   ▼
+//  ┌───────────────────────────────────┐ ║     ╫        ║  ┌──────────────────────────────┐
+//  │ univariate_hiding_kzg::Witness<E> │ ║     ╫        ║  │ chunked_elgamal:: Witness<E> │
+//  │-----------------------------------│ ║     ╫        ║  │------------------------------│
+//  │ hkzg_randomness                   │ ║     ╫        ║  │ chunked_plaintexts           │
+//  │ flattened_chunked_plaintexts      │ ║     ╫        ║  │ elgamal_randomness           │
+//  └──────────────┬────────────────────┘ ║     ╫        ║  └──────────────┬───────────────┘
+//                 │ ╔════════════════════╝     ╫        ╚═══════════════╗ │
+//       HKZG hom  │ ║                          ╫                        ║ │ Chunked ElGamal hom
+//                 │ ║                          ╫ TupleHomomorphism      ║ │
+//                 ▼ ▼                          ╫                        ▼ ▼
+//   ┌──────────────────────────┐               ╫         ┌──────────────────────────┐
+//   │ HKZG output (commitment) │               ╫         │ Chunked ElGamal output   │
+//   └──────────────┬───────────┘               ╫         └──────────────┬───────────┘
+//                  │                           ╫                        │
+//                  └──────────────────────────►╫◄───────────────────────┘
+//                                              ╫
+//                                              ▼
+//                            ┌──────────────────────────────────┐
+//                            │   TupleHomomorphism output       │
+//                            │   (pair of HKZG image and        │
+//                            │    Chunked ElGamal image)        │
+//                            └──────────────────────────────────┘
+//
 //
 // In other words, the tuple homomorphism is roughly given as follows:
 //
 // ( rho, z_{i,j} , r_j ) │----> ( HKZG(rho, (0, z_{i,j}) ) , chunked_elgamal( z_{i,j} , r_j )
-//
+//                             = ( \rho * \xi_1 + \sum_i,j=... z_{i,j} * \ell_i...(\tau)_1 ) ,
+//                                 chunked_elgamal( z_{i,j} , r_j )
+
 // TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.

@@ -177,6 +177,8 @@ impl traits::Transcript for Transcript {
         // TODO: benchmark this
         let (f, extra) =
             fiat_shamir::derive_challenge_scalars(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
+        debug_assert_eq!(f.len(), sc.n + 1 - sc.t);
+        debug_assert_eq!(extra.len(), 2);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();
