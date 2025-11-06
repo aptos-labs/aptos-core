@@ -1,0 +1,16 @@
+//# publish
+module 0x22::test
+
+public fun vec_mut_borrow_instr(): vector<u64>
+    local v: vector<u64>
+    ld_const<vector<u64>> [10, 20, 30]
+    st_loc v
+    ld_u64 99
+    mut_borrow_loc v
+    ld_u64 1
+    vec_mut_borrow <u64>
+    write_ref
+    move_loc v
+    ret
+
+//# run --verbose 0x22::test::vec_mut_borrow_instr --display-trace

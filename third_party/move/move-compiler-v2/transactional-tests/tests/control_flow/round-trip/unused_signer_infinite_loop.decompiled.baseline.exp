@@ -1,5 +1,11 @@
 processed 1 task
 task 0 lines 3-8:  run --gas-budget 700 --signers 0x1 [script {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+  ┌─ TEMPFILE:5:14
+  │
+5 │     fun main(p0: signer) {
+  │              ^^
+
 Error: Script execution failed with VMError: {
     major_status: OUT_OF_GAS,
     sub_status: None,

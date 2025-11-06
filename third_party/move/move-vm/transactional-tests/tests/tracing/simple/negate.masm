@@ -1,0 +1,9 @@
+//# publish
+module 0x22::test
+
+public fun negate_instr(): i8
+    ld_i8 -8
+    negate
+    ret
+
+//# run --verbose 0x22::test::negate_instr --display-trace

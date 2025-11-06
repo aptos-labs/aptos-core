@@ -27,7 +27,9 @@ use aptos_types::{
     write_set::WriteSet,
 };
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, AptosVM, VMBlockExecutor};
-use aptos_vm_environment::prod_configs::{set_layout_caches, set_paranoid_type_checks};
+use aptos_vm_environment::prod_configs::{
+    set_async_runtime_checks, set_layout_caches, set_paranoid_type_checks,
+};
 use clap::Parser;
 use rayon::{iter::ParallelIterator, prelude::IntoParallelIterator};
 use std::{
@@ -184,6 +186,8 @@ impl Verifier {
             Self::get_start_and_limit(&arc_db, config.start_version, config.end_version)?;
         set_layout_caches(true);
         set_paranoid_type_checks(config.paranoid_type_checks);
+        // Paranoid checks are done async if enabled.
+        set_async_runtime_checks(config.paranoid_type_checks);
         info!(
             start_version = start,
             limit = limit,

@@ -69,6 +69,7 @@ fn run_case(input: TransactionState) -> Result<(), Corpus> {
         &VM,
         ChainId::mainnet(),
         Arc::clone(&TP),
+        None,
     )
     .set_not_parallel();
 

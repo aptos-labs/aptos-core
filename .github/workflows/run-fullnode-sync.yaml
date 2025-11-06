@@ -1,5 +1,5 @@
 # This workflow is a simple wrapper around the fullnode-sync github
-# action. It invokes the action with all the neccessary configurations
+# action. It invokes the action with all the necessary configurations
 # required by the specific fullnode sync test instance.
 
 name: "Run Fullnode Sync"
@@ -8,50 +8,50 @@ on:
   workflow_call:
     inputs:
       TEST_NAME:
-        description: "The unique name of the fullnode test."
+        description: "The name of the test run (only used for logs, e.g., slack failures)."
         type: string
         required: true
       GIT_REF:
-        description: "The aptos-core git ref (GIT_REF or commit hash) to switch to before running the fullnode."
+        description: "The aptos-core reference (GIT_REF or commit hash) to compile the fullnode."
         type: string
         required: true
       NETWORK:
-        description: "The network to connect the fullnode to: devnet, testnet, or mainnet."
+        description: "The network to connect the fullnode to (e.g., devnet, testnet, mainnet)."
         type: string
         required: true
       BOOTSTRAPPING_MODE:
-        description: "The state sync bootstrapping mode for the fullnode."
+        description: "The fullnode bootstrapping mode (e.g., DownloadLatestStates)."
         type: string
         required: true
       CONTINUOUS_SYNCING_MODE:
-        description: "The state sync continuous syncing mode for the fullnode."
+        description: "The fullnode continuous syncing mode (e.g., ApplyTransactionOutputs)."
         type: string
         required: true
       TIMEOUT_MINUTES:
-        description: "The number of minutes to wait for fullnode sync to finish."
+        description: "The number of minutes to wait for fullnode to sync."
         type: number
         required: false
         default: 300 # Run for at most 5 hours
   workflow_dispatch:
     inputs:
       TEST_NAME:
-        description: "The unique name of the fullnode test."
+        description: "The name of the test run (only used for logs, e.g., slack failures)."
         type: string
         required: true
       GIT_REF:
-        description: "The aptos-core GIT_REF (or ref) to switch to before running the fullnode."
+        description: "The aptos-core reference (GIT_REF or commit hash) to compile the fullnode."
         type: string
         required: true
       NETWORK:
-        description: "The network to connect the fullnode to: devnet, testnet, or mainnet."
+        description: "The network to connect the fullnode to (e.g., devnet, testnet, mainnet)."
         type: string
         required: true
       BOOTSTRAPPING_MODE:
-        description: "The state sync bootstrapping mode for the fullnode."
+        description: "The fullnode bootstrapping mode (e.g., DownloadLatestStates)."
         type: string
         required: true
       CONTINUOUS_SYNCING_MODE:
-        description: "The state sync continuous syncing mode for the fullnode."
+        description: "The fullnode continuous syncing mode (e.g., ApplyTransactionOutputs)."
         type: string
         required: true
 

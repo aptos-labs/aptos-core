@@ -25,8 +25,8 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    module_traversal::TraversalContext, LoadedFunction, LoadedFunctionOwner, Loader,
-    RuntimeEnvironment,
+    execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext, LoadedFunction,
+    LoadedFunctionOwner, Loader, RuntimeEnvironment,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -500,8 +500,15 @@ fn validate_and_construct(
         )?;
         args.push(arg);
     }
-    let serialized_result =
-        session.execute_loaded_function(function, args, gas_meter, traversal_context, loader)?;
+    let serialized_result = session.execute_loaded_function(
+        function,
+        args,
+        gas_meter,
+        traversal_context,
+        loader,
+        // No need to record the trace for argument construction.
+        &mut NoOpTraceRecorder,
+    )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     Ok(ret_vals

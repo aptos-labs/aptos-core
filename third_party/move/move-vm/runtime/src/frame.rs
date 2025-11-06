@@ -53,11 +53,11 @@ pub(crate) enum LocalTys {
 /// pushed and then popped to/from the call stack.
 pub(crate) struct Frame {
     pub(crate) pc: u16,
-    ty_builder: TypeBuilder,
+    pub(crate) ty_builder: TypeBuilder,
     // Currently being executed function.
     pub(crate) function: Rc<LoadedFunction>,
     // How this frame was established.
-    call_type: CallType,
+    pub(crate) call_type: CallType,
     // Locals for this execution context and their instantiated types.
     pub(crate) locals: Locals,
     pub(crate) local_tys: LocalTys,
