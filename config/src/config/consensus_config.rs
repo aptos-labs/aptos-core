@@ -158,7 +158,7 @@ impl Default for ExecutionBackpressureTxnLimitConfig {
                 metric: ExecutionBackpressureMetric::Percentile(0.5),
                 target_block_time_ms: 90,
             },
-            min_calibrated_txns_per_block: 8,
+            min_calibrated_txns_per_block: 30,
         }
     }
 }
