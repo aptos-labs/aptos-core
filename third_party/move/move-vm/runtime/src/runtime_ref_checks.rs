@@ -78,12 +78,11 @@
 //! one of the reference parameters. They are also transformed to point to the
 //! corresponding access path tree node in the caller's frame (if it exists).
 
-use crate::{frame::Frame, frame_type_cache::FrameTypeCache, LoadedFunction};
+use crate::{frame::Frame, frame_type_cache::FrameTypeCache, instr::Instruction, LoadedFunction};
 use fxhash::FxBuildHasher;
 use hashbrown::HashMap;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
-    file_format::Bytecode,
     safe_assert, safe_unwrap, safe_unwrap_err,
 };
 use move_core_types::{
@@ -246,14 +245,14 @@ pub(crate) trait RuntimeRefCheck {
     /// Transitions the reference check state before executing a bytecode instruction.
     fn pre_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()>;
 
     /// Transitions the reference check state after executing a bytecode instruction.
     fn post_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
@@ -281,7 +280,7 @@ pub(crate) struct FullRuntimeRefCheck;
 impl RuntimeRefCheck for NoRuntimeRefCheck {
     fn pre_execution_transition(
         _frame: &Frame,
-        _instruction: &Bytecode,
+        _instruction: &Instruction,
         _ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
         Ok(())
@@ -289,7 +288,7 @@ impl RuntimeRefCheck for NoRuntimeRefCheck {
 
     fn post_execution_transition(
         _frame: &Frame,
-        _instruction: &Bytecode,
+        _instruction: &Instruction,
         _ref_state: &mut RefCheckState,
         _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
@@ -318,10 +317,10 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
     /// gas is charged during execution, but we may want to validate this preference.
     fn pre_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
-        use Bytecode::*;
+        use Instruction::*;
         match instruction {
             Call(_) | CallGeneric(_) | Branch(_) => {
                 // `Call` and `CallGeneric` are handled by calling `core_call_transition` elsewhere
@@ -438,11 +437,11 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
 
     fn post_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
-        use Bytecode::*;
+        use Instruction::*;
         match instruction {
             Pop => {
                 let top = ref_state.pop_from_shadow_stack()?;

@@ -4,12 +4,11 @@
 //! Defines the trace data structure which is sufficient to replay Move program execution without
 //! requiring any data accesses (only access to code loader is needed).
 
-use crate::{execution_tracing::recorders::BytecodeFingerprintRecorder, LoadedFunction};
-use bitvec::vec::BitVec;
-use move_binary_format::{
-    errors::{PartialVMError, PartialVMResult},
-    file_format::Bytecode,
+use crate::{
+    execution_tracing::recorders::BytecodeFingerprintRecorder, instr::Instruction, LoadedFunction,
 };
+use bitvec::vec::BitVec;
+use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::function::ClosureMask;
 
 /// A non-static call record in the trace. Used for entry-points and closures.
@@ -191,7 +190,7 @@ impl<'a> TraceCursor<'a> {
     /// Decrements a tick (equivalent to replay of an instruction). The caller must ensure it does
     /// not underflow.
     #[inline(always)]
-    pub(crate) fn consume_instruction_unchecked(&mut self, instr: &Bytecode) {
+    pub(crate) fn consume_instruction_unchecked(&mut self, instr: &Instruction) {
         self.instructions_remaining -= 1;
         self.fingerprint_recorder.record(instr);
     }
