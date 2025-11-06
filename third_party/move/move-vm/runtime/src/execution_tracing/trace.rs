@@ -193,7 +193,7 @@ impl<'a> TraceCursor<'a> {
     #[inline(always)]
     pub(crate) fn consume_instruction_unchecked(&mut self, instr: &Bytecode) {
         self.instructions_remaining -= 1;
-        self.fingerprint_recorder.record(instr);
+        // self.fingerprint_recorder.record(instr);
     }
 
     /// Processes a conditional branch. Returns [None] if branch was not recorded.

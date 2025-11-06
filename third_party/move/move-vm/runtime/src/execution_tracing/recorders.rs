@@ -99,7 +99,7 @@ impl TraceRecorder for FullTraceRecorder {
     #[inline(always)]
     fn record_successful_instruction(&mut self, instr: &Bytecode) {
         self.ticks += 1;
-        self.fingerprint_recorder.record(instr);
+        // self.fingerprint_recorder.record(instr);
     }
 
     #[inline(always)]
