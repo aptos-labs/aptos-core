@@ -39,11 +39,11 @@ pub enum BypasserConfig {
 }
 
 impl BypasserConfig {
-    pub fn build(self) -> Result<Bypasser> {
+    pub async fn build(self) -> Result<Bypasser> {
         Ok(match self {
             BypasserConfig::AuthToken(config) => Bypasser::from(AuthTokenBypasser::new(config)?),
             BypasserConfig::FirebaseJwtDomain(config) => {
-                Bypasser::from(FirebaseJwtDomainBypasser::new(config)?)
+                Bypasser::from(FirebaseJwtDomainBypasser::new(config).await?)
             },
 
             BypasserConfig::IpAllowlist(config) => {

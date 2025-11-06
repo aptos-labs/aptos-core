@@ -9,7 +9,6 @@ use crate::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokio::sync::OnceCell;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct FirebaseJwtDomainBypasserConfig {
@@ -21,17 +20,21 @@ pub struct FirebaseJwtDomainBypasserConfig {
 
 pub struct FirebaseJwtDomainBypasser {
     allowed_domains: Vec<String>,
-    identity_platform_gcp_project: String,
-    verifier: OnceCell<FirebaseJwtVerifier>,
+    verifier: FirebaseJwtVerifier,
 }
 
 impl FirebaseJwtDomainBypasser {
-    pub fn new(config: FirebaseJwtDomainBypasserConfig) -> Result<Self> {
+    pub async fn new(config: FirebaseJwtDomainBypasserConfig) -> Result<Self> {
         if config.allowed_domains.is_empty() {
             return Err(anyhow!(
                 "FirebaseJwtDomainBypasser requires at least one allowed domain"
             ));
         }
+
+        let verifier = FirebaseJwtVerifier::new(FirebaseJwtVerifierConfig {
+            identity_platform_gcp_project: config.identity_platform_gcp_project,
+        })
+        .await?;
 
         Ok(Self {
             allowed_domains: config
@@ -39,8 +42,7 @@ impl FirebaseJwtDomainBypasser {
                 .into_iter()
                 .map(|domain| domain.to_ascii_lowercase())
                 .collect(),
-            identity_platform_gcp_project: config.identity_platform_gcp_project,
-            verifier: OnceCell::new(),
+            verifier,
         })
     }
 }
@@ -48,17 +50,11 @@ impl FirebaseJwtDomainBypasser {
 #[async_trait]
 impl BypasserTrait for FirebaseJwtDomainBypasser {
     async fn request_can_bypass(&self, data: CheckerData) -> Result<bool> {
-        let identity_platform_gcp_project = self.identity_platform_gcp_project.clone();
-        let verifier = self
+        let claims = match self
             .verifier
-            .get_or_try_init(|| async {
-                FirebaseJwtVerifier::new(FirebaseJwtVerifierConfig {
-                    identity_platform_gcp_project,
-                })
-                .await
-            })
-            .await?;
-        let claims = match verifier.validate_jwt_claims(data.headers.clone()).await {
+            .validate_jwt_claims(data.headers.clone())
+            .await
+        {
             Ok(claims) => claims,
             Err(_) => return Ok(false),
         };

@@ -107,7 +107,7 @@ impl RunConfig {
         // Build Bypassers.
         let mut bypassers: Vec<Bypasser> = Vec::new();
         for bypasser_config in &self.bypasser_configs {
-            let bypasser = bypasser_config.clone().build().with_context(|| {
+            let bypasser = bypasser_config.clone().build().await.with_context(|| {
                 format!("Failed to build Bypasser with args: {:?}", bypasser_config)
             })?;
             bypassers.push(bypasser);
