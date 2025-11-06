@@ -106,6 +106,7 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
     }
 }
 
+// TODO: it may make sense to make an associated type Scalar of Transcript, then remove S here and replace it with T::Scalar
 #[allow(non_snake_case)]
 #[allow(private_bounds)]
 pub trait PVSS<S: FromBytes, T: Transcript>: ScalarProtocol<S> {

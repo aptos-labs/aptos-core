@@ -232,6 +232,26 @@ where
     pub z: H::Domain,
 }
 
+impl<E: Pairing, H: homomorphism::Trait> Proof<E, H>
+where
+    H::Domain: Witness<E>,
+    H::Codomain: Statement,
+{
+    /// No-op: circumvents the fact that proofs inherit the homomorphism’s lifetime. This method does nothing at runtime.
+    #[allow(non_snake_case)]
+    pub fn change_lifetime<H2>(self) -> Proof<E, H2>
+    where
+        H2: homomorphism::Trait<Domain = H::Domain, Codomain = H::Codomain>,
+    {
+        let first = match self.first_proof_item {
+            FirstProofItem::Commitment(A) => FirstProofItem::Commitment(A),
+            FirstProofItem::Challenge(c) => FirstProofItem::Challenge(c),
+        };
+
+        Proof { first_proof_item: first, z: self.z }
+    }
+}
+
 // Manual implementation of PartialEq and Eq is required here because deriving PartialEq/Eq would
 // automatically require `H` itself to implement PartialEq and Eq, which is undesirable.
 // Workaround would be to make `Proof` generic over `H::Domain` and `H::Codomain` instead of `H`

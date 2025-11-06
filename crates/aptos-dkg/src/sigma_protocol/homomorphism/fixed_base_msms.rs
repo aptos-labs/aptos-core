@@ -153,3 +153,28 @@ where
         H::msm_eval(bases, scalars)
     }
 }
+
+use crate::sigma_protocol;
+use ark_ec::pairing::Pairing;
+use crate::sigma_protocol::Witness;
+
+impl<E: Pairing, H, LargerDomain> sigma_protocol::Trait<E> for homomorphism::LiftHomomorphism<H, LargerDomain>
+where
+    H: sigma_protocol::Trait<E>,
+    LargerDomain: Witness<E>,
+{
+    fn dst(&self) -> Vec<u8> {
+        let mut dst = Vec::new();
+
+        let dst_original = self.hom.dst();
+
+        // Domain-separate them properly so concatenation is unambiguous.
+        // Prefix with their lengths so [a|b] and [ab|] don't collide.
+        dst.extend_from_slice(b"Lift(");
+        dst.extend_from_slice(&(dst_original.len() as u32).to_be_bytes());
+        dst.extend_from_slice(&dst_original);
+        dst.extend_from_slice(b")");
+
+        dst
+    }
+}

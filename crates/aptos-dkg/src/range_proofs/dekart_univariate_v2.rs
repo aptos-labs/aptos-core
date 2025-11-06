@@ -402,9 +402,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let Cs: Vec<_> = f_js_evals
             .iter()
             .zip(rhos.iter())
-            .map(|(f_j, rho)| {
+            .map(|(f_j, &rho)| {
                 let hkzg_commit_input = univariate_hiding_kzg::Witness {
-                    hiding_randomness: Scalar(*rho),
+                    hiding_randomness: univariate_hiding_kzg::CommitmentRandomness(rho),
                     values: Scalar::vec_from_inner_slice(f_j),
                 };
                 hkzg_commitment_hom.apply(&hkzg_commit_input).0
@@ -513,7 +513,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let rho_h = E::ScalarField::rand(rng);
         let D = hkzg_commitment_hom
             .apply(&univariate_hiding_kzg::Witness {
-                hiding_randomness: Scalar(rho_h),
+                hiding_randomness: univariate_hiding_kzg::CommitmentRandomness(rho_h),
                 values: Scalar::vec_from_inner_slice(&h_evals),
             })
             .0;
@@ -698,9 +698,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .map(|(&a_j, &mu_j)| a_j * mu_j)
                 .sum::<E::ScalarField>();
 
+        use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
             vk_hkzg.clone(),
-            univariate_hiding_kzg::Commitment(U),
+            HkzgCommitment(U), // Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a
             gamma,
             a_u,
             pi_gamma.clone(),

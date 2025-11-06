@@ -26,11 +26,27 @@ use ark_std::{
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(pub E::G1);
+pub type Commitment<E: Pairing> = CodomainShape<E::G1>;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+// #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+// pub struct Commitment<E: Pairing>(pub E::G1);
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
+// TODO: maybe make this an alias for Scalar<E> ?
+
+
+impl<E: Pairing> sigma_protocol::Witness<E> for CommitmentRandomness<E> {
+    type Scalar = Scalar<E>;
+
+    fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
+        CommitmentRandomness(self.0 + (c) * other.0)
+    }
+
+    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
+        CommitmentRandomness(E::ScalarField::rand(rng))
+    }
+}
 
 impl<E: Pairing> UniformRand for CommitmentRandomness<E> {
     fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
@@ -152,11 +168,11 @@ pub fn commit_with_randomness<E: Pairing>(
     };
 
     let input = Witness {
-        hiding_randomness: Scalar(r.0),
+        hiding_randomness: r.clone(),
         values: Scalar::vec_from_inner_slice(values),
     };
 
-    Commitment(commitment_hom.apply(&input).0)
+    commitment_hom.apply(&input)
 }
 
 impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
@@ -267,7 +283,7 @@ pub struct CommitmentHomomorphism<'a, E: Pairing> {
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
 pub struct Witness<E: Pairing> {
-    pub hiding_randomness: Scalar<E>,
+    pub hiding_randomness: CommitmentRandomness<E>,
     pub values: Vec<Scalar<E>>,
 }
 

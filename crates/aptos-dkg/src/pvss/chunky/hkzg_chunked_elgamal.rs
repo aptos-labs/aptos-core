@@ -31,7 +31,7 @@ use ark_std::rand::{CryptoRng, RngCore};
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
 pub struct HkzgElgamalWitness<E: Pairing> {
-    pub hkzg_randomness: Scalar<E>,
+    pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<E>,
     pub chunked_plaintexts: Vec<Vec<Scalar<E>>>,
     pub elgamal_randomness: Vec<Scalar<E>>,
 }
@@ -121,7 +121,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
                         .chain(chunked_plaintexts.iter().flatten().cloned())
                         .collect();
                 univariate_hiding_kzg::Witness::<E> {
-                    hiding_randomness: Scalar(hkzg_randomness.0),
+                    hiding_randomness: hkzg_randomness.clone(),
                     values: flattened_chunked_plaintexts,
                 }
             },
