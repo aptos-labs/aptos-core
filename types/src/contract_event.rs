@@ -12,10 +12,12 @@ use crate::{
     jwks::{jwk::JWKMoveStruct, rsa::RSA_JWK, unsupported::UnsupportedJWK, AllProvidersJWKs, ObservedJWKsUpdated, ProviderJWKs},
     move_any::{Any, AsMoveAny},
     transaction::Version,
+    validator_verifier::ValidatorConsensusInfo,
 };
 use anyhow::{bail, Error, Result};
 use api_types::events::contract_event::GravityEvent;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use hex;
 use move_core_types::{
     ident_str,
     language_storage::{StructTag, TypeTag, CORE_CODE_ADDRESS},
@@ -26,6 +28,51 @@ use once_cell::sync::Lazy;
 use proptest_derive::Arbitrary;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{convert::TryFrom, ops::Deref, str::FromStr};
+
+/// Helper function to convert ValidatorConsensusInfoMoveStruct to ValidatorConsensusInfo
+fn convert_validator_consensus_info(
+    v: &api_types::on_chain_config::dkg::ValidatorConsensusInfo,
+) -> Result<ValidatorConsensusInfo, Error> {
+    let addr = crate::account_address::AccountAddress::from_bytes(&v.addr.bytes())
+        .map_err(|e| {
+            eprintln!("Failed to parse address: {:?}, error: {}", v.addr, e);
+            e
+        })?;
+    
+    // Convert 96-character hex string to 48 bytes
+    let pk_bytes = match hex::decode(&v.pk_bytes) {
+        Ok(bytes) => {
+            if bytes.len() != 48 {
+                return Err(anyhow::anyhow!(
+                    "Invalid BLS12381 public key length after hex decode: expected 48 bytes, got {} bytes. Original hex: {:?}", 
+                    bytes.len(), 
+                    v.pk_bytes
+                ));
+            }
+            bytes
+        },
+        Err(e) => {
+            return Err(anyhow::anyhow!(
+                "Failed to decode hex string: {:?}, error: {}", 
+                v.pk_bytes, 
+                e
+            ));
+        }
+    };
+    
+    let public_key = aptos_crypto::bls12381::PublicKey::try_from(pk_bytes.as_slice())
+        .map_err(|e| {
+            eprintln!("Failed to parse BLS12381 public key: pk_bytes length: {}, bytes: {:?}, error: {}", 
+                pk_bytes.len(), pk_bytes, e);
+            e
+        })?;
+    
+    Ok(ValidatorConsensusInfo {
+        address: addr,
+        public_key,
+        voting_power: v.voting_power,
+    })
+}
 
 pub static FEE_STATEMENT_EVENT_TYPE: Lazy<TypeTag> = Lazy::new(|| {
     TypeTag::Struct(Box::new(StructTag {
@@ -486,7 +533,25 @@ impl TryFrom<&GravityEvent> for ContractEvent {
                     bcs::to_bytes(&data).unwrap(),
                 )))
             },
-            GravityEvent::DKG => todo!(),
+            GravityEvent::DKG(dkg) => {
+                let data = DKGStartEvent {
+                    session_metadata: crate::dkg::DKGSessionMetadata {
+                        dealer_epoch: dkg.session_metadata.dealer_epoch,
+                        randomness_config: crate::on_chain_config::OnChainRandomnessConfig::default_enabled().into(),
+                        dealer_validator_set: dkg.session_metadata.dealer_validator_set.clone().into_iter()
+                            .map(|v| convert_validator_consensus_info(&v).map(|info| info.into()))
+                            .collect::<Result<Vec<_>, _>>()?,
+                        target_validator_set: dkg.session_metadata.target_validator_set.clone().into_iter()
+                            .map(|v| convert_validator_consensus_info(&v).map(|info| info.into()))
+                            .collect::<Result<Vec<_>, _>>()?,
+                    },
+                    start_time_us: dkg.start_time_us,
+                };
+                Ok(ContractEvent::V2(ContractEventV2::new(
+                    TypeTag::Struct(Box::new(crate::dkg::DKGStartEvent::struct_tag())),
+                    bcs::to_bytes(&data).unwrap(),
+                )))
+            },
         }
     }
 }

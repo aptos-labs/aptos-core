@@ -19,6 +19,7 @@ pub enum OnChainConfig {
     Epoch,
     ObservedJWKs,
     Features,
+    DKGState,
 }
 
 impl FromStr for OnChainConfig {
@@ -42,6 +43,7 @@ impl FromStr for OnChainConfig {
             "CurrentTimeMicroseconds" => Ok(OnChainConfig::CurrentTimeMicroseconds),
             "ObservedJWKs" => Ok(OnChainConfig::ObservedJWKs),
             "Features" => Ok(OnChainConfig::Features),
+            "DKGState" => Ok(OnChainConfig::DKGState),
             _ => Err(format!("Unknown OnChainConfig variant: {}", s)),
         }
     }
