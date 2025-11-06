@@ -11,6 +11,7 @@ use crate::{
     Scalar,
 };
 use anyhow::ensure;
+use aptos_crypto::arkworks::random::{sample_field_element, UniformRand};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -22,8 +23,6 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, Rng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
-use aptos_crypto::arkworks::random::sample_field_element;
-use aptos_crypto::arkworks::random::UniformRand;
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
@@ -337,10 +336,10 @@ impl<'a, E: Pairing> sigma_protocol::Trait<E> for CommitmentHomomorphism<'a, E> 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_crypto::arkworks::random::{sample_field_element, sample_field_elements};
     use ark_ec::pairing::Pairing;
     use ark_poly::{univariate::DensePolynomial, Polynomial};
     use rand::thread_rng;
-    use aptos_crypto::arkworks::random::{sample_field_element, sample_field_elements};
 
     // TODO: Should set up a PCS trait, then make these tests generic?
     fn assert_kzg_opening_correctness<E: Pairing>() {

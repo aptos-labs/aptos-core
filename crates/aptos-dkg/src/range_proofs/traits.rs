@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::algebra::GroupGenerators;
-use ark_ec::pairing::Pairing;
 use aptos_crypto::arkworks::random::UniformRand;
+use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
 

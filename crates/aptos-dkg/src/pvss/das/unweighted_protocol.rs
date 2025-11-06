@@ -3,18 +3,20 @@
 
 use crate::{
     algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},
-    pvss,
     pvss::{
+        self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das,
-        encryption_dlog, schnorr, traits,
-        traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
+        das, encryption_dlog, schnorr,
+        traits::{
+            self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
+        },
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
             insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_g2_point,
+            random_scalars,
         },
     },
 };
@@ -27,6 +29,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Neg, Sub};
 
@@ -172,12 +175,11 @@ impl traits::Transcript for Transcript {
             );
         }
 
+        let mut rng = thread_rng();
         // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
         // TODO: benchmark this
-        let (f, extra) =
-            fiat_shamir::derive_challenge_scalars(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
-        debug_assert_eq!(f.len(), sc.n + 1 - sc.t);
-        debug_assert_eq!(extra.len(), 2);
+        let f = random_scalars(sc.n + 1 - sc.t, &mut rng);
+        let extra = random_scalars(2, &mut rng);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();

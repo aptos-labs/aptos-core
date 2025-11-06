@@ -17,8 +17,8 @@ use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
 };
-use rand::{CryptoRng, RngCore};
 use num_integer::Roots;
+use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, io::Write};
 
 // Making all fields pub(crate) so one can "generate" a nonsense proof

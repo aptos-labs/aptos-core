@@ -16,10 +16,7 @@ use ark_ff::AdditiveGroup;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid, Validate,
 };
-use ark_std::{
-    io::Read,
-    UniformRand,
-};
+use ark_std::{io::Read, UniformRand};
 use std::{fmt::Debug, io::Write};
 
 pub trait Trait<E: Pairing>:
@@ -49,8 +46,9 @@ pub trait Trait<E: Pairing>:
         public_statement: &Self::Codomain,
         proof: &Proof<E, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         transcript: &mut merlin::Transcript,
-    ) -> anyhow::Result<()> 
-    where H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+    ) -> anyhow::Result<()>
+    where
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
     {
         verify_msm_hom::<E, Self>(
             self,
@@ -250,7 +248,10 @@ where
             FirstProofItem::Challenge(c) => FirstProofItem::Challenge(c),
         };
 
-        Proof { first_proof_item: first, z: self.z }
+        Proof {
+            first_proof_item: first,
+            z: self.z,
+        }
     }
 }
 

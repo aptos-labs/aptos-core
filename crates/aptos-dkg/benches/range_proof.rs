@@ -10,8 +10,8 @@ use aptos_dkg::{
     utils::test_utils::{self},
 };
 use ark_ec::pairing::Pairing;
-use rand::thread_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
+use rand::thread_rng;
 
 /// Generic benchmark function over any pairing curve and range proof
 fn bench_range_proof<E: Pairing, B: BatchedRangeProof<E>>(

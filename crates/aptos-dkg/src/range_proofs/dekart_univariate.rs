@@ -7,7 +7,7 @@ use crate::{
     pcs::univariate_kzg,
     range_proofs::traits,
     sigma_protocol::homomorphism::Trait,
-    utils,
+    utils, Scalar,
 };
 use anyhow::ensure;
 use aptos_crypto::arkworks::random::sample_field_element;
@@ -15,14 +15,12 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, PrimeGroup, VariableBaseMSM,
 };
-use ark_ff::{AdditiveGroup, PrimeField, Field};
+use ark_ff::{AdditiveGroup, Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
-use rand::{CryptoRng, RngCore};
-use crate::Scalar;
-
 #[cfg(feature = "range_proof_timing")]
 use ff::derive::bitvec::macros::internal::funty::Fundamental;
+use rand::{CryptoRng, RngCore};
 #[cfg(feature = "range_proof_timing")]
 use std::time::{Duration, Instant};
 use std::{

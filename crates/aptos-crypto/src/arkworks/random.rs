@@ -7,10 +7,10 @@
 //! `rand` crate, which may differ from the version used by `arkworks` and thus
 //! would not be accepted directly.
 
+use crate::arkworks::hashing::unsafe_hash_to_affine;
+use ark_ec::{AffineRepr, CurveGroup};
 use ark_ff::PrimeField;
 use rand::Rng;
-use ark_ec::{AffineRepr, CurveGroup};
-use crate::arkworks::hashing::unsafe_hash_to_affine;
 
 /// DST used for hashing, see `less_insecure_random_point()`
 pub const DST_RAND_CORE_HELL: &[u8; 24] = b"APTOS_RAND_CORE_HELL_DST";
@@ -45,9 +45,9 @@ where
     C::generator().mul(r)
 }
 
-/// Samples `n` uniformly random elements from the group, but is insecure in the sense 
+/// Samples `n` uniformly random elements from the group, but is insecure in the sense
 /// that the caller learns the discrete log of the random point.
-pub fn insecure_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C> 
+pub fn insecure_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
 {

@@ -18,13 +18,15 @@
 #![allow(clippy::borrow_interior_mutable_const)]
 
 use crate::pvss::{traits, Player};
-use aptos_crypto::arkworks::{random::sample_field_element, shamir::{ShamirShare, ThresholdConfig}};
+use aptos_crypto::arkworks::{
+    random::{sample_field_element, UniformRand},
+    shamir::{ShamirShare, ThresholdConfig},
+};
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rand::Rng;
-use aptos_crypto::arkworks::random::UniformRand;
 use more_asserts::{assert_ge, assert_le};
+use rand::Rng;
 pub use utils::random::DST_RAND_CORE_HELL;
 
 pub mod algebra;
