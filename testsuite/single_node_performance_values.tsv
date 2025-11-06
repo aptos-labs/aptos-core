@@ -11,7 +11,7 @@ publish-package	1	VM	28	0.962	1.027	2120.4
 mix_publish_transfer	1	VM	28	0.966	1.037	29141.8
 batch100-transfer	1	VM	28	0.918	1.070	1484.5
 batch100-transfer	1	NativeVM	26	0.884	1.143	1911.8
-vector-picture30k	1	VM	28	0.977	1.017	143.7
+vector-picture30k	1	VM	28	0.977	1.017	128.2
 vector-picture30k	100	VM	26	0.928	1.044	1845.0
 smart-table-picture30-k-with200-change	1	VM	28	0.759	1.025	50.3
 smart-table-picture30-k-with200-change	100	VM	26	0.951	1.031	729.1
@@ -29,12 +29,12 @@ token-v1nft-mint-and-transfer-sequential	1	VM	26	0.967	1.010	1292.6
 token-v1nft-mint-and-transfer-sequential	100	VM	26	0.978	1.021	17671.5
 coin-init-and-mint	1	VM	26	0.966	1.015	26906.4
 coin-init-and-mint	100	VM	26	0.974	1.023	22837.9
-fungible-asset-mint	1	VM	28	0.953	1.027	29249.3
+fungible-asset-mint	1	VM	28	0.953	1.027	28249.3
 fungible-asset-mint	100	VM	26	0.979	1.022	25367.0
 no-op5-signers	1	VM	26	0.969	1.028	47672.5
-token-v2-ambassador-mint	1	VM	28	0.916	1.023	20719.3
+token-v2-ambassador-mint	1	VM	28	0.916	1.023	19719.3
 token-v2-ambassador-mint	100	VM	26	0.983	1.019	20493.5
-liquidity-pool-swap	1	VM	28	0.929	1.012	1255.3
+liquidity-pool-swap	1	VM	28	0.929	1.012	1155.3
 liquidity-pool-swap	100	VM	26	0.983	1.036	14870.3
 liquidity-pool-swap-stable	1	VM	26	0.969	1.013	1209.6
 liquidity-pool-swap-stable	100	VM	26	0.976	1.030	14570.9

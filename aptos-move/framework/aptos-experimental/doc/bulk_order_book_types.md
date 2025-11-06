@@ -77,20 +77,9 @@ ask_sizes
     -  [Validation:](#@Validation:_7)
 -  [Enum `BulkOrder`](#0x7_bulk_order_book_types_BulkOrder)
     -  [Fields:](#@Fields:_8)
--  [Enum `BulkOrderRejection`](#0x7_bulk_order_book_types_BulkOrderRejection)
--  [Enum `BulkOrderPlaceResponse`](#0x7_bulk_order_book_types_BulkOrderPlaceResponse)
+-  [Struct `BulkOrderPlaceResponse`](#0x7_bulk_order_book_types_BulkOrderPlaceResponse)
 -  [Struct `BulkOrderRequestResponse`](#0x7_bulk_order_book_types_BulkOrderRequestResponse)
 -  [Constants](#@Constants_9)
--  [Function `get_validation_failed_rejection`](#0x7_bulk_order_book_types_get_validation_failed_rejection)
--  [Function `get_bid_length_mismatch_rejection`](#0x7_bulk_order_book_types_get_bid_length_mismatch_rejection)
--  [Function `get_ask_length_mismatch_rejection`](#0x7_bulk_order_book_types_get_ask_length_mismatch_rejection)
--  [Function `get_sequence_number_out_of_order_rejection`](#0x7_bulk_order_book_types_get_sequence_number_out_of_order_rejection)
--  [Function `get_price_crossing_rejection`](#0x7_bulk_order_book_types_get_price_crossing_rejection)
--  [Function `get_empty_order_rejection`](#0x7_bulk_order_book_types_get_empty_order_rejection)
--  [Function `get_bid_size_zero_rejection`](#0x7_bulk_order_book_types_get_bid_size_zero_rejection)
--  [Function `get_ask_size_zero_rejection`](#0x7_bulk_order_book_types_get_ask_size_zero_rejection)
--  [Function `get_bid_order_invalid_rejection`](#0x7_bulk_order_book_types_get_bid_order_invalid_rejection)
--  [Function `get_ask_order_invalid_rejection`](#0x7_bulk_order_book_types_get_ask_order_invalid_rejection)
 -  [Function `new_bulk_order`](#0x7_bulk_order_book_types_new_bulk_order)
     -  [Arguments:](#@Arguments:_10)
     -  [Returns:](#@Returns:_11)
@@ -101,16 +90,8 @@ ask_sizes
 -  [Function `get_account_from_order_request`](#0x7_bulk_order_book_types_get_account_from_order_request)
 -  [Function `get_sequence_number_from_order_request`](#0x7_bulk_order_book_types_get_sequence_number_from_order_request)
 -  [Function `get_sequence_number_from_bulk_order`](#0x7_bulk_order_book_types_get_sequence_number_from_bulk_order)
--  [Function `new_bulk_order_place_response_success`](#0x7_bulk_order_book_types_new_bulk_order_place_response_success)
--  [Function `new_bulk_order_place_response_rejection`](#0x7_bulk_order_book_types_new_bulk_order_place_response_rejection)
--  [Function `is_success`](#0x7_bulk_order_book_types_is_success)
--  [Function `is_rejection`](#0x7_bulk_order_book_types_is_rejection)
--  [Function `is_bulk_order_success_response`](#0x7_bulk_order_book_types_is_bulk_order_success_response)
--  [Function `destroy_bulk_order_place_success_response`](#0x7_bulk_order_book_types_destroy_bulk_order_place_success_response)
--  [Function `destroy_bulk_order_place_reject_response`](#0x7_bulk_order_book_types_destroy_bulk_order_place_reject_response)
--  [Function `new_bulk_order_request_response_success`](#0x7_bulk_order_book_types_new_bulk_order_request_response_success)
--  [Function `new_bulk_order_request_response_rejection`](#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection)
--  [Function `destroy_bulk_order_request_response`](#0x7_bulk_order_book_types_destroy_bulk_order_request_response)
+-  [Function `new_bulk_order_place_response`](#0x7_bulk_order_book_types_new_bulk_order_place_response)
+-  [Function `destroy_bulk_order_place_response`](#0x7_bulk_order_book_types_destroy_bulk_order_place_response)
 -  [Function `validate_not_zero_sizes`](#0x7_bulk_order_book_types_validate_not_zero_sizes)
     -  [Arguments:](#@Arguments:_15)
 -  [Function `validate_price_ordering`](#0x7_bulk_order_book_types_validate_price_ordering)
@@ -150,7 +131,6 @@ ask_sizes
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 </code></pre>
@@ -365,200 +345,15 @@ both original and remaining sizes for tracking purposes.
 
 </details>
 
-<a id="0x7_bulk_order_book_types_BulkOrderRejection"></a>
-
-## Enum `BulkOrderRejection`
-
-
-
-<pre><code>enum <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>ValidationFailed</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>BidLengthMismatch</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>AskLengthMismatch</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>SequenceNumberOutOfOrder</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>EmptyOrder</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>BidSizeZero</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>AskSizeZero</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>BidOrderInvalid</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>AskOrderInvalid</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>PriceCrossing</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
 <a id="0x7_bulk_order_book_types_BulkOrderPlaceResponse"></a>
 
-## Enum `BulkOrderPlaceResponse`
+## Struct `BulkOrderPlaceResponse`
 
 
 
-<pre><code>enum <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
+<pre><code><b>struct</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M: <b>copy</b>, drop, store&gt; <b>has</b> <b>copy</b>, drop
 </code></pre>
 
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>Success</summary>
 
 
 <details>
@@ -607,38 +402,6 @@ both original and remaining sizes for tracking purposes.
 
 </details>
 
-</details>
-
-<details>
-<summary>Rejection</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-<dt>
-<code>reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a></code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a></code>
-</dt>
-<dd>
-
-</dd>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
 <a id="0x7_bulk_order_book_types_BulkOrderRequestResponse"></a>
 
 ## Struct `BulkOrderRequestResponse`
@@ -656,19 +419,7 @@ both original and remaining sizes for tracking purposes.
 
 <dl>
 <dt>
-<code>request: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>rejection_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>&gt;</code>
-</dt>
-<dd>
-
-</dd>
-<dt>
-<code>rejection_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;</code>
+<code>request: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;</code>
 </dt>
 <dd>
 
@@ -728,245 +479,68 @@ both original and remaining sizes for tracking purposes.
 
 
 
-<a id="0x7_bulk_order_book_types_get_validation_failed_rejection"></a>
-
-## Function `get_validation_failed_rejection`
+<a id="0x7_bulk_order_book_types_E_ASK_LENGTH_MISMATCH"></a>
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_validation_failed_rejection">get_validation_failed_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
+<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>: u64 = 7;
 </code></pre>
 
 
 
-<details>
-<summary>Implementation</summary>
+<a id="0x7_bulk_order_book_types_E_ASK_ORDER_INVALID"></a>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_validation_failed_rejection">get_validation_failed_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::ValidationFailed
-}
+
+<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>: u64 = 13;
 </code></pre>
 
 
 
-</details>
-
-<a id="0x7_bulk_order_book_types_get_bid_length_mismatch_rejection"></a>
-
-## Function `get_bid_length_mismatch_rejection`
+<a id="0x7_bulk_order_book_types_E_ASK_SIZE_ZERO"></a>
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_bid_length_mismatch_rejection">get_bid_length_mismatch_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
+<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>: u64 = 11;
 </code></pre>
 
 
 
-<details>
-<summary>Implementation</summary>
+<a id="0x7_bulk_order_book_types_E_BID_LENGTH_MISMATCH"></a>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_bid_length_mismatch_rejection">get_bid_length_mismatch_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::BidLengthMismatch
-}
+
+<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>: u64 = 6;
 </code></pre>
 
 
 
-</details>
-
-<a id="0x7_bulk_order_book_types_get_ask_length_mismatch_rejection"></a>
-
-## Function `get_ask_length_mismatch_rejection`
+<a id="0x7_bulk_order_book_types_E_BID_ORDER_INVALID"></a>
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_ask_length_mismatch_rejection">get_ask_length_mismatch_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
+<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>: u64 = 12;
 </code></pre>
 
 
 
-<details>
-<summary>Implementation</summary>
+<a id="0x7_bulk_order_book_types_E_BID_SIZE_ZERO"></a>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_ask_length_mismatch_rejection">get_ask_length_mismatch_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::AskLengthMismatch
-}
+
+<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>: u64 = 10;
 </code></pre>
 
 
 
-</details>
-
-<a id="0x7_bulk_order_book_types_get_sequence_number_out_of_order_rejection"></a>
-
-## Function `get_sequence_number_out_of_order_rejection`
+<a id="0x7_bulk_order_book_types_E_EMPTY_ORDER"></a>
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number_out_of_order_rejection">get_sequence_number_out_of_order_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
+<pre><code><b>const</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>: u64 = 9;
 </code></pre>
 
 
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_sequence_number_out_of_order_rejection">get_sequence_number_out_of_order_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::SequenceNumberOutOfOrder
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_get_price_crossing_rejection"></a>
-
-## Function `get_price_crossing_rejection`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_price_crossing_rejection">get_price_crossing_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_price_crossing_rejection">get_price_crossing_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::PriceCrossing
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_get_empty_order_rejection"></a>
-
-## Function `get_empty_order_rejection`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_empty_order_rejection">get_empty_order_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_empty_order_rejection">get_empty_order_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::EmptyOrder
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_get_bid_size_zero_rejection"></a>
-
-## Function `get_bid_size_zero_rejection`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_bid_size_zero_rejection">get_bid_size_zero_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_bid_size_zero_rejection">get_bid_size_zero_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::BidSizeZero
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_get_ask_size_zero_rejection"></a>
-
-## Function `get_ask_size_zero_rejection`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_ask_size_zero_rejection">get_ask_size_zero_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_ask_size_zero_rejection">get_ask_size_zero_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::AskSizeZero
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_get_bid_order_invalid_rejection"></a>
-
-## Function `get_bid_order_invalid_rejection`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_bid_order_invalid_rejection">get_bid_order_invalid_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_bid_order_invalid_rejection">get_bid_order_invalid_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::BidOrderInvalid
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_get_ask_order_invalid_rejection"></a>
-
-## Function `get_ask_order_invalid_rejection`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_ask_order_invalid_rejection">get_ask_order_invalid_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_get_ask_order_invalid_rejection">get_ask_order_invalid_rejection</a>(): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a> {
-    BulkOrderRejection::AskOrderInvalid
-}
-</code></pre>
-
-
-
-</details>
 
 <a id="0x7_bulk_order_book_types_new_bulk_order"></a>
 
@@ -1086,7 +660,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 - If ask_prices and ask_sizes have different lengths
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request">new_bulk_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: M): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">bulk_order_book_types::BulkOrderRequestResponse</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request">new_bulk_order_request</a>&lt;M: <b>copy</b>, drop, store&gt;(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, sequence_number: u64, bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, metadata: M): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1103,20 +677,16 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
     ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     metadata: M
-): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M&gt; {
+): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt; {
     // Basic length validation
-    <b>if</b> (bid_prices.length() != bid_sizes.length()) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::BidLengthMismatch,
-            std::string::utf8(b"Bid length mismatch")
-        );
-    };
-    <b>if</b> (ask_prices.length() != ask_sizes.length()) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::AskLengthMismatch,
-            std::string::utf8(b"Ask length mismatch")
-        );
-    };
+    <b>assert</b>!(bid_prices.length() == bid_sizes.length(), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_LENGTH_MISMATCH">E_BID_LENGTH_MISMATCH</a>);
+    <b>assert</b>!(ask_prices.length() == ask_sizes.length(), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_LENGTH_MISMATCH">E_ASK_LENGTH_MISMATCH</a>);
+    <b>assert</b>!(bid_sizes.length() &gt; 0 || ask_sizes.length() &gt; 0, <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_EMPTY_ORDER">E_EMPTY_ORDER</a>);
+    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&bid_sizes), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_SIZE_ZERO">E_BID_SIZE_ZERO</a>);
+    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&ask_sizes), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_SIZE_ZERO">E_ASK_SIZE_ZERO</a>);
+    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&bid_prices, <b>true</b>), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_BID_ORDER_INVALID">E_BID_ORDER_INVALID</a>);
+    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&ask_prices, <b>false</b>), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_E_ASK_ORDER_INVALID">E_ASK_ORDER_INVALID</a>);
+    <b>assert</b>!(<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_no_price_crossing">validate_no_price_crossing</a>(&bid_prices, &ask_prices), <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_EPRICE_CROSSING">EPRICE_CROSSING</a>);
 
     <b>let</b> req = BulkOrderRequest::V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
@@ -1127,53 +697,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
         ask_sizes,
         metadata
     };
-
-    // Ensure bid prices are in descending order and ask prices are in ascending order
-    // Check <b>if</b> at least one side <b>has</b> orders
-    <b>if</b> (req.bid_sizes.length() == 0 && req.ask_sizes.length() == 0) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::EmptyOrder,
-            std::string::utf8(b"No orders")
-        );
-    };
-
-    // Check for zero sizes
-    <b>if</b> (!<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&req.bid_sizes)) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::BidSizeZero,
-            std::string::utf8(b"Zero bid size")
-        );
-    };
-    <b>if</b> (!<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_not_zero_sizes">validate_not_zero_sizes</a>(&req.ask_sizes)) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::AskSizeZero,
-            std::string::utf8(b"Zero ask size")
-        );
-    };
-
-    // Check price ordering
-    <b>if</b> (!<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&req.bid_prices, <b>true</b>)) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::BidOrderInvalid,
-            std::string::utf8(b"Bid order invalid")
-        );
-    };
-    <b>if</b> (!<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_price_ordering">validate_price_ordering</a>(&req.ask_prices, <b>false</b>)) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::AskOrderInvalid,
-            std::string::utf8(b"Ask order invalid")
-        );
-    };
-
-    // Check for price crossing
-    <b>if</b> (!<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_validate_no_price_crossing">validate_no_price_crossing</a>(&req.bid_prices, &req.ask_prices)) {
-        <b>return</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>(
-            BulkOrderRejection::PriceCrossing,
-            std::string::utf8(b"Price crossing")
-        );
-    };
-
-    <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_success">new_bulk_order_request_response_success</a>(req)
+    req
 }
 </code></pre>
 
@@ -1262,13 +786,13 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 
 </details>
 
-<a id="0x7_bulk_order_book_types_new_bulk_order_place_response_success"></a>
+<a id="0x7_bulk_order_book_types_new_bulk_order_place_response"></a>
 
-## Function `new_bulk_order_place_response_success`
+## Function `new_bulk_order_place_response`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response_success">new_bulk_order_place_response_success</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(order: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1277,7 +801,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response_success">new_bulk_order_place_response_success</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response">new_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;,
     cancelled_bid_prices: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     cancelled_bid_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
@@ -1285,7 +809,7 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
     cancelled_ask_sizes: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;,
     previous_seq_num: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 ): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
-    BulkOrderPlaceResponse::Success {
+    <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> {
         order,
         cancelled_bid_prices,
         cancelled_bid_sizes,
@@ -1300,13 +824,13 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 
 </details>
 
-<a id="0x7_bulk_order_book_types_new_bulk_order_place_response_rejection"></a>
+<a id="0x7_bulk_order_book_types_destroy_bulk_order_place_response"></a>
 
-## Function `new_bulk_order_place_response_rejection`
+## Function `destroy_bulk_order_place_response`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response_rejection">new_bulk_order_place_response_rejection</a>&lt;M: <b>copy</b>, drop, store&gt;(reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>, details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: <b>copy</b>, drop, store&gt;(response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -1315,242 +839,11 @@ A <code><a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderReq
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_place_response_rejection">new_bulk_order_place_response_rejection</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a>,
-    details: std::string::String
-): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt; {
-    BulkOrderPlaceResponse::Rejection {
-        reason,
-        details,
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_is_success"></a>
-
-## Function `is_success`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_is_success">is_success</a>&lt;M: <b>copy</b>, drop, store&gt;(response: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_is_success">is_success</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    response: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
-): bool {
-    <b>if</b> (response is BulkOrderPlaceResponse::Success) {
-        <b>true</b>
-    } <b>else</b> {
-        <b>false</b>
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_is_rejection"></a>
-
-## Function `is_rejection`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_is_rejection">is_rejection</a>&lt;M: <b>copy</b>, drop, store&gt;(response: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_is_rejection">is_rejection</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    response: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
-): bool {
-    <b>if</b> (response is BulkOrderPlaceResponse::Rejection) {
-        <b>true</b>
-    } <b>else</b> {
-        <b>false</b>
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_is_bulk_order_success_response"></a>
-
-## Function `is_bulk_order_success_response`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_is_bulk_order_success_response">is_bulk_order_success_response</a>&lt;M: <b>copy</b>, drop, store&gt;(response: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;): bool
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_is_bulk_order_success_response">is_bulk_order_success_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    response: &<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
-): bool {
-    response is BulkOrderPlaceResponse::Success
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_destroy_bulk_order_place_success_response"></a>
-
-## Function `destroy_bulk_order_place_success_response`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_success_response">destroy_bulk_order_place_success_response</a>&lt;M: <b>copy</b>, drop, store&gt;(response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">bulk_order_book_types::BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_success_response">destroy_bulk_order_place_success_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_response">destroy_bulk_order_place_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
     response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
 ): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrder">BulkOrder</a>&lt;M&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
-    <b>let</b> BulkOrderPlaceResponse::Success { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
+    <b>let</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a> { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
     (order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_destroy_bulk_order_place_reject_response"></a>
-
-## Function `destroy_bulk_order_place_reject_response`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_reject_response">destroy_bulk_order_place_reject_response</a>&lt;M: <b>copy</b>, drop, store&gt;(response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">bulk_order_book_types::BulkOrderPlaceResponse</a>&lt;M&gt;): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_place_reject_response">destroy_bulk_order_place_reject_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderPlaceResponse">BulkOrderPlaceResponse</a>&lt;M&gt;
-): (<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a>, std::string::String) {
-    <b>let</b> BulkOrderPlaceResponse::Rejection { reason, details } = response;
-    (reason, details)
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_new_bulk_order_request_response_success"></a>
-
-## Function `new_bulk_order_request_response_success`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_success">new_bulk_order_request_response_success</a>&lt;M: <b>copy</b>, drop, store&gt;(request: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">bulk_order_book_types::BulkOrderRequestResponse</a>&lt;M&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_success">new_bulk_order_request_response_success</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    request: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;
-): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M&gt; {
-    <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a> {
-        request: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(request),
-        rejection_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-        rejection_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_new_bulk_order_request_response_rejection"></a>
-
-## Function `new_bulk_order_request_response_rejection`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>&lt;M: <b>copy</b>, drop, store&gt;(rejection_reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>, rejection_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">bulk_order_book_types::BulkOrderRequestResponse</a>&lt;M&gt;
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_new_bulk_order_request_response_rejection">new_bulk_order_request_response_rejection</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    rejection_reason: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a>,
-    rejection_details: std::string::String
-): <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M&gt; {
-    <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a> {
-        request: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(),
-        rejection_reason: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(rejection_reason),
-        rejection_details: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(rejection_details),
-    }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_bulk_order_book_types_destroy_bulk_order_request_response"></a>
-
-## Function `destroy_bulk_order_request_response`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_request_response">destroy_bulk_order_request_response</a>&lt;M: <b>copy</b>, drop, store&gt;(response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">bulk_order_book_types::BulkOrderRequestResponse</a>&lt;M&gt;): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">bulk_order_book_types::BulkOrderRequest</a>&lt;M&gt;&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">bulk_order_book_types::BulkOrderRejection</a>&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;)
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_destroy_bulk_order_request_response">destroy_bulk_order_request_response</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    response: <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a>&lt;M&gt;
-): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequest">BulkOrderRequest</a>&lt;M&gt;&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRejection">BulkOrderRejection</a>&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;std::string::String&gt;) {
-    <b>let</b> <a href="bulk_order_book_types.md#0x7_bulk_order_book_types_BulkOrderRequestResponse">BulkOrderRequestResponse</a> { request, rejection_reason, rejection_details } = response;
-    (request, rejection_reason, rejection_details)
 }
 </code></pre>
 
