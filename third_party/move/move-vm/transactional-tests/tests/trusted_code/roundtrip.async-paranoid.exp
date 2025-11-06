@@ -1,0 +1,6 @@
+processed 4 tasks
+task 0 lines 1-8:  publish [module 0x99::not_trusted]
+task 1 lines 10-18:  publish [module 0x9::trusted]
+task 2 lines 20-27:  publish [module 0x99::app]
+task 3 lines 30-30:  run --verbose 0x99::app::run
+return values: 22

@@ -22,27 +22,28 @@ use ark_std::{
     UniformRand,
 };
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
+use std::fmt::Debug;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Commitment<E: Pairing>(pub E::G1);
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
 pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
     pi_1: Commitment<E>,
     pi_2: E::G1,
 }
 
-#[derive(CanonicalSerialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct VerificationKey<E: Pairing> {
     pub xi_2: E::G2Affine,
     pub tau_2: E::G2Affine,
     pub group_generators: GroupGenerators<E>,
 }
 
-#[derive(CanonicalSerialize, Debug, Clone)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct CommitmentKey<E: Pairing> {
     pub xi_1: E::G1Affine,
     pub tau_1: E::G1Affine,
@@ -245,12 +246,13 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
 /// The MSM evaluation is then performed using `E::G1::msm()`.
 ///
 /// TODO: Since this code is quite similar to that of ordinary KZG, it may be possible to reduce it a bit
+#[derive(CanonicalSerialize, Debug, Clone, PartialEq, Eq)]
 pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub lagr_g1: &'a [E::G1Affine],
     pub xi_1: E::G1Affine,
 }
 
-impl<'a, E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'a, E> {
+impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
     type Domain = (E::ScalarField, Vec<E::ScalarField>);
 
@@ -259,12 +261,12 @@ impl<'a, E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'a, E> {
     }
 }
 
-impl<'a, E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'a, E> {
+impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     type Base = E::G1Affine;
     type CodomainShape<T>
         = CodomainShape<T>
     where
-        T: CanonicalSerialize + CanonicalDeserialize + Clone;
+        T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
     type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;

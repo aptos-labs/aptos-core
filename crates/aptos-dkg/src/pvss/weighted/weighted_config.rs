@@ -3,7 +3,10 @@
 
 use crate::{
     algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::{traits, traits::SecretSharingConfig, Player, ThresholdConfig},
+    pvss::{
+        traits::{self, SecretSharingConfig, ThresholdConfig},
+        Player, ThresholdConfigBlstrs,
+    },
 };
 use anyhow::anyhow;
 use more_asserts::assert_lt;
@@ -20,7 +23,7 @@ use std::fmt::{Display, Formatter};
 pub struct WeightedConfig {
     /// A weighted config is a $w$-out-of-$W$ threshold config, where $w$ is the minimum weight
     /// needed to reconstruct the secret and $W$ is the total weight.
-    tc: ThresholdConfig,
+    tc: ThresholdConfigBlstrs,
     /// The total number of players in the protocol.
     num_players: usize,
     /// Each player's weight
@@ -32,6 +35,12 @@ pub struct WeightedConfig {
     max_weight: usize,
     /// The minimum weight of any player.
     min_weight: usize,
+}
+
+impl ThresholdConfig for WeightedConfig {
+    fn get_threshold(&self) -> usize {
+        self.tc.get_threshold()
+    }
 }
 
 impl WeightedConfig {
@@ -67,7 +76,7 @@ impl WeightedConfig {
             starting_index.push(starting_index.last().unwrap() + w);
         }
 
-        let tc = ThresholdConfig::new(threshold_weight, W)?;
+        let tc = ThresholdConfigBlstrs::new(threshold_weight, W)?;
         Ok(WeightedConfig {
             tc,
             num_players: n,
@@ -116,7 +125,7 @@ impl WeightedConfig {
         self.max_weight
     }
 
-    pub fn get_threshold_config(&self) -> &ThresholdConfig {
+    pub fn get_threshold_config(&self) -> &ThresholdConfigBlstrs {
         &self.tc
     }
 

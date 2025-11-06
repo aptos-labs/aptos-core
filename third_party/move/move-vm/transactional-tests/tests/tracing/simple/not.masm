@@ -1,0 +1,9 @@
+//# publish
+module 0x22::test
+
+public fun not_instr(): bool
+    ld_true
+    not
+    ret
+
+//# run --verbose 0x22::test::not_instr --display-trace

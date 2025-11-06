@@ -1,0 +1,14 @@
+//# publish
+module 0x22::test
+
+struct A<T> has key
+    value: T
+
+public fun move_to_generic_instr(s: &signer)
+    move_loc s
+    ld_u64 42
+    pack A<u64>
+    move_to A<u64>
+    ret
+
+//# run --verbose 0x22::test::move_to_generic_instr --signers 0x22 --display-trace

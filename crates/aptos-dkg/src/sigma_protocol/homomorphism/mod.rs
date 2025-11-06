@@ -1,7 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
+};
+use std::fmt::Debug;
 
 pub mod fixed_base_msms;
 pub mod tuple;
@@ -13,7 +16,10 @@ pub mod tuple;
 ///
 /// In the context of sigma protocols, homomorphisms are the key building blocks:
 /// they capture the algebraic relations that proofs are designed to demonstrate.
-pub trait Trait {
+///
+/// CanonicalSerialize is added here so its parameters (which will be MSM bases)
+/// can be used for Fiat-Shamir challenges.
+pub trait Trait: CanonicalSerialize {
     type Domain;
     type Codomain;
 
@@ -38,13 +44,34 @@ pub trait Trait {
 /// lets `h` act on the first component of the pair, so `(h ∘ π)(x,y) = h(x)`.
 ///
 /// Naturally this method immediately extends to composing arbitrary homomorphisms,
-/// but we don't need that formalism for now.
+/// but we don't need that formalism for now. We are not deriving Eq here because
+/// function pointer comparisons do not seem useful in this context.
+#[derive(Debug, Clone)]
 pub struct LiftHomomorphism<H, LargerDomain>
 where
     H: Trait,
 {
     pub hom: H,
     pub projection: fn(&LargerDomain) -> H::Domain,
+}
+
+// We only care about the "bases" that are being used to define the homomorphism, so in serializing
+// we ignore `projection` entirely
+impl<H, LargerDomain> CanonicalSerialize for LiftHomomorphism<H, LargerDomain>
+where
+    H: Trait,
+{
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.hom.serialize_with_mode(&mut writer, compress)
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        self.hom.serialized_size(compress)
+    }
 }
 
 /// Implements `Homomorphism` for `LiftHomomorphism` by composing
@@ -71,33 +98,38 @@ where
 /// producing a new value of the same shape but possibly with a different inner type.
 pub trait EntrywiseMap<T> {
     /// The resulting type after mapping the inner elements to type `U`.
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone>;
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone;
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
 }
 
 /// A trivial wrapper type for a single value. Should be used to wrap when the codomain of a homomorphism is something like E::G1
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone)]
-pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone>(pub T);
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct TrivialShape<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq>(pub T);
 
 /// Implements `EntrywiseMap` for `TrivialShape`, mapping the inner value.
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> EntrywiseMap<T> for TrivialShape<T> {
-    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone> = TrivialShape<U>;
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> EntrywiseMap<T>
+    for TrivialShape<T>
+{
+    type Output<U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> =
+        TrivialShape<U>;
 
     fn map<U, F>(self, f: F) -> Self::Output<U>
     where
         F: Fn(T) -> U,
-        U: CanonicalSerialize + CanonicalDeserialize + Clone,
+        U: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq,
     {
         TrivialShape(f(self.0))
     }
 }
 
 /// Implements `IntoIterator` for `TrivialShape`, producing a single-element iterator.
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for TrivialShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> IntoIterator
+    for TrivialShape<T>
+{
     type IntoIter = std::iter::Once<T>;
     type Item = T;
 

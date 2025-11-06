@@ -96,7 +96,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 2147483648u32;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -104,7 +104,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 2147483648u64;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -112,7 +112,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 2147483648u128;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -120,7 +120,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 2147483648u256;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -130,7 +130,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 2147483648i64;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -138,7 +138,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 2147483648i128;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -146,7 +146,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 2147483648i256;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -156,7 +156,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -2147483649i64;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -164,7 +164,7 @@ fun main() {
 script {
 fun main() {
    let v0 = -2147483649i128;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }
 
@@ -172,6 +172,6 @@ fun main() {
 script {
 fun main() {
    let v0 = -2147483649i256;
-   let v2 = v0 as i32; // expect to abort
+   let _v2 = v0 as i32; // expect to abort
 }
 }

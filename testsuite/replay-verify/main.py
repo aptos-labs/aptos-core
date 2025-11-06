@@ -233,7 +233,7 @@ class WorkerPod:
             "--timeout-secs",
             f"{self.config.timeout_secs}",
             "--block-cache-size",
-            "10737418240",
+            f"{36 * 1024 * 1024 * 1024}",
         ]
         # TODO(ibalajiarun): bump memory limit to 180GiB for heavy ranges
         if (
@@ -408,6 +408,9 @@ class ReplayScheduler:
         sorted_skips = [
             list(r) for r in sorted(self.ranges_to_skip) if r[1] >= self.start_version
         ]
+
+        if len(sorted_skips) == 0:
+            return []
 
         # merge skip ranges
         ret = []

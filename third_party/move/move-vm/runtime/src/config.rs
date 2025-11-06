@@ -38,10 +38,12 @@ pub struct VMConfig {
     pub enable_lazy_loading: bool,
     pub enable_depth_checks: bool,
     /// Whether trusted code should be optimized, for example, excluding it from expensive
-    /// paranoid checks.
+    /// paranoid checks. Checks may still not be done in place, and instead delayed to later time.
+    /// Instead, a trace can be recorded which is sufficient for type checking.
     pub optimize_trusted_code: bool,
     /// When this flag is set to true, Move VM will perform additional checks to ensure that
-    /// reference safety is maintained during execution.
+    /// reference safety is maintained during execution. Note that the checks might be delayed and
+    /// instead execution trace can be recorded (so that checks are done based on the trace later).
     pub paranoid_ref_checks: bool,
     pub enable_capture_option: bool,
     pub enable_enum_option: bool,
