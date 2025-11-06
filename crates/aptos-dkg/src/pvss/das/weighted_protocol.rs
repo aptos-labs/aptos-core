@@ -9,6 +9,7 @@ use crate::{
         das, encryption_dlog, schnorr,
         traits::{
             self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
+            ThresholdConfig,
         },
         LowDegreeTest, Player, WeightedConfig,
     },
@@ -198,9 +199,11 @@ impl traits::Transcript for Transcript {
         }
         let W = sc.get_total_weight();
 
-        use crate::pvss::traits::ThresholdConfig;
         let mut rng = rand::thread_rng();
-        let f = random_scalars(sc.get_total_num_shares() + 1 - sc.get_threshold(), &mut rng);
+        let f = random_scalars(
+            sc.get_total_num_shares() + 1 - sc.tc.get_threshold(),
+            &mut rng,
+        );
         let extra = random_scalars(2 + W * 3, &mut rng);
 
         let sok_vrfy_challenge = &extra[W * 3 + 1];
