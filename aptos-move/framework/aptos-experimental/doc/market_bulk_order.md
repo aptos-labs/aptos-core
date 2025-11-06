@@ -82,11 +82,11 @@ Returns:
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;OrderIdType&gt; {
     <b>let</b> validation_result = callbacks.validate_bulk_order_placement(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        bid_prices,
-        bid_sizes,
-        ask_prices,
-        ask_sizes,
-        metadata,
+        &bid_prices,
+        &bid_sizes,
+        &ask_prices,
+        &ask_sizes,
+        &metadata,
     );
     <b>if</b> (!validation_result.is_validation_result_valid()) {
         // If the bulk order is not valid, emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> and <b>return</b> without placing the order.
@@ -102,7 +102,30 @@ Returns:
         );
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
-    <b>let</b> request_response = new_bulk_order_request(
+
+    <b>let</b> result = check_can_place_new_bulk_order_request(
+        &bid_prices,
+        &bid_sizes,
+        &ask_prices,
+        &ask_sizes,
+    );
+    <b>if</b> (result.place_bulk_order_is_err()) {
+        // Bulk order request creation failed - emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
+        <b>let</b> (reason, details) = result.place_bulk_order_unwrap_err();
+        market.emit_event_for_bulk_order_rejected(
+            sequence_number,
+            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            reason,
+            details,
+        );
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+
+    <b>let</b> request = pack_bulk_order_request(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         sequence_number,
         bid_prices,
@@ -111,24 +134,8 @@ Returns:
         ask_sizes,
         metadata,
     );
-    <b>let</b> (request_option, request_rejection_reason, rejection_details) = destroy_bulk_order_request_response(request_response);
-    <b>if</b> (request_option.is_none()) {
-        // Bulk order request creation failed - emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
-        <b>let</b> rejection_reason = request_rejection_reason.destroy_some();
-        market.emit_event_for_bulk_order_rejected(
-            sequence_number,
-            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            rejection_reason,
-            rejection_details.destroy_some(),
-        );
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
-    };
-    <b>let</b> bulk_order_request = request_option.destroy_some();
-    <b>let</b> response = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(bulk_order_request);
+    <b>let</b> response = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(request);
+
     <b>if</b> (is_bulk_order_success_response(&response)) {
         <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_success_response(response);
         <b>let</b> (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
@@ -136,9 +143,21 @@ Returns:
         // Extract previous_seq_num from <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">option</a>, defaulting <b>to</b> 0 <b>if</b> none
         <b>let</b> previous_seq_num = previous_seq_num_option.destroy_with_default(0);
         // Emit an <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for the placed bulk order
-        market.emit_event_for_bulk_order_placed(order_id,
-            order_sequence_number, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num);
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
+        market.emit_event_for_bulk_order_placed(
+            order_id,
+            order_sequence_number,
+            <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            cancelled_bid_prices,
+            cancelled_bid_sizes,
+            cancelled_ask_prices,
+            cancelled_ask_sizes,
+            previous_seq_num,
+        );
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order_id)
     } <b>else</b> {
         // Handle rejection from order book - emit rejection <a href="../../aptos-framework/doc/event.md#0x1_event">event</a>
         <b>let</b> (rejection_reason, details) = destroy_bulk_order_place_reject_response(response);
@@ -152,7 +171,7 @@ Returns:
             rejection_reason,
             details
         );
-        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     }
 }
 </code></pre>
