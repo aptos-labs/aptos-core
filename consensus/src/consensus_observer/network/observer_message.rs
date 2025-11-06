@@ -379,11 +379,11 @@ impl CommitDecision {
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
 pub struct PayloadWithProof {
     transactions: Vec<SignedTransaction>,
-    proofs: Vec<ProofOfStore>,
+    proofs: Vec<ProofOfStore<BatchInfo>>,
 }
 
 impl PayloadWithProof {
-    pub fn new(transactions: Vec<SignedTransaction>, proofs: Vec<ProofOfStore>) -> Self {
+    pub fn new(transactions: Vec<SignedTransaction>, proofs: Vec<ProofOfStore<BatchInfo>>) -> Self {
         Self {
             transactions,
             proofs,
@@ -439,7 +439,7 @@ impl TransactionsWithProof {
         }
     }
 
-    pub fn proofs(&self) -> Vec<ProofOfStore> {
+    pub fn proofs(&self) -> Vec<ProofOfStore<BatchInfo>> {
         match self {
             TransactionsWithProof::TransactionsWithProofAndLimits(payload) => {
                 payload.payload_with_proof.proofs.clone()
@@ -512,7 +512,7 @@ impl BlockTransactionPayload {
     /// Creates a returns a new InQuorumStore transaction payload
     pub fn new_in_quorum_store(
         transactions: Vec<SignedTransaction>,
-        proofs: Vec<ProofOfStore>,
+        proofs: Vec<ProofOfStore<BatchInfo>>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
         Self::DeprecatedInQuorumStore(payload_with_proof)
@@ -521,7 +521,7 @@ impl BlockTransactionPayload {
     /// Creates a returns a new InQuorumStoreWithLimit transaction payload
     pub fn new_in_quorum_store_with_limit(
         transactions: Vec<SignedTransaction>,
-        proofs: Vec<ProofOfStore>,
+        proofs: Vec<ProofOfStore<BatchInfo>>,
         limit: Option<u64>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
@@ -532,7 +532,7 @@ impl BlockTransactionPayload {
     /// Creates a returns a new QuorumStoreInlineHybrid transaction payload
     pub fn new_quorum_store_inline_hybrid(
         transactions: Vec<SignedTransaction>,
-        proofs: Vec<ProofOfStore>,
+        proofs: Vec<ProofOfStore<BatchInfo>>,
         transaction_limit: Option<u64>,
         gas_limit: Option<u64>,
         inline_batches: Vec<BatchInfo>,
@@ -557,7 +557,7 @@ impl BlockTransactionPayload {
 
     pub fn new_opt_quorum_store(
         transactions: Vec<SignedTransaction>,
-        proofs: Vec<ProofOfStore>,
+        proofs: Vec<ProofOfStore<BatchInfo>>,
         transaction_limit: Option<u64>,
         gas_limit: Option<u64>,
         batch_infos: Vec<BatchInfo>,
@@ -613,7 +613,7 @@ impl BlockTransactionPayload {
     }
 
     /// Returns the proofs of the transaction payload
-    pub fn payload_proofs(&self) -> Vec<ProofOfStore> {
+    pub fn payload_proofs(&self) -> Vec<ProofOfStore<BatchInfo>> {
         match self {
             BlockTransactionPayload::DeprecatedInQuorumStore(payload) => payload.proofs.clone(),
             BlockTransactionPayload::DeprecatedInQuorumStoreWithLimit(payload) => {
@@ -715,7 +715,7 @@ impl BlockTransactionPayload {
     }
 
     /// Verifies the payload batches against the expected batches
-    fn verify_batches(&self, expected_proofs: &[ProofOfStore]) -> Result<(), Error> {
+    fn verify_batches(&self, expected_proofs: &[ProofOfStore<BatchInfo>]) -> Result<(), Error> {
         // Get the batches in the block transaction payload
         let payload_proofs = self.payload_proofs();
         let payload_batches: Vec<&BatchInfo> =
@@ -1854,7 +1854,7 @@ mod test {
     fn create_block_payload(
         block_info: Option<BlockInfo>,
         signed_transactions: &[SignedTransaction],
-        proofs: &[ProofOfStore],
+        proofs: &[ProofOfStore<BatchInfo>],
         inline_batches: &[BatchInfo],
     ) -> BlockPayload {
         // Create the transaction payload
@@ -1878,7 +1878,7 @@ mod test {
     fn create_block_optqs_payload(
         block_info: Option<BlockInfo>,
         signed_transactions: &[SignedTransaction],
-        proofs: &[ProofOfStore],
+        proofs: &[ProofOfStore<BatchInfo>],
         opt_and_inline_batches: &[BatchInfo],
     ) -> BlockPayload {
         // Create the transaction payload
@@ -1910,7 +1910,7 @@ mod test {
     fn create_mixed_expiration_proofs(
         block_timestamp: u64,
         signed_transactions: &[SignedTransaction],
-    ) -> (Vec<ProofOfStore>, Vec<SignedTransaction>) {
+    ) -> (Vec<ProofOfStore<BatchInfo>>, Vec<SignedTransaction>) {
         let mut proofs = vec![];
         let mut non_expired_transactions = vec![];
 

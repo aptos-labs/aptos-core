@@ -3,7 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    common::Author, opt_block_data::OptBlockData, proof_of_store::ProofCache, sync_info::SyncInfo,
+    common::Author,
+    opt_block_data::OptBlockData,
+    proof_of_store::{BatchInfo, ProofCache},
+    sync_info::SyncInfo,
 };
 use anyhow::{ensure, Context, Result};
 use aptos_types::validator_verifier::ValidatorVerifier;
@@ -98,7 +101,7 @@ impl OptProposalMsg {
         &self,
         sender: Author,
         validator: &ValidatorVerifier,
-        proof_cache: &ProofCache,
+        proof_cache: &ProofCache<BatchInfo>,
         quorum_store_enabled: bool,
     ) -> Result<()> {
         ensure!(
