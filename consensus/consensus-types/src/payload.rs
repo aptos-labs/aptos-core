@@ -310,6 +310,10 @@ impl OptQuorumStorePayloadV1 {
         self.execution_limits.max_txns_to_execute()
     }
 
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        self.execution_limits.block_gas_limit()
+    }
+
     pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {
         ensure!(
             self.inline_batches

@@ -558,12 +558,13 @@ impl BlockTransactionPayload {
     pub fn new_opt_quorum_store(
         transactions: Vec<SignedTransaction>,
         proofs: Vec<ProofOfStore>,
-        limit: Option<u64>,
+        transaction_limit: Option<u64>,
+        gas_limit: Option<u64>,
         batch_infos: Vec<BatchInfo>,
     ) -> Self {
         let payload_with_proof = PayloadWithProof::new(transactions, proofs);
         let proof_with_limits = TransactionsWithProof::TransactionsWithProofAndLimits(
-            TransactionsWithProofAndLimits::new(payload_with_proof, limit, None),
+            TransactionsWithProofAndLimits::new(payload_with_proof, transaction_limit, gas_limit),
         );
         Self::OptQuorumStore(proof_with_limits, batch_infos)
     }
@@ -1241,6 +1242,7 @@ mod test {
             vec![],
             proofs.clone(),
             transaction_limit,
+            None,
             opt_and_inline_batches.clone(),
         );
 
@@ -1343,6 +1345,7 @@ mod test {
             vec![],
             proofs,
             Some(100),
+            None,
             opt_and_inline_batches,
         );
 
@@ -1882,6 +1885,7 @@ mod test {
         let transaction_payload = BlockTransactionPayload::new_opt_quorum_store(
             signed_transactions.to_vec(),
             proofs.to_vec(),
+            None,
             None,
             opt_and_inline_batches.to_vec(),
         );
