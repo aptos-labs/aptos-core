@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::schema::*;
-use aptos_config::config::RocksdbConfig;
+use aptos_config::config::{IndexType, RocksdbConfig};
 use aptos_schemadb::{
-    BlockBasedOptions, Cache, ColumnFamilyDescriptor, ColumnFamilyName, DBCompressionType, Options,
-    SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
+    BlockBasedIndexType, BlockBasedOptions, Cache, ColumnFamilyDescriptor, ColumnFamilyName,
+    DBCompressionType, Options, SliceTransform, DEFAULT_COLUMN_FAMILY_NAME,
 };
 use aptos_types::transaction::Version;
 
@@ -164,18 +164,15 @@ fn gen_cfds<F>(
 where
     F: Fn(ColumnFamilyName, &mut Options),
 {
-    let mut table_options = BlockBasedOptions::default();
-    table_options.set_cache_index_and_filter_blocks(rocksdb_config.cache_index_and_filter_blocks);
-    table_options.set_pin_l0_filter_and_index_blocks_in_cache(
-        rocksdb_config.pin_l0_filter_and_index_blocks_in_cache,
-    );
-    table_options.set_block_size(rocksdb_config.block_size as usize);
-    if let Some(cache) = block_cache {
-        table_options.set_block_cache(cache);
-    }
-
     let mut cfds = Vec::with_capacity(cfs.len());
     for cf_name in cfs {
+        let mut table_options = gen_table_options(rocksdb_config, block_cache);
+        if cf_name == STATE_VALUE_BY_KEY_HASH_CF_NAME
+            || cf_name == HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME
+        {
+            table_options.set_whole_key_filtering(false);
+        }
+
         let mut cf_opts = Options::default();
         cf_opts.set_compression_type(DBCompressionType::Lz4);
         cf_opts.set_block_based_table_factory(&table_options);
@@ -184,6 +181,43 @@ where
         cfds.push(ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts));
     }
     cfds
+}
+
+fn gen_table_options(
+    rocksdb_config: &RocksdbConfig,
+    block_cache: Option<&Cache>,
+) -> BlockBasedOptions {
+    let mut table_options = BlockBasedOptions::default();
+
+    table_options.set_block_size(rocksdb_config.block_size as usize);
+
+    table_options.set_index_type(convert_index_type(rocksdb_config.index_type));
+    table_options.set_partition_filters(rocksdb_config.partition_filters);
+    table_options.set_cache_index_and_filter_blocks(rocksdb_config.cache_index_and_filter_blocks);
+    table_options.set_pin_l0_filter_and_index_blocks_in_cache(
+        rocksdb_config.pin_l0_filter_and_index_blocks_in_cache,
+    );
+
+    if let Some(cache) = block_cache {
+        table_options.set_block_cache(cache);
+    }
+
+    if let Some(bits) = rocksdb_config.bloom_filter_bits {
+        match rocksdb_config.bloom_before_level {
+            Some(level) => table_options.set_hybrid_ribbon_filter(bits, level),
+            None => table_options.set_bloom_filter(bits, /* block_based = */ false),
+        }
+    }
+
+    table_options
+}
+
+fn convert_index_type(index_type: IndexType) -> BlockBasedIndexType {
+    match index_type {
+        IndexType::BinarySearch => BlockBasedIndexType::BinarySearch,
+        IndexType::HashSearch => BlockBasedIndexType::HashSearch,
+        IndexType::TwoLevelIndexSearch => BlockBasedIndexType::TwoLevelIndexSearch,
+    }
 }
 
 fn with_state_key_extractor_processor(cf_name: ColumnFamilyName, cf_opts: &mut Options) {
