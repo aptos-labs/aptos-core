@@ -18,15 +18,19 @@
 #![allow(clippy::borrow_interior_mutable_const)]
 
 use crate::pvss::{traits, Player};
-use aptos_crypto::arkworks::shamir::{ShamirShare, ThresholdConfig};
+use aptos_crypto::arkworks::{
+    random::{sample_field_element, UniformRand},
+    shamir::{ShamirShare, ThresholdConfig},
+};
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{rand::Rng, UniformRand};
 use more_asserts::{assert_ge, assert_le};
+use rand::Rng;
 pub use utils::random::DST_RAND_CORE_HELL;
 
 pub mod algebra;
+pub mod dlog;
 pub(crate) mod fiat_shamir;
 pub mod pcs;
 pub mod pvss;
@@ -84,9 +88,9 @@ impl<E: Pairing> Scalar<E> {
     }
 }
 
-impl<E: Pairing> Scalar<E> {
-    pub fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        Scalar(E::ScalarField::rand(rng))
+impl<E: Pairing> UniformRand for Scalar<E> {
+    fn rand<R: Rng>(rng: &mut R) -> Self {
+        Scalar(sample_field_element(rng))
     }
 }
 

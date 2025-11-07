@@ -12,10 +12,10 @@ use aptos_dkg::{
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
-use ark_std::rand::thread_rng;
 use criterion::{
     criterion_group, criterion_main, measurement::WallTime, BenchmarkGroup, BenchmarkId, Criterion,
 };
+use rand::thread_rng;
 
 /// WARNING: Do not change this, since our range proof benchmark instructions in
 /// `crates/aptos-crypto/README.md` rely on it.
@@ -88,7 +88,7 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
             b.iter_with_setup(
                 || {
                     let mut rng = thread_rng();
-                    let group_generators = GroupGenerators::sample(&mut rng);
+                    let group_generators = GroupGenerators::default();
                     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
@@ -116,7 +116,7 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
             b.iter_with_setup(
                 || {
                     let mut rng = thread_rng();
-                    let group_generators = GroupGenerators::sample(&mut rng);
+                    let group_generators = GroupGenerators::default();
                     let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);

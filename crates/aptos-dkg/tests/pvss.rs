@@ -139,7 +139,8 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
         .expect("serialized transcript should deserialize correctly");
 
     assert_eq!(trx, trx_deserialized);
-    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx) {
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
         panic!("Reconstructed SK did not match");
     }
 }

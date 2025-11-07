@@ -13,7 +13,7 @@ use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::thread_rng;
+use rand::thread_rng;
 use std::fmt::Debug;
 
 #[cfg(test)]
@@ -136,7 +136,7 @@ where
     B: BatchedRangeProof<E>,
 {
     let mut rng = thread_rng();
-    let group_generators = GroupGenerators::sample(&mut rng);
+    let group_generators = GroupGenerators::default();
     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
     RangeProofUniversalSetup { pk, vk }
 }

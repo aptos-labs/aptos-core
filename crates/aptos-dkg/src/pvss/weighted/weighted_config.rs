@@ -37,16 +37,6 @@ pub struct WeightedConfig {
     min_weight: usize,
 }
 
-impl ThresholdConfig for WeightedConfig {
-    fn new(_t: usize, _n: usize) -> anyhow::Result<Self> {
-        panic!("This shouldn't be used here?") // So maybe something more general than ThresholdConfig should be made, which only has get_threshold
-    }
-
-    fn get_threshold(&self) -> usize {
-        self.tc.get_threshold()
-    }
-}
-
 impl WeightedConfig {
     #[allow(non_snake_case)]
     /// Initializes a weighted secret sharing configuration with threshold weight `threshold_weight`

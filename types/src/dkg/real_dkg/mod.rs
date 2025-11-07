@@ -423,6 +423,7 @@ impl DKGTrait for RealDKG {
                 id: player_idx as usize,
             },
             dk,
+            &pub_params.pvss_config.pp,
         );
         assert_eq!(
             trx.fast.is_some(),
@@ -439,6 +440,7 @@ impl DKGTrait for RealDKG {
                         id: player_idx as usize,
                     },
                     dk,
+                    &pub_params.pvss_config.pp,
                 );
                 (Some(fast_sk), Some(fast_pk))
             },

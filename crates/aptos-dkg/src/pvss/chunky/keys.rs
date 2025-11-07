@@ -88,4 +88,11 @@ impl<E: Pairing> DealtPubKey<E> {
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>);
+pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>); // Should review this at some point!!
+
+impl<E: Pairing> DealtPubKeyShare<E> {
+    #[allow(dead_code)]
+    pub fn new(dealt_pk: DealtPubKey<E>) -> Self {
+        DealtPubKeyShare(dealt_pk)
+    }
+}

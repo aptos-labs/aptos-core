@@ -186,6 +186,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         player: &Player,
         _dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         (self.C[player.id], self.get_public_key_share(sc, player))
     }

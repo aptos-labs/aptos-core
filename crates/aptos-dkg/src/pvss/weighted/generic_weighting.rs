@@ -203,6 +203,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         sc: &Self::SecretSharingConfig,
         player: &Player,
         dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         let weight = sc.get_player_weight(player);
 
@@ -212,8 +213,13 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         for i in 0..weight {
             // println!("Decrypting share {i} for player {player} with DK {:?}", dk);
             let virtual_player = sc.get_virtual_player(player, i);
-            let (dsk_share, dpk_share) =
-                T::decrypt_own_share(&self.trx, sc.get_threshold_config(), &virtual_player, dk);
+            let (dsk_share, dpk_share) = T::decrypt_own_share(
+                &self.trx,
+                sc.get_threshold_config(),
+                &virtual_player,
+                dk,
+                pp,
+            );
             weighted_dsk_share.push(dsk_share);
             weighted_dpk_share.push(dpk_share);
         }

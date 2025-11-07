@@ -7,22 +7,20 @@ use crate::{
     pcs::univariate_kzg,
     range_proofs::traits,
     sigma_protocol::homomorphism::Trait,
-    utils,
+    utils, Scalar,
 };
 use anyhow::ensure;
+use aptos_crypto::arkworks::random::sample_field_element;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, PrimeGroup, VariableBaseMSM,
 };
-use ark_ff::{AdditiveGroup, Field};
+use ark_ff::{AdditiveGroup, Field, PrimeField};
 use ark_poly::{self, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError};
-use ark_std::{
-    rand::{CryptoRng, RngCore},
-    UniformRand,
-};
 #[cfg(feature = "range_proof_timing")]
 use ff::derive::bitvec::macros::internal::funty::Fundamental;
+use rand::{CryptoRng, RngCore};
 #[cfg(feature = "range_proof_timing")]
 use std::time::{Duration, Instant};
 use std::{
@@ -54,7 +52,7 @@ pub fn powers_of_tau<E: Pairing, R>(
 where
     R: RngCore + CryptoRng,
 {
-    let tau = E::ScalarField::rand(rng);
+    let tau: E::ScalarField = sample_field_element(rng);
     let mut t1 = vec![group_generators.g1.into()];
     let mut t2 = vec![group_generators.g2.into()];
     for i in 0..n {
@@ -124,7 +122,7 @@ impl<E: Pairing> CanonicalSerialize for VerificationKey<E> {
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = Commitment<E>;
     type CommitmentKey = ProverKey<E>;
-    type CommitmentRandomness = E::ScalarField;
+    type CommitmentRandomness = Scalar<E>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
@@ -214,7 +212,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             lagr_g1: &pk.lagr_g1,
         };
 
-        let input = (*r, values.to_vec());
+        let input = (r.0, values.to_vec());
 
         Commitment(kzg_commit_hom.apply(&input).0)
     }
@@ -230,7 +228,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         rng: &mut R,
     ) -> Proof<E>
     where
-        R: RngCore + CryptoRng,
+        R: rand_core::RngCore + rand_core::CryptoRng,
     {
         let n = values.len();
         assert!(
@@ -295,7 +293,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         #[cfg(feature = "range_proof_timing")]
         let start = Instant::now();
 
-        let r = correlated_randomness(rng, 2, ell, r);
+        let r = correlated_randomness(rng, 2, ell, &r.0);
 
         #[cfg(feature = "range_proof_timing")]
         {
@@ -687,8 +685,8 @@ pub fn correlated_randomness<F, R>(
     target_sum: &F,
 ) -> Vec<F>
 where
-    F: Field + UniformRand,
-    R: RngCore + CryptoRng,
+    F: PrimeField, // PrimeField because of sample_field_element()
+    R: rand_core::RngCore + rand_core::CryptoRng,
 {
     let mut r_vals = vec![F::zero(); num_chunks];
     let mut remaining = *target_sum;
@@ -696,7 +694,7 @@ where
     let mut cur_base = radix_f;
 
     for i in 1..num_chunks {
-        r_vals[i] = F::rand(rng);
+        r_vals[i] = sample_field_element(rng);
         remaining -= r_vals[i] * cur_base;
         cur_base *= radix_f;
     }
@@ -708,11 +706,11 @@ where
 #[cfg(test)]
 mod tests {
     use crate::range_proofs::dekart_univariate::correlated_randomness;
-    use ark_ff::Field;
-    use ark_std::rand::thread_rng;
+    use ark_ff::PrimeField;
+    use rand::thread_rng;
 
     #[cfg(test)]
-    fn test_correlated_randomness_generic<F: Field>() {
+    fn test_correlated_randomness_generic<F: PrimeField>() {
         let mut rng = thread_rng();
         let target_sum = F::one();
         let radix: u64 = 4;

@@ -233,6 +233,7 @@ pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript + CryptoHash>(
     rng: &mut R,
     dks: &Vec<<T as Transcript>::DecryptPrivKey>,
     trx: T,
+    pp: &T::PublicParameters,
 ) -> <T as Transcript>::DealtSecretKey
 where
     R: rand_core::RngCore,
@@ -242,7 +243,7 @@ where
         .get_random_eligible_subset_of_players(rng)
         .into_iter()
         .map(|p| {
-            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()]);
+            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()], pp);
 
             assert_eq!(pk, trx.get_public_key_share(sc, &p));
 

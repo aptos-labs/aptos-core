@@ -12,10 +12,7 @@ use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
-use ark_std::{
-    fmt::Debug,
-    rand::{CryptoRng, RngCore},
-};
+use ark_std::fmt::Debug;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 

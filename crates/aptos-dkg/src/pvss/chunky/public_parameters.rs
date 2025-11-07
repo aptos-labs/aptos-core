@@ -23,7 +23,7 @@ use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
 };
-use ark_std::rand::{thread_rng, CryptoRng, RngCore};
+use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::ops::Mul;
 
@@ -167,7 +167,7 @@ impl<E: Pairing> PublicParameters<E> {
         let max_num_chunks_padded =
             ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
 
-        let group_generators = GroupGenerators::sample(rng); // TODO: At least one of these should come from a powers of tau ceremony?
+        let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp = Self {
             pp_elgamal: chunked_elgamal::PublicParameters::default(),
             pk_range_proof: dekart_univariate_v2::Proof::setup(
