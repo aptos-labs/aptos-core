@@ -167,7 +167,7 @@ impl Default for RocksdbConfig {
             // Enable but use a less detailed option by default since there might be some overhead.
             stats_level: Some(RocksDBStatsLevel::ExceptHistogramOrTimers),
             // Use RocksDB's default if not specified.
-            stats_dump_period_sec: None,
+            stats_dump_period_sec: Some(300),
         }
     }
 }
