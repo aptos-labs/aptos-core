@@ -94,7 +94,7 @@ pub enum UnverifiedEvent {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     SyncInfo(Box<SyncInfo>),
-    BatchMsg(Box<BatchMsg>),
+    BatchMsg(Box<BatchMsg<BatchInfo>>),
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfo>>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfo>>),
     OptProposalMsg(Box<OptProposalMsg>),
@@ -237,7 +237,7 @@ pub enum VerifiedEvent {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
-    BatchMsg(Box<BatchMsg>),
+    BatchMsg(Box<BatchMsg<BatchInfo>>),
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfoExt>>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfoExt>>),
     // local messages

@@ -115,7 +115,7 @@ impl QuotaManager {
 pub struct BatchStore {
     epoch: OnceCell<u64>,
     last_certified_time: AtomicU64,
-    db_cache: DashMap<HashValue, PersistedValue>,
+    db_cache: DashMap<HashValue, PersistedValue<BatchInfo>>,
     peer_quota: DashMap<PeerId, QuotaManager>,
     expirations: Mutex<TimeExpirations<HashValue>>,
     db: Arc<dyn QuorumStoreStorage>,
@@ -123,7 +123,7 @@ pub struct BatchStore {
     db_quota: usize,
     batch_quota: usize,
     validator_signer: ValidatorSigner,
-    persist_subscribers: DashMap<HashValue, Vec<oneshot::Sender<PersistedValue>>>,
+    persist_subscribers: DashMap<HashValue, Vec<oneshot::Sender<PersistedValue<BatchInfo>>>>,
     expiration_buffer_usecs: u64,
 }
 
@@ -251,7 +251,7 @@ impl BatchStore {
         *self.epoch.get().expect("Epoch should always be set")
     }
 
-    fn free_quota(&self, value: PersistedValue) {
+    fn free_quota(&self, value: PersistedValue<BatchInfo>) {
         let mut quota_manager = self
             .peer_quota
             .get_mut(&value.author())
@@ -267,7 +267,10 @@ impl BatchStore {
     // Note: holds db_cache entry lock (due to DashMap), while accessing peer_quota
     // DashMap. Hence, peer_quota reference should never be held while accessing the
     // db_cache to avoid the deadlock (if needed, order is db_cache, then peer_quota).
-    pub(crate) fn insert_to_cache(&self, value: &PersistedValue) -> anyhow::Result<bool> {
+    pub(crate) fn insert_to_cache(
+        &self,
+        value: &PersistedValue<BatchInfo>,
+    ) -> anyhow::Result<bool> {
         let digest = *value.digest();
         let author = value.author();
         let expiration_time = value.expiration();
@@ -325,7 +328,7 @@ impl BatchStore {
         Ok(true)
     }
 
-    pub(crate) fn save(&self, value: &PersistedValue) -> anyhow::Result<bool> {
+    pub(crate) fn save(&self, value: &PersistedValue<BatchInfo>) -> anyhow::Result<bool> {
         let last_certified_time = self.last_certified_time();
         if value.expiration() > last_certified_time {
             fail_point!("quorum_store::save", |_| {
@@ -397,7 +400,7 @@ impl BatchStore {
     fn persist_inner<T: TBatchInfo>(
         &self,
         batch_info: T,
-        persist_request: PersistedValue,
+        persist_request: PersistedValue<BatchInfo>,
     ) -> Option<SignedBatchInfo<T>> {
         assert!(
             batch_info.as_batch_info() == persist_request.batch_info(),
@@ -436,7 +439,7 @@ impl BatchStore {
         self.last_certified_time.load(Ordering::Relaxed)
     }
 
-    fn get_batch_from_db(&self, digest: &HashValue) -> ExecutorResult<PersistedValue> {
+    fn get_batch_from_db(&self, digest: &HashValue) -> ExecutorResult<PersistedValue<BatchInfo>> {
         counters::GET_BATCH_FROM_DB_COUNT.inc();
 
         match self.db.get_batch(digest) {
@@ -451,7 +454,7 @@ impl BatchStore {
     pub(crate) fn get_batch_from_local(
         &self,
         digest: &HashValue,
-    ) -> ExecutorResult<PersistedValue> {
+    ) -> ExecutorResult<PersistedValue<BatchInfo>> {
         if let Some(value) = self.db_cache.get(digest) {
             if value.payload_storage_mode() == StorageMode::PersistedOnly {
                 self.get_batch_from_db(digest)
@@ -468,7 +471,7 @@ impl BatchStore {
     /// This can be useful in cases where there are multiple flows to add a batch (like
     /// direct from author batch / batch requester fetch) to the batch store and either
     /// flow needs to subscribe to the other.
-    fn subscribe(&self, digest: HashValue) -> oneshot::Receiver<PersistedValue> {
+    fn subscribe(&self, digest: HashValue) -> oneshot::Receiver<PersistedValue<BatchInfo>> {
         let (tx, rx) = oneshot::channel();
         self.persist_subscribers.entry(digest).or_default().push(tx);
 
@@ -481,7 +484,7 @@ impl BatchStore {
         rx
     }
 
-    fn notify_subscribers(&self, value: PersistedValue) {
+    fn notify_subscribers(&self, value: PersistedValue<BatchInfo>) {
         if let Some((_, subscribers)) = self.persist_subscribers.remove(value.digest()) {
             for subscriber in subscribers {
                 subscriber.send(value.clone()).ok();
@@ -491,7 +494,10 @@ impl BatchStore {
 }
 
 impl BatchWriter for BatchStore {
-    fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo<BatchInfo>> {
+    fn persist(
+        &self,
+        persist_requests: Vec<PersistedValue<BatchInfo>>,
+    ) -> Vec<SignedBatchInfo<BatchInfo>> {
         let mut signed_infos = vec![];
         for persist_request in persist_requests.into_iter() {
             let batch_info = persist_request.batch_info().clone();
@@ -505,7 +511,7 @@ impl BatchWriter for BatchStore {
 
     fn persist_v2(
         &self,
-        persist_requests: Vec<PersistedValue>,
+        persist_requests: Vec<PersistedValue<BatchInfo>>,
     ) -> Vec<SignedBatchInfo<BatchInfoExt>> {
         let mut signed_infos = vec![];
         for persist_request in persist_requests.into_iter() {
@@ -648,10 +654,13 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
 }
 
 pub trait BatchWriter: Send + Sync {
-    fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo<BatchInfo>>;
+    fn persist(
+        &self,
+        persist_requests: Vec<PersistedValue<BatchInfo>>,
+    ) -> Vec<SignedBatchInfo<BatchInfo>>;
 
     fn persist_v2(
         &self,
-        persist_requests: Vec<PersistedValue>,
+        persist_requests: Vec<PersistedValue<BatchInfo>>,
     ) -> Vec<SignedBatchInfo<BatchInfoExt>>;
 }

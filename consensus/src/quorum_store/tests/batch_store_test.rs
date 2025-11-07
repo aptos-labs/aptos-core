@@ -46,7 +46,7 @@ fn request_for_test(
     round: u64,
     num_bytes: u64,
     maybe_payload: Option<Vec<SignedTransaction>>,
-) -> PersistedValue {
+) -> PersistedValue<BatchInfo> {
     PersistedValue::new(
         BatchInfo::new(
             *TEST_REQUEST_ACCOUNT, // make sure all request come from the same account
@@ -96,7 +96,7 @@ async fn test_extend_expiration_vs_save() {
     let batch_store_clone2 = batch_store.clone();
 
     let digests: Vec<HashValue> = (0..num_experiments).map(|_| HashValue::random()).collect();
-    let later_exp_values: Vec<PersistedValue> = (0..num_experiments)
+    let later_exp_values: Vec<PersistedValue<BatchInfo>> = (0..num_experiments)
         .map(|i| {
             // Pre-insert some of them.
             if i % 2 == 0 {
