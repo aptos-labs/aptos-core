@@ -9,13 +9,12 @@
 
 use crate::{
     pvss::traits::Transcript, range_proofs::traits::BatchedRangeProof, sigma_protocol,
-    sigma_protocol::homomorphism, utils::random::random_scalar_from_uniform_bytes, Scalar,
+    sigma_protocol::homomorphism, Scalar,
 };
 use aptos_crypto::ValidCryptoMaterial;
 use ark_ec::pairing::Pairing;
 use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
-use ff::PrimeField as FfPrimeField;
 use serde::Serialize;
 
 #[allow(dead_code)] // Will be used in the new PVSS
@@ -30,89 +29,47 @@ pub const PVSS_DOM_SEP: &[u8; 26] = b"APTOS_PVSS_FIAT_SHAMIR_DST";
 /// ⚠️ This trait is intentionally private: functions like `challenge_scalars`
 /// should **only** be used internally to ensure properly
 /// labelled scalar generation across protocols.
-trait ScalarProtocol<S: FromBytes> {
-    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
+//
+// TODO: Again, seems that ideally Scalar<E> should become Scalar<F> instead
+trait ScalarProtocol<E: Pairing> {
+    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<E>>;
 
-    fn challenge_full_scalar(&mut self, label: &[u8]) -> S {
+    fn challenge_full_scalar(&mut self, label: &[u8]) -> Scalar<E> {
         self.challenge_full_scalars(label, 1)[0]
     }
 
-    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S>;
+    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<E>>;
 }
 
-/// Trait for types that can be constructed from uniform bytes or 128-bit random bytes
-trait FromBytes: Copy {
-    const BYTE_SIZE: usize;
+impl<E: Pairing> ScalarProtocol<E> for merlin::Transcript {
+    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<E>> {
+        let byte_size = (E::ScalarField::MODULUS_BIT_SIZE as usize) / 8;
+        let mut buf = vec![0u8; 2 * num_scalars * byte_size];
+        self.challenge_bytes(label, &mut buf);
 
-    /// Construct scalars, each from a uniform byte slice (usually larger than 16 bytes)
-    fn from_uniform_bytes(bytes: &[u8]) -> Self;
-
-    /// Construct scalars, each from exactly 16 bytes (128-bit randomness)
-    fn from_16_random_bytes(bytes: &[u8; 16]) -> Self;
-}
-
-impl<E: Pairing> FromBytes for Scalar<E> {
-    const BYTE_SIZE: usize = (E::ScalarField::MODULUS_BIT_SIZE as usize) / 8;
-
-    fn from_uniform_bytes(bytes: &[u8]) -> Self {
-        assert_eq!(bytes.len(), 2 * Self::BYTE_SIZE);
-        Self(E::ScalarField::from_le_bytes_mod_order(bytes))
+        buf.chunks(2 * byte_size)
+            .map(|chunk| Scalar(E::ScalarField::from_le_bytes_mod_order(chunk)))
+            .collect()
     }
 
-    fn from_16_random_bytes(bytes: &[u8; 16]) -> Self {
-        Self(E::ScalarField::from_le_bytes_mod_order(bytes))
-    }
-}
-
-// TODO: It's unlikely that this code will be useful in the near future...
-impl FromBytes for blstrs::Scalar {
-    const BYTE_SIZE: usize = crate::SCALAR_NUM_BYTES;
-
-    fn from_uniform_bytes(bytes: &[u8]) -> Self {
-        // No assert_eq needed here because it is enforced by the function below
-        random_scalar_from_uniform_bytes(bytes.try_into().expect("Wrong byte length"))
-    }
-
-    fn from_16_random_bytes(bytes: &[u8; 16]) -> Self {
-        blstrs::Scalar::from_u128(u128::from_le_bytes(*bytes))
-    }
-}
-
-impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
-    fn challenge_full_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
-        let mut buf = vec![0u8; 2 * num_scalars * S::BYTE_SIZE];
-        self.challenge_bytes(label, &mut buf); // Label is also appended here
-
-        let result = buf
-            .chunks(2 * S::BYTE_SIZE)
-            .map(S::from_uniform_bytes)
-            .collect::<Vec<_>>();
-
-        debug_assert_eq!(result.len(), num_scalars);
-        result
-    }
-
-    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<S> {
-        // Allocate 16 bytes (128 bits) per scalar
+    fn challenge_128bit_scalars(&mut self, label: &[u8], num_scalars: usize) -> Vec<Scalar<E>> {
         let mut buf = vec![0u8; num_scalars * 16];
         self.challenge_bytes(label, &mut buf);
 
-        let mut scalars = Vec::with_capacity(num_scalars);
-
-        for chunk in buf.chunks(16) {
-            scalars.push(S::from_16_random_bytes(chunk.try_into().unwrap()));
-        }
-
-        debug_assert_eq!(scalars.len(), num_scalars);
-        scalars
+        buf.chunks(16)
+            .map(|chunk| {
+                Scalar(E::ScalarField::from_le_bytes_mod_order(
+                    chunk.try_into().unwrap(),
+                ))
+            })
+            .collect()
     }
 }
 
-// TODO: it may make sense to make an associated type Scalar of Transcript, then remove S here and replace it with T::Scalar. Or remove it entirely given that we now only use arkworks...
 #[allow(non_snake_case)]
 #[allow(private_bounds)]
 #[allow(dead_code)] // Will be used in the new PVSS
-pub trait PVSS<S: FromBytes, T: Transcript>: ScalarProtocol<S> {
+pub trait PVSS<E: Pairing, T: Transcript>: ScalarProtocol<E> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
     fn pvss_domain_sep(&mut self, sc: &T::SecretSharingConfig);
@@ -134,11 +91,11 @@ pub trait PVSS<S: FromBytes, T: Transcript>: ScalarProtocol<S> {
     fn append_transcript(&mut self, trx: &T);
 
     /// Returns a random dual-code word check polynomial for the SCRAPE LDT test.
-    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n: usize) -> Vec<S>;
+    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n: usize) -> Vec<Scalar<E>>;
 
     /// Returns one or more scalars `r` useful for doing linear combinations (e.g., combining
     /// pairings in the SCRAPE multipairing check using coefficients $1, r, r^2, r^3, \ldots$
-    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<S>;
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar<E>>;
 }
 
 pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
@@ -164,7 +121,7 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 }
 
 #[allow(private_bounds)]
-pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scalar<E>> {
+pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<E> {
     fn append_sigma_protocol_sep(&mut self, dst: &[u8]);
 
     /// Append the MSM bases of a sigma protocol.
@@ -186,7 +143,7 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scal
 }
 
 #[allow(non_snake_case)]
-impl<S: FromBytes, T: Transcript> PVSS<S, T> for merlin::Transcript {
+impl<E: Pairing, T: Transcript> PVSS<E, T> for merlin::Transcript {
     fn pvss_domain_sep(&mut self, sc: &T::SecretSharingConfig) {
         self.append_message(b"dom-sep", PVSS_DOM_SEP);
         self.append_message(b"scheme-name", T::scheme_name().as_bytes());
@@ -217,7 +174,7 @@ impl<S: FromBytes, T: Transcript> PVSS<S, T> for merlin::Transcript {
     fn append_auxs<A: Serialize>(&mut self, auxs: &[A]) {
         self.append_u64(b"auxs", auxs.len() as u64);
         for aux in auxs {
-            <merlin::Transcript as PVSS<S, T>>::append_aux::<A>(self, aux);
+            <merlin::Transcript as PVSS<E, T>>::append_aux::<A>(self, aux);
         }
     }
 
@@ -230,17 +187,17 @@ impl<S: FromBytes, T: Transcript> PVSS<S, T> for merlin::Transcript {
         self.append_message(b"transcript", trx.to_bytes().as_slice());
     }
 
-    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n_plus_1: usize) -> Vec<S> {
+    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n_plus_1: usize) -> Vec<Scalar<E>> {
         let num_coeffs = n_plus_1 - t;
-        <merlin::Transcript as ScalarProtocol<S>>::challenge_full_scalars(
+        <merlin::Transcript as ScalarProtocol<E>>::challenge_full_scalars(
             self,
             b"challenge_dual_code_word_polynomial",
             num_coeffs,
         )
     }
 
-    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<S> {
-        <merlin::Transcript as ScalarProtocol<S>>::challenge_full_scalars(
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar<E>> {
+        <merlin::Transcript as ScalarProtocol<E>>::challenge_full_scalars(
             self,
             b"challenge_linear_combination",
             num_scalars,
@@ -250,7 +207,7 @@ impl<S: FromBytes, T: Transcript> PVSS<S, T> for merlin::Transcript {
 
 #[allow(private_bounds)]
 #[allow(dead_code)] // Will be used in the new PVSS
-pub(crate) fn initialize_pvss_transcript<S: FromBytes, T: Transcript>(
+pub(crate) fn initialize_pvss_transcript<E: Pairing, T: Transcript>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     eks: &[T::EncryptPubKey],
@@ -258,9 +215,9 @@ pub(crate) fn initialize_pvss_transcript<S: FromBytes, T: Transcript>(
 ) -> merlin::Transcript {
     let mut fs_t = merlin::Transcript::new(dst);
 
-    <merlin::Transcript as PVSS<S, T>>::pvss_domain_sep(&mut fs_t, sc);
-    <merlin::Transcript as PVSS<S, T>>::append_public_parameters(&mut fs_t, pp);
-    <merlin::Transcript as PVSS<S, T>>::append_encryption_keys(&mut fs_t, eks);
+    <merlin::Transcript as PVSS<E, T>>::pvss_domain_sep(&mut fs_t, sc);
+    <merlin::Transcript as PVSS<E, T>>::append_public_parameters(&mut fs_t, pp);
+    <merlin::Transcript as PVSS<E, T>>::append_encryption_keys(&mut fs_t, eks);
 
     fs_t
 }
@@ -319,29 +276,27 @@ impl<E: Pairing, B: BatchedRangeProof<E>> RangeProof<E, B> for merlin::Transcrip
     }
 
     fn challenges_for_quotient_polynomials(&mut self, ell: usize) -> Vec<E::ScalarField> {
-        let challenges =
-            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_128bit_scalars(
-                self,
-                b"challenge_for_quotient_polynomials",
-                ell + 1,
-            );
+        let challenges = <merlin::Transcript as ScalarProtocol<E>>::challenge_128bit_scalars(
+            self,
+            b"challenge_for_quotient_polynomials",
+            ell + 1,
+        );
 
         Scalar::<E>::vec_into_inner(challenges)
     }
 
     fn challenges_for_linear_combination(&mut self, num: usize) -> Vec<E::ScalarField> {
-        let challenges =
-            <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_128bit_scalars(
-                self,
-                b"challenge_for_linear_combination",
-                num,
-            );
+        let challenges = <merlin::Transcript as ScalarProtocol<E>>::challenge_128bit_scalars(
+            self,
+            b"challenge_for_linear_combination",
+            num,
+        );
 
         Scalar::<E>::vec_into_inner(challenges)
     }
 
     fn challenge_from_verifier(&mut self) -> E::ScalarField {
-        <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_full_scalar(
+        <merlin::Transcript as ScalarProtocol<E>>::challenge_full_scalar(
             self,
             b"verifier_challenge_for_linear_combination",
         )
@@ -397,7 +352,7 @@ where
     }
 
     fn challenge_for_sigma_protocol(&mut self) -> E::ScalarField {
-        <merlin::Transcript as ScalarProtocol<Scalar<E>>>::challenge_full_scalar(
+        <merlin::Transcript as ScalarProtocol<E>>::challenge_full_scalar(
             self,
             b"challenge_sigma_protocol",
         )
