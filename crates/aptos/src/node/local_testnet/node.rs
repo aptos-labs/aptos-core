@@ -208,8 +208,7 @@ impl ServiceManager for NodeManager {
         let mut checkers = HashSet::new();
         checkers.insert(HealthChecker::NodeApi(node_api_url));
         if self.config.indexer_grpc.enabled {
-            let data_service_url =
-                socket_addr_to_url(&self.config.indexer_grpc.address, "http").unwrap();
+            let data_service_url = self.get_data_service_url();
             checkers.insert(HealthChecker::DataServiceGrpc(data_service_url));
         }
         checkers
