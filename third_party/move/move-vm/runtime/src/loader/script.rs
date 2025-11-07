@@ -103,7 +103,7 @@ impl Script {
             });
         }
 
-        let code = script.code.code.clone();
+        let code = script.code.code.iter().map(|b| b.clone().into()).collect();
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters
