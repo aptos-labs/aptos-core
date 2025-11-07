@@ -1,172 +1,162 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.operators {
+// Bytecode version v9
+module 0x42::operators
+// Function definition at index 0
+fun arithm(l0: u64, l1: u64): u64
+    copy_loc l0
+    copy_loc l1
+    copy_loc l0
+    copy_loc l1
+    sub
+    // @5
+    div
+    move_loc l1
+    mul
+    move_loc l0
+    mod
+    // @10
+    add
+    ret
+
+// Function definition at index 1
+fun bits(l0: u64, l1: u8): u64
+    copy_loc l0
+    copy_loc l1
+    shl
+    copy_loc l0
+    bit_and
+    // @5
+    copy_loc l0
+    move_loc l1
+    shr
+    move_loc l0
+    xor
+    // @10
+    bit_or
+    ret
+
+// Function definition at index 2
+fun bools(l0: bool, l1: bool): bool
+    local l2: bool
+    local l3: bool
+    local l4: bool
+    local l5: bool
+    copy_loc l0
+    br_false l0
+    copy_loc l1
+    st_loc l2
+l10: move_loc l2
+    // @5
+    br_false l1
+    ld_true
+    st_loc l3
+l9: move_loc l3
+    br_false l2
+    // @10
+    ld_true
+    st_loc l4
+l7: move_loc l4
+    br_false l3
+    ld_true
+    // @15
+    st_loc l5
+l5: move_loc l5
+    ret
+l3: move_loc l0
+    br_true l4
+    // @20
+    move_loc l1
+    not
+    st_loc l5
+    branch l5
+l4: ld_false
+    // @25
+    st_loc l5
+    branch l5
+l2: copy_loc l0
+    br_true l6
+    copy_loc l1
+    // @30
+    st_loc l4
+    branch l7
+l6: ld_false
+    st_loc l4
+    branch l7
+    // @35
+l1: copy_loc l0
+    br_false l8
+    copy_loc l1
+    not
+    st_loc l3
+    // @40
+    branch l9
+l8: ld_false
+    st_loc l3
+    branch l9
+l0: ld_false
+    // @45
+    st_loc l2
+    branch l10
+
+// Function definition at index 3
+fun equality<T0: drop>(l0: T0, l1: T0): bool
+    move_loc l0
+    move_loc l1
+    eq
+    ret
+
+// Function definition at index 4
+fun inequality<T0: drop>(l0: T0, l1: T0): bool
+    move_loc l0
+    move_loc l1
+    neq
+    ret
+
+// Function definition at index 5
+fun order(l0: u64, l1: u64): bool
+    local l2: bool
+    local l3: bool
+    local l4: bool
+    copy_loc l0
+    copy_loc l1
+    lt
+    br_false l0
+    copy_loc l0
+    // @5
+    copy_loc l1
+    le
+    st_loc l2
+l5: move_loc l2
+    br_false l1
+    // @10
+    copy_loc l0
+    copy_loc l1
+    gt
+    not
+    st_loc l3
+    // @15
+l4: move_loc l3
+    br_false l2
+    move_loc l0
+    move_loc l1
+    ge
+    // @20
+    not
+    st_loc l4
+l3: move_loc l4
+    ret
+l2: ld_false
+    // @25
+    st_loc l4
+    branch l3
+l1: ld_false
+    st_loc l3
+    branch l4
+    // @30
+l0: ld_false
+    st_loc l2
+    branch l5
 
 
-arithm(x: u64, y: u64): u64 /* def_idx: 0 */ {
-B0:
-	0: CopyLoc[0](x: u64)
-	1: CopyLoc[1](y: u64)
-	2: CopyLoc[0](x: u64)
-	3: CopyLoc[1](y: u64)
-	4: Sub
-	5: Div
-	6: MoveLoc[1](y: u64)
-	7: Mul
-	8: MoveLoc[0](x: u64)
-	9: Mod
-	10: Add
-	11: Ret
-}
-bits(x: u64, y: u8): u64 /* def_idx: 1 */ {
-B0:
-	0: CopyLoc[0](x: u64)
-	1: CopyLoc[1](y: u8)
-	2: Shl
-	3: CopyLoc[0](x: u64)
-	4: BitAnd
-	5: CopyLoc[0](x: u64)
-	6: MoveLoc[1](y: u8)
-	7: Shr
-	8: MoveLoc[0](x: u64)
-	9: Xor
-	10: BitOr
-	11: Ret
-}
-bools(x: bool, y: bool): bool /* def_idx: 2 */ {
-L2:	$t5: bool
-L3:	$t4: bool
-L4:	$t3: bool
-L5:	return: bool
-B0:
-	0: CopyLoc[0](x: bool)
-	1: BrFalse(44)
-B1:
-	2: CopyLoc[1](y: bool)
-	3: StLoc[2]($t5: bool)
-B2:
-	4: MoveLoc[2]($t5: bool)
-	5: BrFalse(35)
-B3:
-	6: LdTrue
-	7: StLoc[3]($t4: bool)
-B4:
-	8: MoveLoc[3]($t4: bool)
-	9: BrFalse(27)
-B5:
-	10: LdTrue
-	11: StLoc[4]($t3: bool)
-B6:
-	12: MoveLoc[4]($t3: bool)
-	13: BrFalse(18)
-B7:
-	14: LdTrue
-	15: StLoc[5](return: bool)
-B8:
-	16: MoveLoc[5](return: bool)
-	17: Ret
-B9:
-	18: MoveLoc[0](x: bool)
-	19: BrTrue(24)
-B10:
-	20: MoveLoc[1](y: bool)
-	21: Not
-	22: StLoc[5](return: bool)
-	23: Branch(16)
-B11:
-	24: LdFalse
-	25: StLoc[5](return: bool)
-	26: Branch(16)
-B12:
-	27: CopyLoc[0](x: bool)
-	28: BrTrue(32)
-B13:
-	29: CopyLoc[1](y: bool)
-	30: StLoc[4]($t3: bool)
-	31: Branch(12)
-B14:
-	32: LdFalse
-	33: StLoc[4]($t3: bool)
-	34: Branch(12)
-B15:
-	35: CopyLoc[0](x: bool)
-	36: BrFalse(41)
-B16:
-	37: CopyLoc[1](y: bool)
-	38: Not
-	39: StLoc[3]($t4: bool)
-	40: Branch(8)
-B17:
-	41: LdFalse
-	42: StLoc[3]($t4: bool)
-	43: Branch(8)
-B18:
-	44: LdFalse
-	45: StLoc[2]($t5: bool)
-	46: Branch(4)
-}
-equality<T: drop>(x: T, y: T): bool /* def_idx: 3 */ {
-B0:
-	0: MoveLoc[0](x: T)
-	1: MoveLoc[1](y: T)
-	2: Eq
-	3: Ret
-}
-inequality<T: drop>(x: T, y: T): bool /* def_idx: 4 */ {
-B0:
-	0: MoveLoc[0](x: T)
-	1: MoveLoc[1](y: T)
-	2: Neq
-	3: Ret
-}
-order(x: u64, y: u64): bool /* def_idx: 5 */ {
-L2:	$t5: bool
-L3:	$t8: bool
-L4:	$t10: bool
-B0:
-	0: CopyLoc[0](x: u64)
-	1: CopyLoc[1](y: u64)
-	2: Lt
-	3: BrFalse(30)
-B1:
-	4: CopyLoc[0](x: u64)
-	5: CopyLoc[1](y: u64)
-	6: Le
-	7: StLoc[2]($t5: bool)
-B2:
-	8: MoveLoc[2]($t5: bool)
-	9: BrFalse(27)
-B3:
-	10: CopyLoc[0](x: u64)
-	11: CopyLoc[1](y: u64)
-	12: Gt
-	13: Not
-	14: StLoc[3]($t8: bool)
-B4:
-	15: MoveLoc[3]($t8: bool)
-	16: BrFalse(24)
-B5:
-	17: MoveLoc[0](x: u64)
-	18: MoveLoc[1](y: u64)
-	19: Ge
-	20: Not
-	21: StLoc[4]($t10: bool)
-B6:
-	22: MoveLoc[4]($t10: bool)
-	23: Ret
-B7:
-	24: LdFalse
-	25: StLoc[4]($t10: bool)
-	26: Branch(22)
-B8:
-	27: LdFalse
-	28: StLoc[3]($t8: bool)
-	29: Branch(15)
-B9:
-	30: LdFalse
-	31: StLoc[2]($t5: bool)
-	32: Branch(8)
-}
-}
 ============ bytecode verification succeeded ========

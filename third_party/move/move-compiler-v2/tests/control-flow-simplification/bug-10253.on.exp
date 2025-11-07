@@ -240,182 +240,175 @@ fun vectors::test_guess_without_break() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module cafe.vectors {
+// Bytecode version v9
+module 0xcafe::vectors
+// Function definition at index 0
+#[persistent] entry public fun guess_flips(l0: vector<u8>)
+    local l1: &vector<u8>
+    local l2: u64
+    borrow_loc l0
+    st_loc l1
+    ld_u64 0
+    st_loc l2
+l2: copy_loc l2
+    // @5
+    copy_loc l1
+    vec_len <u8>
+    lt
+    br_false l0
+    copy_loc l1
+    // @10
+    copy_loc l2
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    neq
+    // @15
+    br_false l1
+    move_loc l1
+    pop
+l3: ret
+l1: move_loc l2
+    // @20
+    ld_u64 1
+    add
+    st_loc l2
+    branch l2
+l0: move_loc l1
+    // @25
+    pop
+    branch l3
+
+// Function definition at index 1
+#[persistent] entry public fun guess_flips_directly(l0: vector<u8>)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l3: copy_loc l1
+    borrow_loc l0
+    vec_len <u8>
+    // @5
+    lt
+    br_true l0
+    branch l1
+l0: borrow_loc l0
+    copy_loc l1
+    // @10
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    neq
+    br_false l2
+    // @15
+    branch l1
+l1: ret
+l2: move_loc l1
+    ld_u64 1
+    add
+    // @20
+    st_loc l1
+    branch l3
+
+// Function definition at index 2
+#[persistent] entry public fun guess_with_break_without_inline(l0: vector<u8>)
+    borrow_loc l0
+    call loops_with_break_no_inline
+    ret
+
+// Function definition at index 3
+#[persistent] entry public fun guess_without_break_with_inline(l0: vector<u8>)
+    local l1: &vector<u8>
+    local l2: u64
+    borrow_loc l0
+    st_loc l1
+    ld_u64 0
+    st_loc l2
+l2: copy_loc l2
+    // @5
+    copy_loc l1
+    vec_len <u8>
+    lt
+    br_false l0
+    copy_loc l1
+    // @10
+    copy_loc l2
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    eq
+    // @15
+    br_false l1
+    move_loc l2
+    ld_u64 1
+    add
+    st_loc l2
+    // @20
+    branch l2
+l1: move_loc l1
+    pop
+    ld_u64 3
+    abort
+    // @25
+l0: move_loc l1
+    pop
+    ret
+
+// Function definition at index 4
+fun loops_with_break_no_inline(l0: &vector<u8>)
+    local l1: u64
+    ld_u64 0
+    st_loc l1
+l2: copy_loc l1
+    copy_loc l0
+    vec_len <u8>
+    // @5
+    lt
+    br_false l0
+    copy_loc l0
+    copy_loc l1
+    vec_borrow <u8>
+    // @10
+    read_ref
+    ld_u8 0
+    neq
+    br_false l1
+    move_loc l0
+    // @15
+    pop
+l3: ret
+l1: move_loc l1
+    ld_u64 1
+    add
+    // @20
+    st_loc l1
+    branch l2
+l0: move_loc l0
+    pop
+    branch l3
+
+// Function definition at index 5
+fun test_guess_directly()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips_directly
+    ret
+
+// Function definition at index 6
+fun test_guess_with_break_no_inline()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_with_break_without_inline
+    ret
+
+// Function definition at index 7
+fun test_guess_with_inline_break()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_flips
+    ret
+
+// Function definition at index 8
+fun test_guess_without_break()
+    ld_const<vector<u8>> [0, 0, 0, 0]
+    call guess_without_break_with_inline
+    ret
 
 
-entry public guess_flips(flips: vector<u8>) /* def_idx: 0 */ {
-L1:	$t2: &vector<u8>
-L2:	i: u64
-B0:
-	0: ImmBorrowLoc[0](flips: vector<u8>)
-	1: StLoc[1]($t2: &vector<u8>)
-	2: LdU64(0)
-	3: StLoc[2](i: u64)
-B1:
-	4: CopyLoc[2](i: u64)
-	5: CopyLoc[1]($t2: &vector<u8>)
-	6: VecLen(2)
-	7: Lt
-	8: BrFalse(24)
-B2:
-	9: CopyLoc[1]($t2: &vector<u8>)
-	10: CopyLoc[2](i: u64)
-	11: VecImmBorrow(2)
-	12: ReadRef
-	13: LdU8(0)
-	14: Neq
-	15: BrFalse(19)
-B3:
-	16: MoveLoc[1]($t2: &vector<u8>)
-	17: Pop
-B4:
-	18: Ret
-B5:
-	19: MoveLoc[2](i: u64)
-	20: LdU64(1)
-	21: Add
-	22: StLoc[2](i: u64)
-	23: Branch(4)
-B6:
-	24: MoveLoc[1]($t2: &vector<u8>)
-	25: Pop
-	26: Branch(18)
-}
-entry public guess_flips_directly(flips: vector<u8>) /* def_idx: 1 */ {
-L1:	i: u64
-B0:
-	0: LdU64(0)
-	1: StLoc[1](i: u64)
-B1:
-	2: CopyLoc[1](i: u64)
-	3: ImmBorrowLoc[0](flips: vector<u8>)
-	4: VecLen(2)
-	5: Lt
-	6: BrTrue(8)
-B2:
-	7: Branch(16)
-B3:
-	8: ImmBorrowLoc[0](flips: vector<u8>)
-	9: CopyLoc[1](i: u64)
-	10: VecImmBorrow(2)
-	11: ReadRef
-	12: LdU8(0)
-	13: Neq
-	14: BrFalse(17)
-B4:
-	15: Branch(16)
-B5:
-	16: Ret
-B6:
-	17: MoveLoc[1](i: u64)
-	18: LdU64(1)
-	19: Add
-	20: StLoc[1](i: u64)
-	21: Branch(2)
-}
-entry public guess_with_break_without_inline(flips: vector<u8>) /* def_idx: 2 */ {
-B0:
-	0: ImmBorrowLoc[0](flips: vector<u8>)
-	1: Call loops_with_break_no_inline(&vector<u8>)
-	2: Ret
-}
-entry public guess_without_break_with_inline(flips: vector<u8>) /* def_idx: 3 */ {
-L1:	$t2: &vector<u8>
-L2:	i: u64
-B0:
-	0: ImmBorrowLoc[0](flips: vector<u8>)
-	1: StLoc[1]($t2: &vector<u8>)
-	2: LdU64(0)
-	3: StLoc[2](i: u64)
-B1:
-	4: CopyLoc[2](i: u64)
-	5: CopyLoc[1]($t2: &vector<u8>)
-	6: VecLen(2)
-	7: Lt
-	8: BrFalse(25)
-B2:
-	9: CopyLoc[1]($t2: &vector<u8>)
-	10: CopyLoc[2](i: u64)
-	11: VecImmBorrow(2)
-	12: ReadRef
-	13: LdU8(0)
-	14: Eq
-	15: BrFalse(21)
-B3:
-	16: MoveLoc[2](i: u64)
-	17: LdU64(1)
-	18: Add
-	19: StLoc[2](i: u64)
-	20: Branch(4)
-B4:
-	21: MoveLoc[1]($t2: &vector<u8>)
-	22: Pop
-	23: LdU64(3)
-	24: Abort
-B5:
-	25: MoveLoc[1]($t2: &vector<u8>)
-	26: Pop
-	27: Ret
-}
-loops_with_break_no_inline(flips: &vector<u8>) /* def_idx: 4 */ {
-L1:	i: u64
-B0:
-	0: LdU64(0)
-	1: StLoc[1](i: u64)
-B1:
-	2: CopyLoc[1](i: u64)
-	3: CopyLoc[0](flips: &vector<u8>)
-	4: VecLen(2)
-	5: Lt
-	6: BrFalse(22)
-B2:
-	7: CopyLoc[0](flips: &vector<u8>)
-	8: CopyLoc[1](i: u64)
-	9: VecImmBorrow(2)
-	10: ReadRef
-	11: LdU8(0)
-	12: Neq
-	13: BrFalse(17)
-B3:
-	14: MoveLoc[0](flips: &vector<u8>)
-	15: Pop
-B4:
-	16: Ret
-B5:
-	17: MoveLoc[1](i: u64)
-	18: LdU64(1)
-	19: Add
-	20: StLoc[1](i: u64)
-	21: Branch(2)
-B6:
-	22: MoveLoc[0](flips: &vector<u8>)
-	23: Pop
-	24: Branch(16)
-}
-test_guess_directly() /* def_idx: 5 */ {
-B0:
-	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
-	1: Call guess_flips_directly(vector<u8>)
-	2: Ret
-}
-test_guess_with_break_no_inline() /* def_idx: 6 */ {
-B0:
-	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
-	1: Call guess_with_break_without_inline(vector<u8>)
-	2: Ret
-}
-test_guess_with_inline_break() /* def_idx: 7 */ {
-B0:
-	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
-	1: Call guess_flips(vector<u8>)
-	2: Ret
-}
-test_guess_without_break() /* def_idx: 8 */ {
-B0:
-	0: LdConst[0](Vector(U8): [4, 0, 0, 0, 0])
-	1: Call guess_without_break_with_inline(vector<u8>)
-	2: Ret
-}
-}
 ============ bytecode verification succeeded ========

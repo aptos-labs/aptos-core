@@ -1,71 +1,76 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.pack_unpack_ref {
-struct G {
-	x1: u64,
-	x2: u64,
-	s: S
-}
-struct S {
-	f: u64,
-	g: u64
-}
+// Bytecode version v9
+module 0x42::pack_unpack_ref
+struct G
+  x1: u64
+  x2: u64
+  s: S
 
-unpack_mut_ref(s: &mut S): u64 * u64 /* def_idx: 0 */ {
-L1:	g: &mut u64
-B0:
-	0: CopyLoc[0](s: &mut S)
-	1: MutBorrowField[0](S.f: u64)
-	2: MoveLoc[0](s: &mut S)
-	3: MutBorrowField[1](S.g: u64)
-	4: StLoc[1](g: &mut u64)
-	5: ReadRef
-	6: MoveLoc[1](g: &mut u64)
-	7: ReadRef
-	8: Ret
-}
-unpack_ref(s: &S): u64 * u64 /* def_idx: 1 */ {
-L1:	g: &u64
-B0:
-	0: CopyLoc[0](s: &S)
-	1: ImmBorrowField[0](S.f: u64)
-	2: MoveLoc[0](s: &S)
-	3: ImmBorrowField[1](S.g: u64)
-	4: StLoc[1](g: &u64)
-	5: ReadRef
-	6: MoveLoc[1](g: &u64)
-	7: ReadRef
-	8: Ret
-}
-unpack_ref_G(g: &G): u64 * u64 * u64 * u64 /* def_idx: 2 */ {
-L1:	x2: &u64
-L2:	s: &S
-L3:	f: &u64
-L4:	g: &u64
-B0:
-	0: CopyLoc[0](g: &G)
-	1: ImmBorrowField[2](G.x1: u64)
-	2: CopyLoc[0](g: &G)
-	3: ImmBorrowField[3](G.x2: u64)
-	4: StLoc[1](x2: &u64)
-	5: MoveLoc[0](g: &G)
-	6: ImmBorrowField[4](G.s: S)
-	7: StLoc[2](s: &S)
-	8: CopyLoc[2](s: &S)
-	9: ImmBorrowField[0](S.f: u64)
-	10: StLoc[3](f: &u64)
-	11: MoveLoc[2](s: &S)
-	12: ImmBorrowField[1](S.g: u64)
-	13: StLoc[4](g: &u64)
-	14: ReadRef
-	15: MoveLoc[1](x2: &u64)
-	16: ReadRef
-	17: MoveLoc[3](f: &u64)
-	18: ReadRef
-	19: MoveLoc[4](g: &u64)
-	20: ReadRef
-	21: Ret
-}
-}
+struct S
+  f: u64
+  g: u64
+
+// Function definition at index 0
+fun unpack_mut_ref(l0: &mut S): (u64, u64)
+    local l1: &mut u64
+    copy_loc l0
+    mut_borrow_field S, f
+    move_loc l0
+    mut_borrow_field S, g
+    st_loc l1
+    // @5
+    read_ref
+    move_loc l1
+    read_ref
+    ret
+
+// Function definition at index 1
+fun unpack_ref(l0: &S): (u64, u64)
+    local l1: &u64
+    copy_loc l0
+    borrow_field S, f
+    move_loc l0
+    borrow_field S, g
+    st_loc l1
+    // @5
+    read_ref
+    move_loc l1
+    read_ref
+    ret
+
+// Function definition at index 2
+fun unpack_ref_G(l0: &G): (u64, u64, u64, u64)
+    local l1: &u64
+    local l2: &S
+    local l3: &u64
+    local l4: &u64
+    copy_loc l0
+    borrow_field G, x1
+    copy_loc l0
+    borrow_field G, x2
+    st_loc l1
+    // @5
+    move_loc l0
+    borrow_field G, s
+    st_loc l2
+    copy_loc l2
+    borrow_field S, f
+    // @10
+    st_loc l3
+    move_loc l2
+    borrow_field S, g
+    st_loc l4
+    read_ref
+    // @15
+    move_loc l1
+    read_ref
+    move_loc l3
+    read_ref
+    move_loc l4
+    // @20
+    read_ref
+    ret
+
+
 ============ bytecode verification succeeded ========

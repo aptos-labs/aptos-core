@@ -1,65 +1,61 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.if_else {
+// Bytecode version v9
+module 0x42::if_else
+// Function definition at index 0
+fun if_else(l0: bool, l1: u64): u64
+    local l2: u64
+    move_loc l0
+    br_false l0
+    move_loc l1
+    ld_u64 1
+    add
+    // @5
+    st_loc l2
+l1: move_loc l2
+    ret
+l0: move_loc l1
+    ld_u64 1
+    // @10
+    sub
+    st_loc l2
+    branch l1
+
+// Function definition at index 1
+fun if_else_nested(l0: bool, l1: u64): u64
+    local l2: u64
+    local l3: u64
+    move_loc l0
+    br_false l0
+    copy_loc l1
+    ld_u64 1
+    add
+    // @5
+    st_loc l2
+l3: move_loc l2
+    ld_u64 10
+    gt
+    br_false l1
+    // @10
+    move_loc l1
+    ld_u64 2
+    mul
+    st_loc l3
+l2: move_loc l3
+    // @15
+    ret
+l1: move_loc l1
+    ld_u64 2
+    div
+    st_loc l3
+    // @20
+    branch l2
+l0: copy_loc l1
+    ld_u64 1
+    sub
+    st_loc l2
+    // @25
+    branch l3
 
 
-if_else(cond: bool, x: u64): u64 /* def_idx: 0 */ {
-L2:	$t3: u64
-B0:
-	0: MoveLoc[0](cond: bool)
-	1: BrFalse(8)
-B1:
-	2: MoveLoc[1](x: u64)
-	3: LdU64(1)
-	4: Add
-	5: StLoc[2]($t3: u64)
-B2:
-	6: MoveLoc[2]($t3: u64)
-	7: Ret
-B3:
-	8: MoveLoc[1](x: u64)
-	9: LdU64(1)
-	10: Sub
-	11: StLoc[2]($t3: u64)
-	12: Branch(6)
-}
-if_else_nested(cond: bool, x: u64): u64 /* def_idx: 1 */ {
-L2:	$t5: u64
-L3:	$t6: u64
-B0:
-	0: MoveLoc[0](cond: bool)
-	1: BrFalse(21)
-B1:
-	2: CopyLoc[1](x: u64)
-	3: LdU64(1)
-	4: Add
-	5: StLoc[2]($t5: u64)
-B2:
-	6: MoveLoc[2]($t5: u64)
-	7: LdU64(10)
-	8: Gt
-	9: BrFalse(16)
-B3:
-	10: MoveLoc[1](x: u64)
-	11: LdU64(2)
-	12: Mul
-	13: StLoc[3]($t6: u64)
-B4:
-	14: MoveLoc[3]($t6: u64)
-	15: Ret
-B5:
-	16: MoveLoc[1](x: u64)
-	17: LdU64(2)
-	18: Div
-	19: StLoc[3]($t6: u64)
-	20: Branch(14)
-B6:
-	21: CopyLoc[1](x: u64)
-	22: LdU64(1)
-	23: Sub
-	24: StLoc[2]($t5: u64)
-	25: Branch(6)
-}
-}
 ============ bytecode verification succeeded ========
