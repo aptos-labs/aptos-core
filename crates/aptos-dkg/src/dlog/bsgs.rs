@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use ark_ec::CurveGroup;
 use std::collections::HashMap;
 
