@@ -13,12 +13,20 @@ enum Data has drop
 // Function definition at index 0
 fun test_v1(): bool
     local l0: Data
+    local l1: bool
     ld_u64 43
     pack_variant Data, V1
     st_loc l0
     borrow_loc l0
     test_variant Data, V1
     // @5
+    st_loc l1
+    copy_loc l1
+    br_false l0
+    move_loc l1
+    ret
+    // @10
+l0: move_loc l1
     ret
 
 // Function definition at index 1
@@ -43,7 +51,7 @@ fun test_v1v3(): bool
     // @10
     move_loc l1
     pop
-l4: pack_variant Data, V3
+l5: pack_variant Data, V3
     st_loc l3
     move_loc l2
     // @15
@@ -59,21 +67,25 @@ l4: pack_variant Data, V3
     move_loc l4
     pop
     // @25
-l3: move_loc l5
+l4: move_loc l5
     ret
 l2: move_loc l4
     test_variant Data, V3
     st_loc l5
     // @30
-    branch l3
-l1: ld_false
-    st_loc l5
-    branch l3
-l0: move_loc l1
+    copy_loc l5
+    br_true l3
+    branch l4
+l3: move_loc l5
+    ret
     // @35
+l1: ld_false
+    ret
+l0: move_loc l1
     test_variant Data, V3
     st_loc l2
-    branch l4
+    // @40
+    branch l5
 
 
 ============ bytecode verification succeeded ========

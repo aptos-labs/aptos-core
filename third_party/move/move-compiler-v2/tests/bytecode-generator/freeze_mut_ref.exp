@@ -730,21 +730,16 @@ struct S has drop
 
 // Function definition at index 2
 #[persistent] public fun borrow_mut3<T0>(l0: &mut T0, l1: &T0): &T0
-    local l2: &T0
     move_loc l1
     pop
     move_loc l0
     freeze_ref
-    st_loc l2
-    // @5
-l0: move_loc l2
     ret
+    // @5
     move_loc l0
     pop
     move_loc l1
-    // @10
-    st_loc l2
-    branch l0
+    ret
 
 // Function definition at index 3
 #[persistent] public fun borrow_mut4<T0>(l0: &mut T0): &T0
@@ -853,13 +848,13 @@ fun t6(l0: bool, l1: &mut S, l2: &S)
     pop
     freeze_ref
     pop
-l1: ret
+    ret
     // @10
 l0: move_loc l1
     pop
     move_loc l2
     pop
-    branch l1
+    ret
 
 // Function definition at index 10
 fun t7(l0: bool, l1: &mut S, l2: &S)
@@ -894,13 +889,13 @@ fun t8(l0: bool, l1: &mut S, l2: &S)
     // @5
     freeze_ref
     pop
-l1: ret
+    ret
 l0: move_loc l1
     pop
     // @10
     move_loc l2
     pop
-    branch l1
+    ret
 
 
 ============ bytecode verification succeeded ========
