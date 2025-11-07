@@ -11,10 +11,7 @@ use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::Rng;
 
-/// DST used for hashing, see `less_insecure_random_point()`
-pub const DST_RAND_CORE_HELL: &[u8; 24] = b"APTOS_RAND_CORE_HELL_DST";
-
-/// A version of ark_ff's UniformRand but for older RNGs
+/// A version of `ark_ff`'s UniformRand but for our older RNGs
 pub trait UniformRand {
     /// Securely generate a random instance of self
     fn rand<R: Rng>(rng: &mut R) -> Self;
