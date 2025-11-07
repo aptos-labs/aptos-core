@@ -93,7 +93,7 @@ impl BatchCoordinator {
                 .iter()
                 .map(|persisted_value| {
                     (
-                        persisted_value.batch_info().clone(),
+                        persisted_value.batch_info().clone().into(),
                         persisted_value.summary(),
                     )
                 })
