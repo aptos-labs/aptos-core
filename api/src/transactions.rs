@@ -391,7 +391,7 @@ impl TransactionsApi {
     ///
     /// Retrieves summaries of on-chain committed transactions (both sequence number based
     /// and orderless transactions) from an account.
-    /// Each transaction summary contains the sender addresss, transaction hash, version, and replay protector.
+    /// Each transaction summary contains the sender address, transaction hash, version, and replay protector.
     ///
     /// If start_version is provided, the output consists of transaction summaries starting form that version.
     ///

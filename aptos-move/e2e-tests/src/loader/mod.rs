@@ -51,7 +51,7 @@ pub enum LoaderTransactionGen {
     // - If such edge doesn't exist, add the dependency edge to the graph.
     // Then recompile the package based on the updated graph structure and publish updated package.
     UpdateEdge(Index, Index),
-    // Invoke the corresponing function at a given pacakge.
+    // Invoke the corresponding function at a given package.
     Invoke(Index),
 }
 
@@ -100,7 +100,7 @@ pub enum LoaderTransactionGen {
 // }
 // }
 //
-// By using this strategy, we can generate a set of move packages with complex depenency relationship and assert that the new loader is always
+// By using this strategy, we can generate a set of move packages with complex dependency relationship and assert that the new loader is always
 // linking the call to the right module. We can also invoke the entrypoint function to validate if the module dependencies have been
 // resolved properly. Using LoaderTransactionGen we can also mutate the structure of the graph and invoke the corresponding entry point function.
 impl DependencyGraph {

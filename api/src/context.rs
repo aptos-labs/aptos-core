@@ -353,7 +353,7 @@ impl Context {
                         new_block_event.proposed_time(),
                     ));
                 } else {
-                    // Indexer doesn't have data yet as DB is boostrapping.
+                    // Indexer doesn't have data yet as DB is bootstrapping.
                     return Err(E::service_unavailable_with_code_no_info(
                         "DB is bootstrapping",
                         AptosErrorCode::InternalError,
