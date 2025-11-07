@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::sigma_protocol::{homomorphism, homomorphism::EntrywiseMap};
+use crate::{
+    sigma_protocol,
+    sigma_protocol::{homomorphism, homomorphism::EntrywiseMap, Witness},
+};
+use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
 
@@ -153,9 +157,6 @@ where
         H::msm_eval(bases, scalars)
     }
 }
-
-use crate::{sigma_protocol, sigma_protocol::Witness};
-use ark_ec::pairing::Pairing;
 
 impl<E: Pairing, H, LargerDomain> sigma_protocol::Trait<E>
     for homomorphism::LiftHomomorphism<H, LargerDomain>

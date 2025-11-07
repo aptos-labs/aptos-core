@@ -11,7 +11,9 @@ use crate::{
     Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::random::{sample_field_element, unsafe_random_point, UniformRand};
+#[allow(unused_imports)] // This is used but due to some bug it is not noticed by the compiler
+use aptos_crypto::arkworks::random::UniformRand;
+use aptos_crypto::arkworks::random::{sample_field_element, unsafe_random_point};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -20,36 +22,13 @@ use ark_ec::{
 use ark_ff::Field;
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use rand::{CryptoRng, Rng, RngCore};
+use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
-// #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-// pub struct Commitment<E: Pairing>(pub E::G1);
-
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, Copy, PartialEq, Eq)]
-pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
-// TODO: maybe make this an alias for Scalar<E> ?
-
-impl<E: Pairing> sigma_protocol::Witness<E> for CommitmentRandomness<E> {
-    type Scalar = Scalar<E>;
-
-    fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
-        CommitmentRandomness(self.0 + (c) * other.0)
-    }
-
-    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
-        CommitmentRandomness(sample_field_element(rng))
-    }
-}
-
-impl<E: Pairing> UniformRand for CommitmentRandomness<E> {
-    fn rand<R: Rng>(rng: &mut R) -> Self {
-        CommitmentRandomness(sample_field_element(rng))
-    }
-}
+pub type CommitmentRandomness<E> = Scalar<E>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {

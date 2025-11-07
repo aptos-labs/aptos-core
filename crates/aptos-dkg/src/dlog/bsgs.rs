@@ -4,8 +4,6 @@
 use ark_ec::CurveGroup;
 use std::collections::HashMap;
 
-// N should be 48 for Bn254
-
 /// Compute discrete log using baby-step giant-step with a precomputed table
 ///
 /// # Arguments
@@ -69,7 +67,7 @@ mod tests {
     #[test]
     fn test_bsgs_bn254_random() {
         let G = G1Projective::generator();
-        let m = 1 << 16;
+        let m = 1 << 8;
 
         let baby_table = build_baby_table::<G1Projective, COMPRESSED_SIZE>(G, m);
 

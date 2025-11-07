@@ -18,7 +18,7 @@ use ark_serialize::CanonicalSerialize;
 use ff::PrimeField as FfPrimeField;
 use serde::Serialize;
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Will be used in the new PVSS
 pub const PVSS_DOM_SEP: &[u8; 26] = b"APTOS_PVSS_FIAT_SHAMIR_DST";
 
 /// Helper trait for deriving random scalars from a transcript.
@@ -108,10 +108,10 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
     }
 }
 
-// TODO: it may make sense to make an associated type Scalar of Transcript, then remove S here and replace it with T::Scalar
+// TODO: it may make sense to make an associated type Scalar of Transcript, then remove S here and replace it with T::Scalar. Or remove it entirely given that we now only use arkworks...
 #[allow(non_snake_case)]
 #[allow(private_bounds)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Will be used in the new PVSS
 pub trait PVSS<S: FromBytes, T: Transcript>: ScalarProtocol<S> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
@@ -249,7 +249,7 @@ impl<S: FromBytes, T: Transcript> PVSS<S, T> for merlin::Transcript {
 }
 
 #[allow(private_bounds)]
-#[allow(dead_code)]
+#[allow(dead_code)] // Will be used in the new PVSS
 pub(crate) fn initialize_pvss_transcript<S: FromBytes, T: Transcript>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,

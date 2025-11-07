@@ -13,7 +13,7 @@ use crate::{
 use aptos_crypto::arkworks::{
     self,
     random::{
-        insecure_random_points, sample_field_element, sample_field_elements, unsafe_random_point,
+        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
     },
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
@@ -26,18 +26,17 @@ use num_integer::Roots;
 use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, io::Write};
 
-// Making all fields pub(crate) so one can "generate" a nonsense proof
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
 pub struct Proof<E: Pairing> {
-    pub(crate) hatC: E::G1,
-    pub(crate) pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
-    pub(crate) Cs: Vec<E::G1>, // has length ell
-    pub(crate) D: E::G1,
-    pub(crate) a: E::ScalarField,
-    pub(crate) a_h: E::ScalarField,
-    pub(crate) a_js: Vec<E::ScalarField>, // has length ell
-    pub(crate) pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
+    hatC: E::G1,
+    pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
+    Cs: Vec<E::G1>, // has length ell
+    D: E::G1,
+    a: E::ScalarField,
+    a_h: E::ScalarField,
+    a_js: Vec<E::ScalarField>, // has length ell
+    pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
 impl<E: Pairing> Proof<E> {
@@ -47,7 +46,7 @@ impl<E: Pairing> Proof<E> {
         Self {
             hatC: unsafe_random_point(rng),
             pi_PoK: two_term_msm::Proof::generate(rng),
-            Cs: insecure_random_points(ell, rng),
+            Cs: unsafe_random_points(ell, rng),
             D: unsafe_random_point(rng),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
@@ -424,7 +423,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .zip(rhos.iter())
             .map(|(f_j, &rho)| {
                 let hkzg_commit_input = univariate_hiding_kzg::Witness {
-                    hiding_randomness: univariate_hiding_kzg::CommitmentRandomness(rho),
+                    hiding_randomness: Scalar(rho), // because univariate_hiding_kzg::CommitmentRandomness is an alias for Scalar... TODO: should maybe make a constructor method?
                     values: Scalar::vec_from_inner_slice(f_j),
                 };
                 hkzg_commitment_hom.apply(&hkzg_commit_input).0
@@ -533,7 +532,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let rho_h = sample_field_element(rng);
         let D = hkzg_commitment_hom
             .apply(&univariate_hiding_kzg::Witness {
-                hiding_randomness: univariate_hiding_kzg::CommitmentRandomness(rho_h),
+                hiding_randomness: Scalar(rho_h),
                 values: Scalar::vec_from_inner_slice(&h_evals),
             })
             .0;
@@ -604,7 +603,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             rho_u,
             gamma,
             u_val,
-            &univariate_hiding_kzg::CommitmentRandomness(s),
+            &Scalar(s),
         );
 
         Proof {
@@ -868,6 +867,7 @@ pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
     use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
+    use aptos_crypto::arkworks::random::UniformRand;
     use aptos_crypto_derive::SigmaProtocolWitness;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
     pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
@@ -881,8 +881,8 @@ pub mod two_term_msm {
                     rng,
                 ))),
                 z: Witness {
-                    poly_randomness: Scalar(sample_field_element(rng)),
-                    hiding_kzg_randomness: Scalar(sample_field_element(rng)),
+                    poly_randomness: Scalar::rand(rng),
+                    hiding_kzg_randomness: Scalar::rand(rng),
                 },
             }
         }

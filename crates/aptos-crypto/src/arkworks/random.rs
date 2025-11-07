@@ -30,7 +30,7 @@ where
 
 /// Samples `n` uniformly random elements from the group, but is unsafe in the sense
 /// that the caller learns the discrete log of the random point.
-pub fn insecure_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
+pub fn unsafe_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {

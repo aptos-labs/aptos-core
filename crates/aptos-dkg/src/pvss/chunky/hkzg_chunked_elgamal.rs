@@ -14,7 +14,7 @@ use crate::{
     },
     Scalar,
 };
-use aptos_crypto::arkworks::random::{sample_field_element, unsafe_random_point};
+use aptos_crypto::arkworks::random::{sample_field_element, unsafe_random_point, UniformRand};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -128,9 +128,7 @@ impl<'a, E: Pairing> Proof<'a, E> {
                 },
             )),
             z: HkzgElgamalWitness {
-                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E>(
-                    sample_field_element(rng),
-                ),
+                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E>::rand(rng),
                 chunked_plaintexts: vec![
                     vec![Scalar(sample_field_element(rng)); number_of_chunks];
                     n
