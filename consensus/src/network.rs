@@ -208,6 +208,12 @@ pub trait QuorumStoreSender: Send + Clone {
         recipients: Vec<Author>,
     );
 
+    async fn send_signed_batch_info_msg_v2(
+        &self,
+        signed_batch_infos: Vec<SignedBatchInfo<BatchInfoExt>>,
+        recipients: Vec<Author>,
+    );
+
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
 
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore<BatchInfo>>);
@@ -572,6 +578,18 @@ impl QuorumStoreSender for NetworkSender {
         fail_point!("consensus::send::signed_batch_info", |_| ());
         let msg =
             ConsensusMsg::SignedBatchInfo(Box::new(SignedBatchInfoMsg::new(signed_batch_infos)));
+        self.send(msg, recipients).await
+    }
+
+    async fn send_signed_batch_info_msg_v2(
+        &self,
+        signed_batch_infos: Vec<SignedBatchInfo<BatchInfoExt>>,
+        recipients: Vec<Author>,
+    ) {
+        fail_point!("consensus::send::signed_batch_info", |_| ());
+        let msg = ConsensusMsg::SignedBatchInfoMsgV2(Box::new(SignedBatchInfoMsg::new(
+            signed_batch_infos,
+        )));
         self.send(msg, recipients).await
     }
 

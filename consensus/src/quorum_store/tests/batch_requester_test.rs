@@ -62,6 +62,14 @@ impl QuorumStoreSender for MockBatchRequester {
         unimplemented!()
     }
 
+    async fn send_signed_batch_info_msg_v2(
+        &self,
+        _signed_batch_infos: Vec<SignedBatchInfo<BatchInfoExt>>,
+        _recipients: Vec<Author>,
+    ) {
+        unimplemented!()
+    }
+
     async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch>) {
         unimplemented!()
     }

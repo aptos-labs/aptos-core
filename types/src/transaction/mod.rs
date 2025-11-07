@@ -1301,6 +1301,10 @@ impl SignedTransaction {
     pub fn replay_protector(&self) -> ReplayProtector {
         self.raw_txn.replay_protector()
     }
+
+    pub fn is_encrypted_txn(&self) -> bool {
+        self.payload().is_encrypted_variant()
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

@@ -38,6 +38,13 @@ impl BatchWriter for MockBatchWriter {
     fn persist(&self, _persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo<BatchInfo>> {
         vec![]
     }
+
+    fn persist_v2(
+        &self,
+        _persist_requests: Vec<PersistedValue>,
+    ) -> Vec<SignedBatchInfo<aptos_consensus_types::proof_of_store::BatchInfoExt>> {
+        vec![]
+    }
 }
 
 #[allow(clippy::needless_collect)]

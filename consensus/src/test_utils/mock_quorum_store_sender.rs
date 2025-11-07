@@ -53,6 +53,22 @@ impl QuorumStoreSender for MockQuorumStoreSender {
             .expect("could not send");
     }
 
+    async fn send_signed_batch_info_msg_v2(
+        &self,
+        signed_batch_infos: Vec<SignedBatchInfo<BatchInfoExt>>,
+        recipients: Vec<Author>,
+    ) {
+        self.tx
+            .send((
+                ConsensusMsg::SignedBatchInfoMsgV2(Box::new(SignedBatchInfoMsg::new(
+                    signed_batch_infos,
+                ))),
+                recipients,
+            ))
+            .await
+            .expect("could not send");
+    }
+
     async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch>) {
         unimplemented!()
     }
