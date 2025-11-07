@@ -10,6 +10,7 @@ module aptos_framework::randomness {
     use std::option;
     use std::option::Option;
     use std::vector;
+    use aptos_std::from_bcs;
     use aptos_framework::event;
     use aptos_framework::system_addresses;
     use aptos_framework::transaction_context;
@@ -82,7 +83,14 @@ module aptos_framework::randomness {
 
         vector::append(&mut input, seed);
         vector::append(&mut input, transaction_context::get_transaction_hash());
-        vector::append(&mut input, fetch_and_increment_txn_counter());
+        let counter_bytes = fetch_and_increment_txn_counter();
+        vector::append(&mut input, counter_bytes);
+        let counter_value = from_bcs::to_u64(counter_bytes);
+        if (counter_value == 0) {
+            event::emit(RandomnessGeneratedEvent {});
+        } else {
+            // TODO: can we burn equal amount of gas?
+        };
         hash::sha3_256(input)
     }
 
@@ -101,8 +109,6 @@ module aptos_framework::randomness {
             vector::trim(&mut v, n);
         };
 
-        event::emit(RandomnessGeneratedEvent {});
-
         v
     }
 
@@ -110,8 +116,6 @@ module aptos_framework::randomness {
     public fun u8_integer(): u8 acquires PerBlockRandomness {
         let raw = next_32_bytes();
         let ret: u8 = vector::pop_back(&mut raw);
-
-        event::emit(RandomnessGeneratedEvent {});
 
         ret
     }
@@ -126,8 +130,6 @@ module aptos_framework::randomness {
             i = i + 1;
         };
 
-        event::emit(RandomnessGeneratedEvent {});
-
         ret
     }
 
@@ -140,8 +142,6 @@ module aptos_framework::randomness {
             ret = ret * 256 + (vector::pop_back(&mut raw) as u32);
             i = i + 1;
         };
-
-        event::emit(RandomnessGeneratedEvent {});
 
         ret
     }
@@ -156,8 +156,6 @@ module aptos_framework::randomness {
             i = i + 1;
         };
 
-        event::emit(RandomnessGeneratedEvent {});
-
         ret
     }
 
@@ -171,14 +169,11 @@ module aptos_framework::randomness {
             i = i + 1;
         };
 
-        event::emit(RandomnessGeneratedEvent {});
-
         ret
     }
 
     /// Generates a u256 uniformly at random.
     public fun u256_integer(): u256 acquires PerBlockRandomness {
-        event::emit(RandomnessGeneratedEvent {});
         u256_integer_internal()
     }
 
@@ -201,9 +196,6 @@ module aptos_framework::randomness {
     public fun u8_range(min_incl: u8, max_excl: u8): u8 acquires PerBlockRandomness {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u8);
-
-        event::emit(RandomnessGeneratedEvent {});
-
         min_incl + sample
     }
 
@@ -214,9 +206,6 @@ module aptos_framework::randomness {
     public fun u16_range(min_incl: u16, max_excl: u16): u16 acquires PerBlockRandomness {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u16);
-
-        event::emit(RandomnessGeneratedEvent {});
-
         min_incl + sample
     }
 
@@ -227,9 +216,6 @@ module aptos_framework::randomness {
     public fun u32_range(min_incl: u32, max_excl: u32): u32 acquires PerBlockRandomness {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u32);
-
-        event::emit(RandomnessGeneratedEvent {});
-
         min_incl + sample
     }
 
@@ -238,8 +224,6 @@ module aptos_framework::randomness {
     /// NOTE: The uniformity is not perfect, but it can be proved that the bias is negligible.
     /// If you need perfect uniformity, consider implement your own via rejection sampling.
     public fun u64_range(min_incl: u64, max_excl: u64): u64 acquires PerBlockRandomness {
-        event::emit(RandomnessGeneratedEvent {});
-
         u64_range_internal(min_incl, max_excl)
     }
 
@@ -257,9 +241,6 @@ module aptos_framework::randomness {
     public fun u128_range(min_incl: u128, max_excl: u128): u128 acquires PerBlockRandomness {
         let range = ((max_excl - min_incl) as u256);
         let sample = ((u256_integer_internal() % range) as u128);
-
-        event::emit(RandomnessGeneratedEvent {});
-
         min_incl + sample
     }
 
@@ -290,17 +271,12 @@ module aptos_framework::randomness {
         spec {
             assert sample >= 0 && sample < max_excl - min_incl;
         };
-
-        event::emit(RandomnessGeneratedEvent {});
-
         min_incl + sample
     }
 
     /// Generate a permutation of `[0, 1, ..., n-1]` uniformly at random.
     /// If n is 0, returns the empty vector.
     public fun permutation(n: u64): vector<u64> acquires PerBlockRandomness {
-        event::emit(RandomnessGeneratedEvent {});
-
         let values = vector[];
 
         if(n == 0) {
@@ -414,64 +390,49 @@ module aptos_framework::randomness {
     fun test_emit_events(fx: signer) acquires PerBlockRandomness {
         initialize_for_testing(&fx);
 
-        let c = 0;
-        assert_event_count_equals(c);
+        assert_event_count_equals(0);
 
         let _ = bytes(1);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u8_integer();
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u16_integer();
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u32_integer();
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u64_integer();
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u128_integer();
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u256_integer();
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u8_range(0, 255);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u16_range(0, 255);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u32_range(0, 255);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u64_range(0, 255);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u128_range(0, 255);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = u256_range(0, 255);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
 
         let _ = permutation(6);
-        c = c + 1;
-        assert_event_count_equals(c);
+        assert_event_count_equals(1);
     }
 
     #[test(fx = @aptos_framework)]
