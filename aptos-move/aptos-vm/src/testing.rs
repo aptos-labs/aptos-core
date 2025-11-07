@@ -22,6 +22,8 @@ use aptos_vm_types::{
 use move_binary_format::errors::VMResult;
 #[cfg(any(test, feature = "testing"))]
 use move_core_types::vm_status::VMStatus;
+#[cfg(any(test, feature = "testing"))]
+use move_vm_runtime::InterpreterFunctionCaches;
 
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub enum InjectedError {
@@ -126,6 +128,7 @@ impl AptosVM {
             &log_context,
             change_set_configs,
             &mut TraversalContext::new(&traversal_storage),
+            &mut InterpreterFunctionCaches::new(),
         )
     }
 }

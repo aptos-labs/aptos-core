@@ -27,8 +27,9 @@ use move_core_types::{
 };
 use move_vm_runtime::{
     dispatch_loader, execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext,
-    FunctionDefinitionLoader, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
-    LoadedFunctionOwner, ModuleStorage, StagingModuleStorage, WithRuntimeEnvironment,
+    FunctionDefinitionLoader, InstantiatedFunctionLoader, InterpreterFunctionCaches,
+    LegacyLoaderConfig, LoadedFunction, LoadedFunctionOwner, ModuleStorage, StagingModuleStorage,
+    WithRuntimeEnvironment,
 };
 
 #[derive(Deref, DerefMut)]
@@ -144,6 +145,7 @@ impl<'r> UserSession<'r> {
                                 // We should never enable trace record for init_module - it runs on
                                 // newly published state so it is safer to do checks in-place.
                                 &mut NoOpTraceRecorder,
+                                &mut InterpreterFunctionCaches::new(),
                             )?;
                         }
                     } else {
@@ -174,6 +176,7 @@ impl<'r> UserSession<'r> {
                                 // We should never enable trace record for init_module - it runs on
                                 // newly published state so it is safer to do checks in-place.
                                 &mut NoOpTraceRecorder,
+                                &mut InterpreterFunctionCaches::new(),
                             )?;
                         }
                     }

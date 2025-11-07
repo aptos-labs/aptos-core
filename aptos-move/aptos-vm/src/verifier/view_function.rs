@@ -10,7 +10,7 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{identifier::IdentStr, vm_status::StatusCode};
 use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
-    LoadedFunction, Loader,
+    InterpreterFunctionCaches, LoadedFunction, Loader,
 };
 use move_vm_types::gas::{GasMeter, UnmeteredGasMeter};
 
@@ -67,6 +67,7 @@ pub(crate) fn validate_view_function(
             loader,
             gas_meter,
             traversal_context,
+            &mut InterpreterFunctionCaches::new(),
             func.param_tys(),
             args,
             func.ty_args(),
@@ -81,6 +82,7 @@ pub(crate) fn validate_view_function(
             // No metering with eager loading.
             &mut UnmeteredGasMeter,
             &mut TraversalContext::new(&traversal_storage),
+            &mut InterpreterFunctionCaches::new(),
             func.param_tys(),
             args,
             func.ty_args(),

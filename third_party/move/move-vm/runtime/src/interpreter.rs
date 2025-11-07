@@ -542,7 +542,12 @@ where
                                         e.insert((function.clone(), frame_cache.clone()));
                                         (function, frame_cache)
                                     },
-                                    Entry::Occupied(e) => e.into_mut().clone(),
+                                    Entry::Occupied(e) => {
+                                        // TODO: gas diff: no longer pay for types!
+                                        // TODO: gas diff: no longer pay for load of a function!
+                                        // TODO: same applies to generics.... - revisit.
+                                        e.into_mut().clone()
+                                    },
                                 };
                             current_frame_cache.per_instruction_cache[current_frame.pc as usize] =
                                 PerInstructionCache::CallGeneric(

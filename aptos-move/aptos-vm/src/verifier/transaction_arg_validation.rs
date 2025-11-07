@@ -25,8 +25,8 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext, LoadedFunction,
-    LoadedFunctionOwner, Loader, RuntimeEnvironment,
+    execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext,
+    InterpreterFunctionCaches, LoadedFunction, LoadedFunctionOwner, Loader, RuntimeEnvironment,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -110,6 +110,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
     serialized_signers: &SerializedSigners,
     args: Vec<Vec<u8>>,
     func: &LoadedFunction,
@@ -175,6 +176,7 @@ pub(crate) fn validate_combine_signer_and_txn_args(
         loader,
         gas_meter,
         traversal_context,
+        function_caches,
         &func.param_tys()[signer_param_cnt..],
         args,
         func.ty_args(),
@@ -233,6 +235,7 @@ pub(crate) fn construct_args(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
     types: &[Type],
     args: Vec<Vec<u8>>,
     ty_args: &[Type],
@@ -254,6 +257,7 @@ pub(crate) fn construct_args(
             loader,
             gas_meter,
             traversal_context,
+            function_caches,
             &ty,
             allowed_structs,
             arg,
@@ -273,6 +277,7 @@ fn construct_arg(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     arg: Vec<u8>,
@@ -292,6 +297,7 @@ fn construct_arg(
                 loader,
                 gas_meter,
                 traversal_context,
+                function_caches,
                 ty,
                 allowed_structs,
                 &mut cursor,
@@ -332,6 +338,7 @@ pub(crate) fn recursively_construct_arg(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
     ty: &Type,
     allowed_structs: &ConstructorMap,
     cursor: &mut Cursor<&[u8]>,
@@ -352,6 +359,7 @@ pub(crate) fn recursively_construct_arg(
                     loader,
                     gas_meter,
                     traversal_context,
+                    function_caches,
                     inner,
                     allowed_structs,
                     cursor,
@@ -383,6 +391,7 @@ pub(crate) fn recursively_construct_arg(
                 loader,
                 gas_meter,
                 traversal_context,
+                function_caches,
                 ty,
                 constructor,
                 allowed_structs,
@@ -413,6 +422,7 @@ fn validate_and_construct(
     loader: &impl Loader,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
+    function_caches: &mut InterpreterFunctionCaches,
     expected_type: &Type,
     constructor: &FunctionId,
     allowed_structs: &ConstructorMap,
@@ -491,6 +501,7 @@ fn validate_and_construct(
             loader,
             gas_meter,
             traversal_context,
+            function_caches,
             &arg_ty,
             allowed_structs,
             cursor,
@@ -508,6 +519,7 @@ fn validate_and_construct(
         loader,
         // No need to record the trace for argument construction.
         &mut NoOpTraceRecorder,
+        function_caches,
     )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1

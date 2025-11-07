@@ -52,6 +52,7 @@ impl MoveVM {
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         loader: &impl Loader,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> VMResult<SerializedReturnValues> {
         Self::execute_loaded_function_with_tracing(
             function,
@@ -62,6 +63,7 @@ impl MoveVM {
             extensions,
             loader,
             &mut NoOpTraceRecorder,
+            function_caches,
         )
     }
 
@@ -85,6 +87,7 @@ impl MoveVM {
         extensions: &mut NativeContextExtensions,
         loader: &impl Loader,
         trace_recorder: &mut impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = loader.runtime_environment().vm_config();
 
@@ -121,8 +124,7 @@ impl MoveVM {
                 function,
                 deserialized_args,
                 data_cache,
-                // TODO(caches): async drop
-                &mut InterpreterFunctionCaches::new(),
+                function_caches,
                 loader,
                 &ty_depth_checker,
                 &layout_converter,

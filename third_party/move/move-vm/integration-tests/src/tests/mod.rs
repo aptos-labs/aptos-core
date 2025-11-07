@@ -15,8 +15,8 @@ use move_vm_runtime::{
     module_traversal::{TraversalContext, TraversalStorage},
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsUnsyncCodeStorage, AsUnsyncModuleStorage, InstantiatedFunctionLoader, LegacyLoaderConfig,
-    ModuleStorage, ScriptLoader,
+    AsUnsyncCodeStorage, AsUnsyncModuleStorage, InstantiatedFunctionLoader,
+    InterpreterFunctionCaches, LegacyLoaderConfig, ModuleStorage, ScriptLoader,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{gas::UnmeteredGasMeter, resolver::ResourceResolver};
@@ -122,6 +122,7 @@ fn execute_function_for_test(
             &mut traversal_context,
             &mut NativeContextExtensions::default(),
             &loader,
+            &mut InterpreterFunctionCaches::new(),
         )
     })
 }
@@ -156,6 +157,7 @@ fn execute_script_impl(
             &mut traversal_context,
             &mut NativeContextExtensions::default(),
             &loader,
+            &mut InterpreterFunctionCaches::new(),
         )
     })?;
 

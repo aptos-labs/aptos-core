@@ -19,8 +19,8 @@ use move_vm_runtime::{
     move_vm::MoveVM,
     native_extensions::NativeContextExtensions,
     native_functions::NativeFunction,
-    AsUnsyncCodeStorage, InstantiatedFunctionLoader, LegacyLoaderConfig, RuntimeEnvironment,
-    ScriptLoader,
+    AsUnsyncCodeStorage, InstantiatedFunctionLoader, InterpreterFunctionCaches, LegacyLoaderConfig,
+    RuntimeEnvironment, ScriptLoader,
 };
 use move_vm_test_utils::InMemoryStorage;
 use move_vm_types::{
@@ -229,6 +229,7 @@ fn main() -> Result<()> {
             &mut traversal_context,
             &mut extensions,
             &loader,
+            &mut InterpreterFunctionCaches::new(),
         )
     })?;
     println!("{:?}", return_values);

@@ -44,8 +44,8 @@ use move_vm_runtime::{
     module_traversal::TraversalContext,
     move_vm::{MoveVM, SerializedReturnValues},
     native_extensions::NativeContextExtensions,
-    AsFunctionValueExtension, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
-    Loader, ModuleStorage, VerifiedModuleBundle,
+    AsFunctionValueExtension, InstantiatedFunctionLoader, InterpreterFunctionCaches,
+    LegacyLoaderConfig, LoadedFunction, Loader, ModuleStorage, VerifiedModuleBundle,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -115,6 +115,7 @@ where
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         module_storage: &impl ModuleStorage,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> VMResult<SerializedReturnValues> {
         dispatch_loader!(module_storage, loader, {
             let func = loader.load_instantiated_function(
@@ -133,6 +134,7 @@ where
                 traversal_context,
                 &mut self.extensions,
                 &loader,
+                function_caches,
             )
         })
     }
@@ -145,6 +147,7 @@ where
         traversal_context: &mut TraversalContext,
         loader: &impl Loader,
         trace_recorder: &mut impl TraceRecorder,
+        function_caches: &mut InterpreterFunctionCaches,
     ) -> VMResult<SerializedReturnValues> {
         MoveVM::execute_loaded_function_with_tracing(
             func,
@@ -155,6 +158,7 @@ where
             &mut self.extensions,
             loader,
             trace_recorder,
+            function_caches,
         )
     }
 
