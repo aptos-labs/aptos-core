@@ -36,9 +36,9 @@ impl Key {
 /// The value part of a logging key value pair e.g. `info!(key = value)`
 #[derive(Clone, Copy)]
 pub enum Value<'v> {
-    Debug(&'v (dyn fmt::Debug)),
-    Display(&'v (dyn fmt::Display)),
-    Serde(&'v (dyn erased_serde::Serialize)),
+    Debug(&'v dyn fmt::Debug),
+    Display(&'v dyn fmt::Display),
+    Serde(&'v dyn erased_serde::Serialize),
 }
 
 impl fmt::Debug for Value<'_> {
