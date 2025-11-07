@@ -64,11 +64,11 @@ pub enum ConsensusMsg {
     /// it can save slow machines to quickly confirm the execution result.
     CommitDecisionMsg(Box<CommitDecision>),
     /// Quorum Store: Send a Batch of transactions.
-    BatchMsg(Box<BatchMsg>),
+    BatchMsg(Box<BatchMsg<BatchInfo>>),
     /// Quorum Store: Request the payloads of a completed batch.
     BatchRequestMsg(Box<BatchRequest>),
     /// Quorum Store: Response to the batch request.
-    BatchResponse(Box<Batch>),
+    BatchResponse(Box<Batch<BatchInfo>>),
     /// Quorum Store: Send a signed batch digest. This is a vote for the batch and a promise that
     /// the batch of transactions was received and will be persisted until batch expiration.
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfo>>),
@@ -81,7 +81,7 @@ pub enum ConsensusMsg {
     /// Randomness generation message
     RandGenMessage(RandGenMessage),
     /// Quorum Store: Response to the batch request.
-    BatchResponseV2(Box<BatchResponse>),
+    BatchResponseV2(Box<BatchResponse<BatchInfo>>),
     /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
     /// on a block.
     OrderVoteMsg(Box<OrderVoteMsg>),

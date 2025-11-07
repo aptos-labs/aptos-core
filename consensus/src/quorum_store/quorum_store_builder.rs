@@ -407,7 +407,7 @@ impl InnerBuilder {
                 let response = if let Ok(value) =
                     batch_store.get_batch_from_local(&rpc_request.req.digest())
                 {
-                    let batch: Batch = value.try_into().unwrap();
+                    let batch: Batch<BatchInfo> = value.try_into().unwrap();
                     BatchResponse::Batch(batch)
                 } else {
                     match aptos_db_clone.get_latest_ledger_info() {

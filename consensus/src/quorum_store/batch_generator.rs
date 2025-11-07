@@ -14,7 +14,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchInfoExt, TBatchInfo},
+    proof_of_store::{BatchInfo, BatchInfoExt, TBatchInfo},
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
@@ -33,7 +33,7 @@ use tokio::time::Interval;
 pub enum BatchGeneratorCommand {
     CommitNotification(u64, Vec<BatchInfoExt>),
     ProofExpiration(Vec<BatchId>),
-    RemoteBatch(Batch),
+    RemoteBatch(Batch<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -175,7 +175,7 @@ impl BatchGenerator {
         txns: Vec<SignedTransaction>,
         expiry_time: u64,
         bucket_start: u64,
-    ) -> Batch {
+    ) -> Batch<BatchInfo> {
         let batch_id = self.batch_id;
         self.batch_id.increment();
         self.db
@@ -201,7 +201,7 @@ impl BatchGenerator {
     /// batches are pushed.
     fn push_bucket_to_batches(
         &mut self,
-        batches: &mut Vec<Batch>,
+        batches: &mut Vec<Batch<BatchInfo>>,
         txns: &mut Vec<SignedTransaction>,
         num_txns_in_bucket: usize,
         expiry_time: u64,
@@ -242,7 +242,7 @@ impl BatchGenerator {
         &mut self,
         pulled_txns: &mut Vec<SignedTransaction>,
         expiry_time: u64,
-    ) -> Vec<Batch> {
+    ) -> Vec<Batch<BatchInfo>> {
         // Sort by gas, in descending order. This is a stable sort on existing mempool ordering,
         // so will not reorder accounts or their sequence numbers as long as they have the same gas.
         pulled_txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
@@ -325,7 +325,7 @@ impl BatchGenerator {
         self.txns_in_progress_sorted.len()
     }
 
-    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
+    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch<BatchInfo>> {
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
         trace!(
             "QS: excluding txs len: {:?}",
