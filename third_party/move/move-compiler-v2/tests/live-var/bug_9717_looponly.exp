@@ -912,56 +912,52 @@ public fun vectors::guess_flips_break2($t0: vector<u8>): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module cafe.vectors {
+// Bytecode version v9
+module 0xcafe::vectors
+// Function definition at index 0
+#[persistent] entry public fun guess_flips_break2(l0: vector<u8>): u64
+    local l1: u64
+    local l2: &vector<u8>
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    st_loc l2
+l4: copy_loc l1
+    // @5
+    copy_loc l2
+    vec_len <u8>
+    lt
+    br_true l0
+    branch l1
+    // @10
+l0: copy_loc l2
+    copy_loc l1
+    vec_borrow <u8>
+    read_ref
+    ld_u8 0
+    // @15
+    neq
+    br_false l2
+    branch l1
+l1: move_loc l2
+    vec_len <u8>
+    // @20
+    ret
+l2: move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    // @25
+    copy_loc l2
+    copy_loc l1
+    vec_borrow <u8>
+    read_ref
+    ld_u8 5
+    // @30
+    eq
+    br_false l3
+    branch l1
+l3: branch l4
 
 
-entry public guess_flips_break2(flips: vector<u8>): u64 /* def_idx: 0 */ {
-L1:	i: u64
-L2:	flipsref5: &vector<u8>
-B0:
-	0: LdU64(0)
-	1: StLoc[1](i: u64)
-	2: ImmBorrowLoc[0](flips: vector<u8>)
-	3: StLoc[2](flipsref5: &vector<u8>)
-B1:
-	4: CopyLoc[1](i: u64)
-	5: CopyLoc[2](flipsref5: &vector<u8>)
-	6: VecLen(2)
-	7: Lt
-	8: BrTrue(10)
-B2:
-	9: Branch(18)
-B3:
-	10: CopyLoc[2](flipsref5: &vector<u8>)
-	11: CopyLoc[1](i: u64)
-	12: VecImmBorrow(2)
-	13: ReadRef
-	14: LdU8(0)
-	15: Neq
-	16: BrFalse(21)
-B4:
-	17: Branch(18)
-B5:
-	18: MoveLoc[2](flipsref5: &vector<u8>)
-	19: VecLen(2)
-	20: Ret
-B6:
-	21: MoveLoc[1](i: u64)
-	22: LdU64(1)
-	23: Add
-	24: StLoc[1](i: u64)
-	25: CopyLoc[2](flipsref5: &vector<u8>)
-	26: CopyLoc[1](i: u64)
-	27: VecImmBorrow(2)
-	28: ReadRef
-	29: LdU8(5)
-	30: Eq
-	31: BrFalse(33)
-B7:
-	32: Branch(18)
-B8:
-	33: Branch(4)
-}
-}
 ============ bytecode verification succeeded ========

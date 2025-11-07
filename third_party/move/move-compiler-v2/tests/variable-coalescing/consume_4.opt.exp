@@ -242,35 +242,34 @@ public fun m::test_struct($t0: 0xc0ffee::m::W) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
-struct W has copy, drop {
-	m: u32
-}
+// Bytecode version v9
+module 0xc0ffee::m
+struct W has copy + drop
+  m: u32
 
-consume(_x: u32) /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-consume_(_x: W) /* def_idx: 1 */ {
-B0:
-	0: Ret
-}
-public test(a: u32) /* def_idx: 2 */ {
-B0:
-	0: CopyLoc[0](a: u32)
-	1: Call consume(u32)
-	2: MoveLoc[0](a: u32)
-	3: Call consume(u32)
-	4: Ret
-}
-public test_struct(a: W) /* def_idx: 3 */ {
-B0:
-	0: CopyLoc[0](a: W)
-	1: Call consume_(W)
-	2: MoveLoc[0](a: W)
-	3: Call consume_(W)
-	4: Ret
-}
-}
+// Function definition at index 0
+fun consume(l0: u32)
+    ret
+
+// Function definition at index 1
+fun consume_(l0: W)
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test(l0: u32)
+    copy_loc l0
+    call consume
+    move_loc l0
+    call consume
+    ret
+
+// Function definition at index 3
+#[persistent] public fun test_struct(l0: W)
+    copy_loc l0
+    call consume_
+    move_loc l0
+    call consume_
+    ret
+
+
 ============ bytecode verification succeeded ========

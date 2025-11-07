@@ -58,7 +58,6 @@ use log::{debug, info, log_enabled, Level};
 use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
-use move_disassembler::disassembler::Disassembler;
 use move_model::{
     metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
@@ -625,7 +624,14 @@ pub fn stackless_bytecode_optimization_pipeline(options: &Options) -> FunctionTa
 pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<String> {
     let disassembled_units: anyhow::Result<Vec<_>> = units
         .iter()
-        .map(|unit| Disassembler::from_unit(unit).disassemble())
+        .map(|unit| match unit {
+            CompiledUnit::Module(module) => {
+                move_asm::disassembler::disassemble_module(String::new(), &module.module, false)
+            },
+            CompiledUnit::Script(script) => {
+                move_asm::disassembler::disassemble_script(String::new(), &script.script)
+            },
+        })
         .collect();
     Ok(disassembled_units?.concat())
 }

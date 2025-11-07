@@ -163,33 +163,34 @@ fun m::test($t0: 0xc0ffee::m::S): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
-struct S has copy, drop {
-	a: u64,
-	b: u64
-}
+// Bytecode version v9
+module 0xc0ffee::m
+struct S has copy + drop
+  a: u64
+  b: u64
 
-test(s: S): u64 /* def_idx: 0 */ {
-L1:	p: S
-L2:	q: S
-L3:	$t6: u64
-L4:	ref: &mut u64
-B0:
-	0: MoveLoc[0](s: S)
-	1: StLoc[1](p: S)
-	2: CopyLoc[1](p: S)
-	3: StLoc[2](q: S)
-	4: MutBorrowLoc[1](p: S)
-	5: MutBorrowField[0](S.a: u64)
-	6: StLoc[4](ref: &mut u64)
-	7: LdU64(0)
-	8: MoveLoc[4](ref: &mut u64)
-	9: WriteRef
-	10: ImmBorrowLoc[2](q: S)
-	11: ImmBorrowField[0](S.a: u64)
-	12: ReadRef
-	13: Ret
-}
-}
+// Function definition at index 0
+fun test(l0: S): u64
+    local l1: S
+    local l2: S
+    local l3: u64
+    local l4: &mut u64
+    move_loc l0
+    st_loc l1
+    copy_loc l1
+    st_loc l2
+    mut_borrow_loc l1
+    // @5
+    mut_borrow_field S, a
+    st_loc l4
+    ld_u64 0
+    move_loc l4
+    write_ref
+    // @10
+    borrow_loc l2
+    borrow_field S, a
+    read_ref
+    ret
+
+
 ============ bytecode verification succeeded ========

@@ -29,35 +29,33 @@ module 0xc0ffee::m {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+fun fib(l0: u64): u64
+    local l1: u64
+    copy_loc l0
+    ld_u64 2
+    lt
+    br_false l0
+    move_loc l0
+    // @5
+    st_loc l1
+l1: move_loc l1
+    ret
+l0: copy_loc l0
+    ld_u64 1
+    // @10
+    sub
+    call fib
+    move_loc l0
+    ld_u64 2
+    sub
+    // @15
+    call fib
+    add
+    st_loc l1
+    branch l1
 
 
-fib(n: u64): u64 /* def_idx: 0 */ {
-L1:	$t3: u64
-B0:
-	0: CopyLoc[0](n: u64)
-	1: LdU64(2)
-	2: Lt
-	3: BrFalse(8)
-B1:
-	4: MoveLoc[0](n: u64)
-	5: StLoc[1]($t3: u64)
-B2:
-	6: MoveLoc[1]($t3: u64)
-	7: Ret
-B3:
-	8: CopyLoc[0](n: u64)
-	9: LdU64(1)
-	10: Sub
-	11: Call fib(u64): u64
-	12: MoveLoc[0](n: u64)
-	13: LdU64(2)
-	14: Sub
-	15: Call fib(u64): u64
-	16: Add
-	17: StLoc[1]($t3: u64)
-	18: Branch(6)
-}
-}
 ============ bytecode verification succeeded ========

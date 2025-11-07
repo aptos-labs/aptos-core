@@ -1,47 +1,44 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.m {
-use 0000000000000000000000000000000000000000000000000000000000000001::vector;
+// Bytecode version v9
+module 0x42::m
+use 0x1::vector
+struct E<T0> has copy + drop + store
+  key: T0
+
+struct Option<T0> has copy + drop + store
+  vec: vector<T0>
+
+// Function definition at index 0
+#[persistent] public fun destroy_none<T0>(l0: Option<T0>)
+    borrow_loc l0
+    call is_none<T0>
+    br_false l0
+    move_loc l0
+    unpack Option<T0>
+    // @5
+    vec_unpack <T0>, 0
+    ret
+l0: ld_u64 262144
+    abort
+
+// Function definition at index 1
+#[persistent] public fun foo<T0: drop + store>(l0: E<T0>, l1: &mut T0)
+    move_loc l0
+    unpack E<T0>
+    pack E<T0>
+    unpack E<T0>
+    move_loc l1
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 2
+#[persistent] public fun is_none<T0>(l0: &Option<T0>): bool
+    move_loc l0
+    borrow_field Option<T0>, vec
+    call vector::is_empty<T0>
+    ret
 
 
-struct E<Key> has copy, drop, store {
-	key: Key
-}
-struct Option<Element> has copy, drop, store {
-	vec: vector<Element>
-}
-
-public destroy_none<Element>(t: Option<Element>) /* def_idx: 0 */ {
-B0:
-	0: ImmBorrowLoc[0](t: Option<Element>)
-	1: Call is_none<Element>(&Option<Element>): bool
-	2: BrFalse(7)
-B1:
-	3: MoveLoc[0](t: Option<Element>)
-	4: UnpackGeneric[0](Option<Element>)
-	5: VecUnpack(2, 0)
-	6: Ret
-B2:
-	7: LdU64(262144)
-	8: Abort
-}
-public foo<Key: drop + store>(data: E<Key>, v: &mut Key) /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[0](data: E<Key>)
-	1: UnpackGeneric[1](E<Key>)
-	2: PackGeneric[1](E<Key>)
-	3: UnpackGeneric[1](E<Key>)
-	4: MoveLoc[1](v: &mut Key)
-	5: WriteRef
-	6: Ret
-}
-public is_none<Element>(t: &Option<Element>): bool /* def_idx: 2 */ {
-B0:
-	0: MoveLoc[0](t: &Option<Element>)
-	1: ImmBorrowFieldGeneric[0](Option.vec: vector<Element>)
-	2: Call vector::is_empty<Element>(&vector<Element>): bool
-	3: Ret
-}
-}
 ============ bytecode verification succeeded ========

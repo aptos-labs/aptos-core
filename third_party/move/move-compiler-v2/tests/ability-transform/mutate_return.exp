@@ -468,26 +468,25 @@ fun m::g<#0>($t0: &mut vector<#0>) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun singleton<T0>(l0: T0): vector<T0>
+    local l1: vector<T0>
+    move_loc l0
+    vec_pack <T0>, 1
+    st_loc l1
+    mut_borrow_loc l1
+    call g<T0>
+    // @5
+    move_loc l1
+    ret
+
+// Function definition at index 1
+fun g<T0>(l0: &mut vector<T0>)
+    move_loc l0
+    pop
+    ret
 
 
-public singleton<Element>(e: Element): vector<Element> /* def_idx: 0 */ {
-L1:	v: vector<Element>
-B0:
-	0: MoveLoc[0](e: Element)
-	1: VecPack(0, 1)
-	2: StLoc[1](v: vector<Element>)
-	3: MutBorrowLoc[1](v: vector<Element>)
-	4: Call g<Element>(&mut vector<Element>)
-	5: MoveLoc[1](v: vector<Element>)
-	6: Ret
-}
-g<A>(_v: &mut vector<A>) /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[0](_v: &mut vector<A>)
-	1: Pop
-	2: Ret
-}
-}
 ============ bytecode verification succeeded ========
