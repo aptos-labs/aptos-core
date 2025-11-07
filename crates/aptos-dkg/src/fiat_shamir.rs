@@ -108,7 +108,7 @@ impl<S: FromBytes> ScalarProtocol<S> for merlin::Transcript {
 
 #[allow(non_snake_case)]
 #[allow(private_bounds)]
-pub trait PVSS<T: Transcript>: ScalarProtocol<blstrs::Scalar> {
+pub trait PVSS<S: FromBytes, T: Transcript>: ScalarProtocol<S> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
     fn pvss_domain_sep(&mut self, sc: &T::SecretSharingConfig);
@@ -130,11 +130,11 @@ pub trait PVSS<T: Transcript>: ScalarProtocol<blstrs::Scalar> {
     fn append_transcript(&mut self, trx: &T);
 
     /// Returns a random dual-code word check polynomial for the SCRAPE LDT test.
-    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n: usize) -> Vec<blstrs::Scalar>;
+    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n: usize) -> Vec<S>;
 
     /// Returns one or more scalars `r` useful for doing linear combinations (e.g., combining
     /// pairings in the SCRAPE multipairing check using coefficients $1, r, r^2, r^3, \ldots$
-    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar>;
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<S>;
 }
 
 pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
@@ -182,7 +182,7 @@ pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<Scal
 }
 
 #[allow(non_snake_case)]
-impl<T: Transcript> PVSS<T> for merlin::Transcript {
+impl<S: FromBytes, T: Transcript> PVSS<S, T> for merlin::Transcript {
     fn pvss_domain_sep(&mut self, sc: &T::SecretSharingConfig) {
         self.append_message(b"dom-sep", PVSS_DOM_SEP);
         self.append_message(b"scheme-name", T::scheme_name().as_bytes());
@@ -213,7 +213,7 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     fn append_auxs<A: Serialize>(&mut self, auxs: &[A]) {
         self.append_u64(b"auxs", auxs.len() as u64);
         for aux in auxs {
-            <merlin::Transcript as PVSS<T>>::append_aux::<A>(self, aux);
+            <merlin::Transcript as PVSS<S, T>>::append_aux::<A>(self, aux);
         }
     }
 
@@ -226,21 +226,17 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
         self.append_message(b"transcript", trx.to_bytes().as_slice());
     }
 
-    fn challenge_dual_code_word_polynomial(
-        &mut self,
-        t: usize,
-        n_plus_1: usize,
-    ) -> Vec<blstrs::Scalar> {
+    fn challenge_dual_code_word_polynomial(&mut self, t: usize, n_plus_1: usize) -> Vec<S> {
         let num_coeffs = n_plus_1 - t;
-        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_full_scalars(
+        <merlin::Transcript as ScalarProtocol<S>>::challenge_full_scalars(
             self,
             b"challenge_dual_code_word_polynomial",
             num_coeffs,
         )
     }
 
-    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<blstrs::Scalar> {
-        <merlin::Transcript as ScalarProtocol<blstrs::Scalar>>::challenge_full_scalars(
+    fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<S> {
+        <merlin::Transcript as ScalarProtocol<S>>::challenge_full_scalars(
             self,
             b"challenge_linear_combination",
             num_scalars,
@@ -248,7 +244,8 @@ impl<T: Transcript> PVSS<T> for merlin::Transcript {
     }
 }
 
-pub fn initialize_pvss_transcript<T: Transcript>(
+#[allow(private_bounds)]
+pub(crate) fn initialize_pvss_transcript<S: FromBytes, T: Transcript>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     eks: &[T::EncryptPubKey],
@@ -256,9 +253,9 @@ pub fn initialize_pvss_transcript<T: Transcript>(
 ) -> merlin::Transcript {
     let mut fs_t = merlin::Transcript::new(dst);
 
-    <merlin::Transcript as PVSS<T>>::pvss_domain_sep(&mut fs_t, sc);
-    <merlin::Transcript as PVSS<T>>::append_public_parameters(&mut fs_t, pp);
-    <merlin::Transcript as PVSS<T>>::append_encryption_keys(&mut fs_t, eks);
+    <merlin::Transcript as PVSS<S, T>>::pvss_domain_sep(&mut fs_t, sc);
+    <merlin::Transcript as PVSS<S, T>>::append_public_parameters(&mut fs_t, pp);
+    <merlin::Transcript as PVSS<S, T>>::append_encryption_keys(&mut fs_t, eks);
 
     fs_t
 }

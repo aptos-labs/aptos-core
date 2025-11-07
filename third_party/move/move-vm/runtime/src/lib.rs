@@ -8,6 +8,7 @@
 //! The core Move VM logic.
 
 pub mod data_cache;
+pub mod execution_tracing;
 mod interpreter;
 mod interpreter_caches;
 mod loader;
@@ -18,6 +19,7 @@ pub mod native_functions;
 #[macro_use]
 pub mod tracing;
 pub mod config;
+pub mod instr;
 pub mod module_traversal;
 
 // Only include debugging functionality in debug builds
@@ -30,6 +32,8 @@ mod frame_type_cache;
 mod reentrancy_checker;
 mod runtime_ref_checks;
 mod runtime_type_checks;
+mod runtime_type_checks_async;
+pub use runtime_type_checks_async::TypeChecker;
 mod storage;
 
 pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};

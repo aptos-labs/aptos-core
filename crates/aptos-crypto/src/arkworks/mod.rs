@@ -5,7 +5,8 @@
 
 pub mod differentiate;
 pub mod hashing;
-pub mod rand;
+pub mod random;
+pub mod scrape;
 pub mod serialization;
 pub mod shamir;
 pub mod vanishing_poly;

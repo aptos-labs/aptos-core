@@ -1,0 +1,15 @@
+//# publish
+module 0x22::test
+
+public fun vec_swap_instr(): vector<u64>
+    local v: vector<u64>
+    ld_const<vector<u64>> [10, 20, 30]
+    st_loc v
+    mut_borrow_loc v
+    ld_u64 0
+    ld_u64 2
+    vec_swap <u64>
+    move_loc v
+    ret
+
+//# run --verbose 0x22::test::vec_swap_instr --display-trace

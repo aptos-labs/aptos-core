@@ -1,0 +1,9 @@
+//# publish
+module 0x22::test
+
+public fun cast_u256_instr(): u256
+    ld_u64 256
+    cast_u256
+    ret
+
+//# run --verbose 0x22::test::cast_u256_instr --display-trace

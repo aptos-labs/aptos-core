@@ -3,19 +3,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    instr::Instruction,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
 };
 use better_any::{Tid, TidAble, TidExt};
+use lazy_static::lazy_static;
 use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{
-        Bytecode, CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility,
-    },
+    file_format::{CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility},
 };
 use move_core_types::{
     ability::AbilitySet,
@@ -39,6 +39,7 @@ use move_vm_types::{
 use std::{
     cell::RefCell,
     cmp::Ordering,
+    collections::BTreeSet,
     fmt::{Debug, Formatter},
     hash::{Hash, Hasher},
     mem,
@@ -46,16 +47,32 @@ use std::{
     sync::Arc,
 };
 
+lazy_static! {
+    /// List of native functions that perform a dynamic dispatch via reflection. This was a hack
+    /// and with function values enabled should be replaced. Keeping the set to make sure one can
+    /// statically determine if a native call has dispatched or not.
+    static ref DISPATCHABLE_NATIVES: BTreeSet<&'static str> = BTreeSet::from([
+        "dispatchable_withdraw",
+        "dispatchable_deposit",
+        "dispatchable_derived_balance",
+        "dispatchable_derived_supply",
+        "dispatchable_authenticate",
+    ]);
+}
+
 /// A runtime function definition representation.
 pub struct Function {
     #[allow(unused)]
     pub(crate) file_format_version: u32,
     pub(crate) index: FunctionDefinitionIndex,
-    pub(crate) code: Vec<Bytecode>,
+    pub(crate) code: Vec<Instruction>,
     pub(crate) ty_param_abilities: Vec<AbilitySet>,
     // TODO: Make `native` and `def_is_native` become an enum.
     pub(crate) native: Option<NativeFunction>,
     pub(crate) is_native: bool,
+    /// If true, this is a native function which does native dynamic dispatch (main use cases are
+    /// fungible asset and account abstraction).
+    pub(crate) is_dispatchable_native: bool,
     pub(crate) visibility: Visibility,
     pub(crate) is_entry: bool,
     pub(crate) name: Identifier,
@@ -550,7 +567,7 @@ impl LoadedFunction {
         self.function.index
     }
 
-    pub(crate) fn code(&self) -> &[Bytecode] {
+    pub(crate) fn code(&self) -> &[Instruction] {
         &self.function.code
     }
 
@@ -609,9 +626,12 @@ impl Function {
         } else {
             (None, false)
         };
+        let is_dispatchable_native =
+            is_native && native.is_some() && DISPATCHABLE_NATIVES.contains(name.as_str());
+
         // Native functions do not have a code unit
         let code = match &def.code {
-            Some(code) => code.code.clone(),
+            Some(code) => code.code.iter().map(|b| b.clone().into()).collect(),
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();
@@ -640,6 +660,7 @@ impl Function {
             ty_param_abilities,
             native,
             is_native,
+            is_dispatchable_native,
             visibility: def.visibility,
             is_entry: def.is_entry,
             name,

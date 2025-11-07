@@ -24,19 +24,21 @@ pub(crate) fn derive_challenge_scalars<
     dst: &[u8],
     num_scalars: usize,
 ) -> (Vec<blstrs::Scalar>, Vec<blstrs::Scalar>) {
-    let mut fs_t = fiat_shamir::initialize_pvss_transcript::<T>(sc, pp, eks, dst);
+    let mut fs_t = fiat_shamir::initialize_pvss_transcript::<blstrs::Scalar, T>(sc, pp, eks, dst);
 
-    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_signing_pub_keys(&mut fs_t, spks);
-    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_auxs(&mut fs_t, auxs);
-    <merlin::Transcript as fiat_shamir::PVSS<T>>::append_transcript(&mut fs_t, trx);
+    <merlin::Transcript as fiat_shamir::PVSS<blstrs::Scalar, T>>::append_signing_pub_keys(
+        &mut fs_t, spks,
+    );
+    <merlin::Transcript as fiat_shamir::PVSS<blstrs::Scalar, T>>::append_auxs(&mut fs_t, auxs);
+    <merlin::Transcript as fiat_shamir::PVSS<blstrs::Scalar, T>>::append_transcript(&mut fs_t, trx);
 
     (
-        <merlin::Transcript as fiat_shamir::PVSS<T>>::challenge_dual_code_word_polynomial(
+        <merlin::Transcript as fiat_shamir::PVSS<blstrs::Scalar, T>>::challenge_dual_code_word_polynomial(
             &mut fs_t,
             sc.get_threshold(),
             sc.get_total_num_shares() + 1,
         ),
-        <merlin::Transcript as fiat_shamir::PVSS<T>>::challenge_linear_combination_scalars(
+        <merlin::Transcript as fiat_shamir::PVSS<blstrs::Scalar, T>>::challenge_linear_combination_scalars(
             &mut fs_t,
             num_scalars,
         ),

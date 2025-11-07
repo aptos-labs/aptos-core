@@ -56,7 +56,7 @@ impl<E: Pairing> Uniform for DecryptPrivKey<E> {
         R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
     {
         DecryptPrivKey::<E> {
-            dk: arkworks::rand::sample_field_element(rng),
+            dk: arkworks::random::sample_field_element(rng),
         }
     }
 }

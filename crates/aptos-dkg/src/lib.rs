@@ -77,6 +77,11 @@ impl<E: Pairing> Scalar<E> {
     pub fn vecvec_from_inner(vv: Vec<Vec<E::ScalarField>>) -> Vec<Vec<Self>> {
         vv.into_iter().map(Self::vec_from_inner).collect()
     }
+
+    /// Converts a `&[E::ScalarField]` into a `Vec<Scalar<E>>` safely.
+    pub fn vec_from_inner_slice(slice: &[E::ScalarField]) -> Vec<Self> {
+        slice.iter().copied().map(Self).collect()
+    }
 }
 
 impl<E: Pairing> Scalar<E> {

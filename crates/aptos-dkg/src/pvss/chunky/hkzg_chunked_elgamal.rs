@@ -16,11 +16,11 @@ use ark_std::rand::{CryptoRng, RngCore};
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
 /// In this PVSS scheme, plaintexts (which are shares) are first divided into chunks. Then
-/// two (independent) steps are done:
+/// two more (independent) pieces of data are generated:
 ///
-/// 1. **HKZG randomness** is generated and used in the DeKARTv2 range proof,
+/// - **HKZG randomness** is generated and used in the DeKARTv2 range proof,
 ///    to prove that the chunks lie in the correct range.
-/// 2. **ElGamal randomness** is generated and used to encrypt the chunks.
+/// - **ElGamal randomness** is generated and used to encrypt the chunks.
 ///
 /// To prove consistency between these components, we thus construct a Σ-protocol
 /// defined over a domain that jointly includes:
@@ -36,27 +36,72 @@ pub struct HkzgElgamalWitness<E: Pairing> {
     pub elgamal_randomness: Vec<Scalar<E>>,
 }
 
-/// The two steps described earlier — (1) generating HKZG randomness for the DeKARTv2 proof
+/// The two components described earlier — (1) generating HKZG randomness for the DeKARTv2 proof
 /// and (2) encrypting with ElGamal randomness — are part of a single Σ-protocol
 /// proving knowledge of a *preimage* under a tuple homomorphism, consisting of:
 ///
 /// (i) the HKZG commitment homomorphism, and
 /// (ii) the `chunked_elgamal` homomorphism.
 ///
-/// On the domain side, each component of this tuple homomorphism corresponds to one of the
-/// two steps: in each case, the witness omits (or “ignores”) one of its three fields. Thus,
-/// the overall homomorphism of the Σ-protocol can be viewed as a tuple of two *lifted* homomorphisms.
+/// On the domain side, each of the two parts of this tuple homomorphism corresponds to one of the
+/// two components: in each case, the witness omits (or “ignores”) one of its three fields, then applies
+/// a homomorphism. Thus, the overall homomorphism of the Σ-protocol can be viewed as a tuple of two
+/// *lifted* homomorphisms.
 type LiftedHkzg<'a, E> =
     LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgElgamalWitness<E>>;
 type LiftedChunkedElgamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
 
+//                         ┌───────────────────────────────┐
+//                         │     HkzgElgamalWitness<E>     │
+//                         │-------------------------------│
+//                         │ hkzg_randomness               │
+//                         │ chunked_plaintexts            │
+//                         │ elgamal_randomness            │
+//                         └───────────────┬───────────────┘
+//                                         │
+//              ┌────────────────────────┬─┼─┬──────────────────────┐
+//              │                        ║ ╫ ║                      │
+// projection_1 │    lifted HKZG hom ╔═══╝ ╫ ╚══════╗ lifted        │ projection_2
+//              │                    ║     ╫        ║ Chunked EG    │
+//              ▼                    ║     ╫        ║ hom           ▼
+//  ┌──────────────────────────────┐ ║     ╫        ║  ┌──────────────────────────────┐
+//  │ univariate_hiding_kzg::      │ ║     ╫        ║  │ chunked_elgamal::            │
+//  │ Witness<E>                   │ ║     ╫        ║  │ Witness<E>                   │
+//  │------------------------------│ ║     ╫        ║  │------------------------------│
+//  │ hkzg_randomness              │ ║     ╫        ║  │ chunked_plaintexts           │
+//  │ flattened_chunked_plaintexts │ ║     ╫        ║  │ elgamal_randomness           │
+//  └──────────────┬───────────────┘ ║     ╫        ║  └──────────────┬───────────────┘
+//                 │ ╔═══════════════╝     ╫        ╚═══════════════╗ │
+//       HKZG hom  │ ║                     ╫                        ║ │ Chunked ElGamal hom
+//                 │ ║                     ╫ TupleHomomorphism      ║ │
+//                 ▼ ▼                     ╫                        ▼ ▼
+//   ┌──────────────────────────┐          ╫         ┌──────────────────────────┐
+//   │ HKZG output (commitment) │          ╫         │ Chunked ElGamal output   │
+//   └──────────────┬───────────┘          ╫         └──────────────┬───────────┘
+//                  │                      ╫                        │
+//                  └─────────────────────►╫◄───────────────────────┘
+//                                         ╫
+//                                         ▼
+//                       ┌──────────────────────────────────┐
+//                       │   TupleHomomorphism output       │
+//                       │   (pair of HKZG image and        │
+//                       │    Chunked ElGamal image)        │
+//                       └──────────────────────────────────┘
+//
+// In other words, the tuple homomorphism is roughly given as follows:
+//
+// ( rho, z_{i,j} , r_j ) │----> ( HKZG(rho, (0, z_{i,j}) ) , chunked_elgamal( z_{i,j} , r_j )
+//
+// TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
+// it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
+// DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
 pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>>;
 
 #[allow(non_snake_case)]
 impl<'a, E: Pairing> Homomorphism<'a, E> {
     pub fn new(
-        lagr_g1: &'a [E::G1Affine], // TODO: could combine lagr_g1 and xi_1 into hkzg::PublicParamaters<E>?
+        lagr_g1: &'a [E::G1Affine],
         xi_1: E::G1Affine,
         pp: &'a chunked_elgamal::PublicParameters<E>,
         eks: &'a [E::G1Affine],
@@ -64,20 +109,21 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         // Set up the HKZG homomorphism, and use a projection map to lift it to HkzgElgamalWitness
         let lifted_hkzg = LiftedHkzg::<E> {
             hom: univariate_hiding_kzg::CommitmentHomomorphism { lagr_g1, xi_1 },
-            // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunks into one long vector
+            // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunked plaintexts after adding a zero
             projection: |dom: &HkzgElgamalWitness<E>| {
                 let HkzgElgamalWitness {
                     hkzg_randomness,
                     chunked_plaintexts,
                     ..
                 } = dom;
-                let flattened_chunked_plaintexts: Vec<E::ScalarField> = {
-                    let scalars: Vec<Scalar<E>> = std::iter::once(Scalar(E::ScalarField::ZERO))
+                let flattened_chunked_plaintexts: Vec<Scalar<E>> =
+                    std::iter::once(Scalar(E::ScalarField::ZERO))
                         .chain(chunked_plaintexts.iter().flatten().cloned())
                         .collect();
-                    Scalar::<E>::vec_into_inner(scalars) // This is slightly inefficient; better to extract the scalars during the iter()
-                };
-                (hkzg_randomness.0, flattened_chunked_plaintexts)
+                univariate_hiding_kzg::Witness::<E> {
+                    hiding_randomness: Scalar(hkzg_randomness.0),
+                    values: flattened_chunked_plaintexts,
+                }
             },
         };
         // Set up the chunked_elgamal homomorphism, and use a projection map to lift it to HkzgElgamalWitness
@@ -97,7 +143,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
             },
         };
 
-        // Combine the two lifted homomorphisms, into the required TupleHomomorphism
+        // Combine the two lifted homomorphisms just constructed, into the required TupleHomomorphism
         Self {
             hom1: lifted_hkzg,
             hom2: lifted_chunked_elgamal,

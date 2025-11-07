@@ -103,7 +103,7 @@ impl Script {
             });
         }
 
-        let code = script.code.code.clone();
+        let code = script.code.code.iter().map(|b| b.clone().into()).collect();
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters
@@ -126,6 +126,7 @@ impl Script {
             ty_param_abilities,
             native: None,
             is_native: false,
+            is_dispatchable_native: false,
             visibility: Visibility::Private,
             is_entry: false,
             // TODO: main does not have a name. Revisit.

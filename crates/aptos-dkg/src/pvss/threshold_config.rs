@@ -3,7 +3,7 @@
 
 use crate::{
     algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::{traits, Player},
+    pvss::{traits, traits::ThresholdConfig, Player},
 };
 use anyhow::anyhow;
 use rand::{seq::IteratorRandom, Rng};
@@ -51,33 +51,6 @@ impl<'de> Deserialize<'de> for ThresholdConfigBlstrs {
 }
 
 impl ThresholdConfigBlstrs {
-    /// Creates a new $t$ out of $n$ secret sharing configuration where any subset of $t$ or more
-    /// players can reconstruct the secret.
-    pub fn new(t: usize, n: usize) -> anyhow::Result<Self> {
-        if t == 0 {
-            return Err(anyhow!("expected the reconstruction threshold to be > 0"));
-        }
-
-        if n == 0 {
-            return Err(anyhow!("expected the number of shares to be > 0"));
-        }
-
-        if t > n {
-            return Err(anyhow!(
-                "expected the reconstruction threshold {t} to be < than the number of shares {n}"
-            ));
-        }
-
-        let batch_dom = BatchEvaluationDomain::new(n);
-        let dom = batch_dom.get_subdomain(n);
-        Ok(ThresholdConfigBlstrs {
-            t,
-            n,
-            dom,
-            batch_dom,
-        })
-    }
-
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
         &self.batch_dom
     }
@@ -126,6 +99,33 @@ impl traits::SecretSharingConfig for ThresholdConfigBlstrs {
 }
 
 impl traits::ThresholdConfig for ThresholdConfigBlstrs {
+    /// Creates a new $t$ out of $n$ secret sharing configuration where any subset of $t$ or more
+    /// players can reconstruct the secret.
+    fn new(t: usize, n: usize) -> anyhow::Result<Self> {
+        if t == 0 {
+            return Err(anyhow!("expected the reconstruction threshold to be > 0"));
+        }
+
+        if n == 0 {
+            return Err(anyhow!("expected the number of shares to be > 0"));
+        }
+
+        if t > n {
+            return Err(anyhow!(
+                "expected the reconstruction threshold {t} to be < than the number of shares {n}"
+            ));
+        }
+
+        let batch_dom = BatchEvaluationDomain::new(n);
+        let dom = batch_dom.get_subdomain(n);
+        Ok(ThresholdConfigBlstrs {
+            t,
+            n,
+            dom,
+            batch_dom,
+        })
+    }
+
     /// Returns the threshold $t$. Recall that $\ge t$ shares are needed to reconstruct.
     fn get_threshold(&self) -> usize {
         self.t
@@ -134,7 +134,7 @@ impl traits::ThresholdConfig for ThresholdConfigBlstrs {
 
 #[cfg(test)]
 mod test {
-    use crate::pvss::ThresholdConfigBlstrs;
+    use crate::pvss::{traits::ThresholdConfig, ThresholdConfigBlstrs};
 
     #[test]
     fn create_many_configs() {

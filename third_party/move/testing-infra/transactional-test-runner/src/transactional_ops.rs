@@ -31,7 +31,6 @@ use move_core_types::{
     language_storage::{ModuleId, TypeTag},
     value::{MoveTypeLayout, MoveValue},
 };
-use move_vm_runtime::move_vm::SerializedReturnValues;
 use move_vm_types::values::Value;
 use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
@@ -121,7 +120,7 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
         _args: Vec<MoveValue>,
         _gas_budget: Option<u64>,
         _extra: Self::ExtraRunArgs,
-    ) -> Result<Option<String>> {
+    ) -> Option<String> {
         unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
@@ -134,7 +133,7 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
         _args: Vec<MoveValue>,
         _gas_budget: Option<u64>,
         _extra: Self::ExtraRunArgs,
-    ) -> Result<(Option<String>, SerializedReturnValues)> {
+    ) -> Option<String> {
         unimplemented!("MinimalAdapter is only used for compilation, not execution")
     }
 
@@ -166,7 +165,11 @@ impl<'a> MoveTestAdapter<'a> for MinimalAdapter<'a> {
 }
 
 /// Represents a single operation in a transactional test sequence
-#[derive(Debug, Eq, PartialEq, Clone, arbitrary::Arbitrary, dearbitrary::Dearbitrary)]
+#[cfg_attr(
+    feature = "fuzzing",
+    derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary)
+)]
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub enum TransactionalOperation {
     /// Publish one or more modules
     PublishModule { _module: CompiledModule },
@@ -175,6 +178,8 @@ pub enum TransactionalOperation {
         _script: CompiledScript,
         _type_args: Vec<TypeTag>,
         _args: Vec<MoveValue>,
+        _signers: Vec<AccountAddress>,
+        _exec_group: u64,
     },
     /// Call a function in a published module
     CallFunction {
@@ -182,6 +187,8 @@ pub enum TransactionalOperation {
         _function: FunctionDefinitionIndex,
         _type_args: Vec<TypeTag>,
         _args: Vec<Vec<u8>>,
+        _signers: Vec<AccountAddress>,
+        _exec_group: u64,
     },
 }
 
@@ -240,13 +247,14 @@ where
             },
             TaskCommand::Run(
                 RunCommand {
-                    signers: _,
+                    signers,
                     args,
                     type_args,
                     gas_budget: _,
                     syntax,
                     name: None, // Because script call main function
                     print_bytecode: _,
+                    exec_group,
                 },
                 _extra_args,
             ) => {
@@ -261,6 +269,11 @@ where
 
                 let resolved_args = adapter.compiled_state().resolve_args(args)?;
                 let resolved_type_args = adapter.compiled_state().resolve_type_args(type_args)?;
+                let resolved_signers: Vec<AccountAddress> = signers
+                    .into_iter()
+                    .map(|s| adapter.compiled_state().resolve_address(&s))
+                    .collect();
+                let exec_group = exec_group.unwrap_or(0);
 
                 // Convert resolved args to MoveValue - they are already ConcreteValue
                 let move_args: Vec<MoveValue> =
@@ -270,17 +283,20 @@ where
                     _script: script,
                     _type_args: resolved_type_args,
                     _args: move_args,
+                    _signers: resolved_signers,
+                    _exec_group: exec_group,
                 });
             },
             TaskCommand::Run(
                 RunCommand {
-                    signers: _,
+                    signers,
                     args,
                     type_args,
                     gas_budget: _,
                     syntax: _,
                     name: Some((raw_addr, module_name, function_name)),
                     print_bytecode: _,
+                    exec_group,
                 },
                 _extra_args,
             ) => {
@@ -289,6 +305,11 @@ where
                 let module_id = ModuleId::new(addr, module_name.clone());
                 let resolved_type_args = adapter.compiled_state().resolve_type_args(type_args)?;
                 let resolved_args_concrete_values = adapter.compiled_state().resolve_args(args)?;
+                let resolved_signers: Vec<AccountAddress> = signers
+                    .into_iter()
+                    .map(|s| adapter.compiled_state().resolve_address(&s))
+                    .collect();
+                let exec_group = exec_group.unwrap_or(0);
 
                 let target_compiled_module = published_modules
                     .iter()
@@ -355,6 +376,8 @@ where
                         _script: compiled_wrapper_script,
                         _type_args: resolved_type_args,
                         _args: move_args,
+                        _signers: resolved_signers,
+                        _exec_group: exec_group,
                     });
                 } else {
                     let serialized_args: Vec<Vec<u8>> = resolved_args_concrete_values
@@ -371,6 +394,8 @@ where
                         _function: func_idx,
                         _type_args: resolved_type_args,
                         _args: serialized_args,
+                        _signers: resolved_signers,
+                        _exec_group: exec_group,
                     });
                 }
             },

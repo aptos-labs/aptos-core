@@ -29,6 +29,8 @@ struct TestConfig {
     /// Path substrings for tests to exclude (applied after the include filter).
     /// If empty, no additional tests are excluded.
     exclude: &'static [&'static str],
+    /// If true, delays runtime type checks to post-execution replay based on the collected trace.
+    tracing: bool,
 }
 
 /// Note that any config which has different output for a test directory *must* be added to the
@@ -42,10 +44,11 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             language_version: LanguageVersion::latest(),
             vm_config: vm_config_for_tests(VerifierConfig::production()),
             include: &[],
-            exclude: &["/paranoid-tests/"],
+            exclude: &["/paranoid-tests/", "/tracing/"],
+            tracing: false,
         },
         TestConfig {
-            name: "paranoid-mode-only",
+            name: "async-paranoid",
             experiments: &[("access-use-function-check", false)],
             language_version: LanguageVersion::latest(),
             // Verifier config is irrelevant here, because we disable verifier for these tests.
@@ -53,20 +56,32 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             vm_config: vm_config_for_tests(
                 VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
             ),
-            include: &["/paranoid-tests/"],
+            include: &[
+                // Note: for functions values the difference between generated files are stack
+                // traces only (attached for in-place checks, set to None for async checks).
+                "/function_values_safety/",
+                "/trusted_code/",
+                "/paranoid-tests/",
+            ],
             exclude: &[],
+            tracing: true,
         },
         TestConfig {
             name: "paranoid",
-            experiments: &[],
+            experiments: &[("access-use-function-check", false)],
             language_version: LanguageVersion::latest(),
             // Verifier config is irrelevant here, because we disable verifier for these tests.
             // Importantly, paranoid checks are enabled.
             vm_config: vm_config_for_tests(
                 VerifierConfig::unbounded().set_scope(VerificationScope::Nothing),
             ),
-            include: &["/function_values_safety/", "/trusted_code/"],
+            include: &[
+                "/function_values_safety/",
+                "/trusted_code/",
+                "/paranoid-tests/",
+            ],
             exclude: &[],
+            tracing: false,
         },
         TestConfig {
             name: "eager-loading",
@@ -85,8 +100,10 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 "/paranoid-tests/",
                 "/function_values_safety/",
                 "/trusted_code/",
+                "/tracing/",
                 "/runtime_ref_checks/",
             ],
+            tracing: false,
         },
         // This config is used to test the runtime reference checker.
         TestConfig {
@@ -101,6 +118,16 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             .set_paranoid_ref_checks(true),
             include: &["/runtime_ref_checks/"],
             exclude: &[],
+            tracing: false,
+        },
+        TestConfig {
+            name: "tracing",
+            experiments: &[],
+            language_version: LanguageVersion::latest(),
+            vm_config: vm_config_for_tests(VerifierConfig::production()),
+            include: &["/tracing/"],
+            exclude: &[],
+            tracing: true,
         },
     ]
 });
@@ -158,6 +185,7 @@ fn run(path: &Path, config: TestConfig) -> datatest_stable::Result<()> {
         use_masm: true,
         echo: true,
         cross_compilation_targets: BTreeSet::new(),
+        tracing: config.tracing,
     };
 
     vm_test_harness::run_test_with_config_and_exp_suffix(vm_test_config, path, &exp_suffix)
