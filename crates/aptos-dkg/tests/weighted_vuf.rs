@@ -111,7 +111,7 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     let (mut sks, pks): (Vec<WVUF::SecretKeyShare>, Vec<WVUF::PubKeyShare>) = (0..wc
         .get_total_num_players())
         .map(|p| {
-            let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(p), &dks[p]);
+            let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(p), &dks[p], pvss_pp);
             (sk, pk)
         })
         .collect::<Vec<(WVUF::SecretKeyShare, WVUF::PubKeyShare)>>()

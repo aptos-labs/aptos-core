@@ -194,6 +194,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         sc: &Self::SecretSharingConfig,
         player: &Player,
         dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
 
     /// Generates a random looking transcript (but not a valid one).

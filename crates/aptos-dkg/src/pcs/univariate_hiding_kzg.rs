@@ -37,7 +37,7 @@ pub struct OpeningProof<E: Pairing> {
 }
 
 impl<E: Pairing> OpeningProof<E> {
-    /// Generates a random looking transcript (but not a valid one).
+    /// Generates a random looking opening proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
         Self {

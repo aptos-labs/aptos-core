@@ -23,7 +23,7 @@ use std::fmt::{Display, Formatter};
 pub struct WeightedConfig {
     /// A weighted config is a $w$-out-of-$W$ threshold config, where $w$ is the minimum weight
     /// needed to reconstruct the secret and $W$ is the total weight.
-    pub(crate) tc: ThresholdConfigBlstrs,
+    tc: ThresholdConfigBlstrs,
     /// The total number of players in the protocol.
     num_players: usize,
     /// Each player's weight

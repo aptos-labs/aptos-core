@@ -40,7 +40,7 @@ pub struct Proof<E: Pairing> {
 }
 
 impl<E: Pairing> Proof<E> {
-    /// Generates a random looking transcript (but not a valid one).
+    /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
     pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: usize, rng: &mut R) -> Self {
         Self {
@@ -720,7 +720,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
             vk_hkzg.clone(),
-            HkzgCommitment(U), // Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a
+            HkzgCommitment(U), // TODO: Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a struct with one named field?
             gamma,
             a_u,
             pi_gamma.clone(),
@@ -873,7 +873,7 @@ pub mod two_term_msm {
     pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
 
     impl<E: Pairing> Proof<E> {
-        /// Generates a random looking transcript (but not a valid one).
+        /// Generates a random looking proof (but not a valid one).
         /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
         pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
             Self {

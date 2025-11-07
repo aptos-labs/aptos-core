@@ -98,9 +98,11 @@ type LiftedChunkedElgamal<'a, E> =
 // In other words, the tuple homomorphism is roughly given as follows:
 //
 // ( rho, z_{i,j} , r_j ) │----> ( HKZG(rho, (0, z_{i,j}) ) , chunked_elgamal( z_{i,j} , r_j )
-//                             = ( \xi_1 * \rho  + \sum_i,j \ell_{i * B + j + 1}(\tau)_1 * z_{i,j} ) ,
-//                               ( G_1 * z_i,j + ek_i * r_j )_{i,j},
-//                               ( H_1 * r_j )_j ),
+//                             = (
+//			                         \rho [\xi]_1 + \sum_i,j z_i,j [\ell_{i * B + j + 1}(\tau)]_1,
+//                                  ( z_i,j G_1 + r_j ek_i )_i,j,
+//                                  ( r_j H_1 )_j,
+//			                   )
 // where B denotes the number of chunks.
 //
 // TODO: note here that we had to put a zero before z_{i,j}, because that's what DeKARTv2 is doing. So maybe
@@ -111,7 +113,7 @@ pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunke
 pub type Proof<'a, E> = sigma_protocol::Proof<E, Homomorphism<'a, E>>;
 
 impl<'a, E: Pairing> Proof<'a, E> {
-    /// Generates a random looking transcript (but not a valid one).
+    /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking.
     pub fn generate<R: rand::Rng + rand::CryptoRng>(
         n: usize,

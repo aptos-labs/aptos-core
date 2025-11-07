@@ -175,10 +175,8 @@ impl traits::Transcript for Transcript {
             );
         }
 
+        // Deriving challenges by flipping coins: less complex to implement & less likely to get wrong. Creates bad RNG risks but we deem that acceptable.
         let mut rng = thread_rng();
-        // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        // TODO: benchmark this
-        let f = random_scalars(sc.n + 1 - sc.t, &mut rng);
         let extra = random_scalars(2, &mut rng);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
@@ -193,7 +191,13 @@ impl traits::Transcript for Transcript {
         )?;
 
         // Verify the committed polynomial is of the right degree
-        let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
+        let ldt = LowDegreeTest::random(
+            &mut rng,
+            sc.t,
+            sc.n + 1,
+            true,
+            sc.get_batch_evaluation_domain(),
+        );
         ldt.low_degree_test_on_g2(&self.V)?;
 
         //
@@ -281,6 +285,7 @@ impl traits::Transcript for Transcript {
         _sc: &Self::SecretSharingConfig,
         player: &Player,
         dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
         let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
