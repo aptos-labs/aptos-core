@@ -88,7 +88,7 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
             b.iter_with_setup(
                 || {
                     let mut rng = thread_rng();
-                    let group_generators = GroupGenerators::sample(&mut rng);
+                    let group_generators = GroupGenerators::default();
                     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
@@ -116,7 +116,7 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
             b.iter_with_setup(
                 || {
                     let mut rng = thread_rng();
-                    let group_generators = GroupGenerators::sample(&mut rng);
+                    let group_generators = GroupGenerators::default();
                     let (pk, _) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);

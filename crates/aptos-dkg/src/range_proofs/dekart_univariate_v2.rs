@@ -10,7 +10,12 @@ use crate::{
     sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
     utils, Scalar,
 };
-use aptos_crypto::arkworks::{self, random::sample_field_element};
+use aptos_crypto::arkworks::{
+    self,
+    random::{
+        insecure_random_points, sample_field_element, sample_field_elements, unsafe_random_point,
+    },
+};
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Polynomial};
@@ -33,6 +38,23 @@ pub struct Proof<E: Pairing> {
     pub(crate) a_h: E::ScalarField,
     pub(crate) a_js: Vec<E::ScalarField>, // has length ell
     pub(crate) pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
+}
+
+impl<E: Pairing> Proof<E> {
+    /// Generates a random looking transcript (but not a valid one).
+    /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
+    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: usize, rng: &mut R) -> Self {
+        Self {
+            hatC: unsafe_random_point(rng),
+            pi_PoK: two_term_msm::Proof::generate(rng),
+            Cs: insecure_random_points(ell, rng),
+            D: unsafe_random_point(rng),
+            a: sample_field_element(rng),
+            a_h: sample_field_element(rng),
+            a_js: sample_field_elements(ell, rng),
+            pi_gamma: univariate_hiding_kzg::OpeningProof::generate(rng),
+        }
+    }
 }
 
 #[allow(non_snake_case)]
@@ -845,9 +867,26 @@ mod fiat_shamir {
 pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
-    use crate::sigma_protocol::homomorphism::fixed_base_msms;
+    use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
     use aptos_crypto_derive::SigmaProtocolWitness;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
+    pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
+
+    impl<E: Pairing> Proof<E> {
+        /// Generates a random looking transcript (but not a valid one).
+        /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
+        pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
+            Self {
+                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point(
+                    rng,
+                ))),
+                z: Witness {
+                    poly_randomness: Scalar(sample_field_element(rng)),
+                    hiding_kzg_randomness: Scalar(sample_field_element(rng)),
+                },
+            }
+        }
+    }
 
     /// Represents a homomorphism with two base points over an elliptic curve group.
     ///

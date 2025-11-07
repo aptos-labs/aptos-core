@@ -10,8 +10,8 @@ use rand::{CryptoRng, RngCore};
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize;
     type ProverKey;
-    type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
-    type Input: From<u64>; // TODO: slightly hacky
+    type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this key is often appended to a Fiat-Shamir transcript
+    type Input: From<u64>; // TODO: slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
     type Commitment;
     type CommitmentRandomness: Clone + UniformRand;
     type CommitmentKey;

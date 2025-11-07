@@ -7,8 +7,7 @@
 //! `rand` crate, which may differ from the version used by `arkworks` and thus
 //! would not be accepted directly.
 
-use crate::arkworks::hashing::unsafe_hash_to_affine;
-use ark_ec::{AffineRepr, CurveGroup};
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::Rng;
 
@@ -21,37 +20,24 @@ pub trait UniformRand {
     fn rand<R: Rng>(rng: &mut R) -> Self;
 }
 
-/// Returns a random element given an older RNG as input. Not very secure since the
-/// hash function is vulnerable to timing attacks. Probably alright if only used for setups etc?
-/// TODO: benchmark this
-pub fn less_insecure_random_point<P: AffineRepr, R>(rng: &mut R) -> P
-where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
-{
-    let mut rand_seed = [0u8; 256]; // in our blstrs code it says G1_PROJ_NUM_BYTES here, not sure why
-    rng.fill(rand_seed.as_mut_slice());
-
-    unsafe_hash_to_affine(rand_seed.as_slice(), DST_RAND_CORE_HELL)
-}
-
-/// NOTE: This function is "insecure" in the sense that the caller learns the discrete log of the
+/// NOTE: This function is "unsafe" in the sense that the caller learns the discrete log of the
 /// random point w.r.t. the generator. In many applications, this is not acceptable.
-pub fn insecure_random_point<C: CurveGroup, R>(rng: &mut R) -> C
+pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand_core::RngCore + rand_core::CryptoRng,
 {
     let r: C::ScalarField = sample_field_element(rng);
 
     C::generator().mul(r)
 }
 
-/// Samples `n` uniformly random elements from the group, but is insecure in the sense
+/// Samples `n` uniformly random elements from the group, but is unsafe in the sense
 /// that the caller learns the discrete log of the random point.
 pub fn insecure_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+    R: rand_core::RngCore + rand_core::CryptoRng,
 {
-    (0..n).map(|_| insecure_random_point::<C, R>(rng)).collect()
+    (0..n).map(|_| unsafe_random_point::<C, R>(rng)).collect()
 }
 
 /// Samples `n` uniformly random elements from the prime field `F`.

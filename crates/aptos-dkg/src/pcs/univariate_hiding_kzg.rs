@@ -11,7 +11,7 @@ use crate::{
     Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::random::{sample_field_element, UniformRand};
+use aptos_crypto::arkworks::random::{sample_field_element, unsafe_random_point, UniformRand};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -55,6 +55,17 @@ impl<E: Pairing> UniformRand for CommitmentRandomness<E> {
 pub struct OpeningProof<E: Pairing> {
     pub(crate) pi_1: Commitment<E>,
     pub(crate) pi_2: E::G1,
+}
+
+impl<E: Pairing> OpeningProof<E> {
+    /// Generates a random looking transcript (but not a valid one).
+    /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
+    pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
+        Self {
+            pi_1: sigma_protocol::homomorphism::TrivialShape(unsafe_random_point(rng)),
+            pi_2: unsafe_random_point(rng),
+        }
+    }
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -344,7 +355,7 @@ mod tests {
     // TODO: Should set up a PCS trait, then make these tests generic?
     fn assert_kzg_opening_correctness<E: Pairing>() {
         let mut rng = thread_rng();
-        let group_data = GroupGenerators::sample(&mut rng);
+        let group_data = GroupGenerators::default();
 
         type Fr<E> = <E as Pairing>::ScalarField;
 

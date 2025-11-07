@@ -136,7 +136,7 @@ where
     B: BatchedRangeProof<E>,
 {
     let mut rng = thread_rng();
-    let group_generators = GroupGenerators::sample(&mut rng);
+    let group_generators = GroupGenerators::default();
     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
     RangeProofUniversalSetup { pk, vk }
 }
