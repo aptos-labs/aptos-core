@@ -5,7 +5,6 @@
 
 use crate::{
     algebra::GroupGenerators,
-    dlog,
     pvss::{
         chunky::{chunked_elgamal, input_secret::InputSecret, keys},
         traits,
@@ -23,22 +22,22 @@ use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
-    Write,
 };
 use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::{collections::HashMap, ops::Mul};
+use std::ops::Mul;
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 
-fn compute_powers_of_radix<E: Pairing>(radix_exponent: u8) -> Vec<E::ScalarField> {
+pub const CHUNK_SIZE: u8 = 16; // Will probably move this elsewhere in the next PR. Maybe it becomes a run-time variable...
+
+fn compute_powers_of_radix<E: Pairing>() -> Vec<E::ScalarField> {
     let num_chunks_per_share =
-        E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent as u32) as usize;
+        E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
     arkworks::powers_of_two(num_chunks_per_share)
 }
 
-// TODO: can't we derive CanonicalSerialize/CanonicalDeserialize from Serialize/Deserialize? Or the other way around we can do with ark_se/de... now it's implemented twice
-#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(CanonicalSerialize, Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
@@ -51,11 +50,6 @@ pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
     G_2: E::G2Affine,
 
-    pub ell: u8,
-
-    #[serde(skip)]
-    pub table: HashMap<Vec<u8>, u32>,
-
     #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
 }
@@ -63,33 +57,6 @@ pub struct PublicParameters<E: Pairing> {
 impl<E: Pairing> PublicParameters<E> {
     pub fn get_commitment_base(&self) -> E::G2Affine {
         self.G_2
-    }
-}
-
-impl<E: Pairing> CanonicalSerialize for PublicParameters<E> {
-    fn serialize_with_mode<W: Write>(
-        &self,
-        mut writer: W,
-        compress: Compress,
-    ) -> Result<(), SerializationError> {
-        self.pp_elgamal.serialize_with_mode(&mut writer, compress)?;
-        self.pk_range_proof
-            .serialize_with_mode(&mut writer, compress)?;
-        self.G_2.serialize_with_mode(&mut writer, compress)?;
-        writer.write_all(&[self.ell])?;
-
-        Ok(())
-    }
-
-    fn serialized_size(&self, compress: Compress) -> usize {
-        let mut size = 0;
-
-        size += self.pp_elgamal.serialized_size(compress);
-        size += self.pk_range_proof.serialized_size(compress);
-        size += self.G_2.serialized_size(compress);
-        size += 1; // for ell
-
-        size
     }
 }
 
@@ -108,7 +75,6 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             pk_range_proof: dekart_univariate_v2::ProverKey<E>,
             #[serde(deserialize_with = "ark_de")]
             G_2: E::G2Affine,
-            ell: u8,
         }
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
@@ -117,9 +83,7 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             pp_elgamal: serialized.pp_elgamal,
             pk_range_proof: serialized.pk_range_proof,
             G_2: serialized.G_2,
-            ell: serialized.ell,
-            table: dlog::table::build_default::<E::G1>(1u32 << serialized.ell),
-            powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
+            powers_of_radix: compute_powers_of_radix::<E>(),
         })
     }
 }
@@ -142,15 +106,12 @@ impl<E: Pairing> CanonicalDeserialize for PublicParameters<E> {
             validate,
         )?;
         let G_2 = E::G2Affine::deserialize_with_mode(&mut reader, compress, validate)?;
-        let ell = u8::deserialize_with_mode(&mut reader, compress, validate)?;
 
         Ok(Self {
             pp_elgamal,
             pk_range_proof,
             G_2,
-            ell,
-            table: dlog::table::build_default::<E::G1>(1u32 << ell),
-            powers_of_radix: compute_powers_of_radix::<E>(ell),
+            powers_of_radix: compute_powers_of_radix::<E>(),
         })
     }
 }
@@ -198,11 +159,11 @@ impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(
         max_num_shares: usize,
-        radix_exponent: u8,
+        _radix_exponent: usize,
         rng: &mut R,
     ) -> Self {
         let num_chunks_per_share =
-            E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent as u32) as usize;
+            E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
         let max_num_chunks_padded =
             ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
 
@@ -211,14 +172,12 @@ impl<E: Pairing> PublicParameters<E> {
             pp_elgamal: chunked_elgamal::PublicParameters::default(),
             pk_range_proof: dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded,
-                radix_exponent as usize,
+                CHUNK_SIZE as usize,
                 group_generators,
                 rng,
             )
             .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
-            ell: radix_exponent,
-            table: dlog::table::build_default::<E::G1>(1u32 << radix_exponent),
             powers_of_radix: arkworks::powers_of_two(num_chunks_per_share),
         };
 
@@ -238,6 +197,6 @@ impl<E: Pairing> Default for PublicParameters<E> {
     // TODO: is this only used for testing?
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, 16, &mut rng)
+        Self::new(1, CHUNK_SIZE as usize, &mut rng)
     }
 }
