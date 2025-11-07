@@ -367,14 +367,14 @@ where
                     // INVARIANT:
                     //   We do not need to meter metadata access here. If this resource is in data
                     //   cache, we must have already fetched metadata for its tag.
-                    let metadata = module_storage
-                        .unmetered_get_existing_module_metadata(
+                    let module = module_storage
+                        .unmetered_get_existing_deserialized_module(
                             &struct_tag.address,
                             &struct_tag.module,
                         )
                         .map_err(|e| e.to_partial())?;
 
-                    get_resource_group_member_from_metadata(&struct_tag, &metadata)
+                    get_resource_group_member_from_metadata(&struct_tag, &module.metadata)
                 };
 
                 if let Some(resource_group_tag) = resource_group_tag {

@@ -95,29 +95,27 @@ fun m::test_common_access(): u8 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 815.m {
-enum Positional has drop {
- A{
-	_0: u8
- },
- B{
-	_0: u8
- }
-}
+// Bytecode version v9
+module 0x815::m
+enum Positional has drop
+  A
+    _0: u8
+  B
+    _0: u8
 
-test_common_access(): u8 /* def_idx: 0 */ {
-L0:	x: Positional
-B0:
-	0: LdU8(42)
-	1: PackVariant[0](Positional/A)
-	2: StLoc[0](x: Positional)
-	3: LdU8(19)
-	4: MutBorrowLoc[0](x: Positional)
-	5: MutBorrowVariantField[0](A._0|B._0: u8)
-	6: WriteRef
-	7: LdU8(20)
-	8: Ret
-}
-}
+// Function definition at index 0
+fun test_common_access(): u8
+    local l0: Positional
+    ld_u8 42
+    pack_variant Positional, A
+    st_loc l0
+    ld_u8 19
+    mut_borrow_loc l0
+    // @5
+    mut_borrow_variant_field Positional, A::_0, B::_0
+    write_ref
+    ld_u8 20
+    ret
+
+
 ============ bytecode verification succeeded ========

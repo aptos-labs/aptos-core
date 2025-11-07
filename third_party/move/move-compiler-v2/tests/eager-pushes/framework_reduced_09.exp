@@ -447,64 +447,64 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: u64) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
-struct S {
-	x: u64,
-	y: u64
-}
+// Bytecode version v9
+module 0xc0ffee::m
+struct S
+  x: u64
+  y: u64
 
-bar(r: &mut u64, i: u64): &mut u64 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[1](i: u64)
-	1: CopyLoc[0](r: &mut u64)
-	2: WriteRef
-	3: MoveLoc[0](r: &mut u64)
-	4: Ret
-}
-baz(r: &mut u64, i: u64) /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[1](i: u64)
-	1: MoveLoc[0](r: &mut u64)
-	2: WriteRef
-	3: Ret
-}
-foo(l: &u64): u64 /* def_idx: 2 */ {
-B0:
-	0: MoveLoc[0](l: &u64)
-	1: ReadRef
-	2: Ret
-}
-public test(s: &mut S, v: u64) /* def_idx: 3 */ {
-L2:	n: u64
-B0:
-	0: CopyLoc[0](s: &mut S)
-	1: ImmBorrowField[0](S.x: u64)
-	2: Call foo(&u64): u64
-	3: StLoc[2](n: u64)
-	4: CopyLoc[0](s: &mut S)
-	5: ImmBorrowField[0](S.x: u64)
-	6: ReadRef
-	7: CopyLoc[2](n: u64)
-	8: CopyLoc[0](s: &mut S)
-	9: ImmBorrowField[1](S.y: u64)
-	10: ReadRef
-	11: Mul
-	12: Eq
-	13: BrFalse(21)
-B1:
-	14: MoveLoc[0](s: &mut S)
-	15: MutBorrowField[0](S.x: u64)
-	16: MoveLoc[2](n: u64)
-	17: Call bar(&mut u64, u64): &mut u64
-	18: MoveLoc[1](v: u64)
-	19: Call baz(&mut u64, u64)
-B2:
-	20: Ret
-B3:
-	21: MoveLoc[0](s: &mut S)
-	22: Pop
-	23: Branch(20)
-}
-}
+// Function definition at index 0
+fun bar(l0: &mut u64, l1: u64): &mut u64
+    move_loc l1
+    copy_loc l0
+    write_ref
+    move_loc l0
+    ret
+
+// Function definition at index 1
+fun baz(l0: &mut u64, l1: u64)
+    move_loc l1
+    move_loc l0
+    write_ref
+    ret
+
+// Function definition at index 2
+fun foo(l0: &u64): u64
+    move_loc l0
+    read_ref
+    ret
+
+// Function definition at index 3
+#[persistent] public fun test(l0: &mut S, l1: u64)
+    local l2: u64
+    copy_loc l0
+    borrow_field S, x
+    call foo
+    st_loc l2
+    copy_loc l0
+    // @5
+    borrow_field S, x
+    read_ref
+    copy_loc l2
+    copy_loc l0
+    borrow_field S, y
+    // @10
+    read_ref
+    mul
+    eq
+    br_false l0
+    move_loc l0
+    // @15
+    mut_borrow_field S, x
+    move_loc l2
+    call bar
+    move_loc l1
+    call baz
+    // @20
+l1: ret
+l0: move_loc l0
+    pop
+    branch l1
+
+
 ============ bytecode verification succeeded ========

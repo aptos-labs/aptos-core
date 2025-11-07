@@ -546,6 +546,13 @@ pub enum SingleRunMode {
         run_for_blocks: Option<usize>,
         additional_configs: Option<SingleRunAdditionalConfigs>,
     },
+    EXACT {
+        print_transactions: bool,
+        allow_debug_build: bool,
+        benchmark_block_size: usize,
+        num_blocks: usize,
+        num_init_accounts: usize,
+    },
 }
 
 /// Optional more detailed configuration.
@@ -566,6 +573,24 @@ pub fn run_single_with_default_params(
 ) -> SingleRunResults {
     aptos_logger::Logger::new().init();
 
+    match mode {
+        SingleRunMode::TEST
+        | SingleRunMode::EXACT {
+            allow_debug_build: true,
+            ..
+        } => {},
+        SingleRunMode::BENCHMARK { .. }
+        | SingleRunMode::EXACT {
+            allow_debug_build: false,
+            ..
+        } => {
+            debug_assert!(
+                false,
+                "Benchmark shouldn't be run in debug mode, use --release instead."
+            );
+        },
+    }
+
     set_layout_caches(true);
     set_paranoid_type_checks(true);
     set_async_runtime_checks(true);
@@ -584,10 +609,16 @@ pub fn run_single_with_default_params(
     let print_transactions = match mode {
         SingleRunMode::TEST => true,
         SingleRunMode::BENCHMARK { .. } => false,
+        SingleRunMode::EXACT {
+            print_transactions, ..
+        } => print_transactions,
     };
     let num_accounts = match mode {
         SingleRunMode::TEST => 100,
         SingleRunMode::BENCHMARK { .. } => 100000,
+        SingleRunMode::EXACT {
+            num_init_accounts, ..
+        } => num_init_accounts,
     };
     let num_blocks = match mode {
         SingleRunMode::TEST
@@ -599,23 +630,23 @@ pub fn run_single_with_default_params(
             run_for_blocks: Some(num_blocks),
             ..
         } => num_blocks,
+        SingleRunMode::EXACT { num_blocks, .. } => num_blocks,
     };
     let benchmark_block_size = match mode {
         SingleRunMode::TEST => 10,
-        SingleRunMode::BENCHMARK { approx_tps, .. } => {
-            debug_assert!(
-                false,
-                "Benchmark shouldn't be run in debug mode, use --release instead."
-            );
-            (approx_tps / 4).clamp(10, 10000)
-        },
+        SingleRunMode::BENCHMARK { approx_tps, .. } => (approx_tps / 4).clamp(10, 10000),
+        SingleRunMode::EXACT {
+            benchmark_block_size,
+            ..
+        } => benchmark_block_size,
     };
     let num_generator_workers = match mode {
         SingleRunMode::TEST => 1,
         SingleRunMode::BENCHMARK {
             additional_configs: None,
             ..
-        } => 4,
+        }
+        | SingleRunMode::EXACT { .. } => 4,
         SingleRunMode::BENCHMARK {
             additional_configs:
                 Some(SingleRunAdditionalConfigs {
@@ -630,7 +661,8 @@ pub fn run_single_with_default_params(
         | SingleRunMode::BENCHMARK {
             additional_configs: None,
             ..
-        } => false,
+        }
+        | SingleRunMode::EXACT { .. } => false,
         SingleRunMode::BENCHMARK {
             additional_configs: Some(SingleRunAdditionalConfigs { split_stages, .. }),
             ..
@@ -712,6 +744,7 @@ mod tests {
             },
         },
         pipeline::PipelineConfig,
+        run_single_with_default_params,
         transaction_executor::BENCHMARKS_BLOCK_EXECUTOR_ONCHAIN_CONFIG,
         transaction_generator::TransactionGenerator,
         BenchmarkWorkload,
@@ -1075,5 +1108,56 @@ mod tests {
         test_generic_benchmark::<
             NativeParallelUncoordinatedBlockExecutor<NativeNoStorageRawTransactionExecutor>,
         >(Some(TransactionTypeArg::NoOp), false);
+    }
+
+    #[test]
+    fn test_fibonacci_recursive() {
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::FibonacciRecursive20),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_fibonacci_tail_recursive() {
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::FibonacciTailRecursive20),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_fibonacci_iterative() {
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::FibonacciIterative20),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_external_lib_bench_test() {
+        run_single_with_default_params(
+            TransactionTypeArg::AptFaTransfer.materialize_default(),
+            TempPath::new(),
+            4,
+            true,
+            crate::SingleRunMode::TEST,
+        );
+    }
+    #[test]
+    fn test_external_lib_bench_larger() {
+        run_single_with_default_params(
+            TransactionTypeArg::AptFaTransfer.materialize_default(),
+            TempPath::new(),
+            4,
+            true,
+            crate::SingleRunMode::EXACT {
+                print_transactions: false,
+                allow_debug_build: true,
+                benchmark_block_size: 3,
+                num_blocks: 50,
+                num_init_accounts: 200,
+            },
+        );
     }
 }

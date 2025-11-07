@@ -56,9 +56,9 @@ use aptos_types::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, BlockOutput, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionExecutableRef, TransactionOutput, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput,
+        AuxiliaryInfo, BlockOutput, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
+        Transaction, TransactionExecutableRef, TransactionOutput, TransactionStatus,
+        VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -831,7 +831,17 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         state_view: &(impl StateView + Sync),
         config: BlockExecutorConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let txn_provider = DefaultTxnProvider::new_without_info(txn_block);
+        let auxiliary_info = (0..txn_block.len() as u32)
+            .map(|i| {
+                AuxiliaryInfo::new(
+                    PersistedAuxiliaryInfo::V1 {
+                        transaction_index: i,
+                    },
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
+        let txn_provider = DefaultTxnProvider::new(txn_block, auxiliary_info);
         let metadata = self.get_txn_slice_metadata();
         let result = {
             AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<

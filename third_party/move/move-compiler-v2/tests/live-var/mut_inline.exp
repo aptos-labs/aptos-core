@@ -1647,101 +1647,101 @@ fun m::foo(): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.m {
+// Bytecode version v9
+module 0x42::m
+// Function definition at index 0
+fun foo(): u64
+    local l0: vector<u64>
+    local l1: &mut vector<u64>
+    local l2: &mut vector<u64>
+    local l3: u64
+    local l4: u64
+    local l5: u64
+    ld_const<vector<u64>> [1, 2, 3]
+    st_loc l0
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    // @5
+    st_loc l2
+    ld_u64 0
+    st_loc l3
+    copy_loc l2
+    freeze_ref
+    // @10
+    vec_len <u64>
+    st_loc l4
+l7: copy_loc l3
+    copy_loc l4
+    lt
+    // @15
+    br_true l0
+    branch l1
+l0: copy_loc l2
+    freeze_ref
+    copy_loc l3
+    // @20
+    vec_borrow <u64>
+    read_ref
+    ld_u64 1
+    gt
+    br_true l2
+    // @25
+    branch l1
+l1: copy_loc l3
+    st_loc l5
+    move_loc l3
+    ld_u64 1
+    // @30
+    add
+    st_loc l3
+l6: copy_loc l3
+    copy_loc l4
+    lt
+    // @35
+    br_false l3
+    copy_loc l2
+    freeze_ref
+    copy_loc l3
+    vec_borrow <u64>
+    // @40
+    read_ref
+    ld_u64 1
+    gt
+    br_true l4
+    branch l5
+    // @45
+l4: copy_loc l2
+    copy_loc l5
+    copy_loc l3
+    vec_swap <u64>
+    move_loc l5
+    // @50
+    ld_u64 1
+    add
+    st_loc l5
+l5: move_loc l3
+    ld_u64 1
+    // @55
+    add
+    st_loc l3
+    branch l6
+l3: move_loc l2
+    pop
+    // @60
+    move_loc l1
+    freeze_ref
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    // @65
+    ret
+l2: move_loc l3
+    ld_u64 1
+    add
+    st_loc l3
+    // @70
+    branch l7
 
 
-foo(): u64 /* def_idx: 0 */ {
-L0:	v: vector<u64>
-L1:	r: &mut vector<u64>
-L2:	v: &mut vector<u64>
-L3:	i: u64
-L4:	len: u64
-L5:	$t9: u64
-B0:
-	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
-	1: StLoc[0](v: vector<u64>)
-	2: MutBorrowLoc[0](v: vector<u64>)
-	3: StLoc[1](r: &mut vector<u64>)
-	4: CopyLoc[1](r: &mut vector<u64>)
-	5: StLoc[2](v: &mut vector<u64>)
-	6: LdU64(0)
-	7: StLoc[3](i: u64)
-	8: CopyLoc[2](v: &mut vector<u64>)
-	9: FreezeRef
-	10: VecLen(1)
-	11: StLoc[4](len: u64)
-B1:
-	12: CopyLoc[3](i: u64)
-	13: CopyLoc[4](len: u64)
-	14: Lt
-	15: BrTrue(17)
-B2:
-	16: Branch(26)
-B3:
-	17: CopyLoc[2](v: &mut vector<u64>)
-	18: FreezeRef
-	19: CopyLoc[3](i: u64)
-	20: VecImmBorrow(1)
-	21: ReadRef
-	22: LdU64(1)
-	23: Gt
-	24: BrTrue(66)
-B4:
-	25: Branch(26)
-B5:
-	26: CopyLoc[3](i: u64)
-	27: StLoc[5]($t9: u64)
-	28: MoveLoc[3](i: u64)
-	29: LdU64(1)
-	30: Add
-	31: StLoc[3](i: u64)
-B6:
-	32: CopyLoc[3](i: u64)
-	33: CopyLoc[4](len: u64)
-	34: Lt
-	35: BrFalse(58)
-B7:
-	36: CopyLoc[2](v: &mut vector<u64>)
-	37: FreezeRef
-	38: CopyLoc[3](i: u64)
-	39: VecImmBorrow(1)
-	40: ReadRef
-	41: LdU64(1)
-	42: Gt
-	43: BrTrue(45)
-B8:
-	44: Branch(53)
-B9:
-	45: CopyLoc[2](v: &mut vector<u64>)
-	46: CopyLoc[5]($t9: u64)
-	47: CopyLoc[3](i: u64)
-	48: VecSwap(1)
-	49: MoveLoc[5]($t9: u64)
-	50: LdU64(1)
-	51: Add
-	52: StLoc[5]($t9: u64)
-B10:
-	53: MoveLoc[3](i: u64)
-	54: LdU64(1)
-	55: Add
-	56: StLoc[3](i: u64)
-	57: Branch(32)
-B11:
-	58: MoveLoc[2](v: &mut vector<u64>)
-	59: Pop
-	60: MoveLoc[1](r: &mut vector<u64>)
-	61: FreezeRef
-	62: LdU64(0)
-	63: VecImmBorrow(1)
-	64: ReadRef
-	65: Ret
-B12:
-	66: MoveLoc[3](i: u64)
-	67: LdU64(1)
-	68: Add
-	69: StLoc[3](i: u64)
-	70: Branch(12)
-}
-}
 ============ bytecode verification succeeded ========

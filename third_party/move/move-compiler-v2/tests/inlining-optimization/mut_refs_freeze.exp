@@ -42,26 +42,25 @@ module 0xc0ffee::m {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+fun read(l0: &u64): u64
+    move_loc l0
+    read_ref
+    ret
+
+// Function definition at index 1
+fun read_then_write(l0: &mut u64)
+    copy_loc l0
+    freeze_ref
+    read_ref
+    ld_u64 1
+    add
+    // @5
+    move_loc l0
+    write_ref
+    ret
 
 
-read(r: &u64): u64 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](r: &u64)
-	1: ReadRef
-	2: Ret
-}
-read_then_write(r: &mut u64) /* def_idx: 1 */ {
-B0:
-	0: CopyLoc[0](r: &mut u64)
-	1: FreezeRef
-	2: ReadRef
-	3: LdU64(1)
-	4: Add
-	5: MoveLoc[0](r: &mut u64)
-	6: WriteRef
-	7: Ret
-}
-}
 ============ bytecode verification succeeded ========

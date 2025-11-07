@@ -1,84 +1,79 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.m {
-enum Data has drop {
- V1{
-	x: u64
- },
- V2{
-	x: u64,
-	y: bool
- },
- V3{
+// Bytecode version v9
+module 0x42::m
+enum Data has drop
+  V1
+    x: u64
+  V2
+    x: u64
+    y: bool
+  V3
 
- }
-}
+// Function definition at index 0
+fun test_v1(): bool
+    local l0: Data
+    ld_u64 43
+    pack_variant Data, V1
+    st_loc l0
+    borrow_loc l0
+    test_variant Data, V1
+    // @5
+    ret
 
-test_v1(): bool /* def_idx: 0 */ {
-L0:	d: Data
-B0:
-	0: LdU64(43)
-	1: PackVariant[0](Data/V1)
-	2: StLoc[0](d: Data)
-	3: ImmBorrowLoc[0](d: Data)
-	4: TestVariant[0](Data/V1)
-	5: Ret
-}
-test_v1v3(): bool /* def_idx: 1 */ {
-L0:	d: Data
-L1:	$t4: &Data
-L2:	t: bool
-L3:	d: Data
-L4:	$t6: &Data
-L5:	return: bool
-B0:
-	0: LdU64(43)
-	1: PackVariant[0](Data/V1)
-	2: StLoc[0](d: Data)
-	3: ImmBorrowLoc[0](d: Data)
-	4: StLoc[1]($t4: &Data)
-	5: CopyLoc[1]($t4: &Data)
-	6: TestVariant[0](Data/V1)
-	7: StLoc[2](t: bool)
-	8: CopyLoc[2](t: bool)
-	9: BrFalse(34)
-B1:
-	10: MoveLoc[1]($t4: &Data)
-	11: Pop
-B2:
-	12: PackVariant[1](Data/V3)
-	13: StLoc[3](d: Data)
-	14: MoveLoc[2](t: bool)
-	15: BrFalse(31)
-B3:
-	16: ImmBorrowLoc[3](d: Data)
-	17: StLoc[4]($t6: &Data)
-	18: CopyLoc[4]($t6: &Data)
-	19: TestVariant[0](Data/V1)
-	20: StLoc[5](return: bool)
-	21: CopyLoc[5](return: bool)
-	22: BrFalse(27)
-B4:
-	23: MoveLoc[4]($t6: &Data)
-	24: Pop
-B5:
-	25: MoveLoc[5](return: bool)
-	26: Ret
-B6:
-	27: MoveLoc[4]($t6: &Data)
-	28: TestVariant[1](Data/V3)
-	29: StLoc[5](return: bool)
-	30: Branch(25)
-B7:
-	31: LdFalse
-	32: StLoc[5](return: bool)
-	33: Branch(25)
-B8:
-	34: MoveLoc[1]($t4: &Data)
-	35: TestVariant[1](Data/V3)
-	36: StLoc[2](t: bool)
-	37: Branch(12)
-}
-}
+// Function definition at index 1
+fun test_v1v3(): bool
+    local l0: Data
+    local l1: &Data
+    local l2: bool
+    local l3: Data
+    local l4: &Data
+    local l5: bool
+    ld_u64 43
+    pack_variant Data, V1
+    st_loc l0
+    borrow_loc l0
+    st_loc l1
+    // @5
+    copy_loc l1
+    test_variant Data, V1
+    st_loc l2
+    copy_loc l2
+    br_false l0
+    // @10
+    move_loc l1
+    pop
+l4: pack_variant Data, V3
+    st_loc l3
+    move_loc l2
+    // @15
+    br_false l1
+    borrow_loc l3
+    st_loc l4
+    copy_loc l4
+    test_variant Data, V1
+    // @20
+    st_loc l5
+    copy_loc l5
+    br_false l2
+    move_loc l4
+    pop
+    // @25
+l3: move_loc l5
+    ret
+l2: move_loc l4
+    test_variant Data, V3
+    st_loc l5
+    // @30
+    branch l3
+l1: ld_false
+    st_loc l5
+    branch l3
+l0: move_loc l1
+    // @35
+    test_variant Data, V3
+    st_loc l2
+    branch l4
+
+
 ============ bytecode verification succeeded ========

@@ -186,51 +186,52 @@ fun assign::assign_struct($t0: &mut 0x42::assign::S) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.assign {
-struct T has drop {
-	h: u64
-}
-struct S has drop {
-	f: u64,
-	g: T
-}
+// Bytecode version v9
+module 0x42::assign
+struct T has drop
+  h: u64
 
-assign_field(s: &mut S, f: u64) /* def_idx: 0 */ {
-L2:	$t2: &mut u64
-B0:
-	0: MoveLoc[0](s: &mut S)
-	1: MutBorrowField[0](S.f: u64)
-	2: StLoc[2]($t2: &mut u64)
-	3: MoveLoc[1](f: u64)
-	4: MoveLoc[2]($t2: &mut u64)
-	5: WriteRef
-	6: Ret
-}
-assign_int(x: &mut u64) /* def_idx: 1 */ {
-B0:
-	0: LdU64(42)
-	1: MoveLoc[0](x: &mut u64)
-	2: WriteRef
-	3: Ret
-}
-assign_pattern(s: S, f: u64, h: u64): u64 /* def_idx: 2 */ {
-B0:
-	0: MoveLoc[0](s: S)
-	1: Unpack[1](S)
-	2: Unpack[0](T)
-	3: Add
-	4: Ret
-}
-assign_struct(s: &mut S) /* def_idx: 3 */ {
-B0:
-	0: LdU64(42)
-	1: LdU64(42)
-	2: Pack[0](T)
-	3: Pack[1](S)
-	4: MoveLoc[0](s: &mut S)
-	5: WriteRef
-	6: Ret
-}
-}
+struct S has drop
+  f: u64
+  g: T
+
+// Function definition at index 0
+fun assign_field(l0: &mut S, l1: u64)
+    local l2: &mut u64
+    move_loc l0
+    mut_borrow_field S, f
+    st_loc l2
+    move_loc l1
+    move_loc l2
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 1
+fun assign_int(l0: &mut u64)
+    ld_u64 42
+    move_loc l0
+    write_ref
+    ret
+
+// Function definition at index 2
+fun assign_pattern(l0: S, l1: u64, l2: u64): u64
+    move_loc l0
+    unpack S
+    unpack T
+    add
+    ret
+
+// Function definition at index 3
+fun assign_struct(l0: &mut S)
+    ld_u64 42
+    ld_u64 42
+    pack T
+    pack S
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+
 ============ bytecode verification succeeded ========
