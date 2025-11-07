@@ -60,6 +60,7 @@ async fn test_proof_coordinator_basic() {
         proof_cache.clone(),
         true,
         10,
+        false,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
@@ -113,6 +114,7 @@ async fn test_proof_coordinator_with_unverified_signatures() {
         proof_cache.clone(),
         true,
         10,
+        false,
     );
     let (proof_coordinator_tx, proof_coordinator_rx) = channel(100);
     let (tx, mut rx) = channel(100);
