@@ -112,10 +112,17 @@ pub enum RocksDBStatsLevel {
     All,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IndexType {
+    BinarySearch,
+    HashSearch,
+    TwoLevelIndexSearch,
+}
+
 /// Port selected RocksDB options for tuning underlying rocksdb instance of AptosDB.
 /// see <https://github.com/facebook/rocksdb/blob/master/include/rocksdb/options.h>
 /// for detailed explanations.
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfig {
     /// Maximum number of files open by RocksDB at one time
@@ -129,6 +136,10 @@ pub struct RocksdbConfig {
     pub block_cache_size: u64,
     /// Block size for Rocks DB
     pub block_size: u64,
+    /// Index type used for tables.
+    pub index_type: IndexType,
+    /// Use partitioned filters.
+    pub partition_filters: bool,
     /// Whether to cache index and filter blocks into block cache.
     pub cache_index_and_filter_blocks: bool,
     /// Whether to pin L0 filters and indexes in memory. Only makes sense if
@@ -140,6 +151,8 @@ pub struct RocksdbConfig {
     /// If not zero, dump stats to LOG every this many seconds. `None` means using RocksDB's
     /// default.
     pub stats_dump_period_sec: Option<u32>,
+    pub bloom_filter_bits: Option<f64>,
+    pub bloom_before_level: Option<i32>,
 }
 
 impl RocksdbConfig {
@@ -160,6 +173,8 @@ impl Default for RocksdbConfig {
             // Not used. Only kept for backward compatibility.
             block_cache_size: 0,
             block_size: Self::DEFAULT_BLOCK_SIZE,
+            index_type: IndexType::TwoLevelIndexSearch,
+            partition_filters: true,
             // Count index/filter blocks in block cache usage by default.
             cache_index_and_filter_blocks: true,
             // L0 index/filter blocks are usually small and used frequently.
@@ -168,11 +183,13 @@ impl Default for RocksdbConfig {
             stats_level: Some(RocksDBStatsLevel::ExceptHistogramOrTimers),
             // Use RocksDB's default if not specified.
             stats_dump_period_sec: None,
+            bloom_filter_bits: Some(10.0),
+            bloom_before_level: Some(2),
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct RocksdbConfigs {
     // TODO(grao): Add RocksdbConfig for individual ledger DBs when necessary.
@@ -202,7 +219,10 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            state_kv_db_config: RocksdbConfig::default(),
+            state_kv_db_config: RocksdbConfig {
+                bloom_filter_bits: Some(12.0),
+                ..Default::default()
+            },
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
@@ -215,7 +235,7 @@ impl Default for RocksdbConfigs {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct StorageConfig {
     pub backup_service_address: SocketAddr,
