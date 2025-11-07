@@ -176,11 +176,21 @@ impl NodeManager {
     }
 
     pub fn get_node_api_url(&self) -> Url {
-        socket_addr_to_url(&self.config.api.address, "http").unwrap()
+        let mut addr = self.config.api.address;
+        // If bound to 0.0.0.0, clients should connect to 127.0.0.1 instead.
+        if addr.ip().is_unspecified() {
+            addr.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        }
+        socket_addr_to_url(&addr, "http").unwrap()
     }
 
     pub fn get_data_service_url(&self) -> Url {
-        socket_addr_to_url(&self.config.indexer_grpc.address, "http").unwrap()
+        let mut addr = self.config.indexer_grpc.address;
+        // If bound to 0.0.0.0, clients should connect to 127.0.0.1 instead.
+        if addr.ip().is_unspecified() {
+            addr.set_ip(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)));
+        }
+        socket_addr_to_url(&addr, "http").unwrap()
     }
 }
 
