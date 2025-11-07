@@ -353,6 +353,7 @@ impl InnerBuilder {
             self.broadcast_proofs,
             self.config.batch_expiry_gap_when_init_usecs,
             self.use_batch_info_ext,
+            self.config.enable_proof_v2,
         );
         spawn_named!(
             "proof_coordinator",

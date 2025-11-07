@@ -9,7 +9,7 @@ use crate::{
 use aptos_consensus_types::{
     common::Author,
     proof_of_store::{
-        BatchInfo, ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg,
+        BatchInfo, BatchInfoExt, ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg,
     },
 };
 use std::time::Duration;
@@ -72,8 +72,21 @@ impl QuorumStoreSender for MockQuorumStoreSender {
 
     async fn send_proof_of_store_msg_to_self(
         &mut self,
-        _proof_of_stores: Vec<ProofOfStore<BatchInfo>>,
+        _proof_of_stores: Vec<ProofOfStore<BatchInfoExt>>,
     ) {
         unimplemented!()
+    }
+
+    async fn broadcast_proof_of_store_msg_v2(
+        &mut self,
+        proof_of_stores: Vec<ProofOfStore<BatchInfoExt>>,
+    ) {
+        self.tx
+            .send((
+                ConsensusMsg::ProofOfStoreMsgV2(Box::new(ProofOfStoreMsg::new(proof_of_stores))),
+                vec![],
+            ))
+            .await
+            .expect("We should be able to send the proof of store message");
     }
 }

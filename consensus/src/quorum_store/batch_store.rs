@@ -12,7 +12,7 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::proof_of_store::{BatchInfo, SignedBatchInfo};
+use aptos_consensus_types::proof_of_store::{BatchInfo, BatchInfoExt, SignedBatchInfo};
 use aptos_crypto::{CryptoMaterialError, HashValue};
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_infallible::Mutex;
