@@ -1388,8 +1388,6 @@ dependencies = [
  "num-traits",
  "num_cpus",
  "pairing",
- "phf 0.13.1",
- "phf_macros 0.13.1",
  "rand 0.7.3",
  "rand_core 0.5.1",
  "rayon",
@@ -2018,7 +2016,7 @@ dependencies = [
  "sha2 0.10.8",
  "sha2 0.9.9",
  "sha3 0.9.1",
- "siphasher 0.3.11",
+ "siphasher",
  "smallvec",
  "tempfile",
  "tiny-keccak",
@@ -6813,7 +6811,7 @@ checksum = "91d7b79e99bfaa0d47da0687c43aa3b7381938a62ad3a6498599039321f660b7"
 dependencies = [
  "chrono",
  "chrono-tz-build 0.2.1",
- "phf 0.11.2",
+ "phf",
 ]
 
 [[package]]
@@ -6824,7 +6822,7 @@ checksum = "9c6ac4f2c0bf0f44e9161aec9675e1050aa4a530663c4a9e37e108fa948bca9f"
 dependencies = [
  "chrono",
  "chrono-tz-build 0.4.0",
- "phf 0.11.2",
+ "phf",
 ]
 
 [[package]]
@@ -6834,7 +6832,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "433e39f13c9a060046954e0592a8d0a4bcb1040125cbf91cb8ee58964cfb350f"
 dependencies = [
  "parse-zoneinfo",
- "phf 0.11.2",
+ "phf",
  "phf_codegen",
 ]
 
@@ -14340,18 +14338,8 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ade2d8b8f33c7333b51bcf0428d37e217e9f32192ae4772156f65063b8ce03dc"
 dependencies = [
- "phf_macros 0.11.3",
+ "phf_macros",
  "phf_shared 0.11.2",
-]
-
-[[package]]
-name = "phf"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1562dc717473dbaa4c1f85a36410e03c047b2e7df7f45ee938fbef64ae7fadf"
-dependencies = [
- "phf_shared 0.13.1",
- "serde",
 ]
 
 [[package]]
@@ -14360,7 +14348,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e8d39688d359e6b34654d328e262234662d16cc0f60ec8dcbe5e718709342a5a"
 dependencies = [
- "phf_generator 0.11.2",
+ "phf_generator",
  "phf_shared 0.11.2",
 ]
 
@@ -14375,36 +14363,13 @@ dependencies = [
 ]
 
 [[package]]
-name = "phf_generator"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135ace3a761e564ec88c03a77317a7c6b80bb7f7135ef2544dbe054243b89737"
-dependencies = [
- "fastrand 2.3.0",
- "phf_shared 0.13.1",
-]
-
-[[package]]
 name = "phf_macros"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f84ac04429c13a7ff43785d75ad27569f2951ce0ffd30a3321230db2fc727216"
 dependencies = [
- "phf_generator 0.11.2",
+ "phf_generator",
  "phf_shared 0.11.2",
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
-name = "phf_macros"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "812f032b54b1e759ccd5f8b6677695d5268c588701effba24601f6932f8269ef"
-dependencies = [
- "phf_generator 0.13.1",
- "phf_shared 0.13.1",
  "proc-macro2",
  "quote",
  "syn 2.0.87",
@@ -14416,7 +14381,7 @@ version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6796ad771acdc0123d2a88dc428b5e38ef24456743ddb1744ed628f9815c096"
 dependencies = [
- "siphasher 0.3.11",
+ "siphasher",
 ]
 
 [[package]]
@@ -14425,16 +14390,7 @@ version = "0.11.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90fcb95eef784c2ac79119d1dd819e162b5da872ce6f3c3abe1e8ca1c082f72b"
 dependencies = [
- "siphasher 0.3.11",
-]
-
-[[package]]
-name = "phf_shared"
-version = "0.13.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e57fef6bc5981e38c2ce2d63bfa546861309f875b8a75f092d1d54ae2d64f266"
-dependencies = [
- "siphasher 1.0.1",
+ "siphasher",
 ]
 
 [[package]]
@@ -17249,12 +17205,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
-name = "siphasher"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56199f7ddabf13fe5074ce809e7d3f42b42ae711800501b5b16ea82ad029c39d"
-
-[[package]]
 name = "sized-chunks"
 version = "0.6.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -17466,7 +17416,7 @@ dependencies = [
  "itertools 0.11.0",
  "lalrpop 0.20.2",
  "lalrpop-util 0.20.2",
- "phf 0.11.2",
+ "phf",
  "thiserror",
  "unicode-xid",
 ]
@@ -18282,7 +18232,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.1",
  "percent-encoding",
- "phf 0.11.2",
+ "phf",
  "pin-project-lite",
  "postgres-protocol",
  "postgres-types",
