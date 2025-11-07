@@ -53,3 +53,6 @@ no_commit_apt-fa-transfer	1	VM	5	0.756	1.016	35479.7
 no_commit_apt-fa-transfer	1	NativeVM	5	0.799	1.013	60489.6
 no_commit_apt-fa-transfer	1	AptosVMSpeculative	5	0.680	1.014	10473.4
 no_commit_apt-fa-transfer	1	NativeSpeculative	5	0.702	1.011	102011.3
+fibonacci-recursive-20	1	VM	9	0.989	1.017	3339.3
+fibonacci-tail-recursive-20	1	VM	9	0.989	1.017	3339.3
+fibonacci-iterative-20	1	VM	9	0.989	1.017	3339.3

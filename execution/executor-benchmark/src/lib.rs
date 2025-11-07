@@ -1076,4 +1076,28 @@ mod tests {
             NativeParallelUncoordinatedBlockExecutor<NativeNoStorageRawTransactionExecutor>,
         >(Some(TransactionTypeArg::NoOp), false);
     }
+
+    #[test]
+    fn test_fibonacci_recursive() {
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::FibonacciRecursive20),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_fibonacci_tail_recursive() {
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::FibonacciTailRecursive20),
+            true,
+        );
+    }
+
+    #[test]
+    fn test_fibonacci_iterative() {
+        test_generic_benchmark::<AptosVMBlockExecutor>(
+            Some(TransactionTypeArg::FibonacciIterative20),
+            true,
+        );
+    }
 }
