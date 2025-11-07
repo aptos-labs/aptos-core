@@ -45,9 +45,9 @@ use aptos_types::{
         state_value::{StateValue, StateValueChunkWithProof},
     },
     transaction::{
-        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, Transaction,
-        TransactionAuxiliaryData, TransactionInfo, TransactionListWithProofV2,
-        TransactionOutputListWithProofV2, TransactionWithProof, Version,
+        AccountOrderedTransactionsWithProof, PersistedAuxiliaryInfo, Transaction, TransactionInfo,
+        TransactionListWithProofV2, TransactionOutputListWithProofV2, TransactionWithProof,
+        Version,
     },
     write_set::WriteSet,
     PeerId,
@@ -396,12 +396,6 @@ mock! {
             start_version: Version,
             limit: u64,
         ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<WriteSet>>>>;
-
-        fn get_auxiliary_data_iterator(
-            &self,
-            start_version: Version,
-            limit: u64,
-        ) -> aptos_storage_interface::Result<Box<dyn Iterator<Item = aptos_storage_interface::Result<TransactionAuxiliaryData>>>>;
 
         fn get_transaction_accumulator_range_proof(
             &self,

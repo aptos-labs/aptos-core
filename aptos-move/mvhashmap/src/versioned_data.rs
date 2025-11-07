@@ -636,7 +636,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         );
 
         // Assert that the previous entry for txn_idx, if present, had lower incarnation.
-        assert!(prev_entry.map_or(true, |entry| -> bool {
+        assert!(prev_entry.is_none_or(|entry| -> bool {
             if let EntryCell::ResourceWrite {
                 incarnation: prev_incarnation,
                 ..
@@ -735,7 +735,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         );
 
         // Changes versioned metadata that was stored.
-        prev_entry.map_or(true, |entry| -> bool {
+        prev_entry.is_none_or(|entry| -> bool {
             if let EntryCell::ResourceWrite {
                 value_with_layout: existing_value_with_layout,
                 ..

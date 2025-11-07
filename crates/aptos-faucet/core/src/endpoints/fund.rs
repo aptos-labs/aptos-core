@@ -56,19 +56,13 @@ impl FundRequest {
         if let Some(auth_key) = self.auth_key.as_ref() {
             return match AccountAddress::from_hex_literal(auth_key) {
                 Ok(auth_key) => Some(auth_key),
-                Err(_) => match AccountAddress::from_hex(auth_key) {
-                    Ok(auth_key) => Some(auth_key),
-                    Err(_) => None,
-                },
+                Err(_) => AccountAddress::from_hex(auth_key).ok(),
             };
         }
         if let Some(address) = self.address.as_ref() {
             return match AccountAddress::from_hex_literal(address) {
                 Ok(address) => Some(address),
-                Err(_) => match AccountAddress::from_hex(address) {
-                    Ok(address) => Some(address),
-                    Err(_) => None,
-                },
+                Err(_) => AccountAddress::from_hex(address).ok(),
             };
         }
         if let Some(pub_key) = self.pub_key.as_ref() {

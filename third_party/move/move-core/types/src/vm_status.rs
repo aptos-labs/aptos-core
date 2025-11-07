@@ -195,6 +195,7 @@ impl VMStatus {
     pub fn keep_or_discard(
         self,
         function_values_enabled: bool,
+        memory_limit_exceeded_as_miscellaneous_error: bool,
     ) -> Result<KeptVMStatus, DiscardedVMStatus> {
         match self {
             VMStatus::Executed => Ok(KeptVMStatus::Executed),
@@ -218,7 +219,18 @@ impl VMStatus {
                 status_code: StatusCode::VM_MAX_VALUE_DEPTH_REACHED,
                 ..
             } if function_values_enabled => Ok(KeptVMStatus::MiscellaneousError),
-
+            VMStatus::ExecutionFailure {
+                status_code: StatusCode::MEMORY_LIMIT_EXCEEDED,
+                ..
+            } if memory_limit_exceeded_as_miscellaneous_error => {
+                Ok(KeptVMStatus::MiscellaneousError)
+            },
+            VMStatus::Error {
+                status_code: StatusCode::MEMORY_LIMIT_EXCEEDED,
+                ..
+            } if memory_limit_exceeded_as_miscellaneous_error => {
+                Ok(KeptVMStatus::MiscellaneousError)
+            },
             VMStatus::ExecutionFailure {
                 status_code:
                     StatusCode::EXECUTION_LIMIT_REACHED

@@ -1174,6 +1174,27 @@ TransactionArgument:
     9:
       Serialized:
         NEWTYPE: BYTES
+    10:
+      I8:
+        NEWTYPE: I8
+    11:
+      I16:
+        NEWTYPE: I16
+    12:
+      I32:
+        NEWTYPE: I32
+    13:
+      I64:
+        NEWTYPE: I64
+    14:
+      I128:
+        NEWTYPE: I128
+    15:
+      I256:
+        NEWTYPE:
+          TUPLEARRAY:
+            CONTENT: U8
+            SIZE: 32
 TransactionAuthenticator:
   ENUM:
     0:
@@ -1324,6 +1345,18 @@ TypeTag:
       Function:
         NEWTYPE:
           TYPENAME: FunctionTag
+    12:
+      i8: UNIT
+    13:
+      i16: UNIT
+    14:
+      i32: UNIT
+    15:
+      i64: UNIT
+    16:
+      i128: UNIT
+    17:
+      i256: UNIT
 ValidatorConsensusInfo:
   STRUCT:
     - address:

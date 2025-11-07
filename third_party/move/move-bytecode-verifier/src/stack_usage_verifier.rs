@@ -132,6 +132,12 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::LdU64(_)
             | Bytecode::LdU128(_)
             | Bytecode::LdU256(_)
+            | Bytecode::LdI8(_)
+            | Bytecode::LdI16(_)
+            | Bytecode::LdI32(_)
+            | Bytecode::LdI64(_)
+            | Bytecode::LdI128(_)
+            | Bytecode::LdI256(_)
             | Bytecode::LdTrue
             | Bytecode::LdFalse
             | Bytecode::LdConst(_)
@@ -142,6 +148,7 @@ impl<'a> StackUsageVerifier<'a> {
 
             // Instructions that pop and push once
             Bytecode::Not
+            | Bytecode::Negate
             | Bytecode::FreezeRef
             | Bytecode::ReadRef
             | Bytecode::Exists(_)
@@ -168,6 +175,12 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::CastU64
             | Bytecode::CastU128
             | Bytecode::CastU256
+            | Bytecode::CastI8
+            | Bytecode::CastI16
+            | Bytecode::CastI32
+            | Bytecode::CastI64
+            | Bytecode::CastI128
+            | Bytecode::CastI256
             | Bytecode::VecLen(_)
             | Bytecode::VecPopBack(_) => (1, 1),
 

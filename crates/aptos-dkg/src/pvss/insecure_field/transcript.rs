@@ -7,7 +7,7 @@ use crate::{
     pvss::{
         das, encryption_dlog, traits,
         traits::{transcript::MalleableTranscript, Convert, SecretSharingConfig},
-        Player, ThresholdConfig,
+        Player, ThresholdConfigBlstrs,
     },
     utils::{
         random::{insecure_random_g2_points, random_scalars},
@@ -63,9 +63,13 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = ThresholdConfig;
+    type SecretSharingConfig = ThresholdConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
+
+    fn dst() -> Vec<u8> {
+        b"APTOS_INSECURE_FIELD_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         "insecure_field_pvss".to_string()

@@ -641,7 +641,7 @@ impl Analyzer<'_> {
 
     fn add_types_in_borrow_edge(&mut self, edge: &BorrowEdge) {
         match edge {
-            BorrowEdge::Direct | BorrowEdge::Index(_) => (),
+            BorrowEdge::Direct | BorrowEdge::Invoke | BorrowEdge::Index(_) => (),
             BorrowEdge::Field(qid, _, _) => {
                 self.add_type_root(&qid.to_type());
             },

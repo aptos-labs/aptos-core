@@ -379,9 +379,12 @@ impl AbstractState {
         mut_: bool,
         local: LocalIndex,
     ) -> PartialVMResult<AbstractValue> {
-        // nothing to check in case borrow is mutable since the frame cannot have an full borrow/
-        // epsilon outgoing edge
         if !mut_ && self.is_local_mutably_borrowed(local) {
+            return Err(self.error(StatusCode::BORROWLOC_EXISTS_BORROW_ERROR, offset));
+        }
+
+        // The frame can end up being fully borrowed because of borrow edge overflow.
+        if mut_ && self.has_full_borrows(self.frame_root()) {
             return Err(self.error(StatusCode::BORROWLOC_EXISTS_BORROW_ERROR, offset));
         }
 

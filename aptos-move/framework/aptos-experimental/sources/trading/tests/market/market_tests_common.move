@@ -26,7 +26,7 @@ module aptos_experimental::market_tests_common {
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::{good_till_cancelled, post_only, immediate_or_cancel};
 
-    const PRE_CANCEL_WINDOW_MICROS: u64 = 1000000; // 1 second
+    const PRE_CANCEL_WINDOW_SECS: u64 = 1; // 1 second
     const U64_MAX: u64 = 0xFFFFFFFFFFFFFFFF;
 
     // Helper function to setup market and clearinghouse
@@ -38,7 +38,7 @@ module aptos_experimental::market_tests_common {
         let market = new_market(
             admin,
             market_signer,
-            new_market_config(allow_self_matching, true, PRE_CANCEL_WINDOW_MICROS)
+            new_market_config(allow_self_matching, true, PRE_CANCEL_WINDOW_SECS)
         );
         clearinghouse_test::initialize(admin);
         market
@@ -97,7 +97,7 @@ module aptos_experimental::market_tests_common {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
     ): Option<OrderIdType> {
-        market_bulk_order::place_bulk_order(
+        let order_id = market_bulk_order::place_bulk_order(
             market,
             signer::address_of(maker),
             1, // sequence number for tests
@@ -107,7 +107,8 @@ module aptos_experimental::market_tests_common {
             ask_sizes,
             clearinghouse_test::new_test_order_metadata(1),
             &test_market_callbacks()
-        )
+        );
+        option::some(order_id)
     }
 
     // Helper function to place a taker order that fully fills
@@ -566,7 +567,7 @@ module aptos_experimental::market_tests_common {
             false, // is_bid
             immediate_or_cancel(), // order_type
             &mut event_store,
-            false, // Despite it being a "taker", this order will not cross
+            true, // Despite it being a "taker", this order will not cross
             true,
             new_test_order_metadata(1),
             option::none(),
@@ -798,7 +799,7 @@ module aptos_experimental::market_tests_common {
         let (taker_order_id, _) = place_taker_order(
             &mut market,
             maker1,
-            option::some(1),
+            option::some(std::string::utf8(b"1")),
             option::some(1000),
             1000000,
             false,
@@ -814,7 +815,7 @@ module aptos_experimental::market_tests_common {
                 &mut market,
                 maker1,
                 taker_order_id,
-                option::some(1),
+                option::some(std::string::utf8(b"1")),
                 1001,
                 1000000,
                 false,
@@ -830,7 +831,7 @@ module aptos_experimental::market_tests_common {
                 &mut market,
                 maker1,
                 taker_order_id,
-                option::some(1),
+                option::some(std::string::utf8(b"1")),
                 1001,
                 1000000,
                 false,

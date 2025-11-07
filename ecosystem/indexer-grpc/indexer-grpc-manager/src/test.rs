@@ -40,6 +40,7 @@ async fn test_run() {
         grpc_manager_addresses: vec![self_address],
         fullnode_addresses: vec![],
         is_master: true,
+        allow_fn_fallback: false,
     };
 
     let task = tokio::spawn(async move {

@@ -30,13 +30,7 @@ const PORT_SEED: [u8; 32] = [
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
 ];
 // See https://nexte.st/book/env-vars.html#environment-variables-nextest-sets
-static NEXTEST_RUN_ID: Lazy<Option<String>> = Lazy::new(|| {
-    if let Ok(run_id) = env::var("NEXTEST_RUN_ID") {
-        Some(run_id)
-    } else {
-        None
-    }
-});
+static NEXTEST_RUN_ID: Lazy<Option<String>> = Lazy::new(|| env::var("NEXTEST_RUN_ID").ok());
 static PORT_VECTOR: Lazy<Vec<u16>> = Lazy::new(|| {
     let mut ports: Vec<_> = UNIQUE_PORT_RANGE.collect();
     let mut rng = rand::rngs::StdRng::from_seed(PORT_SEED);

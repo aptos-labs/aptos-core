@@ -81,7 +81,7 @@ pub struct NodeMonitoringConfig {
 impl Default for NodeMonitoringConfig {
     fn default() -> Self {
         Self {
-            node_info_request_interval_ms: 20_000, // 20 seconds
+            node_info_request_interval_ms: 15_000, // 15 seconds
             node_info_request_timeout_ms: 10_000,  // 10 seconds
         }
     }

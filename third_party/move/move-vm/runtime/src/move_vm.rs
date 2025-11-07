@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
+    data_cache::MoveVmDataCache,
+    execution_tracing::{NoOpTraceRecorder, TraceRecorder},
     interpreter::Interpreter,
     interpreter_caches::InterpreterFunctionCaches,
     module_traversal::TraversalContext,
@@ -23,7 +24,6 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
-    resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
@@ -44,6 +44,27 @@ pub struct SerializedReturnValues {
 pub struct MoveVM;
 
 impl MoveVM {
+    pub fn execute_loaded_function(
+        function: LoadedFunction,
+        serialized_args: Vec<impl Borrow<[u8]>>,
+        data_cache: &mut impl MoveVmDataCache,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        extensions: &mut NativeContextExtensions,
+        loader: &impl Loader,
+    ) -> VMResult<SerializedReturnValues> {
+        Self::execute_loaded_function_with_tracing(
+            function,
+            serialized_args,
+            data_cache,
+            gas_meter,
+            traversal_context,
+            extensions,
+            loader,
+            &mut NoOpTraceRecorder,
+        )
+    }
+
     /// Executes provided function with the specified arguments. The arguments are serialized, and
     /// are not checked by the VM. It is the responsibility of the caller of this function to
     /// verify that they are well-formed.
@@ -55,18 +76,17 @@ impl MoveVM {
     ///
     /// When execution finishes, the return values of the function are returned. Additionally, if
     /// there are any mutable references passed as arguments, these values are also returned.
-    pub fn execute_loaded_function(
+    pub fn execute_loaded_function_with_tracing(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         loader: &impl Loader,
-        resource_resolver: &impl ResourceResolver,
+        trace_recorder: &mut impl TraceRecorder,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = loader.runtime_environment().vm_config();
-        let check_invariant_in_swap_loc = vm_config.check_invariant_in_swap_loc;
 
         let function_value_extension = FunctionValueExtensionAdapter {
             module_storage: loader.unmetered_module_storage(),
@@ -90,7 +110,6 @@ impl MoveVM {
             traversal_context,
             &param_tys,
             serialized_args,
-            check_invariant_in_swap_loc,
         )
         .map_err(|err| err.finish(Location::Undefined))?;
 
@@ -107,10 +126,10 @@ impl MoveVM {
                 loader,
                 &ty_depth_checker,
                 &layout_converter,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
+                trace_recorder,
             )?
         };
 
@@ -132,7 +151,7 @@ impl MoveVM {
             })
             .map(|(idx, ty)| {
                 // serialize return values first in the case that a value points into this local
-                let local_val = dummy_locals.move_loc(idx, check_invariant_in_swap_loc)?;
+                let local_val = dummy_locals.move_loc(idx)?;
                 let (bytes, layout) = serialize_return_value(
                     &function_value_extension,
                     &layout_converter,
@@ -202,7 +221,6 @@ fn deserialize_args(
     traversal_context: &mut TraversalContext,
     param_tys: &[Type],
     serialized_args: Vec<impl Borrow<[u8]>>,
-    check_invariant_in_swap_loc: bool,
 ) -> PartialVMResult<(Locals, Vec<Value>)> {
     if param_tys.len() != serialized_args.len() {
         return Err(
@@ -235,7 +253,6 @@ fn deserialize_args(
                         inner_ty,
                         arg_bytes,
                     )?,
-                    check_invariant_in_swap_loc,
                 )?;
                 dummy_locals.borrow_loc(idx)
             },
@@ -297,7 +314,8 @@ fn serialize_return_value(
         .with_func_args_deserialization(function_value_extension)
         .serialize(&value, &layout)?
         .ok_or_else(serialization_error)?;
-    Ok((bytes, layout))
+    // TODO(layouts): consider not cloning returned layouts?
+    Ok((bytes, layout.as_ref().clone()))
 }
 
 fn serialize_return_values(

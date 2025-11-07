@@ -12,13 +12,13 @@ use serde_yaml::Value;
 
 // Whether to enable size and time-aware chunking (for non-production networks).
 // Note: once this becomes stable, we should enable it for all networks (e.g., Mainnet).
-const ENABLE_SIZE_AND_TIME_AWARE_CHUNKING: bool = false;
+const ENABLE_SIZE_AND_TIME_AWARE_CHUNKING: bool = true;
 
 // The maximum message size per state sync message
 const SERVER_MAX_MESSAGE_SIZE: usize = 10 * 1024 * 1024; // 10 MiB
 
 // The maximum message size per state sync message (for v2 data requests)
-const CLIENT_MAX_MESSAGE_SIZE_V2: usize = 15 * 1024 * 1024; // 15 MiB (used for v2 data requests)
+const CLIENT_MAX_MESSAGE_SIZE_V2: usize = 20 * 1024 * 1024; // 20 MiB (used for v2 data requests)
 const SERVER_MAX_MESSAGE_SIZE_V2: usize = 40 * 1024 * 1024; // 40 MiB (used for v2 data requests)
 
 // The maximum chunk sizes for data client requests and response
@@ -832,7 +832,6 @@ mod tests {
         );
     }
 
-    #[ignore] // TODO: revert when size and time-aware chunking is healthy
     #[test]
     fn test_optimize_storage_service_devnet() {
         // Create a node config with size and time-aware chunking disabled
@@ -862,7 +861,6 @@ mod tests {
         assert!(storage_service_config.enable_size_and_time_aware_chunking);
     }
 
-    #[ignore] // TODO: revert when size and time-aware chunking is healthy
     #[test]
     fn test_optimize_storage_service_mainnet() {
         // Create a node config with size and time-aware chunking disabled

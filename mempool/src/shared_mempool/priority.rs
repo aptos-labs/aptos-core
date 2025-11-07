@@ -20,16 +20,28 @@ use std::{
     time::Instant,
 };
 
+/// The number of microseconds in one second
+const MICROS_PER_SECOND: u64 = 1000 * 1000; // 1 million
+
 /// A simple struct that offers comparisons and ordering for peer prioritization
 #[derive(Clone, Debug)]
 struct PrioritizedPeersComparator {
+    // The current mempool configuration
+    mempool_config: MempoolConfig,
+
+    // The random state used to hash peer IDs
     random_state: RandomState,
+
+    // The time service used to calculate timestamps
+    time_service: TimeService,
 }
 
 impl PrioritizedPeersComparator {
-    fn new() -> Self {
+    fn new(mempool_config: MempoolConfig, time_service: TimeService) -> Self {
         Self {
+            mempool_config,
             random_state: RandomState::new(),
+            time_service,
         }
     }
 
@@ -68,7 +80,18 @@ impl PrioritizedPeersComparator {
         let (peer_network_id_a, monitoring_metadata_a) = peer_a;
         let (peer_network_id_b, monitoring_metadata_b) = peer_b;
 
-        // First, compare by network ID (i.e., Validator > VFN > Public)
+        // First, compare the peers by health (e.g., sync lag)
+        let unhealthy_ordering = compare_peer_health(
+            &self.mempool_config,
+            &self.time_service,
+            monitoring_metadata_a,
+            monitoring_metadata_b,
+        );
+        if !unhealthy_ordering.is_eq() {
+            return unhealthy_ordering; // Only return if it's not equal
+        }
+
+        // Next, compare by network ID (i.e., Validator > VFN > Public)
         let network_ordering = compare_network_id(
             &peer_network_id_a.network_id(),
             &peer_network_id_b.network_id(),
@@ -153,10 +176,14 @@ impl PrioritizedPeersState {
         node_type: NodeType,
         time_service: TimeService,
     ) -> Self {
+        let prioritized_peers = Arc::new(RwLock::new(Vec::new()));
+        let peer_comparator =
+            PrioritizedPeersComparator::new(mempool_config.clone(), time_service.clone());
+
         Self {
             mempool_config,
-            prioritized_peers: Arc::new(RwLock::new(Vec::new())),
-            peer_comparator: PrioritizedPeersComparator::new(),
+            prioritized_peers,
+            peer_comparator,
             observed_all_ping_latencies: false,
             last_peer_priority_update: None,
             time_service,
@@ -440,7 +467,7 @@ impl PrioritizedPeersState {
         // Set the last peer priority update time
         self.last_peer_priority_update = Some(self.time_service.now());
         info!(
-            "Updated prioritized peers. Peer count: {:?}, Latencies: {:?},\n Prioritized peers: {:?},\n Sender bucket assignment: {:?}",
+            "Updated prioritized peers. Peer count: {:?}, Latencies: {:?}, Prioritized peers: {:?}, Sender bucket assignment: {:?}",
             peers_and_metadata.len(),
             peers_and_metadata
                 .iter()
@@ -529,6 +556,60 @@ fn compare_ping_latency(
     }
 }
 
+/// Returns true iff the given peer monitoring metadata is healthy. A peer is
+/// considered healthy if its latest ledger timestamp is within the max acceptable
+/// sync lag. If the monitoring metadata is missing, the peer is considered unhealthy.
+fn check_peer_metadata_health(
+    mempool_config: &MempoolConfig,
+    time_service: &TimeService,
+    monitoring_metadata: &Option<&PeerMonitoringMetadata>,
+) -> bool {
+    monitoring_metadata
+        .and_then(|metadata| {
+            metadata
+                .latest_node_info_response
+                .as_ref()
+                .map(|node_information_response| {
+                    // Get the peer's ledger timestamp and the current timestamp
+                    let peer_ledger_timestamp_usecs =
+                        node_information_response.ledger_timestamp_usecs;
+                    let current_timestamp_usecs = get_timestamp_now_usecs(time_service);
+
+                    // Calculate the max sync lag before the peer is considered unhealthy (in microseconds)
+                    let max_sync_lag_secs =
+                        mempool_config.max_sync_lag_before_unhealthy_secs as u64;
+                    let max_sync_lag_usecs = max_sync_lag_secs * MICROS_PER_SECOND;
+
+                    // Determine if the peer is healthy
+                    current_timestamp_usecs.saturating_sub(peer_ledger_timestamp_usecs)
+                        < max_sync_lag_usecs
+                })
+        })
+        .unwrap_or(false) // If metadata is missing, consider the peer unhealthy
+}
+
+/// Compares the health of the given peer monitoring metadata. Healthy
+/// peers are prioritized over unhealthy peers, or peers missing metadata.
+fn compare_peer_health(
+    mempool_config: &MempoolConfig,
+    time_service: &TimeService,
+    monitoring_metadata_a: &Option<&PeerMonitoringMetadata>,
+    monitoring_metadata_b: &Option<&PeerMonitoringMetadata>,
+) -> Ordering {
+    // Check the health of the peer monitoring metadata
+    let is_healthy_a =
+        check_peer_metadata_health(mempool_config, time_service, monitoring_metadata_a);
+    let is_healthy_b =
+        check_peer_metadata_health(mempool_config, time_service, monitoring_metadata_b);
+
+    // Compare the health statuses
+    match (is_healthy_a, is_healthy_b) {
+        (true, false) => Ordering::Greater, // A is healthy, B is unhealthy
+        (false, true) => Ordering::Less,    // A is unhealthy, B is healthy
+        _ => Ordering::Equal,               // Both are healthy or unhealthy
+    }
+}
+
 /// Compares the validator distance for the given pair of monitoring metadata.
 /// The peer with the lowest validator distance is prioritized.
 fn compare_validator_distance(
@@ -557,6 +638,11 @@ fn compare_validator_distance(
     }
 }
 
+/// Returns the current timestamp (in microseconds) since the Unix epoch
+fn get_timestamp_now_usecs(time_service: &TimeService) -> u64 {
+    time_service.now_unix_time().as_micros() as u64
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -565,7 +651,8 @@ mod test {
         network_id::{NetworkId, PeerNetworkId},
     };
     use aptos_peer_monitoring_service_types::{
-        response::NetworkInformationResponse, PeerMonitoringMetadata,
+        response::{NetworkInformationResponse, NodeInformationResponse},
+        PeerMonitoringMetadata,
     };
     use aptos_types::PeerId;
     use core::cmp::Ordering;
@@ -595,6 +682,136 @@ mod test {
             Ordering::Greater,
             compare_network_id(&vfn_network, &public_network)
         );
+    }
+
+    #[test]
+    fn test_check_peer_metadata_health() {
+        // Create a mempool config with a max sync lag of 10 seconds
+        let mempool_config = MempoolConfig {
+            max_sync_lag_before_unhealthy_secs: 10,
+            ..MempoolConfig::default()
+        };
+
+        // Create a mock time service for testing
+        let time_service = TimeService::mock();
+
+        // Create monitoring metadata with no sync lag (healthy)
+        let monitoring_metadata = create_metadata_with_sync_lag(&time_service, 0);
+
+        // Verify the peer is healthy
+        let is_peer_healthy =
+            check_peer_metadata_health(&mempool_config, &time_service, &Some(&monitoring_metadata));
+        assert!(is_peer_healthy);
+
+        // Elapse some time, but not enough to make the peer unhealthy
+        time_service.clone().into_mock().advance_secs(5);
+
+        // Verify the peer is still healthy
+        let is_peer_healthy =
+            check_peer_metadata_health(&mempool_config, &time_service, &Some(&monitoring_metadata));
+        assert!(is_peer_healthy);
+
+        // Elapse some more time, but not enough to make the peer unhealthy
+        time_service.clone().into_mock().advance_secs(4);
+
+        // Verify the peer is still healthy
+        let is_peer_healthy =
+            check_peer_metadata_health(&mempool_config, &time_service, &Some(&monitoring_metadata));
+        assert!(is_peer_healthy);
+
+        // Elapse some more time to make the peer unhealthy
+        time_service.clone().into_mock().advance_secs(1);
+
+        // Verify the peer is now unhealthy
+        let is_peer_healthy =
+            check_peer_metadata_health(&mempool_config, &time_service, &Some(&monitoring_metadata));
+        assert!(!is_peer_healthy);
+    }
+
+    #[test]
+    fn test_compare_peer_health_ordering() {
+        // Create a mempool config with a max sync lag of 10 seconds
+        let mempool_config = MempoolConfig {
+            max_sync_lag_before_unhealthy_secs: 10,
+            ..MempoolConfig::default()
+        };
+
+        // Create a mock time service for testing and elapse some time
+        let time_service = TimeService::mock();
+        time_service.clone().into_mock().advance_secs(100);
+
+        // Create monitoring metadata for healthy peer 1
+        let healthy_metadata_1 = create_metadata_with_sync_lag(&time_service, 9);
+
+        // Create monitoring metadata for healthy peer 2
+        let healthy_metadata_2 = create_metadata_with_sync_lag(&time_service, 5);
+
+        // Create monitoring metadata for unhealthy peer 1
+        let unhealthy_metadata_1 = create_metadata_with_sync_lag(&time_service, 11);
+
+        // Create monitoring metadata for unhealthy peer 2
+        let unhealthy_metadata_2 = create_metadata_with_sync_lag(&time_service, 20);
+
+        // Verify health metadata against others
+        for (metadata_1, metadata_2, expected_ordering) in [
+            (
+                Some(&healthy_metadata_1),
+                Some(&healthy_metadata_2),
+                Ordering::Equal, // Both healthy
+            ),
+            (
+                Some(&healthy_metadata_1),
+                Some(&unhealthy_metadata_1),
+                Ordering::Greater, // Prioritize healthy
+            ),
+            (Some(&healthy_metadata_1), None, Ordering::Greater), // Prioritize healthy
+        ] {
+            verify_metadata_health_ordering(
+                &mempool_config,
+                &time_service,
+                &metadata_1,
+                &metadata_2,
+                expected_ordering,
+            )
+        }
+
+        // Verify unhealthy metadata against others
+        for (metadata_1, metadata_2, expected_ordering) in [
+            (
+                Some(&unhealthy_metadata_1),
+                Some(&unhealthy_metadata_2),
+                Ordering::Equal, // Both unhealthy
+            ),
+            (
+                Some(&unhealthy_metadata_1),
+                Some(&healthy_metadata_1),
+                Ordering::Less, // Prioritize healthy
+            ),
+            (Some(&unhealthy_metadata_1), None, Ordering::Equal), // Unhealthy and missing are equal
+        ] {
+            verify_metadata_health_ordering(
+                &mempool_config,
+                &time_service,
+                &metadata_1,
+                &metadata_2,
+                expected_ordering,
+            )
+        }
+
+        // Verify missing metadata against others
+        for (metadata_1, metadata_2, expected_ordering) in [
+            (None, None, Ordering::Equal),                        // Both missing
+            (None, Some(&healthy_metadata_1), Ordering::Less),    // Prioritize healthy
+            (None, Some(&unhealthy_metadata_1), Ordering::Equal), // Missing and unhealthy are equal
+        ] {
+            verify_metadata_health_ordering(
+                &mempool_config,
+                &time_service,
+                &metadata_1,
+                &metadata_2,
+                expected_ordering,
+            )
+        }
     }
 
     #[test]
@@ -1276,6 +1493,23 @@ mod test {
         PeerMonitoringMetadata::new(average_ping_latency_secs, None, None, None, None)
     }
 
+    /// Creates peer monitoring metadata with the given sync lag (in seconds)
+    fn create_metadata_with_sync_lag(
+        time_service: &TimeService,
+        sync_lag_secs: usize,
+    ) -> PeerMonitoringMetadata {
+        let ledger_timestamp_usecs = get_timestamp_in_past_usecs(time_service, sync_lag_secs);
+
+        let healthy_node_info_response = NodeInformationResponse {
+            ledger_timestamp_usecs,
+            ..Default::default()
+        };
+        PeerMonitoringMetadata {
+            latest_node_info_response: Some(healthy_node_info_response),
+            ..Default::default()
+        }
+    }
+
     /// Creates a validator peer with a random peer ID
     fn create_validator_peer() -> PeerNetworkId {
         PeerNetworkId::new(NetworkId::Validator, PeerId::random())
@@ -1289,5 +1523,23 @@ mod test {
     /// Creates a public peer with a random peer ID
     fn create_public_peer() -> PeerNetworkId {
         PeerNetworkId::new(NetworkId::Public, PeerId::random())
+    }
+
+    /// Returns a timestamp in the past (in microseconds)
+    fn get_timestamp_in_past_usecs(time_service: &TimeService, secs_in_past: usize) -> u64 {
+        let now_usecs = get_timestamp_now_usecs(time_service);
+        now_usecs - ((secs_in_past as u64) * MICROS_PER_SECOND)
+    }
+
+    /// Verifies that the ordering of peer monitoring metadata is as expected
+    fn verify_metadata_health_ordering(
+        mempool_config: &MempoolConfig,
+        time_service: &TimeService,
+        metadata_1: &Option<&PeerMonitoringMetadata>,
+        metadata_2: &Option<&PeerMonitoringMetadata>,
+        expected_ordering: Ordering,
+    ) {
+        let ordering = compare_peer_health(mempool_config, time_service, metadata_1, metadata_2);
+        assert_eq!(ordering, expected_ordering);
     }
 }

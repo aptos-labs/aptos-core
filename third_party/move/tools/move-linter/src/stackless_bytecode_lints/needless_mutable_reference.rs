@@ -15,6 +15,7 @@ use move_compiler_v2::external_checks::StacklessBytecodeChecker;
 use move_model::{
     ast::TempIndex,
     model::{GlobalEnv, Loc, Parameter},
+    ty::{ReferenceKind, Type},
 };
 use move_stackless_bytecode::{
     function_target::FunctionTarget,
@@ -107,7 +108,7 @@ impl MutableReferenceUsageTracker {
     fn update(&mut self, target: &FunctionTarget, instr: &Bytecode) {
         self.update_origins(target, instr);
         self.update_derived_edges(target, instr);
-        self.update_mutably_used(target.global_env(), instr);
+        self.update_mutably_used(target.global_env(), target, instr);
     }
 
     /// Update origins given `instr`.
@@ -148,7 +149,7 @@ impl MutableReferenceUsageTracker {
     }
 
     /// Update mutable usages given `instr`.
-    fn update_mutably_used(&mut self, env: &GlobalEnv, instr: &Bytecode) {
+    fn update_mutably_used(&mut self, env: &GlobalEnv, target: &FunctionTarget, instr: &Bytecode) {
         use Bytecode::*;
         use Operation::*;
         match instr {
@@ -164,6 +165,35 @@ impl MutableReferenceUsageTracker {
                     .filter(|(_, ty)| ty.is_mutable_reference())
                     .map(|(i, _)| srcs[i])
                     .for_each(|src| self.set_and_propagate_mutably_used(src));
+            },
+            Call(_, _, Invoke, srcs, _) => {
+                let fun_type = target.get_local_type(*srcs.last().expect("closure expected"));
+                if let Type::Fun(args_ty, _, _) = fun_type {
+                    match args_ty.as_ref() {
+                        // A single arg closure
+                        Type::Reference(ReferenceKind::Mutable, _) => {
+                            assert!(srcs.len() == 2, "only one argument expected for invoke");
+                            // Single mutable reference argument
+                            let src = srcs[0];
+                            self.set_and_propagate_mutably_used(src);
+                        },
+                        // A multi arg closure
+                        Type::Tuple(x) => {
+                            assert!(
+                                srcs.len() == x.len() + 1,
+                                "{} arguments expected for invoke",
+                                x.len()
+                            );
+                            for (i, ty) in x.iter().enumerate() {
+                                if ty.is_mutable_reference() {
+                                    let src = srcs[i];
+                                    self.set_and_propagate_mutably_used(src);
+                                }
+                            }
+                        },
+                        _ => {},
+                    }
+                }
             },
             Ret(_, srcs) => {
                 for src in srcs {

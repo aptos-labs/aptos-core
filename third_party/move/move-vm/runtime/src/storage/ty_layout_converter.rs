@@ -4,15 +4,17 @@
 use crate::{
     config::VMConfig,
     module_traversal::TraversalContext,
-    storage::{loader::traits::StructDefinitionLoader, ty_tag_converter::TypeTagConverter},
-    RuntimeEnvironment,
+    storage::{
+        layout_cache::DefiningModules, loader::traits::StructDefinitionLoader,
+        ty_tag_converter::TypeTagConverter,
+    },
+    LayoutCacheEntry, RuntimeEnvironment, StructKey,
 };
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{
-    account_address::AccountAddress,
     ident_str,
     identifier::Identifier,
-    language_storage::ModuleId,
+    language_storage::{LEGACY_OPTION_VEC, OPTION_STRUCT_NAME},
     value::{IdentifierMappingKind, MoveFieldLayout, MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -24,24 +26,20 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
 };
-use once_cell::sync::Lazy;
 use std::sync::Arc;
-
-static OPTION_MODULE_ID: Lazy<ModuleId> =
-    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
-static OPTION_STRUCT_NAME: Lazy<Identifier> = Lazy::new(|| Identifier::from(ident_str!("Option")));
+use triomphe::Arc as TriompheArc;
 
 /// Stores type layout as well as a flag if it contains any delayed fields.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct LayoutWithDelayedFields {
-    layout: MoveTypeLayout,
+    layout: TriompheArc<MoveTypeLayout>,
     contains_delayed_fields: bool,
 }
 
 impl LayoutWithDelayedFields {
     /// If layout contains delayed fields, returns [None]. If there are no delayed fields, the
     /// layout is returned.
-    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<MoveTypeLayout> {
+    pub fn into_layout_when_has_no_delayed_fields(self) -> Option<TriompheArc<MoveTypeLayout>> {
         (!self.contains_delayed_fields).then_some(self.layout)
     }
 
@@ -52,7 +50,7 @@ impl LayoutWithDelayedFields {
     }
 
     /// Unpacks and returns the layout and delayed fields flag for the caller to handle.
-    pub fn unpack(self) -> (MoveTypeLayout, bool) {
+    pub fn unpack(self) -> (TriompheArc<MoveTypeLayout>, bool) {
         (self.layout, self.contains_delayed_fields)
     }
 }
@@ -87,9 +85,55 @@ where
         ty: &Type,
         check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
+        let ty_pool = self.runtime_environment().ty_pool();
+        if self.vm_config().enable_layout_caches {
+            let key = match ty {
+                Type::Struct { idx, .. } => {
+                    let ty_args_id = ty_pool.intern_ty_args(&[]);
+                    Some(StructKey {
+                        idx: *idx,
+                        ty_args_id,
+                    })
+                },
+                Type::StructInstantiation { idx, ty_args, .. } => {
+                    let ty_args_id = ty_pool.intern_ty_args(ty_args);
+                    Some(StructKey {
+                        idx: *idx,
+                        ty_args_id,
+                    })
+                },
+                _ => None,
+            };
+
+            if let Some(key) = key {
+                if let Some(result) = self.struct_definition_loader.load_layout_from_cache(
+                    gas_meter,
+                    traversal_context,
+                    &key,
+                ) {
+                    return result;
+                }
+
+                // Otherwise a cache miss, compute the result and store it.
+                let mut modules = DefiningModules::new();
+                let layout = self.type_to_type_layout_with_delayed_fields_impl::<false>(
+                    gas_meter,
+                    traversal_context,
+                    &mut modules,
+                    ty,
+                    check_option_type,
+                )?;
+                let cache_entry = LayoutCacheEntry::new(layout.clone(), modules);
+                self.struct_definition_loader
+                    .store_layout_to_cache(&key, cache_entry)?;
+                return Ok(layout);
+            }
+        }
+
         self.type_to_type_layout_with_delayed_fields_impl::<false>(
             gas_meter,
             traversal_context,
+            &mut DefiningModules::new(),
             ty,
             check_option_type,
         )
@@ -107,6 +151,7 @@ where
         self.type_to_type_layout_with_delayed_fields_impl::<true>(
             gas_meter,
             traversal_context,
+            &mut DefiningModules::new(),
             ty,
             false,
         )
@@ -141,8 +186,8 @@ where
         }
         let struct_name = self.get_struct_name(idx)?;
         Ok(IdentifierMappingKind::from_ident(
-            &struct_name.module,
-            &struct_name.name,
+            struct_name.module(),
+            struct_name.name(),
         ))
     }
 
@@ -181,6 +226,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         ty: &Type,
         check_option_type: bool,
     ) -> PartialVMResult<LayoutWithDelayedFields> {
@@ -190,13 +236,14 @@ where
         let (layout, contains_delayed_fields) = self.type_to_type_layout_impl::<ANNOTATED>(
             gas_meter,
             traversal_context,
+            modules,
             ty,
             &mut count,
             1,
             check_option_type,
         )?;
         Ok(LayoutWithDelayedFields {
-            layout,
+            layout: TriompheArc::new(layout),
             contains_delayed_fields,
         })
     }
@@ -208,6 +255,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         ty: &Type,
         count: &mut u64,
         depth: u64,
@@ -223,6 +271,12 @@ where
             Type::U64 => (MoveTypeLayout::U64, false),
             Type::U128 => (MoveTypeLayout::U128, false),
             Type::U256 => (MoveTypeLayout::U256, false),
+            Type::I8 => (MoveTypeLayout::I8, false),
+            Type::I16 => (MoveTypeLayout::I16, false),
+            Type::I32 => (MoveTypeLayout::I32, false),
+            Type::I64 => (MoveTypeLayout::I64, false),
+            Type::I128 => (MoveTypeLayout::I128, false),
+            Type::I256 => (MoveTypeLayout::I256, false),
             Type::Address => (MoveTypeLayout::Address, false),
             Type::Signer => (MoveTypeLayout::Signer, false),
             Type::Function { .. } => (MoveTypeLayout::Function, false),
@@ -230,6 +284,7 @@ where
                 .type_to_type_layout_impl::<ANNOTATED>(
                     gas_meter,
                     traversal_context,
+                    modules,
                     ty,
                     count,
                     depth + 1,
@@ -242,6 +297,7 @@ where
             Type::Struct { idx, .. } => self.struct_to_type_layout::<ANNOTATED>(
                 gas_meter,
                 traversal_context,
+                modules,
                 idx,
                 &[],
                 count,
@@ -252,6 +308,7 @@ where
                 .struct_to_type_layout::<ANNOTATED>(
                     gas_meter,
                     traversal_context,
+                    modules,
                     idx,
                     ty_args,
                     count,
@@ -273,6 +330,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         tys: &[Type],
         count: &mut u64,
         depth: u64,
@@ -286,6 +344,7 @@ where
                     .type_to_type_layout_impl::<ANNOTATED>(
                         gas_meter,
                         traversal_context,
+                        modules,
                         ty,
                         count,
                         depth,
@@ -310,6 +369,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
+        modules: &mut DefiningModules,
         idx: &StructNameIndex,
         ty_args: &[Type],
         count: &mut u64,
@@ -321,14 +381,16 @@ where
             traversal_context,
             idx,
         )?;
+        let struct_identifier = self
+            .struct_definition_loader
+            .runtime_environment()
+            .struct_name_index_map()
+            .idx_to_struct_name_ref(*idx)?;
+        modules.insert(struct_identifier.module());
 
         if check_option_type && !self.runtime_environment().vm_config().enable_capture_option {
-            let struct_identifier = self
-                .runtime_environment()
-                .struct_name_index_map()
-                .idx_to_struct_name(*idx)?;
-            if struct_identifier.module == *OPTION_MODULE_ID
-                && struct_identifier.name == *OPTION_STRUCT_NAME
+            if struct_identifier.module().is_option()
+                && struct_identifier.name() == &*OPTION_STRUCT_NAME
             {
                 return Err(
                     PartialVMError::new(StatusCode::UNABLE_TO_CAPTURE_OPTION_TYPE)
@@ -342,6 +404,51 @@ where
             // delayed fields is needed because enums cannot be delayed fields!
             StructLayout::Variants(variants) => {
                 let mut variant_contains_delayed_fields = false;
+                let enum_option_enabled = self.runtime_environment().vm_config().enable_enum_option;
+                // convert enum representation of option for backward compatibility
+                if enum_option_enabled && ANNOTATED {
+                    let ty_tag_converter =
+                        TypeTagConverter::new(self.struct_definition_loader.runtime_environment());
+                    let struct_tag =
+                        ty_tag_converter.struct_name_idx_to_struct_tag(idx, ty_args)?;
+                    if struct_tag.is_option() {
+                        let field_name = ident_str!(LEGACY_OPTION_VEC).to_owned();
+                        let ty_builder = &self.vm_config().ty_builder;
+                        if variants.len() < 2 || variants[1].1.is_empty() {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            ));
+                        }
+                        let field_type =
+                            ty_builder.create_ty_with_subst(&variants[1].1[0].1, ty_args)?;
+                        let (mut field_layout, delayed_fields) = self
+                            .types_to_type_layouts::<ANNOTATED>(
+                                gas_meter,
+                                traversal_context,
+                                modules,
+                                &[field_type],
+                                count,
+                                depth + 1,
+                                check_option_type,
+                            )?;
+                        variant_contains_delayed_fields |= delayed_fields;
+                        if field_layout.is_empty() {
+                            return Err(PartialVMError::new(
+                                StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                            ));
+                        }
+                        let field_layout = MoveFieldLayout::new(
+                            field_name,
+                            MoveTypeLayout::Vector(Box::new(field_layout.pop().unwrap())),
+                        );
+                        let struct_layout =
+                            MoveStructLayout::with_types(struct_tag, vec![field_layout]);
+                        return Ok((
+                            MoveTypeLayout::Struct(struct_layout),
+                            variant_contains_delayed_fields,
+                        ));
+                    }
+                }
                 let variant_layouts = variants
                     .iter()
                     .map(|variant| {
@@ -352,6 +459,7 @@ where
                             self.types_to_type_layouts::<false>(
                                 gas_meter,
                                 traversal_context,
+                                modules,
                                 &self.apply_subst_for_field_tys(&variant.1, ty_args)?,
                                 count,
                                 depth,
@@ -378,6 +486,7 @@ where
                     .types_to_type_layouts::<ANNOTATED>(
                         gas_meter,
                         traversal_context,
+                        modules,
                         &self.apply_subst_for_field_tys(fields, ty_args)?,
                         count,
                         depth,
@@ -410,9 +519,9 @@ where
                         let struct_name = self.get_struct_name(idx)?;
                         let msg = format!(
                             "Struct {}::{}::{} contains delayed fields, but is also a delayed field",
-                            struct_name.module.address,
-                            struct_name.module.name,
-                            struct_name.name,
+                            struct_name.module().address,
+                            struct_name.module().name,
+                            struct_name.name(),
                         );
                         return Err(PartialVMError::new_invariant_violation(msg));
                     },
@@ -442,9 +551,9 @@ where
                                     let struct_name = self.get_struct_name(idx)?;
                                     let msg = format!(
                                         "Struct {}::{}::{} must contain at least one field",
-                                        struct_name.module.address,
-                                        struct_name.module.name,
-                                        struct_name.name,
+                                        struct_name.module().address,
+                                        struct_name.module().name,
+                                        struct_name.name(),
                                     );
                                     return Err(PartialVMError::new_invariant_violation(msg));
                                 },
@@ -519,7 +628,7 @@ mod tests {
     fn test_layout_with_delayed_fields(contains_delayed_fields: bool) {
         let layout = LayoutWithDelayedFields {
             // Dummy layout.
-            layout: MoveTypeLayout::U8,
+            layout: TriompheArc::new(MoveTypeLayout::U8),
             contains_delayed_fields,
         };
         assert_eq!(
@@ -567,7 +676,7 @@ mod tests {
             let layout = assert_ok!(result);
 
             assert!(!layout.contains_delayed_fields);
-            assert_eq!(&layout.layout, &expected_layout);
+            assert_eq!(layout.layout.as_ref(), &expected_layout);
         }
     }
 
@@ -668,7 +777,7 @@ mod tests {
                 false
             ));
             let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-            assert_eq!(layout, runtime_layout(vec![]));
+            assert_eq!(layout.as_ref(), &runtime_layout(vec![]));
 
             let layout = assert_ok!(construct_layout_for_test(
                 &layout_converter,
@@ -676,7 +785,7 @@ mod tests {
                 true
             ));
             let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-            assert_eq!(layout, annotated_layout(name, vec![]));
+            assert_eq!(layout.as_ref(), &annotated_layout(name, vec![]));
         }
 
         let layout = assert_ok!(construct_layout_for_test(
@@ -685,7 +794,10 @@ mod tests {
             false
         ));
         let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
-        assert_eq!(layout, runtime_layout(vec![runtime_layout(vec![])]));
+        assert_eq!(
+            layout.as_ref(),
+            &runtime_layout(vec![runtime_layout(vec![])])
+        );
 
         let layout = assert_ok!(construct_layout_for_test(
             &layout_converter,
@@ -694,8 +806,8 @@ mod tests {
         ));
         let layout = assert_some!(layout.into_layout_when_has_no_delayed_fields());
         assert_eq!(
-            layout,
-            annotated_layout("B", vec![MoveFieldLayout::new(
+            layout.as_ref(),
+            &annotated_layout("B", vec![MoveFieldLayout::new(
                 Identifier::from_str("c").unwrap(),
                 annotated_layout("C", vec![])
             )])

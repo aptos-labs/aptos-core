@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::config::{RocksDBStatsLevel, RocksdbConfig};
-use rocksdb::{statistics::StatsLevel, Options};
+use rocksdb::{statistics::StatsLevel, Env, Options};
 
 // TODO: Clean this up. It is currently separated into its own crate
 // to avoid circular dependencies, because it depends on aptos-config (which
@@ -19,11 +19,13 @@ fn convert_stats_level(level: RocksDBStatsLevel) -> StatsLevel {
     }
 }
 
-pub fn gen_rocksdb_options(config: &RocksdbConfig, readonly: bool) -> Options {
+pub fn gen_rocksdb_options(config: &RocksdbConfig, env: Option<&Env>, readonly: bool) -> Options {
     let mut db_opts = Options::default();
+    if let Some(env) = env {
+        db_opts.set_env(env);
+    }
     db_opts.set_max_open_files(config.max_open_files);
     db_opts.set_max_total_wal_size(config.max_total_wal_size);
-    db_opts.set_max_background_jobs(config.max_background_jobs);
 
     if let Some(level) = config.stats_level {
         db_opts.enable_statistics();

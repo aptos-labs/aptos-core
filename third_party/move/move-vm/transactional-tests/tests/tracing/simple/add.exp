@@ -1,0 +1,24 @@
+processed 3 tasks
+task 0 lines 1-8:  publish [module 0x22::test]
+task 1 lines 10-10:  run --verbose 0x22::test::add_instr --args 10u8 20u8 --display-trace
+instructions: 4
+fingerprint: 17475362048979952926
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::add_instr
+return values: 30
+task 2 lines 12-12:  run --verbose 0x22::test::add_instr --args 255u8 255u8 --display-trace
+instructions: 2
+fingerprint: 15885000166333901857
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::add_instr
+Error: Function execution failed with VMError: {
+    message: Addition overflow,
+    major_status: ARITHMETIC_ERROR,
+    sub_status: None,
+    location: 0x22::test,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(0), 2)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

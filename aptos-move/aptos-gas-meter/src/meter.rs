@@ -1,8 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::traits::{AptosGasMeter, GasAlgebra};
-use aptos_gas_algebra::{Fee, FeePerGasUnit, NumTypeNodes};
+use crate::{
+    traits::{AptosGasMeter, GasAlgebra},
+    CacheValueSizes,
+};
+use aptos_gas_algebra::{AbstractValueSize, Fee, FeePerGasUnit, NumTypeNodes};
 use aptos_gas_schedule::{
     gas_feature_versions::*,
     gas_params::{instr::*, txn::*},
@@ -137,6 +140,14 @@ where
             LdU64 => LD_U64,
             LdU128 => LD_U128,
             LdU256 => LD_U256,
+
+            LdI8 => LD_I8,
+            LdI16 => LD_I16,
+            LdI32 => LD_I32,
+            LdI64 => LD_I64,
+            LdI128 => LD_I128,
+            LdI256 => LD_I256,
+
             LdTrue => LD_TRUE,
             LdFalse => LD_FALSE,
 
@@ -162,11 +173,19 @@ where
             CastU128 => CAST_U128,
             CastU256 => CAST_U256,
 
+            CastI8 => CAST_I8,
+            CastI16 => CAST_I16,
+            CastI32 => CAST_I32,
+            CastI64 => CAST_I64,
+            CastI128 => CAST_I128,
+            CastI256 => CAST_I256,
+
             Add => ADD,
             Sub => SUB,
             Mul => MUL,
             Mod => MOD_,
             Div => DIV,
+            Negate => NEGATE,
 
             BitOr => BIT_OR,
             BitAnd => BIT_AND,
@@ -288,9 +307,7 @@ where
             .abs_val
             .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
-        // Note(Gas): this makes a deep copy so we need to charge for the full value size
-        self.algebra
-            .charge_execution(COPY_LOC_BASE + COPY_LOC_PER_ABS_VAL_UNIT * (stack_size + heap_size))
+        self.charge_copy_loc_cached(stack_size, heap_size)
     }
 
     #[inline]
@@ -365,9 +382,7 @@ where
             .abs_val
             .abstract_value_size_stack_and_heap(val, self.feature_version())?;
 
-        // Note(Gas): this makes a deep copy so we need to charge for the full value size
-        self.algebra
-            .charge_execution(READ_REF_BASE + READ_REF_PER_ABS_VAL_UNIT * (stack_size + heap_size))
+        self.charge_read_ref_cached(stack_size, heap_size)
     }
 
     #[inline]
@@ -466,9 +481,8 @@ where
     }
 
     #[inline]
-    fn charge_vec_pack<'a>(
+    fn charge_vec_pack(
         &mut self,
-        _ty: impl TypeView + 'a,
         args: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
         let num_args = NumArgs::new(args.len() as u64);
@@ -480,7 +494,6 @@ where
     #[inline]
     fn charge_vec_unpack(
         &mut self,
-        _ty: impl TypeView,
         expect_num_elements: NumArgs,
         _elems: impl ExactSizeIterator<Item = impl ValueView>,
     ) -> PartialVMResult<()> {
@@ -489,17 +502,12 @@ where
     }
 
     #[inline]
-    fn charge_vec_len(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_len(&mut self) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_LEN_BASE)
     }
 
     #[inline]
-    fn charge_vec_borrow(
-        &mut self,
-        is_mut: bool,
-        _ty: impl TypeView,
-        _is_success: bool,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_borrow(&mut self, is_mut: bool) -> PartialVMResult<()> {
         match is_mut {
             false => self.algebra.charge_execution(VEC_IMM_BORROW_BASE),
             true => self.algebra.charge_execution(VEC_MUT_BORROW_BASE),
@@ -507,25 +515,17 @@ where
     }
 
     #[inline]
-    fn charge_vec_push_back(
-        &mut self,
-        _ty: impl TypeView,
-        _val: impl ValueView,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_push_back(&mut self, _val: impl ValueView) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_PUSH_BACK_BASE)
     }
 
     #[inline]
-    fn charge_vec_pop_back(
-        &mut self,
-        _ty: impl TypeView,
-        _val: Option<impl ValueView>,
-    ) -> PartialVMResult<()> {
+    fn charge_vec_pop_back(&mut self, _val: Option<impl ValueView>) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_POP_BACK_BASE)
     }
 
     #[inline]
-    fn charge_vec_swap(&mut self, _ty: impl TypeView) -> PartialVMResult<()> {
+    fn charge_vec_swap(&mut self) -> PartialVMResult<()> {
         self.algebra.charge_execution(VEC_SWAP_BASE)
     }
 
@@ -616,5 +616,31 @@ where
         self.algebra
             .charge_execution(KEYLESS_BASE_COST)
             .map_err(|e| e.finish(Location::Undefined))
+    }
+}
+
+impl<A> CacheValueSizes for StandardGasMeter<A>
+where
+    A: GasAlgebra,
+{
+    #[inline]
+    fn charge_read_ref_cached(
+        &mut self,
+        stack_size: AbstractValueSize,
+        heap_size: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        self.algebra
+            .charge_execution(READ_REF_BASE + READ_REF_PER_ABS_VAL_UNIT * (stack_size + heap_size))
+    }
+
+    #[inline]
+    fn charge_copy_loc_cached(
+        &mut self,
+        stack_size: AbstractValueSize,
+        heap_size: AbstractValueSize,
+    ) -> PartialVMResult<()> {
+        // Note(Gas): this makes a deep copy so we need to charge for the full value size
+        self.algebra
+            .charge_execution(COPY_LOC_BASE + COPY_LOC_PER_ABS_VAL_UNIT * (stack_size + heap_size))
     }
 }

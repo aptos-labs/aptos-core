@@ -1,0 +1,9 @@
+//# publish
+module 0x22::test
+
+public fun cast_i8_instr(): i8
+    ld_u64 8
+    cast_i8
+    ret
+
+//# run --verbose 0x22::test::cast_i8_instr --display-trace

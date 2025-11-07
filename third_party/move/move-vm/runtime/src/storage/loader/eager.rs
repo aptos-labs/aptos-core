@@ -169,10 +169,10 @@ where
 
         self.module_storage
             .unmetered_get_existing_eagerly_verified_module(
-                struct_name.module.address(),
-                struct_name.module.name(),
+                struct_name.module().address(),
+                struct_name.module().name(),
             )
-            .and_then(|module| module.get_struct(struct_name.name.as_ident_str()))
+            .and_then(|module| module.get_struct(struct_name.name().as_ident_str()))
             .map_err(|err| err.to_partial())
     }
 }

@@ -14,7 +14,6 @@ from tenacity import (
 )
 from typing import Tuple, List, Optional, Any
 
-
 # Constants
 DISK_COPIES = 1
 STORAGE_CLASS = "pd-balanced-xfs-immediate"
@@ -35,8 +34,16 @@ NAMESPACE = "replay-verify"
 ZONE = "us-central1-a"
 
 DEFAULT_PVC_ACCESS_MODE = "ReadOnlyMany"  # Default access mode for PVCs
-SNAPSHOT_DISK_SIZE = "12Ti"  # Default disk size for snapshots
+TESTNET_SNAPSHOT_DISK_SIZE = "12Ti"  # Default disk size for testnet snapshots
+MAINNET_SNAPSHOT_DISK_SIZE = "15Ti"  # Default disk size for mainnet snapshots
 
+def get_disk_size_for_snapshot(snapshot_name: str) -> str:
+    if TESTNET_SNAPSHOT_NAME in snapshot_name:
+        return TESTNET_SNAPSHOT_DISK_SIZE
+    elif MAINNET_SNAPSHOT_NAME in snapshot_name:
+        return MAINNET_SNAPSHOT_DISK_SIZE
+    else:
+        raise ValueError(f"Unknown snapshot name: {snapshot_name}")
 
 def get_region_from_zone(zone: str) -> str:
     return zone.rsplit("-", 1)[0]
@@ -511,11 +518,7 @@ def create_one_pvc_from_snapshot(
     config.load_kube_config()
     api_instance = client.CoreV1Api()
     # testnet and mainnet disk size could be different
-    storage_size = (
-        SNAPSHOT_DISK_SIZE
-        if TESTNET_SNAPSHOT_NAME in snapshot_name
-        else SNAPSHOT_DISK_SIZE
-    )
+    storage_size = get_disk_size_for_snapshot(snapshot_name)
     # Define the PVC manifest
     pvc_manifest = {
         "apiVersion": "v1",
@@ -639,7 +642,7 @@ def create_one_pvc_from_existing(
     config.load_kube_config()
     api_instance = client.CoreV1Api()
     # testnet and mainnet disk size could be different
-    storage_size = "12Ti" if TESTNET_SNAPSHOT_NAME in existing_pvc_name else "12Ti"
+    storage_size = get_disk_size_for_snapshot(existing_pvc_name)
     # Define the PVC manifest
     pvc_manifest = {
         "apiVersion": "v1",

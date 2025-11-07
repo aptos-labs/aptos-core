@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{metrics, utils};
+use crate::{error::PepperServiceError, metrics, utils};
 use anyhow::{anyhow, Result};
 use aptos_infallible::Mutex;
 use aptos_keyless_pepper_common::jwt::parse;
@@ -11,9 +11,8 @@ use aptos_types::{jwks::rsa::RSA_JWK, keyless::test_utils::get_sample_iss};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::Value;
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, str::FromStr, sync::Arc, time::Duration};
 use tokio::time::Instant;
-
 // TODO: at some point, we should try to merge the JWK and resource fetcher code
 
 // Issuer and JWK URL constants for Apple
@@ -58,7 +57,8 @@ pub trait JWKIssuerInterface {
 }
 
 /// A simple JWK issuer struct
-struct JWKIssuer {
+#[derive(Clone, Debug)]
+pub struct JWKIssuer {
     issuer_name: String,
     issuer_jwk_url: String,
 }
@@ -84,6 +84,37 @@ impl JWKIssuerInterface for JWKIssuer {
 
     async fn fetch_jwks(&self) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
         fetch_jwks(&self.issuer_jwk_url).await
+    }
+}
+
+impl FromStr for JWKIssuer {
+    type Err = PepperServiceError;
+
+    /// This is used to parse each jwk issuer from the command line.
+    /// The expected format is: "<iss> <jwk_url>".
+    /// NOTE: we assume there is no whitespace character in either `iss` or `jwk_url`.
+    fn from_str(string: &str) -> std::result::Result<Self, Self::Err> {
+        // Split the string by whitespace
+        let mut iterator = string.split_whitespace();
+
+        // Parse the substrings as issuer and aud
+        let issuer_name = iterator.next().ok_or(PepperServiceError::UnexpectedError(
+            "Failed to parse JWK issuer name!".into(),
+        ))?;
+        let issuer_jwk_url = iterator.next().ok_or(PepperServiceError::UnexpectedError(
+            "Failed to parse JWK issuer URL!".into(),
+        ))?;
+
+        // Verify that there are exactly 2 substrings
+        if iterator.next().is_some() {
+            return Err(PepperServiceError::UnexpectedError(
+                "Too many arguments found for JWK issuer!".into(),
+            ));
+        }
+
+        // Create the override
+        let jwk_issuer = JWKIssuer::new(issuer_name.to_string(), issuer_jwk_url.to_string());
+        Ok(jwk_issuer)
     }
 }
 
@@ -212,7 +243,7 @@ fn parse_jwks(response_text: &str) -> Result<HashMap<KeyID, Arc<RSA_JWK>>> {
 /// JWK URLs. Otherwise, if these values were fetched from on-chain configs,
 /// an attacker who compromises governance could change these values to
 /// point to a malicious issuer (or JWK URL).
-pub fn start_jwk_fetchers() -> JWKCache {
+pub fn start_jwk_fetchers(jwk_issuers_override: Vec<JWKIssuer>) -> JWKCache {
     // Create the JWK cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
 
@@ -224,12 +255,19 @@ pub fn start_jwk_fetchers() -> JWKCache {
     let time_service = TimeService::real();
 
     // Create the known issuers for Google and Apple
-    let jwk_issuer_google = Arc::new(JWKIssuer::new(ISSUER_GOOGLE.into(), JWK_URL_GOOGLE.into()));
-    let jwk_issuer_apple = Arc::new(JWKIssuer::new(ISSUER_APPLE.into(), JWK_URL_APPLE.into()));
+    let default_issuers = vec![
+        JWKIssuer::new(ISSUER_GOOGLE.into(), JWK_URL_GOOGLE.into()),
+        JWKIssuer::new(ISSUER_APPLE.into(), JWK_URL_APPLE.into()),
+    ];
+    let jwk_issuer_map: HashMap<String, Arc<JWKIssuer>> = default_issuers
+        .into_iter()
+        .chain(jwk_issuers_override)
+        .map(|issuer| (issuer.issuer_name.clone(), Arc::new(issuer)))
+        .collect();
 
     // Start the JWK refresh loops for known issuers
-    for jwk_issuer in [jwk_issuer_google, jwk_issuer_apple] {
-        start_jwk_refresh_loop(jwk_issuer.clone(), jwk_cache.clone(), time_service.clone());
+    for (_, jwk_issuer) in jwk_issuer_map {
+        start_jwk_refresh_loop(jwk_issuer, jwk_cache.clone(), time_service.clone());
     }
 
     // Return the JWK cache

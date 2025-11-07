@@ -1,0 +1,26 @@
+//**** Cross-compiled for `move` syntax from `tests/constants/builtin_constants.move`
+
+//# publish
+module 0x66::m {
+    fun compile_for_testing() {
+        ()
+    }
+    fun min_max() {
+        ()
+    }
+}
+
+
+//# run 0x66::m::compile_for_testing
+
+//# run 0x66::m::min_max
+
+//# publish
+module 0x66::shadow {
+    fun shadowed() {
+        ()
+    }
+}
+
+
+//# run 0x66::shadow::shadowed

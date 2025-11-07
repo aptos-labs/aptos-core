@@ -49,6 +49,7 @@ use move_core_types::{
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
+use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use std::{
@@ -707,7 +708,7 @@ fn mock_fee_statement(total_gas: u64) -> FeeStatement {
     // Next two arguments are different kinds of execution gas that are counted
     // towards the block limit. We split the total into two pieces for these arguments.
     // TODO: add variety to generating fee statement based on total gas.
-    FeeStatement::new(total_gas, total_gas / 2, (total_gas + 1) / 2, 0, 0)
+    FeeStatement::new(total_gas, total_gas / 2, total_gas.div_ceil(2), 0, 0)
 }
 
 impl<K, E> TransactionOutput for MockOutput<K, E>
@@ -756,13 +757,13 @@ where
         aggregator_v1_writes: Vec<(K, WriteOp)>,
         patched_resource_write_set: Vec<(K, ValueType)>,
         _patched_events: Vec<E>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<Trace, PanicError> {
         assert_ok!(self
             .patched_resource_write_set
             .set(patched_resource_write_set.clone().into_iter().collect()));
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO: Also test patched events.
-        Ok(())
+        Ok(Trace::empty())
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&mut self) {
@@ -776,7 +777,7 @@ where
     }
 }
 
-impl<'a, K, E> BeforeMaterializationOutput<MockTransaction<K, E>> for &'a MockOutput<K, E>
+impl<K, E> BeforeMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
@@ -914,7 +915,7 @@ where
     }
 }
 
-impl<'a, K, E> AfterMaterializationOutput<MockTransaction<K, E>> for &'a MockOutput<K, E>
+impl<K, E> AfterMaterializationOutput<MockTransaction<K, E>> for &MockOutput<K, E>
 where
     K: PartialOrd + Ord + Send + Sync + Clone + Hash + Eq + ModulePath + Debug + 'static,
     E: Send + Sync + Debug + Clone + TransactionEvent + 'static,
@@ -966,7 +967,11 @@ where
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_environment: &AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
+    fn init(
+        _environment: &AptosEnvironment,
+        _state_view: &impl TStateView<Key = K>,
+        _async_runtime_checks_enabled: bool,
+    ) -> Self {
         Self::new()
     }
 

@@ -1,17 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::hash::CryptoHash;
-use aptos_dkg::{
-    pvss::{
-        das,
-        das::unweighted_protocol,
-        insecure_field, test_utils,
-        test_utils::{reconstruct_dealt_secret_key_randomly, NoAux},
-        traits::{SecretSharingConfig, Transcript},
-        weighted::generic_weighting::GenericWeighting,
-    },
-    utils::random::random_scalar,
+use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash};
+use aptos_dkg::pvss::{
+    das,
+    das::unweighted_protocol,
+    insecure_field, test_utils,
+    test_utils::{reconstruct_dealt_secret_key_randomly, NoAux},
+    traits::{SecretSharingConfig, Transcript},
+    weighted::generic_weighting::GenericWeighting,
 };
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;

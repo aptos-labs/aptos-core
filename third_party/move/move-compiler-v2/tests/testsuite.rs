@@ -592,6 +592,15 @@ const TEST_CONFIGS: Lazy<BTreeMap<&str, TestConfig>> = Lazy::new(|| {
             stop_after: StopAfter::SecondAstPipeline,
             ..config().exp(Experiment::MESSAGE_FORMAT_JSON)
         },
+        // Tests for integers
+        TestConfig {
+            name: "integers",
+            runner: |p| run_test(p, get_config_by_name("integers")),
+            include: vec!["integers"],
+            dump_ast: DumpLevel::EndStage,
+            dump_bytecode: DumpLevel::EndStage,
+            ..config().lang(LanguageVersion::V2_3)
+        },
     ];
     configs.into_iter().map(|c| (c.name, c)).collect()
 });

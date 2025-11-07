@@ -1,0 +1,9 @@
+processed 2 tasks
+task 0 lines 1-8:  publish [module 0x22::test]
+task 1 lines 10-10:  run --verbose 0x22::test::neq_instr --display-trace
+instructions: 4
+fingerprint: 13875183484395156491
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::neq_instr
+return values: true

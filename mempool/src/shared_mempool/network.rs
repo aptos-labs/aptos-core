@@ -267,6 +267,7 @@ impl<NetworkClient: NetworkClientInterface<MempoolSyncMsg>> MempoolNetworkInterf
             self.num_committed_txns_received_since_peers_updated
                 .load(Ordering::Relaxed),
         );
+
         // Resetting the counter
         self.num_mempool_txns_received_since_peers_updated = 0;
         self.num_committed_txns_received_since_peers_updated

@@ -2,10 +2,13 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{loaded_data::runtime_types::TypeBuilder, values::*, views::*};
+use crate::{delayed_values::delayed_field_id::DelayedFieldID, values::*};
 use claims::{assert_err, assert_ok};
 use move_binary_format::errors::*;
-use move_core_types::{account_address::AccountAddress, u256::U256};
+use move_core_types::{
+    account_address::AccountAddress,
+    int256::{I256, U256},
+};
 
 #[test]
 fn locals() -> PartialVMResult<()> {
@@ -13,22 +16,22 @@ fn locals() -> PartialVMResult<()> {
     let mut locals = Locals::new(LEN);
     for i in 0..LEN {
         assert!(locals.copy_loc(i).is_err());
-        assert!(locals.move_loc(i, false).is_err());
+        assert!(locals.move_loc(i).is_err());
         assert!(locals.borrow_loc(i).is_err());
     }
-    locals.store_loc(1, Value::u64(42), false)?;
+    locals.store_loc(1, Value::u64(42))?;
 
     assert!(locals.copy_loc(1)?.equals(&Value::u64(42))?);
     let r = locals.borrow_loc(1)?.value_as::<Reference>()?;
     assert!(r.read_ref()?.equals(&Value::u64(42))?);
-    assert!(locals.move_loc(1, false)?.equals(&Value::u64(42))?);
+    assert!(locals.move_loc(1)?.equals(&Value::u64(42))?);
 
     assert!(locals.copy_loc(1).is_err());
-    assert!(locals.move_loc(1, false).is_err());
+    assert!(locals.move_loc(1).is_err());
     assert!(locals.borrow_loc(1).is_err());
 
     assert!(locals.copy_loc(LEN + 1).is_err());
-    assert!(locals.move_loc(LEN + 1, false).is_err());
+    assert!(locals.move_loc(LEN + 1).is_err());
     assert!(locals.borrow_loc(LEN + 1).is_err());
 
     Ok(())
@@ -42,7 +45,7 @@ fn struct_pack_and_unpack() -> PartialVMResult<()> {
         Value::u32(15),
         Value::u64(20),
         Value::u128(30),
-        Value::u256(U256::max_value()),
+        Value::u256(U256::MAX),
     ];
     let s = Struct::pack(vec![
         Value::u8(10),
@@ -50,7 +53,7 @@ fn struct_pack_and_unpack() -> PartialVMResult<()> {
         Value::u32(15),
         Value::u64(20),
         Value::u128(30),
-        Value::u256(U256::max_value()),
+        Value::u256(U256::MAX),
     ]);
     let unpacked: Vec<_> = s.unpack()?.collect();
 
@@ -68,7 +71,6 @@ fn struct_borrow_field() -> PartialVMResult<()> {
     locals.store_loc(
         0,
         Value::struct_(Struct::pack(vec![Value::u8(10), Value::bool(false)])),
-        false,
     )?;
     let r: StructRef = locals.borrow_loc(0)?.value_as()?;
 
@@ -101,7 +103,7 @@ fn struct_borrow_nested() -> PartialVMResult<()> {
         Value::struct_(Struct::pack(vec![Value::u8(10), inner(x)]))
     }
 
-    locals.store_loc(0, outer(20), false)?;
+    locals.store_loc(0, outer(20))?;
     let r1: StructRef = locals.borrow_loc(0)?.value_as()?;
     let r2: StructRef = r1.borrow_field(1)?.value_as()?;
 
@@ -132,92 +134,9 @@ fn global_value_non_struct() -> PartialVMResult<()> {
     assert!(GlobalValue::cached(Value::bool(false)).is_err());
 
     let mut locals = Locals::new(1);
-    locals.store_loc(0, Value::u8(0), false)?;
+    locals.store_loc(0, Value::u8(0))?;
     let r = locals.borrow_loc(0)?;
     assert!(GlobalValue::cached(r).is_err());
-
-    Ok(())
-}
-
-#[test]
-fn legacy_ref_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let mut locals = Locals::new(10);
-
-    locals.store_loc(0, Value::u128(0), false)?;
-    let r = locals.borrow_loc(0)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    locals.store_loc(1, Value::vector_u8([1, 2, 3]), false)?;
-    let r = locals.borrow_loc(1)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    // Actual limits for type builder are irrelevant for the test.
-    let u8_ty = TypeBuilder::with_limits(10, 10).create_u8_ty();
-
-    let r: VectorRef = r.value_as()?;
-    let r = r.borrow_elem(0, &u8_ty)?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    locals.store_loc(2, Value::struct_(Struct::pack([])), false)?;
-    let r: Reference = locals.borrow_loc(2)?.value_as()?;
-    assert_eq!(r.legacy_abstract_memory_size(), r.legacy_size());
-
-    Ok(())
-}
-
-#[test]
-fn legacy_struct_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let structs = [
-        Struct::pack([]),
-        Struct::pack([Value::struct_(Struct::pack([Value::u8(0), Value::u64(0)]))]),
-    ];
-
-    for s in &structs {
-        assert_eq!(s.legacy_abstract_memory_size(), s.legacy_size());
-    }
-
-    Ok(())
-}
-
-#[test]
-fn legacy_val_abstract_memory_size_consistency() -> PartialVMResult<()> {
-    let vals = [
-        Value::u8(0),
-        Value::u16(0),
-        Value::u32(0),
-        Value::u64(0),
-        Value::u128(0),
-        Value::u256(U256::zero()),
-        Value::bool(true),
-        Value::address(AccountAddress::ZERO),
-        Value::vector_u8([0, 1, 2]),
-        Value::vector_u16([0, 1, 2]),
-        Value::vector_u32([0, 1, 2]),
-        Value::vector_u64([]),
-        Value::vector_u128([1, 2, 3, 4]),
-        Value::vector_u256([1, 2, 3, 4].iter().map(|q| U256::from(*q as u64))),
-        Value::struct_(Struct::pack([])),
-        Value::struct_(Struct::pack([Value::u8(0), Value::bool(false)])),
-        Value::vector_for_testing_only([]),
-        Value::vector_for_testing_only([Value::u8(0), Value::u8(1)]),
-    ];
-
-    let mut locals = Locals::new(vals.len());
-    for (idx, val) in vals.into_iter().enumerate() {
-        let val_size_new = val.legacy_abstract_memory_size();
-        let val_size_old = val.legacy_size();
-        assert_eq!(val_size_new, val_size_old);
-
-        locals.store_loc(idx, val, false)?;
-
-        let val_size_through_ref = locals
-            .borrow_loc(idx)?
-            .value_as::<Reference>()?
-            .value_view()
-            .legacy_abstract_memory_size();
-
-        assert_eq!(val_size_through_ref, val_size_old)
-    }
 
     Ok(())
 }
@@ -234,50 +153,50 @@ fn test_vm_value_vector_u64_casting() {
 fn test_mem_swap() -> PartialVMResult<()> {
     let mut locals = Locals::new(20);
     // IndexedRef(Locals)
-    locals.store_loc(0, Value::u64(0), false)?;
-    locals.store_loc(1, Value::u64(1), false)?;
-    locals.store_loc(2, Value::address(AccountAddress::ZERO), false)?;
-    locals.store_loc(3, Value::address(AccountAddress::ONE), false)?;
+    locals.store_loc(0, Value::u64(0))?;
+    locals.store_loc(1, Value::u64(1))?;
+    locals.store_loc(2, Value::address(AccountAddress::ZERO))?;
+    locals.store_loc(3, Value::address(AccountAddress::ONE))?;
 
     // ContainerRef
 
     // - Specialized
-    locals.store_loc(4, Value::vector_u64(vec![1, 2]), false)?;
-    locals.store_loc(5, Value::vector_u64(vec![3, 4, 5]), false)?;
-    locals.store_loc(6, Value::vector_address(vec![AccountAddress::ZERO]), false)?;
-    locals.store_loc(7, Value::vector_address(vec![AccountAddress::ONE]), false)?;
+    locals.store_loc(4, Value::vector_u64(vec![1, 2]))?;
+    locals.store_loc(5, Value::vector_u64(vec![3, 4, 5]))?;
+    locals.store_loc(6, Value::vector_address(vec![AccountAddress::ZERO]))?;
+    locals.store_loc(7, Value::vector_address(vec![AccountAddress::ONE]))?;
 
     // - Generic
     // -- Container of container
-    locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])), false)?;
-    locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])), false)?;
-    locals.store_loc(10, Value::master_signer(AccountAddress::ZERO), false)?;
-    locals.store_loc(11, Value::master_signer(AccountAddress::ONE), false)?;
+    locals.store_loc(8, Value::struct_(Struct::pack(vec![Value::u16(4)])))?;
+    locals.store_loc(9, Value::struct_(Struct::pack(vec![Value::u16(5)])))?;
+    locals.store_loc(10, Value::master_signer(AccountAddress::ZERO))?;
+    locals.store_loc(11, Value::master_signer(AccountAddress::ONE))?;
 
     // -- Container of vector
     locals.store_loc(
         12,
-        Value::vector_for_testing_only(vec![Value::u64(1u64), Value::u64(2u64)]),
-        false,
+        Value::vector_unchecked(vec![Value::DelayedFieldID {
+            id: DelayedFieldID::from(1),
+        }])?,
     )?;
     locals.store_loc(
         13,
-        Value::vector_for_testing_only(vec![Value::u64(3u64), Value::u64(4u64)]),
-        false,
+        Value::vector_unchecked(vec![Value::DelayedFieldID {
+            id: DelayedFieldID::from(2),
+        }])?,
     )?;
     locals.store_loc(
         14,
-        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ZERO)]),
-        false,
+        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ZERO)]).unwrap(),
     )?;
     locals.store_loc(
         15,
-        Value::vector_for_testing_only(vec![Value::master_signer(AccountAddress::ONE)]),
-        false,
+        Value::vector_unchecked(vec![Value::master_signer(AccountAddress::ONE)]).unwrap(),
     )?;
 
     let mut locals2 = Locals::new(2);
-    locals2.store_loc(0, Value::u64(0), false)?;
+    locals2.store_loc(0, Value::u64(0))?;
 
     let get_local =
         |ls: &Locals, idx: usize| ls.borrow_loc(idx).unwrap().value_as::<Reference>().unwrap();
@@ -310,8 +229,200 @@ fn test_mem_swap() -> PartialVMResult<()> {
     Ok(())
 }
 
+#[test]
+fn test_vector_unchecked() {
+    assert_err!(Value::vector_unchecked(vec![Value::bool(true)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u8(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u16(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u32(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u64(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u128(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::u256(U256::ONE)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i8(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i16(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i32(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i64(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i128(1)]));
+    assert_err!(Value::vector_unchecked(vec![Value::i256(I256::ONE)]));
+    assert_err!(Value::vector_unchecked(vec![Value::address(
+        AccountAddress::ONE
+    )]));
+
+    assert_ok!(Value::vector_unchecked(vec![Value::delayed_value(
+        DelayedFieldID::from(0)
+    )]));
+    assert_ok!(Value::vector_unchecked(vec![Value::vector_u8(vec![1, 2])]));
+    assert_ok!(Value::vector_unchecked(vec![Value::vector_i8(vec![1, 2])]));
+    assert_ok!(Value::vector_unchecked(vec![Value::struct_(Struct::pack(
+        vec![Value::u128(1), Value::u8(0)]
+    ))]));
+}
+
 #[cfg(test)]
-mod native_values {
+mod indexed_ref_tests {
+    use crate::{
+        delayed_values::delayed_field_id::DelayedFieldID,
+        values::{AbstractFunction, Locals, Struct, StructRef, Value, VectorRef},
+    };
+    use better_any::{Tid, TidAble};
+    use claims::{assert_matches, assert_ok};
+    use move_binary_format::errors::PartialVMResult;
+    use move_core_types::{
+        account_address::AccountAddress,
+        function::ClosureMask,
+        int256::{I256, U256},
+    };
+    use std::cmp::Ordering;
+
+    #[derive(Clone, Tid)]
+    struct MockAbstractFunction;
+
+    impl AbstractFunction for MockAbstractFunction {
+        fn closure_mask(&self) -> ClosureMask {
+            unreachable!()
+        }
+
+        fn cmp_dyn(&self, _other: &dyn AbstractFunction) -> PartialVMResult<Ordering> {
+            unreachable!()
+        }
+
+        fn clone_dyn(&self) -> PartialVMResult<Box<dyn AbstractFunction>> {
+            unreachable!()
+        }
+
+        fn to_canonical_string(&self) -> String {
+            unreachable!()
+        }
+    }
+
+    fn test_locals_or_struct_fields() -> Vec<(bool, Value)> {
+        vec![
+            // Primitives.
+            (true, Value::bool(true)),
+            (true, Value::u8(1)),
+            (true, Value::u16(1)),
+            (true, Value::u32(1)),
+            (true, Value::u64(1)),
+            (true, Value::u128(1)),
+            (true, Value::u256(U256::ONE)),
+            (true, Value::i8(1)),
+            (true, Value::i16(1)),
+            (true, Value::i32(1)),
+            (true, Value::i64(1)),
+            (true, Value::i128(1)),
+            (true, Value::i256(I256::ONE)),
+            (true, Value::address(AccountAddress::ONE)),
+            (true, Value::delayed_value(DelayedFieldID::from(0))),
+            (true, Value::closure(Box::new(MockAbstractFunction), vec![])),
+            // Non-primitives.
+            (false, Value::vector_u8(vec![1, 2, 3])),
+            (false, Value::struct_(Struct::pack(vec![Value::bool(true)]))),
+        ]
+    }
+
+    fn test_vectors() -> Vec<(bool, Value)> {
+        vec![
+            // Primitives.
+            (true, Value::vector_bool(vec![false])),
+            (true, Value::vector_u8(vec![1])),
+            (true, Value::vector_u16(vec![1])),
+            (true, Value::vector_u32(vec![1])),
+            (true, Value::vector_u64(vec![1])),
+            (true, Value::vector_u128(vec![1])),
+            (true, Value::vector_u256(vec![U256::ONE])),
+            (true, Value::vector_i8(vec![1])),
+            (true, Value::vector_i16(vec![1])),
+            (true, Value::vector_i32(vec![1])),
+            (true, Value::vector_i64(vec![1])),
+            (true, Value::vector_i128(vec![1])),
+            (true, Value::vector_i256(vec![I256::ONE])),
+            (true, Value::vector_address(vec![AccountAddress::ONE])),
+            (
+                true,
+                Value::vector_unchecked(vec![Value::closure(
+                    Box::new(MockAbstractFunction),
+                    vec![],
+                )])
+                .unwrap(),
+            ),
+            // Non-primitives.
+            (
+                false,
+                Value::vector_unchecked(vec![Value::vector_u8(vec![1, 2, 3])]).unwrap(),
+            ),
+            (
+                false,
+                Value::vector_unchecked(vec![Value::vector_i8(vec![1, 2, 3])]).unwrap(),
+            ),
+            (
+                false,
+                Value::vector_unchecked(vec![Value::struct_(Struct::pack(vec![Value::bool(
+                    true,
+                )]))])
+                .unwrap(),
+            ),
+        ]
+    }
+
+    #[test]
+    fn test_locals_indexed_ref() {
+        let values = test_locals_or_struct_fields();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, value));
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            if is_indexed_ref {
+                assert_matches!(reference, Value::IndexedRef(_));
+            } else {
+                assert_matches!(reference, Value::ContainerRef(_));
+            }
+        }
+    }
+
+    #[test]
+    fn test_struct_indexed_ref() {
+        let values = test_locals_or_struct_fields();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, Value::struct_(Struct::pack(vec![value]))));
+
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            let struct_ref = assert_ok!(reference.value_as::<StructRef>());
+            let field = assert_ok!(struct_ref.borrow_field(0));
+
+            if is_indexed_ref {
+                assert_matches!(field, Value::IndexedRef(_));
+            } else {
+                assert_matches!(field, Value::ContainerRef(_));
+            }
+        }
+    }
+
+    #[test]
+    fn test_vector_indexed_ref() {
+        let values = test_vectors();
+
+        let mut locals = Locals::new(values.len());
+        for (idx, (is_indexed_ref, value)) in values.into_iter().enumerate() {
+            assert_ok!(locals.store_loc(idx, value));
+
+            let reference = assert_ok!(locals.borrow_loc(idx));
+            let vector_ref = assert_ok!(reference.value_as::<VectorRef>());
+            let elem = assert_ok!(vector_ref.borrow_elem(0));
+
+            if is_indexed_ref {
+                assert_matches!(elem, Value::IndexedRef(_));
+            } else {
+                assert_matches!(elem, Value::ContainerRef(_));
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod delayed_fields {
     use super::*;
     use crate::delayed_values::delayed_field_id::{
         DelayedFieldID, ExtractUniqueIndex, ExtractWidth,
@@ -331,7 +442,12 @@ mod native_values {
         assert_err!(Value::u32(0).equals(&v));
         assert_err!(Value::u64(0).equals(&v));
         assert_err!(Value::u128(0).equals(&v));
-        assert_err!(Value::u256(U256::zero()).equals(&v));
+        assert_err!(Value::i8(0).equals(&v));
+        assert_err!(Value::i16(0).equals(&v));
+        assert_err!(Value::i32(0).equals(&v));
+        assert_err!(Value::i64(0).equals(&v));
+        assert_err!(Value::i128(0).equals(&v));
+        assert_err!(Value::i256(I256::ZERO).equals(&v));
 
         assert_err!(Value::address(AccountAddress::ONE).equals(&v));
         assert_err!(Value::master_signer(AccountAddress::ONE).equals(&v));
@@ -344,7 +460,13 @@ mod native_values {
         assert_err!(Value::vector_u32(vec![0, 1]).equals(&v));
         assert_err!(Value::vector_u64(vec![0, 1]).equals(&v));
         assert_err!(Value::vector_u128(vec![0, 1]).equals(&v));
-        assert_err!(Value::vector_u256(vec![U256::zero(), U256::one()]).equals(&v));
+        assert_err!(Value::vector_u256(vec![U256::ZERO, U256::ONE]).equals(&v));
+        assert_err!(Value::vector_i8(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i16(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i32(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i64(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i128(vec![0, 1]).equals(&v));
+        assert_err!(Value::vector_i256(vec![I256::ZERO, I256::ONE]).equals(&v));
 
         assert_err!(
             Value::vector_address(vec![AccountAddress::ONE, AccountAddress::TWO]).equals(&v)
@@ -363,7 +485,7 @@ mod native_values {
     fn test_native_value_borrow() {
         let delayed_value = Value::delayed_value(DelayedFieldID::new_with_width(0, 8));
         let mut locals = Locals::new(1);
-        assert_ok!(locals.store_loc(0, delayed_value, false));
+        assert_ok!(locals.store_loc(0, delayed_value));
 
         let local = assert_ok!(locals.borrow_loc(0));
         let reference = assert_ok!(local.value_as::<Reference>());

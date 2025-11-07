@@ -18,7 +18,7 @@
 /// - OKX
 module aptos_framework::solana_derivable_account {
     use aptos_framework::auth_data::AbstractionAuthData;
-    use aptos_framework::common_account_abstractions_utils::{network_name, entry_function_name};
+    use aptos_framework::common_account_abstractions_utils::{construct_message, daa_authenticate};
     use aptos_std::ed25519::{
         Self,
         new_signature_from_bytes,
@@ -27,15 +27,11 @@ module aptos_framework::solana_derivable_account {
     };
     use std::bcs_stream::{Self, deserialize_u8};
     use std::string_utils;
-    use std::transaction_context;
-    use std::vector;
 
     /// Signature failed to verify.
     const EINVALID_SIGNATURE: u64 = 1;
     /// Non base58 character found in public key.
     const EINVALID_BASE_58_PUBLIC_KEY: u64 = 2;
-    /// Entry function payload is missing.
-    const EMISSING_ENTRY_FUNCTION_PAYLOAD: u64 = 3;
     /// Invalid signature type.
     const EINVALID_SIGNATURE_TYPE: u64 = 4;
     /// Invalid public key.
@@ -81,32 +77,6 @@ module aptos_framework::solana_derivable_account {
         }
     }
 
-    fun construct_message(
-        base58_public_key: &vector<u8>,
-        domain: &vector<u8>,
-        entry_function_name: &vector<u8>,
-        digest_utf8: &vector<u8>,
-    ): vector<u8> {
-        let message = &mut vector[];
-        message.append(*domain);
-        message.append(b" wants you to sign in with your Solana account:\n");
-        message.append(*base58_public_key);
-        message.append(b"\n\nPlease confirm you explicitly initiated this request from ");
-        message.append(*domain);
-        message.append(b".");
-        message.append(b" You are approving to execute transaction ");
-        message.append(*entry_function_name);
-        message.append(b" on Aptos blockchain");
-        let network_name = network_name();
-        message.append(b" (");
-        message.append(network_name);
-        message.append(b")");
-        message.append(b".");
-        message.append(b"\n\nNonce: ");
-        message.append(*digest_utf8);
-        *message
-    }
-
     spec to_public_key_bytes {
         ensures result.length() == PUBLIC_KEY_NUM_BYTES;
     }
@@ -130,26 +100,26 @@ module aptos_framework::solana_derivable_account {
                 let new_carry = current * base + carry;
                 bytes[j] = ((new_carry & 0xff) as u8);
                 carry = new_carry >> 8;
-                j = j + 1;
+                j += 1;
             };
 
             // Add any remaining carry as new bytes
             while (carry > 0) {
                 bytes.push_back((carry & 0xff) as u8);
-                carry = carry >> 8;
+                carry >>= 8;
             };
 
-            i = i + 1;
+            i += 1;
         };
 
         // Handle leading zeros (1's in Base58)
         let i = 0;
         while (i < base58_public_key.length() && base58_public_key[i] == 49) { // '1' is 49 in ASCII
             bytes.push_back(0);
-            i = i + 1;
+            i += 1;
         };
 
-        vector::reverse(&mut bytes);
+        bytes.reverse();
         assert!(bytes.length() == PUBLIC_KEY_NUM_BYTES, EINVALID_PUBLIC_KEY_LENGTH);
         bytes
     }
@@ -174,7 +144,7 @@ module aptos_framework::solana_derivable_account {
         let abstract_signature = deserialize_abstract_signature(aa_auth_data.derivable_abstract_signature());
         match (abstract_signature) {
             SIWSAbstractSignature::MessageV1 { signature: signature_bytes } => {
-                let message = construct_message(&base58_public_key, &domain, entry_function_name, digest_utf8);
+                let message = construct_message(&b"Solana", &base58_public_key, &domain, entry_function_name, digest_utf8);
 
                 let signature = new_signature_from_bytes(signature_bytes);
                 assert!(
@@ -196,15 +166,7 @@ module aptos_framework::solana_derivable_account {
 
     /// Authorization function for domain account abstraction.
     public fun authenticate(account: signer, aa_auth_data: AbstractionAuthData): signer {
-        let maybe_entry_function_payload = transaction_context::entry_function_payload();
-        if (maybe_entry_function_payload.is_some()) {
-            let entry_function_payload = maybe_entry_function_payload.destroy_some();
-            let entry_function_name = entry_function_name(&entry_function_payload);
-            authenticate_auth_data(aa_auth_data, &entry_function_name);
-            account
-        } else {
-            abort(EMISSING_ENTRY_FUNCTION_PAYLOAD)
-        }
+        daa_authenticate(account, aa_auth_data, |auth_data, entry_name| authenticate_auth_data(auth_data, entry_name))
     }
 
     #[test_only]
@@ -256,18 +218,6 @@ module aptos_framework::solana_derivable_account {
         match (siws_abstract_signature) {
             SIWSAbstractSignature::MessageV1 { signature } => assert!(signature == signature_bytes),
         };
-    }
-
-    #[test(framework = @0x1)]
-    fun test_construct_message(framework: &signer) {
-        chain_id::initialize_for_test(framework, 2);
-
-        let base58_public_key = b"G56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV";
-        let domain = b"localhost:3000";
-        let entry_function_name = b"0x1::coin::transfer";
-        let digest_utf8 = b"0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279";
-        let message = construct_message(&base58_public_key, &domain, &entry_function_name, &digest_utf8);
-        assert!(message == b"localhost:3000 wants you to sign in with your Solana account:\nG56zT1K6AQab7FzwHdQ8hiHXusR14Rmddw6Vz5MFbbmV\n\nPlease confirm you explicitly initiated this request from localhost:3000. You are approving to execute transaction 0x1::coin::transfer on Aptos blockchain (testnet).\n\nNonce: 0x9509edc861070b2848d8161c9453159139f867745dc87d32864a71e796c7d279");
     }
 
     #[test]

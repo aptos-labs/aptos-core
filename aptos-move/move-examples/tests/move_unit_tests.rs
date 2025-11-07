@@ -8,7 +8,11 @@ use aptos_types::{
     on_chain_config::{aptos_test_feature_flags_genesis, Features, TimedFeaturesBuilder},
 };
 use aptos_vm::natives;
-use move_cli::base::test::{run_move_unit_tests, UnitTestResult};
+use move_cli::base::{
+    test::{run_move_unit_tests, UnitTestResult},
+    test_validation,
+};
+use move_model::model::GlobalEnv;
 use move_package::{source_package::std_lib::StdVersion, CompilerConfig};
 use move_unit_test::UnitTestingConfig;
 use move_vm_runtime::native_functions::NativeFunctionTable;
@@ -22,6 +26,14 @@ where
     let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     path.push(relative.into());
     path
+}
+
+/// Configures the move-cli unit test validation hook to run the extended checker.
+fn configure_extended_checks_for_unit_test() {
+    fn validate(env: &GlobalEnv) {
+        extended_checks::run_extended_checks(env);
+    }
+    test_validation::set_validation_hook(Box::new(validate));
 }
 
 pub fn run_tests_for_pkg(
@@ -50,6 +62,7 @@ pub fn run_tests_for_pkg(
         /* cost_table */ None,
         /* compute_coverage */ false,
         &mut std::io::stdout(),
+        true,
     );
     if ok.is_err() || ok.is_ok_and(|r| r == UnitTestResult::Failure) {
         panic!("move unit tests failed")
@@ -58,7 +71,7 @@ pub fn run_tests_for_pkg(
 
 pub fn aptos_test_natives() -> NativeFunctionTable {
     natives::configure_for_unit_test();
-    extended_checks::configure_extended_checks_for_unit_test();
+    configure_extended_checks_for_unit_test();
     natives::aptos_natives(
         LATEST_GAS_FEATURE_VERSION,
         NativeGasParameters::zeros(),

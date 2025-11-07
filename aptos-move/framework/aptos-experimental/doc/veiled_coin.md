@@ -1054,7 +1054,7 @@ Given an address <code>addr</code>, returns the ElGamal encryption public key as
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_not_found">error::not_found</a>(<a href="veiled_coin.md#0x7_veiled_coin_EVEILED_COIN_STORE_NOT_PUBLISHED">EVEILED_COIN_STORE_NOT_PUBLISHED</a>)
     );
 
-    <b>borrow_global_mut</b>&lt;<a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>&lt;CoinType&gt;&gt;(addr).pk
+    <b>borrow_global</b>&lt;<a href="veiled_coin.md#0x7_veiled_coin_VeiledCoinStore">VeiledCoinStore</a>&lt;CoinType&gt;&gt;(addr).pk
 }
 </code></pre>
 

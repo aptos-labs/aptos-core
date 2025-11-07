@@ -27,7 +27,10 @@ use move_binary_format::{
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
 };
-use move_vm_runtime::{Module, RuntimeEnvironment, Script, WithRuntimeEnvironment};
+use move_vm_runtime::{
+    LayoutCache, LayoutCacheEntry, Module, RuntimeEnvironment, Script, StructKey,
+    WithRuntimeEnvironment,
+};
 use move_vm_types::code::{
     ambassador_impl_ScriptCache, Code, ModuleCache, ModuleCode, ModuleCodeBuilder, ScriptCache,
     WithBytes,
@@ -50,10 +53,17 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> ModuleCodeBuilder for LatestVi
         &self,
         key: &Self::Key,
     ) -> VMResult<Option<ModuleCode<Self::Deserialized, Self::Verified, Self::Extension>>> {
-        let key = T::Key::from_address_and_module_name(key.address(), key.name());
-        self.get_raw_base_value(&key)
+        let constructed_key = T::Key::from_address_and_module_name(key.address(), key.name());
+        self.get_raw_base_value(&constructed_key)
             .map_err(|err| err.finish(Location::Undefined))?
-            .map(|state_value| {
+            .map(|mut state_value| {
+                // TODO: remove this once framework on mainnet is using the new option module
+                if let Some(bytes) = self
+                    .runtime_environment()
+                    .get_module_bytes_override(key.address(), key.name())
+                {
+                    state_value.set_bytes(bytes);
+                }
                 let extension = Arc::new(AptosModuleExtension::new(state_value));
                 let compiled_module = self
                     .runtime_environment()
@@ -238,5 +248,17 @@ impl<T: Transaction, S: TStateView<Key = T::Key>> LatestView<'_, T, S> {
             ViewState::Sync(state) => state.versioned_map.module_cache(),
             ViewState::Unsync(state) => state.unsync_map.module_cache(),
         }
+    }
+}
+
+impl<T: Transaction, S: TStateView<Key = T::Key>> LayoutCache for LatestView<'_, T, S> {
+    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry> {
+        self.global_module_cache.get_struct_layout_entry(key)
+    }
+
+    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()> {
+        self.global_module_cache
+            .store_struct_layout_entry(key, entry)?;
+        Ok(())
     }
 }

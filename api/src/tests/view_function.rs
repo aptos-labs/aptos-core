@@ -476,3 +476,177 @@ async fn test_view_aggregator(use_txn_payload_v2_format: bool, use_orderless_tra
         .await;
     context.check_golden_output_no_prune(resp);
 }
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_option(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let mut account = context.create_account().await;
+    let account_addr = account.address();
+
+    // Publish packages
+    let named_addresses = vec![("account".to_string(), account_addr)];
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/move/test_option");
+        TestContext::build_package_with_latest_language(path, named_addresses)
+    });
+    context.publish_package(&mut account, txn).await;
+    let function = format!("{}::test_module::return_none", account.address());
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": function,
+                "arguments": [],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    enable_framework_for_option,
+    case(false, false, false),
+    case(false, false, true),
+    case(true, false, false),
+    case(true, true, false)
+)]
+async fn test_view_option_some(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+    enable_framework_for_option: bool,
+) {
+    const FEATURE_FLAG_ENABLE_FRAMEWORK_FOR_OPTION: u64 = 103;
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    if enable_framework_for_option {
+        context
+            .enable_feature(FEATURE_FLAG_ENABLE_FRAMEWORK_FOR_OPTION)
+            .await;
+    } else {
+        context
+            .disable_feature(FEATURE_FLAG_ENABLE_FRAMEWORK_FOR_OPTION)
+            .await;
+    }
+    let mut account = context.create_account().await;
+    let account_addr = account.address();
+
+    // Publish packages
+    let named_addresses = vec![("account".to_string(), account_addr)];
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/move/test_option");
+        TestContext::build_package_with_latest_language(path, named_addresses)
+    });
+    context.publish_package(&mut account, txn).await;
+    let function = format!("{}::test_module::return_some", account.address());
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": function,
+                "arguments": [],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_option_vec(use_txn_payload_v2_format: bool, use_orderless_transactions: bool) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let mut account = context.create_account().await;
+    let account_addr = account.address();
+
+    // Publish packages
+    let named_addresses = vec![("account".to_string(), account_addr)];
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/move/test_option");
+        TestContext::build_package_with_latest_language(path, named_addresses)
+    });
+    context.publish_package(&mut account, txn).await;
+    let function = format!(
+        "{}::test_module::return_vector_of_option",
+        account.address()
+    );
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": function,
+                "arguments": [],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[rstest(
+    use_txn_payload_v2_format,
+    use_orderless_transactions,
+    case(false, false),
+    case(true, false),
+    case(true, true)
+)]
+async fn test_view_option_struct(
+    use_txn_payload_v2_format: bool,
+    use_orderless_transactions: bool,
+) {
+    let mut context = new_test_context_with_orderless_flags(
+        current_function_name!(),
+        use_txn_payload_v2_format,
+        use_orderless_transactions,
+    );
+    let mut account = context.create_account().await;
+    let account_addr = account.address();
+
+    // Publish packages
+    let named_addresses = vec![("account".to_string(), account_addr)];
+    let txn = futures::executor::block_on(async move {
+        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/tests/move/test_option");
+        TestContext::build_package_with_latest_language(path, named_addresses)
+    });
+    context.publish_package(&mut account, txn).await;
+    let function = format!("{}::test_module::return_option_test", account.address());
+    let resp = context
+        .post(
+            "/view",
+            json!({
+                "function": function,
+                "arguments": [],
+                "type_arguments": [],
+            }),
+        )
+        .await;
+    context.check_golden_output_no_prune(resp);
+}

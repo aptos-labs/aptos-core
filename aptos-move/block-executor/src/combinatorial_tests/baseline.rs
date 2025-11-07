@@ -610,7 +610,7 @@ where
         let mut map = self.delayed_field_key_to_id_map.borrow_mut();
         assert!(
             map.insert(key, id)
-                .map_or(true, |existing_id| existing_id == id),
+                .is_none_or(|existing_id| existing_id == id),
             "Inconsistent delayed field ID mapping"
         );
     }
@@ -990,10 +990,10 @@ where
             let expected_group_map = group_world.get(key).unwrap();
 
             if patched_group_bytes.is_deletion() {
-                assert!(maybe_size.map_or(true, |size| *size == ResourceGroupSize::zero_combined()));
+                assert!(maybe_size.is_none_or(|size| *size == ResourceGroupSize::zero_combined()));
             } else {
                 let bytes = patched_group_bytes.extract_raw_bytes().unwrap();
-                assert!(maybe_size.map_or(true, |size| size.get() == bytes.len() as u64));
+                assert!(maybe_size.is_none_or(|size| size.get() == bytes.len() as u64));
                 let patched_group_map: BTreeMap<u32, Bytes> = bcs::from_bytes(&bytes).unwrap();
                 assert_eq!(patched_group_map, *expected_group_map);
             }

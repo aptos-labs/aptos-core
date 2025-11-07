@@ -492,7 +492,7 @@ Read more about [phantom type](https://aptos.dev/move/book/generics#phantom-type
 
 ## Step 7:  Use the Move Prover
     
-> NOTE: Before running the Move Prover, ensure that the [Move Prover](https://aptos.dev/tools/aptos-cli/install-cli/install-move-prover) and associated tools are installed.
+> NOTE: Before running the Move Prover, ensure that the [Move Prover](https://aptos.dev/build/cli/setup-cli/install-move-prover/) and associated tools are installed.
 
 Smart contracts deployed on the blockchain may manipulate high-value assets. As a technique that uses strict
 mathematical methods to describe behavior and reason correctness of computer systems, formal verification

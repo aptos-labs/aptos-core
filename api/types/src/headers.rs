@@ -22,3 +22,5 @@ pub const X_APTOS_CURSOR: &str = "X-Aptos-Cursor";
 pub const X_APTOS_GAS_USED: &str = "X-Aptos-Gas-Used";
 /// Provided by the client to identify what client it is.
 pub const X_APTOS_CLIENT: &str = "x-aptos-client";
+/// W3C Trace Context traceparent header for distributed tracing
+pub const TRACEPARENT: &str = "traceparent";

@@ -17,15 +17,19 @@ module aptos_experimental::pending_order_book_index {
         tie_breaker: UniqueIdxType
     }
 
+    struct PendingTimeKey has store, copy, drop {
+        time: u64,
+        tie_breaker: UniqueIdxType
+    }
+
     enum PendingOrderBookIndex has store {
         V1 {
             // Order to trigger when the oracle price move less than
             price_move_down_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
             // Orders to trigger whem the oracle price move greater than
             price_move_up_index: BigOrderedMap<PendingOrderKey, OrderIdType>,
-            // time_based_index: BigOrderedMap<BidKey<TimestampType>, ActiveBidData>,
             // Orders to trigger when the time is greater than
-            time_based_index: BigOrderedMap<u64, OrderIdType>
+            time_based_index: BigOrderedMap<PendingTimeKey, OrderIdType>
         }
     }
 
@@ -56,16 +60,19 @@ module aptos_experimental::pending_order_book_index {
             self.price_move_down_index.remove(
                 &PendingOrderKey {
                     price: price_move_down_index.destroy_some(),
-                    tie_breaker: unique_priority_idx
+                    tie_breaker: unique_priority_idx.descending_idx()
                 }
             );
         };
         if (time_based_index.is_some()) {
-            self.time_based_index.remove(&time_based_index.destroy_some());
+            self.time_based_index.remove(&PendingTimeKey {
+                time: time_based_index.destroy_some(),
+                tie_breaker: unique_priority_idx
+            });
         };
     }
 
-    public(friend) fun place_pending_maker_order(
+    public(friend) fun place_pending_order(
         self: &mut PendingOrderBookIndex,
         order_id: OrderIdType,
         trigger_condition: TriggerCondition,
@@ -86,12 +93,19 @@ module aptos_experimental::pending_order_book_index {
             self.price_move_down_index.add(
                 PendingOrderKey {
                     price: price_move_down_index.destroy_some(),
-                    tie_breaker: unique_priority_idx
+                    // Use a descending tie breaker to ensure that for price move down orders,
+                    // orders with the same price are processed in FIFO order
+                    tie_breaker: unique_priority_idx.descending_idx()
                 },
                 order_id
             );
         } else if (time_based_index.is_some()) {
-            self.time_based_index.add(time_based_index.destroy_some(), order_id);
+            self.time_based_index.add(
+                PendingTimeKey {
+                    time: time_based_index.destroy_some(),
+                    tie_breaker: unique_priority_idx
+                },
+                order_id);
         };
     }
 
@@ -127,7 +141,7 @@ module aptos_experimental::pending_order_book_index {
         while (!self.time_based_index.is_empty() && orders.length() < order_limit) {
             let current_time = timestamp::now_seconds();
             let (time, order_id) = self.time_based_index.borrow_front();
-            if (current_time >= time) {
+            if (current_time >= time.time) {
                 orders.push_back(*order_id);
                 self.time_based_index.remove(&time);
             } else {
@@ -168,7 +182,7 @@ module aptos_experimental::pending_order_book_index {
     #[test_only]
     public(friend) fun get_time_based_index(
         self: &PendingOrderBookIndex
-    ): &BigOrderedMap<u64, OrderIdType> {
+    ): &BigOrderedMap<PendingTimeKey, OrderIdType> {
         &self.time_based_index
     }
 }

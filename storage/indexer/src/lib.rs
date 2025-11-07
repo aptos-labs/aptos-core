@@ -61,12 +61,13 @@ impl Indexer {
         rocksdb_config: RocksdbConfig,
     ) -> Result<Self> {
         let db_path = db_root_path.as_ref().join(INDEX_DB_NAME);
+        let env = None;
 
         let db = DB::open(
             db_path,
             "index_db",
             column_families(),
-            &gen_rocksdb_options(&rocksdb_config, false),
+            &gen_rocksdb_options(&rocksdb_config, env, false),
         )?;
 
         let next_version = db
@@ -269,6 +270,12 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
             AnnotatedMoveValue::U64(_) => {},
             AnnotatedMoveValue::U128(_) => {},
             AnnotatedMoveValue::U256(_) => {},
+            AnnotatedMoveValue::I8(_) => {},
+            AnnotatedMoveValue::I16(_) => {},
+            AnnotatedMoveValue::I32(_) => {},
+            AnnotatedMoveValue::I64(_) => {},
+            AnnotatedMoveValue::I128(_) => {},
+            AnnotatedMoveValue::I256(_) => {},
             AnnotatedMoveValue::Bool(_) => {},
             AnnotatedMoveValue::Address(_) => {},
             AnnotatedMoveValue::Bytes(_) => {},

@@ -77,7 +77,7 @@ module 0x42::test {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v8
+// Move bytecode v9
 module 42.test {
 struct T<A, B> has drop {
 	x: A,

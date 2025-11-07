@@ -1,0 +1,104 @@
+//**** Cross-compiled for `move` syntax from `tests/signed-int/cast_i32.move`
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        ()
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483648u32 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483648 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483648u128 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483648u256 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483648i64 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483648i128 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = 2147483648i256 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -2147483649i64 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -2147483649i128 as i32;
+    }
+}
+
+
+//# run --verbose
+script {
+    fun main() {
+        let _v0 = -2147483649i256 as i32;
+    }
+}

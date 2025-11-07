@@ -70,6 +70,8 @@ either = { workspace = true }
 fail = { workspace = true }
 futures = { workspace = true }
 hex = { workspace = true }
+move-vm-runtime = { workspace = true }
+move-vm-types = { workspace = true }
 num_cpus = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
@@ -98,4 +100,4 @@ tokio-console = ["aptos-logger/tokio-console", "aptos-config/tokio-console"]
 smoke-test = ["aptos-jwk-consensus/smoke-test", "aptos-dkg-runtime/smoke-test"]
 
 [package.metadata.cargo-machete]
-ignored = ["aptos-crypto"]
+ignored = ["aptos-crypto", "move-vm-types"]

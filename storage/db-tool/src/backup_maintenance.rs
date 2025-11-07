@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::Result;
 use aptos_backup_cli::{
-    coordinators::backup::BackupCompactor, metadata::cache::MetadataCacheOpt,
-    storage::DBToolStorageOpt, utils::ConcurrentDownloadsOpt,
+    coordinators::backup::BackupCompactor,
+    metadata::cache::MetadataCacheOpt,
+    storage::DBToolStorageOpt,
+    utils::{storage_ext::BackupStorageExt, ConcurrentDownloadsOpt},
 };
 use clap::{Parser, Subcommand};
 
@@ -14,6 +16,8 @@ pub enum Command {
     Compact(CompactionOpt),
     #[clap(about = "Cleanup the backup metadata files")]
     Cleanup(CleanupOpt),
+    #[clap(about = "Display the backup meatdata in human-readable JSON format.")]
+    ReadMetadata(ReadMetadataOpt),
 }
 
 #[derive(Parser)]
@@ -48,6 +52,13 @@ pub struct CleanupOpt {
     pub storage: DBToolStorageOpt,
 }
 
+#[derive(Parser)]
+pub struct ReadMetadataOpt {
+    #[clap(flatten)]
+    pub storage: DBToolStorageOpt,
+    pub path: String,
+}
+
 impl Command {
     pub async fn run(self) -> Result<()> {
         match self {
@@ -65,6 +76,14 @@ impl Command {
             },
             Command::Cleanup(_) => {
                 // TODO: add cleanup logic for removing obsolete metadata files
+            },
+            Command::ReadMetadata(opt) => {
+                println!("Reading metadata file at: {}...", opt.path);
+                let storage = opt.storage.init_storage().await?;
+                let json_value = storage
+                    .load_json_file::<serde_json::Value>(&opt.path)
+                    .await?;
+                println!("{}", serde_json::to_string_pretty(&json_value).unwrap());
             },
         }
         Ok(())

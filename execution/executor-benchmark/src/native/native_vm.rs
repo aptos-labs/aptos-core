@@ -123,7 +123,11 @@ impl ExecutorTask for NativeVMExecutorTask {
     type Output = AptosTransactionOutput;
     type Txn = SignatureVerifiedTransaction;
 
-    fn init(env: &AptosEnvironment, _state_view: &impl StateView) -> Self {
+    fn init(
+        env: &AptosEnvironment,
+        _state_view: &impl StateView,
+        _async_runtime_checks_enabled: bool,
+    ) -> Self {
         let fa_migration_complete = env
             .features()
             .is_enabled(FeatureFlag::OPERATIONS_DEFAULT_TO_FA_APT_STORE);
@@ -354,6 +358,7 @@ impl NativeVMExecutorTask {
                 }
             },
             NativeTransaction::BlockEpilogue => return Ok((VMChangeSet::empty(), 0)),
+            NativeTransaction::BlockMetadata => return Ok((VMChangeSet::empty(), 0)),
         };
 
         events.push((

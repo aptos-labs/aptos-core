@@ -1,0 +1,33 @@
+//# publish
+module 0x22::test
+
+public fun add100(a: u64): u64
+    ld_u64 100
+    move_loc a
+    add
+    ret
+
+public fun divide(a: u64, b: u64): u64
+    move_loc a
+    move_loc b
+    div
+    ret
+
+public fun multiply(a: u64, b: u64): u64
+    move_loc a
+    move_loc b
+    mul
+    ret
+
+public fun call_instr(a: u64): u64
+    ld_u64 100
+    copy_loc a
+    call 0x22::test::add100
+    call 0x22::test::multiply
+    move_loc a
+    call 0x22::test::divide
+    ret
+
+//# run --verbose 0x22::test::call_instr --args 10u64 --display-trace
+
+//# run --verbose 0x22::test::call_instr --args 0u64 --display-trace

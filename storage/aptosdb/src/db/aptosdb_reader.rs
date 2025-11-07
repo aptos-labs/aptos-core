@@ -545,26 +545,6 @@ impl DbReader for AptosDB {
         })
     }
 
-    fn get_auxiliary_data_iterator(
-        &self,
-        start_version: Version,
-        limit: u64,
-    ) -> Result<Box<dyn Iterator<Item = Result<TransactionAuxiliaryData>> + '_>> {
-        gauged_api("get_auxiliary_data_iterator", || {
-            error_if_too_many_requested(limit, MAX_REQUEST_LIMIT)?;
-            self.error_if_ledger_pruned("Transaction", start_version)?;
-
-            let iter = self
-                .ledger_db
-                .transaction_auxiliary_data_db()
-                .get_transaction_auxiliary_data_iter(start_version, limit as usize)?;
-            Ok(Box::new(iter)
-                as Box<
-                    dyn Iterator<Item = Result<TransactionAuxiliaryData>> + '_,
-                >)
-        })
-    }
-
     fn get_transaction_accumulator_range_proof(
         &self,
         first_version: Version,

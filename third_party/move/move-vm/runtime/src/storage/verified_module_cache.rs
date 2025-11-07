@@ -53,7 +53,7 @@ lazy_static! {
         VerifiedModuleCache::empty();
 }
 
-#[inline(always)]
+#[cfg_attr(feature = "force-inline", inline(always))]
 fn verifier_cache_enabled() -> bool {
     cfg_if! {
         if #[cfg(feature = "disable_verifier_cache")] {

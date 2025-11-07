@@ -26,9 +26,9 @@ use move_core_types::{
     account_address::AccountAddress, ident_str, value::MoveValue, vm_status::VMStatus,
 };
 use move_vm_runtime::{
-    dispatch_loader, module_traversal::TraversalContext, FunctionDefinitionLoader,
-    InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction, LoadedFunctionOwner,
-    ModuleStorage, StagingModuleStorage,
+    dispatch_loader, execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext,
+    FunctionDefinitionLoader, InstantiatedFunctionLoader, LegacyLoaderConfig, LoadedFunction,
+    LoadedFunctionOwner, ModuleStorage, StagingModuleStorage, WithRuntimeEnvironment,
 };
 
 #[derive(Deref, DerefMut)]
@@ -141,6 +141,9 @@ impl<'r> UserSession<'r> {
                                 gas_meter,
                                 traversal_context,
                                 &loader,
+                                // We should never enable trace record for init_module - it runs on
+                                // newly published state so it is safer to do checks in-place.
+                                &mut NoOpTraceRecorder,
                             )?;
                         }
                     } else {
@@ -152,9 +155,12 @@ impl<'r> UserSession<'r> {
                         ) {
                             verifier::module_init::verify_init_module_function(&function)?;
 
+                            let ty_args_id =
+                                loader.runtime_environment().ty_pool().intern_ty_args(&[]);
                             let loaded_function = LoadedFunction {
                                 owner: LoadedFunctionOwner::Module(module),
                                 ty_args: vec![],
+                                ty_args_id,
                                 function,
                             };
                             session.execute_loaded_function(
@@ -165,6 +171,9 @@ impl<'r> UserSession<'r> {
                                 gas_meter,
                                 traversal_context,
                                 &loader,
+                                // We should never enable trace record for init_module - it runs on
+                                // newly published state so it is safer to do checks in-place.
+                                &mut NoOpTraceRecorder,
                             )?;
                         }
                     }

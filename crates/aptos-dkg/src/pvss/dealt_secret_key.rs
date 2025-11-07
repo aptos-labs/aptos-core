@@ -9,20 +9,21 @@ macro_rules! dealt_secret_key_impl {
         $GTProjective:ident,
         $gt:ident
     ) => {
+        use aptos_crypto::blstrs::{$GT_PROJ_NUM_BYTES, $gt_proj_from_bytes};
         use crate::{
             algebra::lagrange::lagrange_coefficients,
-            constants::$GT_PROJ_NUM_BYTES,
             pvss::{
-                dealt_secret_key_share::$gt::DealtSecretKeyShare, player::Player,
-                threshold_config::ThresholdConfig, traits, traits::SecretSharingConfig,
+                dealt_secret_key_share::$gt::DealtSecretKeyShare, Player,
+                threshold_config::ThresholdConfigBlstrs, traits, traits::SecretSharingConfig,
             },
-            utils::{serialization::$gt_proj_from_bytes, $gt_multi_exp},
+            utils::{$gt_multi_exp},
         };
         use aptos_crypto::CryptoMaterialError;
         use aptos_crypto_derive::{SilentDebug, SilentDisplay};
         use blstrs::{$GTProjective, Scalar};
         use ff::Field;
         use more_asserts::{assert_ge, assert_le};
+        use crate::pvss::traits::ThresholdConfig;
 
         /// The size of a serialized *dealt secret key*.
         pub(crate) const DEALT_SK_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;
@@ -79,12 +80,12 @@ macro_rules! dealt_secret_key_impl {
             }
         }
 
-        impl traits::Reconstructable<ThresholdConfig> for DealtSecretKey {
+        impl traits::Reconstructable<ThresholdConfigBlstrs> for DealtSecretKey {
             type Share = DealtSecretKeyShare;
 
             /// Reconstructs the `DealtSecretKey` given a sufficiently-large subset of shares from players.
             /// Mainly used for testing the PVSS transcript dealing and decryption.
-            fn reconstruct(sc: &ThresholdConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
+            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<(Player, Self::Share)>) -> Self {
                 assert_ge!(shares.len(), sc.get_threshold());
                 assert_le!(shares.len(), sc.get_total_num_players());
 

@@ -77,6 +77,7 @@ impl NativeResult {
     /// failure of the VM which would raise a `PartialVMError` error directly.
     /// The only thing the function can specify is its abort code, as if it had invoked the `Abort`
     /// bytecode instruction
+    #[cold]
     pub fn err(cost: InternalGas, abort_code: u64) -> Self {
         NativeResult::Abort { cost, abort_code }
     }
@@ -90,6 +91,7 @@ impl NativeResult {
     ///
     /// The natives are still required to return a partial cost, which the VM will pass
     /// to the gas meter for proper bookkeeping.
+    #[cold]
     pub fn out_of_gas(partial_cost: InternalGas) -> Self {
         NativeResult::OutOfGas { partial_cost }
     }

@@ -25,7 +25,7 @@ module aptos_experimental::market_bulk_order_tests {
         test_gtc_taker_partially_filled_helper,
         test_post_only_success_helper,
         test_post_only_failure_helper,
-        test_taker_partial_cancelled_maker_reinserted_helper, test_self_matching_not_allowed_helper,
+        test_taker_partial_cancelled_maker_reinserted_helper,
         test_self_matching_allowed_helper,
     };
 
@@ -154,18 +154,6 @@ module aptos_experimental::market_bulk_order_tests {
     }
 
     #[test(
-        admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
-    )]
-    public fun test_self_matching_not_allowed(
-        admin: &signer,
-        market_signer: &signer,
-        maker1: &signer,
-        maker2: &signer
-    ) {
-        test_self_matching_not_allowed_helper(admin, market_signer, maker1, maker2, true);
-    }
-
-    #[test(
         aptos_framework = @0x1, admin = @0x1, market_signer = @0x123, maker1 = @0x456, maker2 = @0x789
     )]
     public fun test_self_matching_allowed(
@@ -276,5 +264,70 @@ module aptos_experimental::market_bulk_order_tests {
         taker: &signer
     ) {
         test_taker_partial_cancelled_maker_reinserted_helper(admin, market_signer, maker, taker, true);
+    }
+
+    #[test(admin = @0x1, market_signer = @0x123, maker = @0x456)]
+    public fun test_bulk_order_cancellation_event_fields(
+        admin: &signer,
+        market_signer: &signer,
+        maker: &signer,
+    ) {
+        use aptos_experimental::market_types::{BulkOrderModifiedEvent, verify_bulk_order_modified_event};
+        use aptos_experimental::market_bulk_order::cancel_bulk_order;
+        use aptos_experimental::event_utils::{new_event_store, latest_emitted_events};
+
+        let market = setup_market(admin, market_signer);
+        let maker_addr = signer::address_of(maker);
+
+        // Define the bulk order parameters
+        let bid_price = 100u64;
+        let bid_size = 50u64;
+        let ask_price = 110u64;
+        let ask_size = 60u64;
+        let sequence_number = 1u64; // The place_bulk_order helper uses sequence_number = 1 internally
+
+        // Place bulk order with one bid and one ask
+        let order_id_option = place_bulk_order(
+            &mut market,
+            maker,
+            vector[bid_price],
+            vector[bid_size],
+            vector[ask_price],
+            vector[ask_size],
+        );
+
+        // Verify order was placed successfully
+        assert!(order_id_option.is_some(), 0);
+        let order_id = order_id_option.destroy_some();
+
+        // Cancel the bulk order
+        cancel_bulk_order(&mut market, maker, &test_market_callbacks());
+
+        // Verify the cancellation event
+        let cancel_event_store = new_event_store();
+        let events = latest_emitted_events<BulkOrderModifiedEvent>(&mut cancel_event_store, option::some(1));
+        assert!(events.length() == 1, 1);
+
+        let bulk_order_cancelled_event = events[0];
+
+        // Verify that the event contains the correct cancelled order details
+        verify_bulk_order_modified_event(
+            bulk_order_cancelled_event,
+            order_id,
+            sequence_number,
+            market.get_market_address(),
+            maker_addr,
+            vector[], // bid_prices - empty after cancellation
+            vector[], // bid_sizes - empty after cancellation
+            vector[], // ask_prices - empty after cancellation
+            vector[], // ask_sizes - empty after cancellation
+            vector[bid_price], // cancelled_bid_prices - the original bid PRICE (100)
+            vector[bid_size], // cancelled_bid_sizes - the original bid SIZE (50)
+            vector[ask_price], // cancelled_ask_prices - the original ask PRICE (110)
+            vector[ask_size], // cancelled_ask_sizes - the original ask SIZE (60)
+            sequence_number, // previous_seq_num - same as sequence_number for cancellation
+        );
+
+        market.destroy_market();
     }
 }

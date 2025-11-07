@@ -122,9 +122,10 @@ pub struct RocksdbConfig {
     pub max_open_files: i32,
     /// Maximum size of the RocksDB write ahead log (WAL)
     pub max_total_wal_size: u64,
-    /// Maximum number of background threads for Rocks DB
+    /// Maximum number of background jobs for Rocks DB
     pub max_background_jobs: i32,
     /// Block cache size for Rocks DB
+    /// DEPRECATED: use `shared_block_cache_size` in `RocksdbConfigs` instead.
     pub block_cache_size: u64,
     /// Block size for Rocks DB
     pub block_size: u64,
@@ -142,13 +143,8 @@ pub struct RocksdbConfig {
 }
 
 impl RocksdbConfig {
-    /// Default block cache size is 1GB,
-    const DEFAULT_BLOCK_CACHE_SIZE: u64 = 1 << 30;
     /// Default block size is 4KB,
     const DEFAULT_BLOCK_SIZE: u64 = 4 * (1 << 10);
-    /// Default block cache size for state kv db is 16GB, because the number of different keys
-    /// being read is usually large.
-    const DEFAULT_STATE_KV_BLOCK_CACHE_SIZE: u64 = 16 * (1 << 30);
 }
 
 impl Default for RocksdbConfig {
@@ -159,10 +155,10 @@ impl Default for RocksdbConfig {
             // For now we set the max total WAL size to be 1G. This config can be useful when column
             // families are updated at non-uniform frequencies.
             max_total_wal_size: 1u64 << 30,
-            // This includes threads for flashing and compaction. Rocksdb will decide the # of
-            // threads to use internally.
-            max_background_jobs: 16,
-            block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
+            // This includes jobs for flush and compaction.
+            max_background_jobs: 4,
+            // Not used. Only kept for backward compatibility.
+            block_cache_size: 0,
             block_size: Self::DEFAULT_BLOCK_SIZE,
             // Count index/filter blocks in block cache usage by default.
             cache_index_and_filter_blocks: true,
@@ -186,6 +182,15 @@ pub struct RocksdbConfigs {
     pub index_db_config: RocksdbConfig,
     #[serde(default = "default_to_true")]
     pub enable_storage_sharding: bool,
+    pub high_priority_background_threads: i32,
+    pub low_priority_background_threads: i32,
+    /// The size of the single block cache shared by all the DB instances in `AptosDB`.
+    pub shared_block_cache_size: usize,
+}
+
+impl RocksdbConfigs {
+    /// Default block cache size is 24GB.
+    pub const DEFAULT_BLOCK_CACHE_SIZE: usize = 24 * (1 << 30);
 }
 
 fn default_to_true() -> bool {
@@ -197,15 +202,15 @@ impl Default for RocksdbConfigs {
         Self {
             ledger_db_config: RocksdbConfig::default(),
             state_merkle_db_config: RocksdbConfig::default(),
-            state_kv_db_config: RocksdbConfig {
-                block_cache_size: RocksdbConfig::DEFAULT_STATE_KV_BLOCK_CACHE_SIZE,
-                ..Default::default()
-            },
+            state_kv_db_config: RocksdbConfig::default(),
             index_db_config: RocksdbConfig {
                 max_open_files: 1000,
                 ..Default::default()
             },
             enable_storage_sharding: true,
+            high_priority_background_threads: 4,
+            low_priority_background_threads: 2,
+            shared_block_cache_size: Self::DEFAULT_BLOCK_CACHE_SIZE,
         }
     }
 }
@@ -697,8 +702,8 @@ impl ConfigSanitizer for StorageConfig {
 #[cfg(test)]
 mod test {
     use crate::config::{
-        config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PersistableConfig, PrunerConfig,
-        RocksdbConfig, ShardPathConfig, ShardedDbPathConfig, StorageConfig,
+        config_optimizer::ConfigOptimizer, NodeConfig, NodeType, PrunerConfig, ShardPathConfig,
+        ShardedDbPathConfig, StorageConfig,
     };
     use aptos_types::chain_id::ChainId;
 
@@ -814,60 +819,5 @@ mod test {
 
         assert_eq!(node_config.storage.ensure_rlimit_nofile, 999_999);
         assert!(node_config.storage.assert_rlimit_nofile);
-    }
-
-    fn verify_parsing_block_cache_size(
-        yaml: &str,
-        expected_ledger_block_cache_size: u64,
-        expected_state_kv_block_cache_size: u64,
-    ) {
-        let node_config = NodeConfig::parse_serialized_config(yaml).unwrap();
-        let config = &node_config.storage;
-        assert_eq!(
-            config.rocksdb_configs.ledger_db_config.block_cache_size,
-            expected_ledger_block_cache_size
-        );
-        assert_eq!(
-            config.rocksdb_configs.state_kv_db_config.block_cache_size,
-            expected_state_kv_block_cache_size,
-        );
-    }
-
-    #[test]
-    fn test_rocksdb_config_override() {
-        verify_parsing_block_cache_size(
-            r#"
-            storage:
-              rocksdb_configs:
-                ledger_db_config:
-                  block_cache_size: 123
-            "#,
-            123,
-            RocksdbConfig::DEFAULT_STATE_KV_BLOCK_CACHE_SIZE,
-        );
-
-        verify_parsing_block_cache_size(
-            r#"
-            storage:
-              rocksdb_configs:
-                state_kv_db_config:
-                  block_cache_size: 123
-            "#,
-            RocksdbConfig::DEFAULT_BLOCK_CACHE_SIZE,
-            123,
-        );
-
-        verify_parsing_block_cache_size(
-            r#"
-            storage:
-              rocksdb_configs:
-                ledger_db_config:
-                  block_cache_size: 123
-                state_kv_db_config:
-                  block_cache_size: 456
-            "#,
-            123,
-            456,
-        );
     }
 }

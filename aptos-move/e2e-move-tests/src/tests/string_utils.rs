@@ -4,8 +4,9 @@
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_language_e2e_tests::executor::FakeExecutor;
-use aptos_types::move_utils::MemberId;
+use aptos_types::{move_utils::MemberId, on_chain_config::FeatureFlag};
 use move_core_types::account_address::AccountAddress;
+use rstest::rstest;
 use std::str::FromStr;
 
 fn initialize(h: &mut MoveHarness) {
@@ -17,9 +18,16 @@ fn initialize(h: &mut MoveHarness) {
     assert_success!(status);
 }
 
-#[test]
-fn test_function_value_formatting_in_modules() {
+#[rstest(enabled, disabled,
+    case(vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION], vec![]),
+    case(vec![], vec![FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION]),
+)]
+fn test_function_value_formatting_in_modules(
+    enabled: Vec<FeatureFlag>,
+    disabled: Vec<FeatureFlag>,
+) {
     let mut h = MoveHarness::new_with_executor(FakeExecutor::from_head_genesis());
+    h.enable_features(enabled, disabled);
     let acc = h.new_account_at(AccountAddress::from_hex_literal("0x123").unwrap());
     initialize(&mut h);
 

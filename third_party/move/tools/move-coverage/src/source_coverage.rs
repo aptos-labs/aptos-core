@@ -269,14 +269,12 @@ impl<'a> SourceCoverageBuilder<'a> {
                                     let all_locations = minimize_locations(
                                         (0..code_unit.code.len())
                                             .filter_map(|code_offset| {
-                                                if let Ok(loc) = source_map.get_code_location(
-                                                    function_def_idx,
-                                                    code_offset as CodeOffset,
-                                                ) {
-                                                    Some(loc)
-                                                } else {
-                                                    None
-                                                }
+                                                source_map
+                                                    .get_code_location(
+                                                        function_def_idx,
+                                                        code_offset as CodeOffset,
+                                                    )
+                                                    .ok()
                                             })
                                             .collect(),
                                     );

@@ -5,9 +5,7 @@ use crate::{assert_success, AptosPackageHooks};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
 use aptos_gas_profiling::TransactionGasLog;
-use aptos_gas_schedule::{
-    AptosGasParameters, FromOnChainGasSchedule, InitialGasSchedule, ToOnChainGasSchedule,
-};
+use aptos_gas_schedule::{AptosGasParameters, FromOnChainGasSchedule, ToOnChainGasSchedule};
 use aptos_language_e2e_tests::{
     account::{Account, TransactionBuilder},
     executor::FakeExecutorImpl,
@@ -41,7 +39,6 @@ use claims::assert_ok;
 use move_core_types::{
     language_storage::{StructTag, TypeTag},
     move_resource::MoveStructType,
-    value::MoveValue,
 };
 use move_package::package_hooks::register_package_hooks;
 use once_cell::sync::Lazy;
@@ -305,6 +302,24 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         result
     }
 
+    pub fn run_block_with_current_metadata(
+        &mut self,
+        txn_block: Vec<SignedTransaction>,
+    ) -> Vec<TransactionStatus> {
+        let mut result = vec![];
+        for output in self
+            .executor
+            .execute_block_with_current_metadata(txn_block)
+            .unwrap()
+        {
+            if matches!(output.status(), TransactionStatus::Keep(_)) {
+                self.executor.apply_write_set(output.write_set());
+            }
+            result.push(output.status().to_owned())
+        }
+        result
+    }
+
     /// Runs a block of signed transactions. On success, applies the write set.
     pub fn run_block_get_output(
         &mut self,
@@ -388,6 +403,11 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
     /// Runs a transaction and return gas used.
     pub fn evaluate_gas(&mut self, account: &Account, payload: TransactionPayload) -> u64 {
         let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_signed(txn)
+    }
+
+    /// Runs a transaction and return gas used.
+    pub fn evaluate_gas_signed(&mut self, txn: SignedTransaction) -> u64 {
         let output = self.run_raw(txn);
         assert_success!(output.status().to_owned());
         output.gas_used()
@@ -400,6 +420,14 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         payload: TransactionPayload,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
+        self.evaluate_gas_with_profiler_signed(txn)
+    }
+
+    /// Runs a transaction with the gas profiler.
+    pub fn evaluate_gas_with_profiler_signed(
+        &mut self,
+        txn: SignedTransaction,
+    ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let (output, gas_log) = self
             .executor
             .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())
@@ -905,50 +933,14 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
             .enable_features(acc.address(), enabled, disabled);
     }
 
-    fn override_one_gas_param(&mut self, param: &str, param_value: u64) {
-        // TODO: The AptosGasParameters::zeros() schedule doesn't do what we want, so
-        // explicitly manipulating gas entries. Wasn't obvious from the gas code how to
-        // do this differently then below, so perhaps improve this...
-        let entries = AptosGasParameters::initial()
-            .to_on_chain_gas_schedule(aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION);
-        let entries = entries
-            .into_iter()
-            .map(|(name, val)| {
-                if name == param {
-                    (name, param_value)
-                } else {
-                    (name, val)
-                }
-            })
-            .collect::<Vec<_>>();
-        let gas_schedule = GasScheduleV2 {
-            feature_version: aptos_gas_schedule::LATEST_GAS_FEATURE_VERSION,
-            entries,
-        };
-        let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
-        let core_signer_arg = MoveValue::Signer(AccountAddress::ONE)
-            .simple_serialize()
-            .unwrap();
-        self.executor
-            .exec("gas_schedule", "set_for_next_epoch", vec![], vec![
-                core_signer_arg.clone(),
-                MoveValue::vector_u8(schedule_bytes)
-                    .simple_serialize()
-                    .unwrap(),
-            ]);
-        self.executor
-            .exec("aptos_governance", "force_end_epoch", vec![], vec![
-                core_signer_arg,
-            ]);
-    }
-
     pub fn modify_gas_scaling(&mut self, gas_scaling_factor: u64) {
-        self.override_one_gas_param("txn.gas_unit_scaling_factor", gas_scaling_factor);
+        self.executor.modify_gas_scaling(gas_scaling_factor);
     }
 
     /// Increase maximal transaction size.
     pub fn increase_transaction_size(&mut self) {
-        self.override_one_gas_param("txn.max_transaction_size_in_bytes", 1000 * 1024);
+        self.executor
+            .override_one_gas_param("txn.max_transaction_size_in_bytes", 1000 * 1024);
     }
 
     pub fn sequence_number_opt(&self, addr: &AccountAddress) -> Option<u64> {

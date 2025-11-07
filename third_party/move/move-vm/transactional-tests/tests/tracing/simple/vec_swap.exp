@@ -1,0 +1,9 @@
+processed 2 tasks
+task 0 lines 1-13:  publish [module 0x22::test]
+task 1 lines 15-15:  run --verbose 0x22::test::vec_swap_instr --display-trace
+instructions: 8
+fingerprint: 11168442215585360526
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::vec_swap_instr
+return values: [30, 20, 10]

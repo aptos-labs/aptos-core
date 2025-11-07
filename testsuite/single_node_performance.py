@@ -3,6 +3,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import math
 import re
 import os
 import tempfile
@@ -84,12 +85,14 @@ SKIP_PERF_IMPROVEMENT_NOTICE = IS_MAINNET
 CODE_PERF_VERSION = "v10"
 
 # default to using production number of execution threads for assertions
-NUMBER_OF_EXECUTION_THREADS = int(
-    os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32)
-)
+# but cap it at available CPU count to avoid concurrency validation errors
+import multiprocessing
+MAX_EXECUTION_THREADS = int(os.environ.get("NUMBER_OF_EXECUTION_THREADS", default=32))
+NUMBER_OF_EXECUTION_THREADS = min(MAX_EXECUTION_THREADS, multiprocessing.cpu_count())
 
 if os.environ.get("DETAILED"):
-    EXECUTION_ONLY_NUMBER_OF_THREADS = [1, 2, 4, 8, 16, 32, 48, 60]
+    # Cap execution threads at available CPU count
+    EXECUTION_ONLY_NUMBER_OF_THREADS = [t for t in [1, 2, 4, 8, 16, 32, 48, 60] if t <= multiprocessing.cpu_count()]
 else:
     EXECUTION_ONLY_NUMBER_OF_THREADS = []
 
@@ -669,7 +672,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                 part for part in line.strip().split(CALIBRATION_SEPARATOR) if part
             ]
         )
-        >= 1
+        >= 3
     }
     print(calibrated_expected_tps)
 
@@ -893,6 +896,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         )
 
         if not HIDE_OUTPUT:
+            def get_tps_delta(r: RunGroupInstance) -> str:
+                tps = r.single_node_result.tps
+                if not math.isclose(r.expected_tps, 0):
+                    delta = (tps - r.expected_tps) / r.expected_tps * 100
+                    return f"{delta:+.2f}%"
+                else:
+                    return "N/A"
+
             print_table(
                 results,
                 by_levels=True,
@@ -900,6 +911,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     ("block_size", lambda r: r.block_size),
                     ("expected t/s", lambda r: r.expected_tps),
                     ("t/s", lambda r: int(round(r.single_node_result.tps))),
+                    ("delta", get_tps_delta),
                 ],
             )
             print_table(

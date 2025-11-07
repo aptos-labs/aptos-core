@@ -423,8 +423,7 @@ fn background_emit_request(high_gas_price: bool) -> EmitJobRequest {
 pub fn background_traffic_for_sweep(num_cases: usize) -> Option<BackgroundTraffic> {
     Some(BackgroundTraffic {
         traffic: background_emit_request(true),
-        criteria: std::iter::repeat(9.5)
-            .take(num_cases)
+        criteria: std::iter::repeat_n(9.5, num_cases)
             .map(|min_tps| {
                 SuccessCriteria::new_float(min_tps)
                     .add_max_expired_tps(0.1)

@@ -1,0 +1,8 @@
+//# publish
+module 0x22::test
+
+public fun ld_u64_instr(): u64
+    ld_u64 64
+    ret
+
+//# run --verbose 0x22::test::ld_u64_instr --display-trace

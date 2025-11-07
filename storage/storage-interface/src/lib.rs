@@ -239,13 +239,6 @@ pub trait DbReader: Send + Sync {
             limit: u64,
         ) -> Result<Box<dyn Iterator<Item = Result<WriteSet>> + '_>>;
 
-        /// Returns an iterator of transaction auxiliary data starting from the given version.
-        fn get_auxiliary_data_iterator(
-            &self,
-            start_version: Version,
-            limit: u64,
-        ) -> Result<Box<dyn Iterator<Item = Result<TransactionAuxiliaryData>> + '_>>;
-
         fn get_transaction_accumulator_range_proof(
             &self,
             start_version: Version,

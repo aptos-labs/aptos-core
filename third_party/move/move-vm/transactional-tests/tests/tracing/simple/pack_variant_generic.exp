@@ -1,0 +1,9 @@
+processed 2 tasks
+task 0 lines 1-12:  publish [module 0x22::test]
+task 1 lines 14-14:  run --verbose 0x22::test::pack_variant_generic_instr --display-trace
+instructions: 4
+fingerprint: 8959826402420142245
+branch_outcomes: 
+calls:
+  entrypoint 0x0000000000000000000000000000000000000000000000000000000000000022::test::pack_variant_generic_instr
+

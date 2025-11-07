@@ -25,7 +25,7 @@ fn test_runner(path: &Path) -> datatest_stable::Result<()> {
             "aptos_std=0x1".to_string(),
             "aptos_framework=0x1".to_string(),
         ],
-        language_version: Some(LanguageVersion::latest_stable()),
+        language_version: Some(LanguageVersion::latest()),
         compiler_version: Some(CompilerVersion::latest_stable()),
         experiments: vec![Experiment::LINT_CHECKS.to_string()],
         external_checks: vec![MoveLintChecks::make(BTreeMap::from([(

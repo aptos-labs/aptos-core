@@ -10,7 +10,6 @@ use strum_macros::{EnumCount as EnumCountMacro, EnumIter};
 
 #[derive(Debug, EnumCountMacro, EnumIter, Clone, Copy, Eq, PartialEq)]
 pub enum TimedFeatureFlag {
-    DisableInvariantViolationCheckInSwapLoc,
     // Was always enabled.
     _LimitTypeTagSize,
     // Enabled on mainnet, cannot be disabled.
@@ -23,6 +22,9 @@ pub enum TimedFeatureFlag {
     // Disable checking for captured option types.
     // Only when this feature is turned on, feature flag ENABLE_CAPTURE_OPTION can control whether the option type can be captured.
     DisabledCaptureOption,
+
+    /// Fixes the bug that table natives double count the memory usage of the global values.
+    FixTableNativesMemoryDoubleCounting,
 }
 
 /// Representation of features that are gated by the block timestamps.
@@ -72,10 +74,6 @@ impl TimedFeatureFlag {
         use TimedFeatureFlag::*;
 
         match (self, chain_id) {
-            // Enabled from the beginning of time.
-            (DisableInvariantViolationCheckInSwapLoc, TESTNET) => BEGINNING_OF_TIME,
-            (DisableInvariantViolationCheckInSwapLoc, MAINNET) => BEGINNING_OF_TIME,
-
             // Note: These have been enabled since the start due to a bug.
             (_LimitTypeTagSize, TESTNET) => BEGINNING_OF_TIME,
             (_LimitTypeTagSize, MAINNET) => BEGINNING_OF_TIME,
@@ -126,6 +124,16 @@ impl TimedFeatureFlag {
             (DisabledCaptureOption, TESTING) => Utc.with_ymd_and_hms(1970, 1, 1, 1, 0, 0).unwrap(),
             // For mainnet, always enable this feature.
             (DisabledCaptureOption, MAINNET) => BEGINNING_OF_TIME,
+
+            (FixTableNativesMemoryDoubleCounting, TESTNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 10, 16, 17, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+            (FixTableNativesMemoryDoubleCounting, MAINNET) => Los_Angeles
+                .with_ymd_and_hms(2025, 10, 21, 10, 0, 0)
+                .unwrap()
+                .with_timezone(&Utc),
+
             // For chains other than testnet and mainnet, a timed feature is considered enabled from
             // the very beginning, if left unspecified.
             (_, TESTING | DEVNET | PREMAINNET) => BEGINNING_OF_TIME,
@@ -281,10 +289,6 @@ mod test {
         // Check testnet on Jan 1, 2024.
         let testnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), jan_1_2024_micros);
         assert!(
-            testnet_jan_1_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
-        assert!(
             testnet_jan_1_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
@@ -298,10 +302,6 @@ mod test {
         );
         // Check testnet on Nov 15, 2024.
         let testnet_nov_15_2024 = TimedFeaturesBuilder::new(ChainId::testnet(), nov_15_2024_micros);
-        assert!(
-            testnet_nov_15_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
         assert!(
             testnet_nov_15_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
@@ -317,10 +317,6 @@ mod test {
         // Check mainnet on Jan 1, 2024.
         let mainnet_jan_1_2024 = TimedFeaturesBuilder::new(ChainId::mainnet(), jan_1_2024_micros);
         assert!(
-            mainnet_jan_1_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
-        assert!(
             mainnet_jan_1_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"
         );
@@ -334,10 +330,6 @@ mod test {
         );
         // Check mainnet on Nov 15, 2024.
         let mainnet_nov_15_2024 = TimedFeaturesBuilder::new(ChainId::mainnet(), nov_15_2024_micros);
-        assert!(
-            mainnet_nov_15_2024.is_enabled(DisableInvariantViolationCheckInSwapLoc),
-            "DisableInvariantViolationCheckInSwapLoc should always be enabled"
-        );
         assert!(
             mainnet_nov_15_2024.is_enabled(_LimitTypeTagSize),
             "LimitTypeTagSize should always be enabled"

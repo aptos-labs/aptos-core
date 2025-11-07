@@ -1,0 +1,149 @@
+//# publish
+module 0x66::a
+
+use 0x1::signer
+
+
+struct S has copy+drop
+	  x: u8
+
+
+entry public fun bar(a: &mut S, b: &mut S)
+	ld_u8 123
+	pack S
+	move_loc a
+	write_ref
+
+	move_loc b
+	read_ref
+	unpack S
+
+	ld_u8 123
+	eq
+	br_false ok
+
+	ld_u64 42
+	abort 
+
+	ok:
+
+	ret
+
+entry public fun foo(s: &signer)
+	local a: &mut S
+	local b: &mut S
+	local vv: S
+	local v0: S
+	local v1: S
+	local v2: S
+	local v3: S
+	local v4: S
+	local v5: S
+	local v6: S
+	local v7: S
+	local v8: S
+	local v9: S
+	local v_aliased: S
+
+	ld_u8 0
+	pack S
+	st_loc vv
+
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+	copy_loc vv
+
+	st_loc v_aliased
+	st_loc v0
+	st_loc v1
+	st_loc v2
+	st_loc v3
+	st_loc v4
+	st_loc v5
+	st_loc v6
+	st_loc v7
+	st_loc v8
+	st_loc v9
+
+	mut_borrow_loc v0
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc v1
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc v2
+	st_loc a
+	ld_false
+	br_true r
+
+
+	mut_borrow_loc v3
+	st_loc a
+	ld_false
+	br_true r
+
+
+	mut_borrow_loc v4
+	st_loc a
+	ld_false
+	br_true r
+
+
+	mut_borrow_loc v5
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc v6
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc v7
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc v8
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc v9
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc vv
+	st_loc a
+	ld_false
+	br_true r
+
+	mut_borrow_loc v_aliased
+	st_loc a
+	ld_false
+	br_true r
+
+
+r:
+
+	mut_borrow_loc v_aliased
+	move_loc a
+	call bar
+
+	ret
+
+
+//# run 0x66::a::foo --signers 0x66 --verbose

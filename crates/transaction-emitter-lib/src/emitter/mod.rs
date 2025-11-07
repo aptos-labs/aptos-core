@@ -19,7 +19,7 @@ use crate::emitter::{
 use again::RetryPolicy;
 use anyhow::{ensure, format_err, Result};
 use aptos_config::config::DEFAULT_MAX_SUBMIT_TRANSACTION_BATCH_SIZE;
-use aptos_crypto::ed25519::Ed25519PrivateKey;
+use aptos_crypto::{ed25519::Ed25519PrivateKey, HashValue};
 use aptos_logger::{sample, sample::SampleRate};
 use aptos_rest_client::{aptos_api_types::AptosErrorCode, error::RestError, Client as RestClient};
 use aptos_sdk::{
@@ -31,7 +31,7 @@ use aptos_transaction_generator_lib::{
     create_txn_generator_creator, AccountType, TransactionType, SEND_AMOUNT,
 };
 use aptos_types::account_config::aptos_test_root_address;
-use futures::future::{try_join_all, FutureExt};
+use futures::future::{join_all, try_join_all, FutureExt};
 use log::{error, info, warn};
 use once_cell::sync::Lazy;
 use rand::{
@@ -993,6 +993,107 @@ fn pick_client(clients: &[RestClient]) -> &RestClient {
     clients.choose(&mut rand::thread_rng()).unwrap()
 }
 
+async fn wait_for_orderless_txns(
+    client: &RestClient,
+    account_orderless_txns: &HashMap<AccountAddress, HashSet<HashValue>>,
+    txn_expiration_ts_secs: u64,
+    sleep_between_cycles: Duration,
+) -> HashMap<AccountAddress, HashSet<HashValue>> {
+    if account_orderless_txns.is_empty() {
+        return HashMap::new();
+    }
+    let mut pending_account_txns = account_orderless_txns.clone();
+    loop {
+        let futures = pending_account_txns.keys().map(|account| async move {
+            (
+                *account,
+                FETCH_ACCOUNT_RETRY_POLICY
+                    .retry(move || {
+                        client.get_account_transaction_summaries(*account, None, None, None)
+                    })
+                    .await,
+            )
+        });
+
+        let mut latest_ledger_ts_secs = u64::MAX;
+        for (account, txn_summaries_result) in join_all(futures).await {
+            match txn_summaries_result {
+                Ok(response) => {
+                    let ledger_timestamp =
+                        Duration::from_micros(response.state().timestamp_usecs).as_secs();
+                    latest_ledger_ts_secs = min(ledger_timestamp, latest_ledger_ts_secs);
+
+                    for txn_summary in response.into_inner() {
+                        let remove_account =
+                            if let Some(txn_hashes) = pending_account_txns.get_mut(&account) {
+                                txn_hashes.remove(&txn_summary.transaction_hash());
+                                txn_hashes.is_empty()
+                            } else {
+                                false
+                            };
+                        if remove_account {
+                            pending_account_txns.remove(&account);
+                        }
+                    }
+                },
+                Err(err) => {
+                    error!(
+                        "Error retrieving summaries for account {}: {:?}",
+                        account, err
+                    );
+                },
+            }
+        }
+
+        if pending_account_txns.is_empty() {
+            break;
+        }
+
+        if latest_ledger_ts_secs > txn_expiration_ts_secs {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(60)),
+                warn!(
+                    "[{}] Ledger timestamp {} exceeded txn expiration timestamp {} for {:?}",
+                    client.path_prefix_string(),
+                    latest_ledger_ts_secs,
+                    txn_expiration_ts_secs,
+                    pending_account_txns.keys(),
+                )
+            );
+            break;
+        }
+
+        sample!(SampleRate::Duration(Duration::from_secs(15)), {
+            warn!(
+                "Num accounts with pending orderless txns: {}",
+                pending_account_txns.len()
+            );
+            warn!(
+                "Pending orderless txns per account: {:?}",
+                pending_account_txns
+                    .iter()
+                    .map(|(account, hashes)| (account, hashes.len()))
+                    .collect::<HashMap<_, _>>()
+            );
+        });
+
+        if aptos_infallible::duration_since_epoch().as_secs() >= txn_expiration_ts_secs + 240 {
+            sample!(
+                SampleRate::Duration(Duration::from_secs(15)),
+                error!(
+                    "[{}] Client cannot catch up to needed timestamp ({}), after additional 240s, aborting",
+                    client.path_prefix_string(),
+                    txn_expiration_ts_secs,
+                )
+            );
+            break;
+        }
+
+        time::sleep(sleep_between_cycles).await;
+    }
+    pending_account_txns
+}
+
 /// This function waits for the submitted transactions to be committed, up to
 /// a wait_timeout (counted from the start_time passed in, not from the function call).
 /// It returns number of transactions that expired without being committed,
@@ -1011,6 +1112,11 @@ async fn wait_for_accounts_sequence(
     let mut latest_fetched_counts = HashMap::new();
 
     let mut sum_of_completion_timestamps_millis = 0u128;
+
+    if pending_addresses.is_empty() {
+        return (HashMap::new(), sum_of_completion_timestamps_millis);
+    }
+
     loop {
         match query_sequence_numbers(client, pending_addresses.iter()).await {
             Ok((sequence_numbers, ledger_timestamp_secs)) => {

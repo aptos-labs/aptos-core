@@ -64,8 +64,8 @@ fn native_move_range(
     // We need to charge before executing, so fetching and checking sizes here.
     // We repeat fetching and checking of the sizes inside VectorRef::move_range call as well.
     // Not sure if possible to combine (as we are never doing charging there).
-    let to_len = to.length_as_usize(&ty_args[0])?;
-    let from_len = from.length_as_usize(&ty_args[0])?;
+    let to_len = to.length_as_usize()?;
+    let from_len = from.length_as_usize()?;
 
     if removal_position
         .checked_add(length)

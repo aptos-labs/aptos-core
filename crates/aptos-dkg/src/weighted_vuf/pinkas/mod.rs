@@ -8,13 +8,11 @@ use crate::{
         dealt_pub_key_share::g2::DealtPubKeyShare, traits::HasEncryptionPublicParams, Player,
         WeightedConfig,
     },
-    utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing, parallel_multi_pairing,
-        random::{random_nonzero_scalar, random_scalar},
-    },
+    utils::{g1_multi_exp, g2_multi_exp, parallel_multi_pairing, random::random_nonzero_scalar},
     weighted_vuf::traits::WeightedVUF,
 };
 use anyhow::{anyhow, bail};
+use aptos_crypto::blstrs::{multi_pairing, random_scalar};
 use blstrs::{pairing, G1Projective, G2Projective, Gt, Scalar};
 use ff::Field;
 use group::{Curve, Group};

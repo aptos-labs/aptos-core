@@ -540,8 +540,8 @@ impl Arbitrary for TransactionExtraConfig {
 }
 
 prop_compose! {
-    fn arb_transaction_status()(vm_status in any::<VMStatus>()) -> TransactionStatus {
-        TransactionStatus::from_vm_status(vm_status, &Features::default())
+    fn arb_transaction_status()(vm_status in any::<VMStatus>(), memory_limit_exceeded_as_miscellaneous_error: bool) -> TransactionStatus {
+        TransactionStatus::from_vm_status(vm_status, &Features::default(), memory_limit_exceeded_as_miscellaneous_error)
     }
 }
 

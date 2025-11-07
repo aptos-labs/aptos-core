@@ -612,19 +612,6 @@ pub fn expect_get_transaction_outputs(
         .returning(move |_, _| Ok(Box::new(events_iterator.clone())))
         .in_sequence(&mut expectation_sequence);
 
-    // Expect a call to get an auxiliary data iterator
-    let auxiliary_data_iterator = output_list_with_proof
-        .clone()
-        .transactions_and_outputs
-        .into_iter()
-        .map(|(_, output)| Ok(output.auxiliary_data().clone()));
-    mock_db
-        .expect_get_auxiliary_data_iterator()
-        .times(1)
-        .with(eq(start_version), eq(num_items))
-        .returning(move |_, _| Ok(Box::new(auxiliary_data_iterator.clone())))
-        .in_sequence(&mut expectation_sequence);
-
     // Expect a call to get a persisted auxiliary info iterator
     let persisted_auxiliary_info_iterator = persisted_auxiliary_infos.clone().into_iter().map(Ok);
     mock_db

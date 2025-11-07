@@ -171,20 +171,14 @@ pub fn convert_bcs_hex_new(typ: u8, value: String) -> Option<String> {
 /// Convert the json serialized PropertyMap's inner BCS fields to their original value in string format
 pub fn convert_bcs_propertymap(s: Value) -> Option<Value> {
     match PropertyMap::from_bcs_encode_str(s) {
-        Some(e) => match serde_json::to_value(&e) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        },
+        Some(e) => serde_json::to_value(&e).ok(),
         None => None,
     }
 }
 
 pub fn convert_bcs_token_object_propertymap(s: Value) -> Option<Value> {
     match TokenObjectPropertyMap::from_bcs_encode_str(s) {
-        Some(e) => match serde_json::to_value(&e) {
-            Ok(val) => Some(val),
-            Err(_) => None,
-        },
+        Some(e) => serde_json::to_value(&e).ok(),
         None => None,
     }
 }

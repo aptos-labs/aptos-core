@@ -8,7 +8,7 @@ use crate::{
     blocks::BlocksApi,
     check_size::PostSizeLimit,
     context::Context,
-    error_converter::convert_error,
+    error_converter::{convert_error, panic_handler},
     events::EventsApi,
     index::IndexApi,
     log::middleware_log,
@@ -29,7 +29,7 @@ use poem::{
     handler,
     http::Method,
     listener::{Listener, RustlsCertificate, RustlsConfig, TcpListener},
-    middleware::{Compression, Cors},
+    middleware::{CatchPanic, Compression, Cors},
     web::Html,
     EndpointExt, Route, Server,
 };
@@ -254,6 +254,7 @@ pub fn attach_poem_to_runtime(
             .with(cors)
             .with_if(config.api.compression_enabled, Compression::new())
             .with(PostSizeLimit::new(size_limit))
+            .with(CatchPanic::new().with_handler(panic_handler))
             // NOTE: Make sure to keep this after all the `with` middleware.
             .catch_all_error(convert_error)
             .around(middleware_log);

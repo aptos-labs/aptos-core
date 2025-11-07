@@ -16,17 +16,12 @@ rust-version = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 aptos-crypto-derive = { workspace = true }
-aptos-dkg = { workspace = true }
 aptos-types = { workspace = true }
-ark-bls12-381 = { workspace = true }
-ark-ec = { workspace = true }
-ark-ff = { workspace = true }
-ark-serialize = { workspace = true }
-ark-std = { workspace = true }
-bcs = { workspace = true }
+bcs = { workspace = true } # needed for BCSCryptoHash
 blstrs = { workspace = true }
 derivation-path = { workspace = true }
 ed25519-dalek = { workspace = true }
+group = "0.13"
 hex = { workspace = true }
 hmac = { workspace = true }
 jsonwebtoken = { workspace = true }

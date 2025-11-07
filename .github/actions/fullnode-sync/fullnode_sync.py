@@ -9,21 +9,88 @@ import yaml
 
 # This script runs the fullnode-sync from the root of aptos-core.
 
-# Useful file constants
+# Network name constants
+TESTNET_STRING = "testnet"
+MAINNET_STRING = "mainnet"
+
+# Config file constants
 FAST_SYNC_BOOTSTRAPPING_MODE = "DownloadLatestStates" # The bootstrapping string for fast sync
 FULLNODE_CONFIG_NAME = "public_full_node.yaml" # Relative to the aptos-core repo
 FULLNODE_CONFIG_TEMPLATE_PATH = "config/src/config/test_data/public_full_node.yaml" # Relative to the aptos-core repo
 GENESIS_BLOB_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/genesis.blob" # Location inside the aptos-networks repo
+WAYPOINT_FILE_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/waypoint.txt" # Location inside the aptos-networks repo
+
+# Service endpoint constants
 LOCAL_METRICS_ENDPOINT = "http://127.0.0.1:9101/json_metrics" # The json metrics endpoint running on the local host
 LOCAL_METRICS_ENDPOINT_TEXT = "http://127.0.0.1:9101/metrics" # The text metrics endpoint running on the local host
 LOCAL_REST_ENDPOINT = "http://127.0.0.1:8080/v1" # The rest endpoint running on the local host
+REMOTE_REST_ENDPOINTS = "https://api.{network}.aptoslabs.com/v1" # The remote rest endpoint
+
+# API and metric constants
 LEDGER_VERSION_API_STRING = "ledger_version" # The string to fetch the ledger version from the REST API
 LEDGER_VERSION_METRICS_STRING = "aptos_state_sync_version.synced" # The string to fetch the ledger version from the metrics API
-MAX_TIME_BETWEEN_SYNC_INCREASES_SECS = 1800 # The number of seconds after which to fail if the node isn't syncing
-REMOTE_REST_ENDPOINTS = "https://fullnode.{network}.aptoslabs.com/v1" # The remote rest endpoint
-SYNCING_DELTA_VERSIONS = 20000 # The number of versions to sync beyond the highest known at the job start
 SYNCED_STATES_METRICS_STRING = "aptos_state_sync_version.synced_states" # The string to fetch the synced states from the metrics API
-WAYPOINT_FILE_PATH = "https://raw.githubusercontent.com/aptos-labs/aptos-networks/main/{network}/waypoint.txt" # Location inside the aptos-networks repo
+
+# Generic constants
+MAX_TIME_BETWEEN_SYNC_INCREASES_SECS = 1800 # The number of seconds after which to fail if the node isn't syncing
+NUMBER_OF_HISTORICAL_TRANSACTIONS_TO_SYNC = 2000000 # The number of historical transactions to sync (when syncing from genesis)
+SYNCING_DELTA_VERSIONS = 20000 # The number of versions to sync beyond the highest known at the job start
+
+# Testnet seed peer constants
+TESTNET_SEED_PEERS = {
+  "2DA03E9D24E501741234047953A63ABC6D84193BE495C507C72F68269FB8B76A": {
+    "addresses": [
+      "/dns4/pfn1.usce1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/2DA03E9D24E501741234047953A63ABC6D84193BE495C507C72F68269FB8B76A/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+  "8B68819D267E19D44716B821CE499B79D258C86BB65E7A60884EC31FF987ED14": {
+    "addresses": [
+      "/dns4/pfn2.usce2.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/8B68819D267E19D44716B821CE499B79D258C86BB65E7A60884EC31FF987ED14/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+  "76902CCCDBDC116894EBA1EDE36D1D2C3BE9155F21D731F6B4EBE17FC611DD00": {
+    "addresses": [
+      "/dns4/pfn1.euwe4.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/76902CCCDBDC116894EBA1EDE36D1D2C3BE9155F21D731F6B4EBE17FC611DD00/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+  "2A8153A065E60FFE63E8B4285044972376FD06092FB8E877EBF72BE91198BB65": {
+    "addresses": [
+      "/dns4/pfn1.apne1.fullnode.testnet.aptoslabs.com/tcp/6182/noise-ik/2A8153A065E60FFE63E8B4285044972376FD06092FB8E877EBF72BE91198BB65/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+}
+
+# Mainnet seed peer constants
+MAINNET_SEED_PEERS = {
+  "A118B9BBBB8670D026C59C494317F7B6AA449A8E1B6AE0F9A6D434478AD1CC35": {
+    "addresses": [
+      "/dns4/pfn1.usce1.fullnode.mainnet.aptoslabs.com/tcp/6182/noise-ik/A118B9BBBB8670D026C59C494317F7B6AA449A8E1B6AE0F9A6D434478AD1CC35/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+  "058D7AF7A9074D8E48255EC08EDD8AEE4D2120CA7FAC18E2A6DE9EC603FF7A66": {
+    "addresses": [
+      "/dns4/pfn2.usce1.fullnode.mainnet.aptoslabs.com/tcp/6182/noise-ik/058D7AF7A9074D8E48255EC08EDD8AEE4D2120CA7FAC18E2A6DE9EC603FF7A66/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+  "C0171305FEF577904C874D44C0A3821F830E9419D3AA3A40C29CA7DEA24F466F": {
+    "addresses": [
+      "/dns4/pfn3.usce1.fullnode.mainnet.aptoslabs.com/tcp/6182/noise-ik/C0171305FEF577904C874D44C0A3821F830E9419D3AA3A40C29CA7DEA24F466F/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+  "99A2C88D211A6FDF56B934BE039330B4E76EC5FEEE4989ACE4C7CD63B2F94C34": {
+    "addresses": [
+      "/dns4/pfn4.usce1.fullnode.mainnet.aptoslabs.com/tcp/6182/noise-ik/99A2C88D211A6FDF56B934BE039330B4E76EC5FEEE4989ACE4C7CD63B2F94C34/handshake/0"
+    ],
+    "role": "Upstream",
+  },
+}
 
 def print_error_and_exit(error):
   """Prints the given error and exits the process"""
@@ -172,7 +239,7 @@ def monitor_fullnode_syncing(fullnode_process_handle, bootstrapping_mode, node_l
     print(errors)
 
     # Sleep for a few seconds while the fullnode synchronizes
-    time.sleep(10)
+    time.sleep(5)
 
 
 def wait_for_fullnode_to_start(fullnode_process_handle):
@@ -191,8 +258,15 @@ def wait_for_fullnode_to_start(fullnode_process_handle):
     api_index_response = ping_rest_api_index_page(LOCAL_REST_ENDPOINT, False)
 
 
-def get_public_and_target_version(network):
+def get_public_and_target_version(network, syncing_historical_data):
   """Calculates the syncing target version of the fullnode"""
+  # If we're syncing historical data, it will take too long to catch up
+  # to the head of the chain, so we only sync to a fixed target version.
+  if syncing_historical_data:
+    target_version = NUMBER_OF_HISTORICAL_TRANSACTIONS_TO_SYNC
+    print("Syncing historical data. Setting public and target version to: {target_version}".format(target_version=target_version))
+    return (target_version, target_version)
+
   # Fetch the latest version from the public fullnode endpoint
   public_fullnode_endpoint = REMOTE_REST_ENDPOINTS.format(network=network)
   api_index_response = ping_rest_api_index_page(public_fullnode_endpoint, True)
@@ -231,7 +305,24 @@ def spawn_fullnode(git_ref, network, bootstrapping_mode, continuous_syncing_mode
   return process_handle
 
 
-def setup_fullnode_config(bootstrapping_mode, continuous_syncing_mode, data_dir_file_path):
+def add_seed_peers(fullnode_config: dict, seed_peers: dict) -> None:
+  """Adds the given seed peers to the public fullnode network of the given config"""
+  # Get the public fullnode network
+  public_network = None
+  for network in fullnode_config["full_node_networks"]:
+    if network.get("network_id") == "public": # The "public" fullnode network is the only network for PFNs
+      public_network = network
+      break
+
+  # Ensure we have the public fullnode network
+  if public_network is None:
+      print_error_and_exit("Exiting! Unable to find the public fullnode network in the config!")
+
+  # Add the seed peers to the public fullnode network
+  public_network["seeds"] = seed_peers
+
+
+def setup_fullnode_config(network, bootstrapping_mode, continuous_syncing_mode, syncing_historical_data, data_dir_file_path):
   """Initializes and configures the fullnode config file"""
   # Copy the node config template to the working directory
   if not os.path.exists(FULLNODE_CONFIG_TEMPLATE_PATH):
@@ -256,6 +347,13 @@ def setup_fullnode_config(bootstrapping_mode, continuous_syncing_mode, data_dir_
   # Enable storage sharding (AIP-97)
   fullnode_config['storage']['rocksdb_configs'] = {"enable_storage_sharding": True}
 
+  # If we're syncing historical data, we need to add seed peers
+  if syncing_historical_data:
+    if network == MAINNET_STRING:
+      add_seed_peers(fullnode_config, MAINNET_SEED_PEERS)
+    elif network == TESTNET_STRING:
+      add_seed_peers(fullnode_config, TESTNET_SEED_PEERS)
+
   # Write the config file back to disk
   with open(FULLNODE_CONFIG_NAME, "w") as file:
     yaml.dump(fullnode_config, file)
@@ -267,6 +365,23 @@ def get_genesis_and_waypoint(network):
   waypoint_file_path = WAYPOINT_FILE_PATH.format(network=network)
   subprocess.run(["curl", "-s", "-O", genesis_blob_path])
   subprocess.run(["curl", "-s", "-O", waypoint_file_path])
+
+
+def check_if_syncing_historical_data(network, bootstrapping_mode):
+    """Determines if we're syncing historical data based on the network and bootstrapping mode"""
+    # If we're fast syncing, we're not syncing historical data
+    if bootstrapping_mode == FAST_SYNC_BOOTSTRAPPING_MODE:
+        print("The bootstrapping mode is fast sync! We're not syncing historical data.")
+        return False
+
+    # If we're on mainnet or testnet, we're syncing historical data
+    if network == TESTNET_STRING or network == MAINNET_STRING:
+        print("Syncing historical data on network: {network}. Bootstrapping mode: {bootstrapping_mode}".format(network=network, bootstrapping_mode=bootstrapping_mode))
+        return True
+
+    # Otherwise, default to not syncing historical data
+    print("Not syncing historical data by default. Network: {network}, Bootstrapping mode: {bootstrapping_mode}".format(network=network, bootstrapping_mode=bootstrapping_mode))
+    return False
 
 
 def checkout_git_ref(git_ref):
@@ -299,6 +414,9 @@ def main():
   NODE_LOG_FILE_PATH = os.environ["NODE_LOG_FILE_PATH"]
   METRICS_DUMP_FILE_PATH = os.environ["METRICS_DUMP_FILE_PATH"]
 
+  # Determine if we're syncing historical data
+  syncing_historical_data = check_if_syncing_historical_data(NETWORK, BOOTSTRAPPING_MODE)
+
   # Check out the correct git ref (branch or commit hash)
   checkout_git_ref(GIT_REF)
 
@@ -306,10 +424,10 @@ def main():
   get_genesis_and_waypoint(NETWORK)
 
   # Setup the fullnode config
-  setup_fullnode_config(BOOTSTRAPPING_MODE, CONTINUOUS_SYNCING_MODE, DATA_DIR_FILE_PATH)
+  setup_fullnode_config(NETWORK, BOOTSTRAPPING_MODE, CONTINUOUS_SYNCING_MODE, syncing_historical_data, DATA_DIR_FILE_PATH)
 
   # Get the public synced version and calculate the fullnode syncing target version
-  (public_version, target_version) = get_public_and_target_version(NETWORK)
+  (public_version, target_version) = get_public_and_target_version(NETWORK, syncing_historical_data)
 
   # Spawn the fullnode
   fullnode_process_handle = spawn_fullnode(GIT_REF, NETWORK, BOOTSTRAPPING_MODE, CONTINUOUS_SYNCING_MODE, NODE_LOG_FILE_PATH)

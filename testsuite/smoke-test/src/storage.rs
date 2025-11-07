@@ -191,7 +191,7 @@ fn db_backup_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     cmd.args(["aptos-db", "backup", "verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
-        cmd.arg(&w.to_string());
+        cmd.arg(w.to_string());
     });
 
     let status = cmd
@@ -223,7 +223,7 @@ fn replay_verify(backup_path: &Path, trusted_waypoints: &[Waypoint]) {
     cmd.args(["aptos-db", "replay-verify"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
-        cmd.arg(&w.to_string());
+        cmd.arg(w.to_string());
     });
 
     let replay = cmd
@@ -426,14 +426,14 @@ pub(crate) fn db_restore(
     cmd.args(["aptos-db", "restore", "bootstrap-db"]);
     trusted_waypoints.iter().for_each(|w| {
         cmd.arg("--trust-waypoint");
-        cmd.arg(&w.to_string());
+        cmd.arg(w.to_string());
     });
 
     cmd.arg("--enable-storage-sharding");
     cmd.arg("--enable-state-indices");
     if let Some(version) = target_verion {
         cmd.arg("--target-version");
-        cmd.arg(&version.to_string());
+        cmd.arg(version.to_string());
     }
 
     let status = cmd

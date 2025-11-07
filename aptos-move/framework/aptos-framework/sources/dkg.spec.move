@@ -30,7 +30,7 @@ spec aptos_framework::dkg {
 
     spec fun has_incomplete_session(): bool {
         if (exists<DKGState>(@aptos_framework)) {
-            option::spec_is_some(global<DKGState>(@aptos_framework).in_progress)
+            option::is_some(global<DKGState>(@aptos_framework).in_progress)
         } else {
             false
         }

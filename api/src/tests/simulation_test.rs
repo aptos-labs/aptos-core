@@ -35,9 +35,11 @@ async fn simulate_aptos_transfer(
         signature,
     } = txn.authenticator_ref()
     {
-        let signature = use_valid_signature
-            .then(|| signature.to_string())
-            .unwrap_or(Ed25519Signature::dummy_signature().to_string());
+        let signature = if use_valid_signature {
+            signature.to_string()
+        } else {
+            Ed25519Signature::dummy_signature().to_string()
+        };
 
         let mut request = json!({
             "sender": txn.sender().to_string(),
@@ -111,9 +113,11 @@ async fn simulate_aptos_transfer_bcs(
         signature,
     } = txn.authenticator_ref()
     {
-        let signature = use_valid_signature
-            .then(|| signature.clone())
-            .unwrap_or(Ed25519Signature::dummy_signature());
+        let signature = if use_valid_signature {
+            signature.clone()
+        } else {
+            Ed25519Signature::dummy_signature()
+        };
 
         let txn = SignedTransaction::new(
             txn.clone().into_raw_transaction(),

@@ -46,6 +46,7 @@ mainnet:
     2308283617: 2308283617_asset_type_v1_null_2
     2662373625: 2662373625_fa_secondary_store_burnt_with_deletion_event
     2975888978: 2975888978_fa_secondary_store_burnt_object_still_exists
+    2424873868: 2424873868_fa_secondary_store_exists_object_core_deleted
 
     # token v2 processor
     1058723093: 1058723093_token_v1_mint_withdraw_deposit_events

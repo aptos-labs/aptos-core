@@ -78,12 +78,11 @@
 //! one of the reference parameters. They are also transformed to point to the
 //! corresponding access path tree node in the caller's frame (if it exists).
 
-use crate::{frame::Frame, frame_type_cache::FrameTypeCache, LoadedFunction};
+use crate::{frame::Frame, frame_type_cache::FrameTypeCache, instr::Instruction, LoadedFunction};
 use fxhash::FxBuildHasher;
 use hashbrown::HashMap;
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
-    file_format::Bytecode,
     safe_assert, safe_unwrap, safe_unwrap_err,
 };
 use move_core_types::{
@@ -246,14 +245,14 @@ pub(crate) trait RuntimeRefCheck {
     /// Transitions the reference check state before executing a bytecode instruction.
     fn pre_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()>;
 
     /// Transitions the reference check state after executing a bytecode instruction.
     fn post_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
@@ -281,7 +280,7 @@ pub(crate) struct FullRuntimeRefCheck;
 impl RuntimeRefCheck for NoRuntimeRefCheck {
     fn pre_execution_transition(
         _frame: &Frame,
-        _instruction: &Bytecode,
+        _instruction: &Instruction,
         _ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
         Ok(())
@@ -289,7 +288,7 @@ impl RuntimeRefCheck for NoRuntimeRefCheck {
 
     fn post_execution_transition(
         _frame: &Frame,
-        _instruction: &Bytecode,
+        _instruction: &Instruction,
         _ref_state: &mut RefCheckState,
         _ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
@@ -318,10 +317,10 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
     /// gas is charged during execution, but we may want to validate this preference.
     fn pre_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
-        use Bytecode::*;
+        use Instruction::*;
         match instruction {
             Call(_) | CallGeneric(_) | Branch(_) => {
                 // `Call` and `CallGeneric` are handled by calling `core_call_transition` elsewhere
@@ -344,6 +343,12 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | LdU64(_)
             | LdU128(_)
             | LdU256(_)
+            | LdI8(_)
+            | LdI16(_)
+            | LdI32(_)
+            | LdI64(_)
+            | LdI128(_)
+            | LdI256(_)
             | LdTrue
             | LdFalse
             | LdConst(_)
@@ -368,11 +373,18 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | CastU64
             | CastU128
             | CastU256
+            | CastI8
+            | CastI16
+            | CastI32
+            | CastI64
+            | CastI128
+            | CastI256
             | Add
             | Sub
             | Mul
             | Mod
             | Div
+            | Negate
             | BitOr
             | BitAnd
             | Xor
@@ -425,11 +437,11 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
 
     fn post_execution_transition(
         frame: &Frame,
-        instruction: &Bytecode,
+        instruction: &Instruction,
         ref_state: &mut RefCheckState,
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
-        use Bytecode::*;
+        use Instruction::*;
         match instruction {
             Pop => {
                 let top = ref_state.pop_from_shadow_stack()?;
@@ -440,12 +452,14 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             Ret | BrTrue(_) | BrFalse(_) | Branch(_) => {
                 // not reachable here, transition is handled in `pre_execution_transition`
             },
-            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | Not | Nop | Exists(_)
+            CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | CastI8 | CastI16
+            | CastI32 | CastI64 | CastI128 | CastI256 | Not | Nop | Exists(_)
             | ExistsGeneric(_) => {
                 // no-op
             },
-            LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdConst(_)
-            | LdTrue | LdFalse => {
+            LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdI8(_)
+            | LdI16(_) | LdI32(_) | LdI64(_) | LdI128(_) | LdI256(_) | LdConst(_) | LdTrue
+            | LdFalse => {
                 ref_state.push_non_refs_to_shadow_stack(1);
             },
             CopyLoc(index) => {
@@ -581,6 +595,9 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | Shl | Shr => {
                 // pop two non-ref values from the shadow stack, push a new non-ref value
                 let _ = ref_state.pop_from_shadow_stack()?;
+            },
+            Negate => {
+                // leaves shadow stack at same value
             },
             Eq | Neq => {
                 // pop two values from the shadow stack (which can be ref or non-ref values)
@@ -1238,7 +1255,7 @@ impl RefCheckState {
     /// Push `num` non-reference values onto the shadow stack.
     fn push_non_refs_to_shadow_stack(&mut self, num: usize) {
         self.shadow_stack
-            .extend(std::iter::repeat(Value::NonRef).take(num));
+            .extend(std::iter::repeat_n(Value::NonRef, num));
     }
 
     /// Push the given `ref_id` onto the shadow stack as a reference value.

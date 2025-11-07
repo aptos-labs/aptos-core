@@ -16,7 +16,9 @@ use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag},
+    language_storage::{
+        FunctionParamOrReturnTag, FunctionTag, ModuleId, StructTag, TypeTag, LEGACY_OPTION_VEC,
+    },
     parser::{parse_struct_tag, parse_type_tag},
     transaction_argument::TransactionArgument,
 };
@@ -127,7 +129,19 @@ macro_rules! define_integer_type {
 
 define_integer_type!(U64, u64, "A string encoded U64.");
 define_integer_type!(U128, u128, "A string encoded U128.");
-define_integer_type!(U256, move_core_types::u256::U256, "A string encoded U256.");
+define_integer_type!(
+    U256,
+    move_core_types::int256::U256,
+    "A string encoded U256."
+);
+
+define_integer_type!(I64, i64, "A string encoded I64.");
+define_integer_type!(I128, i128, "A string encoded I128.");
+define_integer_type!(
+    I256,
+    move_core_types::int256::I256,
+    "A string encoded I256."
+);
 
 /// Hex encoded bytes to allow for having bytes represented in JSON
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -226,6 +240,35 @@ impl TryFrom<AnnotatedMoveStruct> for MoveStructValue {
 
     fn try_from(s: AnnotatedMoveStruct) -> anyhow::Result<Self> {
         let mut map = BTreeMap::new();
+        // This guarantees generated json is backwards compatible.
+        if s.ty_tag.is_option() {
+            if let Some((_, name)) = &s.variant_info {
+                if name.to_string() == "None" {
+                    if !s.value.is_empty() {
+                        return Err(anyhow::anyhow!("None must not have any value"));
+                    }
+                    map.insert(
+                        IdentifierWrapper::from_str(LEGACY_OPTION_VEC)?,
+                        MoveValue::Vector(vec![]).json()?,
+                    );
+                } else if name.to_string() == "Some" {
+                    if s.value.len() != 1 {
+                        return Err(anyhow::anyhow!("Some must have exactly one value"));
+                    }
+                    let v = s.value.into_iter().next().unwrap().1;
+                    map.insert(
+                        IdentifierWrapper::from_str(LEGACY_OPTION_VEC)?,
+                        MoveValue::Vector(vec![MoveValue::try_from(v)?]).json()?,
+                    );
+                } else {
+                    return Err(anyhow::anyhow!(
+                        "Invalid option variant: {}",
+                        name.to_string()
+                    ));
+                }
+                return Ok(Self(map));
+            }
+        }
         if let Some((_, name)) = s.variant_info {
             map.insert(
                 IdentifierWrapper::from_str("__variant__")?,
@@ -324,6 +367,12 @@ pub enum MoveValue {
     U64(U64),
     U128(U128),
     U256(U256),
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(I64),
+    I128(I128),
+    I256(I256),
     /// A bool Move type
     Bool(bool),
     Address(Address),
@@ -375,6 +424,12 @@ impl TryFrom<AnnotatedMoveValue> for MoveValue {
             AnnotatedMoveValue::U64(v) => MoveValue::U64(U64(v)),
             AnnotatedMoveValue::U128(v) => MoveValue::U128(U128(v)),
             AnnotatedMoveValue::U256(v) => MoveValue::U256(U256(v)),
+            AnnotatedMoveValue::I8(v) => MoveValue::I8(v),
+            AnnotatedMoveValue::I16(v) => MoveValue::I16(v),
+            AnnotatedMoveValue::I32(v) => MoveValue::I32(v),
+            AnnotatedMoveValue::I64(v) => MoveValue::I64(I64(v)),
+            AnnotatedMoveValue::I128(v) => MoveValue::I128(I128(v)),
+            AnnotatedMoveValue::I256(v) => MoveValue::I256(I256(v)),
             AnnotatedMoveValue::Bool(v) => MoveValue::Bool(v),
             AnnotatedMoveValue::Address(v) => MoveValue::Address(v.into()),
             AnnotatedMoveValue::Vector(_, vals) => MoveValue::Vector(
@@ -405,6 +460,12 @@ impl From<TransactionArgument> for MoveValue {
             TransactionArgument::U64(v) => MoveValue::U64(U64(v)),
             TransactionArgument::U128(v) => MoveValue::U128(U128(v)),
             TransactionArgument::U256(v) => MoveValue::U256(U256(v)),
+            TransactionArgument::I8(v) => MoveValue::I8(v),
+            TransactionArgument::I16(v) => MoveValue::I16(v),
+            TransactionArgument::I32(v) => MoveValue::I32(v),
+            TransactionArgument::I64(v) => MoveValue::I64(I64(v)),
+            TransactionArgument::I128(v) => MoveValue::I128(I128(v)),
+            TransactionArgument::I256(v) => MoveValue::I256(I256(v)),
             TransactionArgument::Bool(v) => MoveValue::Bool(v),
             TransactionArgument::Address(v) => MoveValue::Address(v.into()),
             TransactionArgument::U8Vector(bytes) => MoveValue::Bytes(HexEncodedBytes(bytes)),
@@ -422,6 +483,12 @@ impl Serialize for MoveValue {
             MoveValue::U64(v) => v.serialize(serializer),
             MoveValue::U128(v) => v.serialize(serializer),
             MoveValue::U256(v) => v.serialize(serializer),
+            MoveValue::I8(v) => v.serialize(serializer),
+            MoveValue::I16(v) => v.serialize(serializer),
+            MoveValue::I32(v) => v.serialize(serializer),
+            MoveValue::I64(v) => v.serialize(serializer),
+            MoveValue::I128(v) => v.serialize(serializer),
+            MoveValue::I256(v) => v.serialize(serializer),
             MoveValue::Bool(v) => v.serialize(serializer),
             MoveValue::Address(v) => v.serialize(serializer),
             MoveValue::Vector(v) => v.serialize(serializer),
@@ -580,6 +647,18 @@ pub enum MoveType {
     U128,
     /// A 256-bit unsigned int
     U256,
+    /// An 8-bit signed int
+    I8,
+    /// A 16-bit signed int
+    I16,
+    /// A 32-bit signed int
+    I32,
+    /// A 64-bit signed int
+    I64,
+    /// A 128-bit signed int
+    I128,
+    /// A 256-bit signed int
+    I256,
     /// A 32-byte account address
     Address,
     /// An account signer
@@ -650,6 +729,12 @@ impl MoveType {
             MoveType::U64 => "string<u64>".to_owned(),
             MoveType::U128 => "string<u128>".to_owned(),
             MoveType::U256 => "string<u256>".to_owned(),
+            MoveType::I8 => "integer<i8>".to_owned(),
+            MoveType::I16 => "integer<i16>".to_owned(),
+            MoveType::I32 => "integer<i32>".to_owned(),
+            MoveType::I64 => "string<i64>".to_owned(),
+            MoveType::I128 => "string<i128>".to_owned(),
+            MoveType::I256 => "string<i256>".to_owned(),
             MoveType::Signer | MoveType::Address => "string<address>".to_owned(),
             MoveType::Bool => "boolean".to_owned(),
             MoveType::Vector { items } => {
@@ -681,6 +766,12 @@ impl fmt::Display for MoveType {
             MoveType::U64 => write!(f, "u64"),
             MoveType::U128 => write!(f, "u128"),
             MoveType::U256 => write!(f, "u256"),
+            MoveType::I8 => write!(f, "i8"),
+            MoveType::I16 => write!(f, "i16"),
+            MoveType::I32 => write!(f, "i32"),
+            MoveType::I64 => write!(f, "i64"),
+            MoveType::I128 => write!(f, "i128"),
+            MoveType::I256 => write!(f, "i256"),
             MoveType::Address => write!(f, "address"),
             MoveType::Signer => write!(f, "signer"),
             MoveType::Bool => write!(f, "bool"),
@@ -790,6 +881,12 @@ impl From<&TypeTag> for MoveType {
             TypeTag::U64 => MoveType::U64,
             TypeTag::U128 => MoveType::U128,
             TypeTag::U256 => MoveType::U256,
+            TypeTag::I8 => MoveType::I8,
+            TypeTag::I16 => MoveType::I16,
+            TypeTag::I32 => MoveType::I32,
+            TypeTag::I64 => MoveType::I64,
+            TypeTag::I128 => MoveType::I128,
+            TypeTag::I256 => MoveType::I256,
             TypeTag::Address => MoveType::Address,
             TypeTag::Signer => MoveType::Signer,
             TypeTag::Vector(v) => MoveType::Vector {
@@ -841,6 +938,12 @@ impl TryFrom<&MoveType> for TypeTag {
             MoveType::U64 => TypeTag::U64,
             MoveType::U128 => TypeTag::U128,
             MoveType::U256 => TypeTag::U256,
+            MoveType::I8 => TypeTag::I8,
+            MoveType::I16 => TypeTag::I16,
+            MoveType::I32 => TypeTag::I32,
+            MoveType::I64 => TypeTag::I64,
+            MoveType::I128 => TypeTag::I128,
+            MoveType::I256 => TypeTag::I256,
             MoveType::Address => TypeTag::Address,
             MoveType::Signer => TypeTag::Signer,
             MoveType::Vector { items } => TypeTag::Vector(Box::new(items.as_ref().try_into()?)),
@@ -1011,6 +1114,8 @@ pub struct MoveStruct {
     pub is_native: bool,
     /// Whether the struct is marked with the #[event] annotation
     pub is_event: bool,
+    /// Whether the struct is an enum (i.e. enum MyEnum vs struct MyStruct).
+    pub is_enum: bool,
     /// Abilities associated with the struct
     pub abilities: Vec<MoveAbility>,
     /// Generic types associated with the struct
@@ -1394,8 +1499,17 @@ mod tests {
         }
         assert_serialize(Bool, json!("bool"));
         assert_serialize(U8, json!("u8"));
+        assert_serialize(U16, json!("u16"));
+        assert_serialize(U32, json!("u32"));
         assert_serialize(U64, json!("u64"));
         assert_serialize(U128, json!("u128"));
+        assert_serialize(U256, json!("u256"));
+        assert_serialize(I8, json!("i8"));
+        assert_serialize(I16, json!("i16"));
+        assert_serialize(I32, json!("i32"));
+        assert_serialize(I64, json!("i64"));
+        assert_serialize(I128, json!("i128"));
+        assert_serialize(I256, json!("i256"));
         assert_serialize(Address, json!("address"));
         assert_serialize(Signer, json!("signer"));
 

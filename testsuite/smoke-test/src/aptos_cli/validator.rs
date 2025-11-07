@@ -697,6 +697,13 @@ async fn test_nodes_rewards() {
         )
         .await
         .unwrap();
+    rest_clients[2]
+        .set_failpoint(
+            "consensus::send::broadcast_opt_proposal".to_string(),
+            "100%return".to_string(),
+        )
+        .await
+        .unwrap();
 
     reconfig(
         &rest_clients[0],
@@ -759,6 +766,13 @@ async fn test_nodes_rewards() {
     rest_clients[2]
         .set_failpoint(
             "consensus::send::broadcast_proposal".to_string(),
+            "20%return".to_string(),
+        )
+        .await
+        .unwrap();
+    rest_clients[2]
+        .set_failpoint(
+            "consensus::send::broadcast_opt_proposal".to_string(),
             "20%return".to_string(),
         )
         .await

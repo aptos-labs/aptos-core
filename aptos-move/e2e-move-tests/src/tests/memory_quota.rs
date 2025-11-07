@@ -6,7 +6,7 @@ use aptos_types::{
     account_address::AccountAddress,
     transaction::{ExecutionStatus, TransactionStatus},
 };
-use move_core_types::value::MoveValue;
+use move_core_types::{value::MoveValue, vm_status::StatusCode};
 
 // TODO(Gas): This test has been disabled since the particularly attack it uses can no longer
 //            be carried out due to the increase in execution costs.
@@ -100,7 +100,9 @@ fn deeply_nested_structs() {
     );
     assert!(matches!(
         result,
-        TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::MEMORY_LIMIT_EXCEEDED
+        )))
     ));
 }
 
@@ -128,7 +130,9 @@ fn clone_large_vectors() {
     );
     assert!(matches!(
         result,
-        TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::MEMORY_LIMIT_EXCEEDED
+        )))
     ));
 }
 
@@ -164,6 +168,8 @@ fn add_vec_to_table() {
     // Should run out of memory before trying to destroy a non-empty table.
     assert!(matches!(
         result,
-        TransactionStatus::Keep(ExecutionStatus::ExecutionFailure { .. })
+        TransactionStatus::Keep(ExecutionStatus::MiscellaneousError(Some(
+            StatusCode::MEMORY_LIMIT_EXCEEDED
+        )))
     ));
 }

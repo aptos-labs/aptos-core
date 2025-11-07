@@ -173,6 +173,16 @@ Issued At: <issued_at>
 ## Constants
 
 
+<a id="0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
+
+Entry function payload is missing.
+
+
+<pre><code><b>const</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 2;
+</code></pre>
+
+
+
 <a id="0x1_ethereum_derivable_account_EADDR_MISMATCH"></a>
 
 Address mismatch.
@@ -199,16 +209,6 @@ Invalid signature type.
 
 
 <pre><code><b>const</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EINVALID_SIGNATURE_TYPE">EINVALID_SIGNATURE_TYPE</a>: u64 = 3;
-</code></pre>
-
-
-
-<a id="0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD"></a>
-
-Entry function payload is missing.
-
-
-<pre><code><b>const</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>: u64 = 2;
 </code></pre>
 
 
@@ -341,7 +341,7 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     message.append(b"\nIssued At: ");
     message.append(*issued_at);
 
-    <b>let</b> msg_len = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(message);
+    <b>let</b> msg_len = message.length();
 
     <b>let</b> prefix = b"\x19Ethereum Signed Message:\n";
     <b>let</b> msg_len_string = <a href="../../aptos-stdlib/doc/string_utils.md#0x1_string_utils_to_string">string_utils::to_string</a>(&msg_len); // returns <a href="../../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">string</a>
@@ -376,27 +376,27 @@ We include the issued_at in the signature as it is a required field in the SIWE 
 
 
 <pre><code><b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(signature_bytes: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;, message: &<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;): <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt; {
-    <b>let</b> rs = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(signature_bytes, 0, 64);
-    <b>let</b> v = *<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_borrow">vector::borrow</a>(signature_bytes, 64);
+    <b>let</b> rs = signature_bytes.slice(0, 64);
+    <b>let</b> v = signature_bytes[64];
     <b>assert</b>!(v == 27 || v == 28, <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EUNEXPECTED_V">EUNEXPECTED_V</a>);
     <b>let</b> signature = <a href="../../aptos-stdlib/doc/secp256k1.md#0x1_secp256k1_ecdsa_signature_from_bytes">secp256k1::ecdsa_signature_from_bytes</a>(rs);
 
     <b>let</b> maybe_recovered = <a href="../../aptos-stdlib/doc/secp256k1.md#0x1_secp256k1_ecdsa_recover">secp256k1::ecdsa_recover</a>(*message, v - 27, &signature);
 
     <b>assert</b>!(
-        <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(&maybe_recovered),
+        maybe_recovered.is_some(),
         <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EINVALID_SIGNATURE">EINVALID_SIGNATURE</a>
     );
 
-    <b>let</b> pubkey = <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(&maybe_recovered);
+    <b>let</b> pubkey = maybe_recovered.borrow();
 
     <b>let</b> pubkey_bytes = <a href="../../aptos-stdlib/doc/secp256k1.md#0x1_secp256k1_ecdsa_raw_public_key_to_bytes">secp256k1::ecdsa_raw_public_key_to_bytes</a>(pubkey);
 
     // Add 0x04 prefix <b>to</b> the <b>public</b> key, <b>to</b> match the
     // full uncompressed format from ethers.js
     <b>let</b> full_pubkey = &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>[];
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(full_pubkey, 4u8);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_append">vector::append</a>(full_pubkey, pubkey_bytes);
+    full_pubkey.push_back(4u8);
+    full_pubkey.append(pubkey_bytes);
 
     *full_pubkey
 }
@@ -436,13 +436,13 @@ We include the issued_at in the signature as it is a required field in the SIWE 
     <b>let</b> public_key_bytes = <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_recover_public_key">recover_public_key</a>(&abstract_signature.signature, &hashed_message);
 
     // 1. Skip the 0x04 prefix (take the bytes after the first byte)
-    <b>let</b> public_key_without_prefix = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&public_key_bytes, 1, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&public_key_bytes));
+    <b>let</b> public_key_without_prefix = public_key_bytes.slice(1, public_key_bytes.length());
     // 2. Run Keccak256 on the <b>public</b> key (without the 0x04 prefix)
     <b>let</b> kexHash = <a href="../../aptos-stdlib/../move-stdlib/doc/hash.md#0x1_aptos_hash_keccak256">aptos_hash::keccak256</a>(public_key_without_prefix);
     // 3. Slice the last 20 bytes (this is the Ethereum <b>address</b>)
-    <b>let</b> recovered_addr = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&kexHash, 12, 32);
+    <b>let</b> recovered_addr = kexHash.slice(12, 32);
     // 4. Remove the 0x prefix from the utf8 <a href="account.md#0x1_account">account</a> <b>address</b>
-    <b>let</b> ethereum_address_without_prefix = <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_slice">vector::slice</a>(&abstract_public_key.ethereum_address, 2, <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_length">vector::length</a>(&abstract_public_key.ethereum_address));
+    <b>let</b> ethereum_address_without_prefix = abstract_public_key.ethereum_address.slice(2, abstract_public_key.ethereum_address.length());
 
     <b>let</b> account_address_vec = base16_utf8_to_vec_u8(ethereum_address_without_prefix);
     // Verify that the recovered <b>address</b> matches the domain <a href="account.md#0x1_account">account</a> identity
@@ -471,15 +471,7 @@ Authorization function for domain account abstraction.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate">authenticate</a>(<a href="account.md#0x1_account">account</a>: <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, aa_auth_data: AbstractionAuthData): <a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a> {
-    <b>let</b> maybe_entry_function_payload = <a href="transaction_context.md#0x1_transaction_context_entry_function_payload">transaction_context::entry_function_payload</a>();
-    <b>if</b> (maybe_entry_function_payload.is_some()) {
-        <b>let</b> entry_function_payload = maybe_entry_function_payload.destroy_some();
-        <b>let</b> entry_function_name = entry_function_name(&entry_function_payload);
-        <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(aa_auth_data, &entry_function_name);
-        <a href="account.md#0x1_account">account</a>
-    } <b>else</b> {
-        <b>abort</b>(<a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_EMISSING_ENTRY_FUNCTION_PAYLOAD">EMISSING_ENTRY_FUNCTION_PAYLOAD</a>)
-    }
+    daa_authenticate(<a href="account.md#0x1_account">account</a>, aa_auth_data, |<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name| <a href="ethereum_derivable_account.md#0x1_ethereum_derivable_account_authenticate_auth_data">authenticate_auth_data</a>(<a href="auth_data.md#0x1_auth_data">auth_data</a>, entry_name))
 }
 </code></pre>
 

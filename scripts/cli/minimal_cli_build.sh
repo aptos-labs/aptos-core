@@ -34,7 +34,17 @@ case "$OS" in
       sh install_pkg.sh build-essential pkgconf libssl-dev git libudev-dev lld libdw-dev clang llvm cmake
     elif has_command dnf; then
       # RHEL / CentOS based DNF
-      sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git rust-libudev-devel lld elfutils-devel clang llvm cmake
+      # This depends on the OS!
+      # Source the os-release file to parse it
+      . /etc/os-release
+
+      # Check if it's Rocky
+      if [ "$ID" = "rocky" ]; then
+        echo "Rocky Linux detected"
+        sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git systemd-devel lld elfutils-devel clang llvm cmake
+      else
+        sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git rust-libudev-devel lld elfutils-devel clang llvm cmake
+      fi
     elif has_command yum; then
       # RHEL / CentOS based YUM
       sh install_pkg.sh gcc gcc-c++ make pkgconf openssl-devel git rust-libudev-devel lld elfutils-devel clang llvm cmake
@@ -60,9 +70,11 @@ case "$OS" in
     fi
   ;;
   Darwin)
+    # macOS
     sh install_pkg.sh pkgconfig openssl git llvm cmake
   ;;
   FreeBSD)
+    # FreeBSD
     sh install_pkg.sh gcc gmake binutils pkgconf git openssl cmake llvm hidapi
   ;;
   *)

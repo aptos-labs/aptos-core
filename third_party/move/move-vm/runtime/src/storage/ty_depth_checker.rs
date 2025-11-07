@@ -52,10 +52,13 @@ where
 {
     /// Creates a new depth checker for the specified loader to query struct definitions if needed.
     pub(crate) fn new(struct_definition_loader: &'a T) -> Self {
-        let maybe_max_depth = struct_definition_loader
-            .runtime_environment()
-            .vm_config()
-            .max_value_nest_depth;
+        let vm_config = struct_definition_loader.runtime_environment().vm_config();
+        // Gate by other config which will be enabled in 1.38. Will be removed after it is enabled.
+        let maybe_max_depth = if vm_config.propagate_dependency_limit_error {
+            None
+        } else {
+            vm_config.max_value_nest_depth
+        };
         Self {
             struct_definition_loader,
             maybe_max_depth,
@@ -66,6 +69,7 @@ where
     /// Checks the depth of a type. If the type is too deep, returns an error. Note that the type
     /// must be non-generic, i.e., all type substitutions must be performed. If needed, the check
     /// traverses multiple modules where inner structs and their fields are defined.
+    #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn check_depth_of_type(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
@@ -116,7 +120,9 @@ where
                     let struct_name = self.get_struct_name($idx)?;
                     return Err(PartialVMError::new_invariant_violation(format!(
                         "Constructing a formula for {}::{}::{} has non-empty visiting set",
-                        struct_name.module.address, struct_name.module.name, struct_name.name
+                        struct_name.module().address,
+                        struct_name.module().name,
+                        struct_name.name()
                     )));
                 }
                 formula
@@ -142,6 +148,12 @@ where
             | Type::U64
             | Type::U128
             | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256
             | Type::Address
             | Type::Signer => check_depth!(0),
             // For function types, we ignore the return/argument types because they do not bound
@@ -209,7 +221,7 @@ where
             let struct_name = self.get_struct_name(idx)?;
             let msg = format!(
                 "Definition of struct {}::{}::{} is recursive: failed to construct its depth formula",
-                struct_name.module.address, struct_name.module.name, struct_name.name
+                struct_name.module().address, struct_name.module().name, struct_name.name()
             );
             return Err(
                 PartialVMError::new(StatusCode::RUNTIME_CYCLIC_MODULE_DEPENDENCY).with_message(msg),
@@ -270,7 +282,9 @@ where
             let struct_name = self.get_struct_name(idx)?;
             let msg = format!(
                 "Depth formula for struct {}::{}::{} is already cached",
-                struct_name.module.address, struct_name.module.name, struct_name.name
+                struct_name.module().address,
+                struct_name.module().name,
+                struct_name.name()
             );
             return Err(PartialVMError::new_invariant_violation(msg));
         }
@@ -296,7 +310,13 @@ where
             | Type::Signer
             | Type::U16
             | Type::U32
-            | Type::U256 => DepthFormula::constant(1),
+            | Type::U256
+            | Type::I8
+            | Type::I16
+            | Type::I32
+            | Type::I64
+            | Type::I128
+            | Type::I256 => DepthFormula::constant(1),
             // For function types, we ignore the return/argument types because they do not bound
             // value size, and we do not to error on a false positive (function operates on a
             // nested value, but does not capture it). Hence, we simply return a constant here.

@@ -2,8 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{interpreter::InterpreterDebugInterface, LoadedFunction, RuntimeEnvironment};
-use move_binary_format::file_format::Bytecode;
+use crate::{
+    instr::Instruction, interpreter::InterpreterDebugInterface, LoadedFunction, RuntimeEnvironment,
+};
 use move_vm_types::values::{self, Locals};
 use std::{
     collections::BTreeSet,
@@ -12,6 +13,7 @@ use std::{
 };
 
 #[derive(Debug)]
+#[allow(unused)]
 enum DebugCommand {
     PrintStack,
     Step(usize),
@@ -109,12 +111,14 @@ impl FromStr for DebugCommand {
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 pub(crate) struct DebugContext {
     breakpoints: BTreeSet<String>,
     input_checker: InputChecker,
 }
 
 #[derive(Debug)]
+#[allow(unused)]
 enum InputChecker {
     StepRemaining(usize),
     StepOverRemaining {
@@ -128,6 +132,7 @@ enum InputChecker {
 }
 
 impl DebugContext {
+    #[allow(unused)]
     pub(crate) fn new() -> Self {
         Self {
             breakpoints: BTreeSet::new(),
@@ -135,12 +140,13 @@ impl DebugContext {
         }
     }
 
+    #[allow(unused)]
     pub(crate) fn debug_loop(
         &mut self,
         function: &LoadedFunction,
         locals: &Locals,
         pc: u16,
-        instr: &Bytecode,
+        instr: &Instruction,
         runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
     ) {
@@ -275,7 +281,7 @@ impl DebugContext {
                                 println!("        Locals:");
                                 if !function.local_tys().is_empty() {
                                     let mut s = String::new();
-                                    values::debug::print_locals(&mut s, locals).unwrap();
+                                    values::debug::print_locals(&mut s, locals, false).unwrap();
                                     println!("{}", s);
                                 } else {
                                     println!("            (none)");

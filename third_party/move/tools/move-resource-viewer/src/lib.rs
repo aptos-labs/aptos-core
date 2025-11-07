@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::fat_type::{
-    FatFunctionType, FatStructLayout, FatStructType, FatType, WrappedAbilitySet,
+    FatFunctionType, FatStructLayout, FatStructRef, FatStructType, FatType, WrappedAbilitySet,
 };
 use anyhow::{anyhow, bail};
 pub use limit::Limiter;
@@ -24,15 +24,17 @@ use move_core_types::{
     account_address::AccountAddress,
     function::{ClosureMask, MoveClosure},
     identifier::{IdentStr, Identifier},
+    int256,
     language_storage::{FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag},
     transaction_argument::{convert_txn_args, TransactionArgument},
-    u256,
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
 };
 use serde::ser::{SerializeMap, SerializeSeq};
 use std::{
     borrow::Borrow,
+    cell::RefCell,
+    collections::BTreeMap,
     convert::{TryFrom, TryInto},
     fmt::{Display, Formatter},
 };
@@ -48,7 +50,7 @@ pub struct AnnotatedMoveStruct {
     pub value: Vec<(Identifier, AnnotatedMoveValue)>,
 }
 
-/// Used to represent raw struct data, with struct name and field names. This stems
+/// Used to represent raw struct data, without struct name and field names. This stems
 /// from closure capture values for which only the serialization layout is known.
 #[derive(Clone, Debug)]
 pub struct RawMoveStruct {
@@ -84,30 +86,47 @@ pub enum AnnotatedMoveValue {
     // NOTE: Added in bytecode version v6, do not reorder!
     U16(u16),
     U32(u32),
-    U256(u256::U256),
+    U256(int256::U256),
     // NOTE: Added in v8
     Closure(AnnotatedMoveClosure),
     RawStruct(RawMoveStruct),
+    // NOTE: Added in bytecode version v9, do not reorder!
+    I8(i8),
+    I16(i16),
+    I32(i32),
+    I64(i64),
+    I128(i128),
+    I256(int256::I256),
 }
 
 pub struct MoveValueAnnotator<V> {
     module_viewer: V,
+    /// A cache for fat type info for structs. For a generic struct, the uninstantiated
+    /// FatStructType of the base definition will be stored here as well.
+    ///
+    /// Notice that this cache (and the next one) effect the computation `Limit`: no-cached
+    /// annotation may hit limits which cached ones don't. Since limits aren't precise metering,
+    /// this effect is expected and OK.
+    fat_struct_def_cache: RefCell<BTreeMap<StructName, FatStructRef>>,
+    /// A cache for fat type info for struct instantiations. This cache is build from
+    /// substituting parameters for the uninstantiated types in `fat_struct_def_cache`.
+    fat_struct_inst_cache: RefCell<BTreeMap<(StructName, Vec<FatType>), FatStructRef>>,
+}
+
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+struct StructName {
+    address: AccountAddress,
+    module: Identifier,
+    name: Identifier,
 }
 
 impl<V: CompiledModuleView> MoveValueAnnotator<V> {
     pub fn new(module_viewer: V) -> Self {
-        Self { module_viewer }
-    }
-
-    pub fn get_type_layout_runtime(&self, type_tag: &TypeTag) -> anyhow::Result<MoveTypeLayout> {
-        TypeLayoutBuilder::build_runtime(type_tag, &self.module_viewer)
-    }
-
-    pub fn get_type_layout_with_fields(
-        &self,
-        type_tag: &TypeTag,
-    ) -> anyhow::Result<MoveTypeLayout> {
-        TypeLayoutBuilder::build_with_fields(type_tag, &self.module_viewer)
+        Self {
+            module_viewer,
+            fat_struct_def_cache: RefCell::default(),
+            fat_struct_inst_cache: RefCell::default(),
+        }
     }
 
     pub fn get_type_layout_with_types(&self, type_tag: &TypeTag) -> anyhow::Result<MoveTypeLayout> {
@@ -196,7 +215,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 | FatType::TyParam(_)
                 | FatType::U16
                 | FatType::U32
-                | FatType::U256 => true,
+                | FatType::U256
+                | FatType::I8
+                | FatType::I16
+                | FatType::I32
+                | FatType::I64
+                | FatType::I128
+                | FatType::I256 => true,
             })
             .collect();
         anyhow::ensure!(
@@ -280,8 +305,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         blob: &[u8],
         limit: &mut Limiter,
     ) -> anyhow::Result<AnnotatedMoveStruct> {
-        let ty = self.resolve_struct(tag)?;
-        let struct_def = (&ty).try_into().map_err(into_vm_status)?;
+        let ty = self.resolve_struct_tag(tag, &mut Limiter::default())?;
+        let struct_def = (ty.as_ref()).try_into().map_err(into_vm_status)?;
         let move_struct = MoveStruct::simple_deserialize(blob, &struct_def)?;
         self.annotate_struct(&move_struct, &ty, limit)
     }
@@ -291,8 +316,8 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         tag: &StructTag,
         blob: &[u8],
     ) -> anyhow::Result<(Option<Identifier>, Vec<(Identifier, MoveValue)>)> {
-        let ty = self.resolve_struct(tag)?;
-        let struct_def = (&ty).try_into().map_err(into_vm_status)?;
+        let ty = self.resolve_struct_tag(tag, &mut Limiter::default())?;
+        let struct_def = (ty.as_ref()).try_into().map_err(into_vm_status)?;
         Ok(match MoveStruct::simple_deserialize(blob, &struct_def)? {
             MoveStruct::Runtime(values) => {
                 let (tag, field_names) = self.get_field_information(&ty, None)?;
@@ -314,29 +339,72 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         })
     }
 
-    fn resolve_struct(&self, struct_tag: &StructTag) -> anyhow::Result<FatStructType> {
-        self.resolve_struct_impl(struct_tag, &mut Limiter::default())
-    }
-
-    fn resolve_struct_impl(
+    fn resolve_struct_tag(
         &self,
         struct_tag: &StructTag,
         limit: &mut Limiter,
-    ) -> anyhow::Result<FatStructType> {
-        let module_id = ModuleId::new(struct_tag.address, struct_tag.module.clone());
-        let module = self.view_existing_module(&module_id)?;
-        let module = module.borrow();
-
-        let struct_def = find_struct_def_in_module(module, struct_tag.name.as_ident_str())?;
-        let ty_args = struct_tag
-            .type_args
+    ) -> anyhow::Result<FatStructRef> {
+        let StructTag {
+            address,
+            module,
+            name,
+            type_args,
+        } = struct_tag;
+        let struct_name = StructName {
+            address: *address,
+            module: module.to_owned(),
+            name: name.to_owned(),
+        };
+        if type_args.is_empty() {
+            return self.resolve_basic_struct(&struct_name, limit);
+        }
+        let type_args = type_args
             .iter()
             .map(|ty| self.resolve_type_impl(ty, limit))
             .collect::<anyhow::Result<Vec<_>>>()?;
-        let ty_body = self.resolve_struct_definition(module, struct_def, limit)?;
-        ty_body.subst(&ty_args, limit).map_err(|e: PartialVMError| {
-            anyhow!("StructTag {:?} cannot be resolved: {:?}", struct_tag, e)
-        })
+        self.resolve_generic_struct(struct_name, type_args, limit)
+    }
+
+    fn resolve_generic_struct(
+        &self,
+        struct_name: StructName,
+        type_args: Vec<FatType>,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<FatStructRef> {
+        let name_and_args = (struct_name, type_args);
+        if let Some(fat_ty) = self.fat_struct_inst_cache.borrow().get(&name_and_args) {
+            return Ok(fat_ty.clone());
+        }
+        let base_type = self.resolve_basic_struct(&name_and_args.0, limit)?;
+        let inst_type = FatStructRef::new(base_type.subst(&name_and_args.1, limit).map_err(
+            |e: PartialVMError| anyhow!("type {:?} cannot be resolved: {:?}", name_and_args, e),
+        )?);
+        self.fat_struct_inst_cache
+            .borrow_mut()
+            .insert(name_and_args, inst_type.clone());
+        Ok(inst_type)
+    }
+
+    fn resolve_basic_struct(
+        &self,
+        struct_name: &StructName,
+        limit: &mut Limiter,
+    ) -> anyhow::Result<FatStructRef> {
+        if let Some(fat_ty) = self.fat_struct_def_cache.borrow().get(struct_name) {
+            return Ok(fat_ty.clone());
+        }
+
+        let module_id = ModuleId::new(struct_name.address, struct_name.module.clone());
+        let module = self.view_existing_module(&module_id)?;
+        let module = module.borrow();
+
+        let struct_def = find_struct_def_in_module(module, struct_name.name.as_ident_str())?;
+        let base_type =
+            FatStructRef::new(self.resolve_struct_definition(module, struct_def, limit)?);
+        self.fat_struct_def_cache
+            .borrow_mut()
+            .insert(struct_name.to_owned(), base_type.clone());
+        Ok(base_type)
     }
 
     fn resolve_struct_definition(
@@ -413,6 +481,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             SignatureToken::U64 => FatType::U64,
             SignatureToken::U128 => FatType::U128,
             SignatureToken::U256 => FatType::U256,
+            SignatureToken::I8 => FatType::I8,
+            SignatureToken::I16 => FatType::I16,
+            SignatureToken::I32 => FatType::I32,
+            SignatureToken::I64 => FatType::I64,
+            SignatureToken::I128 => FatType::I128,
+            SignatureToken::I256 => FatType::I256,
             SignatureToken::Address => FatType::Address,
             SignatureToken::Signer => FatType::Signer,
             SignatureToken::Vector(ty) => {
@@ -444,14 +518,19 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                                 | SignatureToken::TypeParameter(_)
                                 | SignatureToken::U16
                                 | SignatureToken::U32
-                                | SignatureToken::U256 => {
+                                | SignatureToken::U256
+                                | SignatureToken::I8
+                                | SignatureToken::I16
+                                | SignatureToken::I32
+                                | SignatureToken::I64
+                                | SignatureToken::I128
+                                | SignatureToken::I256 => {
                                     self.resolve_signature(module, tok, limit)?
                                 },
                             })
                         })
                         .collect::<anyhow::Result<Vec<_>>>()
                 };
-
                 FatType::Function(Box::new(FatFunctionType {
                     args: resolve_slice(args, limit)?,
                     results: resolve_slice(results, limit)?,
@@ -459,19 +538,16 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 }))
             },
             SignatureToken::Struct(idx) => {
-                FatType::Struct(Box::new(self.resolve_struct_handle(module, *idx, limit)?))
+                let struct_name = self.handle_to_struct_name(module, *idx);
+                FatType::Struct(self.resolve_basic_struct(&struct_name, limit)?)
             },
             SignatureToken::StructInstantiation(idx, toks) => {
-                let struct_ty = self.resolve_struct_handle(module, *idx, limit)?;
-                let args = toks
+                let struct_name = self.handle_to_struct_name(module, *idx);
+                let ty_args = toks
                     .iter()
                     .map(|tok| self.resolve_signature(module, tok, limit))
                     .collect::<anyhow::Result<Vec<_>>>()?;
-                FatType::Struct(Box::new(
-                    struct_ty
-                        .subst(&args, limit)
-                        .map_err(|status| anyhow!("Substitution failure: {:?}", status))?,
-                ))
+                FatType::Struct(self.resolve_generic_struct(struct_name, ty_args, limit)?)
             },
             SignatureToken::TypeParameter(idx) => FatType::TyParam(*idx as usize),
             SignatureToken::MutableReference(_) => return Err(anyhow!("Unexpected Reference")),
@@ -482,25 +558,18 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         })
     }
 
-    fn resolve_struct_handle(
+    fn handle_to_struct_name(
         &self,
         module: BinaryIndexedView,
         idx: StructHandleIndex,
-        limit: &mut Limiter,
-    ) -> anyhow::Result<FatStructType> {
+    ) -> StructName {
         let struct_handle = module.struct_handle_at(idx);
-        let target_module = {
-            let module_handle = module.module_handle_at(struct_handle.module);
-            let module_id = ModuleId::new(
-                *module.address_identifier_at(module_handle.address),
-                module.identifier_at(module_handle.name).to_owned(),
-            );
-            self.view_existing_module(&module_id)?
-        };
-        let target_module = target_module.borrow();
-        let target_idx =
-            find_struct_def_in_module(target_module, module.identifier_at(struct_handle.name))?;
-        self.resolve_struct_definition(target_module, target_idx, limit)
+        let module_handle = module.module_handle_at(struct_handle.module);
+        StructName {
+            address: *module.address_identifier_at(module_handle.address),
+            module: module.identifier_at(module_handle.name).to_owned(),
+            name: module.identifier_at(struct_handle.name).to_owned(),
+        }
     }
 
     fn resolve_type_impl(
@@ -512,13 +581,19 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             TypeTag::Address => FatType::Address,
             TypeTag::Signer => FatType::Signer,
             TypeTag::Bool => FatType::Bool,
-            TypeTag::Struct(st) => FatType::Struct(Box::new(self.resolve_struct_impl(st, limit)?)),
+            TypeTag::Struct(st) => FatType::Struct(self.resolve_struct_tag(st, limit)?),
             TypeTag::U8 => FatType::U8,
             TypeTag::U16 => FatType::U16,
             TypeTag::U32 => FatType::U32,
             TypeTag::U64 => FatType::U64,
             TypeTag::U256 => FatType::U256,
             TypeTag::U128 => FatType::U128,
+            TypeTag::I8 => FatType::I8,
+            TypeTag::I16 => FatType::I16,
+            TypeTag::I32 => FatType::I32,
+            TypeTag::I64 => FatType::I64,
+            TypeTag::I128 => FatType::I128,
+            TypeTag::I256 => FatType::I256,
             TypeTag::Vector(ty) => FatType::Vector(Box::new(self.resolve_type_impl(ty, limit)?)),
             TypeTag::Function(function_tag) => {
                 let mut convert_tags = |tags: &[FunctionParamOrReturnTag]| {
@@ -726,6 +801,12 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             (MoveValue::U64(i), FatType::U64) => AnnotatedMoveValue::U64(*i),
             (MoveValue::U128(i), FatType::U128) => AnnotatedMoveValue::U128(*i),
             (MoveValue::U256(i), FatType::U256) => AnnotatedMoveValue::U256(*i),
+            (MoveValue::I8(i), FatType::I8) => AnnotatedMoveValue::I8(*i),
+            (MoveValue::I16(i), FatType::I16) => AnnotatedMoveValue::I16(*i),
+            (MoveValue::I32(i), FatType::I32) => AnnotatedMoveValue::I32(*i),
+            (MoveValue::I64(i), FatType::I64) => AnnotatedMoveValue::I64(*i),
+            (MoveValue::I128(i), FatType::I128) => AnnotatedMoveValue::I128(*i),
+            (MoveValue::I256(i), FatType::I256) => AnnotatedMoveValue::I256(*i),
             (MoveValue::Address(a), FatType::Address) => AnnotatedMoveValue::Address(*a),
             (MoveValue::Vector(a), FatType::Vector(ty)) => match ty.as_ref() {
                 FatType::U8 => AnnotatedMoveValue::Bytes(
@@ -763,7 +844,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             | (MoveValue::Signer(_), _)
             | (MoveValue::U16(_), _)
             | (MoveValue::U32(_), _)
-            | (MoveValue::U256(_), _) => {
+            | (MoveValue::U256(_), _)
+            | (MoveValue::I8(_), _)
+            | (MoveValue::I16(_), _)
+            | (MoveValue::I32(_), _)
+            | (MoveValue::I64(_), _)
+            | (MoveValue::I128(_), _)
+            | (MoveValue::I256(_), _) => {
                 return Err(anyhow!(
                     "Cannot annotate value {:?} with type {:?}",
                     value,
@@ -815,6 +902,12 @@ fn pretty_print_value(
         AnnotatedMoveValue::U64(v) => write!(f, "{}", v),
         AnnotatedMoveValue::U128(v) => write!(f, "{}u128", v),
         AnnotatedMoveValue::U256(v) => write!(f, "{}u256", v),
+        AnnotatedMoveValue::I8(v) => write!(f, "{}i8", v),
+        AnnotatedMoveValue::I16(v) => write!(f, "{}i16", v),
+        AnnotatedMoveValue::I32(v) => write!(f, "{}i32", v),
+        AnnotatedMoveValue::I64(v) => write!(f, "{}i64", v),
+        AnnotatedMoveValue::I128(v) => write!(f, "{}i128", v),
+        AnnotatedMoveValue::I256(v) => write!(f, "{}i256", v),
         AnnotatedMoveValue::Address(a) => write!(f, "{}", a.short_str_lossless()),
         AnnotatedMoveValue::Vector(_, v) => {
             writeln!(f, "[")?;
@@ -1030,6 +1123,24 @@ impl serde::Serialize for AnnotatedMoveValue {
                 // Copying logic & reasoning from above because if u128 is needs arb precision, u256 should too
                 if let Ok(i) = u64::try_from(*n) {
                     serializer.serialize_u64(i)
+                } else {
+                    serializer.serialize_bytes(&n.to_le_bytes())
+                }
+            },
+            I8(n) => serializer.serialize_i8(*n),
+            I16(n) => serializer.serialize_i16(*n),
+            I32(n) => serializer.serialize_i32(*n),
+            I64(n) => serializer.serialize_i64(*n),
+            I128(n) => {
+                if let Ok(i) = i64::try_from(*n) {
+                    serializer.serialize_i64(i)
+                } else {
+                    serializer.serialize_bytes(&n.to_le_bytes())
+                }
+            },
+            I256(n) => {
+                if let Ok(i) = i64::try_from(*n) {
+                    serializer.serialize_i64(i)
                 } else {
                     serializer.serialize_bytes(&n.to_le_bytes())
                 }

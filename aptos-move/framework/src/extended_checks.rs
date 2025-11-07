@@ -6,7 +6,6 @@ use aptos_types::vm::module_metadata::{
 };
 use legacy_move_compiler::shared::known_attributes;
 use move_binary_format::file_format::Visibility;
-use move_cli::base::test_validation;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     account_address::AccountAddress,
@@ -89,14 +88,6 @@ pub fn run_extended_checks(env: &GlobalEnv) -> BTreeMap<ModuleId, RuntimeModuleM
     let mut checker = ExtendedChecker::new(env);
     checker.run();
     checker.output
-}
-
-/// Configures the move-cli unit test validation hook to run the extended checker.
-pub fn configure_extended_checks_for_unit_test() {
-    fn validate(env: &GlobalEnv) {
-        run_extended_checks(env);
-    }
-    test_validation::set_validation_hook(Box::new(validate));
 }
 
 #[derive(Debug)]

@@ -17,13 +17,9 @@ use tokio::time::Instant;
 
 // TODO: at some point, we should try to merge the JWK and resource fetcher code
 
-// Environment variable names for the resource URLs
-const ENV_ONCHAIN_KEYLESS_CONFIG_URL: &str = "ONCHAIN_KEYLESS_CONFIG_URL";
-const ENV_ONCHAIN_GROTH16_VK_URL: &str = "ONCHAIN_GROTH16_VK_URL";
-
 // Resource names for metrics and logging
-const ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME: &str = "onchain_keyless_configuration";
-const ONCHAIN_GROTH16_VK_RESOURCE_NAME: &str = "onchain_groth16_verification_key";
+const ON_CHAIN_KEYLESS_CONFIG_RESOURCE_NAME: &str = "on_chain_keyless_configuration";
+const ON_CHAIN_GROTH16_VK_RESOURCE_NAME: &str = "on_chain_groth16_verification_key";
 
 // The interval (in seconds) at which to refresh the resources
 pub const RESOURCE_FETCH_INTERVAL_SECS: u64 = 10;
@@ -115,34 +111,18 @@ impl CachedResources {
         Self::new(TimeService::mock())
     }
 
-    /// Starts the refresh loops for the cached resources
-    pub fn start_resource_fetcher(&self) {
-        // Start the keyless config fetcher
-        match utils::read_environment_variable(ENV_ONCHAIN_KEYLESS_CONFIG_URL) {
-            Ok(url) => {
-                let external_resource = Arc::new(ExternalResource::new(
-                    ONCHAIN_KEYLESS_CONFIG_RESOURCE_NAME.into(),
-                    url.clone(),
-                ));
-                start_external_resource_refresh_loop(
-                    external_resource,
-                    self.on_chain_keyless_configuration.clone(),
-                    self.time_service.clone(),
-                );
-            },
-            Err(error) => {
-                warn!(
-                    "{} is not set, skipping on-chain keyless config fetcher! Error: {}",
-                    ENV_ONCHAIN_KEYLESS_CONFIG_URL, error
-                );
-            },
-        }
-
+    /// Starts the refresh loops for the cached resources at the given URLs.
+    /// If a URL is None, the corresponding fetcher is not started.
+    pub fn start_resource_fetcher(
+        &self,
+        on_chain_groth16_vk_url: Option<String>,
+        on_chain_keyless_config_url: Option<String>,
+    ) {
         // Start the Groth16 VK fetcher
-        match utils::read_environment_variable(ENV_ONCHAIN_GROTH16_VK_URL) {
-            Ok(url) => {
+        match on_chain_groth16_vk_url {
+            Some(url) => {
                 let external_resource = Arc::new(ExternalResource::new(
-                    ONCHAIN_GROTH16_VK_RESOURCE_NAME.into(),
+                    ON_CHAIN_GROTH16_VK_RESOURCE_NAME.into(),
                     url.clone(),
                 ));
                 start_external_resource_refresh_loop(
@@ -151,11 +131,26 @@ impl CachedResources {
                     self.time_service.clone(),
                 );
             },
-            Err(error) => {
-                warn!(
-                    "{} is not set, skipping on-chain Groth16 VK fetcher! Error: {}",
-                    ENV_ONCHAIN_GROTH16_VK_URL, error
+            None => {
+                warn!("The on-chain Groth16 VK URL is not set, skipping on-chain Groth16 VK fetching!");
+            },
+        }
+
+        // Start the keyless config fetcher
+        match on_chain_keyless_config_url {
+            Some(url) => {
+                let external_resource = Arc::new(ExternalResource::new(
+                    ON_CHAIN_KEYLESS_CONFIG_RESOURCE_NAME.into(),
+                    url.clone(),
+                ));
+                start_external_resource_refresh_loop(
+                    external_resource,
+                    self.on_chain_keyless_configuration.clone(),
+                    self.time_service.clone(),
                 );
+            },
+            None => {
+                warn!("The on-chain keyless config URL is not set, skipping on-chain keyless config fetching!");
             },
         }
     }
@@ -270,8 +265,11 @@ pub fn start_external_resource_refresh_loop<T: DeserializeOwned + Send + Sync + 
 
 /// Creates and starts the cached resource fetcher, and
 /// returns a handle to the cached resources.
-pub fn start_cached_resource_fetcher() -> CachedResources {
+pub fn start_cached_resource_fetcher(
+    on_chain_groth16_vk_url: Option<String>,
+    on_chain_keyless_config_url: Option<String>,
+) -> CachedResources {
     let cached_resources = CachedResources::new(TimeService::real());
-    cached_resources.start_resource_fetcher();
+    cached_resources.start_resource_fetcher(on_chain_groth16_vk_url, on_chain_keyless_config_url);
     cached_resources
 }

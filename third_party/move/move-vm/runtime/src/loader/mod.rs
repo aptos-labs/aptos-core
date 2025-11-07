@@ -7,7 +7,8 @@ mod access_specifier_loader;
 mod function;
 pub use function::{Function, LoadedFunction, LoadedFunctionOwner};
 pub(crate) use function::{
-    FunctionHandle, FunctionInstantiation, LazyLoadedFunction, LazyLoadedFunctionState,
+    FunctionHandle, FunctionInstantiation, FunctionPtr, GenericFunctionPtr, LazyLoadedFunction,
+    LazyLoadedFunctionState,
 };
 
 mod modules;
@@ -20,4 +21,4 @@ pub use script::Script;
 mod single_signature_loader;
 
 mod type_loader;
-use type_loader::intern_type;
+use type_loader::convert_tok_to_type;

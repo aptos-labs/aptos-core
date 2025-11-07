@@ -1,0 +1,8 @@
+//# publish --verbose
+module 0xcafe::m
+
+fun $f()
+    ret
+
+fun g$122$()
+    ret

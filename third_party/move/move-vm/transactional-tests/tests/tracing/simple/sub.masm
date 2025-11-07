@@ -1,0 +1,12 @@
+//# publish
+module 0x22::test
+
+public fun sub_instr(a: u64, b: u64): u64
+    move_loc a
+    move_loc b
+    sub
+    ret
+
+//# run --verbose 0x22::test::sub_instr --args 20u64 10u64 --display-trace
+
+//# run --verbose 0x22::test::sub_instr --args 10u64 20u64 --display-trace

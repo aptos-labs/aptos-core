@@ -1,6 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::blstrs::random_scalar;
 use aptos_dkg::{
     algebra::{
         evaluation_domain::BatchEvaluationDomain,
@@ -8,7 +9,7 @@ use aptos_dkg::{
             accumulator_poly, accumulator_poly_scheduled, accumulator_poly_slow, poly_eval,
         },
     },
-    utils::random::{random_scalar, random_scalars},
+    utils::random::random_scalars,
 };
 use blstrs::Scalar;
 use ff::Field;

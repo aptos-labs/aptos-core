@@ -3,7 +3,7 @@
 #![allow(unused)]
 
 pub use super::prebuilt_packages::PreBuiltPackagesImpl;
-use aptos_framework::natives::code::{MoveOption, PackageMetadata};
+use aptos_framework::natives::code::PackageMetadata;
 use aptos_sdk::{
     bcs,
     move_types::{
@@ -75,6 +75,15 @@ impl OrderBookState {
             order_idx: AtomicU64::new(0),
         })
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum MoveVmMicroBenchmark {
+    /// Runs a function which creates many local variables (but do not do any expensive compute)
+    Locals,
+    /// Runs a function instantiation which creates many local variables (but do not do any
+    /// expensive compute)
+    LocalsGeneric,
 }
 
 //
@@ -281,6 +290,9 @@ pub enum EntryPoints {
     MonotonicCounter {
         counter_type: MonotonicCounterType,
     },
+
+    /// Different microbenchmarks to stress-test Move VM.
+    MoveVmMicroBenchmark(MoveVmMicroBenchmark),
 }
 
 impl EntryPointTrait for EntryPoints {
@@ -352,6 +364,9 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::IncGlobalMilestoneAggV2 { .. }
             | EntryPoints::CreateGlobalMilestoneAggV2 { .. } => "aggregator_examples",
             EntryPoints::DeserializeU256 => "bcs_stream",
+            EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
+                MoveVmMicroBenchmark::Locals | MoveVmMicroBenchmark::LocalsGeneric => "locals",
+            },
         }
     }
 
@@ -422,6 +437,9 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::MonotonicCounter { .. } => "transaction_context_example",
             EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
+                MoveVmMicroBenchmark::Locals | MoveVmMicroBenchmark::LocalsGeneric => "locals",
+            },
         }
     }
 
@@ -902,6 +920,14 @@ impl EntryPointTrait for EntryPoints {
                     bcs::to_bytes(&is_bid).unwrap(), // is_bid
                 ])
             },
+            EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
+                MoveVmMicroBenchmark::Locals => {
+                    get_payload_void(module_id, ident_str!("benchmark").to_owned())
+                },
+                MoveVmMicroBenchmark::LocalsGeneric => {
+                    get_payload_void(module_id, ident_str!("benchmark_generic").to_owned())
+                },
+            },
         }
     }
 
@@ -1025,6 +1051,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::APTTransferWithMasterSigner => AutomaticArgs::Signer,
             EntryPoints::MonotonicCounter { .. } => AutomaticArgs::None,
             EntryPoints::OrderBook { .. } => AutomaticArgs::None,
+            EntryPoints::MoveVmMicroBenchmark(_) => AutomaticArgs::None,
         }
     }
 }

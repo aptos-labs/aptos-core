@@ -18,6 +18,7 @@ and reducing the size of existing orders.
 
 <pre><code><b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info">0x7::market_clearinghouse_order_info</a>;
 <b>use</b> <a href="market_types.md#0x7_market_types">0x7::market_types</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
@@ -42,15 +43,6 @@ and reducing the size of existing orders.
 
 
 
-<a id="0x7_order_operations_ENOT_ORDER_CREATOR"></a>
-
-
-
-<pre><code><b>const</b> <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>: u64 = 12;
-</code></pre>
-
-
-
 <a id="0x7_order_operations_cancel_order_with_client_id"></a>
 
 ## Function `cancel_order_with_client_id`
@@ -62,12 +54,14 @@ so it can be cancelled when it's eventually placed.
 
 Parameters:
 - market: The market instance
+- account: address of the account that owns the order - please note that no signer validation is done here.
+It it the caller's responsibility to ensure that the account is authorized to cancel the order.
 - user: The signer of the user whose order should be cancelled
 - client_order_id: The client order ID of the order to cancel
 - callbacks: The market clearinghouse callbacks for cleanup operations
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_order_with_client_id">cancel_order_with_client_id</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: u64, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_order_with_client_id">cancel_order_with_client_id</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -79,7 +73,7 @@ Parameters:
 <pre><code><b>public</b> <b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_order_with_client_id">cancel_order_with_client_id</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     market: &<b>mut</b> Market&lt;M&gt;,
     user: <b>address</b>,
-    client_order_id: u64,
+    client_order_id: String,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> order =
@@ -111,6 +105,8 @@ This will cancel the order and emit an event for the order cancellation.
 
 Parameters:
 - market: The market instance
+- account: address of the account that owns the order - please note that no signer validation is done here.
+It it the caller's responsibility to ensure that the account is authorized to cancel the order.
 - user: The signer of the user whose order should be cancelled
 - order_id: The order ID of the order to cancel
 - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -133,7 +129,6 @@ Parameters:
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ): SingleOrder&lt;M&gt; {
     <b>let</b> order = market.get_order_book_mut().<a href="order_operations.md#0x7_order_operations_cancel_order">cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
-    <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == order.get_account(), <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
     <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, callbacks);
     order
 }
@@ -171,7 +166,6 @@ if it was successfully cancelled, or None if the order does not exist.
     <b>let</b> maybe_order = market.get_order_book_mut().<a href="order_operations.md#0x7_order_operations_try_cancel_order">try_cancel_order</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id);
     <b>if</b> (maybe_order.is_some()) {
         <b>let</b> order = maybe_order.destroy_some();
-        <b>assert</b>!(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == order.get_account(), <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
         <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>(market, order, emit_event, callbacks);
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(order)
     } <b>else</b> {
@@ -194,7 +188,8 @@ an event for the size reduction.
 
 Parameters:
 - market: The market instance
-- user: The signer of the user whose order size should be reduced
+- account: address of the account that owns the order - please note that no signer validation is done here.
+It it the caller's responsibility to ensure that the account is authorized to modify the order.
 - order_id: The order ID of the order to reduce
 - size_delta: The amount by which to reduce the order size
 - callbacks: The market clearinghouse callbacks for cleanup operations
@@ -221,7 +216,6 @@ Parameters:
     <b>let</b> maybe_order = <a href="order_book.md#0x7_order_book">order_book</a>.get_order(order_id);
     <b>assert</b>!(maybe_order.is_some(), <a href="order_operations.md#0x7_order_operations_EORDER_DOES_NOT_EXIST">EORDER_DOES_NOT_EXIST</a>);
     <b>let</b> (order, _) = maybe_order.destroy_some().destroy_order_from_state();
-    <b>assert</b>!(order.get_account() == <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, <a href="order_operations.md#0x7_order_operations_ENOT_ORDER_CREATOR">ENOT_ORDER_CREATOR</a>);
     <b>let</b> (
         user,
         order_id,
@@ -231,12 +225,23 @@ Parameters:
         orig_size,
         remaining_size,
         is_bid,
-        _trigger_condition,
+        trigger_condition,
         time_in_force,
         metadata
     ) = order.destroy_single_order();
     callbacks.<a href="order_operations.md#0x7_order_operations_decrease_order_size">decrease_order_size</a>(
-        user, order_id, is_bid, price, remaining_size
+        new_clearinghouse_order_info(
+            user,
+            order_id,
+            client_order_id,
+            is_bid,
+            price,
+            time_in_force,
+            single_order_type(),
+                trigger_condition,
+            metadata
+        ),
+        remaining_size
     );
 
     market.emit_event_for_order(
@@ -267,16 +272,10 @@ Parameters:
 
 ## Function `cancel_single_order_helper`
 
-Internal helper function to cancel a single order.
-This function handles the cleanup and event emission for order cancellation.
-
-Parameters:
-- market: The market instance
-- order: The order to cancel
-- callbacks: The market clearinghouse callbacks for cleanup operations
 
 
-<pre><code><b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, emit_event: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code>#[lint::skip(#[needless_mutable_reference])]
+<b>fun</b> <a href="order_operations.md#0x7_order_operations_cancel_single_order_helper">cancel_single_order_helper</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order: <a href="single_order_types.md#0x7_single_order_types_SingleOrder">single_order_types::SingleOrder</a>&lt;M&gt;, emit_event: bool, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -300,12 +299,12 @@ Parameters:
         orig_size,
         remaining_size,
         is_bid,
-        _trigger_condition,
+        trigger_condition,
         time_in_force,
         metadata
     ) = order.destroy_single_order();
     cleanup_order_internal(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, single_order_book_type(), is_bid, remaining_size, metadata, callbacks
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, single_order_type(), is_bid, time_in_force, remaining_size, price, trigger_condition, metadata, callbacks, <b>false</b>
     );
     <b>if</b> (emit_event) {
         market.emit_event_for_order(

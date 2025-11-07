@@ -20,7 +20,7 @@ on:
         required: false
         type: string
         description: Optional version to end replaying. If not specified, replay-verify will determine end version itself.
-      DRY_RUN: 
+      DRY_RUN:
         required: false
         type: boolean
         description: If true, the workflow will not run replay verify nor build images.
@@ -29,8 +29,7 @@ on:
     paths:
       - ".github/workflows/replay-verify-testnet.yaml"
       - ".github/workflows/workflow-run-replay-verify-on-archive.yaml"
-  schedule:
-    - cron: "0 4 * * 0,2,4" # The main branch cadence. This runs every Sun,Tues,Thurs UTC 04:00
+  # schedule: # NOTE: the schedule is dictated by PIES
 
 permissions:
   contents: read
@@ -45,19 +44,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  determine-test-metadata:
-    runs-on: ubuntu-latest-32-core # consider  moving this to a smaller machine since the compute runs on GKE
-    steps:
-      # checkout the repo first, so check-aptos-core can use it and cancel the workflow if necessary
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/check-aptos-core
-        with:
-          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
-
   replay:
-    if: |
-      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    needs: determine-test-metadata
+    if: github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/workflow-run-replay-verify-on-archive.yaml
     secrets: inherit
     with:

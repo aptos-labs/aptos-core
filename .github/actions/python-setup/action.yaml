@@ -11,7 +11,7 @@ inputs:
   poetry_version:
     description: "Poetry package manager version"
     required: false
-    default: 1.2.2
+    default: 2.2.1
 
 runs:
   using: composite

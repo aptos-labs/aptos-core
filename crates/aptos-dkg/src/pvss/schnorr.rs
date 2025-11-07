@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::utils::{hash_to_scalar, random::random_scalar, HasMultiExp};
+use crate::utils::{hash_to_scalar, HasMultiExp};
 use anyhow::bail;
-use aptos_crypto::signing_message;
+use aptos_crypto::{blstrs::random_scalar, signing_message};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::Scalar;
 use ff::Field;
