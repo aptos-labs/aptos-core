@@ -30,7 +30,7 @@ RETRY_DELAY = 20  # seconds
 QUERY_DELAY = 5  # seconds
 TEARDOWN_DELAY = 30 * 60  # 30 minutes slack to allow for pod setup and teardown
 
-REPLAY_CONCURRENCY_LEVEL = 4
+REPLAY_CONCURRENCY_LEVEL = 32
 
 INT64_MAX = 9_223_372_036_854_775_807
 
@@ -99,7 +99,7 @@ class ReplayConfig:
             self.range_size = 5_000_000
             self.timeout_secs = 9000
         else:
-            self.concurrent_replayer = 4
+            self.concurrent_replayer = 1
             self.pvc_number = 10
             self.min_range_size = 10_000
             self.range_size = 2_000_000

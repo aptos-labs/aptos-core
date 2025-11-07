@@ -214,7 +214,7 @@ impl Verifier {
         }
 
         AptosVM::set_concurrency_level_once(self.replay_concurrency_level);
-        AptosVM::set_blockstm_v2_enabled_once(true);
+        // AptosVM::set_blockstm_v2_enabled_once(true);
         aptos_vm_logging::disable_speculative_logging();
         let thread_pool = rayon::ThreadPoolBuilder::new()
             .num_threads(self.concurrent_replay)
