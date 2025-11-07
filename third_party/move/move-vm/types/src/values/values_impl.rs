@@ -33,6 +33,7 @@ use serde::{
     ser::{Error as SerError, SerializeSeq, SerializeTuple, SerializeTupleVariant},
     Deserialize,
 };
+use std::cmp::max;
 use std::{
     cell::RefCell,
     cmp::Ordering,
@@ -129,7 +130,7 @@ pub enum Value {
 /// Except when not owned by the VM stack, a container always lives inside an Rc<RefCell<>>,
 /// making it possible to be shared by references.
 #[derive(Debug)]
-pub(crate) enum Container {
+pub enum Container {
     Locals(Rc<RefCell<Vec<Value>>>),
     Vec(Rc<RefCell<Vec<Value>>>),
     Struct(Rc<RefCell<Vec<Value>>>),
@@ -521,7 +522,7 @@ impl Value {
     // Note(inline): recursive function, but `#[cfg_attr(feature = "force-inline", inline(always))]` seems to improve perf slightly
     //               and doesn't add much compile time.
     #[inline(always)]
-    fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
+    pub fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
         use Value::*;
 
         check_depth(depth, max_depth)?;
@@ -658,6 +659,7 @@ impl ContainerRef {
 
 #[cfg(test)]
 impl Value {
+    #[inline]
     pub fn copy_value_with_depth(&self, max_depth: u64) -> PartialVMResult<Self> {
         self.copy_value(1, Some(max_depth))
     }
@@ -1998,6 +2000,21 @@ impl StructRef {
         self.0.borrow_elem(idx)
     }
 
+    #[inline]
+    pub fn get_field(&self, idx: usize) -> PartialVMResult<Value> {
+        let container = self.0.container();
+        let field = match container {
+            Container::Struct(fields) => {
+                let fields = fields.borrow();
+                fields[idx].copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+            },
+            _ => {
+                todo!()
+            }
+        };
+        field
+    }
+
     pub fn borrow_variant_field(
         &self,
         allowed: &[VariantIndex],
@@ -2103,6 +2120,53 @@ impl Locals {
             ),
         }
     }
+
+    #[cfg_attr(feature = "force-inline", inline(always))]
+    pub fn borrow_loc_struct_ref(&self, idx: usize) -> PartialVMResult<StructRef> {
+        let v = self.0.borrow();
+        if idx >= v.len() {
+            return Err(
+                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                    format!(
+                        "index out of bounds when borrowing local: got: {}, len: {}",
+                        idx,
+                        v.len()
+                    ),
+                ),
+            );
+        }
+
+        let container_ref = match &v[idx] {
+            Value::Container(c) => ContainerRef::Local(c.copy_by_ref()),
+
+            // Value::U8(_)
+            // | Value::U16(_)
+            // | Value::U32(_)
+            // | Value::U64(_)
+            // | Value::U128(_)
+            // | Value::U256(_)
+            // | Value::I8(_)
+            // | Value::I16(_)
+            // | Value::I32(_)
+            // | Value::I64(_)
+            // | Value::I128(_)
+            // | Value::I256(_)
+            // | Value::Bool(_)
+            // | Value::Address(_)
+            // | Value::ClosureValue(_)
+            // | Value::DelayedFieldID { .. } => Ok(Value::IndexedRef(IndexedRef {
+            //     idx,
+            //     container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
+            // })),
+            _ => {
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("cannot borrow local {:?}", &v[idx])),
+                )
+            },
+        };
+        Ok(StructRef(container_ref))
+    }
 }
 
 impl SignerRef {
@@ -2183,6 +2247,69 @@ impl Locals {
             Some(v) => Ok(v.copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))?),
             None => Err(Self::local_index_out_of_bounds(idx, locals.len())),
         }
+    }
+
+    #[cfg_attr(feature = "inline-locals", inline(always))]
+    pub fn get_field_loc(&self, idx: usize, field_offset: usize) -> PartialVMResult<Value> {
+        let mut locals = self.0.borrow();
+        let local = match locals.get(idx) {
+            Some(Value::Invalid) => {
+                return Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                )
+                    .with_message(format!("cannot copy invalid value at index {}", idx)));
+            },
+            Some(v) => v,
+            None => {
+                return Err(Self::local_index_out_of_bounds(idx, locals.len()));
+            },
+        };
+        let struct_fields = match local {
+            Value::Container(Container::Struct(fields)) => fields.borrow(),
+            Value::ContainerRef(container_ref) => {
+                let container = container_ref.container();
+                match container {
+                    Container::Struct(fields) => fields.borrow(),
+                    _ => panic!("not a struct, {:?}", container),
+                }
+            },
+            _ => panic!("not a struct, {:?}", local),
+        };
+        struct_fields[field_offset].copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
+    }
+
+    #[cfg_attr(feature = "inline-locals", inline(always))]
+    pub fn get_field_loc_and_destroy(&self, idx: usize, field_offset: usize) -> PartialVMResult<Value> {
+        let mut locals = self.0.borrow_mut();
+        let local = match locals.get_mut(idx) {
+            Some(Value::Invalid) => {
+                return Err(PartialVMError::new(
+                    StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                )
+                    .with_message(format!("cannot copy invalid value at index {}", idx)));
+            },
+            Some(v) => mem::replace(v, Value::Invalid),
+            None => {
+                return Err(Self::local_index_out_of_bounds(idx, locals.len()));
+            },
+        };
+        // let local = if destroy_local {
+        //     &mem::replace(local, Value::Invalid)
+        // } else {
+        //     local
+        // };
+        let struct_fields = match &local {
+            Value::Container(Container::Struct(fields)) => fields.borrow(),
+            Value::ContainerRef(container_ref) => {
+                let container = container_ref.container();
+                match container {
+                    Container::Struct(fields) => fields.borrow(),
+                    _ => panic!("not a struct, {:?}", container),
+                }
+            },
+            _ => panic!("not a struct, {:?}", local),
+        };
+        struct_fields[field_offset].copy_value(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH))
     }
 
     #[cfg_attr(feature = "inline-locals", inline(always))]
@@ -2324,10 +2451,10 @@ impl Value {
     }
 
     pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
-        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
-            Value::address(x),
-            Value::address(perm_storage_address),
-        ]))
+        Self::struct_(Struct::pack_variant(
+            PERMISSIONED_SIGNER_VARIANT,
+            vec![Value::address(x), Value::address(perm_storage_address)],
+        ))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in

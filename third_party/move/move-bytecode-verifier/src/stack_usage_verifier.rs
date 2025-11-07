@@ -143,6 +143,7 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::LdConst(_)
             | Bytecode::CopyLoc(_)
             | Bytecode::MoveLoc(_)
+            | Bytecode::GetFieldLoc(_, _)
             | Bytecode::MutBorrowLoc(_)
             | Bytecode::ImmBorrowLoc(_) => (0, 1),
 
@@ -161,6 +162,7 @@ impl<'a> StackUsageVerifier<'a> {
             | Bytecode::MutBorrowFieldGeneric(_)
             | Bytecode::ImmBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
+            | Bytecode::GetField(_)
             | Bytecode::MutBorrowVariantField(_)
             | Bytecode::MutBorrowVariantFieldGeneric(_)
             | Bytecode::ImmBorrowVariantField(_)
@@ -221,7 +223,7 @@ impl<'a> StackUsageVerifier<'a> {
             Bytecode::VecSwap(_) => (3, 0),
 
             // Branch and Nop neither pops nor pushes
-            Bytecode::Branch(_) | Bytecode::Nop => (0, 0),
+            Bytecode::Branch(_) | Bytecode::Nop | Bytecode::DropLoc(_) => (0, 0),
 
             // Return performs `return_count` pops
             Bytecode::Ret => {

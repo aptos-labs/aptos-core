@@ -796,6 +796,11 @@ pub enum StatusCode {
     RESERVED_VERIFICATION_ERROR_3 = 1138,
     RESERVED_VERIFICATION_ERROR_4 = 1139,
 
+    SWAPLOC_UNAVAILABLE_ERROR = 1140,
+    SWAPLOC_UNSAFE_TO_DESTROY_ERROR = 1141,
+    DROPLOC_UNAVAILABLE_ERROR = 1142,
+
+
     // These are errors that the VM might raise if a violation of internal
     // invariants takes place.
     // Invariant Violation Errors: 2000-2999

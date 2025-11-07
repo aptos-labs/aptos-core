@@ -423,6 +423,11 @@ fn load_local_index(cursor: &mut VersionedCursor) -> BinaryLoaderResult<u8> {
     read_uleb_internal(cursor, LOCAL_INDEX_MAX)
 }
 
+fn load_use_loc(cursor: &mut VersionedCursor) -> BinaryLoaderResult<UseLoc> {
+    let de_value: u64 = read_uleb_internal(cursor, LOCAL_INDEX_MAX)?;
+    Ok(de_value.into())
+}
+
 /// Module internal function that manages deserialization of transactions.
 fn deserialize_compiled_script(
     binary: &[u8],
@@ -1865,6 +1870,7 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             Opcodes::COPY_LOC => Bytecode::CopyLoc(load_local_index(cursor)?),
             Opcodes::MOVE_LOC => Bytecode::MoveLoc(load_local_index(cursor)?),
             Opcodes::ST_LOC => Bytecode::StLoc(load_local_index(cursor)?),
+            Opcodes::DROP_LOC => Bytecode::DropLoc(load_local_index(cursor)?),
             Opcodes::MUT_BORROW_LOC => Bytecode::MutBorrowLoc(load_local_index(cursor)?),
             Opcodes::IMM_BORROW_LOC => Bytecode::ImmBorrowLoc(load_local_index(cursor)?),
             Opcodes::MUT_BORROW_FIELD => Bytecode::MutBorrowField(load_field_handle_index(cursor)?),
@@ -1886,6 +1892,16 @@ fn load_code(cursor: &mut VersionedCursor, code: &mut Vec<Bytecode>) -> BinaryLo
             },
             Opcodes::IMM_BORROW_VARIANT_FIELD_GENERIC => {
                 Bytecode::ImmBorrowVariantFieldGeneric(load_variant_field_inst_index(cursor)?)
+            },
+            Opcodes::GET_FIELD_LOC => {
+                let local_idx = load_local_index(cursor)?;
+                let use_loc = load_use_loc(cursor)?;
+                let field_idx = load_field_handle_index(cursor)?;
+                Bytecode::GetFieldLoc((local_idx, use_loc), field_idx)
+            },
+            Opcodes::GET_FIELD => {
+                let field_idx = load_field_handle_index(cursor)?;
+                Bytecode::GetField(field_idx)
             },
             Opcodes::CALL => Bytecode::Call(load_function_handle_index(cursor)?),
             Opcodes::CALL_GENERIC => Bytecode::CallGeneric(load_function_inst_index(cursor)?),
@@ -2226,6 +2242,10 @@ impl Opcodes {
             0x65 => Ok(Opcodes::CAST_I128),
             0x66 => Ok(Opcodes::CAST_I256),
             0x67 => Ok(Opcodes::NEGATE),
+            // Experiments
+            0x68 => Ok(Opcodes::GET_FIELD),
+            0x69 => Ok(Opcodes::DROP_LOC),
+            0x70 => Ok(Opcodes::GET_FIELD_LOC),
             _ => Err(PartialVMError::new(StatusCode::UNKNOWN_OPCODE)
                 .with_message(format!("code {:X}", value))),
         }

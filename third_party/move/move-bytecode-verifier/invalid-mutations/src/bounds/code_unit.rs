@@ -500,6 +500,12 @@ impl<'a> ApplyCodeUnitBoundsContext<'a> {
                         // TODO(#13806): implement
                         panic!("Enum types bytecode NYI: {:?}", code[bytecode_idx])
                     },
+                    GetFieldLoc(_, _) => {
+                        unimplemented!()
+                    }
+                    GetField(_) => {
+                        unimplemented!()
+                    }
                     PackClosure(..) | PackClosureGeneric(..) | CallClosure(..) => {
                         // TODO(#15664): implement
                         panic!("Closure bytecode NYI: {:?}", code[bytecode_idx])
@@ -581,5 +587,8 @@ fn is_interesting(bytecode: &Bytecode) -> bool {
             // TODO(#13806): implement
             false
         },
+
+        GetFieldLoc(_, _) => false,
+        GetField(_) => false,
     }
 }

@@ -31,6 +31,7 @@ use move_binary_format::{
 };
 use move_core_types::{function::ClosureMask, vm_status::StatusCode};
 use std::collections::{BTreeSet, HashMap};
+use move_binary_format::file_format::UseLoc;
 
 struct ReferenceSafetyAnalysis<'a> {
     resolver: &'a BinaryIndexedView<'a>,
@@ -265,7 +266,14 @@ fn execute_inner(
         Bytecode::StLoc(local) => {
             state.st_loc(offset, *local, safe_unwrap!(verifier.stack.pop()))?
         },
-
+        Bytecode::DropLoc(local) => {
+            // MoveLoc
+            let value = state.move_loc(offset, *local)?;
+            // verifier.stack.push(value);
+            // Pop
+            // let value = safe_unwrap!(verifier.stack.pop());
+            state.release_value(value)
+        },
         Bytecode::FreezeRef => {
             let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
             let frozen = state.freeze_ref(offset, id)?;
@@ -336,6 +344,54 @@ fn execute_inner(
             )?;
             verifier.stack.push(value)
         },
+        Bytecode::GetFieldLoc((local, use_loc), field_handle_idx) => {
+            match use_loc {
+                UseLoc::Borrow => {
+                    let value = state.borrow_loc(offset, false, *local)?;
+                    verifier.stack.push(value);
+                },
+                UseLoc::Move => {
+                    let value = state.move_loc(offset, *local)?;
+                    verifier.stack.push(value);
+                },
+                UseLoc::Copy => {
+                    let value = state.copy_loc(offset, *local)?;
+                    verifier.stack.push(value);
+                }
+            };
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.borrow_field(
+                offset,
+                false,
+                id,
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::FieldIndex(*field_handle_idx),
+                )?,
+            )?;
+            verifier.stack.push(value);
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.read_ref(offset, id)?;
+            verifier.stack.push(value);
+        }
+        Bytecode::GetField(field_handle_idx) => {
+            // let value = state.borrow_loc(offset, false, *local_idx)?;
+            // verifier.stack.push(value);
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.borrow_field(
+                offset,
+                false,
+                id,
+                get_member_index(
+                    verifier,
+                    FieldOrVariantIndex::FieldIndex(*field_handle_idx),
+                )?,
+            )?;
+            verifier.stack.push(value);
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.read_ref(offset, id)?;
+            verifier.stack.push(value);
+        }
         Bytecode::ImmBorrowFieldGeneric(field_inst_index) => {
             let field_inst = verifier
                 .resolver

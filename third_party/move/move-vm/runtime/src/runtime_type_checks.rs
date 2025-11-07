@@ -6,6 +6,7 @@ use crate::{
     reentrancy_checker::CallType, Function, LoadedFunction,
 };
 use move_binary_format::{errors::*, file_format::Bytecode};
+use move_binary_format::file_format::UseLoc;
 use move_core_types::{
     ability::{Ability, AbilitySet},
     function::ClosureMask,
@@ -334,12 +335,15 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Bytecode::LdConst(_)
             | Bytecode::CopyLoc(_)
             | Bytecode::MoveLoc(_)
+            | Bytecode::DropLoc(_)
             | Bytecode::MutBorrowLoc(_)
             | Bytecode::ImmBorrowLoc(_)
             | Bytecode::ImmBorrowField(_)
             | Bytecode::MutBorrowField(_)
             | Bytecode::ImmBorrowFieldGeneric(_)
             | Bytecode::MutBorrowFieldGeneric(_)
+            | Bytecode::GetFieldLoc(_, _)
+            | Bytecode::GetField(_)
             | Bytecode::PackClosure(..)
             | Bytecode::PackClosureGeneric(..)
             | Bytecode::Pack(_)
@@ -513,6 +517,12 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 let ty = frame.local_ty_at(*idx as usize).clone();
                 operand_stack.push_ty(ty)?;
             },
+            Bytecode::DropLoc(idx) => {
+                let ty = frame.local_ty_at(*idx as usize).clone();
+                // operand_stack.push_ty(ty)?;
+                // let ty = operand_stack.pop_ty()?;
+                ty.paranoid_check_has_ability(Ability::Drop)?;
+            },
             Bytecode::StLoc(_) => (),
             Bytecode::MutBorrowLoc(idx) => {
                 let ty = frame.local_ty_at(*idx as usize);
@@ -582,6 +592,84 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Bytecode::PackClosure(..) | Bytecode::PackClosureGeneric(..) => {
                 // Skip: runtime checks are implemented in interpreter loop!
+            },
+
+            Bytecode::GetFieldLoc((idx, use_loc), field_handle_idx) => {
+                // ImmBorrowLoc
+                let ref_ty = match use_loc {
+                    UseLoc::Borrow => {
+                        let ty = frame.local_ty_at(*idx as usize);
+                        let ref_ty = ty_builder.create_ref_ty(ty, false)?;
+                        ref_ty
+                        // operand_stack.push_ty(ref_ty)?;
+                    },
+                    UseLoc::Move => {
+                        let ty = frame.local_ty_at(*idx as usize).clone();
+                        ty
+                        // operand_stack.push_ty(ty)?;
+                    },
+                    UseLoc::Copy => {
+                        let ty = frame.local_ty_at(*idx as usize).clone();
+                        ty.paranoid_check_has_ability(Ability::Copy)?;
+                        ty
+                        // operand_stack.push_ty(ty)?;
+                    }
+                };
+                // ImmBorrowField
+                // let ref_ty = operand_stack.pop_ty()?;
+                let expected_ty = frame.field_handle_to_struct(*field_handle_idx);
+                ref_ty.paranoid_check_ref_eq(&expected_ty, false)?;
+
+                let field_ty = frame.get_field_ty(*field_handle_idx)?;
+
+                let inner_ty = ty_builder.clone_checking_ty_size(field_ty, 2)
+                    .map_err(|e| {
+                        e.append_message_with_separator(
+                            '.',
+                            format!(
+                                "Failed to create a (mutable: {}) reference type with inner type {}",
+                                false, field_ty
+                            ),
+                        )
+                    })?;
+                inner_ty.paranoid_check_has_ability(Ability::Copy)?;
+
+                // let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+                // // operand_stack.push_ty(field_ref_ty)?;
+                // // ReadRef
+                // // let field_ref_ty = operand_stack.pop_ty()?;
+                // let inner_ty = field_ref_ty.paranoid_read_ref()?;
+                operand_stack.push_ty(inner_ty)?;
+            }
+
+            Bytecode::GetField(field_handle_idx) => {
+                // ImmBorrowField
+                let ty = operand_stack.pop_ty()?;
+                let expected_ty = frame.field_handle_to_struct(*field_handle_idx);
+                ty.paranoid_check_ref_eq(&expected_ty, false)?;
+
+                let field_ty = frame.get_field_ty(*field_handle_idx)?;
+
+                // let field_ref_ty = ty_builder.create_ref_ty(field_ty, false)?;
+
+                let inner_ty = ty_builder.clone_checking_ty_size(field_ty, 2)
+                    .map_err(|e| {
+                        e.append_message_with_separator(
+                            '.',
+                            format!(
+                                "Failed to create a (mutable: {}) reference type with inner type {}",
+                                false, field_ty
+                            ),
+                        )
+                    })?;
+                inner_ty.paranoid_check_has_ability(Ability::Copy)?;
+                // let inner_ty = inner_ty.as_ref().clone();
+
+                // operand_stack.push_ty(field_ref_ty)?;
+                // ReadRef
+                // let field_ref_ty = operand_stack.pop_ty()?;
+                // let inner_ty = field_ref_ty.paranoid_read_ref()?;
+                operand_stack.push_ty(inner_ty)?;
             },
 
             Bytecode::Pack(idx) => {

@@ -796,15 +796,15 @@ impl Type {
                 "Unexpected TyParam type after translating from TypeTag to Type".to_string(),
             )),
 
-            Type::Vector(ty) => {
-                AbilitySet::polymorphic_abilities(AbilitySet::VECTOR, vec![false], vec![
-                    ty.abilities()?
-                ])
-                .map_err(|e| {
-                    PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
-                        .with_message(e.to_string())
-                })
-            },
+            Type::Vector(ty) => AbilitySet::polymorphic_abilities(
+                AbilitySet::VECTOR,
+                vec![false],
+                vec![ty.abilities()?],
+            )
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION)
+                    .with_message(e.to_string())
+            }),
             Type::Struct { ability, .. } => Ok(ability.base_ability_set),
             Type::StructInstantiation {
                 ty_args,
@@ -1192,7 +1192,7 @@ impl TypeBuilder {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
+    pub fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
         if *count >= self.max_ty_size {
             return Err(
                 PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
@@ -1296,7 +1296,30 @@ impl TypeBuilder {
         )
     }
 
-    fn clone_impl<G>(
+    pub fn clone_checking_ty_size(&self, ty: &Type, initial_depth: u64) -> PartialVMResult<Type> {
+        let mut count = 1;
+        let check = |c: &mut u64, d: u64| self.check(c, d);
+        Self::apply_subst(
+            ty,
+            |idx, _, _| {
+                // The type cannot contain type parameters anymore (it also does not make
+                // sense to have them!), and so it is the caller's responsibility to ensure
+                // type substitution has been performed.
+                Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!(
+                        "There is an unresolved type parameter (index: {}) when cloning type {}",
+                        idx, ty
+                    )),
+                )
+            },
+            &mut count,
+            initial_depth,
+            check,
+        )
+    }
+
+    pub fn clone_impl<G>(
         &self,
         ty: &Type,
         count: &mut u64,

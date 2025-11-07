@@ -19,6 +19,7 @@ use move_binary_format::{
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
 };
+use move_binary_format::file_format::UseLoc;
 use move_core_types::{ability::AbilitySet, function::ClosureMask, vm_status::StatusCode};
 
 struct Locals<'a> {
@@ -762,6 +763,71 @@ fn verify_instr(
             )?
         },
 
+        Bytecode::GetFieldLoc((local_idx, use_loc), field_handle_idx) => {
+            match use_loc {
+                UseLoc::Borrow => {
+                    borrow_loc(verifier, meter, offset, false, *local_idx)?;
+                },
+                UseLoc::Copy => {
+                    let local_signature = verifier.local_at(*local_idx).clone();
+                    if !verifier
+                        .resolver
+                        .abilities(&local_signature, verifier.function_view.type_parameters())?
+                        .has_copy()
+                    {
+                        return Err(verifier.error(StatusCode::COPYLOC_WITHOUT_COPY_ABILITY, offset));
+                    }
+                    verifier.push(meter, local_signature)?
+                },
+                UseLoc::Move => {
+                    let local_signature = verifier.local_at(*local_idx).clone();
+                    verifier.push(meter, local_signature)?;
+                }
+            }
+            borrow_field(
+                verifier,
+                meter,
+                offset,
+                false,
+                FieldOrVariantIndex::FieldIndex(*field_handle_idx),
+                &Signature(vec![]),
+            )?;
+            let operand = safe_unwrap!(verifier.stack.pop());
+            match operand {
+                ST::Reference(inner) | ST::MutableReference(inner) => {
+                    if !verifier.abilities(&inner)?.has_copy() {
+                        return Err(
+                            verifier.error(StatusCode::READREF_WITHOUT_COPY_ABILITY, offset)
+                        );
+                    }
+                    verifier.push(meter, *inner)?;
+                },
+                _ => return Err(verifier.error(StatusCode::READREF_TYPE_MISMATCH_ERROR, offset)),
+            };
+        },
+        Bytecode::GetField(field_handle_idx) => {
+            borrow_field(
+                verifier,
+                meter,
+                offset,
+                false,
+                FieldOrVariantIndex::FieldIndex(*field_handle_idx),
+                &Signature(vec![]),
+            )?;
+            let operand = safe_unwrap!(verifier.stack.pop());
+            match operand {
+                ST::Reference(inner) | ST::MutableReference(inner) => {
+                    if !verifier.abilities(&inner)?.has_copy() {
+                        return Err(
+                            verifier.error(StatusCode::READREF_WITHOUT_COPY_ABILITY, offset)
+                        );
+                    }
+                    verifier.push(meter, *inner)?;
+                },
+                _ => return Err(verifier.error(StatusCode::READREF_TYPE_MISMATCH_ERROR, offset)),
+            };
+        },
+
         Bytecode::LdU8(_) => {
             verifier.push(meter, ST::U8)?;
         },
@@ -834,6 +900,20 @@ fn verify_instr(
         Bytecode::MoveLoc(idx) => {
             let local_signature = verifier.local_at(*idx).clone();
             verifier.push(meter, local_signature)?
+        },
+
+        Bytecode::DropLoc(idx) => {
+            // MoveLoc
+            let operand = verifier.local_at(*idx).clone();
+            // verifier.push(meter, operand)?;
+            // Pop
+            // let operand = safe_unwrap!(verifier.stack.pop());
+            let abilities = verifier
+                .resolver
+                .abilities(&operand, verifier.function_view.type_parameters());
+            if !abilities?.has_drop() {
+                return Err(verifier.error(StatusCode::POP_WITHOUT_DROP_ABILITY, offset));
+            }
         },
 
         Bytecode::MutBorrowLoc(idx) => borrow_loc(verifier, meter, offset, true, *idx)?,

@@ -117,6 +117,7 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::Ret
             | Bytecode::StLoc(_)
             | Bytecode::MoveLoc(_)
+            | Bytecode::DropLoc(_)
             | Bytecode::CopyLoc(_)
             | Bytecode::ImmBorrowLoc(_)
             | Bytecode::MutBorrowLoc(_)
@@ -129,6 +130,8 @@ impl<'a> AcquiresVerifier<'a> {
             | Bytecode::MutBorrowVariantFieldGeneric(_)
             | Bytecode::ImmBorrowVariantField(_)
             | Bytecode::ImmBorrowVariantFieldGeneric(_)
+            | Bytecode::GetFieldLoc(_, _)
+            | Bytecode::GetField(_)
             | Bytecode::LdU8(_)
             | Bytecode::LdU16(_)
             | Bytecode::LdU32(_)
