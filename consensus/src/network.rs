@@ -29,7 +29,7 @@ use aptos_consensus_types::{
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
     proof_of_store::{
-        BatchInfo, ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg,
+        BatchInfo, BatchInfoExt, ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg,
     },
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
@@ -212,9 +212,14 @@ pub trait QuorumStoreSender: Send + Clone {
 
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore<BatchInfo>>);
 
+    async fn broadcast_proof_of_store_msg_v2(
+        &mut self,
+        proof_of_stores: Vec<ProofOfStore<BatchInfoExt>>,
+    );
+
     async fn send_proof_of_store_msg_to_self(
         &mut self,
-        proof_of_stores: Vec<ProofOfStore<BatchInfo>>,
+        proof_of_stores: Vec<ProofOfStore<BatchInfoExt>>,
     );
 }
 
@@ -582,9 +587,15 @@ impl QuorumStoreSender for NetworkSender {
         self.broadcast(msg).await
     }
 
-    async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore<BatchInfo>>) {
+    async fn broadcast_proof_of_store_msg_v2(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
         fail_point!("consensus::send::proof_of_store", |_| ());
-        let msg = ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proofs)));
+        let msg = ConsensusMsg::ProofOfStoreMsgV2(Box::new(ProofOfStoreMsg::new(proofs)));
+        self.broadcast(msg).await
+    }
+
+    async fn send_proof_of_store_msg_to_self(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
+        fail_point!("consensus::send::proof_of_store", |_| ());
+        let msg = ConsensusMsg::ProofOfStoreMsgV2(Box::new(ProofOfStoreMsg::new(proofs)));
         self.send(msg, vec![self.author]).await
     }
 }
