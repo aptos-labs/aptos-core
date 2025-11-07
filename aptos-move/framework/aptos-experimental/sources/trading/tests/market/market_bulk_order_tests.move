@@ -317,14 +317,14 @@ module aptos_experimental::market_bulk_order_tests {
             sequence_number,
             market.get_market_address(),
             maker_addr,
-            vector[], // bid_sizes - empty after cancellation
             vector[], // bid_prices - empty after cancellation
-            vector[], // ask_sizes - empty after cancellation
+            vector[], // bid_sizes - empty after cancellation
             vector[], // ask_prices - empty after cancellation
-            vector[bid_size], // cancelled_bid_sizes - the original bid SIZE (50)
+            vector[], // ask_sizes - empty after cancellation
             vector[bid_price], // cancelled_bid_prices - the original bid PRICE (100)
-            vector[ask_size], // cancelled_ask_sizes - the original ask SIZE (60)
+            vector[bid_size], // cancelled_bid_sizes - the original bid SIZE (50)
             vector[ask_price], // cancelled_ask_prices - the original ask PRICE (110)
+            vector[ask_size], // cancelled_ask_sizes - the original ask SIZE (60)
             sequence_number, // previous_seq_num - same as sequence_number for cancellation
         );
 

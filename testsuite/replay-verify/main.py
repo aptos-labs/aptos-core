@@ -409,6 +409,9 @@ class ReplayScheduler:
             list(r) for r in sorted(self.ranges_to_skip) if r[1] >= self.start_version
         ]
 
+        if len(sorted_skips) == 0:
+            return []
+
         # merge skip ranges
         ret = []
         current_skip = sorted_skips.pop(0)

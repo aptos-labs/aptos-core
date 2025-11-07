@@ -17,21 +17,20 @@ use ark_std::rand::thread_rng;
 use std::fmt::Debug;
 
 #[cfg(test)]
-pub fn test_sigma_protocol<E, P>(instance: P, witness: P::Domain)
+pub fn test_sigma_protocol<E, H>(hom: H, witness: H::Domain)
 where
     E: Pairing,
-    P: sigma_protocol::Trait<E>,
+    H: sigma_protocol::Trait<E>,
 {
     let mut rng = thread_rng();
 
-    let statement = instance.apply(&witness);
+    let statement = hom.apply(&witness);
 
     let mut prover_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    let proof = instance.prove(&witness, &statement, &mut prover_transcript, &mut rng);
+    let proof = hom.prove(&witness, &statement, &mut prover_transcript, &mut rng);
 
     let mut verifier_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    instance
-        .verify(&statement, &proof, &mut verifier_transcript)
+    hom.verify(&statement, &proof, &mut verifier_transcript)
         .expect("Sigma protocol proof failed verification");
 }
 
@@ -40,15 +39,17 @@ mod schnorr {
     use ark_ec::VariableBaseMSM;
     use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 
-    #[derive(Clone, Debug)]
+    #[allow(non_snake_case)]
+    #[derive(CanonicalSerialize, Clone, Debug)]
     pub(crate) struct Schnorr<E: Pairing> {
-        pub g: E::G1Affine,
+        pub G: E::G1Affine,
     }
 
+    // E::G1Affine doesn't seem to implement Default, otherwise it would've been derived for Schnorr
     impl<E: Pairing> Default for Schnorr<E> {
         fn default() -> Self {
             Self {
-                g: E::G1::generator().into_affine(),
+                G: E::G1::generator().into_affine(),
             }
         }
     }
@@ -74,7 +75,7 @@ mod schnorr {
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
             CodomainShape(fixed_base_msms::MsmInput {
-                bases: vec![self.g],
+                bases: vec![self.G],
                 scalars: vec![input.0],
             })
         }
@@ -97,12 +98,13 @@ mod chaum_pedersen {
     pub type ChaumPedersen<E> = TupleHomomorphism<Schnorr<E>, Schnorr<E>>;
 
     // Implementing e.g. Default here would require a wrapper, but then sigma_protocol::Trait would have to get re-implemented...
+    #[allow(non_snake_case)]
     pub fn make_chaum_pedersen_instance<E: Pairing>() -> ChaumPedersen<E> {
-        let g1 = E::G1::generator().into_affine();
-        let g2 = (g1 * E::ScalarField::from(123456789u64)).into_affine();
+        let G_1 = E::G1::generator().into_affine();
+        let G_2 = (G_1 * E::ScalarField::from(123456789u64)).into_affine();
 
-        let schnorr1 = Schnorr { g: g1 };
-        let schnorr2 = Schnorr { g: g2 };
+        let schnorr1 = Schnorr { G: G_1 };
+        let schnorr2 = Schnorr { G: G_2 };
 
         TupleHomomorphism {
             hom1: schnorr1,

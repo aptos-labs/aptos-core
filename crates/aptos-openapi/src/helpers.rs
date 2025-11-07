@@ -177,10 +177,11 @@ mod test {
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
 
-    #[derive(Debug, Deserialize, Serialize)]
-    struct This {
-        value: String,
-    }
+    // Temporarily commented out to suppress dead code warning for Rust 1.90.0 upgrade
+    // #[derive(Debug, Deserialize, Serialize)]
+    // struct This {
+    //     value: String,
+    // }
 
     #[derive(Debug, Deserialize, Serialize)]
     struct That(pub String);
@@ -193,7 +194,8 @@ mod test {
         }
     }
 
-    impl_poem_type!(This, "string", ());
+    // Temporarily commented out to suppress dead code warning for Rust 1.90.0 upgrade
+    // impl_poem_type!(This, "string", ());
     impl_poem_type!(That, "string", ());
     impl_poem_parameter!(That);
 

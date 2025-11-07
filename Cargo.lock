@@ -1088,8 +1088,10 @@ dependencies = [
  "ark-ff 0.5.0",
  "ark-groth16",
  "ark-poly 0.5.0",
+ "ark-relations",
  "ark-serialize 0.4.2",
  "ark-serialize 0.5.0",
+ "ark-snark",
  "ark-std 0.5.0",
  "base64 0.13.1",
  "bcs 0.1.4",
@@ -1112,6 +1114,7 @@ dependencies = [
  "group",
  "hex",
  "hkdf 0.10.0",
+ "itertools 0.13.0",
  "libsecp256k1",
  "merlin",
  "more-asserts",
@@ -1374,6 +1377,7 @@ dependencies = [
  "blst",
  "blstrs",
  "criterion",
+ "derive_more 0.99.17",
  "ff",
  "group",
  "hex",
@@ -4944,6 +4948,7 @@ dependencies = [
  "once_cell",
  "serde",
  "sha3 0.9.1",
+ "triomphe",
 ]
 
 [[package]]
@@ -5027,6 +5032,7 @@ dependencies = [
  "bcs 0.1.4",
  "bytes",
  "claims",
+ "derivative",
  "either",
  "move-binary-format",
  "move-core-types",
@@ -9595,6 +9601,7 @@ dependencies = [
 name = "fuzzer-fuzz"
 version = "0.0.0"
 dependencies = [
+ "aptos-block-executor",
  "aptos-cached-packages",
  "aptos-consensus",
  "aptos-crypto",
@@ -9613,6 +9620,7 @@ dependencies = [
  "move-bytecode-verifier",
  "move-core-types",
  "move-transactional-test-runner",
+ "move-vm-runtime",
  "move-vm-types",
  "once_cell",
  "rayon",
@@ -13054,6 +13062,7 @@ dependencies = [
  "ambassador",
  "anyhow",
  "better_any",
+ "bitvec",
  "bytes",
  "cfg-if",
  "claims",

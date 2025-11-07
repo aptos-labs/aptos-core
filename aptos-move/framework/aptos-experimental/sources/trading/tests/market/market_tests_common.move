@@ -97,7 +97,7 @@ module aptos_experimental::market_tests_common {
         ask_prices: vector<u64>,
         ask_sizes: vector<u64>,
     ): Option<OrderIdType> {
-        market_bulk_order::place_bulk_order(
+        let order_id = market_bulk_order::place_bulk_order(
             market,
             signer::address_of(maker),
             1, // sequence number for tests
@@ -107,7 +107,8 @@ module aptos_experimental::market_tests_common {
             ask_sizes,
             clearinghouse_test::new_test_order_metadata(1),
             &test_market_callbacks()
-        )
+        );
+        option::some(order_id)
     }
 
     // Helper function to place a taker order that fully fills

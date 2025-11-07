@@ -7,7 +7,7 @@ use crate::{
     algebra::{polynomials, GroupGenerators},
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
-    sigma_protocol::{self, homomorphism, homomorphism::Trait as HomomorphismTrait, Trait},
+    sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
     utils, Scalar,
 };
 use aptos_crypto::arkworks;
@@ -29,7 +29,7 @@ use std::{fmt::Debug, io::Write};
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
-    Cj: Vec<E::G1>,
+    Cs: Vec<E::G1>,
     D: E::G1,
     a: E::ScalarField,
     a_h: E::ScalarField,
@@ -37,15 +37,12 @@ pub struct Proof<E: Pairing> {
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(pub(crate) E::G1);
-
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProverKey<E: Pairing> {
-    vk: VerificationKey<E>,
+    pub(crate) vk: VerificationKey<E>,
     pub(crate) ck_S: univariate_hiding_kzg::CommitmentKey<E>,
-    max_n: usize,
+    pub(crate) max_n: usize,
     pub(crate) prover_precomputed: ProverPrecomputed<E>,
 }
 
@@ -53,7 +50,7 @@ pub struct ProverKey<E: Pairing> {
 pub struct PublicStatement<E: Pairing> {
     n: usize,
     ell: usize,
-    comm: Commitment<E>,
+    comm: univariate_hiding_kzg::Commitment<E>,
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -80,15 +77,21 @@ impl<E: Pairing> CanonicalSerialize for ProverPrecomputed<E> {
         self.powers_of_two
             .len()
             .serialize_with_mode(&mut writer, compress)?;
-        self.h_denom_eval[0].serialize_with_mode(&mut writer, compress)?;
+        let triangular_number = self.h_denom_eval[0]
+            .inverse()
+            .expect("Could not invert h_denom_eval[0]");
+        let num_omegas = floored_triangular_root(
+            arkworks::scalar_to_u32(&triangular_number)
+                .expect("triangular number did not fit in u32") as usize,
+        ) + 1;
+        num_omegas.serialize_with_mode(&mut writer, compress)?;
 
         Ok(())
     }
 
     fn serialized_size(&self, compress: Compress) -> usize {
         let mut size = 0;
-        size += self.powers_of_two.len().serialized_size(compress);
-        size += self.powers_of_two[0].serialized_size(compress);
+        size += 2 * self.powers_of_two.len().serialized_size(compress); // `num_omegas` is also a usize
         size
     }
 }
@@ -100,15 +103,11 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
         validate: Validate,
     ) -> Result<Self, SerializationError> {
         let powers_len = usize::deserialize_with_mode(&mut reader, compress, validate)?;
-        let first_h_denom_eval =
-            E::ScalarField::deserialize_with_mode(&mut reader, compress, validate)?;
-        let first_h_denom_eval_as_u32 = arkworks::scalar_to_u32(&first_h_denom_eval)
-            .expect("first_h_denom_eval did not fit in u32!");
+        let num_omegas = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
-        let powers_of_two = arkworks::powers_of_two::<E>(powers_len);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(powers_len);
 
-        let max_n = floored_triangular_root(first_h_denom_eval_as_u32 as usize);
-        let roots_of_unity = arkworks::compute_roots_of_unity::<E>(max_n);
+        let roots_of_unity = arkworks::compute_roots_of_unity::<E::ScalarField>(num_omegas);
         let h_denom_eval = compute_h_denom_eval::<E>(&roots_of_unity);
 
         Ok(Self {
@@ -118,7 +117,7 @@ impl<E: Pairing> CanonicalDeserialize for ProverPrecomputed<E> {
     }
 }
 
-// Required by CanonicalDeserialize
+// Required by `CanonicalDeserialize`
 impl<E: Pairing> Valid for ProverPrecomputed<E> {
     #[inline]
     fn check(&self) -> Result<(), SerializationError> {
@@ -168,8 +167,8 @@ impl<E: Pairing> CanonicalDeserialize for VerifierPrecomputed<E> {
         let num_omegas = usize::deserialize_with_mode(&mut reader, compress, validate)?;
         let max_ell = usize::deserialize_with_mode(&mut reader, compress, validate)?;
 
-        let roots_of_unity = arkworks::compute_roots_of_unity::<E>(num_omegas);
-        let powers_of_two = arkworks::powers_of_two::<E>(max_ell);
+        let roots_of_unity = arkworks::compute_roots_of_unity::<E::ScalarField>(num_omegas);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell);
 
         // Reconstruct the VerificationKey
         Ok(Self {
@@ -187,7 +186,6 @@ impl<E: Pairing> Valid for VerifierPrecomputed<E> {
     }
 }
 
-#[allow(non_snake_case)]
 fn compute_h_denom_eval<E: Pairing>(
     roots_of_unity_in_eval_dom: &Vec<E::ScalarField>,
 ) -> Vec<E::ScalarField> {
@@ -210,9 +208,9 @@ fn compute_h_denom_eval<E: Pairing>(
 }
 
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
-    type Commitment = Commitment<E>;
+    type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
-    type CommitmentRandomness = E::ScalarField;
+    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
@@ -243,7 +241,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         let h_denom_eval = compute_h_denom_eval::<E>(&ck_S.roots_of_unity_in_eval_dom);
 
-        let powers_of_two = arkworks::powers_of_two::<E>(max_ell);
+        let powers_of_two = arkworks::powers_of_two::<E::ScalarField>(max_ell);
 
         let prover_precomputed = ProverPrecomputed {
             powers_of_two: powers_of_two.clone(),
@@ -276,18 +274,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ck_S: &Self::CommitmentKey,
         values: &[Self::Input],
         rho: &Self::CommitmentRandomness,
-    ) -> Commitment<E> {
+    ) -> Self::Commitment {
         let mut values_shifted = vec![E::ScalarField::ZERO]; // start with 0,
         values_shifted.extend(values); // then append all values from the original vector
 
-        let hiding_kzg_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-            lagr_g1: &ck_S.lagr_g1,
-            xi_1: ck_S.xi_1,
-        };
-
-        let hiding_kzg_input = (*rho, values_shifted);
-
-        Commitment(hiding_kzg_hom.apply(&hiding_kzg_input).0)
+        univariate_hiding_kzg::commit_with_randomness(ck_S, &values_shifted, rho)
     }
 
     #[allow(non_snake_case)]
@@ -320,7 +311,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             n,
             max_n
         );
-        // TODO: Use a subdomain to make the FFTs smaller
+        // TODO: Use a subdomain to make the FFTs smaller, when n is much smaller than max_n
         assert!(
             ell <= max_ell,
             "ell (got {}) must be ≤ max_ell (which is {})",
@@ -408,17 +399,20 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             lagr_g1,
             xi_1: *xi_1,
         };
-        let Cj: Vec<_> = f_js_evals
+        let Cs: Vec<_> = f_js_evals
             .iter()
             .zip(rhos.iter())
             .map(|(f_j, rho)| {
-                let hkzg_commit_input = (*rho, f_j.clone());
+                let hkzg_commit_input = univariate_hiding_kzg::Witness {
+                    hiding_randomness: Scalar(*rho),
+                    values: Scalar::vec_from_inner_slice(f_j),
+                };
                 hkzg_commitment_hom.apply(&hkzg_commit_input).0
             })
             .collect();
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cj);
+        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
 
         // Step 6
         let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
@@ -474,7 +468,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 let sum_betas_term: E::ScalarField = betas
                     .iter()
                     .zip(&rs)
-                    .map(|(beta_j, r_j)| *beta_j * r_j * (*r_j - E::ScalarField::ONE))
+                    .map(|(&beta_j, r_j)| beta_j * r_j * (*r_j - E::ScalarField::ONE))
                     .sum();
 
                 let numerator = beta * (r - sum_pow2_rs) + sum_betas_term;
@@ -517,8 +511,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         };
 
         let rho_h = E::ScalarField::rand(rng);
-        let D = hkzg_commitment_hom.apply(&(rho_h, h_evals.clone())).0;
-
+        let D = hkzg_commitment_hom
+            .apply(&univariate_hiding_kzg::Witness {
+                hiding_randomness: Scalar(rho_h),
+                values: Scalar::vec_from_inner_slice(&h_evals),
+            })
+            .0;
         // Step 7b
         fiat_shamir::append_h_commitment::<E>(fs_t, &D);
 
@@ -566,7 +564,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         // Step 10
         let s = E::ScalarField::rand(rng);
 
-        let rho_u = mu * (*rho + delta_rho)
+        let rho_u = mu * (rho.0 + delta_rho)
             + mu_h * rho_h
             + mus
                 .iter()
@@ -592,7 +590,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         Proof {
             hatC,
             pi_PoK,
-            Cj,
+            Cs,
             D,
             a,
             a_h,
@@ -628,7 +626,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let Proof {
             hatC,
             pi_PoK,
-            Cj,
+            Cs,
             D,
             a,
             a_h,
@@ -657,7 +655,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_sigma_proof(fs_t, &pi_PoK);
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cj);
+        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
 
         // Step 5
         let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
@@ -670,10 +668,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 8
         let U_bases: Vec<E::G1Affine> = {
-            let mut v = Vec::with_capacity(2 + Cj.len());
+            let mut v = Vec::with_capacity(2 + Cs.len());
             v.push(*hatC);
             v.push(*D);
-            v.extend_from_slice(&Cj);
+            v.extend_from_slice(&Cs);
             E::G1::normalize_batch(&v)
         };
 
@@ -785,9 +783,9 @@ mod fiat_shamir {
     #[allow(non_snake_case)]
     pub(crate) fn append_f_j_commitments<E: Pairing>(
         fs_transcript: &mut Transcript,
-        Cj: &Vec<E::G1>,
+        Cs: &Vec<E::G1>,
     ) {
-        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cj);
+        <Transcript as RangeProof<E, Proof<E>>>::append_f_j_commitments(fs_transcript, Cs);
     }
 
     pub(crate) fn get_beta_challenges<E: Pairing>(
@@ -929,7 +927,7 @@ fn floored_triangular_root(a: usize) -> usize {
 }
 
 #[cfg(test)]
-mod test_invert_triangular_number {
+mod test_floored_triangular_root {
     use super::floored_triangular_root;
 
     #[test]

@@ -1,0 +1,22 @@
+//# publish
+module 0x22::test
+
+fun loop(x: u64)
+l1: copy_loc x
+    ld_u64 0
+    gt
+    br_false l2
+    copy_loc x
+    ld_u64 1
+    sub
+    st_loc x
+    branch l1
+l2: ret
+
+//# run --verbose 0x22::test::loop --args 0u64 --display-trace
+
+//# run --verbose 0x22::test::loop --args 1u64 --display-trace
+
+//# run --verbose 0x22::test::loop --args 2u64 --display-trace
+
+//# run --verbose 0x22::test::loop --args 3u64 --display-trace

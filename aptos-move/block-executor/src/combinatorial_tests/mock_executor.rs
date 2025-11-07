@@ -49,6 +49,7 @@ use move_core_types::{
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
+use move_vm_runtime::execution_tracing::Trace;
 use move_vm_types::delayed_values::delayed_field_id::DelayedFieldID;
 use once_cell::sync::OnceCell;
 use std::{
@@ -756,13 +757,13 @@ where
         aggregator_v1_writes: Vec<(K, WriteOp)>,
         patched_resource_write_set: Vec<(K, ValueType)>,
         _patched_events: Vec<E>,
-    ) -> Result<(), PanicError> {
+    ) -> Result<Trace, PanicError> {
         assert_ok!(self
             .patched_resource_write_set
             .set(patched_resource_write_set.clone().into_iter().collect()));
         assert_ok!(self.materialized_delta_writes.set(aggregator_v1_writes));
         // TODO: Also test patched events.
-        Ok(())
+        Ok(Trace::empty())
     }
 
     fn set_txn_output_for_non_dynamic_change_set(&mut self) {
@@ -966,7 +967,11 @@ where
     type Output = MockOutput<K, E>;
     type Txn = MockTransaction<K, E>;
 
-    fn init(_environment: &AptosEnvironment, _state_view: &impl TStateView<Key = K>) -> Self {
+    fn init(
+        _environment: &AptosEnvironment,
+        _state_view: &impl TStateView<Key = K>,
+        _async_runtime_checks_enabled: bool,
+    ) -> Self {
         Self::new()
     }
 

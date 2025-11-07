@@ -3,7 +3,10 @@
 
 use crate::{
     algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::{traits, traits::SecretSharingConfig, Player, ThresholdConfigBlstrs},
+    pvss::{
+        traits::{self, SecretSharingConfig, ThresholdConfig},
+        Player, ThresholdConfigBlstrs,
+    },
 };
 use anyhow::anyhow;
 use more_asserts::assert_lt;
@@ -32,6 +35,16 @@ pub struct WeightedConfig {
     max_weight: usize,
     /// The minimum weight of any player.
     min_weight: usize,
+}
+
+impl ThresholdConfig for WeightedConfig {
+    fn new(_t: usize, _n: usize) -> anyhow::Result<Self> {
+        panic!("This shouldn't be used here?") // So maybe something more general than ThresholdConfig should be made, which only has get_threshold
+    }
+
+    fn get_threshold(&self) -> usize {
+        self.tc.get_threshold()
+    }
 }
 
 impl WeightedConfig {

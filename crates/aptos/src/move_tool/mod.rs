@@ -898,14 +898,11 @@ impl FromStr for IncludedArtifacts {
 }
 
 impl IncludedArtifacts {
-    pub(crate) fn build_options(
-        self,
-        move_options: &MovePackageOptions,
-    ) -> CliTypedResult<BuildOptions> {
+    pub fn build_options(self, move_options: &MovePackageOptions) -> CliTypedResult<BuildOptions> {
         self.build_options_with_experiments(move_options, vec![], false)
     }
 
-    pub(crate) fn build_options_with_experiments(
+    pub fn build_options_with_experiments(
         self,
         move_options: &MovePackageOptions,
         mut more_experiments: Vec<String>,

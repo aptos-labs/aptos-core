@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{
+    CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
+};
 use std::fmt::Debug;
 
 pub mod fixed_base_msms;
@@ -14,7 +16,10 @@ pub mod tuple;
 ///
 /// In the context of sigma protocols, homomorphisms are the key building blocks:
 /// they capture the algebraic relations that proofs are designed to demonstrate.
-pub trait Trait {
+///
+/// CanonicalSerialize is added here so its parameters (which will be MSM bases)
+/// can be used for Fiat-Shamir challenges.
+pub trait Trait: CanonicalSerialize {
     type Domain;
     type Codomain;
 
@@ -39,14 +44,34 @@ pub trait Trait {
 /// lets `h` act on the first component of the pair, so `(h ∘ π)(x,y) = h(x)`.
 ///
 /// Naturally this method immediately extends to composing arbitrary homomorphisms,
-/// but we don't need that formalism for now.
-#[derive(Debug)]
+/// but we don't need that formalism for now. We are not deriving Eq here because
+/// function pointer comparisons do not seem useful in this context.
+#[derive(Debug, Clone)]
 pub struct LiftHomomorphism<H, LargerDomain>
 where
     H: Trait,
 {
     pub hom: H,
     pub projection: fn(&LargerDomain) -> H::Domain,
+}
+
+// We only care about the "bases" that are being used to define the homomorphism, so in serializing
+// we ignore `projection` entirely
+impl<H, LargerDomain> CanonicalSerialize for LiftHomomorphism<H, LargerDomain>
+where
+    H: Trait,
+{
+    fn serialize_with_mode<W: Write>(
+        &self,
+        mut writer: W,
+        compress: Compress,
+    ) -> Result<(), SerializationError> {
+        self.hom.serialize_with_mode(&mut writer, compress)
+    }
+
+    fn serialized_size(&self, compress: Compress) -> usize {
+        self.hom.serialized_size(compress)
+    }
 }
 
 /// Implements `Homomorphism` for `LiftHomomorphism` by composing

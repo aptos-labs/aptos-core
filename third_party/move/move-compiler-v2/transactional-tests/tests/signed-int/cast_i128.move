@@ -82,7 +82,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 170141183460469231731687303715884105728u128;
-   let v2 = v0 as i128; // expect to abort
+   let _v2 = v0 as i128; // expect to abort
 }
 }
 
@@ -90,7 +90,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 170141183460469231731687303715884105728u256;
-   let v2 = v0 as i128; // expect to abort
+   let _v2 = v0 as i128; // expect to abort
 }
 }
 
@@ -100,7 +100,7 @@ fun main() {
 script {
 fun main() {
    let v0 = 170141183460469231731687303715884105728i256;
-   let v2 = v0 as i128; // expect to abort
+   let _v2 = v0 as i128; // expect to abort
 }
 }
 
@@ -110,6 +110,6 @@ fun main() {
 script {
 fun main() {
    let v0 = -170141183460469231731687303715884105729i256;
-   let v2 = v0 as i128; // expect to abort
+   let _v2 = v0 as i128; // expect to abort
 }
 }
