@@ -48,7 +48,7 @@
 //! does not hold.
 
 use crate::pvss::{
-    traits::{Convert, HasEncryptionPublicParams, Reconstructable, SecretSharingConfig},
+    traits::{Convert, HasEncryptionPublicParams, Reconstructable},
     Player,
 };
 use anyhow::bail;
@@ -57,6 +57,11 @@ use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 
+/// This is needed instead of Default because `n` significantly influences the parameters of the range proof, in the case of `chunky`
+pub trait WithMaxNumShares {
+    fn with_max_num_shares(n: usize) -> Self;
+}
+
 /// A trait for a PVSS protocol. This trait allows both for:
 ///
 /// 1. Normal/unweighted $t$-out-of-$n$ PVSS protocols where any $t$ players (or more) can
@@ -64,7 +69,7 @@ use std::{fmt::Debug, ops::AddAssign};
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
 pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
-    type SecretSharingConfig: SecretSharingConfig
+    type SecretSharingConfig: aptos_crypto::traits::SecretSharingConfig
         + DeserializeOwned
         + Serialize
         + Debug
@@ -72,6 +77,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Eq;
 
     type PublicParameters: HasEncryptionPublicParams
+        + WithMaxNumShares
         + Default
         + ValidCryptoMaterial
         + DeserializeOwned
@@ -199,7 +205,11 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
 
     /// Generates a random looking transcript (but not a valid one).
     /// Useful for testing and benchmarking.
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng;
 }

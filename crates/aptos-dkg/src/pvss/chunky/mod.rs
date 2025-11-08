@@ -7,4 +7,7 @@ mod hkzg_chunked_elgamal;
 mod input_secret;
 mod keys;
 mod public_parameters;
-//mod transcript;
+mod transcript;
+
+// pub use public_parameters::PublicParameters;
+pub use transcript::Transcript;

@@ -7,9 +7,7 @@ use crate::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
         das, encryption_dlog, schnorr,
-        traits::{
-            self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
-        },
+        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
     utils::{
@@ -24,6 +22,7 @@ use anyhow::bail;
 use aptos_crypto::{
     bls12381,
     blstrs::{multi_pairing, random_scalar},
+    traits::SecretSharingConfig as _,
     CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -299,7 +298,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {

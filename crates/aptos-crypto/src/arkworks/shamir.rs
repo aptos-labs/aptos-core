@@ -3,10 +3,13 @@
 
 //! Contains a version of shamir secret sharing and `ThresholdConfig` for arkworks
 
-use crate::arkworks::{
-    differentiate::DifferentiableFn,
-    serialization::{ark_de, ark_se},
-    vanishing_poly,
+use crate::{
+    arkworks::{
+        differentiate::DifferentiableFn,
+        serialization::{ark_de, ark_se},
+        vanishing_poly,
+    },
+    traits,
 };
 use anyhow::{anyhow, Result};
 use ark_ff::{batch_inversion, FftField, Field, PrimeField};
@@ -27,9 +30,13 @@ pub struct ShamirShare<F: PrimeField> {
     pub y: F,
 }
 
+use crate::player::Player;
+use rand::{seq::IteratorRandom, Rng};
+use rand_core::{CryptoRng, RngCore};
+
 /// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
-/// because Shamir shares are usually defined over such a field. For reconstructing to a group (TODO)
-/// we'll use a generic parameter `G: CurveGroup<ScalarField = F>`
+/// because Shamir shares are usually defined over such a field, but any field is possible.
+/// For reconstructing to a group (TODO) we'll use a generic parameter `G: CurveGroup<ScalarField = F>`
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 pub struct ThresholdConfig<F: PrimeField> {
     /// Total number of participants (shares)
@@ -41,6 +48,50 @@ pub struct ThresholdConfig<F: PrimeField> {
     /// Used for FFT-based polynomial operations. Recomputed from `n` on deserialize
     #[serde(skip)]
     pub domain: Radix2EvaluationDomain<F>,
+}
+
+impl<F: PrimeField> traits::SecretSharingConfig for ThresholdConfig<F> {
+    /// For testing only.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: RngCore + CryptoRng,
+    {
+        Player {
+            id: rng.gen_range(0, self.n),
+        }
+    }
+
+    /// For testing only.
+    fn get_random_eligible_subset_of_players<R>(&self, mut rng: &mut R) -> Vec<Player>
+    where
+        R: RngCore,
+    {
+        (0..self.get_total_num_shares())
+            .choose_multiple(&mut rng, self.t)
+            .into_iter()
+            .map(|i| self.get_player(i))
+            .collect::<Vec<Player>>()
+    }
+
+    fn get_total_num_players(&self) -> usize {
+        self.n
+    }
+
+    fn get_total_num_shares(&self) -> usize {
+        self.n
+    }
+}
+
+impl<F: PrimeField> traits::ThresholdConfig for ThresholdConfig<F> {
+    fn new(t: usize, n: usize) -> Result<Self> {
+        let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` internally does `n.next_power_of_two()`
+            .expect("Invalid domain size: {}");
+        Ok(Self { n, t, domain })
+    }
+
+    fn get_threshold(&self) -> usize {
+        self.t
+    }
 }
 
 impl<F: PrimeField> fmt::Display for ThresholdConfig<F> {

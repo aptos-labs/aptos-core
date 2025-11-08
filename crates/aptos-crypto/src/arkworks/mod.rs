@@ -14,6 +14,7 @@ pub mod vanishing_poly;
 use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
 use ark_poly::EvaluationDomain;
+pub use shamir::ThresholdConfig;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]

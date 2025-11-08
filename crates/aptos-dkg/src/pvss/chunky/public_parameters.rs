@@ -11,6 +11,7 @@ use crate::{
         traits,
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
+    traits::transcript::WithMaxNumShares,
 };
 use aptos_crypto::{
     arkworks::{
@@ -235,9 +236,16 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
 }
 
 impl<E: Pairing> Default for PublicParameters<E> {
-    // TODO: is this only used for testing?
+    // This only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
         Self::new(1, 16, &mut rng)
+    }
+}
+
+impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
+    fn with_max_num_shares(n: usize) -> Self {
+        let mut rng = thread_rng();
+        Self::new(n, 16, &mut rng)
     }
 }

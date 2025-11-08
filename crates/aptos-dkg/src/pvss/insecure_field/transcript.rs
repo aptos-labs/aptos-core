@@ -6,7 +6,7 @@ use crate::{
     pvss,
     pvss::{
         das, encryption_dlog, traits,
-        traits::{transcript::MalleableTranscript, Convert, SecretSharingConfig},
+        traits::{transcript::MalleableTranscript, Convert},
         Player, ThresholdConfigBlstrs,
     },
     utils::{
@@ -15,7 +15,9 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381, traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G2Projective, Scalar};
 use rand::thread_rng;
@@ -192,7 +194,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
