@@ -1,12 +1,12 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Utils file, currently only contains a `power()` function
+//! Utility functions for general-purpose operations.
+//! Currently contains only a `powers()` function for computing sequential powers of a base element.
 
 use ark_std::ops::MulAssign;
 use num_traits::One;
 
-// Maybe move this to a utils file?
 /// Returns the first `count` powers of a given `base` element, so
 /// [1, base, base^2, base^3, ..., base^{count - 1}]
 pub fn powers<T>(base: T, count: usize) -> Vec<T>

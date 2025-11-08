@@ -63,11 +63,10 @@ pub fn compute_roots_of_unity<F: FftField>(num_omegas: usize) -> Vec<F> {
     eval_dom.elements().collect()
 }
 
-/// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
-/// because Shamir shares are usually defined over such a field, but any field is possible.
-/// For reconstructing to a group (TODO) we'll use a generic parameter `G: CurveGroup<ScalarField = F>`
+/// Configuration for a threshold cryptography scheme. Usually one restricts `F` to `Primefield`
+/// but any field is theoretically possible.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-pub struct ThresholdConfig<F: PrimeField> {
+pub struct ThresholdConfig<F: FftField> {
     /// Total number of participants (shares)
     pub n: usize,
     /// Threshold number of shares required to reconstruct the secret. Note that in
