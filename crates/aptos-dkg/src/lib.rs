@@ -94,6 +94,8 @@ impl<E: Pairing> UniformRand for Scalar<E> {
     }
 }
 
+use ark_poly::EvaluationDomain; // TODO: MOVE THIS
+
 impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
@@ -110,7 +112,11 @@ impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Sc
         let shamir_shares: Vec<ShamirShare<E::ScalarField>> = shares
             .iter()
             .map(|(p, share)| ShamirShare {
-                x: E::ScalarField::from(p.id as u64),
+                x: sc
+                    .domain
+                    .elements()
+                    .nth(p.id as usize)
+                    .expect("Too many players for the FFT domain?"), // TODO: FIX THIS
                 y: share.0,
             })
             .collect();

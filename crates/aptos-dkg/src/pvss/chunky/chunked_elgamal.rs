@@ -6,7 +6,7 @@ use crate::{
     sigma_protocol::homomorphism::{self, fixed_base_msms, fixed_base_msms::Trait, EntrywiseMap},
     Scalar,
 };
-use aptos_crypto::arkworks::hashing;
+use aptos_crypto::arkworks::{hashing, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
 use ark_serialize::{
@@ -173,7 +173,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
     type Scalar = E::ScalarField;
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-        // C_i,j = G_1 * z_i,j + ek[i] * r_j
+        // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
         let Cs = input
             .plaintext_chunks
             .iter()
@@ -189,7 +189,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
             })
             .collect();
 
-        //  R_j = H_1 * r_j
+        // R_j = r_j * H_1
         let Rs = input
             .plaintext_randomness
             .iter()
@@ -213,5 +213,116 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 impl<'a, E: Pairing> sigma_protocol::Trait<E> for Homomorphism<'a, E> {
     fn dst(&self) -> Vec<u8> {
         b"APTOS_CHUNKED_ELGAMAL_SIGMA_PROTOCOL_DST".to_vec()
+    }
+}
+
+pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: usize) -> Vec<F>
+where
+    F: ark_ff::PrimeField,
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    let mut r_vals = Vec::with_capacity(num_chunks);
+    r_vals.push(F::zero()); // placeholder for r_0
+    let mut remainder = F::zero();
+
+    // Precompute radix as F once
+    let radix_f = F::from(radix);
+    let mut cur_base = radix_f;
+
+    // Fill r_1 .. r_{num_chunks-1} randomly
+    for _ in 1..num_chunks {
+        let r = sample_field_element(rng);
+        r_vals.push(r);
+        remainder -= r * cur_base;
+        cur_base *= radix_f;
+    }
+
+    r_vals[0] = remainder;
+
+    r_vals
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{pvss::chunky::chunks, sigma_protocol::homomorphism::Trait as _};
+    use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_points};
+    use ark_ec::CurveGroup;
+    use ark_ff::{Field, PrimeField};
+    use rand::thread_rng;
+
+    #[allow(non_snake_case)]
+    fn test_reconstruct_ciphertexts<E: Pairing>() {
+        let mut rng = thread_rng();
+
+        // 1. Generate two random "shares"
+        let zs = sample_field_elements(2, &mut rng);
+
+        // 2. Choose a radix and compute number_of_chunks
+        let radix_exponent = 16; // Making this smaller would probably make the test slower
+        let number_of_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent) as usize;
+
+        // 3. Generate correlated randomness
+        let rs: Vec<E::ScalarField> =
+            correlated_randomness(&mut rng, 1 << radix_exponent, number_of_chunks);
+
+        // 4. Convert the two values into little-endian chunks
+        let chunked_values: Vec<Vec<E::ScalarField>> = zs
+            .iter()
+            .map(|v| chunks::scalar_to_le_chunks(radix_exponent as usize, v))
+            .collect();
+
+        // 5. Build a witness for the homomorphism
+        let witness = Witness {
+            plaintext_chunks: Scalar::<E>::vecvec_from_inner(chunked_values),
+            plaintext_randomness: Scalar::vec_from_inner(rs),
+        };
+
+        // 6. Initialize a homomorphism (mock params or reuse pp, eks as needed)
+        let eks_inner: Vec<_> = E::G1::normalize_batch(&unsafe_random_points(2, &mut rng));
+        let pp = PublicParameters::default();
+
+        let hom = Homomorphism {
+            pp: &pp,
+            eks: &eks_inner,
+        };
+
+        // 7. Apply homomorphism to obtain chunked ciphertexts
+        let CodomainShape {
+            chunks: Cs,
+            randomness: _Rs,
+        } = hom.apply(&witness);
+
+        // 8. Reconstruct original values from the chunked ciphertexts
+        for (i, &orig_val) in zs.iter().enumerate() {
+            // compute powers of the radix for this chunk vector safely in the field
+            let radix_f = E::ScalarField::from(1u64 << radix_exponent); // radix as field element
+            let mut cur_power = E::ScalarField::ONE;
+            let powers_of_radix: Vec<E::ScalarField> = (0..Cs[i].len())
+                .map(|_| {
+                    let p = cur_power;
+                    cur_power *= radix_f;
+                    p
+                })
+                .collect();
+
+            // perform the MSM to reconstruct the "plaintext group element"
+            let reconstructed = E::G1::msm(&E::G1::normalize_batch(&Cs[i]), &powers_of_radix)
+                .expect("MSM reconstruction failed");
+
+            // multiply the original scalar by the group generator (or message base)
+            let expected = *pp.message_base() * orig_val;
+
+            assert_eq!(
+                reconstructed, expected,
+                "Reconstructed value {} does not match original",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn test_reconstruct_ciphertexts_bn254() {
+        test_reconstruct_ciphertexts::<ark_bn254::Bn254>();
     }
 }

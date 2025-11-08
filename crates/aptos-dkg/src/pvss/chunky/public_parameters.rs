@@ -15,10 +15,10 @@ use crate::{
 };
 use aptos_crypto::{
     arkworks::{
-        self, hashing,
+        hashing,
         serialization::{ark_de, ark_se},
     },
-    CryptoMaterialError, ValidCryptoMaterial,
+    utils, CryptoMaterialError, ValidCryptoMaterial,
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
@@ -35,7 +35,10 @@ const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be 
 fn compute_powers_of_radix<E: Pairing>(radix_exponent: u8) -> Vec<E::ScalarField> {
     let num_chunks_per_share =
         E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent as u32) as usize;
-    arkworks::powers_of_two(num_chunks_per_share)
+    utils::powers(
+        E::ScalarField::from(1u64 << radix_exponent),
+        num_chunks_per_share,
+    )
 }
 
 // TODO: can't we derive CanonicalSerialize/CanonicalDeserialize from Serialize/Deserialize? Or the other way around we can do with ark_se/de... now it's implemented twice
@@ -113,13 +116,14 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
         }
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
+        let G: E::G1 = serialized.pp_elgamal.G.into();
 
         Ok(Self {
             pp_elgamal: serialized.pp_elgamal,
             pk_range_proof: serialized.pk_range_proof,
             G_2: serialized.G_2,
             ell: serialized.ell,
-            table: dlog::table::build_default::<E::G1>(1u32 << serialized.ell),
+            table: dlog::table::build::<E::G1>(G, 1u32 << serialized.ell / 2),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
         })
     }
@@ -144,13 +148,14 @@ impl<E: Pairing> CanonicalDeserialize for PublicParameters<E> {
         )?;
         let G_2 = E::G2Affine::deserialize_with_mode(&mut reader, compress, validate)?;
         let ell = u8::deserialize_with_mode(&mut reader, compress, validate)?;
+        let G_1: E::G1 = pp_elgamal.G.into();
 
         Ok(Self {
             pp_elgamal,
             pk_range_proof,
             G_2,
             ell,
-            table: dlog::table::build_default::<E::G1>(1u32 << ell),
+            table: dlog::table::build::<E::G1>(G_1, 1u32 << ell / 2),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         })
     }
@@ -219,8 +224,11 @@ impl<E: Pairing> PublicParameters<E> {
             .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
             ell: radix_exponent,
-            table: dlog::table::build_default::<E::G1>(1u32 << radix_exponent),
-            powers_of_radix: arkworks::powers_of_two(num_chunks_per_share),
+            table: dlog::table::build::<E::G1>(
+                chunked_elgamal::PublicParameters::<E>::default().G.into(),
+                1u32 << radix_exponent / 2,
+            ), // needs to be come radix_exponent / 2 ?
+            powers_of_radix: compute_powers_of_radix::<E>(radix_exponent),
         };
 
         pp
@@ -239,13 +247,13 @@ impl<E: Pairing> Default for PublicParameters<E> {
     // This only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, 16, &mut rng)
+        Self::new(1, 8, &mut rng) // make radix smaller if it speeds up tests???
     }
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares(n: usize) -> Self {
         let mut rng = thread_rng();
-        Self::new(n, 16, &mut rng)
+        Self::new(n, 8, &mut rng)
     }
 }

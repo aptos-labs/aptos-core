@@ -18,6 +18,7 @@ pub use shamir::ThresholdConfig;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]
+/// Should be slightly faster than using `powers()` below
 pub fn powers_of_two<F: Field>(ell: usize) -> Vec<F> {
     (0..ell).map(|j| F::from(1u64 << j)).collect()
 }

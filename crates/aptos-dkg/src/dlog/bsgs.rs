@@ -13,6 +13,7 @@ use std::collections::HashMap;
 /// - `m`: size of the baby-step table
 #[allow(non_snake_case)]
 pub fn dlog<C: CurveGroup>(G: C, H: C, baby_table: &HashMap<Vec<u8>, u32>, m: u32) -> Option<u32> {
+    // add debug_assert saying that number of table keys = 1 << m ?
     let G_neg_m = G * -C::ScalarField::from(m);
 
     let mut gamma = H;

@@ -9,5 +9,4 @@ mod keys;
 mod public_parameters;
 mod transcript;
 
-// pub use public_parameters::PublicParameters;
 pub use transcript::Transcript;

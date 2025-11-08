@@ -13,7 +13,10 @@ use crate::{
 use anyhow::ensure;
 #[allow(unused_imports)] // This is used but due to some bug it is not noticed by the compiler
 use aptos_crypto::arkworks::random::UniformRand;
-use aptos_crypto::arkworks::random::{sample_field_element, unsafe_random_point};
+use aptos_crypto::{
+    arkworks::random::{sample_field_element, unsafe_random_point},
+    utils,
+};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -87,7 +90,7 @@ pub fn lagrange_basis<E: Pairing>(
     eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>,
     tau: E::ScalarField,
 ) -> Vec<E::G1Affine> {
-    let powers_of_tau = crate::utils::powers(tau, n);
+    let powers_of_tau = utils::powers(tau, n);
     let lagr_basis_scalars = eval_dom.ifft(&powers_of_tau);
     debug_assert!(lagr_basis_scalars.iter().sum::<E::ScalarField>() == E::ScalarField::ONE);
 

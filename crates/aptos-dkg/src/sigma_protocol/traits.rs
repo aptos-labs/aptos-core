@@ -7,10 +7,10 @@ use crate::{
         self,
         fixed_base_msms::{self, IsMsmInput},
     },
-    utils, Scalar,
+    Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::random::sample_field_element;
+use aptos_crypto::{arkworks::random::sample_field_element, utils};
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::AdditiveGroup;
 use ark_serialize::{
