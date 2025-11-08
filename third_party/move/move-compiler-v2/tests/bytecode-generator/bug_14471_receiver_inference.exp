@@ -234,10 +234,10 @@ fun add<T0: drop, T1: drop>(l0: &mut Table<T0, T1>, l1: T0, l2: T1)
     move_loc l3
     // @15
     call add<address, ValueWrap>
-l1: ret
+    ret
 l0: move_loc l2
     pop
-    branch l1
+    ret
 
 
 ============ bytecode verification succeeded ========

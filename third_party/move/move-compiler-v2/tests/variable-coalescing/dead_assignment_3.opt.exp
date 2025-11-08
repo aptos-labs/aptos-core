@@ -55,14 +55,13 @@ public fun m::test($t0: bool): u32 {
      var $t1: u32
      var $t2: u32
   0: $t2 := 1
-  1: if ($t0) goto 2 else goto 6
+  1: if ($t0) goto 2 else goto 5
   2: label L0
   3: $t1 := move($t2)
-  4: label L2
-  5: return $t1
-  6: label L1
-  7: $t1 := 9
-  8: goto 4
+  4: return $t1
+  5: label L1
+  6: $t1 := 9
+  7: return $t1
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -76,24 +75,22 @@ public fun m::test($t0: bool): u32 {
   0: $t2 := 1
      # live vars: $t0, $t2
      # events: e:$t0
-  1: if ($t0) goto 2 else goto 6
+  1: if ($t0) goto 2 else goto 5
      # live vars: $t2
   2: label L0
      # live vars: $t2
      # events: b:$t1
   3: $t1 := move($t2)
      # live vars: $t1
-  4: label L2
-     # live vars: $t1
-  5: return $t1
+  4: return $t1
      # live vars: $t2
      # events: e:$t2
-  6: label L1
+  5: label L1
      # live vars:
-  7: $t1 := 9
+  6: $t1 := 9
      # live vars: $t1
      # events: e:$t1
-  8: goto 4
+  7: return $t1
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -103,14 +100,13 @@ public fun m::test($t0: bool): u32 {
      var $t1: u32
      var $t2: u32
   0: $t2 := 1
-  1: if ($t0) goto 2 else goto 6
+  1: if ($t0) goto 2 else goto 5
   2: label L0
   3: $t1 := move($t2)
-  4: label L2
-  5: return $t1
-  6: label L1
-  7: $t1 := 9
-  8: goto 4
+  4: return $t1
+  5: label L1
+  6: $t1 := 9
+  7: return $t1
 }
 
 ============ after DeadStoreElimination: ================
@@ -120,14 +116,13 @@ public fun m::test($t0: bool): u32 {
      var $t1: u32
      var $t2: u32
   0: $t2 := 1
-  1: if ($t0) goto 2 else goto 6
+  1: if ($t0) goto 2 else goto 5
   2: label L0
   3: $t1 := move($t2)
-  4: label L2
-  5: return $t1
-  6: label L1
-  7: $t1 := 9
-  8: goto 4
+  4: return $t1
+  5: label L1
+  6: $t1 := 9
+  7: return $t1
 }
 
 
@@ -137,20 +132,15 @@ module 0xc0ffee::m
 // Function definition at index 0
 #[persistent] public fun test(l0: bool): u32
     local l1: u32
-    local l2: u32
     ld_u32 1
     st_loc l1
     move_loc l0
     br_false l0
     move_loc l1
     // @5
-    st_loc l2
-l1: move_loc l2
     ret
 l0: ld_u32 9
-    st_loc l2
-    // @10
-    branch l1
+    ret
 
 
 ============ bytecode verification succeeded ========
