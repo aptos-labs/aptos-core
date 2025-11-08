@@ -19,8 +19,9 @@
 
 use crate::pvss::{traits, Player};
 use aptos_crypto::arkworks::{
+    self,
     random::{sample_field_element, UniformRand},
-    shamir::{ShamirShare, ThresholdConfig},
+    shamir::ShamirShare,
 };
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
@@ -96,13 +97,13 @@ impl<E: Pairing> UniformRand for Scalar<E> {
 
 use ark_poly::EvaluationDomain; // TODO: MOVE THIS
 
-impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Scalar<E> {
+impl<E: Pairing> traits::Reconstructable<arkworks::ThresholdConfig<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
     // TODO: converting between Vec<(Player, Self::Share)> and Vec<ShamirShare<E::ScalarField>> feels bulky,
     // one of them needs to go
     fn reconstruct(
-        sc: &ThresholdConfig<E::ScalarField>,
+        sc: &arkworks::ThresholdConfig<E::ScalarField>,
         shares: &Vec<(Player, Self::Share)>,
     ) -> Self {
         assert_ge!(shares.len(), sc.get_threshold());

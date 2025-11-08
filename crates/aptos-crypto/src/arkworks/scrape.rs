@@ -208,7 +208,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::arkworks::shamir::ThresholdConfig;
+    use crate::arkworks::ThresholdConfig;
     use ark_bn254::Fr;
     use ark_ff::PrimeField;
     use ark_std::vec::Vec;

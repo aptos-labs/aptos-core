@@ -7,14 +7,17 @@ use crate::{
     arkworks::{
         differentiate::DifferentiableFn,
         serialization::{ark_de, ark_se},
-        vanishing_poly,
+        vanishing_poly, ThresholdConfig,
     },
+    player::Player,
     traits,
 };
 use anyhow::{anyhow, Result};
 use ark_ff::{batch_inversion, FftField, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
+use rand::{seq::IteratorRandom, Rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 
@@ -28,26 +31,6 @@ pub struct ShamirShare<F: PrimeField> {
     /// The evaluation of the polynomial at `x`.
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub y: F,
-}
-
-use crate::player::Player;
-use rand::{seq::IteratorRandom, Rng};
-use rand_core::{CryptoRng, RngCore};
-
-/// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
-/// because Shamir shares are usually defined over such a field, but any field is possible.
-/// For reconstructing to a group (TODO) we'll use a generic parameter `G: CurveGroup<ScalarField = F>`
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-pub struct ThresholdConfig<F: PrimeField> {
-    /// Total number of participants (shares)
-    pub n: usize,
-    /// Threshold number of shares required to reconstruct the secret. Note that in
-    /// MPC literature `t` usually denotes the maximal adversary threshold, so `t + 1`
-    /// shares would be required to reconstruct the secret
-    pub t: usize,
-    /// Used for FFT-based polynomial operations. Recomputed from `n` on deserialize
-    #[serde(skip)]
-    pub domain: Radix2EvaluationDomain<F>,
 }
 
 impl<F: PrimeField> traits::SecretSharingConfig for ThresholdConfig<F> {
