@@ -52,15 +52,10 @@ use crate::pvss::{
     Player,
 };
 use anyhow::bail;
-use aptos_crypto::{SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
+use aptos_crypto::{SecretSharingConfig, SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
-
-/// This is needed instead of Default because `n` significantly influences the parameters of the range proof, in the case of `chunky`
-pub trait WithMaxNumShares {
-    fn with_max_num_shares(n: usize) -> Self;
-}
 
 /// A trait for a PVSS protocol. This trait allows both for:
 ///
@@ -69,7 +64,7 @@ pub trait WithMaxNumShares {
 /// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
 ///    reconstruct the secret (but players with combined weight $< w$ cannot)
 pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
-    type SecretSharingConfig: aptos_crypto::traits::SecretSharingConfig
+    type SecretSharingConfig: SecretSharingConfig
         + DeserializeOwned
         + Serialize
         + Debug
@@ -225,4 +220,9 @@ pub trait MalleableTranscript: Transcript {
         aux: &A,
         dealer: &Player,
     );
+}
+
+/// This is needed instead of Default because `max_n` influences the public parameters of the DeKARTv2 range proof, and hence the public parameters of `chunky`
+pub trait WithMaxNumShares {
+    fn with_max_num_shares(n: usize) -> Self;
 }

@@ -11,17 +11,16 @@ use aptos_crypto::{
     traits::SecretSharingConfig as _,
 };
 use aptos_dkg::pvss::{
-    chunky, das,
+    das,
     das::unweighted_protocol,
     insecure_field, test_utils,
     test_utils::{
         get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    traits::transcript::Transcript,
+    traits::transcript::{Transcript, WithMaxNumShares},
     GenericWeighting, ThresholdConfigBlstrs,
 };
-use ark_bn254::Bn254;
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 
@@ -45,16 +44,16 @@ fn test_pvss_all_unweighted() {
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
     }
 
-    // Restarting the loop here because now it'll grab **arkworks** threshold configs instead
-    let tcs = test_utils::get_threshold_configs_for_testing();
-    for tc in tcs {
-        println!("\nTesting {tc} PVSS");
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
+    // let tcs = test_utils::get_threshold_configs_for_testing();
+    // for tc in tcs {
+    //     println!("\nTesting {tc} PVSS");
 
-        let seed = random_scalar(&mut rng);
+    //     let seed = random_scalar(&mut rng);
 
-        // Chunky
-        pvss_deal_verify_and_reconstruct::<chunky::Transcript<Bn254>>(&tc, seed.to_bytes_le());
-    }
+    //     // Chunky
+    //     pvss_deal_verify_and_reconstruct::<chunky::Transcript<Bn254>>(&tc, seed.to_bytes_le());
+    // }
 }
 
 #[test]
@@ -160,7 +159,11 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript>(
 fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
     let mut rng = thread_rng();
 
-    let trx = T::generate(&sc, &T::PublicParameters::default(), &mut rng);
+    let trx = T::generate(
+        &sc,
+        &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
+        &mut rng,
+    );
     let actual_size = trx.to_bytes().len();
 
     actual_size

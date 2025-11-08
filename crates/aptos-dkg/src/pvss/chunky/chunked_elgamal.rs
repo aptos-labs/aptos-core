@@ -216,6 +216,7 @@ impl<'a, E: Pairing> sigma_protocol::Trait<E> for Homomorphism<'a, E> {
     }
 }
 
+#[allow(dead_code)] // Will be used in the new PVSS
 pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: usize) -> Vec<F>
 where
     F: ark_ff::PrimeField,

@@ -17,7 +17,7 @@ use aptos_dkg::{
             get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
             DealingArgs, NoAux,
         },
-        traits::transcript::{MalleableTranscript, Transcript},
+        traits::transcript::{MalleableTranscript, Transcript, WithMaxNumShares},
         LowDegreeTest, WeightedConfig,
     },
 };
@@ -162,7 +162,11 @@ fn pvss_aggregate<T: Transcript, M: Measurement>(
     g.bench_function(format!("aggregate/{}", sc), move |b| {
         b.iter_with_setup(
             || {
-                let trx = T::generate(&sc, &T::PublicParameters::default(), &mut rng); // TODO: fix this?
+                let trx = T::generate(
+                    &sc,
+                    &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
+                    &mut rng,
+                );
                 (trx.clone(), trx)
             },
             |(mut first, second)| {
@@ -309,7 +313,13 @@ fn pvss_transcript_random<T: Transcript, M: Measurement>(
     let mut rng = thread_rng();
 
     g.bench_function(format!("transcript-random/{}", sc), move |b| {
-        b.iter(|| T::generate(&sc, &T::PublicParameters::default(), &mut rng))
+        b.iter(|| {
+            T::generate(
+                &sc,
+                &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
+                &mut rng,
+            )
+        })
     });
 }
 
