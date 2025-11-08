@@ -40,6 +40,12 @@ use move_vm_runtime::{
 use move_vm_test_utils::InMemoryStorage;
 use rayon::prelude::*;
 use std::{io::Write, marker::Send, sync::Mutex, time::Instant};
+use thiserror::Error;
+
+/// Fail-fast error to short-circuit test execution
+#[derive(Debug, Error)]
+#[error("fail-fast triggered with {0:?}")]
+struct FailFast(pub TestStatistics);
 
 /// Test state common to all tests
 pub struct SharedTestingConfig {
@@ -49,6 +55,7 @@ pub struct SharedTestingConfig {
     #[allow(dead_code)] // used by some features
     source_files: Vec<String>,
     record_writeset: bool,
+    fail_fast: bool,
 }
 
 pub struct TestRunner {
@@ -119,6 +126,7 @@ impl TestRunner {
         genesis_state: Option<ChangeSet>,
         record_writeset: bool,
         enable_enum_option: bool,
+        fail_fast: bool,
     ) -> Result<Self> {
         let native_function_table = native_function_table.unwrap_or_else(|| {
             move_stdlib::natives::all_natives(
@@ -152,6 +160,7 @@ impl TestRunner {
                 starting_storage_state,
                 source_files,
                 record_writeset,
+                fail_fast,
             },
             num_threads,
             tests,
@@ -168,17 +177,30 @@ impl TestRunner {
             .build()
             .unwrap()
             .install(|| {
-                let final_statistics = self
+                // we do a try_reduce so that we can short-circuit on fail-fast
+                // if not in fail-fast mode, we expect no errors at all
+                // if in fail-fast mode, we expect only FailFast errors
+                let stats = self
                     .tests
                     .module_tests
                     .par_iter()
-                    .map(|(_, test_plan)| {
-                        self.testing_config
-                            .exec_module_tests(test_plan, writer, options)
+                    .map(|(_, plan)| {
+                        self.testing_config.exec_module_tests(plan, writer, options)
                     })
-                    .reduce(TestStatistics::new, |acc, stats| acc.combine(stats));
+                    .try_reduce(TestStatistics::new, |a, b| Ok(a.combine(b)));
 
-                Ok(TestResults::new(final_statistics, self.tests))
+                let final_stats = stats.unwrap_or_else(|e| {
+                    if !self.testing_config.fail_fast {
+                        panic!("We expect no errors at all when not in fail-fast mode, but got: {:?}", e);
+                    }
+                    e.downcast_ref::<FailFast>().map(|fail_fast| {
+                        fail_fast.0.clone() // The error wraps the stats up to the first failure
+                    }).unwrap_or_else(|| {
+                        panic!("Only FailFast errors are expected in fail-fast mode, but got a different error: {:?}", e);
+                    })
+                });
+
+                Ok(TestResults::new(final_stats, self.tests))
             })
     }
 
@@ -338,7 +360,7 @@ impl SharedTestingConfig {
         test_plan: &ModuleTestPlan,
         output: &TestOutput<impl Write>,
         factory: &Mutex<F>,
-    ) -> TestStatistics {
+    ) -> Result<TestStatistics> {
         let mut stats = TestStatistics::new();
 
         for (function_name, test_info) in &test_plan.tests {
@@ -409,7 +431,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if self.fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                         Some(ExpectedFailure::ExpectedWithCodeDEPRECATED(expected_code)) => {
                             output.fail(function_name);
@@ -424,7 +449,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if self.fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                         None if err.major_status() == StatusCode::OUT_OF_GAS => {
                             // Ran out of ticks, report a test timeout and log a test failure
@@ -437,7 +465,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if self.fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                         None => {
                             output.fail(function_name);
@@ -449,7 +480,10 @@ impl SharedTestingConfig {
                                     save_session_state(),
                                 ),
                                 test_plan,
-                            )
+                            );
+                            if self.fail_fast {
+                                return Err(FailFast(stats).into());
+                            }
                         },
                     }
                 },
@@ -465,7 +499,10 @@ impl SharedTestingConfig {
                                 save_session_state(),
                             ),
                             test_plan,
-                        )
+                        );
+                        if self.fail_fast {
+                            return Err(FailFast(stats).into());
+                        }
                     } else {
                         // Expected the test to execute fully and it did
                         output.pass(function_name);
@@ -475,7 +512,7 @@ impl SharedTestingConfig {
             }
         }
 
-        stats
+        Ok(stats)
     }
 
     fn exec_module_tests<F: UnitTestFactory>(
@@ -483,7 +520,7 @@ impl SharedTestingConfig {
         test_plan: &ModuleTestPlan,
         writer: &Mutex<impl Write>,
         factory: &Mutex<F>,
-    ) -> TestStatistics {
+    ) -> Result<TestStatistics> {
         let output = TestOutput { test_plan, writer };
         self.exec_module_tests_move_vm_and_stackless_vm(test_plan, &output, factory)
     }
