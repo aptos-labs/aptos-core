@@ -83,8 +83,8 @@ default = [
     "aptos-network/fuzzing",
 ]
 
-# Forwarding feature so downstream users can enable randomness default behavior at workspace level
-randomness_enabled = ["aptos-types/randomness_enabled"]
+# Forwarding feature so downstream users can disable randomness default behavior at workspace level
+randomness_disabled = ["aptos-types/randomness_disabled"]
 
 [workspace]
 resolver = "2"

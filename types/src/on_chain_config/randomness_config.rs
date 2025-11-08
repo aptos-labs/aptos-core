@@ -147,9 +147,9 @@ impl OnChainRandomnessConfig {
             onchain_raw_config
                 .and_then(|onchain_raw| OnChainRandomnessConfig::try_from(onchain_raw).ok())
                 .unwrap_or_else({
-                    #[cfg(feature = "randomness_enabled")]
+                    #[cfg(not(feature = "randomness_disabled"))]
                     { OnChainRandomnessConfig::default_for_genesis }
-                    #[cfg(not(feature = "randomness_enabled"))]
+                    #[cfg(feature = "randomness_disabled")]
                     { OnChainRandomnessConfig::default_if_missing }
                 })
         }

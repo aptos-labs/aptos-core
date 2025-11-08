@@ -96,7 +96,7 @@ url = { workspace = true }
 default = []
 testing = ["aptos-crypto/fuzzing"]
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing", "arbitrary"]
-randomness_enabled = []
+randomness_disabled = []
 
 [[bench]]
 name = "keyless"

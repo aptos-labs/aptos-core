@@ -47,10 +47,16 @@ pub struct ExternalBlockMeta {
 }
 
 #[derive(Debug, Clone)]
+pub enum ExtraDataType {
+    JWK(Vec<u8>),
+    DKG(Vec<u8>),
+}
+
+#[derive(Debug, Clone)]
 pub struct ExternalBlock {
     pub block_meta: ExternalBlockMeta,
     pub txns: Vec<VerifiedTxn>,
-    pub jwks_extra_data: Vec<Vec<u8>>,
+    pub extra_data: Vec<ExtraDataType>,
     pub enable_randomness: bool,
 }
 
