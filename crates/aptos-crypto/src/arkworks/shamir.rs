@@ -282,7 +282,7 @@ impl<F: PrimeField> ShamirSharingScheme<F> {
     pub fn share(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
         debug_assert_eq!(coeffs.len(), self.t);
         let evals = self.domain.fft(coeffs);
-        (0..self.n).map(|i| Player::new(i)).zip(evals).collect()
+        (0..self.n).map(Player::new).zip(evals).collect()
     }
 
     /// This method uses Lagrange interpolation to recover the original secret
