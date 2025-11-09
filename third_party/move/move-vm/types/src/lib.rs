@@ -45,5 +45,6 @@ pub mod value_traversal;
 pub mod values;
 pub mod views;
 
+pub mod instr;
 #[cfg(test)]
 mod unit_tests;

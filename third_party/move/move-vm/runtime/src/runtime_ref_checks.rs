@@ -78,7 +78,7 @@
 //! one of the reference parameters. They are also transformed to point to the
 //! corresponding access path tree node in the caller's frame (if it exists).
 
-use crate::{frame::Frame, frame_type_cache::FrameTypeCache, instr::Instruction, LoadedFunction};
+use crate::{frame::Frame, frame_type_cache::FrameTypeCache, LoadedFunction};
 use fxhash::FxBuildHasher;
 use hashbrown::HashMap;
 use move_binary_format::{
@@ -89,7 +89,7 @@ use move_core_types::{
     function::ClosureMask,
     vm_status::{sub_status::unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE, StatusCode},
 };
-use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::{instr::Instruction, loaded_data::runtime_types::Type};
 use std::{collections::BTreeSet, slice};
 
 /// A deterministic hash map (used in the Rust compiler), expected to perform well.

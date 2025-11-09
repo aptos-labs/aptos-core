@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    frame::Frame, frame_type_cache::FrameTypeCache, instr::Instruction, interpreter::Stack,
+    frame::Frame, frame_type_cache::FrameTypeCache, interpreter::Stack,
     reentrancy_checker::CallType, Function, LoadedFunction,
 };
 use move_binary_format::errors::*;
@@ -11,7 +11,10 @@ use move_core_types::{
     function::ClosureMask,
     vm_status::{sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode},
 };
-use move_vm_types::loaded_data::runtime_types::{Type, TypeBuilder};
+use move_vm_types::{
+    instr::Instruction,
+    loaded_data::runtime_types::{Type, TypeBuilder},
+};
 
 pub(crate) trait RuntimeTypeCheck {
     /// Paranoid type checks to perform before instruction execution.

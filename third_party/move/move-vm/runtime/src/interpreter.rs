@@ -9,7 +9,6 @@ use crate::{
     execution_tracing::TraceRecorder,
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
-    instr::Instruction,
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
     module_traversal::TraversalContext,
@@ -46,6 +45,7 @@ use move_core_types::{
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
+    instr::Instruction,
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     ty_interner::InternedTypePool,

@@ -19,7 +19,6 @@ pub mod native_functions;
 #[macro_use]
 pub mod tracing;
 pub mod config;
-pub mod instr;
 pub mod module_traversal;
 
 // Only include debugging functionality in debug builds

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    instr::Instruction,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -28,6 +27,7 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::DependencyGasMeter,
+    instr::Instruction,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
