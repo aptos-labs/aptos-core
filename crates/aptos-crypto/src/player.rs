@@ -26,7 +26,7 @@ pub struct Player {
 impl Player {
     /// Creates a new `Player`
     pub fn new(id: usize) -> Self {
-        Self { id } 
+        Self { id }
     }
 
     /// Returns the numeric ID of the player.

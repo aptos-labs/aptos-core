@@ -98,12 +98,10 @@ fn multi_ed25519_bcs_material() {
     );
 
     // Verify bitmap
-    assert_eq!(multi_signature_7of10.bitmap(), &[
-        0b1111_1110,
-        0u8,
-        0u8,
-        0u8
-    ]);
+    assert_eq!(
+        multi_signature_7of10.bitmap(),
+        &[0b1111_1110, 0u8, 0u8, 0u8]
+    );
 
     // Verify signature
     assert!(multi_signature_7of10

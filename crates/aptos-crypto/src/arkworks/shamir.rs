@@ -8,6 +8,7 @@ use crate::arkworks::{
     serialization::{ark_de, ark_se},
     vanishing_poly,
 };
+use crate::player::Player;
 use anyhow::{anyhow, Result};
 use ark_ec::CurveGroup;
 use ark_ff::{batch_inversion, FftField, Field, PrimeField};
@@ -15,8 +16,6 @@ use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
-use crate::player::Player;
-
 
 /// A pair corresponding to a player (i.e., an index into the roots of unity) and a field element
 /// evaluation
@@ -24,7 +23,6 @@ pub type ShamirShare<F: PrimeField> = (Player, F);
 /// A pair corresponding to a player (i.e., an index into the roots of unity) and a group element
 /// whose exponent is an evaluation
 pub type ShamirGroupShare<G: CurveGroup> = (Player, G::Affine);
-
 
 /// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
 /// because Shamir shares are usually defined over such a field. For reconstructing to a group (TODO)
@@ -238,9 +236,7 @@ impl<F: PrimeField> ThresholdConfig<F> {
     pub fn share(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
         debug_assert_eq!(coeffs.len(), self.t);
         let evals = self.domain.fft(coeffs);
-        (0..self.n).map(|i| Player::new(i))
-            .zip(evals)
-            .collect()
+        (0..self.n).map(|i| Player::new(i)).zip(evals).collect()
     }
 
     /// This method uses Lagrange interpolation to recover the original secret
@@ -252,10 +248,13 @@ impl<F: PrimeField> ThresholdConfig<F> {
         } else {
             let mut sum = F::zero();
 
-            let xs : Vec<F> = shares.iter().map(|(player, _)| self.domain.element(player.get_id())).collect();
+            let xs: Vec<F> = shares
+                .iter()
+                .map(|(player, _)| self.domain.element(player.get_id()))
+                .collect();
             let lagrange_coeffs = self.lagrange_for_subset(&HashSet::from_iter(xs.iter().cloned()));
 
-            for (x, (_, y))  in xs.iter().zip(shares) {
+            for (x, (_, y)) in xs.iter().zip(shares) {
                 sum += lagrange_coeffs[x] * y;
             }
 
@@ -264,18 +263,23 @@ impl<F: PrimeField> ThresholdConfig<F> {
     }
 
     /// Same as above, but in the exponent.
-    pub fn reconstruct_in_exponent<G: CurveGroup<ScalarField = F>>(&self, shares: &[ShamirGroupShare<G>]) -> Result<G::Affine> {
+    pub fn reconstruct_in_exponent<G: CurveGroup<ScalarField = F>>(
+        &self,
+        shares: &[ShamirGroupShare<G>],
+    ) -> Result<G::Affine> {
         if shares.len() != self.t {
             Err(anyhow!("Incorrect number of shares provided"))
         } else {
-            let xs : Vec<F> = shares.iter().map(|(player, _)| self.domain.element(player.get_id())).collect();
+            let xs: Vec<F> = shares
+                .iter()
+                .map(|(player, _)| self.domain.element(player.get_id()))
+                .collect();
             let lagrange_coeffs = self.lagrange_for_subset(&HashSet::from_iter(xs.iter().cloned()));
 
-            let (bases, coeffs)
-                : (Vec<G::Affine>, Vec<F>) =
-                xs.iter().zip(shares)
-                .map(|(x, (_, g_y))|
-                    (g_y, lagrange_coeffs[x]))
+            let (bases, coeffs): (Vec<G::Affine>, Vec<F>) = xs
+                .iter()
+                .zip(shares)
+                .map(|(x, (_, g_y))| (g_y, lagrange_coeffs[x]))
                 .collect();
 
             Ok(G::msm(&bases, &coeffs)
@@ -351,7 +355,6 @@ mod shamir_tests {
 
                 let shares = params.share(&coeffs);
 
-
                 for reconstruct_shares in shares.iter().combinations(t) {
                     let reconstruct_shares_vec: Vec<ShamirShare<Fr>> =
                         reconstruct_shares.into_iter().cloned().collect();
@@ -374,13 +377,18 @@ mod shamir_tests {
                 coeffs.extend((1..t).map(|_| Fr::rand(&mut rng)));
 
                 let shares = params.share(&coeffs);
-                let shares_g1 : Vec<ShamirGroupShare<G1Projective>> = shares.into_iter().map(
-                    | (player, y) | (player, (G1Affine::generator() * y).into()) 
-                ).collect();
-
+                let shares_g1: Vec<ShamirGroupShare<G1Projective>> = shares
+                    .into_iter()
+                    .map(|(player, y)| (player, (G1Affine::generator() * y).into()))
+                    .collect();
 
                 for reconstruct_shares_g1 in shares_g1.into_iter().combinations(t) {
-                    assert_eq!(params.reconstruct_in_exponent::<G1Projective>(&reconstruct_shares_g1).unwrap(), G1Affine::generator() * secret);
+                    assert_eq!(
+                        params
+                            .reconstruct_in_exponent::<G1Projective>(&reconstruct_shares_g1)
+                            .unwrap(),
+                        G1Affine::generator() * secret
+                    );
                 }
             }
         }
