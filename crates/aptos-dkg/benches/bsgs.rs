@@ -41,11 +41,9 @@ where
             &table_size,
             |b, &_ts| {
                 b.iter(|| {
-                    for (i, H) in Hs.iter().enumerate() {
-                        let recovered = bsgs::dlog::<E::G1>(G, *H, &baby_table, range_limit)
-                            .expect("Discrete log not found");
-                        assert_eq!(recovered, xs[i]);
-                    } // could also use dlog_vec here instead
+                    let recovered = bsgs::dlog_vec(G, &Hs, &baby_table, range_limit)
+                        .expect("Discrete log not found");
+                    assert_eq!(recovered, xs);
                 });
             },
         );

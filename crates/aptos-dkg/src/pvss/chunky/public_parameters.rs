@@ -29,15 +29,15 @@ use std::{collections::HashMap, ops::Mul};
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 
-fn compute_powers_of_radix<E: Pairing>(radix_exponent: u8) -> Vec<E::ScalarField> {
-    let num_chunks_per_share = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent as u32);
+fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
+    let num_chunks_per_share = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32);
     utils::powers(
-        E::ScalarField::from(1u64 << radix_exponent),
+        E::ScalarField::from(1u64 << ell),
         num_chunks_per_share as usize,
     )
 }
 
-// TODO: If we need it alter, let's derive CanonicalSerialize/CanonicalDeserialize from Serialize/Deserialize? E.g. the opposite of ark_se/de...
+// TODO: If we need it later, let's derive CanonicalSerialize/CanonicalDeserialize from Serialize/Deserialize? E.g. the opposite of ark_se/de...
 #[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
@@ -139,13 +139,8 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
 #[allow(dead_code)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
-    pub fn new<R: RngCore + CryptoRng>(
-        max_num_shares: usize,
-        radix_exponent: u8,
-        rng: &mut R,
-    ) -> Self {
-        let num_chunks_per_share =
-            E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent as u32) as usize;
+    pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, rng: &mut R) -> Self {
+        let num_chunks_per_share = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32) as usize;
         let max_num_chunks_padded =
             ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
 
@@ -154,18 +149,18 @@ impl<E: Pairing> PublicParameters<E> {
             pp_elgamal: chunked_elgamal::PublicParameters::default(),
             pk_range_proof: dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded,
-                radix_exponent as usize,
+                ell as usize,
                 group_generators,
                 rng,
             )
             .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
-            ell: radix_exponent,
+            ell,
             table: dlog::table::build::<E::G1>(
                 chunked_elgamal::PublicParameters::<E>::default().G.into(),
-                1u32 << (radix_exponent / 2),
+                1u32 << (ell / 2),
             ),
-            powers_of_radix: compute_powers_of_radix::<E>(radix_exponent),
+            powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 
         pp
@@ -180,17 +175,19 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
+const DEFAULT_ELL_FOR_TESTING: u8 = 16;
+
 impl<E: Pairing> Default for PublicParameters<E> {
     // This only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, 8, &mut rng) // make radix smaller if it speeds up tests???
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, &mut rng)
     }
 }
 
 impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares(n: usize) -> Self {
         let mut rng = thread_rng();
-        Self::new(n, 8, &mut rng)
+        Self::new(n, DEFAULT_ELL_FOR_TESTING, &mut rng)
     }
 }
