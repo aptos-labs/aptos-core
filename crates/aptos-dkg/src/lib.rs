@@ -107,7 +107,7 @@ impl<E: Pairing> traits::Reconstructable<ShamirSharingScheme<E::ScalarField>> fo
         assert_le!(shares.len(), sc.get_total_num_players());
 
         let shares_destructured: Vec<(Player, E::ScalarField)> = shares
-            .into_iter()
+            .iter()
             .map(|(player, scalar)| (*player, scalar.0))
             .collect();
 
