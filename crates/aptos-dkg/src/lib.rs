@@ -116,7 +116,7 @@ impl<E: Pairing> traits::Reconstructable<arkworks::ThresholdConfig<E::ScalarFiel
                 x: sc
                     .domain
                     .elements()
-                    .nth(p.id as usize)
+                    .nth(p.id)
                     .expect("Too many players for the FFT domain?"), // TODO: FIX THIS
                 y: share.0,
             })

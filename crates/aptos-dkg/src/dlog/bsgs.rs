@@ -9,24 +9,29 @@ use std::collections::HashMap;
 /// # Arguments
 /// - `G`: base of the exponentiation
 /// - `H`: target point
-/// - `baby_table`: precomputed HashMap from `C::Affine.to_compressed()` |---> exponent
-/// - `m`: size of the baby-step table
+/// - `baby_table`: precomputed HashMap from `C.to_compressed()` |---> exponent
+/// - `range_limit`: maximum size of the exponent we're trying to obtain. TODO: Change to u64?
 #[allow(non_snake_case)]
-pub fn dlog<C: CurveGroup>(G: C, H: C, baby_table: &HashMap<Vec<u8>, u32>, m: u32) -> Option<u32> {
-    debug_assert!(
-        baby_table.len() == m as usize,
-        "Expected baby_table to have {} entries, but got {}",
-        m,
-        baby_table.len()
-    ); // TODO: so we're fixing the total bit size to double the baby table size? Sure?
+pub fn dlog<C: CurveGroup>(
+    G: C,
+    H: C,
+    baby_table: &HashMap<Vec<u8>, u32>,
+    range_limit: u32,
+) -> Option<u32> {
+    let byte_size = G.compressed_size();
+
+    let m = baby_table
+        .len()
+        .try_into()
+        .expect("Table seems rather large");
+    let n = range_limit.div_ceil(m);
 
     let G_neg_m = G * -C::ScalarField::from(m);
 
     let mut gamma = H;
-    let size = gamma.compressed_size();
 
-    for i in 0..m {
-        let mut buf = vec![0u8; size];
+    for i in 0..n {
+        let mut buf = vec![0u8; byte_size];
         gamma.serialize_compressed(&mut buf[..]).unwrap();
 
         if let Some(&j) = baby_table.get(&buf) {
@@ -44,12 +49,12 @@ pub fn dlog_vec<C: CurveGroup>(
     G: C,
     H_vec: &[C],
     baby_table: &HashMap<Vec<u8>, u32>,
-    m: u32,
+    range_limit: u32,
 ) -> Option<Vec<u32>> {
     let mut result = Vec::with_capacity(H_vec.len());
 
     for H in H_vec {
-        if let Some(x) = dlog(G, *H, baby_table, m) {
+        if let Some(x) = dlog(G, *H, baby_table, range_limit) {
             result.push(x);
         } else {
             return None; // fail early if any element cannot be solved
@@ -70,16 +75,16 @@ mod tests {
     #[test]
     fn test_bsgs_bn254_exhaustive() {
         let G = G1Projective::generator();
-        let m = 1 << 4;
+        let range_limit = 1 << 8;
 
-        let baby_table = dlog::table::build::<G1Projective>(G, m);
+        let baby_table = dlog::table::build::<G1Projective>(G, 1 << 4);
 
-        // Test all values of x from 0 to m^2 - 1
-        for x in 0..m * m {
-            let H = G * ark_bn254::Fr::from(x as u32);
+        // Test **all** values of x from 0 to `range_limit - 1`
+        for x in 0..range_limit {
+            let H = G * ark_bn254::Fr::from(x);
 
-            let recovered =
-                dlog::<G1Projective>(G, H, &baby_table, m).expect("Failed to recover discrete log");
+            let recovered = dlog::<G1Projective>(G, H, &baby_table, range_limit)
+                .expect("Failed to recover discrete log");
 
             assert_eq!(recovered, x, "Discrete log mismatch for x = {}", x);
         }

@@ -4,17 +4,18 @@
 use ark_ec::CurveGroup;
 use std::collections::HashMap;
 
-/// Build a baby-step table of size `m`
+/// Build a baby-step table of size `table_size`
 ///
-/// Returns a HashMap: `C::Affine.to_compressed() |---> exponent`
+/// Returns a HashMap: `C.to_compressed() |---> exponent`
 #[allow(non_snake_case)]
-pub fn build<C: CurveGroup>(G: C, m: u32) -> HashMap<Vec<u8>, u32> {
-    let mut table = HashMap::with_capacity(m as usize);
+pub fn build<C: CurveGroup>(G: C, table_size: u32) -> HashMap<Vec<u8>, u32> {
+    let byte_size = G.compressed_size();
+
+    let mut table = HashMap::with_capacity(table_size as usize);
     let mut current = C::zero();
 
-    for j in 0..m {
-        let size = current.compressed_size();
-        let mut buf = vec![0u8; size];
+    for j in 0..table_size {
+        let mut buf = vec![0u8; byte_size];
         current.serialize_compressed(&mut &mut buf[..]).unwrap();
         table.insert(buf, j);
         current += G;
@@ -24,7 +25,7 @@ pub fn build<C: CurveGroup>(G: C, m: u32) -> HashMap<Vec<u8>, u32> {
 }
 
 #[allow(non_snake_case)]
-pub fn build_default<C: CurveGroup>(m: u32) -> HashMap<Vec<u8>, u32> {
+pub fn build_default<C: CurveGroup>(table_size: u32) -> HashMap<Vec<u8>, u32> {
     let G = C::generator();
-    build(G, m)
+    build(G, table_size)
 }
