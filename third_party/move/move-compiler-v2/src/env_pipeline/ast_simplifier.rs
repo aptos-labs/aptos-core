@@ -52,7 +52,7 @@ use itertools::Itertools;
 use log::{debug, log_enabled, trace, Level};
 use move_core_types::ability::Ability;
 use move_model::{
-    ast::{Exp, ExpData, Operation, Pattern, Value, VisitorPosition},
+    ast::{Exp, ExpData, MatchArm, Operation, Pattern, Value, VisitorPosition},
     constant_folder::ConstantFolder,
     exp_rewriter::ExpRewriterFunctions,
     model::{FunctionEnv, GlobalEnv, NodeId, Parameter},
@@ -868,6 +868,41 @@ impl ExpRewriterFunctions for SimplifierRewriter<'_> {
                     None
                 }
             })
+    }
+
+    fn rewrite_match(&mut self, id: NodeId, disc: &Exp, arms: &[MatchArm]) -> Option<Exp> {
+        // match (e) { V(_) => true, _ => false } ==> e is V
+        let is_bool = |e: &Exp, test: bool| -> bool {
+            matches!(e.as_ref(), ExpData::Value(_, Value::Bool(v)) if test == *v)
+        };
+        if arms.len() == 2
+            && let MatchArm {
+                loc: _,
+                pattern: Pattern::Struct(_, qid, Some(variant), args),
+                condition: None,
+                body,
+            } = &arms[0]
+            && args.iter().all(|p| matches!(p, Pattern::Wildcard(_)))
+            && is_bool(body, true)
+            && let MatchArm {
+                loc: _,
+                pattern: Pattern::Wildcard(_),
+                condition: None,
+                body,
+            } = &arms[1]
+            && is_bool(body, false)
+        {
+            Some(
+                ExpData::Call(
+                    id,
+                    Operation::TestVariants(qid.module_id, qid.id, vec![*variant]),
+                    vec![disc.clone()],
+                )
+                .into_exp(),
+            )
+        } else {
+            None
+        }
     }
 
     fn rewrite_enter_block_scope(

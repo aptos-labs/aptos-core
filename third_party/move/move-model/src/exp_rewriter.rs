@@ -246,6 +246,9 @@ pub trait ExpRewriterFunctions {
     ) -> Option<MatchArm> {
         None
     }
+    fn rewrite_match(&mut self, id: NodeId, disc: &Exp, arms: &[MatchArm]) -> Option<Exp> {
+        None
+    }
     // Optionally rewrite a pattern, which may be in `Let`, `Lambda`, or `Assign` expression.
     //
     // Parameter`creating_scope` is `true` for `Let` and `Lambda` operations, which create a new
@@ -509,8 +512,10 @@ pub trait ExpRewriterFunctions {
                     arms_changed =
                         arms_changed || arm_changed || pat_changed || cond_changed || body_changed;
                 }
-                if id_changed || disc_changed || arms_changed {
-                    Match(*id, new_disc, new_arms).into_exp()
+                if let Some(new_exp) = self.rewrite_match(new_id, &new_disc, &new_arms) {
+                    new_exp
+                } else if id_changed || disc_changed || arms_changed {
+                    Match(new_id, new_disc, new_arms).into_exp()
                 } else {
                     exp
                 }
