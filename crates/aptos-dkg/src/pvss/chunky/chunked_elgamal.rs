@@ -217,12 +217,12 @@ impl<'a, E: Pairing> sigma_protocol::Trait<E> for Homomorphism<'a, E> {
 }
 
 #[allow(dead_code)] // Will be used in the new PVSS
-pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: usize) -> Vec<F>
+pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: u32) -> Vec<F>
 where
     F: ark_ff::PrimeField,
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
-    let mut r_vals = Vec::with_capacity(num_chunks);
+    let mut r_vals = Vec::with_capacity(num_chunks as usize);
     r_vals.push(F::zero()); // placeholder for r_0
     let mut remainder = F::zero();
 
@@ -247,21 +247,24 @@ where
 mod tests {
     use super::*;
     use crate::{pvss::chunky::chunks, sigma_protocol::homomorphism::Trait as _};
-    use aptos_crypto::arkworks::random::{sample_field_elements, unsafe_random_points};
+    use aptos_crypto::{
+        arkworks::random::{sample_field_elements, unsafe_random_points},
+        utils,
+    };
     use ark_ec::CurveGroup;
-    use ark_ff::{Field, PrimeField};
+    use ark_ff::PrimeField;
     use rand::thread_rng;
 
     #[allow(non_snake_case)]
     fn test_reconstruct_ciphertexts<E: Pairing>() {
         let mut rng = thread_rng();
 
-        // 1. Generate two random "shares"
+        // 1. Generate two random values
         let zs = sample_field_elements(2, &mut rng);
 
         // 2. Choose a radix and compute number_of_chunks
-        let radix_exponent = 16; // Making this smaller would probably make the test slower
-        let number_of_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent) as usize;
+        let radix_exponent = 16u8; // Making this smaller would probably make the test slower
+        let number_of_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent as u32);
 
         // 3. Generate correlated randomness
         let rs: Vec<E::ScalarField> =
@@ -270,7 +273,7 @@ mod tests {
         // 4. Convert the two values into little-endian chunks
         let chunked_values: Vec<Vec<E::ScalarField>> = zs
             .iter()
-            .map(|v| chunks::scalar_to_le_chunks(radix_exponent as usize, v))
+            .map(|z| chunks::scalar_to_le_chunks(radix_exponent, z))
             .collect();
 
         // 5. Build a witness for the homomorphism
@@ -279,13 +282,12 @@ mod tests {
             plaintext_randomness: Scalar::vec_from_inner(rs),
         };
 
-        // 6. Initialize a homomorphism (mock params or reuse pp, eks as needed)
-        let eks_inner: Vec<_> = E::G1::normalize_batch(&unsafe_random_points(2, &mut rng));
+        // 6. Initialize the homomorphism
         let pp = PublicParameters::default();
 
         let hom = Homomorphism {
             pp: &pp,
-            eks: &eks_inner,
+            eks: &E::G1::normalize_batch(&unsafe_random_points(2, &mut rng)), // Randomly generate encryption keys, we won't use them
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
@@ -296,24 +298,14 @@ mod tests {
 
         // 8. Reconstruct original values from the chunked ciphertexts
         for (i, &orig_val) in zs.iter().enumerate() {
-            // compute powers of the radix for this chunk vector safely in the field
-            let radix_f = E::ScalarField::from(1u64 << radix_exponent); // radix as field element
-            let mut cur_power = E::ScalarField::ONE;
-            let powers_of_radix: Vec<E::ScalarField> = (0..Cs[i].len())
-                .map(|_| {
-                    let p = cur_power;
-                    cur_power *= radix_f;
-                    p
-                })
-                .collect();
+            let powers_of_radix: Vec<E::ScalarField> =
+                utils::powers(E::ScalarField::from(1u64 << radix_exponent), Cs[i].len());
 
-            // perform the MSM to reconstruct the "plaintext group element"
+            // perform the MSM to reconstruct the encryption of z_i
             let reconstructed = E::G1::msm(&E::G1::normalize_batch(&Cs[i]), &powers_of_radix)
                 .expect("MSM reconstruction failed");
 
-            // multiply the original scalar by the group generator (or message base)
             let expected = *pp.message_base() * orig_val;
-
             assert_eq!(
                 reconstructed, expected,
                 "Reconstructed value {} does not match original",

@@ -25,6 +25,7 @@ use aptos_crypto::arkworks::{
 };
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
+use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use more_asserts::{assert_ge, assert_le};
 use rand::Rng;
@@ -95,8 +96,6 @@ impl<E: Pairing> UniformRand for Scalar<E> {
     }
 }
 
-use ark_poly::EvaluationDomain; // TODO: MOVE THIS
-
 impl<E: Pairing> traits::Reconstructable<arkworks::ThresholdConfig<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
@@ -117,7 +116,7 @@ impl<E: Pairing> traits::Reconstructable<arkworks::ThresholdConfig<E::ScalarFiel
                     .domain
                     .elements()
                     .nth(p.id)
-                    .expect("Too many players for the FFT domain?"), // TODO: FIX THIS
+                    .expect("Too many players for the FFT domain?"), // Not so efficient but will be changed again soon
                 y: share.0,
             })
             .collect();

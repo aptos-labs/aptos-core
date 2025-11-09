@@ -9,11 +9,11 @@ use std::collections::HashMap;
 
 /// Generic benchmark for the discrete log computation using Baby-step Giant-step
 #[allow(non_snake_case)]
-fn bench_dlog_for_engine<E: Pairing>(c: &mut Criterion, engine_name: &str)
+fn bench_dlog<E: Pairing>(c: &mut Criterion, curve_name: &str)
 where
     E::G1: CurveGroup<ScalarField = E::ScalarField>,
 {
-    let mut group = c.benchmark_group(format!("dlog_bsgs_{}", engine_name));
+    let mut group = c.benchmark_group(format!("dlog_bsgs_{}", curve_name));
 
     // Parameters
     let range_limit = 1 << 16;
@@ -54,12 +54,47 @@ where
     group.finish();
 }
 
+#[allow(non_snake_case)]
+fn bench_table_build<E: Pairing>(c: &mut Criterion, curve_name: &str)
+where
+    E::G1: CurveGroup<ScalarField = E::ScalarField>,
+{
+    let mut group = c.benchmark_group(format!("dlog_table_build_{}", curve_name));
+
+    // Time seems almost linear, so doesn't make sense to benchmark many values
+    let table_sizes: &[u32] = &[
+        1u32 << 8, // 256
+    ];
+
+    let G = E::G1::generator();
+
+    for &table_size in table_sizes {
+        group.bench_with_input(
+            BenchmarkId::from_parameter(table_size),
+            &table_size,
+            |b, &_ts| {
+                b.iter(|| {
+                    // Measure table build time only
+                    let table: HashMap<Vec<u8>, u32> = table::build::<E::G1>(G, table_size);
+                    let table_len: u32 = table.len().try_into().unwrap();
+                    assert_eq!(table_len, table_size, "unexpected table length");
+                });
+            },
+        );
+    }
+
+    group.finish();
+}
+
 fn criterion_benchmark(c: &mut Criterion) {
     use ark_bls12_381::Bls12_381;
     use ark_bn254::Bn254;
 
-    bench_dlog_for_engine::<Bn254>(c, "bn254");
-    bench_dlog_for_engine::<Bls12_381>(c, "bls12_381");
+    bench_dlog::<Bn254>(c, "bn254");
+    bench_table_build::<Bn254>(c, "bn254");
+
+    bench_dlog::<Bls12_381>(c, "bls12_381");
+    bench_table_build::<Bls12_381>(c, "bls12_381");
 }
 
 criterion_group!(benches, criterion_benchmark);
