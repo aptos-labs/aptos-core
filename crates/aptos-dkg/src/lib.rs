@@ -19,13 +19,11 @@
 
 use crate::pvss::{traits, Player};
 use aptos_crypto::arkworks::{
-    self,
     random::{sample_field_element, UniformRand},
-    shamir::ShamirShare,
+    shamir::ShamirSharingScheme,
 };
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
-use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use more_asserts::{assert_ge, assert_le};
 use rand::Rng;
@@ -96,31 +94,23 @@ impl<E: Pairing> UniformRand for Scalar<E> {
     }
 }
 
-impl<E: Pairing> traits::Reconstructable<arkworks::ThresholdConfig<E::ScalarField>> for Scalar<E> {
+// TODO: maybe move the Reconstructable trait to the SecretSharingConfig in the PVSS trait, with associated Scalar equal to InputSecret
+// then make the existing implementation of `fn reconstruct()` part of a trait... and then we can remove the trivial implementation below!
+impl<E: Pairing> traits::Reconstructable<ShamirSharingScheme<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
-    // TODO: converting between Vec<(Player, Self::Share)> and Vec<ShamirShare<E::ScalarField>> feels bulky,
-    // one of them needs to go
     fn reconstruct(
-        sc: &arkworks::ThresholdConfig<E::ScalarField>,
+        sc: &ShamirSharingScheme<E::ScalarField>,
         shares: &Vec<(Player, Self::Share)>,
     ) -> Self {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
 
-        // Convert shares to a Vec of ShamirShare // TODO: get rid of this?
-        let shamir_shares: Vec<ShamirShare<E::ScalarField>> = shares
-            .iter()
-            .map(|(p, share)| ShamirShare {
-                x: sc
-                    .domain
-                    .elements()
-                    .nth(p.id)
-                    .expect("Too many players for the FFT domain?"), // Not so efficient but will be changed again soon
-                y: share.0,
-            })
+        let shares_destructured: Vec<(Player, E::ScalarField)> = shares
+            .into_iter()
+            .map(|(player, scalar)| (*player, scalar.0))
             .collect();
 
-        Scalar(sc.reconstruct(&shamir_shares).unwrap())
+        Scalar(sc.reconstruct(&shares_destructured).unwrap())
     }
 }

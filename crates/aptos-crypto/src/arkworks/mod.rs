@@ -13,8 +13,7 @@ pub mod vanishing_poly;
 
 use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
-use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
-use serde::Serialize;
+use ark_poly::EvaluationDomain;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]
@@ -61,21 +60,6 @@ pub fn compute_roots_of_unity<F: FftField>(num_omegas: usize) -> Vec<F> {
     let eval_dom = ark_poly::Radix2EvaluationDomain::<F>::new(num_omegas)
         .expect("Could not reconstruct evaluation domain");
     eval_dom.elements().collect()
-}
-
-/// Configuration for a threshold cryptography scheme. Usually one restricts `F` to `Primefield`
-/// but any field is theoretically possible.
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-pub struct ThresholdConfig<F: FftField> {
-    /// Total number of participants (shares)
-    pub n: usize,
-    /// Threshold number of shares required to reconstruct the secret. Note that in
-    /// MPC literature `t` usually denotes the maximal adversary threshold, so `t + 1`
-    /// shares would be required to reconstruct the secret
-    pub t: usize,
-    /// Used for FFT-based polynomial operations. Recomputed from `n` on deserialize
-    #[serde(skip)]
-    pub domain: Radix2EvaluationDomain<F>,
 }
 
 #[cfg(test)]
