@@ -238,6 +238,7 @@ members = [
     "third_party/move/move-symbol-pool",
     "third_party/move/move-vm/integration-tests",
     "third_party/move/move-vm/metrics",
+    "third_party/move/move-vm/profiler",
     "third_party/move/move-vm/runtime",
     "third_party/move/move-vm/test-utils",
     "third_party/move/move-vm/transactional-tests",
@@ -843,6 +844,7 @@ ureq = { version = "1.5.4", features = [
     "native-tls",
 ], default-features = false }
 url = { version = "2.4.0", features = ["serde"] }
+usdt = "0.6.0"
 uuid = { version = "1.0.0", features = ["v4", "serde"] }
 variant_count = "1.1.0"
 walkdir = "2.3.3"
@@ -902,6 +904,7 @@ move-unit-test = { path = "third_party/move/tools/move-unit-test", features = [
     "table-extension",
 ] }
 move-vm-metrics = { path = "third_party/move/move-vm/metrics" }
+move-vm-profiler = { path = "third_party/move/move-vm/profiler" }
 move-vm-runtime = { path = "third_party/move/move-vm/runtime" }
 move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = [
     "table-extension",

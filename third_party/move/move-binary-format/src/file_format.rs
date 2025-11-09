@@ -61,7 +61,7 @@ macro_rules! define_index {
         kind: $kind: ident,
         doc: $comment: literal,
     } => {
-        #[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+        #[derive(Clone, Copy, Default, Eq, Hash, Ord, PartialEq, PartialOrd, Serialize)]
         #[cfg_attr(any(test, feature = "fuzzing"), derive(proptest_derive::Arbitrary))]
         #[cfg_attr(any(test, feature = "fuzzing"), proptest(no_params))]
         #[cfg_attr(feature = "fuzzing", derive(arbitrary::Arbitrary, dearbitrary::Dearbitrary))]

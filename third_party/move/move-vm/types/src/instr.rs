@@ -11,6 +11,7 @@ use move_core_types::{
     function::ClosureMask,
     int256::{I256, U256},
 };
+use serde::Serialize;
 
 /// The VM's internal representation of instructions.
 ///
@@ -19,7 +20,7 @@ use move_core_types::{
 ///
 /// This provides path for incremental performance optimizations, while making it less painful to
 /// maintain backward compatibility.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
 pub enum Instruction {
     Pop,
     Ret,

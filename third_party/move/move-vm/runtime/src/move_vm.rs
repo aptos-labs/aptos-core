@@ -21,6 +21,7 @@ use move_binary_format::{
 };
 use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_metrics::{Timer, VM_TIMER};
+use move_vm_profiler::{Profiler, VM_PROFILER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
@@ -117,6 +118,9 @@ impl MoveVM {
 
         let return_values = {
             let _timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
+
+            let _guard = VM_PROFILER.function(function.name_as_pretty_string());
+
             Interpreter::entrypoint(
                 function,
                 deserialized_args,

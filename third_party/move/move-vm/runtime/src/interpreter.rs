@@ -42,6 +42,7 @@ use move_core_types::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
 };
+use move_vm_profiler::{Profiler, VM_PROFILER};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
@@ -1948,6 +1949,8 @@ impl Frame {
                         ),
                     )
                 });
+
+                let _guard = VM_PROFILER.instruction(instruction);
 
                 // Paranoid Mode: Perform the type stack transition check to make sure all type safety requirements has been met.
                 //
