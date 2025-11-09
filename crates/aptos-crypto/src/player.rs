@@ -24,6 +24,11 @@ pub struct Player {
 }
 
 impl Player {
+    /// Creates a new `Player`
+    pub fn new(id: usize) -> Self {
+        Self { id } 
+    }
+
     /// Returns the numeric ID of the player.
     pub fn get_id(&self) -> usize {
         self.id

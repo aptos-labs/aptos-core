@@ -20,7 +20,7 @@
 use crate::pvss::{traits, Player};
 use aptos_crypto::arkworks::{
     random::{sample_field_element, UniformRand},
-    shamir::{ShamirShare, ThresholdConfig},
+    shamir::ThresholdConfig,
 };
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
@@ -94,6 +94,7 @@ impl<E: Pairing> UniformRand for Scalar<E> {
     }
 }
 
+// TODO is this trait necessary? Since ThresholdConfig already has reconstruct()
 impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
@@ -106,15 +107,9 @@ impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Sc
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
 
-        // Convert shares to a Vec of ShamirShare // TODO: get rid of this?
-        let shamir_shares: Vec<ShamirShare<E::ScalarField>> = shares
-            .iter()
-            .map(|(p, share)| ShamirShare {
-                x: E::ScalarField::from(p.id as u64),
-                y: share.0,
-            })
-            .collect();
+        let shares_destructured: Vec<(Player, E::ScalarField)> = 
+        shares.into_iter().map(|(player, scalar)| (*player, scalar.0)).collect();
 
-        Scalar(sc.reconstruct(&shamir_shares).unwrap())
+        Scalar(sc.reconstruct(&shares_destructured).unwrap())
     }
 }
