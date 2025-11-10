@@ -59,18 +59,17 @@ fun m::test($t0: bool): u64 {
      var $t5: u64
      var $t6: u64
   0: $t2 := 2
-  1: if ($t0) goto 2 else goto 7
+  1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t3 := 3
   4: $t1 := move($t3)
-  5: label L2
-  6: return $t1
-  7: label L1
-  8: $t5 := move($t2)
-  9: $t6 := 1
- 10: $t4 := +($t5, $t6)
- 11: $t1 := move($t4)
- 12: goto 5
+  5: return $t1
+  6: label L1
+  7: $t5 := move($t2)
+  8: $t6 := 1
+  9: $t4 := +($t5, $t6)
+ 10: $t1 := move($t4)
+ 11: return $t1
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -88,7 +87,7 @@ fun m::test($t0: bool): u64 {
   0: $t2 := 2
      # live vars: $t0, $t2
      # events: e:$t0
-  1: if ($t0) goto 2 else goto 7
+  1: if ($t0) goto 2 else goto 6
      # live vars: $t2
   2: label L0
      # live vars:
@@ -98,26 +97,24 @@ fun m::test($t0: bool): u64 {
      # events: e:$t3, b:$t1
   4: $t1 := move($t3)
      # live vars: $t1
-  5: label L2
-     # live vars: $t1
-  6: return $t1
+  5: return $t1
      # live vars: $t2
-  7: label L1
+  6: label L1
      # live vars: $t2
      # events: e:$t2, b:$t5
-  8: $t5 := move($t2)
+  7: $t5 := move($t2)
      # live vars: $t5
      # events: b:$t6
-  9: $t6 := 1
+  8: $t6 := 1
      # live vars: $t5, $t6
      # events: e:$t5, e:$t6, b:$t4
- 10: $t4 := +($t5, $t6)
+  9: $t4 := +($t5, $t6)
      # live vars: $t4
      # events: e:$t4
- 11: $t1 := move($t4)
+ 10: $t1 := move($t4)
      # live vars: $t1
      # events: e:$t1
- 12: goto 5
+ 11: return $t1
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -131,18 +128,17 @@ fun m::test($t0: bool): u64 {
      var $t5: u64 [unused]
      var $t6: u64
   0: $t2 := 2
-  1: if ($t0) goto 2 else goto 7
+  1: if ($t0) goto 2 else goto 6
   2: label L0
   3: $t3 := 3
   4: $t3 := move($t3)
-  5: label L2
-  6: return $t3
-  7: label L1
-  8: $t2 := move($t2)
-  9: $t6 := 1
- 10: $t2 := +($t2, $t6)
- 11: $t3 := move($t2)
- 12: goto 5
+  5: return $t3
+  6: label L1
+  7: $t2 := move($t2)
+  8: $t6 := 1
+  9: $t2 := +($t2, $t6)
+ 10: $t3 := move($t2)
+ 11: return $t3
 }
 
 ============ after DeadStoreElimination: ================
@@ -156,17 +152,16 @@ fun m::test($t0: bool): u64 {
      var $t5: u64 [unused]
      var $t6: u64
   0: $t2 := 2
-  1: if ($t0) goto 2 else goto 6
+  1: if ($t0) goto 2 else goto 5
   2: label L0
   3: $t3 := 3
-  4: label L2
-  5: return $t3
-  6: label L1
-  7: $t2 := move($t2)
-  8: $t6 := 1
-  9: $t2 := +($t2, $t6)
- 10: $t3 := move($t2)
- 11: goto 4
+  4: return $t3
+  5: label L1
+  6: $t2 := move($t2)
+  7: $t6 := 1
+  8: $t2 := +($t2, $t6)
+  9: $t3 := move($t2)
+ 10: return $t3
 }
 
 
@@ -176,22 +171,17 @@ module 0xc0ffee::m
 // Function definition at index 0
 fun test(l0: bool): u64
     local l1: u64
-    local l2: u64
     ld_u64 2
     st_loc l1
     move_loc l0
     br_false l0
     ld_u64 3
     // @5
-    st_loc l2
-l1: move_loc l2
     ret
 l0: move_loc l1
     ld_u64 1
-    // @10
     add
-    st_loc l2
-    branch l1
+    ret
 
 
 ============ bytecode verification succeeded ========

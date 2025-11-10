@@ -38,11 +38,11 @@ l3: move_loc l0
     // @15
     ld_u64 0
     eq
-    br_true l4
-    branch l5
-l4: call bar
+    br_false l4
+    call bar
+    ret
     // @20
-l5: ret
+l4: ret
 
 
 ============ bytecode verification succeeded ========

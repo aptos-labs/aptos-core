@@ -51,7 +51,6 @@ enum Outer
     local l1: &Inner
     local l2: u64
     local l3: u64
-    local l4: u64
     borrow_loc l0
     st_loc l1
     copy_loc l1
@@ -62,26 +61,21 @@ enum Outer
     pop
     move_loc l0
     unpack_variant Inner, Inner1
-    st_loc l2
-    // @10
-l2: move_loc l2
     ret
+    // @10
 l0: move_loc l1
     test_variant Inner, Inner2
     br_false l1
-    // @15
     move_loc l0
     unpack_variant Inner, Inner2
+    // @15
     add
-    st_loc l2
-    branch l2
-    // @20
+    ret
 l1: ld_u64 14566554180833181697
     abort
 
 // Function definition at index 1
 #[persistent] public fun is_inner1(l0: &Inner): bool
-    local l1: bool
     copy_loc l0
     test_variant Inner, Inner1
     br_false l0
@@ -89,19 +83,15 @@ l1: ld_u64 14566554180833181697
     pop
     // @5
     ld_true
-    st_loc l1
-l1: move_loc l1
     ret
 l0: move_loc l0
-    // @10
     pop
     ld_false
-    st_loc l1
-    branch l1
+    // @10
+    ret
 
 // Function definition at index 2
 #[persistent] public fun is_some<T0>(l0: &Option<T0>): bool
-    local l1: bool
     copy_loc l0
     test_variant Option<T0>, None
     br_false l0
@@ -109,23 +99,18 @@ l0: move_loc l0
     pop
     // @5
     ld_false
-    st_loc l1
-l2: move_loc l1
     ret
 l0: move_loc l0
-    // @10
     test_variant Option<T0>, Some
     br_false l1
+    // @10
     ld_true
-    st_loc l1
-    branch l2
-    // @15
+    ret
 l1: ld_u64 14566554180833181697
     abort
 
 // Function definition at index 3
 #[persistent] public fun is_some_dropped<T0: drop>(l0: Option<T0>): bool
-    local l1: bool
     borrow_loc l0
     test_variant Option<T0>, None
     br_false l0
@@ -133,17 +118,12 @@ l1: ld_u64 14566554180833181697
     unpack_variant Option<T0>, None
     // @5
     ld_false
-    st_loc l1
-l1: move_loc l1
     ret
 l0: ld_true
-    // @10
-    st_loc l1
-    branch l1
+    ret
 
 // Function definition at index 4
 #[persistent] public fun is_some_specialized(l0: &Option<Option<u64>>): bool
-    local l1: bool
     copy_loc l0
     test_variant Option<Option<u64>>, None
     br_false l0
@@ -151,50 +131,44 @@ l0: ld_true
     pop
     // @5
     ld_false
-    st_loc l1
-l6: move_loc l1
     ret
 l0: copy_loc l0
-    // @10
     test_variant Option<Option<u64>>, Some
     br_true l1
+    // @10
     branch l2
 l2: copy_loc l0
     test_variant Option<Option<u64>>, Some
-    // @15
     br_true l3
     move_loc l0
+    // @15
     pop
 l5: ld_u64 14566554180833181697
     abort
-    // @20
 l3: move_loc l0
     borrow_variant_field Option<Option<u64>>, Some::value
+    // @20
     test_variant Option<u64>, Some
     br_true l4
     branch l5
-    // @25
 l4: ld_true
-    st_loc l1
-    branch l6
+    ret
+    // @25
 l1: copy_loc l0
     borrow_variant_field Option<Option<u64>>, Some::value
-    // @30
     test_variant Option<u64>, None
-    br_true l7
+    br_true l6
     branch l2
-l7: move_loc l0
+    // @30
+l6: move_loc l0
     pop
-    // @35
     ld_false
-    st_loc l1
-    branch l6
+    ret
 
 // Function definition at index 5
 #[persistent] public fun outer_value(l0: Outer): u64
     local l1: &Outer
-    local l2: u64
-    local l3: Box
+    local l2: Box
     borrow_loc l0
     st_loc l1
     copy_loc l1
@@ -207,45 +181,39 @@ l7: move_loc l0
     unpack_variant Outer, None
     ld_u64 0
     // @10
-    st_loc l2
-l2: move_loc l2
     ret
 l0: copy_loc l1
     test_variant Outer, One
-    // @15
     br_false l1
     move_loc l1
+    // @15
     pop
     move_loc l0
     unpack_variant Outer, One
-    // @20
     call inner_value
-    st_loc l2
-    branch l2
+    ret
+    // @20
 l1: move_loc l1
     test_variant Outer, Two
-    // @25
-    br_false l3
+    br_false l2
     move_loc l0
     unpack_variant Outer, Two
-    st_loc l3
+    // @25
+    st_loc l2
     call inner_value
-    // @30
-    borrow_loc l3
+    borrow_loc l2
     borrow_field Box, x
     read_ref
+    // @30
     add
-    st_loc l2
-    // @35
-    branch l2
-l3: ld_u64 14566554180833181697
+    ret
+l2: ld_u64 14566554180833181697
     abort
 
 // Function definition at index 6
 #[persistent] public fun outer_value_nested(l0: Outer): u64
     local l1: &Outer
-    local l2: u64
-    local l3: Box
+    local l2: Box
     borrow_loc l0
     st_loc l1
     copy_loc l1
@@ -258,64 +226,57 @@ l3: ld_u64 14566554180833181697
     unpack_variant Outer, None
     ld_u64 0
     // @10
-    st_loc l2
-l4: move_loc l2
     ret
 l0: copy_loc l1
     test_variant Outer, One
-    // @15
     br_true l1
     branch l2
+    // @15
 l2: copy_loc l1
     test_variant Outer, One
     br_false l3
-    // @20
     move_loc l1
     pop
+    // @20
     move_loc l0
     unpack_variant Outer, One
     call inner_value
-    // @25
-    st_loc l2
-    branch l4
+    ret
 l3: move_loc l1
+    // @25
     test_variant Outer, Two
-    br_false l5
-    // @30
+    br_false l4
     move_loc l0
     unpack_variant Outer, Two
-    st_loc l3
+    st_loc l2
+    // @30
     call inner_value
-    borrow_loc l3
-    // @35
+    borrow_loc l2
     borrow_field Box, x
     read_ref
     add
-    st_loc l2
-    branch l4
-    // @40
-l5: ld_u64 14566554180833181697
+    // @35
+    ret
+l4: ld_u64 14566554180833181697
     abort
 l1: copy_loc l1
     borrow_variant_field Outer, One::i
+    // @40
     test_variant Inner, Inner1
-    // @45
-    br_true l6
+    br_true l5
     branch l2
-l6: move_loc l1
+l5: move_loc l1
     pop
+    // @45
     move_loc l0
-    // @50
     unpack_variant Outer, One
     unpack_variant Inner, Inner1
-    st_loc l2
-    branch l4
+    ret
 
 // Function definition at index 7
 #[persistent] public fun outer_value_with_cond(l0: Outer): u64
     local l1: &Outer
-    local l2: u64
-    local l3: Box
+    local l2: Box
     borrow_loc l0
     st_loc l1
     copy_loc l1
@@ -328,65 +289,58 @@ l6: move_loc l1
     unpack_variant Outer, None
     ld_u64 0
     // @10
-    st_loc l2
-l4: move_loc l2
     ret
 l0: copy_loc l1
     test_variant Outer, One
-    // @15
     br_true l1
     branch l2
+    // @15
 l2: copy_loc l1
     test_variant Outer, One
     br_false l3
-    // @20
     move_loc l1
     pop
+    // @20
     move_loc l0
     unpack_variant Outer, One
     call inner_value
-    // @25
-    st_loc l2
-    branch l4
+    ret
 l3: move_loc l1
+    // @25
     test_variant Outer, Two
-    br_false l5
-    // @30
+    br_false l4
     move_loc l0
     unpack_variant Outer, Two
-    st_loc l3
+    st_loc l2
+    // @30
     call inner_value
-    borrow_loc l3
-    // @35
+    borrow_loc l2
     borrow_field Box, x
     read_ref
     add
-    st_loc l2
-    branch l4
-    // @40
-l5: ld_u64 14566554180833181697
+    // @35
+    ret
+l4: ld_u64 14566554180833181697
     abort
 l1: copy_loc l1
     borrow_variant_field Outer, One::i
+    // @40
     call is_inner1
-    // @45
-    br_true l6
+    br_true l5
     branch l2
-l6: move_loc l1
+l5: move_loc l1
     pop
+    // @45
     move_loc l0
-    // @50
     unpack_variant Outer, One
     call inner_value
     ld_u64 2
     mod
-    st_loc l2
-    // @55
-    branch l4
+    // @50
+    ret
 
 // Function definition at index 8
 #[persistent] public fun outer_value_with_cond_ref(l0: &Outer): bool
-    local l1: bool
     copy_loc l0
     test_variant Outer, None
     br_false l0
@@ -394,50 +348,44 @@ l6: move_loc l1
     pop
     // @5
     ld_false
-    st_loc l1
-l4: move_loc l1
     ret
 l0: copy_loc l0
-    // @10
     test_variant Outer, One
     br_true l1
+    // @10
     branch l2
 l2: copy_loc l0
     test_variant Outer, One
-    // @15
     br_false l3
     move_loc l0
+    // @15
     borrow_variant_field Outer, One::i
     call is_inner1
-    st_loc l1
-    // @20
-    branch l4
+    ret
 l3: copy_loc l0
     test_variant Outer, Two
-    br_false l5
+    // @20
+    br_false l4
     move_loc l0
-    // @25
     borrow_variant_field Outer, Two::i
     call is_inner1
-    st_loc l1
-    branch l4
-l5: move_loc l0
-    // @30
+    ret
+    // @25
+l4: move_loc l0
     pop
     ld_u64 14566554180833181697
     abort
 l1: copy_loc l0
+    // @30
     borrow_variant_field Outer, One::i
-    // @35
     call is_inner1
-    br_true l6
+    br_true l5
     branch l2
-l6: move_loc l0
+l5: move_loc l0
+    // @35
     pop
-    // @40
     ld_true
-    st_loc l1
-    branch l4
+    ret
 
 // Function definition at index 9
 fun select_common_fields(l0: CommonFields): u64

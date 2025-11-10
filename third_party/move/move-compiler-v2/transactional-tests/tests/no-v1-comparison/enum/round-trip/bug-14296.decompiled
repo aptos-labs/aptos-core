@@ -19,8 +19,13 @@ module 0x42::test {
     struct S0 has drop {
     }
     fun extract_last_u8(p0: &E): u8 {
-        let _v0;
-        if (p0 is V1) _v0 = *&(&p0.y).x else if (p0 is V2) _v0 = 1u8 else abort 14566554180833181697;
-        _v0
+        loop {
+            if (!(p0 is V1)) {
+                if (p0 is V2) break;
+                abort 14566554180833181697
+            };
+            return *&(&p0.y).x
+        };
+        1u8
     }
 }

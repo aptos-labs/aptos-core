@@ -1,0 +1,17 @@
+Running Move unit tests
+[ PASS    ] 0x1::UnitTest::test_baz
+[ FAIL    ] 0x1::UnitTest::test_unexpected_success
+0x1::UnitTest::test_baz
+Output: Ok(Changes { accounts: {} })
+0x1::UnitTest::test_unexpected_success
+Output: Ok(Changes { accounts: {} })
+
+Test failures:
+
+Failures in 0x1::UnitTest:
+
+┌── test_unexpected_success ──────
+│ Test did not error as expected
+└──────────────────
+
+Test result: FAILED. Total tests: 2; passed: 1; failed: 1

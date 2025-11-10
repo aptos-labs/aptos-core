@@ -71,15 +71,15 @@ pub enum Value {
     U32(u32),
     U64(u64),
     U128(u128),
-    U256(int256::U256),
+    U256(Box<int256::U256>),
     I8(i8),
     I16(i16),
     I32(i32),
     I64(i64),
     I128(i128),
-    I256(int256::I256),
+    I256(Box<int256::I256>),
     Bool(bool),
-    Address(AccountAddress),
+    Address(Box<AccountAddress>),
 
     Container(Container),
 
@@ -407,7 +407,7 @@ impl Container {
     fn master_signer(x: AccountAddress) -> Self {
         Container::Struct(Rc::new(RefCell::new(vec![
             Value::U16(MASTER_SIGNER_VARIANT),
-            Value::Address(x),
+            Value::Address(Box::new(x)),
         ])))
     }
 }
@@ -484,20 +484,44 @@ macro_rules! impl_vm_value_ref {
     };
 }
 
+macro_rules! impl_vm_value_ref_boxed {
+    ($ty:ty, $tc:ident) => {
+        impl VMValueRef<$ty> for Value {
+            #[cfg_attr(feature = "inline-vm-casts", inline)]
+            fn value_ref(&self) -> PartialVMResult<&$ty> {
+                return match self {
+                    Value::$tc(x) => Ok(x.as_ref()),
+                    _ => __cannot_ref_cast(self),
+                };
+                #[cold]
+                fn __cannot_ref_cast(v: &Value) -> PartialVMResult<&$ty> {
+                    Err(
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                            "cannot take {:?} as &{}",
+                            v,
+                            stringify!($ty)
+                        )),
+                    )
+                }
+            }
+        }
+    };
+}
+
 impl_vm_value_ref!(u8, U8);
 impl_vm_value_ref!(u16, U16);
 impl_vm_value_ref!(u32, U32);
 impl_vm_value_ref!(u64, U64);
 impl_vm_value_ref!(u128, U128);
-impl_vm_value_ref!(int256::U256, U256);
+impl_vm_value_ref_boxed!(int256::U256, U256);
 impl_vm_value_ref!(i8, I8);
 impl_vm_value_ref!(i16, I16);
 impl_vm_value_ref!(i32, I32);
 impl_vm_value_ref!(i64, I64);
 impl_vm_value_ref!(i128, I128);
-impl_vm_value_ref!(int256::I256, I256);
+impl_vm_value_ref_boxed!(int256::I256, I256);
 impl_vm_value_ref!(bool, Bool);
-impl_vm_value_ref!(AccountAddress, Address);
+impl_vm_value_ref_boxed!(AccountAddress, Address);
 
 impl Value {
     fn as_value_ref<T>(&self) -> PartialVMResult<&T>
@@ -533,15 +557,15 @@ impl Value {
             U32(x) => U32(*x),
             U64(x) => U64(*x),
             U128(x) => U128(*x),
-            U256(x) => U256(*x),
+            U256(x) => U256(x.clone()),
             I8(x) => I8(*x),
             I16(x) => I16(*x),
             I32(x) => I32(*x),
             I64(x) => I64(*x),
             I128(x) => I128(*x),
-            I256(x) => I256(*x),
+            I256(x) => I256(x.clone()),
             Bool(x) => Bool(*x),
-            Address(x) => Address(*x),
+            Address(x) => Address(x.clone()),
 
             // Note: refs copy only clones Rc, so no need to increment depth.
             ContainerRef(r) => ContainerRef(r.copy_by_ref()),
@@ -562,7 +586,7 @@ impl Value {
                     .iter()
                     .map(|v| v.copy_value(depth + 1, max_depth))
                     .collect::<PartialVMResult<_>>()?;
-                ClosureValue(Closure(fun.clone_dyn()?, captured))
+                ClosureValue(Closure(fun.clone_dyn()?, Box::new(captured)))
             },
         })
     }
@@ -1393,15 +1417,15 @@ impl IndexedRef {
             VecU32(r) => Value::U32(r.borrow()[self.idx]),
             VecU64(r) => Value::U64(r.borrow()[self.idx]),
             VecU128(r) => Value::U128(r.borrow()[self.idx]),
-            VecU256(r) => Value::U256(r.borrow()[self.idx]),
+            VecU256(r) => Value::U256(Box::new(r.borrow()[self.idx])),
             VecI8(r) => Value::I8(r.borrow()[self.idx]),
             VecI16(r) => Value::I16(r.borrow()[self.idx]),
             VecI32(r) => Value::I32(r.borrow()[self.idx]),
             VecI64(r) => Value::I64(r.borrow()[self.idx]),
             VecI128(r) => Value::I128(r.borrow()[self.idx]),
-            VecI256(r) => Value::I256(r.borrow()[self.idx]),
+            VecI256(r) => Value::I256(Box::new(r.borrow()[self.idx])),
             VecBool(r) => Value::Bool(r.borrow()[self.idx]),
-            VecAddress(r) => Value::Address(r.borrow()[self.idx]),
+            VecAddress(r) => Value::Address(Box::new(r.borrow()[self.idx])),
 
             Locals(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
         };
@@ -1526,15 +1550,15 @@ impl IndexedRef {
             (Container::VecU32(r), Value::U32(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecU64(r), Value::U64(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecU128(r), Value::U128(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU256(r), Value::U256(x)) => r.borrow_mut()[self.idx] = *x,
+            (Container::VecU256(r), Value::U256(x)) => r.borrow_mut()[self.idx] = **x,
             (Container::VecI8(r), Value::I8(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecI16(r), Value::I16(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecI32(r), Value::I32(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecI64(r), Value::I64(x)) => r.borrow_mut()[self.idx] = *x,
             (Container::VecI128(r), Value::I128(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecI256(r), Value::I256(x)) => r.borrow_mut()[self.idx] = *x,
+            (Container::VecI256(r), Value::I256(x)) => r.borrow_mut()[self.idx] = **x,
             (Container::VecBool(r), Value::Bool(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecAddress(r), Value::Address(x)) => r.borrow_mut()[self.idx] = *x,
+            (Container::VecAddress(r), Value::Address(x)) => r.borrow_mut()[self.idx] = **x,
 
             (Container::VecU8(_), _)
             | (Container::VecU16(_), _)
@@ -1599,20 +1623,30 @@ macro_rules! impl_vm_value_from_primitive {
     };
 }
 
+macro_rules! impl_vm_value_from_primitive_boxed {
+    ($ty:ty, $tc:ident) => {
+        impl VMValueFromPrimitive<$ty> for Value {
+            fn from_primitive(val: $ty) -> Self {
+                Self::$tc(Box::new(val))
+            }
+        }
+    };
+}
+
 impl_vm_value_from_primitive!(u8, U8);
 impl_vm_value_from_primitive!(u16, U16);
 impl_vm_value_from_primitive!(u32, U32);
 impl_vm_value_from_primitive!(u64, U64);
 impl_vm_value_from_primitive!(u128, U128);
-impl_vm_value_from_primitive!(int256::U256, U256);
+impl_vm_value_from_primitive_boxed!(int256::U256, U256);
 impl_vm_value_from_primitive!(i8, I8);
 impl_vm_value_from_primitive!(i16, I16);
 impl_vm_value_from_primitive!(i32, I32);
 impl_vm_value_from_primitive!(i64, I64);
 impl_vm_value_from_primitive!(i128, I128);
-impl_vm_value_from_primitive!(int256::I256, I256);
+impl_vm_value_from_primitive_boxed!(int256::I256, I256);
 impl_vm_value_from_primitive!(bool, Bool);
-impl_vm_value_from_primitive!(AccountAddress, Address);
+impl_vm_value_from_primitive_boxed!(AccountAddress, Address);
 
 /**************************************************************************************
  *
@@ -2284,7 +2318,7 @@ impl Value {
     }
 
     pub fn u256(x: int256::U256) -> Self {
-        Value::U256(x)
+        Value::U256(Box::new(x))
     }
 
     pub fn i8(x: i8) -> Self {
@@ -2308,7 +2342,7 @@ impl Value {
     }
 
     pub fn i256(x: int256::I256) -> Self {
-        Value::I256(x)
+        Value::I256(Box::new(x))
     }
 
     pub fn bool(x: bool) -> Self {
@@ -2316,7 +2350,7 @@ impl Value {
     }
 
     pub fn address(x: AccountAddress) -> Self {
-        Value::Address(x)
+        Value::Address(Box::new(x))
     }
 
     pub fn master_signer(x: AccountAddress) -> Self {
@@ -2510,20 +2544,44 @@ macro_rules! impl_vm_value_cast {
     };
 }
 
+macro_rules! impl_vm_value_cast_boxed {
+    ($ty:ty, $tc:ident) => {
+        impl VMValueCast<$ty> for Value {
+            #[cfg_attr(feature = "inline-vm-casts", inline)]
+            fn cast(self) -> PartialVMResult<$ty> {
+                return match self {
+                    Value::$tc(x) => Ok(*x),
+                    v => __cannot_cast(v),
+                };
+                #[cold]
+                fn __cannot_cast(v: Value) -> PartialVMResult<$ty> {
+                    Err(
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(format!(
+                            "cannot cast {:?} to {}",
+                            v,
+                            stringify!($ty)
+                        )),
+                    )
+                }
+            }
+        }
+    };
+}
+
 impl_vm_value_cast!(u8, U8);
 impl_vm_value_cast!(u16, U16);
 impl_vm_value_cast!(u32, U32);
 impl_vm_value_cast!(u64, U64);
 impl_vm_value_cast!(u128, U128);
-impl_vm_value_cast!(int256::U256, U256);
+impl_vm_value_cast_boxed!(int256::U256, U256);
 impl_vm_value_cast!(i8, I8);
 impl_vm_value_cast!(i16, I16);
 impl_vm_value_cast!(i32, I32);
 impl_vm_value_cast!(i64, I64);
 impl_vm_value_cast!(i128, I128);
-impl_vm_value_cast!(int256::I256, I256);
+impl_vm_value_cast_boxed!(int256::I256, I256);
 impl_vm_value_cast!(bool, Bool);
-impl_vm_value_cast!(AccountAddress, Address);
+impl_vm_value_cast_boxed!(AccountAddress, Address);
 impl_vm_value_cast!(ContainerRef, ContainerRef);
 impl_vm_value_cast!(IndexedRef, IndexedRef);
 
@@ -2694,13 +2752,13 @@ impl Value {
             Self::U32(x) => x == 0,
             Self::U64(x) => x == 0,
             Self::U128(x) => x == 0,
-            Self::U256(x) => x == int256::U256::ZERO,
+            Self::U256(x) => *x == int256::U256::ZERO,
             Self::I8(x) => x == 0,
             Self::I16(x) => x == 0,
             Self::I32(x) => x == 0,
             Self::I64(x) => x == 0,
             Self::I128(x) => x == 0,
-            Self::I256(x) => x == int256::I256::ZERO,
+            Self::I256(x) => *x == int256::I256::ZERO,
             _ => false,
         }
     }
@@ -2722,13 +2780,13 @@ impl Value {
             (U32(l), U32(r)) => u32::checked_add(l, r).map(U32),
             (U64(l), U64(r)) => u64::checked_add(l, r).map(U64),
             (U128(l), U128(r)) => u128::checked_add(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_add(l, r).map(U256),
+            (U256(l), U256(r)) => int256::U256::checked_add(*l, *r).map(|res| U256(Box::new(res))),
             (I8(l), I8(r)) => i8::checked_add(l, r).map(I8),
             (I16(l), I16(r)) => i16::checked_add(l, r).map(I16),
             (I32(l), I32(r)) => i32::checked_add(l, r).map(I32),
             (I64(l), I64(r)) => i64::checked_add(l, r).map(I64),
             (I128(l), I128(r)) => i128::checked_add(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_add(l, r).map(I256),
+            (I256(l), I256(r)) => int256::I256::checked_add(*l, *r).map(|res| I256(Box::new(res))),
             (l, r) => {
                 let msg = format!("Cannot add {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2748,13 +2806,13 @@ impl Value {
             (U32(l), U32(r)) => u32::checked_sub(l, r).map(U32),
             (U64(l), U64(r)) => u64::checked_sub(l, r).map(U64),
             (U128(l), U128(r)) => u128::checked_sub(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_sub(l, r).map(U256),
+            (U256(l), U256(r)) => int256::U256::checked_sub(*l, *r).map(|res| U256(Box::new(res))),
             (I8(l), I8(r)) => i8::checked_sub(l, r).map(I8),
             (I16(l), I16(r)) => i16::checked_sub(l, r).map(I16),
             (I32(l), I32(r)) => i32::checked_sub(l, r).map(I32),
             (I64(l), I64(r)) => i64::checked_sub(l, r).map(I64),
             (I128(l), I128(r)) => i128::checked_sub(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_sub(l, r).map(I256),
+            (I256(l), I256(r)) => int256::I256::checked_sub(*l, *r).map(|res| I256(Box::new(res))),
             (l, r) => {
                 let msg = format!("Cannot sub {:?} from {:?}", r, l);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2774,13 +2832,13 @@ impl Value {
             (U32(l), U32(r)) => u32::checked_mul(l, r).map(U32),
             (U64(l), U64(r)) => u64::checked_mul(l, r).map(U64),
             (U128(l), U128(r)) => u128::checked_mul(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_mul(l, r).map(U256),
+            (U256(l), U256(r)) => int256::U256::checked_mul(*l, *r).map(|res| U256(Box::new(res))),
             (I8(l), I8(r)) => i8::checked_mul(l, r).map(I8),
             (I16(l), I16(r)) => i16::checked_mul(l, r).map(I16),
             (I32(l), I32(r)) => i32::checked_mul(l, r).map(I32),
             (I64(l), I64(r)) => i64::checked_mul(l, r).map(I64),
             (I128(l), I128(r)) => i128::checked_mul(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_mul(l, r).map(I256),
+            (I256(l), I256(r)) => int256::I256::checked_mul(*l, *r).map(|res| I256(Box::new(res))),
             (l, r) => {
                 let msg = format!("Cannot mul {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2800,13 +2858,13 @@ impl Value {
             (U32(l), U32(r)) => u32::checked_div(l, *r).map(U32),
             (U64(l), U64(r)) => u64::checked_div(l, *r).map(U64),
             (U128(l), U128(r)) => u128::checked_div(l, *r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_div(l, *r).map(U256),
+            (U256(l), U256(r)) => int256::U256::checked_div(*l, **r).map(|res| U256(Box::new(res))),
             (I8(l), I8(r)) => i8::checked_div(l, *r).map(I8),
             (I16(l), I16(r)) => i16::checked_div(l, *r).map(I16),
             (I32(l), I32(r)) => i32::checked_div(l, *r).map(I32),
             (I64(l), I64(r)) => i64::checked_div(l, *r).map(I64),
             (I128(l), I128(r)) => i128::checked_div(l, *r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_div(l, *r).map(I256),
+            (I256(l), I256(r)) => int256::I256::checked_div(*l, **r).map(|res| I256(Box::new(res))),
             (l, r) => {
                 let msg = format!("Cannot div {:?} by {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2830,13 +2888,13 @@ impl Value {
             (U32(l), U32(r)) => u32::checked_rem(l, r).map(U32),
             (U64(l), U64(r)) => u64::checked_rem(l, r).map(U64),
             (U128(l), U128(r)) => u128::checked_rem(l, r).map(U128),
-            (U256(l), U256(r)) => int256::U256::checked_rem(l, r).map(U256),
+            (U256(l), U256(r)) => int256::U256::checked_rem(*l, *r).map(|res| U256(Box::new(res))),
             (I8(l), I8(r)) => i8::checked_rem(l, r).map(I8),
             (I16(l), I16(r)) => i16::checked_rem(l, r).map(I16),
             (I32(l), I32(r)) => i32::checked_rem(l, r).map(I32),
             (I64(l), I64(r)) => i64::checked_rem(l, r).map(I64),
             (I128(l), I128(r)) => i128::checked_rem(l, r).map(I128),
-            (I256(l), I256(r)) => int256::I256::checked_rem(l, r).map(I256),
+            (I256(l), I256(r)) => int256::I256::checked_rem(*l, *r).map(|res| I256(Box::new(res))),
             (l, r) => {
                 let msg = format!("Cannot rem {:?} by {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2856,7 +2914,7 @@ impl Value {
             I32(x) => x.checked_neg().map(I32),
             I64(x) => x.checked_neg().map(I64),
             I128(x) => x.checked_neg().map(I128),
-            I256(x) => x.checked_neg().map(I256),
+            I256(x) => x.checked_neg().map(|res| I256(Box::new(res))),
             _ => {
                 let msg = format!("Cannot negate {:?}", self);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2876,7 +2934,7 @@ impl Value {
             (U32(l), U32(r)) => U32(l | r),
             (U64(l), U64(r)) => U64(l | r),
             (U128(l), U128(r)) => U128(l | r),
-            (U256(l), U256(r)) => U256(l | r),
+            (U256(l), U256(r)) => U256(Box::new(*l | *r)),
             (l, r) => {
                 let msg = format!("Cannot bit_or {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2892,7 +2950,7 @@ impl Value {
             (U32(l), U32(r)) => U32(l & r),
             (U64(l), U64(r)) => U64(l & r),
             (U128(l), U128(r)) => U128(l & r),
-            (U256(l), U256(r)) => U256(l & r),
+            (U256(l), U256(r)) => U256(Box::new(*l & *r)),
             (l, r) => {
                 let msg = format!("Cannot bit_and {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2908,7 +2966,7 @@ impl Value {
             (U32(l), U32(r)) => U32(l ^ r),
             (U64(l), U64(r)) => U64(l ^ r),
             (U128(l), U128(r)) => U128(l ^ r),
-            (U256(l), U256(r)) => U256(l ^ r),
+            (U256(l), U256(r)) => U256(Box::new(*l ^ *r)),
             (l, r) => {
                 let msg = format!("Cannot bit_xor {:?} and {:?}", l, r);
                 return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(msg));
@@ -2925,7 +2983,7 @@ impl Value {
             U32(x) if n_bits < 32 => U32(x << n_bits),
             U64(x) if n_bits < 64 => U64(x << n_bits),
             U128(x) if n_bits < 128 => U128(x << n_bits),
-            U256(x) => U256(x << int256::U256::from(n_bits)),
+            U256(x) => U256(Box::new(*x << int256::U256::from(n_bits))),
             _ => {
                 return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                     .with_message("Shift Left overflow".to_string()));
@@ -2942,7 +3000,7 @@ impl Value {
             U32(x) if n_bits < 32 => U32(x >> n_bits),
             U64(x) if n_bits < 64 => U64(x >> n_bits),
             U128(x) if n_bits < 128 => U128(x >> n_bits),
-            U256(x) => U256(x >> int256::U256::from(n_bits)),
+            U256(x) => U256(Box::new(*x >> int256::U256::from(n_bits))),
             _ => {
                 return Err(PartialVMError::new(StatusCode::ARITHMETIC_ERROR)
                     .with_message("Shift Right overflow".to_string()));
@@ -3181,13 +3239,13 @@ impl Value {
             U32(x) => cast_int_narrowing!(u32, u8, x),
             U64(x) => cast_int_narrowing!(u64, u8, x),
             U128(x) => cast_int_narrowing!(u128, u8, x),
-            U256(x) => cast_int_with_try_from!(U256, u8, x),
+            U256(x) => cast_int_with_try_from!(U256, u8, *x),
             I8(x) => cast_int_i2u_widening!(i8, u8, x),
             I16(x) => cast_int_i2u_narrowing!(i16, u8, x),
             I32(x) => cast_int_i2u_narrowing!(i32, u8, x),
             I64(x) => cast_int_i2u_narrowing!(i64, u8, x),
             I128(x) => cast_int_i2u_narrowing!(i128, u8, x),
-            I256(x) => cast_int_with_try_from!(I256, u8, x),
+            I256(x) => cast_int_with_try_from!(I256, u8, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3201,13 +3259,13 @@ impl Value {
             U32(x) => cast_int_narrowing!(u32, u16, x),
             U64(x) => cast_int_narrowing!(u64, u16, x),
             U128(x) => cast_int_narrowing!(u128, u16, x),
-            U256(x) => cast_int_with_try_from!(U256, u16, x),
+            U256(x) => cast_int_with_try_from!(U256, u16, *x),
             I8(x) => cast_int_i2u_widening!(i8, u16, x),
             I16(x) => cast_int_i2u_widening!(i16, u16, x),
             I32(x) => cast_int_i2u_narrowing!(i32, u16, x),
             I64(x) => cast_int_i2u_narrowing!(i64, u16, x),
             I128(x) => cast_int_i2u_narrowing!(i128, u16, x),
-            I256(x) => cast_int_with_try_from!(I256, u16, x),
+            I256(x) => cast_int_with_try_from!(I256, u16, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3221,13 +3279,13 @@ impl Value {
             U32(x) => Ok(x),
             U64(x) => cast_int_narrowing!(u64, u32, x),
             U128(x) => cast_int_narrowing!(u128, u32, x),
-            U256(x) => cast_int_with_try_from!(U256, u32, x),
+            U256(x) => cast_int_with_try_from!(U256, u32, *x),
             I8(x) => cast_int_i2u_widening!(i8, u32, x),
             I16(x) => cast_int_i2u_widening!(i16, u32, x),
             I32(x) => cast_int_i2u_widening!(i32, u32, x),
             I64(x) => cast_int_i2u_narrowing!(i64, u32, x),
             I128(x) => cast_int_i2u_narrowing!(i128, u32, x),
-            I256(x) => cast_int_with_try_from!(I256, u32, x),
+            I256(x) => cast_int_with_try_from!(I256, u32, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3241,13 +3299,13 @@ impl Value {
             U32(x) => cast_int_widening!(u32, u64, x),
             U64(x) => Ok(x),
             U128(x) => cast_int_narrowing!(u128, u64, x),
-            U256(x) => cast_int_with_try_from!(U256, u64, x),
+            U256(x) => cast_int_with_try_from!(U256, u64, *x),
             I8(x) => cast_int_i2u_widening!(i8, u64, x),
             I16(x) => cast_int_i2u_widening!(i16, u64, x),
             I32(x) => cast_int_i2u_widening!(i32, u64, x),
             I64(x) => cast_int_i2u_widening!(i64, u64, x),
             I128(x) => cast_int_i2u_narrowing!(i128, u64, x),
-            I256(x) => cast_int_with_try_from!(I256, u64, x),
+            I256(x) => cast_int_with_try_from!(I256, u64, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3261,13 +3319,13 @@ impl Value {
             U32(x) => cast_int_widening!(u32, u128, x),
             U64(x) => cast_int_widening!(u64, u128, x),
             U128(x) => Ok(x),
-            U256(x) => cast_int_with_try_from!(U256, u128, x),
+            U256(x) => cast_int_with_try_from!(U256, u128, *x),
             I8(x) => cast_int_i2u_widening!(i8, u128, x),
             I16(x) => cast_int_i2u_widening!(i16, u128, x),
             I32(x) => cast_int_i2u_widening!(i32, u128, x),
             I64(x) => cast_int_i2u_widening!(i64, u128, x),
             I128(x) => cast_int_i2u_widening!(i128, u128, x),
-            I256(x) => cast_int_with_try_from!(I256, u128, x),
+            I256(x) => cast_int_with_try_from!(I256, u128, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3281,13 +3339,13 @@ impl Value {
             U32(x) => int256::U256::from(x),
             U64(x) => int256::U256::from(x),
             U128(x) => int256::U256::from(x),
-            U256(x) => x,
+            U256(x) => *x,
             I8(x) => cast_int_with_try_from!(i8, int256::U256, x)?,
             I16(x) => cast_int_with_try_from!(i16, int256::U256, x)?,
             I32(x) => cast_int_with_try_from!(i32, int256::U256, x)?,
             I64(x) => cast_int_with_try_from!(i64, int256::U256, x)?,
             I128(x) => cast_int_with_try_from!(i128, int256::U256, x)?,
-            I256(x) => cast_int_with_try_from!(I256, int256::U256, x)?,
+            I256(x) => cast_int_with_try_from!(I256, int256::U256, *x)?,
             v => Self::no_int_cast_err(v)?,
         })
     }
@@ -3301,13 +3359,13 @@ impl Value {
             U32(x) => cast_int_u2i_narrowing!(u32, i8, x),
             U64(x) => cast_int_u2i_narrowing!(u64, i8, x),
             U128(x) => cast_int_u2i_narrowing!(u128, i8, x),
-            U256(x) => cast_int_with_try_from!(U256, i8, x),
+            U256(x) => cast_int_with_try_from!(U256, i8, *x),
             I8(x) => Ok(x),
             I16(x) => cast_int_narrowing!(i16, i8, x),
             I32(x) => cast_int_narrowing!(i32, i8, x),
             I64(x) => cast_int_narrowing!(i64, i8, x),
             I128(x) => cast_int_narrowing!(i128, i8, x),
-            I256(x) => cast_int_with_try_from!(I256, i8, x),
+            I256(x) => cast_int_with_try_from!(I256, i8, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3321,13 +3379,13 @@ impl Value {
             U32(x) => cast_int_u2i_narrowing!(u32, i16, x),
             U64(x) => cast_int_u2i_narrowing!(u64, i16, x),
             U128(x) => cast_int_u2i_narrowing!(u128, i16, x),
-            U256(x) => cast_int_with_try_from!(U256, i16, x),
+            U256(x) => cast_int_with_try_from!(U256, i16, *x),
             I8(x) => cast_int_widening!(i8, i16, x),
             I16(x) => Ok(x),
             I32(x) => cast_int_narrowing!(i32, i16, x),
             I64(x) => cast_int_narrowing!(i64, i16, x),
             I128(x) => cast_int_narrowing!(i128, i16, x),
-            I256(x) => cast_int_with_try_from!(I256, i16, x),
+            I256(x) => cast_int_with_try_from!(I256, i16, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3341,13 +3399,13 @@ impl Value {
             U32(x) => cast_int_u2i_narrowing!(u32, i32, x),
             U64(x) => cast_int_u2i_narrowing!(u64, i32, x),
             U128(x) => cast_int_u2i_narrowing!(u128, i32, x),
-            U256(x) => cast_int_with_try_from!(U256, i32, x),
+            U256(x) => cast_int_with_try_from!(U256, i32, *x),
             I8(x) => cast_int_widening!(i8, i32, x),
             I16(x) => cast_int_widening!(i16, i32, x),
             I32(x) => Ok(x),
             I64(x) => cast_int_narrowing!(i64, i32, x),
             I128(x) => cast_int_narrowing!(i128, i32, x),
-            I256(x) => cast_int_with_try_from!(I256, i32, x),
+            I256(x) => cast_int_with_try_from!(I256, i32, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3361,13 +3419,13 @@ impl Value {
             U32(x) => cast_int_u2i_widening!(u32, i64, x),
             U64(x) => cast_int_u2i_narrowing!(u64, i64, x),
             U128(x) => cast_int_u2i_narrowing!(u128, i64, x),
-            U256(x) => cast_int_with_try_from!(U256, i64, x),
+            U256(x) => cast_int_with_try_from!(U256, i64, *x),
             I8(x) => cast_int_widening!(i8, i64, x),
             I16(x) => cast_int_widening!(i16, i64, x),
             I32(x) => cast_int_widening!(i32, i64, x),
             I64(x) => Ok(x),
             I128(x) => cast_int_narrowing!(i128, i64, x),
-            I256(x) => cast_int_with_try_from!(I256, i64, x),
+            I256(x) => cast_int_with_try_from!(I256, i64, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3381,13 +3439,13 @@ impl Value {
             U32(x) => cast_int_u2i_widening!(u32, i128, x),
             U64(x) => cast_int_u2i_widening!(u64, i128, x),
             U128(x) => cast_int_u2i_narrowing!(u128, i128, x),
-            U256(x) => cast_int_with_try_from!(U256, i128, x),
+            U256(x) => cast_int_with_try_from!(U256, i128, *x),
             I8(x) => cast_int_widening!(i8, i128, x),
             I16(x) => cast_int_widening!(i16, i128, x),
             I32(x) => cast_int_widening!(i32, i128, x),
             I64(x) => cast_int_widening!(i64, i128, x),
             I128(x) => Ok(x),
-            I256(x) => cast_int_with_try_from!(I256, i128, x),
+            I256(x) => cast_int_with_try_from!(I256, i128, *x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -3401,13 +3459,13 @@ impl Value {
             U32(x) => Ok(int256::I256::from(x)),
             U64(x) => Ok(int256::I256::from(x)),
             U128(x) => Ok(int256::I256::from(x)),
-            U256(x) => cast_int_with_try_from!(int256::U256, int256::I256, x),
+            U256(x) => cast_int_with_try_from!(int256::U256, int256::I256, *x),
             I8(x) => Ok(int256::I256::from(x)),
             I16(x) => Ok(int256::I256::from(x)),
             I32(x) => Ok(int256::I256::from(x)),
             I64(x) => Ok(int256::I256::from(x)),
             I128(x) => Ok(int256::I256::from(x)),
-            I256(x) => Ok(x),
+            I256(x) => Ok(*x),
             v => Self::no_int_cast_err(v),
         }
     }
@@ -5332,15 +5390,15 @@ impl Container {
             VecU32(vals) => visitor.visit_u32(depth + 1, vals.borrow()[idx]),
             VecU64(vals) => visitor.visit_u64(depth + 1, vals.borrow()[idx]),
             VecU128(vals) => visitor.visit_u128(depth + 1, vals.borrow()[idx]),
-            VecU256(vals) => visitor.visit_u256(depth + 1, vals.borrow()[idx]),
+            VecU256(vals) => visitor.visit_u256(depth + 1, &vals.borrow()[idx]),
             VecI8(vals) => visitor.visit_i8(depth + 1, vals.borrow()[idx]),
             VecI16(vals) => visitor.visit_i16(depth + 1, vals.borrow()[idx]),
             VecI32(vals) => visitor.visit_i32(depth + 1, vals.borrow()[idx]),
             VecI64(vals) => visitor.visit_i64(depth + 1, vals.borrow()[idx]),
             VecI128(vals) => visitor.visit_i128(depth + 1, vals.borrow()[idx]),
-            VecI256(vals) => visitor.visit_i256(depth + 1, vals.borrow()[idx]),
+            VecI256(vals) => visitor.visit_i256(depth + 1, &vals.borrow()[idx]),
             VecBool(vals) => visitor.visit_bool(depth + 1, vals.borrow()[idx]),
-            VecAddress(vals) => visitor.visit_address(depth + 1, vals.borrow()[idx]),
+            VecAddress(vals) => visitor.visit_address(depth + 1, &vals.borrow()[idx]),
         }
     }
 }
@@ -5349,7 +5407,7 @@ impl Closure {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         let Self(_, captured) = self;
         if visitor.visit_closure(depth, captured.len())? {
-            for val in captured {
+            for val in captured.iter() {
                 val.visit_impl(visitor, depth + 1)?;
             }
         }
@@ -5400,15 +5458,15 @@ impl Value {
             U32(val) => visitor.visit_u32(depth, *val),
             U64(val) => visitor.visit_u64(depth, *val),
             U128(val) => visitor.visit_u128(depth, *val),
-            U256(val) => visitor.visit_u256(depth, *val),
+            U256(val) => visitor.visit_u256(depth, val.as_ref()),
             I8(val) => visitor.visit_i8(depth, *val),
             I16(val) => visitor.visit_i16(depth, *val),
             I32(val) => visitor.visit_i32(depth, *val),
             I64(val) => visitor.visit_i64(depth, *val),
             I128(val) => visitor.visit_i128(depth, *val),
-            I256(val) => visitor.visit_i256(depth, *val),
+            I256(val) => visitor.visit_i256(depth, val.as_ref()),
             Bool(val) => visitor.visit_bool(depth, *val),
-            Address(val) => visitor.visit_address(depth, *val),
+            Address(val) => visitor.visit_address(depth, val.as_ref()),
             Container(c) => c.visit_impl(visitor, depth),
             ContainerRef(r) => r.visit_impl(visitor, depth),
             IndexedRef(r) => r.visit_impl(visitor, depth),
@@ -5838,15 +5896,15 @@ impl Value {
             (L::U32, Value::U32(x)) => MoveValue::U32(*x),
             (L::U64, Value::U64(x)) => MoveValue::U64(*x),
             (L::U128, Value::U128(x)) => MoveValue::U128(*x),
-            (L::U256, Value::U256(x)) => MoveValue::U256(*x),
+            (L::U256, Value::U256(x)) => MoveValue::U256(**x),
             (L::I8, Value::I8(x)) => MoveValue::I8(*x),
             (L::I16, Value::I16(x)) => MoveValue::I16(*x),
             (L::I32, Value::I32(x)) => MoveValue::I32(*x),
             (L::I64, Value::I64(x)) => MoveValue::I64(*x),
             (L::I128, Value::I128(x)) => MoveValue::I128(*x),
-            (L::I256, Value::I256(x)) => MoveValue::I256(*x),
+            (L::I256, Value::I256(x)) => MoveValue::I256(**x),
             (L::Bool, Value::Bool(x)) => MoveValue::Bool(*x),
-            (L::Address, Value::Address(x)) => MoveValue::Address(*x),
+            (L::Address, Value::Address(x)) => MoveValue::Address(**x),
 
             (L::Struct(struct_layout), Value::Container(Container::Struct(r))) => {
                 let values_ref = r.borrow();
@@ -5906,7 +5964,7 @@ impl Value {
             (L::Signer, Value::Container(Container::Struct(r))) => {
                 let v = r.borrow();
                 match &v[MASTER_ADDRESS_FIELD_OFFSET] {
-                    Value::Address(a) => MoveValue::Signer(*a),
+                    Value::Address(a) => MoveValue::Signer(**a),
                     v => panic!("Unexpected non-address while converting signer: {:?}", v),
                 }
             },
