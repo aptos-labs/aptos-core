@@ -2171,10 +2171,12 @@ impl Locals {
             Some(n) => n,
             None => {
                 let first_out_of_bounds_index = num_expected_locals;
-                let out_of_bounds_error =
-                    Locals::local_index_out_of_bounds(first_out_of_bounds_index, num_expected_locals);
+                let out_of_bounds_error = Locals::local_index_out_of_bounds(
+                    first_out_of_bounds_index,
+                    num_expected_locals,
+                );
                 return Err(out_of_bounds_error);
-            }
+            },
         };
         values.reserve(num_invalid_locals);
         for _ in 0..num_invalid_locals {
@@ -2340,10 +2342,10 @@ impl Value {
     }
 
     pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
-        Self::struct_(Struct::pack_variant(
-            PERMISSIONED_SIGNER_VARIANT,
-            vec![Value::address(x), Value::address(perm_storage_address)],
-        ))
+        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
+            Value::address(x),
+            Value::address(perm_storage_address),
+        ]))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
