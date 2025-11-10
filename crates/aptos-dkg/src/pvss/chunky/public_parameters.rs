@@ -159,10 +159,7 @@ impl<E: Pairing> PublicParameters<E> {
             .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
             ell,
-            table: dlog::table::build::<E::G1>(
-                G.into(),
-                1u32 << (ell / 2),
-            ),
+            table: dlog::table::build::<E::G1>(G.into(), 1u32 << (ell / 2)),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 

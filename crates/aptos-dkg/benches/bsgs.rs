@@ -91,9 +91,7 @@ where
     group.sample_size(10); // It can't do less than 10
 
     // Time seems almost linear in the size of the table, so doesn't make sense to benchmark many values
-    let table_sizes: &[u32] = &[
-        1u32 << 16,
-    ];
+    let table_sizes: &[u32] = &[1u32 << 16];
 
     let G = E::G1::generator();
 
