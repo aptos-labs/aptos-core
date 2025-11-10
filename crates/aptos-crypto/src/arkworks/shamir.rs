@@ -231,17 +231,23 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
     /// Fast lagrange coefficient computation algorithm, taken from the paper
     /// "Towards Scalable Threshold Cryptosystems" by Alin Tomescu, Robert Chen, Yiming Zheng, Ittai
     /// Abraham, Benny Pinkas, Guy Golan Gueta and Srinivas Devadas
-    /// (which I think takes it from Modern Computer Algebra, by von zur Gathen and Gerhard
-    pub fn lagrange_for_subset(&self, xs: &HashSet<F>) -> HashMap<F, F> {
+    /// (which I think takes it from Modern Computer Algebra, by von zur Gathen and Gerhard)
+    ///
+    /// Takes as input a subset of the roots-of-unity domain, represented by a slice of indices.
+    /// Outputs the Lagrange coefficients of those x-coordinates.
+    pub fn lagrange_for_subset(&self, indices: &[usize]) -> Vec<F> {
         // Step 0: check that subset is large enough
         assert!(
-            xs.len() >= self.t,
+            indices.len() >= self.t,
             "subset size {} is smaller than threshold t={}",
-            xs.len(),
+            indices.len(),
             self.t
         );
 
-        let xs_vec: Vec<F> = xs.iter().cloned().collect();
+        let xs_vec: Vec<F> = indices
+            .into_iter()
+            .map(|i| self.domain.element(*i))
+            .collect();
 
         // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
         let vanishing_poly = vanishing_poly::from_roots(&xs_vec);
@@ -266,11 +272,10 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
         batch_inversion(&mut denominators);
 
         // Step 4: compute Lagrange coefficients
-        xs_vec
+        numerators
             .into_iter()
-            .zip(numerators)
             .zip(denominators)
-            .map(|((x, numerator), denom_inv)| (x, numerator * denom_inv))
+            .map(|(numerator, denom_inv)| numerator * denom_inv)
             .collect()
     }
 
@@ -295,14 +300,14 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
         } else {
             let mut sum = F::zero();
 
-            let xs: Vec<F> = shares
+            let roots_of_unity_indices: Vec<usize> = shares
                 .iter()
-                .map(|(player, _)| self.domain.element(player.get_id()))
+                .map(|(p, _)| p.get_id())
                 .collect();
-            let lagrange_coeffs = self.lagrange_for_subset(&HashSet::from_iter(xs.iter().cloned()));
+            let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
 
-            for (x, (_, y)) in xs.iter().zip(shares) {
-                sum += lagrange_coeffs[x] * y;
+            for (l_i, (_, y)) in lagrange_coeffs.into_iter().zip(shares) {
+                sum += l_i * y;
             }
 
             Ok(sum)
@@ -317,19 +322,14 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
         if shares.len() != self.t {
             Err(anyhow!("Incorrect number of shares provided"))
         } else {
-            let xs: Vec<F> = shares
+            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<G::Affine>) = shares
                 .iter()
-                .map(|(player, _)| self.domain.element(player.get_id()))
-                .collect();
-            let lagrange_coeffs = self.lagrange_for_subset(&HashSet::from_iter(xs.iter().cloned()));
-
-            let (bases, coeffs): (Vec<G::Affine>, Vec<F>) = xs
-                .iter()
-                .zip(shares)
-                .map(|(x, (_, g_y))| (g_y, lagrange_coeffs[x]))
+                .map(|(p, g_y)| (p.get_id(), g_y))
                 .collect();
 
-            Ok(G::msm(&bases, &coeffs)
+            let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
+
+            Ok(G::msm(&bases, &lagrange_coeffs)
                 .expect("MSM failed during reconstruct_in_exponent()")
                 .into())
         }
@@ -345,15 +345,15 @@ mod shamir_tests {
     use ark_ff::One;
     use itertools::Itertools;
 
-    fn single_lagrange(x: Fr, xs: &HashSet<Fr>, omegas: &[Fr]) -> Fr {
+    fn single_lagrange(i: usize, xs_indices: &[usize], xs: &[Fr]) -> Fr {
         let mut prod = Fr::one();
 
-        for &xprime in omegas {
-            if x == xprime {
+        for &i_prime in xs_indices {
+            if i == i_prime {
                 continue;
-            } else if xs.contains(&xprime) {
-                prod *= -xprime;
-                prod /= x - xprime;
+            } else {
+                prod *= -xs[i_prime];
+                prod /= xs[i] - xs[i_prime];
             }
         }
 
@@ -368,19 +368,18 @@ mod shamir_tests {
             for t in 1..=n {
                 let config = ShamirThresholdConfig::new(t, n);
 
-                let elements: Vec<Fr> = config.domain.elements().collect();
+                let elements: Vec<usize> = (0..n).collect();
 
-                for subset_vec in elements.iter().cloned().combinations(t) {
-                    let subset: HashSet<Fr> = subset_vec.iter().cloned().collect();
+                for subset in elements.iter().cloned().combinations(t) {
 
                     let lagrange_for_subset = config.lagrange_for_subset(&subset);
 
-                    for (x, lagrange) in lagrange_for_subset {
-                        let expected = single_lagrange(x, &subset, &elements);
+                    for (i, lagrange) in subset.iter().zip(&lagrange_for_subset) {
+                        let expected = single_lagrange(*i, &subset, &config.domain.elements().collect::<Vec<Fr>>());
                         assert_eq!(
-                            lagrange, expected,
-                            "Mismatch at x={:?}, subset={:?}",
-                            x, subset
+                            *lagrange, expected,
+                            "Mismatch at i={:?}, subset={:?}, domain size={:?}",
+                            i, subset, n
                         );
                     }
                 }
