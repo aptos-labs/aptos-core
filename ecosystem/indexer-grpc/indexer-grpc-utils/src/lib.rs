@@ -8,6 +8,7 @@ pub mod constants;
 pub mod counters;
 pub mod file_store_operator;
 pub mod file_store_operator_v2;
+pub mod filter_utils;
 pub mod in_memory_cache;
 pub mod status_page;
 pub mod types;

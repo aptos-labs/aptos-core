@@ -23,6 +23,7 @@ use aptos_protos::{
     },
     util::timestamp::Timestamp,
 };
+use aptos_transaction_filter::{BooleanTransactionFilter, Filterable};
 use itertools::Itertools;
 use serde::Serialize;
 use std::{sync::Arc, time::Duration};
@@ -44,6 +45,7 @@ pub struct IndexerStreamCoordinator {
     pub highest_known_version: u64,
     pub context: Arc<Context>,
     pub transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
+    pub filter: Option<BooleanTransactionFilter>,
 }
 
 // Single batch of transactions to fetch, convert, and stream
@@ -64,6 +66,7 @@ impl IndexerStreamCoordinator {
         processor_batch_size: u16,
         output_batch_size: u16,
         transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
+        filter: Option<BooleanTransactionFilter>,
     ) -> Self {
         Self {
             current_version: request_start_version,
@@ -74,6 +77,7 @@ impl IndexerStreamCoordinator {
             highest_known_version: 0,
             context,
             transactions_sender,
+            filter,
         }
     }
 
@@ -146,13 +150,24 @@ impl IndexerStreamCoordinator {
 
         let output_batch_size = self.output_batch_size;
         let ledger_chain_id = self.context.chain_id().id();
+        let filter = self.filter.clone();
         let mut tasks = vec![];
         for batch in task_batches {
             let context = self.context.clone();
+            let filter = filter.clone();
             let task = tokio::task::spawn_blocking(move || {
                 let raw_txns = batch;
                 let api_txns = Self::convert_to_api_txns(context, raw_txns);
                 let pb_txns = Self::convert_to_pb_txns(api_txns);
+                // Apply filter if present.
+                let pb_txns = if let Some(ref filter) = filter {
+                    pb_txns
+                        .into_iter()
+                        .filter(|txn| filter.matches(txn))
+                        .collect::<Vec<_>>()
+                } else {
+                    pb_txns
+                };
                 let mut responses = vec![];
                 // Wrap in stream response object and send to channel
                 for chunk in pb_txns.chunks(output_batch_size as usize) {

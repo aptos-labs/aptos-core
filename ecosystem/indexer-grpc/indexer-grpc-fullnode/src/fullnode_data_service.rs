@@ -94,6 +94,7 @@ impl FullnodeData for FullnodeDataService {
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
+                None, // No filtering for fullnode data service.
             );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
