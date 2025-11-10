@@ -815,10 +815,10 @@ impl Type {
                     },
                 ..
             } => {
-                let type_argument_abilities = ty_args
-                    .iter()
-                    .map(|arg| arg.abilities())
-                    .collect::<PartialVMResult<Vec<_>>>()?;
+                let mut type_argument_abilities = Vec::with_capacity(ty_args.len());
+                for ty_arg in ty_args.iter() {
+                    type_argument_abilities.push(ty_arg.abilities()?);
+                }
                 AbilitySet::polymorphic_abilities(
                     *base_ability_set,
                     phantom_ty_args_mask.iter(),
@@ -1131,26 +1131,25 @@ impl TypeBuilder {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
 
-        let ty_args = ty_params
-            .iter()
-            .map(|ty| {
-                // Note that depth is 2 because we accounted for the parent struct type.
-                self.subst_impl(ty, ty_args, &mut count, 2, check)
-                    .map_err(|e| {
-                        e.append_message_with_separator(
-                            '.',
-                            format!(
-                                "Failed to instantiate a type {} with type arguments {:?}",
-                                ty, ty_args
-                            ),
-                        )
-                    })
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
+        let mut subst_ty_args = Vec::with_capacity(ty_params.len());
+        for ty in ty_params {
+            // Note that depth is 2 because we accounted for the parent struct type.
+            let ty_arg = self.subst_impl(ty, ty_args, &mut count, 2, check)
+                .map_err(|e| {
+                    e.append_message_with_separator(
+                        '.',
+                        format!(
+                            "Failed to instantiate a type {} with type arguments {:?}",
+                            ty, ty_args
+                        ),
+                    )
+                })?;
+            subst_ty_args.push(ty_arg);
+        }
 
         Ok(Type::StructInstantiation {
             idx: struct_ty.idx,
-            ty_args: triomphe::Arc::new(ty_args),
+            ty_args: triomphe::Arc::new(subst_ty_args),
             ability: AbilityInfo::generic_struct(
                 struct_ty.abilities,
                 struct_ty.phantom_ty_params_mask.clone(),
@@ -1266,6 +1265,7 @@ impl TypeBuilder {
         })
     }
 
+    #[inline]
     fn subst_impl<G>(
         &self,
         ty: &Type,
@@ -1296,6 +1296,7 @@ impl TypeBuilder {
         )
     }
 
+    #[inline]
     fn clone_impl<G>(
         &self,
         ty: &Type,
@@ -1384,7 +1385,7 @@ impl TypeBuilder {
                 ty_args: non_instantiated_tys,
                 ability,
             } => {
-                let mut instantiated_tys = vec![];
+                let mut instantiated_tys = Vec::with_capacity(non_instantiated_tys.len());
                 for ty in non_instantiated_tys.iter() {
                     let ty = Self::apply_subst(ty, subst, count, depth + 1, check)?;
                     instantiated_tys.push(ty);
@@ -1400,20 +1401,20 @@ impl TypeBuilder {
                 results,
                 abilities,
             } => {
-                let subs_elem = |count: &mut u64, ty: &Type| -> PartialVMResult<Type> {
+                let subst_elem = |count: &mut u64, ty: &Type| -> PartialVMResult<Type> {
                     Self::apply_subst(ty, subst, count, depth + 1, check)
                 };
-                let args = args
-                    .iter()
-                    .map(|ty| subs_elem(count, ty))
-                    .collect::<PartialVMResult<Vec<_>>>()?;
-                let results = results
-                    .iter()
-                    .map(|ty| subs_elem(count, ty))
-                    .collect::<PartialVMResult<Vec<_>>>()?;
+                let mut subst_args = Vec::with_capacity(args.len());
+                for arg in args {
+                    subst_args.push(subst_elem(count, arg)?);
+                }
+                let mut subst_results = Vec::with_capacity(results.len());
+                for result in results {
+                    subst_results.push(subst_elem(count, result)?);
+                }
                 Function {
-                    args,
-                    results,
+                    args: subst_args,
+                    results: subst_results,
                     abilities: *abilities,
                 }
             },
@@ -1464,7 +1465,7 @@ impl TypeBuilder {
                         ability: AbilityInfo::struct_(struct_ty.abilities),
                     }
                 } else {
-                    let mut ty_args = vec![];
+                    let mut ty_args = Vec::with_capacity(struct_tag.type_args.len());
                     for ty_arg in &struct_tag.type_args {
                         let ty_arg = self.create_ty_impl(ty_arg, resolver, count, depth + 1)?;
                         ty_args.push(ty_arg);

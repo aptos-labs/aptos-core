@@ -194,12 +194,13 @@ impl Frame {
                 if let Some(local_tys) = cache_borrow.instantiated_local_tys.as_ref().cloned() {
                     LocalTys::BorrowFromFunctionGeneric(local_tys)
                 } else {
-                    let local_tys: Rc<[Type]> = function
-                        .local_tys()
-                        .iter()
-                        .map(|ty| ty_builder.create_ty_with_subst(ty, ty_args))
-                        .collect::<PartialVMResult<Vec<_>>>()
-                        .map(Rc::from)?;
+                    let fun_local_tys = function.local_tys();
+                    let mut local_tys = Vec::with_capacity(fun_local_tys.len());
+                    for fun_local_ty in fun_local_tys {
+                        let local_ty = ty_builder.create_ty_with_subst(fun_local_ty, ty_args)?;
+                        local_tys.push(local_ty);
+                    }
+                    let local_tys: Rc<[Type]> = Rc::from(local_tys);
                     cache_borrow.instantiated_local_tys = Some(local_tys.clone());
                     LocalTys::BorrowFromFunctionGeneric(local_tys)
                 }
@@ -350,14 +351,15 @@ impl Frame {
         ty: &Type,
         instantiation_tys: &[Type],
     ) -> PartialVMResult<Type> {
-        let instantiation_tys = instantiation_tys
-            .iter()
-            .map(|inst_ty| {
+        let mut subst_instantiation_tys = Vec::with_capacity(instantiation_tys.len());
+        for inst_ty in instantiation_tys {
+            subst_instantiation_tys.push(
                 self.ty_builder
-                    .create_ty_with_subst(inst_ty, self.function.ty_args())
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
-        self.ty_builder.create_ty_with_subst(ty, &instantiation_tys)
+                    .create_ty_with_subst(inst_ty, self.function.ty_args())?,
+            );
+        }
+        self.ty_builder
+            .create_ty_with_subst(ty, &subst_instantiation_tys)
     }
 
     pub(crate) fn variant_field_info_at(&self, idx: VariantFieldHandleIndex) -> &VariantFieldInfo {
@@ -424,22 +426,21 @@ impl Frame {
         variant: Option<VariantIndex>,
         instantiation: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
-        let instantiation_tys = instantiation
-            .iter()
-            .map(|inst_ty| {
+        let mut instantiation_tys = Vec::with_capacity(instantiation.len());
+        for inst_ty in instantiation {
+            instantiation_tys.push(
                 self.ty_builder
-                    .create_ty_with_subst(inst_ty, self.function.ty_args())
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
+                    .create_ty_with_subst(inst_ty, self.function.ty_args())?,
+            );
+        }
 
-        struct_ty
-            .fields(variant)?
-            .iter()
-            .map(|(_, inst_ty)| {
-                self.ty_builder
-                    .create_ty_with_subst(inst_ty, &instantiation_tys)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()
+        let fields = struct_ty.fields(variant)?;
+        let mut generic_fields = Vec::with_capacity(fields.len());
+        for (_, inst_ty) in fields {
+            generic_fields.push(self.ty_builder
+                .create_ty_with_subst(inst_ty, &instantiation_tys)?);
+        }
+        Ok(generic_fields)
     }
 
     fn single_type_at(&self, idx: SignatureIndex) -> &Type {
@@ -563,17 +564,17 @@ impl Frame {
             }
         }
 
-        let instantiation = instantiation
-            .iter()
-            .map(|ty| self.ty_builder.create_ty_with_subst(ty, ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()?;
+        let mut fun_instantiation = Vec::with_capacity(instantiation.len());
+        for ty in instantiation {
+            fun_instantiation.push(self.ty_builder.create_ty_with_subst(ty, ty_args)?);
+        }
         let ty_args_id = match ty_args_id {
             Some(ty_args_id) => ty_args_id,
             // We can hit this case where original type args were only a partial instantiation.
-            None => ty_pool.intern_ty_args(&instantiation),
+            None => ty_pool.intern_ty_args(&fun_instantiation),
         };
 
-        Ok((instantiation, ty_args_id))
+        Ok((fun_instantiation, ty_args_id))
     }
 
     pub(crate) fn build_loaded_function_from_name_and_ty_args(

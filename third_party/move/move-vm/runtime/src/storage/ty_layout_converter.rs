@@ -337,23 +337,21 @@ where
         check_option_type: bool,
     ) -> PartialVMResult<(Vec<MoveTypeLayout>, bool)> {
         let mut contains_delayed_fields = false;
-        let layouts = tys
-            .iter()
-            .map(|ty| {
-                let (layout, ty_contains_delayed_fields) = self
-                    .type_to_type_layout_impl::<ANNOTATED>(
-                        gas_meter,
-                        traversal_context,
-                        modules,
-                        ty,
-                        count,
-                        depth,
-                        check_option_type,
-                    )?;
-                contains_delayed_fields |= ty_contains_delayed_fields;
-                Ok(layout)
-            })
-            .collect::<PartialVMResult<Vec<_>>>()?;
+        let mut layouts = Vec::with_capacity(tys.len());
+        for ty in tys {
+            let (layout, ty_contains_delayed_fields) = self
+                .type_to_type_layout_impl::<ANNOTATED>(
+                    gas_meter,
+                    traversal_context,
+                    modules,
+                    ty,
+                    count,
+                    depth,
+                    check_option_type,
+                )?;
+            contains_delayed_fields |= ty_contains_delayed_fields;
+            layouts.push(layout);
+        }
         Ok((layouts, contains_delayed_fields))
     }
 
@@ -575,10 +573,11 @@ where
         ty_args: &[Type],
     ) -> PartialVMResult<Vec<Type>> {
         let ty_builder = &self.vm_config().ty_builder;
-        field_tys
-            .iter()
-            .map(|(_, ty)| ty_builder.create_ty_with_subst(ty, ty_args))
-            .collect::<PartialVMResult<Vec<_>>>()
+        let mut res_field_tys = Vec::with_capacity(field_tys.len());
+        for (_, field_ty) in field_tys {
+            res_field_tys.push(ty_builder.create_ty_with_subst(field_ty, ty_args)?);
+        }
+        Ok(res_field_tys)
     }
 }
 
