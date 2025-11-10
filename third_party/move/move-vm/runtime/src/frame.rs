@@ -33,7 +33,7 @@ use move_vm_types::{
         runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     },
     ty_interner::{InternedTypePool, TypeVecId},
-    values::Locals,
+    values::{Locals, Value},
 };
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 

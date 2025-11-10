@@ -587,7 +587,9 @@ where
         let num_params = function.param_tys().len();
         let num_locals = function.local_tys().len();
 
-        let args = iter::repeat_with(dummy_local).take(num_params).collect();
+        let args = iter::repeat_with(dummy_local)
+            .take(num_params)
+            .collect::<Vec<_>>();
         let locals = Locals::new_from(args, num_locals)?;
         Frame::make_new_frame::<RTTCheck>(
             &mut UnmeteredGasMeter,

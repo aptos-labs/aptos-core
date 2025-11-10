@@ -2151,6 +2151,11 @@ impl SignerRef {
  *
  **************************************************************************************/
 impl Locals {
+    #[inline]
+    pub fn init_values(n: usize) -> Vec<Value> {
+        iter::repeat_with(|| Value::Invalid).take(n).collect()
+    }
+
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
@@ -2160,16 +2165,27 @@ impl Locals {
 
     /// Constructs values from the specified value vector, extending it to the desired number of
     /// locals by adding additional invalid variants.
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    pub fn new_from(mut values: Vec<Value>, n: usize) -> PartialVMResult<Self> {
-        let num_invalid_locals = n.checked_sub(values.len()).ok_or_else(|| {
-            PartialVMError::new_invariant_violation("Cannot create locals: too many values")
-        })?;
+    #[cfg_attr(feature = "inline-locals", inline(always))]
+    pub fn new_from(mut values: Vec<Value>, num_expected_locals: usize) -> PartialVMResult<Self> {
+        let num_invalid_locals = match num_expected_locals.checked_sub(values.len()) {
+            Some(n) => n,
+            None => {
+                let first_out_of_bounds_index = num_expected_locals;
+                let out_of_bounds_error =
+                    Locals::local_index_out_of_bounds(first_out_of_bounds_index, num_expected_locals);
+                return Err(out_of_bounds_error);
+            }
+        };
         values.reserve(num_invalid_locals);
         for _ in 0..num_invalid_locals {
             values.push(Value::Invalid);
         }
         Ok(Self(Rc::new(RefCell::new(values))))
+    }
+
+    #[cfg_attr(feature = "inline-locals", inline(always))]
+    pub fn from_values(values: Vec<Value>) -> Self {
+        Self(Rc::new(RefCell::new(values)))
     }
 
     #[cfg_attr(feature = "inline-locals", inline(always))]
@@ -2243,7 +2259,7 @@ impl Locals {
     }
 
     #[cold]
-    fn local_index_out_of_bounds(idx: usize, num_locals: usize) -> PartialVMError {
+    pub fn local_index_out_of_bounds(idx: usize, num_locals: usize) -> PartialVMError {
         PartialVMError::new(StatusCode::VERIFIER_INVARIANT_VIOLATION).with_message(format!(
             "local index out of bounds: got {}, len: {}",
             idx, num_locals
@@ -2324,10 +2340,10 @@ impl Value {
     }
 
     pub fn permissioned_signer(x: AccountAddress, perm_storage_address: AccountAddress) -> Self {
-        Self::struct_(Struct::pack_variant(PERMISSIONED_SIGNER_VARIANT, vec![
-            Value::address(x),
-            Value::address(perm_storage_address),
-        ]))
+        Self::struct_(Struct::pack_variant(
+            PERMISSIONED_SIGNER_VARIANT,
+            vec![Value::address(x), Value::address(perm_storage_address)],
+        ))
     }
 
     /// Create a "unowned" reference to a signer value (&signer) for populating the &signer in
