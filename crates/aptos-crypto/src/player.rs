@@ -23,12 +23,9 @@ pub struct Player {
     pub id: usize,
 }
 
+/// The point of Player is to provide type-safety: ensure nobody creates out-of-range player IDs.
+/// So there is no `new()` method; only the SecretSharingConfig trait is allowed to create them.
 impl Player {
-    /// Creates a new `Player`
-    pub fn new(id: usize) -> Self {
-        Self { id }
-    }
-
     /// Returns the numeric ID of the player.
     pub fn get_id(&self) -> usize {
         self.id

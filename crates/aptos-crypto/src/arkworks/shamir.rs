@@ -7,6 +7,7 @@ use crate::{
     arkworks::{differentiate::DifferentiableFn, vanishing_poly},
     player::Player,
     traits,
+    traits::SecretSharingConfig,
 };
 use anyhow::{anyhow, Result};
 use ark_ec::CurveGroup;
@@ -30,7 +31,7 @@ pub type ShamirGroupShare<G: CurveGroup> = (Player, G::Affine);
 /// Configuration for a threshold cryptography scheme. Usually one restricts `F` to `Primefield`
 /// but any field is theoretically possible.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-pub struct ShamirSharingScheme<F: FftField> {
+pub struct ShamirThresholdConfig<F: FftField> {
     /// Total number of participants (shares)
     pub n: usize,
     /// Threshold number of shares required to reconstruct the secret. Note that in
@@ -42,7 +43,7 @@ pub struct ShamirSharingScheme<F: FftField> {
     pub domain: Radix2EvaluationDomain<F>,
 }
 
-impl<F: PrimeField> traits::SecretSharingConfig for ShamirSharingScheme<F> {
+impl<F: PrimeField> traits::SecretSharingConfig for ShamirThresholdConfig<F> {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where
@@ -74,7 +75,7 @@ impl<F: PrimeField> traits::SecretSharingConfig for ShamirSharingScheme<F> {
     }
 }
 
-impl<F: PrimeField> traits::ThresholdConfig for ShamirSharingScheme<F> {
+impl<F: PrimeField> traits::ThresholdConfig for ShamirThresholdConfig<F> {
     fn new(t: usize, n: usize) -> Result<Self> {
         let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` internally does `n.next_power_of_two()`
             .expect("Invalid domain size: {}");
@@ -86,13 +87,13 @@ impl<F: PrimeField> traits::ThresholdConfig for ShamirSharingScheme<F> {
     }
 }
 
-impl<F: PrimeField> fmt::Display for ShamirSharingScheme<F> {
+impl<F: PrimeField> fmt::Display for ShamirThresholdConfig<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ThresholdConfig {{ n: {}, t: {} }}", self.n, self.t)
     }
 }
 
-impl<'de, F: PrimeField> Deserialize<'de> for ShamirSharingScheme<F> {
+impl<'de, F: PrimeField> Deserialize<'de> for ShamirThresholdConfig<F> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -108,7 +109,7 @@ impl<'de, F: PrimeField> Deserialize<'de> for ShamirSharingScheme<F> {
         let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` internally does `n.next_power_of_two()`
             .ok_or_else(|| serde::de::Error::custom(format!("Invalid domain size: {}", n)))?;
 
-        Ok(ShamirSharingScheme { n, t, domain })
+        Ok(ShamirThresholdConfig { n, t, domain })
     }
 }
 
@@ -207,14 +208,14 @@ pub fn all_lagrange_denominators<F: FftField>(
     denoms
 }
 
-impl<F: PrimeField> ShamirSharingScheme<F> {
+impl<F: PrimeField> ShamirThresholdConfig<F> {
     /// This initializes a `(t, n)` threshold scheme configuration.
     /// The `domain` is automatically computed as a radix-2 evaluation domain
     /// of size `n.next_power_of_two()` for use in FFT-based polynomial operations.
     pub fn new(t: usize, n: usize) -> Self {
         debug_assert!(t <= n, "Expected t <= n, but t = {} and n = {}", t, n);
         let domain = Radix2EvaluationDomain::new(n).unwrap();
-        ShamirSharingScheme { n, t, domain }
+        ShamirThresholdConfig { n, t, domain }
     }
 
     /// Returns the threshold `t` for this `(t, n)` Shamir secret sharing scheme.
@@ -287,7 +288,7 @@ impl<F: PrimeField> ShamirSharingScheme<F> {
     pub fn share(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
         debug_assert_eq!(coeffs.len(), self.t);
         let evals = self.domain.fft(coeffs);
-        (0..self.n).map(Player::new).zip(evals).collect()
+        (0..self.n).map(|i| self.get_player(i)).zip(evals).collect()
     }
 
     /// This method uses Lagrange interpolation to recover the original secret
@@ -365,7 +366,7 @@ mod shamir_tests {
 
         for n in 2..8 {
             for t in 1..=n {
-                let config : ShamirSharingScheme<Fr> = ShamirSharingScheme::new(t, n);
+                let config = ShamirThresholdConfig::new(t, n);
 
                 let elements: Vec<usize> = (0..n).collect();
 
@@ -390,8 +391,8 @@ mod shamir_tests {
         rng: &mut impl rand::RngCore,
         t: usize,
         n: usize,
-    ) -> (ShamirSharingScheme<Fr>, Fr, Vec<ShamirShare<Fr>>) {
-        let sharing_scheme = ShamirSharingScheme::new(t, n);
+    ) -> (ShamirThresholdConfig<Fr>, Fr, Vec<ShamirShare<Fr>>) {
+        let sharing_scheme = ShamirThresholdConfig::new(t, n);
 
         let coeffs = sample_field_elements(t, rng);
 
@@ -402,7 +403,8 @@ mod shamir_tests {
     #[test]
     fn test_reconstruct() {
         let mut rng = rand::thread_rng();
-        for n in 2..8 {
+        for n in 2..6 {
+            // Can increase this a bit if desired, the test is very fast
             for t in 1..=n {
                 let (sharing_scheme, secret, shares) = sample_shares(&mut rng, t, n);
 

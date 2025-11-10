@@ -20,7 +20,7 @@
 use crate::pvss::{traits, Player};
 use aptos_crypto::arkworks::{
     random::{sample_field_element, UniformRand},
-    shamir::ShamirSharingScheme,
+    shamir::ShamirThresholdConfig,
 };
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
@@ -96,11 +96,11 @@ impl<E: Pairing> UniformRand for Scalar<E> {
 
 // TODO: maybe move the Reconstructable trait to the SecretSharingConfig in the PVSS trait, with associated Scalar equal to InputSecret
 // then make the existing implementation of `fn reconstruct()` part of a trait... and then we can remove the trivial implementation below!
-impl<E: Pairing> traits::Reconstructable<ShamirSharingScheme<E::ScalarField>> for Scalar<E> {
+impl<E: Pairing> traits::Reconstructable<ShamirThresholdConfig<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
     fn reconstruct(
-        sc: &ShamirSharingScheme<E::ScalarField>,
+        sc: &ShamirThresholdConfig<E::ScalarField>,
         shares: &Vec<(Player, Self::Share)>,
     ) -> Self {
         assert_ge!(shares.len(), sc.get_threshold());
