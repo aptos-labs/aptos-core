@@ -660,9 +660,9 @@ impl CliCommand<&'static str> for TestPackage {
 
                 println!("Please use `aptos move coverage -h` for more detailed source or bytecode test coverage of this package");
             }
-        }
-        if UnitTestResult::NoTests == result {
-            println!("No tests found - coverage map not generated");
+            if UnitTestResult::NoTests == result {
+                println!("No tests found - coverage map not generated");
+            }
         }
 
         match result {
