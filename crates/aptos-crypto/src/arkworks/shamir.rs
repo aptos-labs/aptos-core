@@ -245,7 +245,7 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
         );
 
         let xs_vec: Vec<F> = indices
-            .into_iter()
+            .iter()
             .map(|i| self.domain.element(*i))
             .collect();
 
