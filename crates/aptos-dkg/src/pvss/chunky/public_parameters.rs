@@ -60,12 +60,6 @@ pub struct PublicParameters<E: Pairing> {
     pub powers_of_radix: Vec<E::ScalarField>,
 }
 
-impl<E: Pairing> PublicParameters<E> {
-    pub fn get_commitment_base(&self) -> E::G2Affine {
-        self.G_2
-    }
-}
-
 #[allow(non_snake_case)]
 impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -95,6 +89,12 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             table: dlog::table::build::<E::G1>(G, 1u32 << (serialized.ell / 2)),
             powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
         })
+    }
+}
+
+impl<E: Pairing> PublicParameters<E> {
+    pub fn get_commitment_base(&self) -> E::G2Affine {
+        self.G_2
     }
 }
 
@@ -136,7 +136,8 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Will be used in next PR
+#[allow(non_snake_case)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, rng: &mut R) -> Self {
@@ -145,8 +146,10 @@ impl<E: Pairing> PublicParameters<E> {
             ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
+        let pp_elgamal = chunked_elgamal::PublicParameters::default();
+        let G = *pp_elgamal.message_base();
         let pp = Self {
-            pp_elgamal: chunked_elgamal::PublicParameters::default(),
+            pp_elgamal,
             pk_range_proof: dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded,
                 ell as usize,
@@ -157,7 +160,7 @@ impl<E: Pairing> PublicParameters<E> {
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
             ell,
             table: dlog::table::build::<E::G1>(
-                chunked_elgamal::PublicParameters::<E>::default().G.into(),
+                G.into(),
                 1u32 << (ell / 2),
             ),
             powers_of_radix: compute_powers_of_radix::<E>(ell),
@@ -178,7 +181,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
 const DEFAULT_ELL_FOR_TESTING: u8 = 16;
 
 impl<E: Pairing> Default for PublicParameters<E> {
-    // This only used for testing and benchmarking
+    // This is only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
         Self::new(1, DEFAULT_ELL_FOR_TESTING, &mut rng)

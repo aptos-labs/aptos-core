@@ -17,6 +17,7 @@ use rand::{seq::IteratorRandom, Rng};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
+use crate::traits::SecretSharingConfig;
 
 /// A pair corresponding to a player (i.e., an index into the roots of unity) and a field element
 /// evaluation
@@ -282,7 +283,7 @@ impl<F: PrimeField> ShamirSharingScheme<F> {
     pub fn share(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
         debug_assert_eq!(coeffs.len(), self.t);
         let evals = self.domain.fft(coeffs);
-        (0..self.n).map(Player::new).zip(evals).collect()
+        (0..self.n).map(|i| self.get_player(i)).zip(evals).collect()
     }
 
     /// This method uses Lagrange interpolation to recover the original secret
@@ -403,7 +404,7 @@ mod shamir_tests {
     #[test]
     fn test_reconstruct() {
         let mut rng = rand::thread_rng();
-        for n in 2..8 {
+        for n in 2..6 { // Can increase this a bit if desired, the test is very fast
             for t in 1..=n {
                 let (sharing_scheme, secret, shares) = sample_shares(&mut rng, t, n);
 

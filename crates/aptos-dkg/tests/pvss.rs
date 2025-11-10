@@ -24,6 +24,8 @@ use aptos_dkg::pvss::{
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 
+// TODO: Add a test for public parameters serialization roundtrip?
+
 #[test]
 fn test_pvss_all_unweighted() {
     let mut rng = thread_rng();
