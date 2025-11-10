@@ -1,0 +1,26 @@
+server_config:
+  api_path_base: ""
+metrics_server_config:
+  listen_port: 9105
+bypasser_configs: []
+checker_configs: []
+funder_config:
+  type: "MintFunder"
+  node_url: "https://api.shelbynet.shelby.xyz"
+  key_file_path: "/tmp/mint.key"
+  chain_id: 4
+  mint_account_address: "0xA550C18"
+  assets:
+    apt:
+      do_not_delegate: false
+      amount_to_fund: 100000000 
+      mint_script: "/path/to/apt_mint_script.mv"
+    shelbyusd:
+      do_not_delegate: false
+      amount_to_fund: 100000000 
+      mintTransactionModuleAddress: "0x124"
+	    mintTransactionModuleName: "shelby_usd"
+	    mintTransactionModuleFunction: "mint"
+handler_config:
+  use_helpful_errors: true
+  return_rejections_early: false

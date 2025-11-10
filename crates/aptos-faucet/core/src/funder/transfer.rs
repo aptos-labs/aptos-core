@@ -253,6 +253,7 @@ impl FunderTrait for TransferFunder {
         &self,
         amount: Option<u64>,
         receiver_address: AccountAddress,
+        asset: Option<String>,
         check_only: bool,
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
