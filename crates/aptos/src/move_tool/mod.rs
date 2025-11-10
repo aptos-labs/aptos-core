@@ -666,8 +666,8 @@ impl CliCommand<&'static str> for TestPackage {
         }
 
         match result {
-            UnitTestResult::Success => Ok("Success"),
-            UnitTestResult::NoTests | UnitTestResult::Failure => Err(CliError::MoveTestError),
+            UnitTestResult::Success | UnitTestResult::NoTests => Ok("Success"),
+            UnitTestResult::Failure => Err(CliError::MoveTestError),
         }
     }
 }
