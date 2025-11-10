@@ -20,7 +20,7 @@ use serde::Serialize;
 ///
 /// This provides path for incremental performance optimizations, while making it less painful to
 /// maintain backward compatibility.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Instruction {
     Pop,
     Ret,
