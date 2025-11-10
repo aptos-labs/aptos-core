@@ -244,10 +244,7 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
             self.t
         );
 
-        let xs_vec: Vec<F> = indices
-            .iter()
-            .map(|i| self.domain.element(*i))
-            .collect();
+        let xs_vec: Vec<F> = indices.iter().map(|i| self.domain.element(*i)).collect();
 
         // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
         let vanishing_poly = vanishing_poly::from_roots(&xs_vec);
@@ -300,10 +297,8 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
         } else {
             let mut sum = F::zero();
 
-            let roots_of_unity_indices: Vec<usize> = shares
-                .iter()
-                .map(|(p, _)| p.get_id())
-                .collect();
+            let roots_of_unity_indices: Vec<usize> =
+                shares.iter().map(|(p, _)| p.get_id()).collect();
             let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
 
             for (l_i, (_, y)) in lagrange_coeffs.into_iter().zip(shares) {
@@ -322,10 +317,8 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
         if shares.len() != self.t {
             Err(anyhow!("Incorrect number of shares provided"))
         } else {
-            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<G::Affine>) = shares
-                .iter()
-                .map(|(p, g_y)| (p.get_id(), g_y))
-                .collect();
+            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<G::Affine>) =
+                shares.iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
 
             let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
 
@@ -371,11 +364,14 @@ mod shamir_tests {
                 let elements: Vec<usize> = (0..n).collect();
 
                 for subset in elements.iter().cloned().combinations(t) {
-
                     let lagrange_for_subset = config.lagrange_for_subset(&subset);
 
                     for (i, lagrange) in subset.iter().zip(&lagrange_for_subset) {
-                        let expected = single_lagrange(*i, &subset, &config.domain.elements().collect::<Vec<Fr>>());
+                        let expected = single_lagrange(
+                            *i,
+                            &subset,
+                            &config.domain.elements().collect::<Vec<Fr>>(),
+                        );
                         assert_eq!(
                             *lagrange, expected,
                             "Mismatch at i={:?}, subset={:?}, domain size={:?}",
