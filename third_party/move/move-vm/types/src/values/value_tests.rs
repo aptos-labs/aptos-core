@@ -11,6 +11,11 @@ use move_core_types::{
 };
 
 #[test]
+fn test_make_sure_value_size_stays_under_32_bytes() {
+    assert!(size_of::<Value>() <= 32);
+}
+
+#[test]
 fn locals() -> PartialVMResult<()> {
     const LEN: usize = 4;
     let mut locals = Locals::new(LEN);
@@ -39,7 +44,7 @@ fn locals() -> PartialVMResult<()> {
 
 #[test]
 fn struct_pack_and_unpack() -> PartialVMResult<()> {
-    let vals = vec![
+    let vals = [
         Value::u8(10),
         Value::u16(12),
         Value::u32(15),
