@@ -57,6 +57,25 @@ pub struct ModuleGenerator {
     address_to_idx: BTreeMap<AccountAddress, FF::AddressIdentifierIndex>,
     /// A mapping from functions to indices.
     fun_to_idx: BTreeMap<QualifiedId<FunId>, FF::FunctionHandleIndex>,
+    /// A mapping from structs to indices of test variant apis.
+    struct_to_api_test_variant_idx:
+        BTreeMap<QualifiedId<StructId>, BTreeMap<Symbol, FF::FunctionHandleIndex>>,
+    /// A mapping from structs to indices of pack apis.
+    struct_to_api_pack_idx:
+        BTreeMap<QualifiedId<StructId>, BTreeMap<Option<Symbol>, FF::FunctionHandleIndex>>,
+    /// A mapping from structs to indices of unpack apis.
+    struct_to_api_unpack_idx:
+        BTreeMap<QualifiedId<StructId>, BTreeMap<Option<Symbol>, FF::FunctionHandleIndex>>,
+    /// A mapping from structs to indices of immutable borrow field apis.
+    struct_to_api_imm_borrow_field_idx: BTreeMap<
+        QualifiedId<StructId>,
+        Vec<((Option<Vec<Symbol>>, usize), FF::FunctionHandleIndex)>,
+    >,
+    /// A mapping from structs to indices of mutable borrow field apis.
+    struct_to_api_mut_borrow_field_idx: BTreeMap<
+        QualifiedId<StructId>,
+        Vec<((Option<Vec<Symbol>>, usize), FF::FunctionHandleIndex)>,
+    >,
     /// The special function handle of the `main` function of a script. This is not stored
     /// in `module.function_handles` because the file format does not maintain a handle
     /// for this function.
@@ -66,6 +85,9 @@ pub struct ModuleGenerator {
     /// A mapping from function instantiations to indices.
     fun_inst_to_idx:
         BTreeMap<(QualifiedId<FunId>, FF::SignatureIndex), FF::FunctionInstantiationIndex>,
+    /// A mapping from function handles to instantiation indices.
+    fun_handle_idx_to_inst_idx:
+        BTreeMap<(FF::FunctionHandleIndex, FF::SignatureIndex), FF::FunctionInstantiationIndex>,
     /// A mapping from structs to indices.
     struct_to_idx: BTreeMap<QualifiedId<StructId>, FF::StructHandleIndex>,
     /// A mapping from function instantiations to indices.
@@ -163,6 +185,11 @@ impl ModuleGenerator {
             name_to_idx: Default::default(),
             address_to_idx: Default::default(),
             fun_to_idx: Default::default(),
+            struct_to_api_test_variant_idx: Default::default(),
+            struct_to_api_pack_idx: Default::default(),
+            struct_to_api_unpack_idx: Default::default(),
+            struct_to_api_imm_borrow_field_idx: Default::default(),
+            struct_to_api_mut_borrow_field_idx: Default::default(),
             struct_to_idx: Default::default(),
             struct_def_inst_to_idx: Default::default(),
             field_to_idx: Default::default(),
@@ -174,6 +201,7 @@ impl ModuleGenerator {
             struct_variant_to_idx: Default::default(),
             struct_variant_inst_to_idx: Default::default(),
             fun_inst_to_idx: Default::default(),
+            fun_handle_idx_to_inst_idx: Default::default(),
             main_handle: None,
             script_handle: None,
             module,
@@ -200,7 +228,20 @@ impl ModuleGenerator {
 
         for struct_env in module_env.get_structs() {
             assert!(compile_test_code || !struct_env.is_test_only());
-            self.gen_struct(ctx, &struct_env)
+            self.gen_struct(ctx, &struct_env);
+            // Generate struct apis
+            if ctx
+                .env
+                .language_version()
+                .language_version_for_public_struct()
+                && struct_env.get_visibility().is_public_or_friend()
+            {
+                FunctionGenerator::gen_struct_test_variant_api(self, ctx, &struct_env);
+                FunctionGenerator::gen_struct_pack_api(self, ctx, &struct_env);
+                FunctionGenerator::gen_struct_unpack_api(self, ctx, &struct_env);
+                FunctionGenerator::gen_struct_borrow_field_api(self, ctx, &struct_env, true);
+                FunctionGenerator::gen_struct_borrow_field_api(self, ctx, &struct_env, false);
+            }
         }
 
         let acquires_map = ctx.generate_acquires_map(module_env);
@@ -568,6 +609,427 @@ impl ModuleGenerator {
         idx
     }
 
+    /// Common builder for struct apis
+    fn build_struct_api_index_common<K: Ord>(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+        op_prefix: &str, // e.g., well_known::PACK / UNPACK / TEST_VARIANT
+        param_sig_index: Option<FF::SignatureIndex>,
+        return_sig_index: Option<FF::SignatureIndex>,
+        include_nonvariant_case: bool, // PACK/UNPACK: true; TEST_VARIANT: false
+        key_conv: fn(Option<Symbol>) -> K,
+    ) -> BTreeMap<K, FF::FunctionHandleIndex> {
+        let module = self.module_index(ctx, loc, &struct_env.module_env);
+        let struct_full_name = struct_env.get_full_name_with_address();
+        let fun_name_prefix = format!(
+            "{}{}{}",
+            op_prefix,
+            well_known::PUBLIC_STRUCT_DELIMITER,
+            struct_full_name
+        )
+        .replace("::", "$");
+
+        let type_parameters = struct_env
+            .get_type_parameters()
+            .iter()
+            .map(|TypeParameter(_, TypeParameterKind { abilities, .. }, _)| *abilities)
+            .collect_vec();
+
+        let pool = struct_env.env().symbol_pool();
+        let cases = if struct_env.has_variants() {
+            struct_env
+                .get_variants()
+                .map(|variant| {
+                    let name = format!(
+                        "{}{}{}",
+                        fun_name_prefix,
+                        well_known::PUBLIC_STRUCT_DELIMITER,
+                        variant.display(pool)
+                    );
+                    let field_types = struct_env
+                        .get_fields_of_variant(variant)
+                        .map(|f| f.get_type())
+                        .collect::<Vec<_>>();
+                    (Some(variant), name, field_types)
+                })
+                .collect()
+        } else if include_nonvariant_case {
+            let field_types = struct_env
+                .get_fields()
+                .map(|f| f.get_type())
+                .collect::<Vec<_>>();
+            vec![(None, fun_name_prefix, field_types)]
+        } else {
+            Vec::new()
+        };
+
+        let mut result = BTreeMap::new();
+        for (variant_opt, name, field_types) in cases {
+            let params_sig =
+                param_sig_index.unwrap_or_else(|| self.signature(ctx, loc, field_types.clone()));
+            let return_sig =
+                return_sig_index.unwrap_or_else(|| self.signature(ctx, loc, field_types));
+
+            let idx = FF::FunctionHandleIndex(ctx.checked_bound(
+                loc,
+                self.module.function_handles.len(),
+                MAX_FUNCTION_COUNT,
+                "used function",
+            ));
+
+            let name_sym = struct_env.env().symbol_pool().make(&name);
+            let name_idx = self.name_index(ctx, loc, name_sym);
+
+            let handle = FF::FunctionHandle {
+                module,
+                name: name_idx,
+                type_parameters: type_parameters.clone(),
+                parameters: params_sig,
+                return_: return_sig,
+                access_specifiers: None,
+                attributes: vec![],
+            };
+
+            self.module.function_handles.push(handle);
+            result.insert(key_conv(variant_opt), idx);
+        }
+
+        result
+    }
+
+    /// Generates function handle index for pack api
+    pub fn struct_api_pack_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+    ) -> BTreeMap<Option<Symbol>, FF::FunctionHandleIndex> {
+        let qid = struct_env.get_qualified_id();
+        if let Some(v) = self.struct_to_api_pack_idx.get(&qid) {
+            return v.clone();
+        }
+        fn id(opt: Option<Symbol>) -> Option<Symbol> {
+            opt
+        }
+        let struct_ty = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            TypeParameter::vec_to_formals(struct_env.get_type_parameters()),
+        );
+        let struct_sig = self.signature(ctx, loc, vec![struct_ty]);
+        let built = self.build_struct_api_index_common(
+            ctx,
+            loc,
+            struct_env,
+            well_known::PACK,
+            None,             // params = fields
+            Some(struct_sig), // return = struct
+            true,             // single case if non-variant
+            id,
+        );
+        self.struct_to_api_pack_idx.insert(qid, built.clone());
+        built
+    }
+
+    /// Generates function handle index for unpack api
+    pub fn struct_api_unpack_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+    ) -> BTreeMap<Option<Symbol>, FF::FunctionHandleIndex> {
+        let qid = struct_env.get_qualified_id();
+        if let Some(v) = self.struct_to_api_unpack_idx.get(&qid) {
+            return v.clone();
+        }
+        fn id(opt: Option<Symbol>) -> Option<Symbol> {
+            opt
+        }
+        let struct_ty = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            TypeParameter::vec_to_formals(struct_env.get_type_parameters()),
+        );
+        let struct_sig = self.signature(ctx, loc, vec![struct_ty]);
+        let built = self.build_struct_api_index_common(
+            ctx,
+            loc,
+            struct_env,
+            well_known::UNPACK,
+            Some(struct_sig),
+            None,
+            true,
+            id,
+        );
+        self.struct_to_api_unpack_idx.insert(qid, built.clone());
+        built
+    }
+
+    /// Generates function handle index for test variant api
+    pub fn struct_api_test_variant_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+    ) -> BTreeMap<Symbol, FF::FunctionHandleIndex> {
+        let qid = struct_env.get_qualified_id();
+        if let Some(v) = self.struct_to_api_test_variant_idx.get(&qid) {
+            return v.clone();
+        }
+        fn must_some(opt: Option<Symbol>) -> Symbol {
+            opt.expect("test_variant key must be a concrete variant")
+        }
+        let struct_ty = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            TypeParameter::vec_to_formals(struct_env.get_type_parameters()),
+        );
+        let ref_struct_ty = Type::Reference(ReferenceKind::Immutable, Box::new(struct_ty));
+        let ref_struct_sig = self.signature(ctx, loc, vec![ref_struct_ty]);
+        let bool_sig = self.signature(ctx, loc, vec![Type::Primitive(PrimitiveType::Bool)]);
+        let built = self.build_struct_api_index_common(
+            ctx,
+            loc,
+            struct_env,
+            well_known::TEST_VARIANT,
+            Some(ref_struct_sig),
+            Some(bool_sig),
+            false, // no function for non-variant structs
+            must_some,
+        );
+        self.struct_to_api_test_variant_idx
+            .insert(qid, built.clone());
+        built
+    }
+
+    // Helper function to construct:
+    // - A mapping from (field name, offset) to (type, variants) when field with the same name and same offset have the same type in variants
+    // - A mapping from (field name, variant, offset) to type when field with the same name and same offset have different types in variants
+    fn construct_map_for_borrow_field_api(
+        struct_env: &StructEnv<'_>,
+    ) -> (
+        BTreeMap<(Symbol, usize), (Type, Vec<Symbol>)>,
+        BTreeMap<(Symbol, Symbol, usize), Type>,
+    ) {
+        let mut field_name_offset_to_variant_map: BTreeMap<(Symbol, usize), (Type, Vec<Symbol>)> =
+            BTreeMap::new();
+        let mut single_field_name_offset_variant_to_ty_map: BTreeMap<
+            (Symbol, Symbol, usize),
+            Type,
+        > = BTreeMap::new();
+        let mut single_field_name_offset_pair = Vec::new();
+        for variant in struct_env.get_variants() {
+            for field in struct_env.get_fields_of_variant(variant) {
+                let ty = field.get_type();
+                let offset = field.get_offset();
+                let field_name = field.get_name();
+                if single_field_name_offset_pair.contains(&(field_name, offset)) {
+                    single_field_name_offset_variant_to_ty_map
+                        .insert((field_name, variant, offset), ty.clone());
+                    continue;
+                }
+                if let std::collections::btree_map::Entry::Vacant(e) =
+                    field_name_offset_to_variant_map.entry((field_name, offset))
+                {
+                    let variant_vec = vec![variant];
+                    e.insert((ty, variant_vec));
+                } else if field_name_offset_to_variant_map
+                    .get(&(field_name, offset))
+                    .unwrap()
+                    .0
+                    != ty
+                {
+                    single_field_name_offset_pair.push((field_name, offset));
+                    while let Some((ty, variant_vec)) =
+                        field_name_offset_to_variant_map.get(&(field_name, offset))
+                    {
+                        for v in variant_vec {
+                            single_field_name_offset_variant_to_ty_map
+                                .entry((field_name, *v, offset))
+                                .or_insert_with(|| ty.clone());
+                        }
+                        field_name_offset_to_variant_map.remove(&(field_name, offset));
+                    }
+                    single_field_name_offset_variant_to_ty_map
+                        .insert((field_name, variant, offset), ty.clone());
+                } else {
+                    let variant_vec: &mut Vec<Symbol> = &mut field_name_offset_to_variant_map
+                        .get_mut(&(field_name, offset))
+                        .unwrap()
+                        .1;
+                    variant_vec.push(variant);
+                }
+            }
+        }
+        (
+            field_name_offset_to_variant_map,
+            single_field_name_offset_variant_to_ty_map,
+        )
+    }
+
+    /// Generates function handle index for borrow field api
+    pub fn struct_api_borrow_index(
+        &mut self,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        struct_env: &StructEnv,
+        is_imm: bool,
+    ) -> Vec<((Option<Vec<Symbol>>, usize), FF::FunctionHandleIndex)> {
+        let module = self.module_index(ctx, loc, &struct_env.module_env);
+        if is_imm
+            && self
+                .struct_to_api_imm_borrow_field_idx
+                .contains_key(&struct_env.get_qualified_id())
+        {
+            return self
+                .struct_to_api_imm_borrow_field_idx
+                .get(&struct_env.get_qualified_id())
+                .unwrap()
+                .clone();
+        }
+        if !is_imm
+            && self
+                .struct_to_api_mut_borrow_field_idx
+                .contains_key(&struct_env.get_qualified_id())
+        {
+            return self
+                .struct_to_api_mut_borrow_field_idx
+                .get(&struct_env.get_qualified_id())
+                .unwrap()
+                .clone();
+        }
+        let construct_ref_type = |ty: Type| -> Type {
+            Type::Reference(
+                if is_imm {
+                    ReferenceKind::Immutable
+                } else {
+                    ReferenceKind::Mutable
+                },
+                Box::new(ty),
+            )
+        };
+
+        let struct_full_name = struct_env.get_full_name_with_address();
+        let fun_name_prefix = format!(
+            "{}{}{}",
+            if is_imm {
+                well_known::BORROW_NAME
+            } else {
+                well_known::BORROW_MUT_NAME
+            },
+            well_known::PUBLIC_STRUCT_DELIMITER,
+            struct_full_name
+        )
+        .replace("::", "$");
+        let struct_ty = Type::Struct(
+            struct_env.module_env.get_id(),
+            struct_env.get_id(),
+            TypeParameter::vec_to_formals(struct_env.get_type_parameters()),
+        );
+        let ref_struct_ty = construct_ref_type(struct_ty.clone());
+        let type_parameters = struct_env
+            .get_type_parameters()
+            .iter()
+            .map(|TypeParameter(_, TypeParameterKind { abilities, .. }, _)| *abilities)
+            .collect::<Vec<_>>();
+        let parameters = self.signature(ctx, loc, vec![ref_struct_ty]);
+        let mut ret = vec![];
+        if struct_env.has_variants() {
+            let (field_name_offset_to_variant_map, standalone_field_name_offset_variant_to_ty_map) =
+                Self::construct_map_for_borrow_field_api(struct_env);
+            let mut handle_elements = vec![];
+            for ((field_name, offset), (ty, variant_vec)) in field_name_offset_to_variant_map.iter()
+            {
+                let return_ = self.signature(ctx, loc, vec![construct_ref_type(ty.clone())]);
+                let name = format!(
+                    "{}{}{}{}{}",
+                    fun_name_prefix,
+                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    field_name.display(struct_env.env().symbol_pool()),
+                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    offset
+                );
+                handle_elements.push((name, return_, variant_vec.clone(), offset));
+            }
+            for ((field_name, variant, offset), ty) in
+                standalone_field_name_offset_variant_to_ty_map.iter()
+            {
+                let return_ = self.signature(ctx, loc, vec![construct_ref_type(ty.clone())]);
+                let name = format!(
+                    "{}{}{}{}{}{}{}",
+                    fun_name_prefix,
+                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    field_name.display(struct_env.env().symbol_pool()),
+                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    offset,
+                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    variant.display(struct_env.env().symbol_pool())
+                );
+                handle_elements.push((name, return_, vec![*variant].clone(), offset));
+            }
+            for (name, return_, variant_vec, offset) in handle_elements {
+                let handle: FF::FunctionHandle = FF::FunctionHandle {
+                    module,
+                    name: self.name_index(ctx, loc, struct_env.env().symbol_pool().make(&name)),
+                    type_parameters: type_parameters.clone(),
+                    parameters,
+                    return_,
+                    access_specifiers: None,
+                    attributes: vec![],
+                };
+                let idx = FF::FunctionHandleIndex(ctx.checked_bound(
+                    loc,
+                    self.module.function_handles.len(),
+                    MAX_FUNCTION_COUNT,
+                    "used function",
+                ));
+                self.module.function_handles.push(handle);
+                ret.push(((Some(variant_vec), *offset), idx));
+            }
+        } else {
+            for field in struct_env.get_fields() {
+                let offset = field.get_offset();
+                let ref_type = construct_ref_type(field.get_type());
+                let return_ = self.signature(ctx, loc, vec![ref_type]);
+                let name = format!(
+                    "{}{}{}{}{}",
+                    fun_name_prefix,
+                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    field.get_name().display(struct_env.env().symbol_pool()),
+                    well_known::PUBLIC_STRUCT_DELIMITER,
+                    offset
+                );
+                let idx = FF::FunctionHandleIndex(ctx.checked_bound(
+                    loc,
+                    self.module.function_handles.len(),
+                    MAX_FUNCTION_COUNT,
+                    "used function",
+                ));
+                let handle: FF::FunctionHandle = FF::FunctionHandle {
+                    module,
+                    name: self.name_index(ctx, loc, struct_env.env().symbol_pool().make(&name)),
+                    type_parameters: type_parameters.clone(),
+                    parameters,
+                    return_,
+                    access_specifiers: None,
+                    attributes: vec![],
+                };
+                self.module.function_handles.push(handle);
+                ret.push(((None, offset), idx));
+            }
+        }
+        if is_imm {
+            self.struct_to_api_imm_borrow_field_idx
+                .insert(struct_env.get_qualified_id(), ret.clone());
+        } else {
+            self.struct_to_api_mut_borrow_field_idx
+                .insert(struct_env.get_qualified_id(), ret.clone());
+        }
+        ret
+    }
+
     pub fn access_specifier(
         &mut self,
         ctx: &ModuleContext,
@@ -672,6 +1134,40 @@ impl ModuleGenerator {
         ));
         self.module.function_instantiations.push(fun_inst);
         self.fun_inst_to_idx.insert(cache_key, idx);
+        idx
+    }
+
+    // Obtains or generates instantiation index from handle index and type parameters
+    pub fn function_instantiation_index_from_handle_index(
+        &mut self,
+        handle: FF::FunctionHandleIndex,
+        ctx: &ModuleContext,
+        loc: &Loc,
+        inst: Vec<Type>,
+    ) -> FF::FunctionInstantiationIndex {
+        let type_parameters = self.signature(ctx, loc, inst);
+        let fun_inst = FF::FunctionInstantiation {
+            handle,
+            type_parameters,
+        };
+        if self
+            .fun_handle_idx_to_inst_idx
+            .contains_key(&(handle, type_parameters))
+        {
+            return *self
+                .fun_handle_idx_to_inst_idx
+                .get(&(handle, type_parameters))
+                .unwrap();
+        }
+        let idx = FF::FunctionInstantiationIndex(ctx.checked_bound(
+            loc,
+            self.module.function_instantiations.len(),
+            MAX_FUNCTION_INST_COUNT,
+            "function instantiation",
+        ));
+        self.module.function_instantiations.push(fun_inst);
+        self.fun_handle_idx_to_inst_idx
+            .insert((handle, type_parameters), idx);
         idx
     }
 
