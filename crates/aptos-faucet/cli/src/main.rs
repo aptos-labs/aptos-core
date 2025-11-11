@@ -3,9 +3,9 @@
 
 use anyhow::{Context, Result};
 use aptos_faucet_core::funder::{
-    ApiConnectionConfig, AssetConfig, DEFAULT_ASSET_NAME, FunderTrait, MintAssetConfig, MintFunder, TransactionSubmissionConfig,
+    ApiConnectionConfig, AssetConfig, FunderTrait, MintAssetConfig, MintFunder,
+    TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
 };
-use std::collections::HashMap;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
     types::{
@@ -14,7 +14,11 @@ use aptos_sdk::{
     },
 };
 use clap::Parser;
-use std::{collections::HashSet, path::PathBuf, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    str::FromStr,
+};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -60,15 +64,10 @@ pub struct FaucetCliArgs {
 impl FaucetCliArgs {
     async fn run(&self) -> Result<()> {
         // Create an AssetConfig to get the key
-        let asset_config = AssetConfig::new(
-            None,
-            self.key_file_path.clone(),
-        );
+        let asset_config = AssetConfig::new(None, self.key_file_path.clone());
 
         // Get network root key from the asset config.
-        let key = asset_config
-            .get_key()
-            .context("Failed to build root key")?;
+        let key = asset_config.get_key().context("Failed to build root key")?;
 
         // Build the account that the MintFunder will use.
         let faucet_account = LocalAccount::new(
@@ -92,10 +91,7 @@ impl FaucetCliArgs {
         );
 
         // Create asset configuration for the default asset
-        let base_asset_config = AssetConfig::new(
-            None,
-            self.key_file_path.clone(),
-        );
+        let base_asset_config = AssetConfig::new(None, self.key_file_path.clone());
         let mint_asset_config = MintAssetConfig::new(
             base_asset_config,
             self.mint_account_address,
