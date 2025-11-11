@@ -205,15 +205,23 @@ module aptos_experimental::bulk_order_book_types {
         ask_sizes: vector<u64>,
         metadata: M
     ): BulkOrderRequest<M> {
+        let num_bids = bid_prices.length();
+        let num_asks = ask_prices.length();
+
         // Basic length validation
-        assert!(bid_prices.length() == bid_sizes.length(), E_BID_LENGTH_MISMATCH);
-        assert!(ask_prices.length() == ask_sizes.length(), E_ASK_LENGTH_MISMATCH);
-        assert!(bid_sizes.length() > 0 || ask_sizes.length() > 0, E_EMPTY_ORDER);
+        assert!(num_bids == bid_sizes.length(), E_BID_LENGTH_MISMATCH);
+        assert!(num_asks == ask_sizes.length(), E_ASK_LENGTH_MISMATCH);
+        assert!(num_bids > 0 || num_asks > 0, E_EMPTY_ORDER);
         assert!(validate_not_zero_sizes(&bid_sizes), E_BID_SIZE_ZERO);
         assert!(validate_not_zero_sizes(&ask_sizes), E_ASK_SIZE_ZERO);
         assert!(validate_price_ordering(&bid_prices, true), E_BID_ORDER_INVALID);
         assert!(validate_price_ordering(&ask_prices, false), E_ASK_ORDER_INVALID);
-        assert!(validate_no_price_crossing(&bid_prices, &ask_prices), EPRICE_CROSSING);
+
+        if (num_bids > 0 && num_asks > 0) {
+            // First element in bids is the highest (descending order), first element in asks is the lowest (ascending
+            // order).
+            assert!(bid_prices[0] < ask_prices[0], EPRICE_CROSSING);
+        };
 
         // Ensure bid prices are in descending order and ask prices are in ascending order
         // Check if at least one side has orders
@@ -425,7 +433,6 @@ module aptos_experimental::bulk_order_book_types {
         i // Return the index of the first non-crossing level
     }
 
-    #[lint::skip(needless_mutable_reference)]
     // Creates a new single bulk order match result.
     //
     // Arguments:
@@ -447,13 +454,13 @@ module aptos_experimental::bulk_order_book_types {
         };
         new_order_match<M>(
             new_bulk_order_match_details<M>(
-                order.get_order_id(),
-                order.get_account(),
-                order.get_unique_priority_idx(),
+                order.order_id,
+                order.account,
+                order.unique_priority_idx,
                 price,
                 remaining_size,
                 is_bid,
-                get_sequence_number_from_bulk_order(order),
+                order.order_sequence_number,
                 order.metadata,
             ),
             matched_size
@@ -530,9 +537,9 @@ module aptos_experimental::bulk_order_book_types {
     ): Option<u64> {
         let prices = if (is_bid) { &self.bid_prices } else { &self.ask_prices };
         if (prices.length() == 0) {
-            return option::none() // No active price level
+            option::none() // No active price level
         } else {
-            return option::some(prices[0]) // Return the first price level
+            option::some(prices[0]) // Return the first price level
         }
     }
 
@@ -570,7 +577,7 @@ module aptos_experimental::bulk_order_book_types {
         self: &BulkOrder<M>,
         is_bid: bool,
     ): Option<u64> {
-        let sizes = if (is_bid) { self.bid_sizes } else { self.ask_sizes };
+        let sizes = if (is_bid) { &self.bid_sizes } else { &self.ask_sizes };
         if (sizes.length() == 0) {
             option::none() // No active size level
         } else {
@@ -610,10 +617,11 @@ module aptos_experimental::bulk_order_book_types {
         // Reinsert the price and size at the front of the respective vectors - if the price already exists, we ensure that
         // it is same as the reinsertion price and we just increase the size
         // If the price does not exist, we insert it at the front.
-        if (prices.length() > 0 && prices[0] == other.get_price_from_match_details()) {
+        let other_price = other.get_price_from_match_details();
+        if (prices.length() > 0 && prices[0] == other_price) {
             sizes[0] += other.get_remaining_size_from_match_details(); // Increase the size at the first price level
         } else {
-            prices.insert(0, other.get_price_from_match_details()); // Insert the new price at the front
+            prices.insert(0, other_price); // Insert the new price at the front
             sizes.insert(0, other.get_remaining_size_from_match_details()); // Insert the new size at the front
         }
     }

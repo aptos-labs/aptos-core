@@ -510,10 +510,11 @@ module aptos_experimental::single_order_book {
         order_ids.for_each(|order_id| {
             let order_with_state = self_orders.remove(&order_id);
             let (order, _) = order_with_state.destroy_order_from_state();
-            if (order.get_client_order_id().is_some()) {
+            let client_order_id = order.get_client_order_id();
+            if (client_order_id.is_some()) {
                 self_client_order_ids.remove(
                     &new_account_client_order_id(
-                        order.get_account(), order.get_client_order_id().destroy_some()
+                        order.get_account(), client_order_id.destroy_some()
                     )
                 );
             };

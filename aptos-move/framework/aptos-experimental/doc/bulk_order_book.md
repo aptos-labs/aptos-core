@@ -385,7 +385,7 @@ A <code>SingleBulkOrderMatch</code> containing the match details.
     <b>let</b> order_address = self.order_id_to_address.get(&order_id).destroy_some();
     <b>let</b> order = self.orders.remove(&order_address);
     <b>let</b> order_match = new_bulk_order_match&lt;M&gt;(
-        &<b>mut</b> order,
+        &order,
         !is_bid,
         matched_size,
     );

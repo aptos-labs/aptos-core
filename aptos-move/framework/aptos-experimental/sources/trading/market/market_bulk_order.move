@@ -49,11 +49,11 @@ module aptos_experimental::market_bulk_order {
     ): OrderIdType {
         let validation_result = callbacks.validate_bulk_order_placement(
             account,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            metadata,
+            &bid_prices,
+            &bid_sizes,
+            &ask_prices,
+            &ask_sizes,
+            &metadata,
         );
         assert!(validation_result.is_validation_result_valid(), E_CLEARINGHOUSE_VALIDATION_FAILED);
         let request = new_bulk_order_request(
@@ -71,6 +71,7 @@ module aptos_experimental::market_bulk_order {
         let (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
         assert!(sequence_number == order_sequence_number, E_SEQUENCE_NUMBER_MISMATCH);
         // Extract previous_seq_num from option, defaulting to 0 if none
+<<<<<<< HEAD
         let previous_seq_num = if (previous_seq_num_option.is_some()) {
             previous_seq_num_option.destroy_some()
 =======
@@ -106,9 +107,24 @@ module aptos_experimental::market_bulk_order {
         } else {
             0
         };
+=======
+        let previous_seq_num = previous_seq_num_option.destroy_with_default(0);
+>>>>>>> 9da51f6a78 ([move] rollback some optimizations)
         // Emit an event for the placed bulk order
-        market.emit_event_for_bulk_order_placed(order_id,
-            order_sequence_number, account, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num);
+        market.emit_event_for_bulk_order_placed(
+            order_id,
+            order_sequence_number,
+            account,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            cancelled_bid_prices,
+            cancelled_bid_sizes,
+            cancelled_ask_prices,
+            cancelled_ask_sizes,
+            previous_seq_num
+        );
         order_id
     }
 

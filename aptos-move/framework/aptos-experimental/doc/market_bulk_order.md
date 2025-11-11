@@ -90,11 +90,11 @@ Returns:
 ): OrderIdType {
     <b>let</b> validation_result = callbacks.validate_bulk_order_placement(
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        bid_prices,
-        bid_sizes,
-        ask_prices,
-        ask_sizes,
-        metadata,
+        &bid_prices,
+        &bid_sizes,
+        &ask_prices,
+        &ask_sizes,
+        &metadata,
     );
     <b>assert</b>!(validation_result.is_validation_result_valid(), <a href="market_bulk_order.md#0x7_market_bulk_order_E_CLEARINGHOUSE_VALIDATION_FAILED">E_CLEARINGHOUSE_VALIDATION_FAILED</a>);
     <b>let</b> request = new_bulk_order_request(
@@ -112,6 +112,7 @@ Returns:
     <b>let</b> (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
     <b>assert</b>!(sequence_number == order_sequence_number, <a href="market_bulk_order.md#0x7_market_bulk_order_E_SEQUENCE_NUMBER_MISMATCH">E_SEQUENCE_NUMBER_MISMATCH</a>);
     // Extract previous_seq_num from <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">option</a>, defaulting <b>to</b> 0 <b>if</b> none
+<<<<<<< HEAD
     <b>let</b> previous_seq_num = <b>if</b> (previous_seq_num_option.is_some()) {
         previous_seq_num_option.destroy_some()
 =======
@@ -147,9 +148,24 @@ Returns:
     } <b>else</b> {
         0
     };
+=======
+    <b>let</b> previous_seq_num = previous_seq_num_option.destroy_with_default(0);
+>>>>>>> 9da51f6a78 ([move] rollback some optimizations)
     // Emit an <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> for the placed bulk order
-    market.emit_event_for_bulk_order_placed(order_id,
-        order_sequence_number, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num);
+    market.emit_event_for_bulk_order_placed(
+        order_id,
+        order_sequence_number,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        bid_prices,
+        bid_sizes,
+        ask_prices,
+        ask_sizes,
+        cancelled_bid_prices,
+        cancelled_bid_sizes,
+        cancelled_ask_prices,
+        cancelled_ask_sizes,
+        previous_seq_num
+    );
     order_id
 }
 </code></pre>

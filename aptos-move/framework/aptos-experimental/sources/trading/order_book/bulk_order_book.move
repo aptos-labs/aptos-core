@@ -48,7 +48,7 @@ module aptos_experimental::bulk_order_book {
 
     use aptos_framework::big_ordered_map::BigOrderedMap;
     use aptos_framework::transaction_context;
-    use aptos_experimental::order_book_types::{ActiveMatchedOrder};
+    use aptos_experimental::order_book_types::ActiveMatchedOrder;
     use aptos_experimental::order_book_types;
     use aptos_experimental::bulk_order_book_types::{
         BulkOrder, BulkOrderPlaceResponse, BulkOrderRequest,
@@ -132,7 +132,7 @@ module aptos_experimental::bulk_order_book {
         let order_address = self.order_id_to_address.get(&order_id).destroy_some();
         let order = self.orders.remove(&order_address);
         let order_match = new_bulk_order_match<M>(
-            &mut order,
+            &order,
             !is_bid,
             matched_size,
         );

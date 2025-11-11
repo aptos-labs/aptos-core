@@ -889,17 +889,17 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     unsettled_size: u64,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
-    <b>let</b> cancelled_size = unsettled_size + maker_order.get_remaining_size_from_match_details();
-
     // Get the order state before cancellation <b>to</b> track what's being cancelled
     <b>let</b> order_before_cancel = market.get_order_book().get_bulk_order(maker_address);
     <b>let</b> (_, _, _, sequence_number, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, _ ) = order_before_cancel.destroy_bulk_order();
 
-    <b>if</b> (maker_order.get_remaining_size_from_match_details() != 0) {
-            // For bulk orders, we cancel all orders for the user
-            market.get_order_book_mut().cancel_bulk_order(maker_address);
+    <b>let</b> remaining_size = maker_order.get_remaining_size_from_match_details();
+    <b>if</b> (remaining_size != 0) {
+        // For bulk orders, we cancel all orders for the user
+        market.get_order_book_mut().cancel_bulk_order(maker_address);
     };
 
+    <b>let</b> cancelled_size = unsettled_size + remaining_size;
     callbacks.cleanup_bulk_order_at_price(
         maker_address, order_id, maker_order.is_bid_from_match_details(), maker_order.get_price_from_match_details(), cancelled_size
     );
@@ -953,8 +953,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
     time_in_force: TimeInForce,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
-    <b>let</b> is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_type();
-    <b>if</b> (is_bulk_order) {
+    <b>if</b> (maker_order.is_bulk_order_from_match_details()) {
         <b>return</b> <a href="order_placement.md#0x7_order_placement_cancel_bulk_maker_order_internal">cancel_bulk_maker_order_internal</a>(
             market,
             maker_order,
@@ -1200,7 +1199,6 @@ Places a market order - The order is guaranteed to be a taker order and will be 
         market.get_order_book_mut()
             .get_single_match_for_taker(price, *remaining_size, is_bid);
     <b>let</b> (maker_order, maker_matched_size) = result.destroy_order_match();
-    <b>let</b> is_bulk_order = maker_order.get_book_type_from_match_details() != single_order_type();
     <b>if</b> (!market.is_allowed_self_trade() && maker_order.get_account_from_match_details() == user_addr) {
         <a href="order_placement.md#0x7_order_placement_cancel_maker_order_internal">cancel_maker_order_internal</a>(
             market,
@@ -1271,7 +1269,7 @@ Places a market order - The order is guaranteed to be a taker order and will be 
             callbacks
         );
         // Event for maker fill
-        <b>if</b> (is_bulk_order) {
+        <b>if</b> (maker_order.is_bulk_order_from_match_details()) {
             market.emit_event_for_bulk_order_filled(
                 maker_order.get_order_id_from_match_details(),
                 maker_order.get_sequence_number_from_match_details(),
@@ -1417,7 +1415,7 @@ is done before calling this function if needed.
     <b>assert</b>!(limit_price &gt; 0, <a href="order_placement.md#0x7_order_placement_EINVALID_ORDER">EINVALID_ORDER</a>);
     <b>if</b> (order_id.is_none()) {
         // If order id is not provided, generate a new order id
-        order_id = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(market.next_order_id());
+        order_id = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(next_order_id());
     };
     <b>let</b> order_id = order_id.destroy_some();
     <b>let</b> callback_results = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();

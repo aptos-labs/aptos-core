@@ -80,10 +80,10 @@ module aptos_experimental::price_time_index {
     /// Returns None if there are no buys
     public(friend) fun best_bid_price(self: &PriceTimeIndex): Option<u64> {
         if (self.buys.is_empty()) {
-            return option::none()
+            option::none()
         } else {
-            let back_key = self.buys.borrow_back_key();
-            return option::some(back_key.price)
+            let back_key = self.buys.back_key();
+            option::some(back_key.price)
         }
     }
 
@@ -91,23 +91,23 @@ module aptos_experimental::price_time_index {
     /// Returns None if there are no sells
     public(friend) fun best_ask_price(self: &PriceTimeIndex): Option<u64> {
         if (self.sells.is_empty()) {
-            return option::none()
+            option::none()
         } else {
-            let front_key = self.sells.borrow_front_key();
-            return option::some(front_key.price)
+            let front_key = self.sells.front_key();
+            option::some(front_key.price)
         }
     }
 
-    fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
-        let best_bid = self.best_bid_price();
-        let best_ask = self.best_ask_price();
-        if (best_bid.is_none() || best_ask.is_none()) {
-            return option::none()
-        } else {
-            return option::some(
-                (best_bid.destroy_some() + best_ask.destroy_some()) / 2
-            )
-        }
+    /// Returns the mid price (i.e. the average of the highest bid (buy) price and the lowest ask (sell) price. If
+    /// there are o buys / sells, returns None.
+    public(friend) fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
+        if (self.sells.is_empty() || self.buys.is_empty()) {
+            return option::none();
+        };
+
+        let best_ask = self.sells.front_key().price;
+        let best_bid = self.buys.back_key().price;
+        option::some((best_bid + best_ask) / 2)
     }
 
     public(friend) fun get_slippage_price(
@@ -122,9 +122,9 @@ module aptos_experimental::price_time_index {
             mid_price, slippage_pct, get_slippage_pct_precision() * 100
         );
         if (is_bid) {
-            return option::some(mid_price + slippage)
+            option::some(mid_price + slippage)
         } else {
-            return option::some(mid_price - slippage)
+            option::some(mid_price - slippage)
         }
     }
 
@@ -147,9 +147,9 @@ module aptos_experimental::price_time_index {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
         let key = PriceTime { price, tie_breaker };
         if (is_bid) {
-            return self.buys.remove(&key).size
+            self.buys.remove(&key).size
         } else {
-            return self.sells.remove(&key).size
+            self.sells.remove(&key).size
         }
     }
 
@@ -162,9 +162,9 @@ module aptos_experimental::price_time_index {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
         let key = PriceTime { price, tie_breaker };
         if (is_bid) {
-            return self.buys.contains(&key)
+            self.buys.contains(&key)
         } else {
-            return self.sells.contains(&key)
+            self.sells.contains(&key)
         }
     }
 
@@ -174,10 +174,10 @@ module aptos_experimental::price_time_index {
     ): bool {
         if (is_bid) {
             let best_ask_price = self.best_ask_price();
-            return best_ask_price.is_some() && price >= best_ask_price.destroy_some()
+            best_ask_price.is_some() && price >= best_ask_price.destroy_some()
         } else {
             let best_bid_price = self.best_bid_price();
-            return best_bid_price.is_some() && price <= best_bid_price.destroy_some()
+            best_bid_price.is_some() && price <= best_bid_price.destroy_some()
         }
     }
 
@@ -250,9 +250,9 @@ module aptos_experimental::price_time_index {
         is_bid: bool
     ): ActiveMatchedOrder {
         if (is_bid) {
-            return self.get_single_match_for_buy_order(price, size)
+            self.get_single_match_for_buy_order(price, size)
         } else {
-            return self.get_single_match_for_sell_order(price, size)
+            self.get_single_match_for_sell_order(price, size)
         }
     }
 
@@ -267,13 +267,13 @@ module aptos_experimental::price_time_index {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
         let key = PriceTime { price, tie_breaker };
         if (is_bid) {
-            return modify_order_data(
+            modify_order_data(
                 &mut self.buys, &key, |order_data| {
                     order_data.size += size_delta;
                 }
             );
         } else {
-            return modify_order_data(
+            modify_order_data(
                 &mut self.sells, &key, |order_data| {
                     order_data.size += size_delta;
                 }
@@ -292,13 +292,13 @@ module aptos_experimental::price_time_index {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
         let key = PriceTime { price, tie_breaker };
         if (is_bid) {
-            return modify_order_data(
+            modify_order_data(
                 &mut self.buys, &key, |order_data| {
                     order_data.size -= size_delta;
                 }
             );
         } else {
-            return modify_order_data(
+            modify_order_data(
                 &mut self.sells, &key, |order_data| {
                     order_data.size -= size_delta;
                 }
@@ -321,9 +321,9 @@ module aptos_experimental::price_time_index {
         // Assert that this is not a taker order
         assert!(!self.is_taker_order(price, is_bid), EINVALID_MAKER_ORDER);
         if (is_bid) {
-            return self.buys.add(key, value);
+            self.buys.add(key, value);
         } else {
-            return self.sells.add(key, value);
+            self.sells.add(key, value);
         };
     }
 

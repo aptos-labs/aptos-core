@@ -246,10 +246,10 @@ Returns None if there are no buys
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
     <b>if</b> (self.buys.is_empty()) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
-        <b>let</b> back_key = self.buys.borrow_back_key();
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(back_key.price)
+        <b>let</b> back_key = self.buys.back_key();
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(back_key.price)
     }
 }
 </code></pre>
@@ -277,10 +277,10 @@ Returns None if there are no sells
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
     <b>if</b> (self.sells.is_empty()) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
-        <b>let</b> front_key = self.sells.borrow_front_key();
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(front_key.price)
+        <b>let</b> front_key = self.sells.front_key();
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(front_key.price)
     }
 }
 </code></pre>
@@ -293,9 +293,11 @@ Returns None if there are no sells
 
 ## Function `get_mid_price`
 
+Returns the mid price (i.e. the average of the highest bid (buy) price and the lowest ask (sell) price. If
+there are o buys / sells, returns None.
 
 
-<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
 </code></pre>
 
 
@@ -304,16 +306,14 @@ Returns None if there are no sells
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
-    <b>let</b> best_bid = self.<a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>();
-    <b>let</b> best_ask = self.<a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>();
-    <b>if</b> (best_bid.is_none() || best_ask.is_none()) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
-    } <b>else</b> {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(
-            (best_bid.destroy_some() + best_ask.destroy_some()) / 2
-        )
-    }
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="price_time_index.md#0x7_price_time_index_get_mid_price">get_mid_price</a>(self: &<a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">PriceTimeIndex</a>): Option&lt;u64&gt; {
+    <b>if</b> (self.sells.is_empty() || self.buys.is_empty()) {
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
+    };
+
+    <b>let</b> best_ask = self.sells.front_key().price;
+    <b>let</b> best_bid = self.buys.back_key().price;
+    <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>((best_bid + best_ask) / 2)
 }
 </code></pre>
 
@@ -348,9 +348,9 @@ Returns None if there are no sells
         mid_price, slippage_pct, get_slippage_pct_precision() * 100
     );
     <b>if</b> (is_bid) {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price + slippage)
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price + slippage)
     } <b>else</b> {
-        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price - slippage)
+        <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(mid_price - slippage)
     }
 }
 </code></pre>
@@ -413,9 +413,9 @@ Returns None if there are no sells
     <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
     <b>if</b> (is_bid) {
-        <b>return</b> self.buys.remove(&key).size
+        self.buys.remove(&key).size
     } <b>else</b> {
-        <b>return</b> self.sells.remove(&key).size
+        self.sells.remove(&key).size
     }
 }
 </code></pre>
@@ -448,9 +448,9 @@ Returns None if there are no sells
     <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
     <b>if</b> (is_bid) {
-        <b>return</b> self.buys.contains(&key)
+        self.buys.contains(&key)
     } <b>else</b> {
-        <b>return</b> self.sells.contains(&key)
+        self.sells.contains(&key)
     }
 }
 </code></pre>
@@ -480,10 +480,10 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
 ): bool {
     <b>if</b> (is_bid) {
         <b>let</b> best_ask_price = self.<a href="price_time_index.md#0x7_price_time_index_best_ask_price">best_ask_price</a>();
-        <b>return</b> best_ask_price.is_some() && price &gt;= best_ask_price.destroy_some()
+        best_ask_price.is_some() && price &gt;= best_ask_price.destroy_some()
     } <b>else</b> {
         <b>let</b> best_bid_price = self.<a href="price_time_index.md#0x7_price_time_index_best_bid_price">best_bid_price</a>();
-        <b>return</b> best_bid_price.is_some() && price &lt;= best_bid_price.destroy_some()
+        best_bid_price.is_some() && price &lt;= best_bid_price.destroy_some()
     }
 }
 </code></pre>
@@ -656,9 +656,9 @@ Check if the order is a taker order - i.e. if it can be immediately matched with
     is_bid: bool
 ): ActiveMatchedOrder {
     <b>if</b> (is_bid) {
-        <b>return</b> self.<a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(price, size)
+        self.<a href="price_time_index.md#0x7_price_time_index_get_single_match_for_buy_order">get_single_match_for_buy_order</a>(price, size)
     } <b>else</b> {
-        <b>return</b> self.<a href="price_time_index.md#0x7_price_time_index_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(price, size)
+        self.<a href="price_time_index.md#0x7_price_time_index_get_single_match_for_sell_order">get_single_match_for_sell_order</a>(price, size)
     }
 }
 </code></pre>
@@ -693,13 +693,13 @@ Increase the size of the order in the orderbook without altering its position in
     <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
     <b>if</b> (is_bid) {
-        <b>return</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
             &<b>mut</b> self.buys, &key, |order_data| {
                 order_data.size += size_delta;
             }
         );
     } <b>else</b> {
-        <b>return</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
             &<b>mut</b> self.sells, &key, |order_data| {
                 order_data.size += size_delta;
             }
@@ -738,13 +738,13 @@ Decrease the size of the order in the order book without altering its position i
     <b>let</b> tie_breaker = <a href="price_time_index.md#0x7_price_time_index_get_tie_breaker">get_tie_breaker</a>(unique_priority_idx, is_bid);
     <b>let</b> key = <a href="price_time_index.md#0x7_price_time_index_PriceTime">PriceTime</a> { price, tie_breaker };
     <b>if</b> (is_bid) {
-        <b>return</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
             &<b>mut</b> self.buys, &key, |order_data| {
                 order_data.size -= size_delta;
             }
         );
     } <b>else</b> {
-        <b>return</b> <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
+        <a href="price_time_index.md#0x7_price_time_index_modify_order_data">modify_order_data</a>(
             &<b>mut</b> self.sells, &key, |order_data| {
                 order_data.size -= size_delta;
             }
@@ -787,9 +787,9 @@ Decrease the size of the order in the order book without altering its position i
     // Assert that this is not a taker order
     <b>assert</b>!(!self.<a href="price_time_index.md#0x7_price_time_index_is_taker_order">is_taker_order</a>(price, is_bid), <a href="price_time_index.md#0x7_price_time_index_EINVALID_MAKER_ORDER">EINVALID_MAKER_ORDER</a>);
     <b>if</b> (is_bid) {
-        <b>return</b> self.buys.add(key, value);
+        self.buys.add(key, value);
     } <b>else</b> {
-        <b>return</b> self.sells.add(key, value);
+        self.sells.add(key, value);
     };
 }
 </code></pre>

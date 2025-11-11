@@ -1257,10 +1257,11 @@ Removes and returns the orders that are ready to be executed based on the curren
     order_ids.for_each(|order_id| {
         <b>let</b> order_with_state = self_orders.remove(&order_id);
         <b>let</b> (order, _) = order_with_state.destroy_order_from_state();
-        <b>if</b> (order.get_client_order_id().is_some()) {
+        <b>let</b> client_order_id = order.get_client_order_id();
+        <b>if</b> (client_order_id.is_some()) {
             self_client_order_ids.remove(
                 &new_account_client_order_id(
-                    order.get_account(), order.get_client_order_id().destroy_some()
+                    order.get_account(), client_order_id.destroy_some()
                 )
             );
         };

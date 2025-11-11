@@ -51,6 +51,8 @@ Order book type definitions
 -  [Function `get_client_order_id_from_match_details`](#0x7_order_book_types_get_client_order_id_from_match_details)
 -  [Function `is_bid_from_match_details`](#0x7_order_book_types_is_bid_from_match_details)
 -  [Function `get_book_type_from_match_details`](#0x7_order_book_types_get_book_type_from_match_details)
+-  [Function `is_bulk_order_from_match_details`](#0x7_order_book_types_is_bulk_order_from_match_details)
+-  [Function `is_single_order_from_match_details`](#0x7_order_book_types_is_single_order_from_match_details)
 -  [Function `get_sequence_number_from_match_details`](#0x7_order_book_types_get_sequence_number_from_match_details)
 -  [Function `new_single_order_match_details`](#0x7_order_book_types_new_single_order_match_details)
 -  [Function `new_bulk_order_match_details`](#0x7_order_book_types_new_bulk_order_match_details)
@@ -1119,13 +1121,13 @@ particular match operation.
     (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
     match(self) {
         TriggerCondition::PriceMoveAbove(price) =&gt; {
-            <b>return</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*price), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
+            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*price), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
         }
         TriggerCondition::PriceMoveBelow(price) =&gt; {
-            <b>return</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*price), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
+            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*price), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>())
         }
         TriggerCondition::TimeBased(time) =&gt; {
-            <b>return</b> (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*time))
+            (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>(), <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(*time))
         }
     }
 }
@@ -1438,9 +1440,9 @@ Validates that a reinsertion request is valid for the given original order.
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
 ): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> {
     <b>if</b> (self is OrderMatchDetails::SingleOrder) {
-        <b>return</b> self.time_in_force
+        self.time_in_force
     } <b>else</b> {
-        <b>return</b> <a href="order_book_types.md#0x7_order_book_types_good_till_cancelled">good_till_cancelled</a>()
+        <a href="order_book_types.md#0x7_order_book_types_good_till_cancelled">good_till_cancelled</a>()
     }
 }
 </code></pre>
@@ -1550,10 +1552,62 @@ Validates that a reinsertion request is valid for the given original order.
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
 ): <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> {
     <b>if</b> (self is OrderMatchDetails::SingleOrder) {
-        <b>return</b> <a href="order_book_types.md#0x7_order_book_types_single_order_type">single_order_type</a>()
+        <a href="order_book_types.md#0x7_order_book_types_single_order_type">single_order_type</a>()
     } <b>else</b> {
-        <b>return</b> <a href="order_book_types.md#0x7_order_book_types_bulk_order_type">bulk_order_type</a>()
+        <a href="order_book_types.md#0x7_order_book_types_bulk_order_type">bulk_order_type</a>()
     }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_is_bulk_order_from_match_details"></a>
+
+## Function `is_bulk_order_from_match_details`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bulk_order_from_match_details">is_bulk_order_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bulk_order_from_match_details">is_bulk_order_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): bool {
+    self is OrderMatchDetails::BulkOrder
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_is_single_order_from_match_details"></a>
+
+## Function `is_single_order_from_match_details`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_single_order_from_match_details">is_single_order_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_single_order_from_match_details">is_single_order_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): bool {
+    self is OrderMatchDetails::SingleOrder
 }
 </code></pre>
 

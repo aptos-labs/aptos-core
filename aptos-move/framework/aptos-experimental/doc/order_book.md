@@ -25,6 +25,7 @@
 -  [Function `take_ready_time_based_orders`](#0x7_order_book_take_ready_time_based_orders)
 -  [Function `best_bid_price`](#0x7_order_book_best_bid_price)
 -  [Function `best_ask_price`](#0x7_order_book_best_ask_price)
+-  [Function `get_mid_price`](#0x7_order_book_get_mid_price)
 -  [Function `get_slippage_price`](#0x7_order_book_get_slippage_price)
 -  [Function `get_bulk_order_remaining_size`](#0x7_order_book_get_bulk_order_remaining_size)
 -  [Function `is_taker_order`](#0x7_order_book_is_taker_order)
@@ -601,6 +602,30 @@
 
 </details>
 
+<a id="0x7_order_book_get_mid_price"></a>
+
+## Function `get_mid_price`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_mid_price">get_mid_price</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">order_book::OrderBook</a>&lt;M&gt;): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book.md#0x7_order_book_get_mid_price">get_mid_price</a>&lt;M: store + <b>copy</b> + drop&gt;(self: &<a href="order_book.md#0x7_order_book_OrderBook">OrderBook</a>&lt;M&gt;): Option&lt;u64&gt; {
+    self.price_time_idx.<a href="order_book.md#0x7_order_book_get_mid_price">get_mid_price</a>()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_get_slippage_price"></a>
 
 ## Function `get_slippage_price`
@@ -711,9 +736,9 @@ Checks if the order is a taker order i.e., matched immediately with the active o
 ): OrderMatch&lt;M&gt; {
     <b>let</b> result = self.price_time_idx.get_single_match_result(price, size, is_bid);
     <b>if</b> (result.is_active_matched_book_type_single_order()) {
-        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(result)
+        self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(result)
     } <b>else</b> {
-        <b>return</b> self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(&<b>mut</b> self.price_time_idx, result, is_bid)
+        self.<a href="bulk_order_book.md#0x7_bulk_order_book">bulk_order_book</a>.<a href="order_book.md#0x7_order_book_get_single_match_for_taker">get_single_match_for_taker</a>(&<b>mut</b> self.price_time_idx, result, is_bid)
     }
 }
 </code></pre>
@@ -742,9 +767,7 @@ Checks if the order is a taker order i.e., matched immediately with the active o
     reinsert_order: OrderMatchDetails&lt;M&gt;,
     original_order: &OrderMatchDetails&lt;M&gt;,
 ) {
-    <b>assert</b>!(reinsert_order.get_book_type_from_match_details()
-        == original_order.get_book_type_from_match_details(), <a href="order_book.md#0x7_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
-    <b>if</b> (reinsert_order.get_book_type_from_match_details() == single_order_type()) {
+    <b>if</b> (reinsert_order.is_single_order_from_match_details()) {
         self.<a href="single_order_book.md#0x7_single_order_book">single_order_book</a>.<a href="order_book.md#0x7_order_book_reinsert_order">reinsert_order</a>(
             &<b>mut</b> self.price_time_idx, reinsert_order, original_order
         )

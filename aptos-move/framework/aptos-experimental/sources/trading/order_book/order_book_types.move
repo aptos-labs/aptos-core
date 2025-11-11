@@ -164,13 +164,13 @@ module aptos_experimental::order_book_types {
         (option::Option<u64>, option::Option<u64>, option::Option<u64>) {
         match(self) {
             TriggerCondition::PriceMoveAbove(price) => {
-                return (option::none(), option::some(*price), option::none())
+                (option::none(), option::some(*price), option::none())
             }
             TriggerCondition::PriceMoveBelow(price) => {
-                return (option::some(*price), option::none(), option::none())
+                (option::some(*price), option::none(), option::none())
             }
             TriggerCondition::TimeBased(time) => {
-                return (option::none(), option::none(), option::some(*time))
+                (option::none(), option::none(), option::some(*time))
             }
         }
     }
@@ -317,9 +317,9 @@ module aptos_experimental::order_book_types {
         self: &OrderMatchDetails<M>,
     ): TimeInForce {
         if (self is OrderMatchDetails::SingleOrder) {
-            return self.time_in_force
+            self.time_in_force
         } else {
-            return good_till_cancelled()
+            good_till_cancelled()
         }
     }
 
@@ -349,11 +349,24 @@ module aptos_experimental::order_book_types {
         self: &OrderMatchDetails<M>,
     ): OrderType {
         if (self is OrderMatchDetails::SingleOrder) {
-            return single_order_type()
+            single_order_type()
         } else {
-            return bulk_order_type()
+            bulk_order_type()
         }
     }
+
+    public(friend) fun is_bulk_order_from_match_details<M: store + copy + drop>(
+        self: &OrderMatchDetails<M>,
+    ): bool {
+        self is OrderMatchDetails::BulkOrder
+    }
+
+    public(friend) fun is_single_order_from_match_details<M: store + copy + drop>(
+        self: &OrderMatchDetails<M>,
+    ): bool {
+        self is OrderMatchDetails::SingleOrder
+    }
+
 
     /// This should only be called on bulk orders, aborts if called for non-bulk order.
     public(friend) fun get_sequence_number_from_match_details<M: store + copy + drop>(
