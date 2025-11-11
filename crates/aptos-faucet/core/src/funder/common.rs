@@ -41,6 +41,9 @@ const MAX_NUM_OUTSTANDING_TRANSACTIONS: u64 = 15;
 
 const DEFAULT_KEY_FILE_PATH: &str = "/opt/aptos/etc/mint.key";
 
+/// Default asset name used when no asset is specified in requests.
+pub const DEFAULT_ASSET_NAME: &str = "apt";
+
 /// This defines configuration for any Funder that needs to interact with a real
 /// blockchain API. This includes the MintFunder and the TransferFunder currently.
 ///

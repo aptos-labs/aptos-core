@@ -9,7 +9,7 @@ use crate::{
         build_openapi_service, convert_error, mint, BasicApi, CaptchaApi, FundApi,
         FundApiComponents,
     },
-    funder::{ApiConnectionConfig, AssetConfig, FunderConfig, MintAssetConfig, MintFunderConfig, TransactionSubmissionConfig},
+    funder::{ApiConnectionConfig, AssetConfig, DEFAULT_ASSET_NAME, FunderConfig, MintAssetConfig, MintFunderConfig, TransactionSubmissionConfig},
     middleware::middleware_log,
 };
 use anyhow::{anyhow, Context, Result};
@@ -286,11 +286,12 @@ impl RunConfig {
                     35,      // wait_for_outstanding_txns_secs
                     false,   // wait_for_transactions
                 ),
-                assets: HashMap::from([("apt".to_string(), MintAssetConfig::new(
+                assets: HashMap::from([(DEFAULT_ASSET_NAME.to_string(), MintAssetConfig::new(
                     AssetConfig::new(None, key_file_path),
                     Some(aptos_test_root_address()),
                     do_not_delegate,
                 ))]),
+                default_asset: None, // Will default to DEFAULT_ASSET_NAME ("apt")
                 amount_to_fund: 100_000_000_000,
             }),
             handler_config: HandlerConfig {

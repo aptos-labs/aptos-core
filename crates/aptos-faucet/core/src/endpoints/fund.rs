@@ -149,15 +149,12 @@ impl FundApi {
             return Ok(());
         }
 
-        // Normalize asset parameter: default to "apt" if not specified
-        let asset_name = asset.0.unwrap_or_else(|| "apt".to_string());
-
         // Call Funder.fund with `check_only` set, meaning it only does the
         // initial set of checks without actually submitting any transactions
-        // to fund the account.
+        // to fund the account. Pass asset directly, funder will use its configured default if None.
         self.components
             .funder
-            .fund(fund_request.amount, checker_data.receiver, Some(asset_name), true, bypass)
+            .fund(fund_request.amount, checker_data.receiver, asset.0, true, bypass)
             .await?;
 
         Ok(())
@@ -292,13 +289,11 @@ impl FundApiComponents {
             .preprocess_request(&fund_request, source_ip, header_map, dry_run)
             .await?;
 
-        // Normalize asset parameter: default to "apt" if not specified
-        let asset_name = asset.unwrap_or_else(|| "apt".to_string());
-
-        // Fund the account
+        // Fund the account - pass asset directly, funder will use its configured default if None
+        let asset_for_logging = asset.clone();
         let fund_result = self
             .funder
-            .fund(fund_request.amount, checker_data.receiver, Some(asset_name.clone()), false, bypass)
+            .fund(fund_request.amount, checker_data.receiver, asset, false, bypass)
             .await;
 
         // This might be empty if there is an error and we never got to the
@@ -314,7 +309,7 @@ impl FundApiComponents {
             jwt_sub = jwt_sub(checker_data.headers.clone()).ok(),
             address = checker_data.receiver,
             requested_amount = fund_request.amount,
-            asset = asset_name.as_str(),
+            asset = asset_for_logging.as_deref().unwrap_or("default"),
             txn_hashes = txn_hashes,
             success = fund_result.is_ok(),
         );
