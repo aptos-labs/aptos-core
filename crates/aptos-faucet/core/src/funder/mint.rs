@@ -16,14 +16,14 @@ use aptos_sdk::{
         transaction::{
             authenticator::AuthenticationKey, Script, SignedTransaction, TransactionArgument,
         },
-        AccountKey, LocalAccount,
+        LocalAccount,
     },
 };
 use async_trait::async_trait;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tokio::sync::{RwLock, Mutex};
+use tokio::sync::RwLock;
 
 static MINTER_SCRIPT: &[u8] = include_bytes!(
     "../../../../../aptos-move/move-examples/scripts/minter/build/Minter/bytecode_scripts/main.mv"
@@ -126,37 +126,40 @@ impl MintFunderConfig {
             self.amount_to_fund,
         );
 
-        // Pre-create delegated accounts for all assets that need delegation
-        minter.initialize_delegated_accounts(&self.assets).await?;
+        // If default asset needs delegation, do it once at startup
+        if !default_asset_config.do_not_delegate {
+            minter
+                .use_delegated_account()
+                .await
+                .context("Failed to make MintFunder use delegated account")?;
+        }
 
         Ok(minter)
     }
 }
 
 pub struct MintFunder {
-    // Keep existing fields
+    /// URL of an Aptos node API.
     node_url: Url,
     node_api_key: Option<String>,
     node_additional_headers: Option<HashMap<String, String>>,
-    txn_config: TransactionSubmissionConfig,
-    transaction_factory: TransactionFactory,
-    gas_unit_price_manager: GasUnitPriceManager,
-    outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
 
-    // Keep single faucet account - just switch the key/address per request
+    txn_config: TransactionSubmissionConfig,
+
     faucet_account: RwLock<LocalAccount>,
 
-    // Store asset configs for lookup
+    transaction_factory: TransactionFactory,
+
+    gas_unit_price_manager: GasUnitPriceManager,
+
+    /// When recovering from being overloaded, this struct ensures we handle
+    /// requests in the order they came in.
+    outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
+
+    // Multi-asset support: store asset configs
     assets: HashMap<String, MintAssetConfig>,
-
-    // Default asset to use when no asset is specified in requests
     default_asset: String,
-
-    // Amount to fund when no specific amount is requested
     amount_to_fund: u64,
-
-    // Cache for delegated accounts per asset (to avoid recreating them on every request)
-    delegated_accounts_cache: Mutex<HashMap<String, LocalAccount>>,
 }
 
 impl MintFunder {
@@ -166,7 +169,7 @@ impl MintFunder {
         node_additional_headers: Option<HashMap<String, String>>,
         chain_id: ChainId,
         txn_config: TransactionSubmissionConfig,
-        initial_account: LocalAccount,
+        faucet_account: LocalAccount,
         assets: HashMap<String, MintAssetConfig>,
         default_asset: String,
         amount_to_fund: u64,
@@ -181,135 +184,17 @@ impl MintFunder {
             node_api_key,
             node_additional_headers,
             txn_config,
+            faucet_account: RwLock::new(faucet_account),
             transaction_factory,
             gas_unit_price_manager,
             outstanding_requests: RwLock::new(vec![]),
-            faucet_account: RwLock::new(initial_account),
             assets,
             default_asset,
             amount_to_fund,
-            delegated_accounts_cache: Mutex::new(HashMap::new()),
         }
     }
 
-    /// Initialize delegated accounts for all assets during startup
-    async fn initialize_delegated_accounts(&self, assets: &HashMap<String, MintAssetConfig>) -> Result<()> {
-        for (asset_name, asset_config) in assets {
-            if !asset_config.do_not_delegate {
-                info!("Attempting to create delegated account for asset: {}", asset_name);
 
-                let key = asset_config.get_key()?;
-                let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
-                    AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
-                });
-
-                // Create base account and clone key for fallback
-                let key_bytes = key.to_bytes();
-                let cloned_key = Ed25519PrivateKey::try_from(key_bytes.as_ref())?;
-                let mut base_account = LocalAccount::new(account_address, key, 0);
-
-                // Try to create delegated account with timeout
-                match tokio::time::timeout(
-                    tokio::time::Duration::from_secs(30), // 30 second timeout
-                    self.create_delegated_account_for_asset(&mut base_account)
-                ).await {
-                    Ok(Ok(delegated_account)) => {
-                        // Success - cache the delegated account
-                        let mut cache = self.delegated_accounts_cache.lock().await;
-                        let private_key_bytes = delegated_account.private_key().to_bytes();
-                        let cloned_private_key = Ed25519PrivateKey::try_from(private_key_bytes.as_ref())
-                            .context("Failed to clone private key")?;
-                        cache.insert(asset_name.clone(), LocalAccount::new(
-                            delegated_account.address(),
-                            AccountKey::from_private_key(cloned_private_key),
-                            delegated_account.sequence_number(),
-                        ));
-
-                        info!("Successfully created delegated account for asset: {} at address: {}",
-                              asset_name, delegated_account.address());
-                    },
-                    Ok(Err(e)) => {
-                        // Delegation failed - fall back to base account
-                        eprintln!("Warning: Failed to create delegated account for asset '{}': {}. Falling back to base account.", asset_name, e);
-
-                        let fallback_key = Ed25519PrivateKey::try_from(key_bytes.as_ref())?;
-                        let mut cache = self.delegated_accounts_cache.lock().await;
-                        cache.insert(asset_name.clone(), LocalAccount::new(
-                            account_address,
-                            AccountKey::from_private_key(fallback_key),
-                            0,
-                        ));
-
-                        info!("Using base account for asset: {} at address: {}", asset_name, account_address);
-                    },
-                    Err(_) => {
-                        // Timeout - fall back to base account
-                        eprintln!("Warning: Timeout creating delegated account for asset '{}'. Falling back to base account.", asset_name);
-
-                        let mut cache = self.delegated_accounts_cache.lock().await;
-                        cache.insert(asset_name.clone(), LocalAccount::new(
-                            account_address,
-                            AccountKey::from_private_key(cloned_key),
-                            0,
-                        ));
-
-                        info!("Using base account for asset: {} at address: {}", asset_name, account_address);
-                    }
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Create a faucet account for the requested asset
-    async fn create_faucet_account_for_asset(&self, asset_config: &MintAssetConfig, asset_name: &str) -> Result<LocalAccount, AptosTapError> {
-        // Handle delegation if needed
-        if !asset_config.do_not_delegate {
-            // Get the cached delegated account (should already exist from initialization)
-            let cache = self.delegated_accounts_cache.lock().await;
-            if let Some(cached_account) = cache.get(asset_name) {
-                // Return a fresh copy of the cached account with current sequence number from blockchain
-                let private_key_bytes = cached_account.private_key().to_bytes();
-                let cloned_private_key = Ed25519PrivateKey::try_from(private_key_bytes.as_ref())
-                    .map_err(|e| AptosTapError::new_with_error_code(anyhow::anyhow!(e), AptosTapErrorCode::InternalError))?;
-
-                // Get current sequence number from blockchain
-                let client = self.get_api_client();
-                let current_seq = match client.get_account_bcs(cached_account.address()).await {
-                    Ok(account_info) => account_info.inner().sequence_number(),
-                    Err(_) => 0, // Account doesn't exist yet, start from 0
-                };
-
-                Ok(LocalAccount::new(
-                    cached_account.address(),
-                    AccountKey::from_private_key(cloned_private_key),
-                    current_seq,
-                ))
-            } else {
-                Err(AptosTapError::new(
-                    format!("Delegated account for asset '{}' not found in cache. This should have been created during initialization.", asset_name),
-                    AptosTapErrorCode::InternalError,
-                ))
-            }
-        } else {
-            // For non-delegated accounts, create a fresh account each time
-            let key = asset_config.get_key()
-                .map_err(|e| AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest))?;
-
-            let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
-                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
-            });
-
-            // Get current sequence number from blockchain
-            let client = self.get_api_client();
-            let current_seq = match client.get_account_bcs(account_address).await {
-                Ok(account_info) => account_info.inner().sequence_number(),
-                Err(_) => 0, // Account doesn't exist yet, start from 0
-            };
-
-            Ok(LocalAccount::new(account_address, key, current_seq))
-        }
-    }
 
     async fn get_gas_unit_price(&self) -> Result<u64, AptosTapError> {
         match self.txn_config.gas_unit_price_override {
@@ -331,71 +216,10 @@ impl MintFunder {
             .with_gas_unit_price(self.get_gas_unit_price().await?))
     }
 
-    /// Create a delegated account for a specific asset account with retry logic
-    async fn create_delegated_account_for_asset(&self, asset_account: &mut LocalAccount) -> Result<LocalAccount> {
-        // Build a client.
-        let client = self.get_api_client();
 
-        // Create a new random account, then delegate to it
-        let delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
-
-        // Create the account, wait for the response.
-        self.process_with_account(
-            &client,
-            asset_account,
-            100_000_000_000,
-            delegated_account
-                .authentication_key()
-                .clone()
-                .account_address(),
-            false,
-            false, // Don't wait for transaction to avoid timeout
-        )
-        .await
-        .context("Failed to create new account")?;
-
-        // Build a transaction factory using the gas unit price from the
-        // GasUnitPriceManager. This mostly ensures that we will build a
-        // transaction with a gas unit price that will be accepted.
-        let transaction_factory = self.get_transaction_factory().await?;
-
-        // Delegate minting to the account (submit without waiting)
-        let delegation_txn = asset_account.sign_with_transaction_builder(
-            transaction_factory.payload(aptos_stdlib::aptos_coin_delegate_mint_capability(
-                delegated_account.address(),
-            )),
-        );
-
-        client
-            .submit_bcs(&delegation_txn)
-            .await
-            .context("Failed to submit delegation transaction")?;
-
-        // Wait a bit for the transaction to be processed
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        // Claim the capability (submit without waiting)
-        let claim_txn = delegated_account.sign_with_transaction_builder(
-            transaction_factory.payload(aptos_stdlib::aptos_coin_claim_mint_capability()),
-        );
-
-        client
-            .submit_bcs(&claim_txn)
-            .await
-            .context("Failed to submit claim transaction")?;
-
-        // Wait a bit for the claim transaction to be processed
-        tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-
-        info!(
-            "Successfully configured MintFunder to use delegated account: {}",
-            delegated_account.address()
-        );
-
-        Ok(delegated_account)
-    }
-
-    /// todo explain / rename - kept for backward compatibility but now unused
+    /// Performs the delegated account creation and delegation. The (Aptos) coin::mint function that
+    /// used in the MintFunder expects the caller to have the MintCapability.
+    /// So we need to create a new account and delegate the MintCapability to it.
     pub async fn use_delegated_account(&self) -> Result<()> {
         // Build a client.
         let client = self.get_api_client();
@@ -448,7 +272,6 @@ impl MintFunder {
             delegated_account.address()
         );
 
-        // Update: Handle Option<LocalAccount>
         let mut faucet_account = self.faucet_account.write().await;
         *faucet_account = delegated_account;
 
@@ -474,6 +297,7 @@ impl MintFunder {
         builder.build()
     }
 
+    /// Core processing logic that handles sequence numbers and transaction submission.
     pub async fn process(
         &self,
         client: &Client,
@@ -530,102 +354,6 @@ impl MintFunder {
         ])
     }
 
-    pub async fn process_with_account(
-        &self,
-        client: &Client,
-        faucet_account: &mut LocalAccount,
-        amount: u64,
-        receiver_address: AccountAddress,
-        check_only: bool,
-        wait_for_transactions: bool,
-    ) -> Result<Vec<SignedTransaction>, AptosTapError> {
-        // For process_with_account, we don't use the shared outstanding_requests tracking
-        // since we're working with a specific account instance
-
-        if check_only {
-            return Ok(vec![]);
-        }
-
-        let transaction_factory = self.get_transaction_factory().await?;
-        let txn = faucet_account.sign_with_transaction_builder(transaction_factory.script(
-            Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![
-                TransactionArgument::Address(receiver_address),
-                TransactionArgument::U64(amount),
-            ]),
-        ));
-
-        // Submit the transaction directly without using the shared account wrapper
-        self.submit_transaction_direct(
-            client,
-            faucet_account,
-            txn,
-            &receiver_address,
-            wait_for_transactions,
-        )
-        .await
-        .map(|txn| vec![txn])
-    }
-
-    /// Submit a transaction using a direct LocalAccount reference (not wrapped in RwLock)
-    async fn submit_transaction_direct(
-        &self,
-        client: &Client,
-        faucet_account: &mut LocalAccount,
-        signed_transaction: SignedTransaction,
-        receiver_address: &AccountAddress,
-        wait_for_transactions: bool,
-    ) -> Result<SignedTransaction, AptosTapError> {
-        let (result, event_on_success) = if wait_for_transactions {
-            (
-                client
-                    .submit_and_wait_bcs(&signed_transaction)
-                    .await
-                    .map(|_| ())
-                    .map_err(|e| {
-                        AptosTapError::new_with_error_code(e, AptosTapErrorCode::TransactionFailed)
-                    }),
-                "transaction_submitted_and_waited",
-            )
-        } else {
-            (
-                client
-                    .submit_bcs(&signed_transaction)
-                    .await
-                    .map(|_| ())
-                    .map_err(|e| {
-                        AptosTapError::new_with_error_code(e, AptosTapErrorCode::TransactionFailed)
-                    }),
-                "transaction_submitted",
-            )
-        };
-
-        match result {
-            Ok(_) => {
-                // Increment sequence number
-                faucet_account.increment_sequence_number();
-
-                info!(
-                    event = event_on_success,
-                    sender_address = faucet_account.address(),
-                    receiver_address = receiver_address,
-                    txn_hash = signed_transaction.committed_hash(),
-                );
-                Ok(signed_transaction)
-            }
-            Err(e) => {
-                // Decrement sequence number on failure to maintain correct sequence tracking
-                faucet_account.decrement_sequence_number();
-                info!(
-                    event = "transaction_failed",
-                    sender_address = faucet_account.address(),
-                    receiver_address = receiver_address,
-                    txn_hash = signed_transaction.committed_hash(),
-                    error = %e,
-                );
-                Err(e)
-            }
-        }
-    }
 }
 
 #[async_trait]
@@ -638,27 +366,45 @@ impl FunderTrait for MintFunder {
         check_only: bool,
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
-
-        // 1. Resolve asset (use configured default if not specified)
+        // Resolve asset (use configured default if not specified)
         let asset_name = asset.as_deref().unwrap_or(&self.default_asset);
 
-        // 2. Get asset config
+        // Get asset config
         let asset_config = self.assets.get(asset_name)
             .ok_or_else(|| AptosTapError::new(
                 format!("Asset '{}' is not configured", asset_name),
                 AptosTapErrorCode::InvalidRequest,
             ))?;
 
-        // 3. Create a dedicated account for this asset request (no shared state)
-        let mut asset_account = self.create_faucet_account_for_asset(asset_config, asset_name).await?;
+        // Only set faucet_account if it's NOT the default asset
+        // (default asset is already set and delegated at startup)
+        if asset_name != self.default_asset {
+            let key = asset_config.get_key()
+                .map_err(|e| AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest))?;
+            let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
+                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
+            });
+
+            let mint_account = LocalAccount::new(account_address, key, 0);
+            {
+                let mut faucet_account = self.faucet_account.write().await;
+                *faucet_account = mint_account;
+            }
+        }
+
+
+        // Only delegate if it's NOT the default asset
+        // (default asset is already delegated at startup)
+        if !asset_config.do_not_delegate && asset_name != self.default_asset {
+            self.use_delegated_account()
+                .await
+                .map_err(|e| AptosTapError::new_with_error_code(e, AptosTapErrorCode::InternalError))?;
+        }
 
         let client = self.get_api_client();
         let amount = self.get_amount(amount, did_bypass_checkers);
-
-        // Use the dedicated account for this request
-        self.process_with_account(
+        self.process(
             &client,
-            &mut asset_account,
             amount,
             receiver_address,
             check_only,
