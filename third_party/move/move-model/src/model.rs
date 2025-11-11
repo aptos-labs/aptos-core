@@ -1667,9 +1667,12 @@ impl GlobalEnv {
         }
         for idx in 0..module.function_defs.len() {
             let def_idx = FunctionDefinitionIndex(idx as u16);
+            let definition = module.function_def_at(def_idx);
+            let definition_view = FunctionDefinitionView::new(&module, definition);
             let handle_idx = module.function_def_at(def_idx).function;
             let handle = module.function_handle_at(handle_idx);
             let view = FunctionHandleView::new(&module, handle);
+
             let name_str = view.name().as_str();
             let fun_id = if name_str.starts_with(SCRIPT_BYTECODE_FUN_NAME) {
                 // This is a pseudo script module, which has exactly one function. Determine
@@ -1686,34 +1689,76 @@ impl GlobalEnv {
             };
 
             // While releasing any mutation, compute the used/called functions if needed.
-            let fun_data = &self.module_data[module_id.to_usize()]
-                .function_data
-                .get(&fun_id)
-                .unwrap();
-            let used_funs = if fun_data.used_funs.is_none() {
-                Some(self.get_used_funs_from_bytecode(&module, def_idx))
+            let (used_funs, called_funs) = if let Some(fun_data) = self.module_data
+                [module_id.to_usize()]
+            .function_data
+            .get(&fun_id)
+            {
+                let used_funs = if fun_data.used_funs.is_none() {
+                    Some(self.get_used_funs_from_bytecode(&module, def_idx))
+                } else {
+                    None
+                };
+                let called_funs = if fun_data.called_funs.is_none() {
+                    Some(self.get_called_funs_from_bytecode(&module, def_idx))
+                } else {
+                    None
+                };
+                (used_funs, called_funs)
             } else {
-                None
+                let used_funs = Some(self.get_used_funs_from_bytecode(&module, def_idx));
+                let called_funs = Some(self.get_called_funs_from_bytecode(&module, def_idx));
+                (used_funs, called_funs)
             };
-            let called_funs = if fun_data.called_funs.is_none() {
-                Some(self.get_called_funs_from_bytecode(&module, def_idx))
-            } else {
-                None
+            // Compute the location for function data that is not available in the source code (e.g. non-private struct APIs)
+            let (default_loc, fun_source_map_def_loc_opt) = {
+                // only immutable borrow here
+                let mod_data_imm = &self.module_data[module_id.0 as usize];
+                let default_loc = mod_data_imm.loc.clone();
+                let def_loc = mod_data_imm
+                    .source_map
+                    .as_ref()
+                    .and_then(|sm| sm.get_function_source_map(def_idx).ok())
+                    .map(|s| s.definition_location);
+                (default_loc, def_loc)
             };
 
+            let loc = fun_source_map_def_loc_opt
+                .map(|l| self.to_loc(&l))
+                .unwrap_or(default_loc);
+            let name = self.symbol_pool.make(name_str);
+            let for_public_struct_api =
+                self.language_version().language_version_for_public_struct();
             let mod_data = &mut self.module_data[module_id.0 as usize];
-            if let Some(fun_data) = mod_data.function_data.get_mut(&fun_id) {
-                fun_data.def_idx = Some(def_idx);
-                fun_data.handle_idx = Some(handle_idx);
-                mod_data.function_idx_to_id.insert(def_idx, fun_id);
-                if let Some(used_funs) = used_funs {
-                    fun_data.used_funs = Some(used_funs);
-                }
-                if let Some(called_funs) = called_funs {
-                    fun_data.called_funs = Some(called_funs);
-                }
+
+            let fun_data = if let Some(fun_data) = mod_data.function_data.get_mut(&fun_id) {
+                fun_data
+            } else if for_public_struct_api {
+                // for public/friend/package struct, we will add corresponding APIs
+                let entry = mod_data
+                    .function_data
+                    .entry(fun_id)
+                    .or_insert_with(|| FunctionData::new(name, loc));
+                entry.visibility = definition_view.visibility();
+                entry.is_native = definition_view.is_native();
+                entry.kind = if definition_view.is_entry() {
+                    FunctionKind::Entry
+                } else {
+                    FunctionKind::Regular
+                };
+                entry
             } else {
-                panic!("attaching mismatching bytecode module")
+                panic!("attaching mismatching bytecode module");
+            };
+
+            fun_data.def_idx = Some(def_idx);
+            fun_data.handle_idx = Some(handle_idx);
+            mod_data.function_idx_to_id.insert(def_idx, fun_id);
+            if let Some(used_funs) = used_funs {
+                fun_data.used_funs = Some(used_funs);
+            }
+            if let Some(called_funs) = called_funs {
+                fun_data.called_funs = Some(called_funs);
             }
         }
         let used_modules = self.get_used_modules_from_bytecode(&module);
@@ -1948,6 +1993,7 @@ impl GlobalEnv {
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
+            is_empty_struct: false,
         }
     }
 
@@ -3788,6 +3834,10 @@ pub struct StructData {
     /// Whether this struct has package visibility before the transformation.
     /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
+
+    /// Whether this struct is empty when defined by the user
+    /// Note: by default set to false when created from compiled module since the info is not available
+    pub is_empty_struct: bool,
 }
 
 impl StructData {
@@ -3806,6 +3856,7 @@ impl StructData {
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
+            is_empty_struct: false,
         }
     }
 }
@@ -3832,9 +3883,19 @@ impl<'env> StructEnv<'env> {
         self.module_env.env
     }
 
+    /// Returns true if struct is empty when defined by the user
+    pub fn is_empty_struct(&self) -> bool {
+        self.data.is_empty_struct
+    }
+
     /// Returns the name of this struct.
     pub fn get_name(&self) -> Symbol {
         self.data.name
+    }
+
+    /// Returns the name of this struct as string.
+    pub fn get_name_str(&self) -> String {
+        self.get_name().display(self.symbol_pool()).to_string()
     }
 
     /// Gets full name as string.

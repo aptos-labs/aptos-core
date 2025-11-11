@@ -1,0 +1,527 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x66::fv_enum_basic
+enum Action has drop
+  Noop
+  Call
+    _0: |u64|u64 has drop
+
+enum FunVec<T0> has drop
+  V1
+    v1: vector<|&mut T0|T0 has copy + drop + store>
+  V2
+    v0: u64
+    v1: vector<|&mut T0|T0 has copy + drop + store>
+
+enum Mapper<T0, T1> has drop
+  Id
+    _0: |T0|T1 has copy + drop + store
+  Twice
+    _0: Version<T0, T1>
+
+enum Version<T0, T1> has copy + drop + store
+  V1
+    v1: |T0|T1 has copy + drop + store
+
+// Function definition at index 0
+public fun test_variant$Action$Noop(l0: &Action): bool
+    local l1: &Action
+    move_loc l0
+    test_variant Action, Noop
+    ret
+
+// Function definition at index 1
+public fun test_variant$Action$Call(l0: &Action): bool
+    local l1: &Action
+    move_loc l0
+    test_variant Action, Call
+    ret
+
+// Function definition at index 2
+public fun pack$Action$Noop(): Action
+    pack_variant Action, Noop
+    ret
+
+// Function definition at index 3
+public fun pack$Action$Call(l0: |u64|u64 has drop): Action
+    local l1: |u64|u64 has drop
+    move_loc l0
+    pack_variant Action, Call
+    ret
+
+// Function definition at index 4
+public fun unpack$Action$Noop(l0: Action)
+    local l1: Action
+    move_loc l0
+    unpack_variant Action, Noop
+    ret
+
+// Function definition at index 5
+public fun unpack$Action$Call(l0: Action): |u64|u64 has drop
+    local l1: Action
+    move_loc l0
+    unpack_variant Action, Call
+    ret
+
+// Function definition at index 6
+public fun borrow$Action$0$0(l0: &Action): &|u64|u64 has drop
+    local l1: &Action
+    move_loc l0
+    borrow_variant_field Action, Call::_0
+    ret
+
+// Function definition at index 7
+public fun borrow_mut$Action$0$0(l0: &mut Action): &mut |u64|u64 has drop
+    local l1: &mut Action
+    move_loc l0
+    mut_borrow_variant_field Action, Call::_0
+    ret
+
+// Function definition at index 8
+public fun test_variant$FunVec$V1<T0>(l0: &FunVec<T0>): bool
+    local l1: &FunVec<T0>
+    move_loc l0
+    test_variant FunVec<T0>, V1
+    ret
+
+// Function definition at index 9
+public fun test_variant$FunVec$V2<T0>(l0: &FunVec<T0>): bool
+    local l1: &FunVec<T0>
+    move_loc l0
+    test_variant FunVec<T0>, V2
+    ret
+
+// Function definition at index 10
+public fun pack$FunVec$V1<T0>(l0: vector<|&mut T0|T0 has copy + drop + store>): FunVec<T0>
+    local l1: vector<|&mut T0|T0 has copy + drop + store>
+    move_loc l0
+    pack_variant FunVec<T0>, V1
+    ret
+
+// Function definition at index 11
+public fun pack$FunVec$V2<T0>(l0: u64, l1: vector<|&mut T0|T0 has copy + drop + store>): FunVec<T0>
+    local l2: u64
+    local l3: vector<|&mut T0|T0 has copy + drop + store>
+    move_loc l0
+    move_loc l1
+    pack_variant FunVec<T0>, V2
+    ret
+
+// Function definition at index 12
+public fun unpack$FunVec$V1<T0>(l0: FunVec<T0>): vector<|&mut T0|T0 has copy + drop + store>
+    local l1: FunVec<T0>
+    move_loc l0
+    unpack_variant FunVec<T0>, V1
+    ret
+
+// Function definition at index 13
+public fun unpack$FunVec$V2<T0>(l0: FunVec<T0>): (u64, vector<|&mut T0|T0 has copy + drop + store>)
+    local l1: FunVec<T0>
+    move_loc l0
+    unpack_variant FunVec<T0>, V2
+    ret
+
+// Function definition at index 14
+public fun borrow$FunVec$0$1<T0>(l0: &FunVec<T0>): &u64
+    local l1: &FunVec<T0>
+    move_loc l0
+    borrow_variant_field FunVec<T0>, V2::v0
+    ret
+
+// Function definition at index 15
+public fun borrow$FunVec$0$0<T0>(l0: &FunVec<T0>): &vector<|&mut T0|T0 has copy + drop + store>
+    local l1: &FunVec<T0>
+    move_loc l0
+    borrow_variant_field FunVec<T0>, V1::v1
+    ret
+
+// Function definition at index 16
+public fun borrow$FunVec$1$2<T0>(l0: &FunVec<T0>): &vector<|&mut T0|T0 has copy + drop + store>
+    local l1: &FunVec<T0>
+    move_loc l0
+    borrow_variant_field FunVec<T0>, V2::v1
+    ret
+
+// Function definition at index 17
+public fun borrow_mut$FunVec$0$1<T0>(l0: &mut FunVec<T0>): &mut u64
+    local l1: &mut FunVec<T0>
+    move_loc l0
+    mut_borrow_variant_field FunVec<T0>, V2::v0
+    ret
+
+// Function definition at index 18
+public fun borrow_mut$FunVec$0$0<T0>(l0: &mut FunVec<T0>): &mut vector<|&mut T0|T0 has copy + drop + store>
+    local l1: &mut FunVec<T0>
+    move_loc l0
+    mut_borrow_variant_field FunVec<T0>, V1::v1
+    ret
+
+// Function definition at index 19
+public fun borrow_mut$FunVec$1$2<T0>(l0: &mut FunVec<T0>): &mut vector<|&mut T0|T0 has copy + drop + store>
+    local l1: &mut FunVec<T0>
+    move_loc l0
+    mut_borrow_variant_field FunVec<T0>, V2::v1
+    ret
+
+// Function definition at index 20
+public fun test_variant$Mapper$Id<T0, T1>(l0: &Mapper<T0, T1>): bool
+    local l1: &Mapper<T0, T1>
+    move_loc l0
+    test_variant Mapper<T0, T1>, Id
+    ret
+
+// Function definition at index 21
+public fun test_variant$Mapper$Twice<T0, T1>(l0: &Mapper<T0, T1>): bool
+    local l1: &Mapper<T0, T1>
+    move_loc l0
+    test_variant Mapper<T0, T1>, Twice
+    ret
+
+// Function definition at index 22
+public fun pack$Mapper$Id<T0, T1>(l0: |T0|T1 has copy + drop + store): Mapper<T0, T1>
+    local l1: |T0|T1 has copy + drop + store
+    move_loc l0
+    pack_variant Mapper<T0, T1>, Id
+    ret
+
+// Function definition at index 23
+public fun pack$Mapper$Twice<T0, T1>(l0: Version<T0, T1>): Mapper<T0, T1>
+    local l1: Version<T0, T1>
+    move_loc l0
+    pack_variant Mapper<T0, T1>, Twice
+    ret
+
+// Function definition at index 24
+public fun unpack$Mapper$Id<T0, T1>(l0: Mapper<T0, T1>): |T0|T1 has copy + drop + store
+    local l1: Mapper<T0, T1>
+    move_loc l0
+    unpack_variant Mapper<T0, T1>, Id
+    ret
+
+// Function definition at index 25
+public fun unpack$Mapper$Twice<T0, T1>(l0: Mapper<T0, T1>): Version<T0, T1>
+    local l1: Mapper<T0, T1>
+    move_loc l0
+    unpack_variant Mapper<T0, T1>, Twice
+    ret
+
+// Function definition at index 26
+public fun borrow$Mapper$0$1<T0, T1>(l0: &Mapper<T0, T1>): &Version<T0, T1>
+    local l1: &Mapper<T0, T1>
+    move_loc l0
+    borrow_variant_field Mapper<T0, T1>, Twice::_0
+    ret
+
+// Function definition at index 27
+public fun borrow$Mapper$0$0<T0, T1>(l0: &Mapper<T0, T1>): &|T0|T1 has copy + drop + store
+    local l1: &Mapper<T0, T1>
+    move_loc l0
+    borrow_variant_field Mapper<T0, T1>, Id::_0
+    ret
+
+// Function definition at index 28
+public fun borrow_mut$Mapper$0$1<T0, T1>(l0: &mut Mapper<T0, T1>): &mut Version<T0, T1>
+    local l1: &mut Mapper<T0, T1>
+    move_loc l0
+    mut_borrow_variant_field Mapper<T0, T1>, Twice::_0
+    ret
+
+// Function definition at index 29
+public fun borrow_mut$Mapper$0$0<T0, T1>(l0: &mut Mapper<T0, T1>): &mut |T0|T1 has copy + drop + store
+    local l1: &mut Mapper<T0, T1>
+    move_loc l0
+    mut_borrow_variant_field Mapper<T0, T1>, Id::_0
+    ret
+
+// Function definition at index 30
+public fun test_variant$Version$V1<T0, T1>(l0: &Version<T0, T1>): bool
+    local l1: &Version<T0, T1>
+    move_loc l0
+    test_variant Version<T0, T1>, V1
+    ret
+
+// Function definition at index 31
+public fun pack$Version$V1<T0, T1>(l0: |T0|T1 has copy + drop + store): Version<T0, T1>
+    local l1: |T0|T1 has copy + drop + store
+    move_loc l0
+    pack_variant Version<T0, T1>, V1
+    ret
+
+// Function definition at index 32
+public fun unpack$Version$V1<T0, T1>(l0: Version<T0, T1>): |T0|T1 has copy + drop + store
+    local l1: Version<T0, T1>
+    move_loc l0
+    unpack_variant Version<T0, T1>, V1
+    ret
+
+// Function definition at index 33
+public fun borrow$Version$0$0<T0, T1>(l0: &Version<T0, T1>): &|T0|T1 has copy + drop + store
+    local l1: &Version<T0, T1>
+    move_loc l0
+    borrow_variant_field Version<T0, T1>, V1::v1
+    ret
+
+// Function definition at index 34
+public fun borrow_mut$Version$0$0<T0, T1>(l0: &mut Version<T0, T1>): &mut |T0|T1 has copy + drop + store
+    local l1: &mut Version<T0, T1>
+    move_loc l0
+    mut_borrow_variant_field Version<T0, T1>, V1::v1
+    ret
+
+// Bytecode version v9
+module 0x66::fv_enum_basic_public
+use 0x66::fv_enum_basic
+// Function definition at index 0
+#[persistent] fun add_k_persistent(l0: u64, l1: u64): u64
+    move_loc l0
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 1
+#[persistent] fun add_k_persistent_ref(l0: &mut u64, l1: u64): u64
+    copy_loc l0
+    read_ref
+    ld_u64 1
+    add
+    copy_loc l0
+    // @5
+    write_ref
+    move_loc l0
+    read_ref
+    move_loc l1
+    add
+    // @10
+    ret
+
+// Function definition at index 2
+fun call_square(l0: u64)
+    local l1: fv_enum_basic::Action
+    local l2: |u64|u64 has drop
+    local l3: u64
+    pack_closure square, 0
+    call fv_enum_basic::pack$Action$Call
+    st_loc l1
+    borrow_loc l1
+    call fv_enum_basic::test_variant$Action$Call
+    // @5
+    br_false l0
+    move_loc l1
+    call fv_enum_basic::unpack$Action$Call
+    st_loc l2
+    move_loc l0
+    // @10
+    move_loc l2
+    call_closure <|u64|u64 has drop>
+    st_loc l3
+    branch l1
+l0: move_loc l1
+    // @15
+    ld_u64 0
+    st_loc l3
+    pop
+    branch l1
+    ld_u64 14566554180833181697
+    // @20
+    abort
+l1: move_loc l3
+    ld_u64 49
+    eq
+    br_false l2
+    // @25
+    branch l3
+l2: ld_u64 14566554180833181696
+    abort
+l3: ret
+
+// Function definition at index 3
+fun square(l0: u64): u64
+    copy_loc l0
+    move_loc l0
+    mul
+    ret
+
+// Function definition at index 4
+fun test_enum_in_another_enum()
+    local l0: fv_enum_basic::Mapper<u64, u64>
+    local l1: &mut fv_enum_basic::Mapper<u64, u64>
+    local l2: u64
+    local l3: &mut fv_enum_basic::Version<u64, u64>
+    local l4: |u64|u64 has copy + drop + store
+    local l5: u64
+    local l6: u64
+    local l7: &mut |u64|u64 has copy + drop + store
+    local l8: |u64|u64 has copy + drop + store
+    ld_u64 3
+    pack_closure add_k_persistent, 10
+    call fv_enum_basic::pack$Version$V1<u64, u64>
+    call fv_enum_basic::pack$Mapper$Twice<u64, u64>
+    st_loc l0
+    // @5
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    freeze_ref
+    call fv_enum_basic::test_variant$Mapper$Twice<u64, u64>
+    // @10
+    br_false l0
+    move_loc l1
+    call fv_enum_basic::borrow_mut$Mapper$0$1<u64, u64>
+    ld_u64 10
+    st_loc l2
+    // @15
+    st_loc l3
+    copy_loc l3
+    freeze_ref
+    call fv_enum_basic::borrow$Version$0$0<u64, u64>
+    read_ref
+    // @20
+    st_loc l4
+    move_loc l2
+    move_loc l4
+    call_closure <|u64|u64 has copy + drop + store>
+    move_loc l3
+    // @25
+    freeze_ref
+    call fv_enum_basic::borrow$Version$0$0<u64, u64>
+    read_ref
+    call_closure <|u64|u64 has copy + drop + store>
+    st_loc l5
+    // @30
+    branch l1
+l0: copy_loc l1
+    freeze_ref
+    call fv_enum_basic::test_variant$Mapper$Id<u64, u64>
+    br_false l2
+    // @35
+    move_loc l1
+    call fv_enum_basic::borrow_mut$Mapper$0$0<u64, u64>
+    ld_u64 10
+    st_loc l6
+    st_loc l7
+    // @40
+    move_loc l7
+    read_ref
+    st_loc l8
+    move_loc l6
+    move_loc l8
+    // @45
+    call_closure <|u64|u64 has copy + drop + store>
+    st_loc l5
+    branch l1
+l2: move_loc l1
+    pop
+    // @50
+    ld_u64 14566554180833181697
+    abort
+l1: move_loc l5
+    ld_u64 16
+    eq
+    // @55
+    br_false l3
+    branch l4
+l3: ld_u64 99
+    abort
+l4: ret
+
+// Function definition at index 5
+fun test_fun_vec()
+    local l0: |&mut u64|u64 has copy + drop + store
+    local l1: fv_enum_basic::FunVec<u64>
+    local l2: &fv_enum_basic::FunVec<u64>
+    local l3: vector<|&mut u64|u64 has copy + drop + store>
+    local l4: u64
+    local l5: &mut u64
+    local l6: |&mut u64|u64 has copy + drop + store
+    local l7: bool
+    local l8: u64
+    local l9: bool
+    ld_u64 3
+    pack_closure add_k_persistent_ref, 10
+    st_loc l0
+    copy_loc l0
+    move_loc l0
+    // @5
+    vec_pack <|&mut u64|u64 has copy + drop + store>, 2
+    call fv_enum_basic::pack$FunVec$V1<u64>
+    st_loc l1
+    borrow_loc l1
+    st_loc l2
+    // @10
+    copy_loc l2
+    call fv_enum_basic::test_variant$FunVec$V1<u64>
+    br_false l0
+    move_loc l2
+    pop
+    // @15
+    move_loc l1
+    call fv_enum_basic::unpack$FunVec$V1<u64>
+    st_loc l3
+    mut_borrow_loc l3
+    vec_pop_back <|&mut u64|u64 has copy + drop + store>
+    // @20
+    ld_u64 3
+    st_loc l4
+    mut_borrow_loc l4
+    st_loc l5
+    st_loc l6
+    // @25
+    move_loc l5
+    copy_loc l6
+    call_closure <|&mut u64|u64 has copy + drop + store>
+    move_loc l4
+    ld_u64 4
+    // @30
+    eq
+    st_loc l7
+    st_loc l8
+    move_loc l7
+    br_false l1
+    // @35
+    branch l2
+l1: ld_u64 0
+    abort
+l2: move_loc l8
+    ld_u64 7
+    // @40
+    eq
+    br_false l3
+    branch l4
+l3: ld_u64 1
+    abort
+    // @45
+l4: mut_borrow_loc l3
+    move_loc l6
+    vec_push_back <|&mut u64|u64 has copy + drop + store>
+    ld_u64 10
+    move_loc l3
+    // @50
+    call fv_enum_basic::pack$FunVec$V2<u64>
+    pop
+    branch l5
+l0: move_loc l2
+    call fv_enum_basic::test_variant$FunVec$V2<u64>
+    // @55
+    br_false l6
+    move_loc l1
+    call fv_enum_basic::unpack$FunVec$V2<u64>
+    vec_unpack <|&mut u64|u64 has copy + drop + store>, 0
+    ld_false
+    // @60
+    st_loc l9
+    pop
+    move_loc l9
+    br_false l7
+    branch l8
+    // @65
+l7: ld_u64 2
+    abort
+l8: branch l5
+l6: ld_u64 14566554180833181697
+    abort
+    // @70
+l5: ret
+
+
+============ bytecode verification succeeded ========

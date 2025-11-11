@@ -1,5 +1,8 @@
 // -- Model dump before first bytecode pipeline
 module 0xc0ffee::m {
+    struct Empty {
+        dummy_field: bool,
+    }
     struct S {
         x: u64,
     }
@@ -140,6 +143,8 @@ module 0xc0ffee::m {
     friend 0xc0ffee::n7;
     friend 0xc0ffee::n8;
     friend 0xc0ffee::n9;
+    struct Empty {
+    }
     struct S {
         x: u64,
     }
@@ -399,6 +404,9 @@ fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
 
 // -- Model dump before second bytecode pipeline
 module 0xc0ffee::m {
+    struct Empty {
+        dummy_field: bool,
+    }
     struct S {
         x: u64,
     }
@@ -676,83 +684,351 @@ fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
 }
 
 
-Diagnostics:
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:35:9
-   │
-35 │     fun test() {
-   │         ^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xc0ffee::m
+friend 0xc0ffee::n
+friend 0xc0ffee::n2
+friend 0xc0ffee::n3
+friend 0xc0ffee::n4
+friend 0xc0ffee::n5
+friend 0xc0ffee::n6
+friend 0xc0ffee::n7
+friend 0xc0ffee::n8
+friend 0xc0ffee::n9
+struct Empty
+  dummy_field: bool
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:44:9
-   │
-44 │     fun test_pack() {
-   │         ^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+struct S
+  x: u64
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:52:9
-   │
-52 │     fun test_unpack(w: Wrapper) {
-   │         ^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+struct S2
+  x: u64
+  s: S
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:60:9
-   │
-60 │     fun test_select_variant(w: Wrapper): u64 {
-   │         ^^^^^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+enum Wrapper has drop
+  V1
+    _0: u64
+  V2
+    _0: u64
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:68:9
-   │
-68 │     fun test_test_variant(w: Wrapper): bool {
-   │         ^^^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+// Function definition at index 0
+friend fun pack$Empty(l0: bool): Empty
+    local l1: bool
+    move_loc l0
+    pack Empty
+    ret
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:76:9
-   │
-76 │     fun test_match(w: Wrapper): bool {
-   │         ^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+// Function definition at index 1
+friend fun unpack$Empty(l0: Empty): bool
+    local l1: Empty
+    move_loc l0
+    unpack Empty
+    ret
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:87:9
-   │
-87 │     fun test_pack_struct(): S {
-   │         ^^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+// Function definition at index 2
+friend fun pack$S(l0: u64): S
+    local l1: u64
+    move_loc l0
+    pack S
+    ret
 
-bug: compiler internal error: struct not defined
-   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:95:9
-   │
-95 │     fun test_pack_friend_struct(): T {
-   │         ^^^^^^^^^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+// Function definition at index 3
+friend fun unpack$S(l0: S): u64
+    local l1: S
+    move_loc l0
+    unpack S
+    ret
 
-bug: compiler internal error: struct not defined
-    ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:107:9
-    │
-107 │     fun test_pack_struct(): S {
-    │         ^^^^^^^^^^^^^^^^
-    │
-    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+// Function definition at index 4
+friend fun borrow$S$0(l0: &S): &u64
+    local l1: &S
+    move_loc l0
+    borrow_field S, x
+    ret
 
-bug: compiler internal error: struct not defined
-    ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:120:9
-    │
-120 │     fun test_pack_unpack_struct_in_lambda() {
-    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    │
-    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+// Function definition at index 5
+friend fun borrow_mut$S$0(l0: &mut S): &mut u64
+    local l1: &mut S
+    move_loc l0
+    mut_borrow_field S, x
+    ret
+
+// Function definition at index 6
+friend fun pack$S2(l0: u64, l1: S): S2
+    local l2: u64
+    local l3: S
+    move_loc l0
+    move_loc l1
+    pack S2
+    ret
+
+// Function definition at index 7
+friend fun unpack$S2(l0: S2): (u64, S)
+    local l1: S2
+    move_loc l0
+    unpack S2
+    ret
+
+// Function definition at index 8
+friend fun borrow$S2$0(l0: &S2): &u64
+    local l1: &S2
+    move_loc l0
+    borrow_field S2, x
+    ret
+
+// Function definition at index 9
+friend fun borrow$S2$1(l0: &S2): &S
+    local l1: &S2
+    move_loc l0
+    borrow_field S2, s
+    ret
+
+// Function definition at index 10
+friend fun borrow_mut$S2$0(l0: &mut S2): &mut u64
+    local l1: &mut S2
+    move_loc l0
+    mut_borrow_field S2, x
+    ret
+
+// Function definition at index 11
+friend fun borrow_mut$S2$1(l0: &mut S2): &mut S
+    local l1: &mut S2
+    move_loc l0
+    mut_borrow_field S2, s
+    ret
+
+// Function definition at index 12
+friend fun test_variant$Wrapper$V1(l0: &Wrapper): bool
+    local l1: &Wrapper
+    move_loc l0
+    test_variant Wrapper, V1
+    ret
+
+// Function definition at index 13
+friend fun test_variant$Wrapper$V2(l0: &Wrapper): bool
+    local l1: &Wrapper
+    move_loc l0
+    test_variant Wrapper, V2
+    ret
+
+// Function definition at index 14
+friend fun pack$Wrapper$V1(l0: u64): Wrapper
+    local l1: u64
+    move_loc l0
+    pack_variant Wrapper, V1
+    ret
+
+// Function definition at index 15
+friend fun pack$Wrapper$V2(l0: u64): Wrapper
+    local l1: u64
+    move_loc l0
+    pack_variant Wrapper, V2
+    ret
+
+// Function definition at index 16
+friend fun unpack$Wrapper$V1(l0: Wrapper): u64
+    local l1: Wrapper
+    move_loc l0
+    unpack_variant Wrapper, V1
+    ret
+
+// Function definition at index 17
+friend fun unpack$Wrapper$V2(l0: Wrapper): u64
+    local l1: Wrapper
+    move_loc l0
+    unpack_variant Wrapper, V2
+    ret
+
+// Function definition at index 18
+friend fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
+    local l1: &Wrapper
+    move_loc l0
+    borrow_variant_field Wrapper, V1::_0, V2::_0
+    ret
+
+// Function definition at index 19
+friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
+    local l1: &mut Wrapper
+    move_loc l0
+    mut_borrow_variant_field Wrapper, V1::_0, V2::_0
+    ret
+
+// Function definition at index 20
+#[persistent] public fun make(l0: u64): Wrapper
+    move_loc l0
+    pack_variant Wrapper, V1
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::m_friend
+friend 0xc0ffee::n_friend
+struct T
+  x: u64
+
+// Function definition at index 0
+friend fun pack$T(l0: u64): T
+    local l1: u64
+    move_loc l0
+    pack T
+    ret
+
+// Function definition at index 1
+friend fun unpack$T(l0: T): u64
+    local l1: T
+    move_loc l0
+    unpack T
+    ret
+
+// Function definition at index 2
+friend fun borrow$T$0(l0: &T): &u64
+    local l1: &T
+    move_loc l0
+    borrow_field T, x
+    ret
+
+// Function definition at index 3
+friend fun borrow_mut$T$0(l0: &mut T): &mut u64
+    local l1: &mut T
+    move_loc l0
+    mut_borrow_field T, x
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n
+use 0xc0ffee::m
+// Function definition at index 0
+fun test()
+    local l0: m::Wrapper
+    ld_u64 22
+    call m::make
+    st_loc l0
+    borrow_loc l0
+    call m::borrow$Wrapper$0$0
+    // @5
+    read_ref
+    ld_u64 22
+    eq
+    br_false l0
+    ret
+    // @10
+l0: ld_u64 1
+    abort
+
+// Bytecode version v9
+module 0xc0ffee::n2
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_pack()
+    ld_u64 22
+    call m::pack$Wrapper$V1
+    pop
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n3
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_unpack(l0: m::Wrapper)
+    move_loc l0
+    call m::unpack$Wrapper$V1
+    pop
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n4
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_select_variant(l0: m::Wrapper): u64
+    borrow_loc l0
+    call m::borrow$Wrapper$0$0
+    read_ref
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n5
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_test_variant(l0: m::Wrapper): bool
+    borrow_loc l0
+    call m::test_variant$Wrapper$V1
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n6
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_match(l0: m::Wrapper): bool
+    local l1: &m::Wrapper
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    call m::test_variant$Wrapper$V1
+    br_false l0
+    // @5
+    move_loc l1
+    pop
+    move_loc l0
+    call m::unpack$Wrapper$V1
+    pop
+    // @10
+    ld_true
+    ret
+l0: move_loc l1
+    call m::test_variant$Wrapper$V2
+    br_false l1
+    // @15
+    move_loc l0
+    call m::unpack$Wrapper$V2
+    pop
+    ld_false
+    ret
+    // @20
+l1: ld_u64 14566554180833181697
+    abort
+
+// Bytecode version v9
+module 0xc0ffee::n7
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_pack_struct(): m::S
+    ld_u64 22
+    call m::pack$S
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n8
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_pack_struct(): m::S
+    ld_u64 22
+    call m::pack$S
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n9
+use 0xc0ffee::m
+// Function definition at index 0
+fun test_pack_unpack_struct_in_lambda()
+    ld_u64 22
+    ld_u64 33
+    call m::pack$S
+    call m::pack$S2
+    call m::unpack$S2
+    // @5
+    call m::unpack$S
+    pop
+    pop
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::n_friend
+use 0xc0ffee::m_friend
+// Function definition at index 0
+fun test_pack_friend_struct(): m_friend::T
+    ld_u64 22
+    call m_friend::pack$T
+    ret
+
+
+============ bytecode verification succeeded ========
