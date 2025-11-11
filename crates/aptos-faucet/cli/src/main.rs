@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use aptos_faucet_core::funder::{
-    ApiConnectionConfig, FunderTrait, MintFunder, TransactionSubmissionConfig,
+    ApiConnectionConfig, AssetConfig, FunderTrait, MintFunder, TransactionSubmissionConfig,
 };
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
@@ -13,7 +13,7 @@ use aptos_sdk::{
     },
 };
 use clap::Parser;
-use std::{collections::HashSet, str::FromStr};
+use std::{collections::HashSet, path::PathBuf, str::FromStr};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -45,6 +45,12 @@ pub struct FaucetCliArgs {
     #[clap(long)]
     pub mint_account_address: Option<AccountAddress>,
 
+    /// Path to the private key file for minting coins.
+    /// To manually generate a keypair, use generate-key:
+    /// `cargo run -p generate-keypair -- -o <output_file_path>`
+    #[clap(long, default_value = "/opt/aptos/etc/mint.key")]
+    pub key_file_path: PathBuf,
+
     /// The maximum amount of gas in OCTA to spend on a single transaction.
     #[clap(long, default_value_t = 500_000)]
     pub max_gas_amount: u64,
@@ -52,9 +58,16 @@ pub struct FaucetCliArgs {
 
 impl FaucetCliArgs {
     async fn run(&self) -> Result<()> {
-        // Get network root key based on the connection config.
-        let key = self
-            .api_connection_args
+        // Create an AssetConfig to get the key
+        let asset_config = AssetConfig::new(
+            None,
+            self.mint_account_address,
+            false, // do_not_delegate
+            self.key_file_path.clone(),
+        );
+
+        // Get network root key from the asset config.
+        let key = asset_config
             .get_key()
             .context("Failed to build root key")?;
 
@@ -80,7 +93,7 @@ impl FaucetCliArgs {
         );
 
         // Build the MintFunder service.
-        let mut mint_funder = MintFunder::new(
+        let mint_funder = MintFunder::new(
             self.api_connection_args.node_url.clone(),
             self.api_connection_args.api_key.clone(),
             self.api_connection_args.additional_headers.clone(),
@@ -107,7 +120,7 @@ impl FaucetCliArgs {
         // Mint coins to each of the accounts.
         for account in accounts {
             let response = mint_funder
-                .fund(Some(self.amount), account, false, false)
+                .fund(Some(self.amount), account, None, false, false)
                 .await;
             match response {
                 Ok(response) => println!(

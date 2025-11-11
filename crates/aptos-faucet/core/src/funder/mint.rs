@@ -229,16 +229,16 @@ impl MintFunder {
                     Err(_) => 0, // Account doesn't exist yet, start from 0
                 };
 
-                return Ok(LocalAccount::new(
+                Ok(LocalAccount::new(
                     cached_account.address(),
                     AccountKey::from_private_key(cloned_private_key),
                     current_seq,
-                ));
+                ))
             } else {
-                return Err(AptosTapError::new(
+                Err(AptosTapError::new(
                     format!("Delegated account for asset '{}' not found in cache. This should have been created during initialization.", asset_name),
                     AptosTapErrorCode::InternalError,
-                ));
+                ))
             }
         } else {
             // For non-delegated accounts, create a fresh account each time
