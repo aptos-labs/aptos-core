@@ -7,7 +7,7 @@ mod mint;
 mod transfer;
 
 pub use self::{
-    common::{ApiConnectionConfig, TransactionSubmissionConfig},
+    common::{ApiConnectionConfig, TransactionSubmissionConfig, AssetConfig},
     mint::MintFunderConfig,
 };
 use self::{fake::FakeFunderConfig, transfer::TransferFunderConfig};

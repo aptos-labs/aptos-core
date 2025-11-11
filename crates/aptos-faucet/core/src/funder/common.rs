@@ -62,20 +62,6 @@ pub struct ApiConnectionConfig {
     #[clap(skip)]
     pub additional_headers: Option<HashMap<String, String>>,
 
-    /// Path to the private key for creating test account and minting coins in
-    /// the MintFunder case, or for transferring coins in the TransferFunder case.
-    /// To keep Testnet simple, we used one private key for aptos root account
-    /// To manually generate a keypair, use generate-key:
-    /// `cargo run -p generate-keypair -- -o <output_file_path>`
-    #[serde(default = "ApiConnectionConfig::default_mint_key_file_path")]
-    #[clap(long, default_value = DEFAULT_KEY_FILE_PATH, value_parser)]
-    key_file_path: PathBuf,
-
-    /// Hex string of an Ed25519PrivateKey for minting / transferring coins.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string)]
-    key: Option<ConfigKey<Ed25519PrivateKey>>,
-
     /// Chain ID of the network this client is connecting to. For example, for mainnet:
     /// "MAINNET" or 1, testnet: "TESTNET" or 2. If there is no predefined string
     /// alias (e.g. "MAINNET"), just use the number. Note: Chain ID of 0 is not allowed.
@@ -88,48 +74,14 @@ impl ApiConnectionConfig {
         node_url: Url,
         api_key: Option<String>,
         additional_headers: Option<HashMap<String, String>>,
-        key_file_path: PathBuf,
-        key: Option<ConfigKey<Ed25519PrivateKey>>,
         chain_id: ChainId,
     ) -> Self {
         Self {
             node_url,
             api_key,
             additional_headers,
-            key_file_path,
-            key,
             chain_id,
         }
-    }
-
-    fn default_mint_key_file_path() -> PathBuf {
-        PathBuf::from_str(DEFAULT_KEY_FILE_PATH).unwrap()
-    }
-
-    pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
-        if let Some(ref key) = self.key {
-            return Ok(key.private_key());
-        }
-        let key_bytes = std::fs::read(self.key_file_path.as_path()).with_context(|| {
-            format!(
-                "Failed to read key file: {}",
-                self.key_file_path.to_string_lossy()
-            )
-        })?;
-        // decode as bcs first, fall back to a file of hex
-        let result = aptos_sdk::bcs::from_bytes(&key_bytes); //.with_context(|| "bad bcs");
-        if let Ok(x) = result {
-            return Ok(x);
-        }
-        let keystr = String::from_utf8(key_bytes).map_err(|e| anyhow!(e))?;
-        Ok(ConfigKey::from_encoded_string(keystr.as_str())
-            .with_context(|| {
-                format!(
-                    "{}: key file failed as both bcs and hex",
-                    self.key_file_path.to_string_lossy()
-                )
-            })?
-            .private_key())
     }
 }
 
@@ -465,5 +417,72 @@ impl GasUnitPriceManager {
             .await?
             .into_inner()
             .gas_estimate)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Parser)]
+pub struct AssetConfig {
+    /// Address of the account to send transactions from. On testnet, for
+    /// example, this is a550c18. If not given, we use the account address
+    /// corresponding to the given private key.
+    pub mint_account_address: Option<AccountAddress>,
+
+    /// Just use the account given in funder args, don't make a new one and
+    /// delegate the mint capability to it.
+    pub do_not_delegate: bool,
+
+    /// Path to the private key for creating test account and minting coins in
+    /// the MintFunder case, or for transferring coins in the TransferFunder case.
+    /// To keep Testnet simple, we used one private key for aptos root account
+    /// To manually generate a keypair, use generate-key:
+    /// `cargo run -p generate-keypair -- -o <output_file_path>`
+    #[serde(default = "AssetConfig::default_mint_key_file_path")]
+    #[clap(long, default_value = DEFAULT_KEY_FILE_PATH, value_parser)]
+    pub key_file_path: PathBuf,
+
+    /// Hex string of an Ed25519PrivateKey for minting / transferring coins.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string)]
+    pub key: Option<ConfigKey<Ed25519PrivateKey>>,
+}
+
+impl AssetConfig {
+    pub fn new(
+        key: Option<ConfigKey<Ed25519PrivateKey>>,
+        mint_account_address: Option<AccountAddress>,
+        do_not_delegate: bool,
+        key_file_path: PathBuf,
+    ) -> Self {
+        Self { key, mint_account_address, do_not_delegate, key_file_path }
+    }
+
+    fn default_mint_key_file_path() -> PathBuf {
+        PathBuf::from_str(DEFAULT_KEY_FILE_PATH).unwrap()
+    }
+
+    pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
+        if let Some(ref key) = self.key {
+            return Ok(key.private_key());
+        }
+        let key_bytes = std::fs::read(self.key_file_path.as_path()).with_context(|| {
+            format!(
+                "Failed to read key file: {}",
+                self.key_file_path.to_string_lossy()
+            )
+        })?;
+        // decode as bcs first, fall back to a file of hex
+        let result = aptos_sdk::bcs::from_bytes(&key_bytes); //.with_context(|| "bad bcs");
+        if let Ok(x) = result {
+            return Ok(x);
+        }
+        let keystr = String::from_utf8(key_bytes).map_err(|e| anyhow!(e))?;
+        Ok(ConfigKey::from_encoded_string(keystr.as_str())
+            .with_context(|| {
+                format!(
+                    "{}: key file failed as both bcs and hex",
+                    self.key_file_path.to_string_lossy()
+                )
+            })?
+            .private_key())
     }
 }

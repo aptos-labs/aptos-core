@@ -31,7 +31,7 @@ static MINTER_SCRIPT: &[u8] = include_bytes!(
 
 use super::common::{
     submit_transaction, update_sequence_numbers, ApiConnectionConfig, GasUnitPriceManager,
-    TransactionSubmissionConfig,
+    TransactionSubmissionConfig, AssetConfig
 };
 
 /// explain these contain additional args for the mint funder.
@@ -43,65 +43,62 @@ pub struct MintFunderConfig {
     #[serde(flatten)]
     pub transaction_submission_config: TransactionSubmissionConfig,
 
-    /// Address of the account to send transactions from. On testnet, for
-    /// example, this is a550c18. If not given, we use the account address
-    /// corresponding to the given private key.
-    pub mint_account_address: Option<AccountAddress>,
+    pub assets: HashMap<String, AssetConfig>,
 
-    /// Just use the account given in funder args, don't make a new one and
-    /// delegate the mint capability to it.
-    pub do_not_delegate: bool,
+    pub amount_to_fund: u64,
 }
 
 impl MintFunderConfig {
     pub async fn build_funder(self) -> Result<MintFunder> {
-        let key = self.api_connection_config.get_key()?;
+        // Validate we have at least one asset
+        if self.assets.is_empty() {
+            return Err(anyhow::anyhow!("No assets configured"));
+        }
 
-        let faucet_account = LocalAccount::new(
-            self.mint_account_address.unwrap_or_else(|| {
+        // Initialize with ANY asset - we don't know which one will be used until the request comes in
+        let default_asset_config = self.assets.get("apt")
+            .or_else(|| self.assets.values().next())
+            .unwrap();
+
+        let key = default_asset_config.get_key()?;
+        let initial_account = LocalAccount::new(
+            default_asset_config.mint_account_address.unwrap_or_else(|| {
                 AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
             }),
             key,
             0,
         );
 
-        let mut minter = MintFunder::new(
+        let minter = MintFunder::new(
             self.api_connection_config.node_url.clone(),
             self.api_connection_config.api_key.clone(),
             self.api_connection_config.additional_headers.clone(),
             self.api_connection_config.chain_id,
             self.transaction_submission_config,
-            faucet_account,
+            initial_account,
+            self.assets,
         );
-
-        if !self.do_not_delegate {
-            minter
-                .use_delegated_account()
-                .await
-                .context("Failed to make MintFunder use delegated account")?;
-        }
 
         Ok(minter)
     }
 }
 
 pub struct MintFunder {
-    /// URL of an Aptos node API.
+    // Keep existing fields
     node_url: Url,
     node_api_key: Option<String>,
     node_additional_headers: Option<HashMap<String, String>>,
-
     txn_config: TransactionSubmissionConfig,
+    transaction_factory: TransactionFactory,
+    gas_unit_price_manager: GasUnitPriceManager,
+    outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
 
+    // Keep single faucet account - just switch the key/address per request
     faucet_account: RwLock<LocalAccount>,
 
-    transaction_factory: TransactionFactory,
+    // Store asset configs for lookup
+    assets: HashMap<String, AssetConfig>,
 
-    gas_unit_price_manager: GasUnitPriceManager,
-
-    /// When recovering from being overloaded, this struct ensures we handle
-    /// requests in the order they came in.
-    outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
 }
 
 impl MintFunder {
@@ -111,7 +108,8 @@ impl MintFunder {
         node_additional_headers: Option<HashMap<String, String>>,
         chain_id: ChainId,
         txn_config: TransactionSubmissionConfig,
-        faucet_account: LocalAccount,
+        initial_account: LocalAccount,
+        assets: HashMap<String, AssetConfig>,
     ) -> Self {
         let gas_unit_price_manager =
             GasUnitPriceManager::new(node_url.clone(), txn_config.get_gas_unit_price_ttl_secs());
@@ -123,11 +121,37 @@ impl MintFunder {
             node_api_key,
             node_additional_headers,
             txn_config,
-            faucet_account: RwLock::new(faucet_account),
             transaction_factory,
             gas_unit_price_manager,
             outstanding_requests: RwLock::new(vec![]),
+            faucet_account: RwLock::new(initial_account),
+            assets,
         }
+    }
+
+    /// Set the faucet account for the requested asset
+    async fn ensure_faucet_account_for_asset(&self, asset_config: &AssetConfig) -> Result<(), AptosTapError> {
+        let key = asset_config.get_key()
+            .map_err(|e| AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest))?;
+
+        let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
+            AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
+        });
+
+        // Simply replace the entire account
+        let new_account = LocalAccount::new(account_address, key, 0);
+
+        let mut faucet_account = self.faucet_account.write().await;
+        *faucet_account = new_account;
+        drop(faucet_account);
+
+        // Handle delegation if needed
+        if !asset_config.do_not_delegate {
+            self.use_delegated_account().await
+                .map_err(|e| AptosTapError::new_with_error_code(e, AptosTapErrorCode::InternalError))?;
+        }
+
+        Ok(())
     }
 
     async fn get_gas_unit_price(&self) -> Result<u64, AptosTapError> {
@@ -151,7 +175,7 @@ impl MintFunder {
     }
 
     /// todo explain / rename
-    pub async fn use_delegated_account(&mut self) -> Result<()> {
+    pub async fn use_delegated_account(&self) -> Result<()> {
         // Build a client.
         let client = self.get_api_client();
 
@@ -203,7 +227,9 @@ impl MintFunder {
             delegated_account.address()
         );
 
-        self.faucet_account = RwLock::new(delegated_account);
+        // Update: Handle Option<LocalAccount>
+        let mut faucet_account = self.faucet_account.write().await;
+        *faucet_account = delegated_account;
 
         Ok(())
     }
@@ -294,6 +320,20 @@ impl FunderTrait for MintFunder {
         check_only: bool,
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
+
+        // 1. Resolve asset (default to "apt")
+        let asset_name = asset.as_deref().unwrap_or("apt");
+
+        // 2. Get asset config
+        let asset_config = self.assets.get(asset_name)
+            .ok_or_else(|| AptosTapError::new(
+                format!("Asset '{}' is not configured", asset_name),
+                AptosTapErrorCode::InvalidRequest,
+            ))?;
+
+        // 3. Update faucet account if needed (only if different from current)
+        self.ensure_faucet_account_for_asset(asset_config).await?;
+
         let client = self.get_api_client();
         let amount = self.get_amount(amount, did_bypass_checkers);
         self.process(

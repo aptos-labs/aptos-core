@@ -6,21 +6,14 @@ bypasser_configs: []
 checker_configs: []
 funder_config:
   type: "MintFunder"
-  node_url: "https://api.shelbynet.shelby.xyz"
-  key_file_path: "/tmp/mint.key"
+  node_url: "http://127.0.0.1:8080"
   chain_id: 4
-  mint_account_address: "0xA550C18"
+  amount_to_fund: 100000000 
   assets:
     apt:
       do_not_delegate: false
-      amount_to_fund: 100000000 
-      mint_script: "/path/to/apt_mint_script.mv"
-    shelbyusd:
-      do_not_delegate: false
-      amount_to_fund: 100000000 
-      mintTransactionModuleAddress: "0x124"
-	    mintTransactionModuleName: "shelby_usd"
-	    mintTransactionModuleFunction: "mint"
+      key_file_path: ".aptos/testnet/mint.key"
+      mint_account_address: "0xA550C18"
 handler_config:
   use_helpful_errors: true
   return_rejections_early: false

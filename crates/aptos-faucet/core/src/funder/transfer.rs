@@ -3,7 +3,7 @@
 
 use super::{
     common::{
-        submit_transaction, ApiConnectionConfig, GasUnitPriceManager, TransactionSubmissionConfig,
+        submit_transaction, ApiConnectionConfig, GasUnitPriceManager, TransactionSubmissionConfig, AssetConfig,
     },
     FunderHealthMessage, FunderTrait,
 };
@@ -46,12 +46,17 @@ pub struct TransferFunderConfig {
 
     /// The amount of coins to fund the receiver account.
     pub amount_to_fund: AmountToFund,
+
+    /// The assets to transfer.
+    pub assets: HashMap<String, AssetConfig>,
 }
 
 impl TransferFunderConfig {
     pub async fn build_funder(&self) -> Result<TransferFunder> {
         // Read in private key.
-        let key = self.api_connection_config.get_key()?;
+        let apt_asset_config = self.assets.get("apt")
+            .ok_or_else(|| anyhow::anyhow!("No 'apt' asset configuration found"))?;
+        let key = apt_asset_config.get_key()?;
 
         // Build account address from private key.
         let account_address = account_address_from_private_key(&key);
@@ -253,7 +258,7 @@ impl FunderTrait for TransferFunder {
         &self,
         amount: Option<u64>,
         receiver_address: AccountAddress,
-        asset: Option<String>,
+        _asset: Option<String>,
         check_only: bool,
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
