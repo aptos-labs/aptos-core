@@ -4,6 +4,7 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 - When using `--bind-to 0.0.0.0`, clients created by the localnet will try to connect at 127.0.0.1, not 0.0.0.0.
+- Add `--docker-network` flag to allow specifying existing Docker network.
 
 ## [7.10.2]
 - Fix backward compatibility issue of enum-based option module
