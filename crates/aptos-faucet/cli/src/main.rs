@@ -86,7 +86,8 @@ impl FaucetCliArgs {
             self.api_connection_args.additional_headers.clone(),
             self.api_connection_args.chain_id,
             transaction_submission_config,
-            faucet_account,
+            self.amount,
+            Some(faucet_account),
         );
 
         // Create an account that we'll delegate mint functionality to, then use it.
