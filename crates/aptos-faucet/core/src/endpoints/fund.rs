@@ -149,12 +149,15 @@ impl FundApi {
             return Ok(());
         }
 
+        // Normalize asset parameter: default to "apt" if not specified
+        let asset_name = asset.0.unwrap_or_else(|| "apt".to_string());
+
         // Call Funder.fund with `check_only` set, meaning it only does the
         // initial set of checks without actually submitting any transactions
         // to fund the account.
         self.components
             .funder
-            .fund(fund_request.amount, checker_data.receiver, asset.0, true, bypass)
+            .fund(fund_request.amount, checker_data.receiver, Some(asset_name), true, bypass)
             .await?;
 
         Ok(())
@@ -289,23 +292,14 @@ impl FundApiComponents {
             .preprocess_request(&fund_request, source_ip, header_map, dry_run)
             .await?;
 
-        // Fund the account - handle asset parameter
-        let fund_result = match &asset {
-            Some(asset_name) => {
-                // NEW: Multi-asset path
-                info!("Using multi-asset flow for asset: {}", asset_name);
-                self.funder
-                    .fund(fund_request.amount, checker_data.receiver, Some(asset_name.clone()), false, bypass)
-                    .await
-            }
-            None => {
-                // EXISTING: Default APT path (unchanged behavior)
-                info!("Using existing APT flow (no asset specified)");
-                self.funder
-                    .fund(fund_request.amount, checker_data.receiver, None, false, bypass)
-                    .await
-            }
-        };
+        // Normalize asset parameter: default to "apt" if not specified
+        let asset_name = asset.unwrap_or_else(|| "apt".to_string());
+
+        // Fund the account
+        let fund_result = self
+            .funder
+            .fund(fund_request.amount, checker_data.receiver, Some(asset_name.clone()), false, bypass)
+            .await;
 
         // This might be empty if there is an error and we never got to the
         // point where we could submit a transaction.
@@ -320,7 +314,7 @@ impl FundApiComponents {
             jwt_sub = jwt_sub(checker_data.headers.clone()).ok(),
             address = checker_data.receiver,
             requested_amount = fund_request.amount,
-            asset = asset.as_deref().unwrap_or("apt (default)"),
+            asset = asset_name.as_str(),
             txn_hashes = txn_hashes,
             success = fund_result.is_ok(),
         );
