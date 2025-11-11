@@ -208,7 +208,7 @@ impl<'a, F: PrimeField> LowDegreeTest<'a, F> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::arkworks::shamir::ThresholdConfig;
+    use crate::arkworks::shamir::ShamirThresholdConfig;
     use ark_bn254::Fr;
     use ark_ff::PrimeField;
     use ark_std::vec::Vec;
@@ -226,7 +226,7 @@ mod tests {
         // TODO: Move get_threshold_configs_for_testing() and the ThresholdConfig trait to aptos-crypto
         for t in 1..8 {
             for n in (t + 1)..(3 * t + 1) {
-                let sc = ThresholdConfig::new(t, n);
+                let sc = ShamirThresholdConfig::new(t, n);
 
                 // A degree t-1 polynomial p(X)
                 let p = sample_random_polynomial::<Fr, _>(t - 1, &mut rng);
@@ -258,7 +258,7 @@ mod tests {
 
         for t in 1..8 {
             for n in (t + 1)..(3 * t + 1) {
-                let sc = ThresholdConfig::new(t, n);
+                let sc = ShamirThresholdConfig::new(t, n);
 
                 // A degree t polynomial f(X), higher by 1 than what the LDT expects
                 let p = sample_random_polynomial::<Fr, _>(t, &mut rng);

@@ -5,39 +5,40 @@
 
 use crate::{
     algebra::GroupGenerators,
+    dlog,
     pvss::{
         chunky::{chunked_elgamal, input_secret::InputSecret, keys},
         traits,
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
+    traits::transcript::WithMaxNumShares,
 };
 use aptos_crypto::{
     arkworks::{
-        self, hashing,
+        hashing,
         serialization::{ark_de, ark_se},
     },
-    CryptoMaterialError, ValidCryptoMaterial,
+    utils, CryptoMaterialError, ValidCryptoMaterial,
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_ff::PrimeField;
-use ark_serialize::{
-    CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
-};
+use ark_serialize::{SerializationError, Valid};
 use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::ops::Mul;
+use std::{collections::HashMap, ops::Mul};
 
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 
-pub const CHUNK_SIZE: u8 = 16; // Will probably move this elsewhere in the next PR. Maybe it becomes a run-time variable...
-
-fn compute_powers_of_radix<E: Pairing>() -> Vec<E::ScalarField> {
-    let num_chunks_per_share =
-        E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
-    arkworks::powers_of_two(num_chunks_per_share)
+fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
+    let num_chunks_per_share = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32);
+    utils::powers(
+        E::ScalarField::from(1u64 << ell),
+        num_chunks_per_share as usize,
+    )
 }
 
-#[derive(CanonicalSerialize, Serialize, Clone, Debug, PartialEq, Eq)]
+// TODO: If we need it later, let's derive CanonicalSerialize/CanonicalDeserialize from Serialize/Deserialize? E.g. the opposite of ark_se/de...
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 #[allow(non_snake_case)]
 pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
@@ -50,14 +51,13 @@ pub struct PublicParameters<E: Pairing> {
     #[serde(serialize_with = "ark_se")]
     G_2: E::G2Affine,
 
+    pub ell: u8,
+
+    #[serde(skip)]
+    pub table: HashMap<Vec<u8>, u32>,
+
     #[serde(skip)]
     pub powers_of_radix: Vec<E::ScalarField>,
-}
-
-impl<E: Pairing> PublicParameters<E> {
-    pub fn get_commitment_base(&self) -> E::G2Affine {
-        self.G_2
-    }
 }
 
 #[allow(non_snake_case)]
@@ -75,44 +75,26 @@ impl<'de, E: Pairing> Deserialize<'de> for PublicParameters<E> {
             pk_range_proof: dekart_univariate_v2::ProverKey<E>,
             #[serde(deserialize_with = "ark_de")]
             G_2: E::G2Affine,
+            ell: u8,
         }
 
         let serialized = SerializedFields::<E>::deserialize(deserializer)?;
+        let G: E::G1 = serialized.pp_elgamal.G.into();
 
         Ok(Self {
             pp_elgamal: serialized.pp_elgamal,
             pk_range_proof: serialized.pk_range_proof,
             G_2: serialized.G_2,
-            powers_of_radix: compute_powers_of_radix::<E>(),
+            ell: serialized.ell,
+            table: dlog::table::build::<E::G1>(G, 1u32 << (serialized.ell / 2)),
+            powers_of_radix: compute_powers_of_radix::<E>(serialized.ell),
         })
     }
 }
 
-#[allow(non_snake_case)]
-impl<E: Pairing> CanonicalDeserialize for PublicParameters<E> {
-    fn deserialize_with_mode<R: Read>(
-        mut reader: R,
-        compress: Compress,
-        validate: Validate,
-    ) -> Result<Self, SerializationError> {
-        let pp_elgamal = chunked_elgamal::PublicParameters::<E>::deserialize_with_mode(
-            &mut reader,
-            compress,
-            validate,
-        )?;
-        let pk_range_proof = dekart_univariate_v2::ProverKey::<E>::deserialize_with_mode(
-            &mut reader,
-            compress,
-            validate,
-        )?;
-        let G_2 = E::G2Affine::deserialize_with_mode(&mut reader, compress, validate)?;
-
-        Ok(Self {
-            pp_elgamal,
-            pk_range_proof,
-            G_2,
-            powers_of_radix: compute_powers_of_radix::<E>(),
-        })
+impl<E: Pairing> PublicParameters<E> {
+    pub fn get_commitment_base(&self) -> E::G2Affine {
+        self.G_2
     }
 }
 
@@ -154,31 +136,31 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
     }
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // Will be used in next PR
+#[allow(non_snake_case)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
-    pub fn new<R: RngCore + CryptoRng>(
-        max_num_shares: usize,
-        _radix_exponent: usize,
-        rng: &mut R,
-    ) -> Self {
-        let num_chunks_per_share =
-            E::ScalarField::MODULUS_BIT_SIZE.div_ceil(CHUNK_SIZE as u32) as usize;
+    pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, rng: &mut R) -> Self {
+        let num_chunks_per_share = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32) as usize;
         let max_num_chunks_padded =
             ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
+        let pp_elgamal = chunked_elgamal::PublicParameters::default();
+        let G = *pp_elgamal.message_base();
         let pp = Self {
-            pp_elgamal: chunked_elgamal::PublicParameters::default(),
+            pp_elgamal,
             pk_range_proof: dekart_univariate_v2::Proof::setup(
                 max_num_chunks_padded,
-                CHUNK_SIZE as usize,
+                ell as usize,
                 group_generators,
                 rng,
             )
             .0,
             G_2: hashing::unsafe_hash_to_affine(b"G_2", DST),
-            powers_of_radix: arkworks::powers_of_two(num_chunks_per_share),
+            ell,
+            table: dlog::table::build::<E::G1>(G.into(), 1u32 << (ell / 2)),
+            powers_of_radix: compute_powers_of_radix::<E>(ell),
         };
 
         pp
@@ -193,10 +175,19 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
+const DEFAULT_ELL_FOR_TESTING: u8 = 16;
+
 impl<E: Pairing> Default for PublicParameters<E> {
-    // TODO: is this only used for testing?
+    // This is only used for testing and benchmarking
     fn default() -> Self {
         let mut rng = thread_rng();
-        Self::new(1, CHUNK_SIZE as usize, &mut rng)
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, &mut rng)
+    }
+}
+
+impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
+    fn with_max_num_shares(n: usize) -> Self {
+        let mut rng = thread_rng();
+        Self::new(n, DEFAULT_ELL_FOR_TESTING, &mut rng)
     }
 }

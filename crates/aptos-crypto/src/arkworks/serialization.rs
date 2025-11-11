@@ -5,7 +5,7 @@
 
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 
-/// Serializes a type implementing `CanonicalSerialize` into bytes using the
+/// Serializes a type implementing `CanonicalSerialize` into bytes (with compression) using the
 /// [`ark_serialize`](https://docs.rs/ark-serialize) format and writes it to a Serde serializer.
 ///
 /// This is useful for integrating Arkworks types (e.g., elliptic curve elements, field elements)
@@ -23,7 +23,7 @@ where
 /// Deserializes a type implementing `CanonicalDeserialize` from bytes produced by [`ark_se`].
 ///
 /// This function allows Arkworks types to be deserialized from Serde-compatible data sources.
-/// It assumes the data was serialized without compression and without validation.
+/// It assumes the data was serialized with compression, and attempts to check its correctness.
 pub fn ark_de<'de, D, A: CanonicalDeserialize>(data: D) -> Result<A, D::Error>
 where
     D: serde::de::Deserializer<'de>,

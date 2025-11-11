@@ -3,12 +3,10 @@
 
 use crate::{
     algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::{
-        traits::{self, SecretSharingConfig, ThresholdConfig},
-        Player, ThresholdConfigBlstrs,
-    },
+    pvss::{Player, ThresholdConfigBlstrs},
 };
 use anyhow::anyhow;
+use aptos_crypto::traits::{self, SecretSharingConfig as _, ThresholdConfig as _};
 use more_asserts::assert_lt;
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
@@ -321,7 +319,8 @@ impl traits::SecretSharingConfig for WeightedConfig {
 
 #[cfg(test)]
 mod test {
-    use crate::pvss::{traits::SecretSharingConfig, WeightedConfig};
+    use crate::pvss::WeightedConfig;
+    use aptos_crypto::traits::SecretSharingConfig as _;
 
     #[test]
     fn bvt() {

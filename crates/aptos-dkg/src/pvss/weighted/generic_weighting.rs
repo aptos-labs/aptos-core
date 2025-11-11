@@ -6,10 +6,10 @@
 /// WARNING: This will **NOT** necessarily be secure for any PVSS scheme, since it will reuse encryption
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
-    traits::{transcript::MalleableTranscript, Reconstructable, SecretSharingConfig, Transcript},
+    traits::{transcript::MalleableTranscript, Reconstructable, Transcript},
     Player, ThresholdConfigBlstrs, WeightedConfig,
 };
-use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -227,12 +227,12 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         (weighted_dsk_share, weighted_dpk_share)
     }
 
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
     where
         R: RngCore + CryptoRng,
     {
         GenericWeighting {
-            trx: T::generate(sc.get_threshold_config(), rng),
+            trx: T::generate(sc.get_threshold_config(), pp, rng),
         }
     }
 }

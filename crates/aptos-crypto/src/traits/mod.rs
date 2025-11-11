@@ -6,12 +6,19 @@
 //!
 //! For examples on how to use these traits, see the implementations of the [`crate::ed25519`]
 
-use crate::hash::{CryptoHash, CryptoHasher};
+use crate::{
+    hash::{CryptoHash, CryptoHasher},
+    player::Player,
+};
 use anyhow::Result;
 use core::convert::{From, TryFrom};
+use more_asserts::assert_lt;
 use rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{fmt::Debug, hash::Hash};
+use std::{
+    fmt::{Debug, Display},
+    hash::Hash,
+};
 use thiserror::Error;
 
 /// An error type for key and signature validation issues, see [`ValidCryptoMaterial`].
@@ -310,6 +317,43 @@ pub trait Uniform {
 pub trait Genesis: PrivateKey {
     /// Produces the genesis private key.
     fn genesis() -> Self;
+}
+
+/// Trait defining the interface for secret sharing schemes.
+pub trait SecretSharingConfig: Display {
+    /// Creates a new player ID; a number from 0 to `n-1`, where `n = get_total_num_players(&self)`.
+    fn get_player(&self, i: usize) -> Player {
+        let n = self.get_total_num_players();
+        assert_lt!(i, n);
+
+        Player { id: i }
+    }
+
+    /// Useful during testing.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng;
+
+    /// Returns a random subset of players who are capable of reconstructing the secret.
+    /// Useful during testing.
+    fn get_random_eligible_subset_of_players<R>(&self, rng: &mut R) -> Vec<Player>
+    where
+        R: rand_core::RngCore;
+
+    /// Returns the total number of players in the scheme.
+    fn get_total_num_players(&self) -> usize;
+
+    /// Returns the total number of shares in the scheme.
+    fn get_total_num_shares(&self) -> usize;
+}
+
+/// Trait for secret sharing schemes that expose a threshold `t`.
+pub trait ThresholdConfig: SecretSharingConfig + Sized {
+    /// Constructs a new threshold configuration given `t` (threshold) and `n` (number of players). Only used in `get_threshold_configs_for_testing()`, maybe not ideal here
+    fn new(t: usize, n: usize) -> anyhow::Result<Self>;
+
+    /// Returns the threshold `t` required to reconstruct the secret.
+    fn get_threshold(&self) -> usize;
 }
 
 /// A pub(crate) mod hiding a Sealed trait and its implementations, allowing
