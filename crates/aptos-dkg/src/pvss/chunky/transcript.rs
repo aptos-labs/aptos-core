@@ -297,6 +297,7 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
         debug_assert_eq!(self.C.len(), sc.n);
         debug_assert_eq!(self.V.len(), sc.n + 1);
         debug_assert_eq!(self.C.len(), other.C.len());
+        debug_assert_eq!(self.R.len(), other.R.len());
         debug_assert_eq!(self.V.len(), other.V.len());
 
         for i in 0..sc.n {
@@ -307,6 +308,11 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
             }
         }
         self.V[sc.n] += other.V[sc.n];
+
+        for (r_self, r_other) in self.R.iter_mut().zip(&other.R) {
+            *r_self += r_other;
+        }
+
         self.dealers.extend_from_slice(other.dealers.as_slice());
 
         self.sharing_proof = None; // the proofs don't aggregate
