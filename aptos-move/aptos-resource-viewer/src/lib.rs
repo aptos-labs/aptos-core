@@ -16,11 +16,11 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     transaction_argument::TransactionArgument,
-    value::{MoveStruct, MoveTypeLayout, MoveValue},
+    value::{MoveTypeLayout, MoveValue},
 };
 use move_resource_viewer::MoveValueAnnotator;
 pub use move_resource_viewer::{
-    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, RawMoveStruct,
+    AnnotatedMoveClosure, AnnotatedMoveStruct, AnnotatedMoveValue, MoveTableInfo, RawMoveStruct,
 };
 use std::sync::Arc;
 
@@ -37,7 +37,7 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
         &self,
         ty_tag: &TypeTag,
         blob: &[u8],
-        infos: &mut Vec<(StructTag, MoveStruct)>,
+        infos: &mut Vec<MoveTableInfo>,
     ) -> anyhow::Result<()> {
         self.0.collect_table_info(ty_tag, blob, infos)
     }
