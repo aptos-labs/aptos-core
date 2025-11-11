@@ -285,9 +285,6 @@ impl FundApiComponents {
         dry_run: bool,
         asset: Option<String>,
     ) -> poem::Result<Vec<SignedTransaction>, AptosTapError> {
-        // Add logging for the asset parameter
-        println!("fund_inner called with asset: {:?}", asset);
-
         let (checker_data, bypass, _semaphore_permit) = self
             .preprocess_request(&fund_request, source_ip, header_map, dry_run)
             .await?;
