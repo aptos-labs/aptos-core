@@ -77,6 +77,7 @@ impl MintFunderConfig {
             self.transaction_submission_config,
             initial_account,
             self.assets,
+            self.amount_to_fund,
         );
 
         Ok(minter)
@@ -99,6 +100,8 @@ pub struct MintFunder {
     // Store asset configs for lookup
     assets: HashMap<String, AssetConfig>,
 
+    // Amount to fund when no specific amount is requested
+    amount_to_fund: u64,
 }
 
 impl MintFunder {
@@ -110,6 +113,7 @@ impl MintFunder {
         txn_config: TransactionSubmissionConfig,
         initial_account: LocalAccount,
         assets: HashMap<String, AssetConfig>,
+        amount_to_fund: u64,
     ) -> Self {
         let gas_unit_price_manager =
             GasUnitPriceManager::new(node_url.clone(), txn_config.get_gas_unit_price_ttl_secs());
@@ -126,6 +130,7 @@ impl MintFunder {
             outstanding_requests: RwLock::new(vec![]),
             faucet_account: RwLock::new(initial_account),
             assets,
+            amount_to_fund,
         }
     }
 
@@ -138,7 +143,16 @@ impl MintFunder {
             AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
         });
 
-        // Simply replace the entire account
+        // Check if we already have the correct account for this asset
+        {
+            let current_account = self.faucet_account.read().await;
+            if current_account.address() == account_address {
+                // Account is already correct, no need to replace or re-delegate
+                return Ok(());
+            }
+        }
+
+        // Replace the account only if it's different
         let new_account = LocalAccount::new(account_address, key, 0);
 
         let mut faucet_account = self.faucet_account.write().await;
@@ -353,8 +367,8 @@ impl FunderTrait for MintFunder {
         ) {
             (Some(amount), Some(maximum_amount)) => std::cmp::min(amount, maximum_amount),
             (Some(amount), None) => amount,
-            (None, Some(maximum_amount)) => maximum_amount,
-            (None, None) => 0,
+            (None, Some(maximum_amount)) => std::cmp::min(self.amount_to_fund, maximum_amount),
+            (None, None) => self.amount_to_fund,
         }
     }
 
