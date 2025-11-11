@@ -284,11 +284,9 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
             [pp.get_commitment_base(), (-weighted_Vs).into_affine()],
         ); // Making things affine here rather than converting the two bases to group elements, since that's probably what they would be converted to anyway: https://github.com/arkworks-rs/algebra/blob/c1f4f5665504154a9de2345f464b0b3da72c28ec/ec/src/models/bls12/g1.rs#L14
 
-        assert_eq!(
-            PairingOutput::<E>::ZERO,
-            res,
-            "Expected zero during multi-pairing check",
-        );
+        if PairingOutput::<E>::ZERO != res {
+            return Err(anyhow::anyhow!("Expected zero during multi-pairing check"));
+        }
 
         Ok(())
     }
@@ -306,7 +304,6 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
 
         for i in 0..sc.n {
             self.V[i] += other.V[i];
-            self.R[i] += other.R[i];
             for j in 0..self.C[i].len() {
                 self.C[i][j] += other.C[i][j];
             }
