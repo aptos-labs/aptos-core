@@ -441,10 +441,7 @@ pub struct AssetConfig {
 }
 
 impl AssetConfig {
-    pub fn new(
-        key: Option<ConfigKey<Ed25519PrivateKey>>,
-        key_file_path: PathBuf,
-    ) -> Self {
+    pub fn new(key: Option<ConfigKey<Ed25519PrivateKey>>, key_file_path: PathBuf) -> Self {
         Self { key, key_file_path }
     }
 

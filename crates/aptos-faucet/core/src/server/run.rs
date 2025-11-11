@@ -9,7 +9,10 @@ use crate::{
         build_openapi_service, convert_error, mint, BasicApi, CaptchaApi, FundApi,
         FundApiComponents,
     },
-    funder::{ApiConnectionConfig, AssetConfig, DEFAULT_ASSET_NAME, FunderConfig, MintAssetConfig, MintFunderConfig, TransactionSubmissionConfig},
+    funder::{
+        ApiConnectionConfig, AssetConfig, FunderConfig, MintAssetConfig, MintFunderConfig,
+        TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
+    },
     middleware::middleware_log,
 };
 use anyhow::{anyhow, Context, Result};
@@ -18,16 +21,19 @@ use aptos_faucet_metrics_server::{run_metrics_server, MetricsServerConfig};
 use aptos_logger::info;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
-    types::{account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId},
+    types::{
+        account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
+    },
 };
 use clap::Parser;
 use futures::{channel::oneshot::Sender as OneShotSender, lock::Mutex};
 use poem::{http::Method, listener::TcpAcceptor, middleware::Cors, EndpointExt, Route, Server};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc};
+use std::{
+    collections::HashMap, fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc,
+};
 use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
-use std::collections::HashMap;
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct HandlerConfig {
@@ -286,11 +292,14 @@ impl RunConfig {
                     35,      // wait_for_outstanding_txns_secs
                     false,   // wait_for_transactions
                 ),
-                assets: HashMap::from([(DEFAULT_ASSET_NAME.to_string(), MintAssetConfig::new(
-                    AssetConfig::new(None, key_file_path),
-                    Some(aptos_test_root_address()),
-                    do_not_delegate,
-                ))]),
+                assets: HashMap::from([(
+                    DEFAULT_ASSET_NAME.to_string(),
+                    MintAssetConfig::new(
+                        AssetConfig::new(None, key_file_path),
+                        Some(aptos_test_root_address()),
+                        do_not_delegate,
+                    ),
+                )]),
                 default_asset: None, // Will default to DEFAULT_ASSET_NAME ("apt")
                 amount_to_fund: 100_000_000_000,
             }),
@@ -370,10 +379,7 @@ pub struct RunSimple {
 impl RunSimple {
     pub async fn run_simple(&self) -> Result<()> {
         // Create an AssetConfig from the CLI arguments to get the key
-        let asset_config = AssetConfig::new(
-            None,
-            self.key_file_path.clone(),
-        );
+        let asset_config = AssetConfig::new(None, self.key_file_path.clone());
 
         let key = asset_config
             .get_key()

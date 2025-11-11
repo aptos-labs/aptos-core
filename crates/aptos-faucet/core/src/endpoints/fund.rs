@@ -154,7 +154,13 @@ impl FundApi {
         // to fund the account. Pass asset directly, funder will use its configured default if None.
         self.components
             .funder
-            .fund(fund_request.amount, checker_data.receiver, asset.0, true, bypass)
+            .fund(
+                fund_request.amount,
+                checker_data.receiver,
+                asset.0,
+                true,
+                bypass,
+            )
             .await?;
 
         Ok(())
@@ -293,7 +299,13 @@ impl FundApiComponents {
         let asset_for_logging = asset.clone();
         let fund_result = self
             .funder
-            .fund(fund_request.amount, checker_data.receiver, asset, false, bypass)
+            .fund(
+                fund_request.amount,
+                checker_data.receiver,
+                asset,
+                false,
+                bypass,
+            )
             .await;
 
         // This might be empty if there is an error and we never got to the

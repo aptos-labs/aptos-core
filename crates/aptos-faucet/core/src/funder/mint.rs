@@ -30,8 +30,8 @@ static MINTER_SCRIPT: &[u8] = include_bytes!(
 );
 
 use super::common::{
-    submit_transaction, update_sequence_numbers, ApiConnectionConfig, GasUnitPriceManager,
-    TransactionSubmissionConfig, AssetConfig, DEFAULT_ASSET_NAME
+    submit_transaction, update_sequence_numbers, ApiConnectionConfig, AssetConfig,
+    GasUnitPriceManager, TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
 };
 
 /// Asset configuration specific to minting, extends the base AssetConfig with mint-specific fields.
@@ -96,20 +96,25 @@ impl MintFunderConfig {
         }
 
         // Resolve default asset: use configured value or fall back to constant
-        let default_asset = self.default_asset.unwrap_or_else(|| DEFAULT_ASSET_NAME.to_string());
+        let default_asset = self
+            .default_asset
+            .unwrap_or_else(|| DEFAULT_ASSET_NAME.to_string());
 
         // Validate that the default asset exists in the assets map
-        let default_asset_config = self.assets.get(&default_asset)
-            .ok_or_else(|| anyhow::anyhow!(
+        let default_asset_config = self.assets.get(&default_asset).ok_or_else(|| {
+            anyhow::anyhow!(
                 "Default asset '{}' is not configured in assets map",
                 default_asset
-            ))?;
+            )
+        })?;
 
         let key = default_asset_config.get_key()?;
         let initial_account = LocalAccount::new(
-            default_asset_config.mint_account_address.unwrap_or_else(|| {
-                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
-            }),
+            default_asset_config
+                .mint_account_address
+                .unwrap_or_else(|| {
+                    AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
+                }),
             key,
             0,
         );
@@ -194,8 +199,6 @@ impl MintFunder {
         }
     }
 
-
-
     async fn get_gas_unit_price(&self) -> Result<u64, AptosTapError> {
         match self.txn_config.gas_unit_price_override {
             Some(gas_unit_price) => Ok(gas_unit_price),
@@ -215,7 +218,6 @@ impl MintFunder {
             .clone()
             .with_gas_unit_price(self.get_gas_unit_price().await?))
     }
-
 
     /// Performs the delegated account creation and delegation. The (Aptos) coin::mint function that
     /// used in the MintFunder expects the caller to have the MintCapability.
@@ -353,7 +355,6 @@ impl MintFunder {
             .await?,
         ])
     }
-
 }
 
 #[async_trait]
@@ -370,17 +371,19 @@ impl FunderTrait for MintFunder {
         let asset_name = asset.as_deref().unwrap_or(&self.default_asset);
 
         // Get asset config
-        let asset_config = self.assets.get(asset_name)
-            .ok_or_else(|| AptosTapError::new(
+        let asset_config = self.assets.get(asset_name).ok_or_else(|| {
+            AptosTapError::new(
                 format!("Asset '{}' is not configured", asset_name),
                 AptosTapErrorCode::InvalidRequest,
-            ))?;
+            )
+        })?;
 
         // Only set faucet_account if it's NOT the default asset
         // (default asset is already set and delegated at startup)
         if asset_name != self.default_asset {
-            let key = asset_config.get_key()
-                .map_err(|e| AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest))?;
+            let key = asset_config.get_key().map_err(|e| {
+                AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest)
+            })?;
             let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
                 AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
             });
@@ -392,13 +395,12 @@ impl FunderTrait for MintFunder {
             }
         }
 
-
         // Only delegate if it's NOT the default asset
         // (default asset is already delegated at startup)
         if !asset_config.do_not_delegate && asset_name != self.default_asset {
-            self.use_delegated_account()
-                .await
-                .map_err(|e| AptosTapError::new_with_error_code(e, AptosTapErrorCode::InternalError))?;
+            self.use_delegated_account().await.map_err(|e| {
+                AptosTapError::new_with_error_code(e, AptosTapErrorCode::InternalError)
+            })?;
         }
 
         let client = self.get_api_client();
