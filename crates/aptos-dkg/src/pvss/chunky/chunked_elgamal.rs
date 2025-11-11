@@ -332,7 +332,7 @@ mod tests {
 
         let hom = Homomorphism {
             pp: &pp,
-            eks: &E::G1::normalize_batch(&vec![pp.H * dks[0], pp.H * dks[1]]),
+            eks: &E::G1::normalize_batch(&[pp.H * dks[0], pp.H * dks[1]]),
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts

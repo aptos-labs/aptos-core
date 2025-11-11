@@ -370,20 +370,21 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
+        let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
         Transcript {
             dealers: vec![sc.get_player(0)],
             V: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
             C: (0..sc.n)
-                .map(|_| unsafe_random_points(pp.ell as usize, rng))
+                .map(|_| unsafe_random_points(num_chunks_per_share, rng))
                 .collect::<Vec<_>>(),
-            R: unsafe_random_points(sc.n, rng),
+            R: unsafe_random_points(num_chunks_per_share, rng),
             sharing_proof: Some(SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),
                 ),
                 PoK: hkzg_chunked_elgamal::Proof::generate(
                     pp.pk_range_proof.max_n,
-                    num_chunks_per_scalar::<E>(pp.ell) as usize,
+                    num_chunks_per_share,
                     rng,
                 ),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
