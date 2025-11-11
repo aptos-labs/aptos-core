@@ -76,14 +76,14 @@ pub trait PVSS<E: Pairing, T: Transcript>: ScalarProtocol<E> {
     fn append_public_parameters(&mut self, pp: &T::PublicParameters);
 
     /// Append the signing pub keys.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Not a secure alternative to session identifiers? So remove?
     fn append_signing_pub_keys(&mut self, spks: &[T::SigningPubKey]);
 
     /// Append the encryption keys `eks`.
     fn append_encryption_keys(&mut self, eks: &[T::EncryptPubKey]);
 
     /// Append the aux data.
-    #[allow(dead_code)]
+    #[allow(dead_code)] // Will put session identifiers here?
     fn append_auxs<A: Serialize>(&mut self, aux: &[A]);
     #[allow(dead_code)]
     fn append_aux<A: Serialize>(&mut self, aux: &A);
