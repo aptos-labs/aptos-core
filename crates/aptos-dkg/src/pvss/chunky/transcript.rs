@@ -247,7 +247,7 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
         let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
         ldt.low_degree_test_group(&self.V)?;
 
-        // Now do the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO?
+        // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO?
         let mut base_vec = Vec::new();
         let mut exp_vec = Vec::new();
 
@@ -255,7 +255,7 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
         let powers_of_beta = utils::powers(beta, self.C.len() + 1);
 
         for i in 0..self.C.len() {
-            for j in 0..self.C[0].len() {
+            for j in 0..self.C[i].len() {
                 let base = self.C[i][j];
                 let exp = pp.powers_of_radix[j] * powers_of_beta[i];
                 base_vec.push(base);
@@ -338,18 +338,18 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let ctxts = &self.C[player.id];
+        let C_i = &self.C[player.id]; // where i = player.id
 
         let ephemeral_keys: Vec<_> = self.R.iter().map(|Ri| Ri.mul(dk.dk)).collect();
         assert_eq!(
             ephemeral_keys.len(),
-            ctxts.len(),
+            C_i.len(),
             "Number of ephemeral keys does not match the number of ciphertext chunks"
         );
-        let dealt_encrypted_secret_key_share_chunks: Vec<_> = ctxts
+        let dealt_encrypted_secret_key_share_chunks: Vec<_> = C_i
             .iter()
             .zip(ephemeral_keys.iter())
-            .map(|(Cij, ephemeral_key)| Cij.sub(ephemeral_key))
+            .map(|(C_ij, ephemeral_key)| C_ij.sub(ephemeral_key))
             .collect();
 
         let dealt_chunked_secret_key_share = bsgs::dlog_vec(
