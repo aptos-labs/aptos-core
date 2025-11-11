@@ -54,13 +54,13 @@ pub const DST: &[u8; 32] = b"APTOS_CHUNK_EG_FIELD_PVSS_FS_DST";
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)] // Removed CryptoHasher - not compatible with <E: Pairing> and doesn't seem to be used?
 pub struct Transcript<E: Pairing> {
     dealers: Vec<Player>,
-    /// Public key shares from 0 to n-1: V[i] = s_i G_2; public key is in V[n]
+    /// Public key shares from 0 to n-1: V[i] = s_i * G_2; public key is in V[n]
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub V: Vec<E::G2>,
-    /// First chunked ElGamal component: C[i][j] = s_{i,j} G + r_j ek_i. Here s_i = \sum_j s_{i,j} B^j
+    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub C: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway
-    /// Second chunked ElGamal component: R[j] = r_j H
+    /// Second chunked ElGamal component: R[j] = r_j * H
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub R: Vec<E::G1>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C

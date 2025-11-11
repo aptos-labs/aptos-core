@@ -298,7 +298,7 @@ mod tests {
 
         let hom = Homomorphism {
             pp: &pp,
-            eks: &E::G1::normalize_batch(&unsafe_random_points(2, &mut thread_rng())),
+            eks: &E::G1::normalize_batch(&unsafe_random_points(2, &mut thread_rng())), // Randomly generate encryption keys, we won't use them
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
@@ -322,6 +322,7 @@ mod tests {
         }
     }
 
+    // This is essentially a more advanced version of the previous test... so remove that one?
     #[allow(non_snake_case)]
     fn test_decrypt_roundtrip<E: Pairing>() {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
