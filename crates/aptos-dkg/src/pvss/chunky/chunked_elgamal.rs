@@ -243,7 +243,7 @@ where
     r_vals
 }
 
-pub(crate) fn num_chunks_per_share<E: Pairing>(ell: u8) -> u32 {
+pub(crate) fn num_chunks_per_scalar<E: Pairing>(ell: u8) -> u32 {
     E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32) // Maybe add `as usize` here?
 }
 
@@ -269,7 +269,7 @@ mod tests {
         let zs = sample_field_elements(num_values, &mut rng);
 
         // 2. Compute number of chunks
-        let number_of_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32);
+        let number_of_chunks = num_chunks_per_scalar::<E>(ell);
 
         // 3. Generate correlated randomness
         let rs: Vec<E::ScalarField> = correlated_randomness(&mut rng, 1 << ell, number_of_chunks);

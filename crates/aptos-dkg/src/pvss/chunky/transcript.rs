@@ -7,7 +7,7 @@ use crate::{
     pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
-            chunked_elgamal, chunked_elgamal::num_chunks_per_share, chunks, hkzg_chunked_elgamal,
+            chunked_elgamal, chunked_elgamal::num_chunks_per_scalar, chunks, hkzg_chunked_elgamal,
             hkzg_chunked_elgamal::HkzgElgamalWitness, input_secret::InputSecret, keys,
             public_parameters::PublicParameters,
         },
@@ -230,7 +230,7 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
             // Verify the range proof
             if let Err(err) = proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
-                sc.n * num_chunks_per_share::<E>(pp.ell) as usize,
+                sc.n * num_chunks_per_scalar::<E>(pp.ell) as usize,
                 pp.ell as usize,
                 &proof.range_proof_commitment,
                 &mut fs_t,
@@ -383,7 +383,7 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
                 ),
                 PoK: hkzg_chunked_elgamal::Proof::generate(
                     pp.pk_range_proof.max_n,
-                    num_chunks_per_share::<E>(pp.ell) as usize,
+                    num_chunks_per_scalar::<E>(pp.ell) as usize,
                     rng,
                 ),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
@@ -407,7 +407,7 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
     let elgamal_randomness = Scalar::vec_from_inner(chunked_elgamal::correlated_randomness(
         rng,
         1 << pp.ell as u64,
-        num_chunks_per_share::<E>(pp.ell),
+        num_chunks_per_scalar::<E>(pp.ell),
     ));
 
     // Chunk and flatten the shares
