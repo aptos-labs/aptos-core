@@ -47,6 +47,7 @@ fn test_pvss_all_unweighted() {
     }
 
     // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
+    // TODO: maybe reduce the number of tcs to make it a bit faster?
     let tcs = test_utils::get_threshold_configs_for_testing();
     for tc in tcs {
         println!("\nTesting {tc} PVSS");
@@ -102,6 +103,8 @@ fn test_pvss_transcript_size() {
 
         print_transcript_size::<das::Transcript>("Expected", &sc, expected_size);
         print_transcript_size::<das::Transcript>("Actual", &sc, actual_size);
+
+        // TODO: add `chunky` here?
     }
 
     for wc in get_weighted_configs_for_benchmarking() {

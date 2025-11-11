@@ -17,7 +17,6 @@ use ark_ff::PrimeField;
 use ark_serialize::CanonicalSerialize;
 use serde::Serialize;
 
-#[allow(dead_code)] // Will be used in the new PVSS
 pub const PVSS_DOM_SEP: &[u8; 26] = b"APTOS_PVSS_FIAT_SHAMIR_DST";
 
 /// Helper trait for deriving random scalars from a transcript.
@@ -68,7 +67,6 @@ impl<E: Pairing> ScalarProtocol<E> for merlin::Transcript {
 
 #[allow(non_snake_case)]
 #[allow(private_bounds)]
-#[allow(dead_code)] // Will be used in the new PVSS
 pub trait PVSS<E: Pairing, T: Transcript>: ScalarProtocol<E> {
     /// Append a domain separator for the PVSS protocol (in addition to the transcript-level DST used to initialise the FS transcript),
     /// consisting of a sharing configuration `sc`, which locks in the $t$ out of $n$ threshold.
@@ -78,23 +76,29 @@ pub trait PVSS<E: Pairing, T: Transcript>: ScalarProtocol<E> {
     fn append_public_parameters(&mut self, pp: &T::PublicParameters);
 
     /// Append the signing pub keys.
+    #[allow(dead_code)]
     fn append_signing_pub_keys(&mut self, spks: &[T::SigningPubKey]);
 
     /// Append the encryption keys `eks`.
     fn append_encryption_keys(&mut self, eks: &[T::EncryptPubKey]);
 
     /// Append the aux data.
+    #[allow(dead_code)]
     fn append_auxs<A: Serialize>(&mut self, aux: &[A]);
+    #[allow(dead_code)]
     fn append_aux<A: Serialize>(&mut self, aux: &A);
 
     /// Appends the transcript
+    #[allow(dead_code)] // TODO: Remove?
     fn append_transcript(&mut self, trx: &T);
 
     /// Returns a random dual-code word check polynomial for the SCRAPE LDT test.
+    #[allow(dead_code)] // TODO: Remove?
     fn challenge_dual_code_word_polynomial(&mut self, t: usize, n: usize) -> Vec<Scalar<E>>;
 
     /// Returns one or more scalars `r` useful for doing linear combinations (e.g., combining
     /// pairings in the SCRAPE multipairing check using coefficients $1, r, r^2, r^3, \ldots$
+    #[allow(dead_code)] // TODO: Remove?
     fn challenge_linear_combination_scalars(&mut self, num_scalars: usize) -> Vec<Scalar<E>>;
 }
 
@@ -206,7 +210,6 @@ impl<E: Pairing, T: Transcript> PVSS<E, T> for merlin::Transcript {
 }
 
 #[allow(private_bounds)]
-#[allow(dead_code)] // Will be used in the new PVSS
 pub(crate) fn initialize_pvss_transcript<E: Pairing, T: Transcript>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,

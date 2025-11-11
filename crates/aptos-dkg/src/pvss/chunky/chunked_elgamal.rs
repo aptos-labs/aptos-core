@@ -9,6 +9,7 @@ use crate::{
 use aptos_crypto::arkworks::{hashing, random::sample_field_element};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, VariableBaseMSM};
+use ark_ff::PrimeField;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
@@ -216,7 +217,6 @@ impl<'a, E: Pairing> sigma_protocol::Trait<E> for Homomorphism<'a, E> {
     }
 }
 
-#[allow(dead_code)] // Will be used in the new PVSS
 pub(crate) fn correlated_randomness<F, R>(rng: &mut R, radix: u64, num_chunks: u32) -> Vec<F>
 where
     F: ark_ff::PrimeField,
@@ -243,6 +243,10 @@ where
     r_vals
 }
 
+pub(crate) fn num_chunks_per_share<E: Pairing>(ell: u8) -> u32 {
+    E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32) // Maybe add `as usize` here?
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -252,7 +256,6 @@ mod tests {
         utils,
     };
     use ark_ec::{AffineRepr, CurveGroup};
-    use ark_ff::PrimeField;
     use rand::thread_rng;
     use std::ops::Sub;
 

@@ -7,7 +7,9 @@ use crate::{
     algebra::GroupGenerators,
     dlog,
     pvss::{
-        chunky::{chunked_elgamal, input_secret::InputSecret, keys},
+        chunky::{
+            chunked_elgamal, chunked_elgamal::num_chunks_per_share, input_secret::InputSecret, keys,
+        },
         traits,
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
@@ -21,7 +23,6 @@ use aptos_crypto::{
     utils, CryptoMaterialError, ValidCryptoMaterial,
 };
 use ark_ec::{pairing::Pairing, CurveGroup};
-use ark_ff::PrimeField;
 use ark_serialize::{SerializationError, Valid};
 use rand::{thread_rng, CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -30,10 +31,9 @@ use std::{collections::HashMap, ops::Mul};
 const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be used in setting up a group generator `G_2`, see below
 
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
-    let num_chunks_per_share = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32);
     utils::powers(
         E::ScalarField::from(1u64 << ell),
-        num_chunks_per_share as usize,
+        num_chunks_per_share::<E>(ell) as usize,
     )
 }
 
@@ -136,14 +136,13 @@ impl<E: Pairing> TryFrom<&[u8]> for PublicParameters<E> {
     }
 }
 
-#[allow(dead_code)] // Will be used in next PR
 #[allow(non_snake_case)]
 impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, rng: &mut R) -> Self {
-        let num_chunks_per_share = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32) as usize;
         let max_num_chunks_padded =
-            ((max_num_shares * num_chunks_per_share) + 1).next_power_of_two() - 1;
+            ((max_num_shares * num_chunks_per_share::<E>(ell) as usize) + 1).next_power_of_two()
+                - 1;
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
         let pp_elgamal = chunked_elgamal::PublicParameters::default();
