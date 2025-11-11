@@ -9,7 +9,7 @@ use crate::{
         build_openapi_service, convert_error, mint, BasicApi, CaptchaApi, FundApi,
         FundApiComponents,
     },
-    funder::{ApiConnectionConfig, FunderConfig, MintFunderConfig, TransactionSubmissionConfig, AssetConfig},
+    funder::{ApiConnectionConfig, AssetConfig, FunderConfig, MintAssetConfig, MintFunderConfig, TransactionSubmissionConfig},
     middleware::middleware_log,
 };
 use anyhow::{anyhow, Context, Result};
@@ -286,11 +286,10 @@ impl RunConfig {
                     35,      // wait_for_outstanding_txns_secs
                     false,   // wait_for_transactions
                 ),
-                assets: HashMap::from([("apt".to_string(), AssetConfig::new(
-                    None,
+                assets: HashMap::from([("apt".to_string(), MintAssetConfig::new(
+                    AssetConfig::new(None, key_file_path),
                     Some(aptos_test_root_address()),
                     do_not_delegate,
-                    key_file_path,
                 ))]),
                 amount_to_fund: 100_000_000_000,
             }),
@@ -369,13 +368,11 @@ pub struct RunSimple {
 
 impl RunSimple {
     pub async fn run_simple(&self) -> Result<()> {
-        // Create an AssetConfig from the CLI arguments
-        let asset_config = AssetConfig {
-            do_not_delegate: self.do_not_delegate,
-            key_file_path: self.key_file_path.clone(),
-            key: None,
-            mint_account_address: self.mint_account_address,
-        };
+        // Create an AssetConfig from the CLI arguments to get the key
+        let asset_config = AssetConfig::new(
+            None,
+            self.key_file_path.clone(),
+        );
 
         let key = asset_config
             .get_key()
@@ -386,7 +383,7 @@ impl RunSimple {
             self.listen_address.clone(),
             self.listen_port,
             FunderKeyEnum::Key(ConfigKey::new(key)),
-            asset_config.do_not_delegate,
+            self.do_not_delegate,
             Some(self.api_connection_config.chain_id),
         );
         run_config.run().await

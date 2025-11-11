@@ -34,6 +34,41 @@ use super::common::{
     TransactionSubmissionConfig, AssetConfig
 };
 
+/// Asset configuration specific to minting, extends the base AssetConfig with mint-specific fields.
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct MintAssetConfig {
+    #[serde(flatten)]
+    pub base: AssetConfig,
+
+    /// Address of the account to send transactions from. On localnet, for
+    /// example, this is a550c18. If not given, we use the account address
+    /// corresponding to the given private key.
+    pub mint_account_address: Option<AccountAddress>,
+
+    /// Just use the account given in funder args, don't make a new one and
+    /// delegate the mint capability to it.
+    pub do_not_delegate: bool,
+}
+
+impl MintAssetConfig {
+    pub fn new(
+        base: AssetConfig,
+        mint_account_address: Option<AccountAddress>,
+        do_not_delegate: bool,
+    ) -> Self {
+        Self {
+            base,
+            mint_account_address,
+            do_not_delegate,
+        }
+    }
+
+    /// Delegate to the base AssetConfig's get_key method.
+    pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
+        self.base.get_key()
+    }
+}
+
 /// explain these contain additional args for the mint funder.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MintFunderConfig {
@@ -43,7 +78,7 @@ pub struct MintFunderConfig {
     #[serde(flatten)]
     pub transaction_submission_config: TransactionSubmissionConfig,
 
-    pub assets: HashMap<String, AssetConfig>,
+    pub assets: HashMap<String, MintAssetConfig>,
 
     pub amount_to_fund: u64,
 }
@@ -101,7 +136,7 @@ pub struct MintFunder {
     faucet_account: RwLock<LocalAccount>,
 
     // Store asset configs for lookup
-    assets: HashMap<String, AssetConfig>,
+    assets: HashMap<String, MintAssetConfig>,
 
     // Amount to fund when no specific amount is requested
     amount_to_fund: u64,
@@ -118,7 +153,7 @@ impl MintFunder {
         chain_id: ChainId,
         txn_config: TransactionSubmissionConfig,
         initial_account: LocalAccount,
-        assets: HashMap<String, AssetConfig>,
+        assets: HashMap<String, MintAssetConfig>,
         amount_to_fund: u64,
     ) -> Self {
         let gas_unit_price_manager =
@@ -142,7 +177,7 @@ impl MintFunder {
     }
 
     /// Initialize delegated accounts for all assets during startup
-    async fn initialize_delegated_accounts(&self, assets: &HashMap<String, AssetConfig>) -> Result<()> {
+    async fn initialize_delegated_accounts(&self, assets: &HashMap<String, MintAssetConfig>) -> Result<()> {
         for (asset_name, asset_config) in assets {
             if !asset_config.do_not_delegate {
                 info!("Attempting to create delegated account for asset: {}", asset_name);
@@ -211,7 +246,7 @@ impl MintFunder {
     }
 
     /// Create a faucet account for the requested asset
-    async fn create_faucet_account_for_asset(&self, asset_config: &AssetConfig, asset_name: &str) -> Result<LocalAccount, AptosTapError> {
+    async fn create_faucet_account_for_asset(&self, asset_config: &MintAssetConfig, asset_name: &str) -> Result<LocalAccount, AptosTapError> {
         // Handle delegation if needed
         if !asset_config.do_not_delegate {
             // Get the cached delegated account (should already exist from initialization)

@@ -422,21 +422,12 @@ impl GasUnitPriceManager {
 
 #[derive(Clone, Debug, Deserialize, Serialize, Parser)]
 pub struct AssetConfig {
-    /// Address of the account to send transactions from. On testnet, for
-    /// example, this is a550c18. If not given, we use the account address
-    /// corresponding to the given private key.
-    pub mint_account_address: Option<AccountAddress>,
-
-    /// Just use the account given in funder args, don't make a new one and
-    /// delegate the mint capability to it.
-    pub do_not_delegate: bool,
-
     /// Path to the private key for creating test account and minting coins in
     /// the MintFunder case, or for transferring coins in the TransferFunder case.
     /// To keep Testnet simple, we used one private key for aptos root account
     /// To manually generate a keypair, use generate-key:
     /// `cargo run -p generate-keypair -- -o <output_file_path>`
-    #[serde(default = "AssetConfig::default_mint_key_file_path")]
+    #[serde(default = "AssetConfig::default_key_file_path")]
     #[clap(long, default_value = DEFAULT_KEY_FILE_PATH, value_parser)]
     pub key_file_path: PathBuf,
 
@@ -449,14 +440,12 @@ pub struct AssetConfig {
 impl AssetConfig {
     pub fn new(
         key: Option<ConfigKey<Ed25519PrivateKey>>,
-        mint_account_address: Option<AccountAddress>,
-        do_not_delegate: bool,
         key_file_path: PathBuf,
     ) -> Self {
-        Self { key, mint_account_address, do_not_delegate, key_file_path }
+        Self { key, key_file_path }
     }
 
-    fn default_mint_key_file_path() -> PathBuf {
+    fn default_key_file_path() -> PathBuf {
         PathBuf::from_str(DEFAULT_KEY_FILE_PATH).unwrap()
     }
 

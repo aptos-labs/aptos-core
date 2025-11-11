@@ -61,8 +61,6 @@ impl FaucetCliArgs {
         // Create an AssetConfig to get the key
         let asset_config = AssetConfig::new(
             None,
-            self.mint_account_address,
-            false, // do_not_delegate
             self.key_file_path.clone(),
         );
 
