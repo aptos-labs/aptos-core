@@ -335,6 +335,11 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
         let ctxts = &self.C[player.id];
 
         let ephemeral_keys: Vec<_> = self.R.iter().map(|Ri| Ri.mul(dk.dk)).collect();
+        assert_eq!(
+            ephemeral_keys.len(),
+            ctxts.len(),
+            "Number of ephemeral keys does not match the number of ciphertext chunks"
+        );
         let dealt_encrypted_secret_key_share_chunks: Vec<_> = ctxts
             .iter()
             .zip(ephemeral_keys.iter())
