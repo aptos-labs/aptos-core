@@ -562,6 +562,8 @@ impl MintFunder {
                 Ok(signed_transaction)
             }
             Err(e) => {
+                // Decrement sequence number on failure to maintain correct sequence tracking
+                faucet_account.decrement_sequence_number();
                 info!(
                     event = "transaction_failed",
                     sender_address = faucet_account.address(),
