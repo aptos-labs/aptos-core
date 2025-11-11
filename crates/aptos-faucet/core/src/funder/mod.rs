@@ -8,7 +8,7 @@ mod transfer;
 
 pub use self::{
     common::{ApiConnectionConfig, TransactionSubmissionConfig, AssetConfig},
-    mint::MintFunderConfig,
+    mint::{MintAssetConfig, MintFunderConfig},
 };
 use self::{fake::FakeFunderConfig, transfer::TransferFunderConfig};
 use crate::endpoints::AptosTapError;
