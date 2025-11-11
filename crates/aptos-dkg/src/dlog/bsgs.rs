@@ -11,6 +11,8 @@ use std::collections::HashMap;
 /// - `H`: target point
 /// - `baby_table`: precomputed HashMap from `C.to_compressed()` |---> exponent
 /// - `range_limit`: maximum size of the exponent we're trying to obtain. TODO: Change to u64?
+//
+// TODO:: ensure that G is also the element used to build the baby_table? So turn baby_table into a struct?
 #[allow(non_snake_case)]
 pub fn dlog<C: CurveGroup>(
     G: C,

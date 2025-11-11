@@ -246,55 +246,60 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{pvss::chunky::chunks, sigma_protocol::homomorphism::Trait as _};
+    use crate::{dlog, dlog::bsgs, pvss::chunky::chunks, sigma_protocol::homomorphism::Trait as _};
     use aptos_crypto::{
         arkworks::random::{sample_field_elements, unsafe_random_points},
         utils,
     };
-    use ark_ec::CurveGroup;
+    use ark_ec::{AffineRepr, CurveGroup};
     use ark_ff::PrimeField;
     use rand::thread_rng;
+    use std::ops::Sub;
 
-    #[allow(non_snake_case)]
-    fn test_reconstruct_ciphertexts<E: Pairing>() {
+    fn prepare_chunked_witness<E: Pairing>(
+        num_values: usize,
+        ell: u8,
+    ) -> (Vec<E::ScalarField>, Witness<E>, u8, u32) {
         let mut rng = thread_rng();
 
-        // 1. Generate two random values
-        let zs = sample_field_elements(2, &mut rng);
+        // 1. Generate random values
+        let zs = sample_field_elements(num_values, &mut rng);
 
-        // 2. Choose a radix and compute number_of_chunks
-        let radix_exponent = 16u8; // Making this smaller would probably make the test slower
-        let number_of_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(radix_exponent as u32);
+        // 2. Compute number of chunks
+        let number_of_chunks = E::ScalarField::MODULUS_BIT_SIZE.div_ceil(ell as u32);
 
         // 3. Generate correlated randomness
-        let rs: Vec<E::ScalarField> =
-            correlated_randomness(&mut rng, 1 << radix_exponent, number_of_chunks);
+        let rs: Vec<E::ScalarField> = correlated_randomness(&mut rng, 1 << ell, number_of_chunks);
 
-        // 4. Convert the two values into little-endian chunks
+        // 4. Convert values into little-endian chunks
         let chunked_values: Vec<Vec<E::ScalarField>> = zs
             .iter()
-            .map(|z| chunks::scalar_to_le_chunks(radix_exponent, z))
+            .map(|z| chunks::scalar_to_le_chunks(ell, z))
             .collect();
 
-        // 5. Build a witness for the homomorphism
+        // 5. Build witness
         let witness = Witness {
             plaintext_chunks: Scalar::<E>::vecvec_from_inner(chunked_values),
             plaintext_randomness: Scalar::vec_from_inner(rs),
         };
+
+        (zs, witness, ell, number_of_chunks)
+    }
+
+    #[allow(non_snake_case)]
+    fn test_reconstruct_ciphertexts<E: Pairing>() {
+        let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
         let pp = PublicParameters::default();
 
         let hom = Homomorphism {
             pp: &pp,
-            eks: &E::G1::normalize_batch(&unsafe_random_points(2, &mut rng)), // Randomly generate encryption keys, we won't use them
+            eks: &E::G1::normalize_batch(&unsafe_random_points(2, &mut thread_rng())),
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
-        let CodomainShape {
-            chunks: Cs,
-            randomness: _Rs,
-        } = hom.apply(&witness);
+        let CodomainShape { chunks: Cs, .. } = hom.apply(&witness);
 
         // 8. Reconstruct original values from the chunked ciphertexts
         for (i, &orig_val) in zs.iter().enumerate() {
@@ -314,8 +319,72 @@ mod tests {
         }
     }
 
+    #[allow(non_snake_case)]
+    fn test_decrypt_roundtrip<E: Pairing>() {
+        let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
+
+        // 6. Initialize the homomorphism
+        let pp = PublicParameters::default();
+        let dks: Vec<E::ScalarField> = sample_field_elements(2, &mut thread_rng());
+
+        let hom = Homomorphism {
+            pp: &pp,
+            eks: &E::G1::normalize_batch(&vec![pp.H * dks[0], pp.H * dks[1]]),
+        };
+
+        // 7. Apply homomorphism to obtain chunked ciphertexts
+        let CodomainShape {
+            chunks: Cs,
+            randomness: Rs,
+        } = hom.apply(&witness);
+
+        // 8. Build a baby-step giant-step table for computing discrete logs
+        let table = dlog::table::build::<E::G1>(pp.G.into(), 1u32 << (radix_exponent / 2));
+
+        // 9. Perform decryption of each ciphertext and reconstruct plaintexts
+        let mut decrypted_scalars = Vec::new();
+        for i in 0..2 {
+            // Compute C - d_k * R for all chunks
+            let exponentiated_chunks: Vec<E::G1> = Cs[i]
+                .iter()
+                .zip(Rs.iter())
+                .map(|(C_ij, &R_j)| C_ij.sub(R_j * dks[i]))
+                .collect();
+
+            // Recover plaintext chunk values
+            let chunks: Vec<_> = bsgs::dlog_vec(
+                pp.G.into_group(),
+                &exponentiated_chunks,
+                &table,
+                1 << radix_exponent,
+            )
+            .expect("dlog_vec failed")
+            .into_iter()
+            .map(|x| E::ScalarField::from(x))
+            .collect();
+
+            // Convert chunks back to scalar
+            let recovered = chunks::le_chunks_to_scalar(radix_exponent, &chunks);
+            decrypted_scalars.push(recovered);
+        }
+
+        // 10. Compare decrypted scalars to original plaintexts
+        for (i, (orig, recovered)) in zs.iter().zip(decrypted_scalars.iter()).enumerate() {
+            assert_eq!(
+                orig, recovered,
+                "Decrypted plaintext {} does not match original",
+                i
+            );
+        }
+    }
+
     #[test]
     fn test_reconstruct_ciphertexts_bn254() {
         test_reconstruct_ciphertexts::<ark_bn254::Bn254>();
+    }
+
+    #[test]
+    fn test_decrypt_roundtrip_bn254() {
+        test_decrypt_roundtrip::<ark_bn254::Bn254>();
     }
 }

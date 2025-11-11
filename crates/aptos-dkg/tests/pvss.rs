@@ -11,7 +11,7 @@ use aptos_crypto::{
     traits::SecretSharingConfig as _,
 };
 use aptos_dkg::pvss::{
-    das,
+    chunky, das,
     das::unweighted_protocol,
     insecure_field, test_utils,
     test_utils::{
@@ -44,6 +44,20 @@ fn test_pvss_all_unweighted() {
 
         // Insecure testing-only field-element PVSS
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
+    }
+
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
+    let tcs = test_utils::get_threshold_configs_for_testing();
+    for tc in tcs {
+        println!("\nTesting {tc} PVSS");
+
+        let seed = random_scalar(&mut rng);
+
+        // Chunky
+        pvss_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
+            &tc,
+            seed.to_bytes_le(),
+        );
     }
 }
 
