@@ -339,16 +339,15 @@ where
         let mut contains_delayed_fields = false;
         let mut layouts = Vec::with_capacity(tys.len());
         for ty in tys {
-            let (layout, ty_contains_delayed_fields) = self
-                .type_to_type_layout_impl::<ANNOTATED>(
-                    gas_meter,
-                    traversal_context,
-                    modules,
-                    ty,
-                    count,
-                    depth,
-                    check_option_type,
-                )?;
+            let (layout, ty_contains_delayed_fields) = self.type_to_type_layout_impl::<ANNOTATED>(
+                gas_meter,
+                traversal_context,
+                modules,
+                ty,
+                count,
+                depth,
+                check_option_type,
+            )?;
             contains_delayed_fields |= ty_contains_delayed_fields;
             layouts.push(layout);
         }

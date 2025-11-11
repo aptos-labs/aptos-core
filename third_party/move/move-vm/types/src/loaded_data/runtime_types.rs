@@ -1134,7 +1134,8 @@ impl TypeBuilder {
         let mut subst_ty_args = Vec::with_capacity(ty_params.len());
         for ty in ty_params {
             // Note that depth is 2 because we accounted for the parent struct type.
-            let ty_arg = self.subst_impl(ty, ty_args, &mut count, 2, check)
+            let ty_arg = self
+                .subst_impl(ty, ty_args, &mut count, 2, check)
                 .map_err(|e| {
                     e.append_message_with_separator(
                         '.',

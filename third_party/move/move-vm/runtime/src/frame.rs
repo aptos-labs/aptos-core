@@ -437,8 +437,10 @@ impl Frame {
         let fields = struct_ty.fields(variant)?;
         let mut generic_fields = Vec::with_capacity(fields.len());
         for (_, inst_ty) in fields {
-            generic_fields.push(self.ty_builder
-                .create_ty_with_subst(inst_ty, &instantiation_tys)?);
+            generic_fields.push(
+                self.ty_builder
+                    .create_ty_with_subst(inst_ty, &instantiation_tys)?,
+            );
         }
         Ok(generic_fields)
     }
