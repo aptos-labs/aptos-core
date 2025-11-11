@@ -158,9 +158,13 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
         let (C, R, sharing_proof) =
             encrypt_chunked_shares(&f_evals, eks, sc, pp, &mut fs_transcript, rng);
 
-        // Add constant term for the `\mathbb{G}_2` commitment below (we're doing this **after** the previous step because we're now mutating `f_evals` by enlarging it)
+        // Add constant term for the `\mathbb{G}_2` commitment following immediately below (we're doing this
+        // **after** the previous step because we're now mutating `f_evals` by enlarging it; this is a silly
+        // technicality however, it has no impact on computational complexity whatsoever as we could simply
+        // modify the `commit_to_scalars()` function to take another input)
         f_evals.push(f[0]); // or *s.get_secret_a()
-                            // Commit to polynomial evaluations + constant term
+
+        // Commit to polynomial evaluations + constant term
         let G_2 = pp.get_commitment_base();
         let V = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(V.len(), sc.n + 1);
@@ -241,7 +245,7 @@ impl<E: Pairing> traits::Transcript for Transcript<E> {
             println!("There is no sharing proof");
         }
 
-        let mut rng = rand::thread_rng(); // TODO: make rng a parameter of fn verify()?
+        let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
 
         // Do the SCRAPE LDT
         let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
@@ -447,12 +451,12 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
         &pp.pp_elgamal,
         &eks_inner,
     );
-    //   (2b) Compute its image, so the range proof commitment and chunked_elgamal encryptions
+    //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
     let statement = hom.apply(&witness);
     //   (2c) Prove knowledge of its inverse
     let PoK = hom
         .prove(&witness, &statement, fs_transcript, rng)
-        .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom`
+        .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
     // Destructure the "public statement" of the above sigma protocol
     let TupleCodomainShape(

@@ -209,7 +209,6 @@ impl<E: Pairing, T: Transcript> PVSS<E, T> for merlin::Transcript {
     }
 }
 
-#[allow(private_bounds)]
 pub(crate) fn initialize_pvss_transcript<E: Pairing, T: Transcript>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,

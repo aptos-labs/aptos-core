@@ -237,7 +237,7 @@ where
     H::Domain: Witness<E>,
     H::Codomain: Statement,
 {
-    /// No-op: circumvents the fact that proofs inherit the homomorphism’s lifetime. This method does nothing at runtime.
+    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method does nothing at runtime.
     #[allow(non_snake_case)]
     pub fn change_lifetime<H2>(self) -> Proof<E, H2>
     where
