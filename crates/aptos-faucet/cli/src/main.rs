@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use aptos_faucet_core::funder::{
-    ApiConnectionConfig, AssetConfig, FunderTrait, MintFunder, TransactionSubmissionConfig,
+    ApiConnectionConfig, AssetConfig, DEFAULT_ASSET_NAME, FunderTrait, MintFunder, TransactionSubmissionConfig,
 };
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
@@ -91,6 +91,7 @@ impl FaucetCliArgs {
         );
 
         // Build the MintFunder service.
+        // Note: CLI uses empty assets map, so default_asset won't be used in practice
         let mint_funder = MintFunder::new(
             self.api_connection_args.node_url.clone(),
             self.api_connection_args.api_key.clone(),
@@ -99,6 +100,7 @@ impl FaucetCliArgs {
             transaction_submission_config,
             faucet_account,
             std::collections::HashMap::new(), // Empty assets for CLI
+            DEFAULT_ASSET_NAME.to_string(), // Default asset (not used since assets map is empty)
             self.amount,
         );
 

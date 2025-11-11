@@ -31,7 +31,7 @@ static MINTER_SCRIPT: &[u8] = include_bytes!(
 
 use super::common::{
     submit_transaction, update_sequence_numbers, ApiConnectionConfig, GasUnitPriceManager,
-    TransactionSubmissionConfig, AssetConfig
+    TransactionSubmissionConfig, AssetConfig, DEFAULT_ASSET_NAME
 };
 
 /// Asset configuration specific to minting, extends the base AssetConfig with mint-specific fields.
@@ -80,6 +80,11 @@ pub struct MintFunderConfig {
 
     pub assets: HashMap<String, MintAssetConfig>,
 
+    /// Default asset to use when no asset is specified in requests.
+    /// If not provided, defaults to "apt".
+    #[serde(default)]
+    pub default_asset: Option<String>,
+
     pub amount_to_fund: u64,
 }
 
@@ -90,10 +95,15 @@ impl MintFunderConfig {
             return Err(anyhow::anyhow!("No assets configured"));
         }
 
-        // Initialize with ANY asset - we don't know which one will be used until the request comes in
-        let default_asset_config = self.assets.get("apt")
-            .or_else(|| self.assets.values().next())
-            .unwrap();
+        // Resolve default asset: use configured value or fall back to constant
+        let default_asset = self.default_asset.unwrap_or_else(|| DEFAULT_ASSET_NAME.to_string());
+
+        // Validate that the default asset exists in the assets map
+        let default_asset_config = self.assets.get(&default_asset)
+            .ok_or_else(|| anyhow::anyhow!(
+                "Default asset '{}' is not configured in assets map",
+                default_asset
+            ))?;
 
         let key = default_asset_config.get_key()?;
         let initial_account = LocalAccount::new(
@@ -112,6 +122,7 @@ impl MintFunderConfig {
             self.transaction_submission_config,
             initial_account,
             self.assets.clone(),
+            default_asset,
             self.amount_to_fund,
         );
 
@@ -138,6 +149,9 @@ pub struct MintFunder {
     // Store asset configs for lookup
     assets: HashMap<String, MintAssetConfig>,
 
+    // Default asset to use when no asset is specified in requests
+    default_asset: String,
+
     // Amount to fund when no specific amount is requested
     amount_to_fund: u64,
 
@@ -154,6 +168,7 @@ impl MintFunder {
         txn_config: TransactionSubmissionConfig,
         initial_account: LocalAccount,
         assets: HashMap<String, MintAssetConfig>,
+        default_asset: String,
         amount_to_fund: u64,
     ) -> Self {
         let gas_unit_price_manager =
@@ -171,6 +186,7 @@ impl MintFunder {
             outstanding_requests: RwLock::new(vec![]),
             faucet_account: RwLock::new(initial_account),
             assets,
+            default_asset,
             amount_to_fund,
             delegated_accounts_cache: Mutex::new(HashMap::new()),
         }
@@ -623,8 +639,8 @@ impl FunderTrait for MintFunder {
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
 
-        // 1. Resolve asset (default to "apt")
-        let asset_name = asset.as_deref().unwrap_or("apt");
+        // 1. Resolve asset (use configured default if not specified)
+        let asset_name = asset.as_deref().unwrap_or(&self.default_asset);
 
         // 2. Get asset config
         let asset_config = self.assets.get(asset_name)

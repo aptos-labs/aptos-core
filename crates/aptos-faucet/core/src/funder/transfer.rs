@@ -4,6 +4,7 @@
 use super::{
     common::{
         submit_transaction, ApiConnectionConfig, GasUnitPriceManager, TransactionSubmissionConfig, AssetConfig,
+        DEFAULT_ASSET_NAME,
     },
     FunderHealthMessage, FunderTrait,
 };
@@ -54,8 +55,8 @@ pub struct TransferFunderConfig {
 impl TransferFunderConfig {
     pub async fn build_funder(&self) -> Result<TransferFunder> {
         // Read in private key.
-        let apt_asset_config = self.assets.get("apt")
-            .ok_or_else(|| anyhow::anyhow!("No 'apt' asset configuration found"))?;
+        let apt_asset_config = self.assets.get(DEFAULT_ASSET_NAME)
+            .ok_or_else(|| anyhow::anyhow!("No '{}' asset configuration found", DEFAULT_ASSET_NAME))?;
         let key = apt_asset_config.get_key()?;
 
         // Build account address from private key.
