@@ -76,6 +76,7 @@ module aptos_experimental::order_placement {
         MarketClearinghouseCallbacks,
         Market, CallbackResult, new_callback_result_not_available, next_order_id
     };
+    use aptos_framework::transaction_context;
 
     // Error codes
     const EINVALID_ORDER: u64 = 1;
@@ -642,7 +643,7 @@ module aptos_experimental::order_placement {
             );
             return (option::none(), new_callback_result_not_available());
         };
-        let fill_id = market.next_fill_id();
+        let fill_id = transaction_context::monotonically_increasing_counter();
         let settle_result = callbacks.settle_trade(
             market,
             new_clearinghouse_order_info(
