@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 //! A profiler that emits USDT probes.
 
 use move_vm_types::instr::Instruction;
