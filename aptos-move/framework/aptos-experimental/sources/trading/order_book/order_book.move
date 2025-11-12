@@ -7,6 +7,7 @@ module aptos_experimental::order_book {
 
     use std::option::Option;
     use std::string::String;
+    use std::layout_reference::{LayoutReference, Self};
     use aptos_experimental::bulk_order_book_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
@@ -23,7 +24,7 @@ module aptos_experimental::order_book {
     enum OrderBook<M: store + copy + drop> has store {
         UnifiedV1 {
             single_order_book: SingleOrderBook<M>,
-            bulk_order_book: BulkOrderBook<M>,
+            bulk_order_book: LayoutReference<BulkOrderBook<M>>,
             price_time_idx: PriceTimeIndex,
         }
     }
@@ -31,7 +32,7 @@ module aptos_experimental::order_book {
     public fun new_order_book<M: store + copy + drop>(): OrderBook<M> {
         OrderBook::UnifiedV1 {
             single_order_book: new_single_order_book(),
-            bulk_order_book: new_bulk_order_book(),
+            bulk_order_book: layout_reference::new_external_table(new_bulk_order_book()),
             price_time_idx: new_price_time_idx(),
         }
     }
@@ -174,7 +175,7 @@ module aptos_experimental::order_book {
         order_creator: address,
         is_bid: bool
     ): u64 {
-        self.bulk_order_book.get_remaining_size(order_creator, is_bid)
+        self.bulk_order_book.borrow().get_remaining_size(order_creator, is_bid)
     }
 
     /// Checks if the order is a taker order i.e., matched immediately with the active order book.
@@ -201,7 +202,7 @@ module aptos_experimental::order_book {
         if (book_type == single_order_type()) {
             self.single_order_book.get_single_match_for_taker(result)
         } else {
-            self.bulk_order_book.get_single_match_for_taker(&mut self.price_time_idx, result, is_bid)
+            self.bulk_order_book.borrow_mut().get_single_match_for_taker(&mut self.price_time_idx, result, is_bid)
         }
     }
 
@@ -217,7 +218,7 @@ module aptos_experimental::order_book {
                 &mut self.price_time_idx, reinsert_order, original_order
             )
         } else {
-            self.bulk_order_book.reinsert_order(
+            self.bulk_order_book.borrow_mut().reinsert_order(
                 &mut self.price_time_idx, reinsert_order, original_order
             );
         }
@@ -227,7 +228,7 @@ module aptos_experimental::order_book {
     public(friend) fun place_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_req: BulkOrderRequest<M>
     ) : BulkOrderPlaceResponse<M> {
-        self.bulk_order_book.place_bulk_order(
+        self.bulk_order_book.borrow_mut().place_bulk_order(
             &mut self.price_time_idx,
             order_req
         )
@@ -236,13 +237,13 @@ module aptos_experimental::order_book {
     public(friend) fun get_bulk_order<M: store + copy + drop>(
         self: &OrderBook<M>, order_creator: address
     ): BulkOrder<M> {
-        self.bulk_order_book.get_bulk_order(order_creator)
+        self.bulk_order_book.borrow().get_bulk_order(order_creator)
     }
 
     public(friend) fun cancel_bulk_order<M: store + copy + drop>(
         self: &mut OrderBook<M>, order_creator: address
     ): BulkOrder<M> {
-        self.bulk_order_book.cancel_bulk_order(&mut self.price_time_idx, order_creator)
+        self.bulk_order_book.borrow_mut().cancel_bulk_order(&mut self.price_time_idx, order_creator)
     }
 
     // ============================= test_only APIs ====================================
@@ -255,7 +256,7 @@ module aptos_experimental::order_book {
             bulk_order_book,
             price_time_idx,
         } = self;
-        bulk_order_book.destroy_bulk_order_book();
+        bulk_order_book.destroy().destroy_bulk_order_book();
         retail_order_book.destroy_single_order_book();
         price_time_idx.destroy_price_time_idx();
     }
