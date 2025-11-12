@@ -49,6 +49,14 @@ impl Default for NativeRuntimeRefChecksModel {
         let single_return_derived_from_first_ref_param = vec![0];
         let models = BTreeMap::from([
             (
+                ("storage_slot", "borrow_storage_slot_resource"),
+                single_return_derived_from_first_ref_param.clone(),
+            ),
+            (
+                ("storage_slot", "borrow_storage_slot_resource_mut"),
+                single_return_derived_from_first_ref_param.clone(),
+            ),
+            (
                 ("signer", "borrow_address"),
                 single_return_derived_from_first_ref_param.clone(),
             ),
