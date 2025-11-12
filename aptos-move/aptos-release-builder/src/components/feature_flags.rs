@@ -164,6 +164,7 @@ pub enum FeatureFlag {
     MultisigScript,
     TransactionLimits,
     VersionedTransactionValidation,
+    StorageSlotNatives,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -429,6 +430,7 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::VersionedTransactionValidation => {
                 AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION
             },
+            FeatureFlag::StorageSlotNatives => AptosFeatureFlag::STORAGE_SLOT_NATIVES,
         }
     }
 }
@@ -621,6 +623,7 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::VERSIONED_TRANSACTION_VALIDATION => {
                 FeatureFlag::VersionedTransactionValidation
             },
+            AptosFeatureFlag::STORAGE_SLOT_NATIVES => FeatureFlag::StorageSlotNatives,
         }
     }
 }

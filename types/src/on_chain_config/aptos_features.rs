@@ -175,6 +175,8 @@ pub enum FeatureFlag {
     TRANSACTION_LIMITS = 111,
     /// Whether versioned enum-based transaction validation is enabled.
     VERSIONED_TRANSACTION_VALIDATION = 112,
+    /// Whether storage_slot move natives are enabled.
+    STORAGE_SLOT_NATIVES = 113,
 }
 
 impl FeatureFlag {
@@ -287,6 +289,7 @@ impl FeatureFlag {
             Self::MULTISIG_SCRIPT,
             Self::TRANSACTION_LIMITS,
             Self::VERSIONED_TRANSACTION_VALIDATION,
+            Self::STORAGE_SLOT_NATIVES,
         ]
     }
 }

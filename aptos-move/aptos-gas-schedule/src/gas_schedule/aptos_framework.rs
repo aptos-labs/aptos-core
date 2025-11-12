@@ -362,5 +362,11 @@ crate::gas_schedule::macros::define_gas_parameters!(
 
         // Reflection
         [reflect_resolve_base: InternalGas, { RELEASE_V1_39.. => "reflect.resolve_base" }, 40960],
+
+        // Storage slot
+        [storage_slot_borrow_base: InternalGas, "storage_slot.borrow.base", 9190],
+        [storage_slot_borrow_per_byte_loaded: InternalGasPerByte, "storage_slot.borrow.per_byte_loaded", 1830],
+        [storage_slot_borrow_mut_base: InternalGas, "storage_slot.borrow_mut.base", 9190],
+        [storage_slot_borrow_mut_per_byte_loaded: InternalGasPerByte, "storage_slot.borrow_mut.per_byte_loaded", 1830],
     ]
 );
