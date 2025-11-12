@@ -23,7 +23,9 @@ use async_trait::async_trait;
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::sync::RwLock;
+use rand::rngs::OsRng;
 
 static MINTER_SCRIPT: &[u8] = include_bytes!(
     "../../../../../aptos-move/move-examples/scripts/minter/build/Minter/bytecode_scripts/main.mv"
@@ -33,6 +35,14 @@ use super::common::{
     submit_transaction, update_sequence_numbers, ApiConnectionConfig, AssetConfig,
     GasUnitPriceManager, TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
 };
+
+/// Helper function to clone an Ed25519PrivateKey by serializing and deserializing it.
+/// This is necessary because Ed25519PrivateKey doesn't implement Clone.
+fn clone_private_key(key: &Ed25519PrivateKey) -> Ed25519PrivateKey {
+    let serialized: &[u8] = &(key.to_bytes());
+    Ed25519PrivateKey::try_from(serialized)
+        .expect("Failed to deserialize private key - this should never happen")
+}
 
 /// Asset configuration specific to minting, extends the base AssetConfig with mint-specific fields.
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -127,16 +137,22 @@ impl MintFunderConfig {
             self.transaction_submission_config,
             initial_account,
             self.assets.clone(),
-            default_asset,
+            default_asset.clone(),
             self.amount_to_fund,
         );
 
         // If default asset needs delegation, do it once at startup
         if !default_asset_config.do_not_delegate {
-            minter
-                .use_delegated_account()
+            let delegated_account = minter
+                .use_delegated_account_for_asset(&default_asset)
                 .await
                 .context("Failed to make MintFunder use delegated account")?;
+            // Set it as the current faucet account
+            // Note: delegated_account is already a LocalAccount (not Arc) from use_delegated_account_for_asset
+            {
+                let mut faucet_account = minter.faucet_account.write().await;
+                *faucet_account = delegated_account;
+            }
         }
 
         Ok(minter)
@@ -165,6 +181,10 @@ pub struct MintFunder {
     assets: HashMap<String, MintAssetConfig>,
     default_asset: String,
     amount_to_fund: u64,
+
+    // Cache of delegated accounts per asset to avoid recreating them
+    // Using Arc to allow sharing the non-cloneable LocalAccount
+    delegated_accounts: RwLock<HashMap<String, Arc<LocalAccount>>>,
 }
 
 impl MintFunder {
@@ -196,6 +216,7 @@ impl MintFunder {
             assets,
             default_asset,
             amount_to_fund,
+            delegated_accounts: RwLock::new(HashMap::new()),
         }
     }
 
@@ -219,15 +240,66 @@ impl MintFunder {
             .with_gas_unit_price(self.get_gas_unit_price().await?))
     }
 
-    /// Performs the delegated account creation and delegation. The (Aptos) coin::mint function that
-    /// used in the MintFunder expects the caller to have the MintCapability.
-    /// So we need to create a new account and delegate the MintCapability to it.
+    /// Legacy method for backward compatibility - delegates for the current asset
     pub async fn use_delegated_account(&self) -> Result<()> {
+        // This is only used at startup for the default asset
+        // We'll handle it differently in build_funder
+        let delegated_account = self.use_delegated_account_for_asset(&self.default_asset).await?;
+        let mut faucet_account = self.faucet_account.write().await;
+        *faucet_account = delegated_account;
+        Ok(())
+    }
+
+    /// Performs the delegated account creation and delegation for a specific asset.
+    /// Returns the delegated account and caches it.
+    ///
+    /// This method uses a double-check locking pattern to prevent race conditions:
+    /// 1. First check the cache with a read lock (fast path for already-delegated assets)
+    /// 2. If not found, acquire a write lock and check again (prevents duplicate creation)
+    /// 3. If still not found, create and delegate a new account, then cache it
+    ///
+    /// The write lock is held during account creation to ensure only one thread creates
+    /// a delegated account per asset, even if multiple requests arrive concurrently.
+    pub async fn use_delegated_account_for_asset(&self, asset_name: &str) -> Result<LocalAccount> {
+        // Fast path: Check cache with read lock first
+        // This allows concurrent reads for already-delegated assets
+        {
+            let delegated_accounts = self.delegated_accounts.read().await;
+            if let Some(cached_account) = delegated_accounts.get(asset_name) {
+                // Reconstruct LocalAccount from Arc (since LocalAccount doesn't implement Clone)
+                // Clone the private key by serializing/deserializing
+                let private_key = clone_private_key(cached_account.private_key());
+                return Ok(LocalAccount::new(
+                    cached_account.address(),
+                    private_key,
+                    cached_account.sequence_number(),
+                ));
+            }
+        }
+
+        // Slow path: Acquire write lock before creating account
+        // This ensures only one thread creates the delegated account for this asset
+        let mut delegated_accounts = self.delegated_accounts.write().await;
+
+        // Double-check: Another thread may have created it while we waited for the write lock
+        if let Some(cached_account) = delegated_accounts.get(asset_name) {
+            // Reconstruct LocalAccount from Arc
+            // Clone the private key by serializing/deserializing
+            let private_key = clone_private_key(cached_account.private_key());
+            return Ok(LocalAccount::new(
+                cached_account.address(),
+                private_key,
+                cached_account.sequence_number(),
+            ));
+        }
+
+        // We're the first to create a delegated account for this asset
+        // The write lock is held during all async operations to prevent duplicates
         // Build a client.
         let client = self.get_api_client();
 
         // Create a new random account, then delegate to it
-        let delegated_account = LocalAccount::generate(&mut rand::rngs::OsRng);
+        let delegated_account = LocalAccount::generate(&mut OsRng::default());
 
         // Create the account, wait for the response.
         self.process(
@@ -248,20 +320,31 @@ impl MintFunder {
         // transaction with a gas unit price that will be accepted.
         let transaction_factory = self.get_transaction_factory().await?;
 
-        // Delegate minting to the account
-        {
-            let faucet_account = self.faucet_account.write().await;
-            client
-                .submit_and_wait(&faucet_account.sign_with_transaction_builder(
-                    transaction_factory.payload(aptos_stdlib::aptos_coin_delegate_mint_capability(
-                        delegated_account.address(),
-                    )),
-                ))
-                .await
-                .context("Failed to delegate minting to the new account")?;
-        }
+        // Get the current faucet account (which should be the mint account for this asset)
+        // This was set by the caller in the fund() method before calling this function
+        let mint_account = {
+            let faucet_account = self.faucet_account.read().await;
+            // Reconstruct from the account to avoid cloning issues
+            // Clone the private key by serializing/deserializing
+            let private_key = clone_private_key(faucet_account.private_key());
+            LocalAccount::new(
+                faucet_account.address(),
+                private_key,
+                faucet_account.sequence_number(),
+            )
+        };
 
-        // Claim the capability!
+        // Delegate minting capability from the mint account to the new delegated account
+        client
+            .submit_and_wait(&mint_account.sign_with_transaction_builder(
+                transaction_factory.payload(aptos_stdlib::aptos_coin_delegate_mint_capability(
+                    delegated_account.address(),
+                )),
+            ))
+            .await
+            .context("Failed to delegate minting to the new account")?;
+
+        // Claim the mint capability on the delegated account
         client
             .submit_and_wait(&delegated_account.sign_with_transaction_builder(
                 transaction_factory.payload(aptos_stdlib::aptos_coin_claim_mint_capability()),
@@ -270,14 +353,23 @@ impl MintFunder {
             .context("Failed to claim the minting capability")?;
 
         info!(
-            "Successfully configured MintFunder to use delegated account: {}",
+            "Successfully configured MintFunder to use delegated account for asset '{}': {}",
+            asset_name,
             delegated_account.address()
         );
 
-        let mut faucet_account = self.faucet_account.write().await;
-        *faucet_account = delegated_account;
+        // Cache the delegated account so future requests for this asset can reuse it
+        let account_arc = Arc::new(delegated_account);
+        delegated_accounts.insert(asset_name.to_string(), Arc::clone(&account_arc));
 
-        Ok(())
+        // Reconstruct and return LocalAccount (not Arc)
+        // Clone the private key by serializing/deserializing
+        let private_key = clone_private_key(account_arc.private_key());
+        Ok(LocalAccount::new(
+            account_arc.address(),
+            private_key,
+            account_arc.sequence_number(),
+        ))
     }
 
     /// Within a single request we should just call this once and use this client
@@ -378,31 +470,48 @@ impl FunderTrait for MintFunder {
             )
         })?;
 
-        // Only set faucet_account if it's NOT the default asset
-        // (default asset is already set and delegated at startup)
-        if asset_name != self.default_asset {
-            let key = asset_config.get_key().map_err(|e| {
-                AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest)
-            })?;
-            let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
-                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
-            });
+        // Switch to the mint account for this asset
+        // Each asset has its own mint account (with its own private key)
+        // We need to switch faucet_account to the correct mint account before processing
+        let key = asset_config.get_key().map_err(|e| {
+            AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest)
+        })?;
+        let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
+            AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
+        });
+        let mint_account = LocalAccount::new(account_address, key, 0);
 
-            let mint_account = LocalAccount::new(account_address, key, 0);
+        // Set the mint account as the current faucet account
+        // This is a per-request operation - faucet_account is shared state that gets
+        // switched for each request based on the requested asset
+        {
+            let mut faucet_account = self.faucet_account.write().await;
+            *faucet_account = mint_account;
+        }
+
+        // Get or create the delegated account for this asset (if delegation is needed)
+        // The delegated account is the one that actually performs the minting.
+        // It's created once per asset and cached for reuse.
+        //
+        // Note: use_delegated_account_for_asset reads from faucet_account, so we must
+        // set the mint account first (which we did above).
+        if !asset_config.do_not_delegate {
+            let delegated_account = self.use_delegated_account_for_asset(asset_name).await
+                .map_err(|e| {
+                    AptosTapError::new_with_error_code(e, AptosTapErrorCode::InternalError)
+                })?;
+            // Switch to the delegated account - this is the account that will sign the mint transaction
+            // Note: delegated_account is already a LocalAccount (not Arc) from use_delegated_account_for_asset
             {
                 let mut faucet_account = self.faucet_account.write().await;
-                *faucet_account = mint_account;
+                *faucet_account = delegated_account;
             }
         }
 
-        // Only delegate if it's NOT the default asset
-        // (default asset is already delegated at startup)
-        if !asset_config.do_not_delegate && asset_name != self.default_asset {
-            self.use_delegated_account().await.map_err(|e| {
-                AptosTapError::new_with_error_code(e, AptosTapErrorCode::InternalError)
-            })?;
-        }
-
+        // Process the minting request using the correct account
+        // At this point, faucet_account points to either:
+        // - The delegated account (if do_not_delegate is false)
+        // - The mint account directly (if do_not_delegate is true)
         let client = self.get_api_client();
         let amount = self.get_amount(amount, did_bypass_checkers);
         self.process(
