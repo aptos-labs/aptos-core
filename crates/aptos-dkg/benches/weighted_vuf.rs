@@ -6,13 +6,14 @@
 #![allow(clippy::extra_unused_type_parameters)]
 #![allow(clippy::needless_borrow)]
 
+use aptos_crypto::traits::SecretSharingConfig as _;
 use aptos_dkg::{
     pvss::{
         das,
         dealt_secret_key::g1::DealtSecretKey,
         insecure_field,
         test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux},
-        traits::{SecretSharingConfig, Transcript},
+        traits::Transcript,
         GenericWeighting, Player, WeightedConfig,
     },
     utils::random::{random_g1_points, random_g2_points},

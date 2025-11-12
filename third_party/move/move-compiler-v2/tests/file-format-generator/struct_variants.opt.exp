@@ -76,18 +76,8 @@ l1: ld_u64 14566554180833181697
 
 // Function definition at index 1
 #[persistent] public fun is_inner1(l0: &Inner): bool
-    copy_loc l0
-    test_variant Inner, Inner1
-    br_false l0
     move_loc l0
-    pop
-    // @5
-    ld_true
-    ret
-l0: move_loc l0
-    pop
-    ld_false
-    // @10
+    test_variant Inner, Inner1
     ret
 
 // Function definition at index 2

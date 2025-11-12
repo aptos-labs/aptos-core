@@ -3,11 +3,9 @@
 
 use crate::{
     algebra::lagrange::lagrange_coefficients,
-    pvss::{
-        traits::{Reconstructable, SecretSharingConfig, ThresholdConfig},
-        Player, ThresholdConfigBlstrs,
-    },
+    pvss::{traits::Reconstructable, Player, ThresholdConfigBlstrs},
 };
+use aptos_crypto::traits::{SecretSharingConfig as _, ThresholdConfig as _};
 use blstrs::Scalar;
 use ff::Field;
 use more_asserts::{assert_ge, assert_le};

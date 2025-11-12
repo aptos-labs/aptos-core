@@ -4,13 +4,13 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::blstrs::random_scalar;
+use aptos_crypto::{blstrs::random_scalar, traits::SecretSharingConfig as _};
 use aptos_dkg::{
     pvss,
     pvss::{
         test_utils,
         test_utils::{DealingArgs, NoAux},
-        traits::{SecretSharingConfig, Transcript},
+        traits::Transcript,
         Player, WeightedConfig,
     },
     weighted_vuf::{pinkas::PinkasWUF, traits::WeightedVUF},

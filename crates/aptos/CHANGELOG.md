@@ -3,7 +3,10 @@
 All notable changes to the Aptos CLI will be captured in this file. This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) and the format set out by [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 # Unreleased
+
+## [7.11.0]
 - When using `--bind-to 0.0.0.0`, clients created by the localnet will try to connect at 127.0.0.1, not 0.0.0.0.
+- Add `--docker-network` flag to allow specifying existing Docker network.
 
 ## [7.10.2]
 - Fix backward compatibility issue of enum-based option module

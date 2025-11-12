@@ -48,11 +48,11 @@
 //! does not hold.
 
 use crate::pvss::{
-    traits::{Convert, HasEncryptionPublicParams, Reconstructable, SecretSharingConfig},
+    traits::{Convert, HasEncryptionPublicParams, Reconstructable},
     Player,
 };
 use anyhow::bail;
-use aptos_crypto::{SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
+use aptos_crypto::{SecretSharingConfig, SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
@@ -72,6 +72,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Eq;
 
     type PublicParameters: HasEncryptionPublicParams
+        + WithMaxNumShares
         + Default
         + ValidCryptoMaterial
         + DeserializeOwned
@@ -199,7 +200,11 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
 
     /// Generates a random looking transcript (but not a valid one).
     /// Useful for testing and benchmarking.
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng;
 }
@@ -215,4 +220,9 @@ pub trait MalleableTranscript: Transcript {
         aux: &A,
         dealer: &Player,
     );
+}
+
+/// This is needed instead of Default because `max_n` influences the public parameters of the DeKARTv2 range proof, and hence the public parameters of `chunky`
+pub trait WithMaxNumShares {
+    fn with_max_num_shares(n: usize) -> Self;
 }

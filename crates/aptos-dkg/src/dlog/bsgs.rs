@@ -9,22 +9,30 @@ use std::collections::HashMap;
 /// # Arguments
 /// - `G`: base of the exponentiation
 /// - `H`: target point
-/// - `baby_table`: precomputed HashMap from `C::Affine.to_compressed()` |---> exponent
-/// - `m`: size of the baby-step table
+/// - `baby_table`: precomputed HashMap from `C.to_compressed()` |---> exponent
+/// - `range_limit`: maximum size of the exponent we're trying to obtain. TODO: Change to u64?
 #[allow(non_snake_case)]
-pub fn baby_step_giant_step<C: CurveGroup, const N: usize>(
+pub fn dlog<C: CurveGroup>(
     G: C,
     H: C,
-    baby_table: &HashMap<[u8; N], u64>,
-    m: u64,
-) -> Option<u64> {
+    baby_table: &HashMap<Vec<u8>, u32>,
+    range_limit: u32,
+) -> Option<u32> {
+    let byte_size = G.compressed_size();
+
+    let m = baby_table
+        .len()
+        .try_into()
+        .expect("Table seems rather large");
+    let n = range_limit.div_ceil(m);
+
     let G_neg_m = G * -C::ScalarField::from(m);
 
     let mut gamma = H;
 
-    for i in 0..m {
-        let mut buf = [0u8; N];
-        gamma.serialize_compressed(&mut &mut buf[..]).unwrap();
+    for i in 0..n {
+        let mut buf = vec![0u8; byte_size];
+        gamma.serialize_compressed(&mut buf[..]).unwrap();
 
         if let Some(&j) = baby_table.get(&buf) {
             return Some(i * m + j);
@@ -36,47 +44,47 @@ pub fn baby_step_giant_step<C: CurveGroup, const N: usize>(
     None
 }
 
-/// Build a baby-step table of size `m`
-///
-/// Returns a HashMap: `C::Affine.to_compressed() |---> exponent`
 #[allow(non_snake_case)]
-pub fn build_baby_table<C: CurveGroup, const N: usize>(G: C, m: u64) -> HashMap<[u8; N], u64> {
-    let mut table = HashMap::with_capacity(m as usize);
-    let mut current = C::zero();
+pub fn dlog_vec<C: CurveGroup>(
+    G: C,
+    H_vec: &[C],
+    baby_table: &HashMap<Vec<u8>, u32>,
+    range_limit: u32,
+) -> Option<Vec<u32>> {
+    let mut result = Vec::with_capacity(H_vec.len());
 
-    for j in 0..m {
-        let mut buf = [0u8; N];
-        current.serialize_compressed(&mut &mut buf[..]).unwrap();
-        table.insert(buf, j);
-        current += G;
+    for H in H_vec {
+        if let Some(x) = dlog(G, *H, baby_table, range_limit) {
+            result.push(x);
+        } else {
+            return None; // fail early if any element cannot be solved
+        }
     }
 
-    table
+    Some(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::dlog;
     use ark_bn254::G1Projective;
     use ark_ec::PrimeGroup;
 
-    const COMPRESSED_SIZE: usize = 48;
-
     #[allow(non_snake_case)]
     #[test]
-    fn test_bsgs_bn254_random() {
+    fn test_bsgs_bn254_exhaustive() {
         let G = G1Projective::generator();
-        let m = 1 << 4;
+        let range_limit = 1 << 8;
 
-        let baby_table = build_baby_table::<G1Projective, COMPRESSED_SIZE>(G, m);
+        let baby_table = dlog::table::build::<G1Projective>(G, 1 << 4);
 
-        // Test all values of x from 0 to m^2 - 1
-        for x in 0..m * m {
-            let H = G * ark_bn254::Fr::from(x as u32);
+        // Test **all** values of x from 0 to `range_limit - 1`
+        for x in 0..range_limit {
+            let H = G * ark_bn254::Fr::from(x);
 
-            let recovered =
-                baby_step_giant_step::<G1Projective, COMPRESSED_SIZE>(G, H, &baby_table, m)
-                    .expect("Failed to recover discrete log");
+            let recovered = dlog::<G1Projective>(G, H, &baby_table, range_limit)
+                .expect("Failed to recover discrete log");
 
             assert_eq!(recovered, x, "Discrete log mismatch for x = {}", x);
         }

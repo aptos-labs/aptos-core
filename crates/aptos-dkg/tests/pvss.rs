@@ -8,7 +8,7 @@
 //! PVSS scheme-independent testing
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
-    hash::CryptoHash,
+    traits::SecretSharingConfig as _,
 };
 use aptos_dkg::pvss::{
     das,
@@ -18,11 +18,13 @@ use aptos_dkg::pvss::{
         get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    traits::{transcript::Transcript, SecretSharingConfig},
+    traits::transcript::{Transcript, WithMaxNumShares},
     GenericWeighting, ThresholdConfigBlstrs,
 };
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
+
+// TODO: Add a test for public parameters serialization roundtrip?
 
 #[test]
 fn test_pvss_all_unweighted() {
@@ -110,7 +112,7 @@ fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingCo
 ///  1. Deals a secret, creating a transcript
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
-fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
+fn pvss_deal_verify_and_reconstruct<T: Transcript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -148,7 +150,11 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
 fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
     let mut rng = thread_rng();
 
-    let trx = T::generate(&sc, &mut rng);
+    let trx = T::generate(
+        &sc,
+        &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
+        &mut rng,
+    );
     let actual_size = trx.to_bytes().len();
 
     actual_size

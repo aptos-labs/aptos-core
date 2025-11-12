@@ -1,17 +1,17 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    pvss::{
-        traits::{
-            transcript::Transcript, Convert, HasEncryptionPublicParams, Reconstructable,
-            SecretSharingConfig,
-        },
-        Player, ThresholdConfigBlstrs, WeightedConfig,
+use crate::pvss::{
+    traits::{
+        transcript::{Transcript, WithMaxNumShares},
+        Convert, HasEncryptionPublicParams, Reconstructable,
     },
-    traits::ThresholdConfig,
+    Player, ThresholdConfigBlstrs, WeightedConfig,
 };
-use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
+use aptos_crypto::{
+    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
+    SigningKey, Uniform,
+};
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
 use serde::Serialize;
@@ -54,7 +54,7 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
         sc
     );
 
-    let pp = T::PublicParameters::default();
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_players());
 
     let ssks = (0..sc.get_total_num_players())
         .map(|_| T::SigningSecretKey::generate(&mut rng))
@@ -128,7 +128,7 @@ macro_rules! vec_to_str {
 #[allow(unused)]
 pub(crate) use vec_to_str;
 
-pub fn get_threshold_configs_for_testing<T: ThresholdConfig>() -> Vec<T> {
+pub fn get_threshold_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<T> {
     let mut tcs = vec![];
 
     for t in 1..8 {
@@ -228,7 +228,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     wcs
 }
 
-pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript + CryptoHash>(
+pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript>(
     sc: &<T as Transcript>::SecretSharingConfig,
     rng: &mut R,
     dks: &Vec<<T as Transcript>::DecryptPrivKey>,

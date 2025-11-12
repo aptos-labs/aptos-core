@@ -3,35 +3,35 @@
 
 //! Contains a version of shamir secret sharing and `ThresholdConfig` for arkworks
 
-use crate::arkworks::{
-    differentiate::DifferentiableFn,
-    serialization::{ark_de, ark_se},
-    vanishing_poly,
+use crate::{
+    arkworks::{differentiate::DifferentiableFn, vanishing_poly},
+    player::Player,
+    traits,
+    traits::SecretSharingConfig,
 };
 use anyhow::{anyhow, Result};
+use ark_ec::CurveGroup;
 use ark_ff::{batch_inversion, FftField, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
+use rand::{seq::IteratorRandom, Rng};
+use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// Represents a single share in Shamir's Secret Sharing scheme. Each
-/// `ShamirShare` consists of an `(x, y)` point on the secret sharing polynomial.
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
-pub struct ShamirShare<F: PrimeField> {
-    /// The interpolation point of the secret sharing polynomial.
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub x: F,
-    /// The evaluation of the polynomial at `x`.
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub y: F,
-}
+/// A pair corresponding to a player (i.e., an index into the roots of unity) and a field element
+/// evaluation
+#[allow(type_alias_bounds)]
+pub type ShamirShare<F: PrimeField> = (Player, F);
+/// A pair corresponding to a player (i.e., an index into the roots of unity) and a group element
+/// whose exponent is an evaluation
+#[allow(type_alias_bounds)]
+pub type ShamirGroupShare<G: CurveGroup> = (Player, G::Affine);
 
-/// Configuration for a threshold cryptography scheme. We're restricting F to `Primefield`
-/// because Shamir shares are usually defined over such a field. For reconstructing to a group (TODO)
-/// we'll use a generic parameter `G: CurveGroup<ScalarField = F>`
+/// Configuration for a threshold cryptography scheme. Usually one restricts `F` to `Primefield`
+/// but any field is theoretically possible.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
-pub struct ThresholdConfig<F: PrimeField> {
+pub struct ShamirThresholdConfig<F: FftField> {
     /// Total number of participants (shares)
     pub n: usize,
     /// Threshold number of shares required to reconstruct the secret. Note that in
@@ -43,13 +43,57 @@ pub struct ThresholdConfig<F: PrimeField> {
     pub domain: Radix2EvaluationDomain<F>,
 }
 
-impl<F: PrimeField> fmt::Display for ThresholdConfig<F> {
+impl<F: PrimeField> traits::SecretSharingConfig for ShamirThresholdConfig<F> {
+    /// For testing only.
+    fn get_random_player<R>(&self, rng: &mut R) -> Player
+    where
+        R: RngCore + CryptoRng,
+    {
+        Player {
+            id: rng.gen_range(0, self.n),
+        }
+    }
+
+    /// For testing only.
+    fn get_random_eligible_subset_of_players<R>(&self, mut rng: &mut R) -> Vec<Player>
+    where
+        R: RngCore,
+    {
+        (0..self.get_total_num_shares())
+            .choose_multiple(&mut rng, self.t)
+            .into_iter()
+            .map(|i| self.get_player(i))
+            .collect::<Vec<Player>>()
+    }
+
+    fn get_total_num_players(&self) -> usize {
+        self.n
+    }
+
+    fn get_total_num_shares(&self) -> usize {
+        self.n
+    }
+}
+
+impl<F: PrimeField> traits::ThresholdConfig for ShamirThresholdConfig<F> {
+    fn new(t: usize, n: usize) -> Result<Self> {
+        let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` internally does `n.next_power_of_two()`
+            .expect("Invalid domain size: {}");
+        Ok(Self { n, t, domain })
+    }
+
+    fn get_threshold(&self) -> usize {
+        self.t
+    }
+}
+
+impl<F: PrimeField> fmt::Display for ShamirThresholdConfig<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ThresholdConfig {{ n: {}, t: {} }}", self.n, self.t)
     }
 }
 
-impl<'de, F: PrimeField> Deserialize<'de> for ThresholdConfig<F> {
+impl<'de, F: PrimeField> Deserialize<'de> for ShamirThresholdConfig<F> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -65,7 +109,7 @@ impl<'de, F: PrimeField> Deserialize<'de> for ThresholdConfig<F> {
         let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` internally does `n.next_power_of_two()`
             .ok_or_else(|| serde::de::Error::custom(format!("Invalid domain size: {}", n)))?;
 
-        Ok(ThresholdConfig { n, t, domain })
+        Ok(ShamirThresholdConfig { n, t, domain })
     }
 }
 
@@ -164,14 +208,14 @@ pub fn all_lagrange_denominators<F: FftField>(
     denoms
 }
 
-impl<F: PrimeField> ThresholdConfig<F> {
+impl<F: PrimeField> ShamirThresholdConfig<F> {
     /// This initializes a `(t, n)` threshold scheme configuration.
     /// The `domain` is automatically computed as a radix-2 evaluation domain
     /// of size `n.next_power_of_two()` for use in FFT-based polynomial operations.
     pub fn new(t: usize, n: usize) -> Self {
         debug_assert!(t <= n, "Expected t <= n, but t = {} and n = {}", t, n);
         let domain = Radix2EvaluationDomain::new(n).unwrap();
-        ThresholdConfig { n, t, domain }
+        ShamirThresholdConfig { n, t, domain }
     }
 
     /// Returns the threshold `t` for this `(t, n)` Shamir secret sharing scheme.
@@ -187,17 +231,20 @@ impl<F: PrimeField> ThresholdConfig<F> {
     /// Fast lagrange coefficient computation algorithm, taken from the paper
     /// "Towards Scalable Threshold Cryptosystems" by Alin Tomescu, Robert Chen, Yiming Zheng, Ittai
     /// Abraham, Benny Pinkas, Guy Golan Gueta and Srinivas Devadas
-    /// (which I think takes it from Modern Computer Algebra, by von zur Gathen and Gerhard
-    pub fn lagrange_for_subset(&self, xs: &HashSet<F>) -> HashMap<F, F> {
+    /// (which I think takes it from Modern Computer Algebra, by von zur Gathen and Gerhard)
+    ///
+    /// Takes as input a subset of the roots-of-unity domain, represented by a slice of indices.
+    /// Outputs the Lagrange coefficients of those x-coordinates.
+    pub fn lagrange_for_subset(&self, indices: &[usize]) -> Vec<F> {
         // Step 0: check that subset is large enough
         assert!(
-            xs.len() >= self.t,
+            indices.len() >= self.t,
             "subset size {} is smaller than threshold t={}",
-            xs.len(),
+            indices.len(),
             self.t
         );
 
-        let xs_vec: Vec<F> = xs.iter().cloned().collect();
+        let xs_vec: Vec<F> = indices.iter().map(|i| self.domain.element(*i)).collect();
 
         // Step 1: compute poly w/ roots at all x in xs, compute eval at 0
         let vanishing_poly = vanishing_poly::from_roots(&xs_vec);
@@ -222,11 +269,10 @@ impl<F: PrimeField> ThresholdConfig<F> {
         batch_inversion(&mut denominators);
 
         // Step 4: compute Lagrange coefficients
-        xs_vec
+        numerators
             .into_iter()
-            .zip(numerators)
             .zip(denominators)
-            .map(|((x, numerator), denom_inv)| (x, numerator * denom_inv))
+            .map(|(numerator, denom_inv)| numerator * denom_inv)
             .collect()
     }
 
@@ -236,10 +282,10 @@ impl<F: PrimeField> ThresholdConfig<F> {
     /// it outside of this file so it won't depend on the specific version of the `rand` crate.
     /// 2. The polynomial is evaluated over the `domain` using FFT to produce all evaluations,
     ///    which are subsequently trunked.
-    pub fn share(&self, coeffs: &[F]) -> Vec<F> {
+    pub fn share(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
         debug_assert_eq!(coeffs.len(), self.t);
         let evals = self.domain.fft(coeffs);
-        evals[..self.n].to_vec()
+        (0..self.n).map(|i| self.get_player(i)).zip(evals).collect()
     }
 
     /// This method uses Lagrange interpolation to recover the original secret
@@ -251,14 +297,34 @@ impl<F: PrimeField> ThresholdConfig<F> {
         } else {
             let mut sum = F::zero();
 
-            let xs = HashSet::from_iter(shares.iter().map(|s| s.x));
-            let lagrange_coeffs = self.lagrange_for_subset(&xs);
+            let roots_of_unity_indices: Vec<usize> =
+                shares.iter().map(|(p, _)| p.get_id()).collect();
+            let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
 
-            for ShamirShare { x, y } in shares {
-                sum += lagrange_coeffs[x] * y;
+            for (l_i, (_, y)) in lagrange_coeffs.into_iter().zip(shares) {
+                sum += l_i * y;
             }
 
             Ok(sum)
+        }
+    }
+
+    /// Same as above, but in the exponent.
+    pub fn reconstruct_in_exponent<G: CurveGroup<ScalarField = F>>(
+        &self,
+        shares: &[ShamirGroupShare<G>],
+    ) -> Result<G::Affine> {
+        if shares.len() != self.t {
+            Err(anyhow!("Incorrect number of shares provided"))
+        } else {
+            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<G::Affine>) =
+                shares.iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
+
+            let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
+
+            Ok(G::msm(&bases, &lagrange_coeffs)
+                .expect("MSM failed during reconstruct_in_exponent()")
+                .into())
         }
     }
 }
@@ -266,20 +332,21 @@ impl<F: PrimeField> ThresholdConfig<F> {
 #[cfg(test)]
 mod shamir_tests {
     use super::*;
-    use ark_bls12_381::Fr;
-    use ark_ff::{One, UniformRand};
-    use ark_std::rand::thread_rng;
+    use crate::arkworks::random::sample_field_elements;
+    use ark_bn254::{Fr, G1Affine, G1Projective};
+    use ark_ec::AffineRepr as _;
+    use ark_ff::One;
     use itertools::Itertools;
 
-    fn single_lagrange(x: Fr, xs: &HashSet<Fr>, omegas: &[Fr]) -> Fr {
+    fn single_lagrange(i: usize, xs_indices: &[usize], xs: &[Fr]) -> Fr {
         let mut prod = Fr::one();
 
-        for &xprime in omegas {
-            if x == xprime {
+        for &i_prime in xs_indices {
+            if i == i_prime {
                 continue;
-            } else if xs.contains(&xprime) {
-                prod *= -xprime;
-                prod /= x - xprime;
+            } else {
+                prod *= -xs[i_prime];
+                prod /= xs[i] - xs[i_prime];
             }
         }
 
@@ -292,21 +359,23 @@ mod shamir_tests {
 
         for n in 2..8 {
             for t in 1..=n {
-                let config = ThresholdConfig::new(t, n);
+                let config = ShamirThresholdConfig::new(t, n);
 
-                let elements: Vec<Fr> = config.domain.elements().collect();
+                let elements: Vec<usize> = (0..n).collect();
 
-                for subset_vec in elements.iter().cloned().combinations(t) {
-                    let subset: HashSet<Fr> = subset_vec.iter().cloned().collect();
-
+                for subset in elements.iter().cloned().combinations(t) {
                     let lagrange_for_subset = config.lagrange_for_subset(&subset);
 
-                    for (x, lagrange) in lagrange_for_subset {
-                        let expected = single_lagrange(x, &subset, &elements);
+                    for (i, lagrange) in subset.iter().zip(&lagrange_for_subset) {
+                        let expected = single_lagrange(
+                            *i,
+                            &subset,
+                            &config.domain.elements().collect::<Vec<Fr>>(),
+                        );
                         assert_eq!(
-                            lagrange, expected,
-                            "Mismatch at x={:?}, subset={:?}",
-                            x, subset
+                            *lagrange, expected,
+                            "Mismatch at i={:?}, subset={:?}, domain size={:?}",
+                            i, subset, n
                         );
                     }
                 }
@@ -314,31 +383,59 @@ mod shamir_tests {
         }
     }
 
+    fn sample_shares(
+        rng: &mut impl rand::RngCore,
+        t: usize,
+        n: usize,
+    ) -> (ShamirThresholdConfig<Fr>, Fr, Vec<ShamirShare<Fr>>) {
+        let sharing_scheme = ShamirThresholdConfig::new(t, n);
+
+        let coeffs = sample_field_elements(t, rng);
+
+        let shares = sharing_scheme.share(&coeffs);
+        (sharing_scheme, coeffs[0], shares)
+    }
+
     #[test]
     fn test_reconstruct() {
-        for n in 2..8 {
+        let mut rng = rand::thread_rng();
+        for n in 2..6 {
+            // Can increase this a bit if desired, the test is very fast
             for t in 1..=n {
-                let mut rng = thread_rng();
-                let params = ThresholdConfig::new(t, n);
-
-                let secret = Fr::rand(&mut rng);
-                let mut coeffs = vec![secret];
-                coeffs.extend((1..t).map(|_| Fr::rand(&mut rng)));
-
-                let evals = params.share(&coeffs);
-
-                let xs: Vec<Fr> = params.domain.elements().take(n).collect();
-                let shares: Vec<ShamirShare<Fr>> = xs
-                    .iter()
-                    .zip(evals.iter())
-                    .map(|(&x, &y)| ShamirShare { x, y })
-                    .collect();
+                let (sharing_scheme, secret, shares) = sample_shares(&mut rng, t, n);
 
                 for reconstruct_shares in shares.iter().combinations(t) {
                     let reconstruct_shares_vec: Vec<ShamirShare<Fr>> =
                         reconstruct_shares.into_iter().cloned().collect();
 
-                    assert_eq!(params.reconstruct(&reconstruct_shares_vec).unwrap(), secret);
+                    assert_eq!(
+                        sharing_scheme.reconstruct(&reconstruct_shares_vec).unwrap(),
+                        secret
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_reconstruct_in_exponent() {
+        let mut rng = rand::thread_rng();
+        for n in 2..8 {
+            for t in 1..=n {
+                let (sharing_scheme, secret, shares) = sample_shares(&mut rng, t, n);
+
+                let shares_g1: Vec<ShamirGroupShare<G1Projective>> = shares
+                    .into_iter()
+                    .map(|(player, y)| (player, (G1Affine::generator() * y).into()))
+                    .collect();
+
+                for reconstruct_shares_g1 in shares_g1.into_iter().combinations(t) {
+                    assert_eq!(
+                        sharing_scheme
+                            .reconstruct_in_exponent::<G1Projective>(&reconstruct_shares_g1)
+                            .unwrap(),
+                        G1Affine::generator() * secret
+                    );
                 }
             }
         }

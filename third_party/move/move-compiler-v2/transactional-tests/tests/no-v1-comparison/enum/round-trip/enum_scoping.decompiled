@@ -25,7 +25,6 @@ module 0x42::m {
         }
     }
     public fun check_scoping(p0: &Inner): u64 {
-        if (p0 is Inner1) ();
         3
     }
     fun t1_check_scoping(): u64 {

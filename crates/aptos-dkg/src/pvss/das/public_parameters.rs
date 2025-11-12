@@ -3,7 +3,10 @@
 
 //! This submodule implements the *public parameters* for this PVSS scheme.
 
-use crate::pvss::{encryption_elgamal, traits};
+use crate::{
+    pvss::{encryption_elgamal, traits},
+    traits::transcript::WithMaxNumShares,
+};
 use aptos_crypto::{
     blstrs::G2_PROJ_NUM_BYTES, CryptoMaterialError, ValidCryptoMaterial,
     ValidCryptoMaterialStringExt,
@@ -87,6 +90,12 @@ impl ValidCryptoMaterial for PublicParameters {
 
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes()
+    }
+}
+
+impl WithMaxNumShares for PublicParameters {
+    fn with_max_num_shares(_n: usize) -> Self {
+        Self::default()
     }
 }
 
