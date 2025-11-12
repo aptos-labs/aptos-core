@@ -10,10 +10,9 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
-    use aptos_framework::transaction_context;
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
-    use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
+    use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::order_book_types::TimeInForce;
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book::{OrderBook, new_order_book};
@@ -21,6 +20,8 @@ module aptos_experimental::market_types {
 
     #[test_only]
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
+    #[test_only]
+    use aptos_experimental::order_book_types::new_order_id_type;
 
     const EINVALID_ADDRESS: u64 = 1;
     const EINVALID_SETTLE_RESULT: u64 = 2;
@@ -448,10 +449,6 @@ module aptos_experimental::market_types {
         }
     }
 
-    public fun next_order_id(): OrderIdType {
-        new_order_id_type(transaction_context::monotonically_increasing_counter())
-    }
-
     public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &OrderBook<M> {
         &self.order_book
     }
@@ -736,7 +733,6 @@ module aptos_experimental::market_types {
     ): &mut PreCancellationTracker {
         self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
     }
-
 
     // ============================= test_only APIs ====================================
     #[test_only]

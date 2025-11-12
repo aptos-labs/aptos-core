@@ -51,7 +51,6 @@
 -  [Function `get_order_metadata_bytes`](#0x7_market_types_get_order_metadata_bytes)
 -  [Function `new_market_config`](#0x7_market_types_new_market_config)
 -  [Function `new_market`](#0x7_market_types_new_market)
--  [Function `next_order_id`](#0x7_market_types_next_order_id)
 -  [Function `get_order_book`](#0x7_market_types_get_order_book)
 -  [Function `get_market_address`](#0x7_market_types_get_market_address)
 -  [Function `best_bid_price`](#0x7_market_types_best_bid_price)
@@ -80,7 +79,6 @@
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/table.md#0x1_table">0x1::table</a>;
-<b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="market_clearinghouse_order_info.md#0x7_market_clearinghouse_order_info">0x7::market_clearinghouse_order_info</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
@@ -1967,30 +1965,6 @@
         <a href="order_book.md#0x7_order_book">order_book</a>: new_order_book(),
         <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker">pre_cancellation_tracker</a>,
     }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_market_types_next_order_id"></a>
-
-## Function `next_order_id`
-
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_next_order_id">next_order_id</a>(): OrderIdType {
-    new_order_id_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>())
 }
 </code></pre>
 

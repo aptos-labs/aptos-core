@@ -866,7 +866,7 @@ The first price levels of both bid and ask sides will be activated in the active
         <a href="bulk_order_book.md#0x7_bulk_order_book_cancel_active_orders">cancel_active_orders</a>(price_time_idx, &old_order);
         (old_order.get_order_id(), std::option::some(existing_sequence_number))
     } <b>else</b> {
-        <b>let</b> order_id = new_order_id_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
+        <b>let</b> order_id = next_order_id();
         self.order_id_to_address.add(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>);
         (order_id, std::option::none())
     };

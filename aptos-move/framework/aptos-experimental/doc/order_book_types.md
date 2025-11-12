@@ -23,6 +23,7 @@ Order book type definitions
 -  [Function `is_bulk_order_type`](#0x7_order_book_types_is_bulk_order_type)
 -  [Function `is_single_order_type`](#0x7_order_book_types_is_single_order_type)
 -  [Function `new_default_big_ordered_map`](#0x7_order_book_types_new_default_big_ordered_map)
+-  [Function `next_order_id`](#0x7_order_book_types_next_order_id)
 -  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
 -  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
@@ -64,11 +65,13 @@ Order book type definitions
 -  [Function `destroy_active_matched_order`](#0x7_order_book_types_destroy_active_matched_order)
 -  [Function `get_active_matched_size`](#0x7_order_book_types_get_active_matched_size)
 -  [Function `is_active_matched_book_type_single_order`](#0x7_order_book_types_is_active_matched_book_type_single_order)
+-  [Function `reverse_bits`](#0x7_order_book_types_reverse_bits)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 </code></pre>
 
 
@@ -797,6 +800,31 @@ particular match operation.
         <a href="order_book_types.md#0x7_order_book_types_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>,
         <b>true</b>
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_next_order_id"></a>
+
+## Function `next_order_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> {
+    // reverse bits <b>to</b> make order ids random, so indices on top of them are shuffled.
+    <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> { order_id: <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()) }
 }
 </code></pre>
 
@@ -1954,6 +1982,55 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
     self: &<a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a>
 ): bool {
     <a href="order_book_types.md#0x7_order_book_types_is_single_order_type">is_single_order_type</a>(&self.order_book_type)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_reverse_bits"></a>
+
+## Function `reverse_bits`
+
+Reverse the bits in a u128 value using divide and conquer approach
+This is more efficient than the bit-by-bit approach, reducing from O(n) to O(log n)
+
+
+<pre><code><b>fun</b> <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(value: u128): u128
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>fun</b> <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(value: u128): u128 {
+    <b>let</b> v = value;
+
+    // Swap odd and even bits
+    v = ((v & 0x55555555555555555555555555555555) &lt;&lt; 1) | ((v &gt;&gt; 1) & 0x55555555555555555555555555555555);
+
+    // Swap consecutive pairs
+    v = ((v & 0x33333333333333333333333333333333) &lt;&lt; 2) | ((v &gt;&gt; 2) & 0x33333333333333333333333333333333);
+
+    // Swap nibbles
+    v = ((v & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f) &lt;&lt; 4) | ((v &gt;&gt; 4) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+
+    // Swap bytes
+    v = ((v & 0x00ff00ff00ff00ff00ff00ff00ff00ff) &lt;&lt; 8) | ((v &gt;&gt; 8) & 0x00ff00ff00ff00ff00ff00ff00ff00ff);
+
+    // Swap 2-byte chunks
+    v = ((v & 0x0000ffff0000ffff0000ffff0000ffff) &lt;&lt; 16) | ((v &gt;&gt; 16) & 0x0000ffff0000ffff0000ffff0000ffff);
+
+    // Swap 4-byte chunks
+    v = ((v & 0x00000000ffffffff00000000ffffffff) &lt;&lt; 32) | ((v &gt;&gt; 32) & 0x00000000ffffffff00000000ffffffff);
+
+    // Swap 8-byte chunks
+    v = (v &lt;&lt; 64) | (v &gt;&gt; 64);
+
+    v
 }
 </code></pre>
 
