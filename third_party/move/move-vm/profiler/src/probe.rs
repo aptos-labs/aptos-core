@@ -3,8 +3,8 @@
 
 //! A profiler that emits USDT probes.
 
+use crate::Profiler;
 use move_vm_types::instr::Instruction;
-use once_cell::sync::Lazy;
 use std::time::Instant;
 
 #[usdt::provider]

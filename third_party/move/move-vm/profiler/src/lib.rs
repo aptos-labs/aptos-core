@@ -2,6 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use move_vm_types::instr::Instruction;
+#[cfg(feature = "probe-profiler")]
+use once_cell::sync::Lazy;
+#[cfg(feature = "probe-profiler")]
+use probe::ProbeProfiler;
 
 #[cfg(feature = "probe-profiler")]
 pub mod probe;

@@ -11,7 +11,6 @@ use move_core_types::{
     function::ClosureMask,
     int256::{I256, U256},
 };
-use serde::Serialize;
 
 /// The VM's internal representation of instructions.
 ///
