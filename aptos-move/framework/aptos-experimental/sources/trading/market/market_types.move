@@ -7,10 +7,9 @@ module aptos_experimental::market_types {
     use std::option::Option;
     use std::signer;
     use std::string::String;
-    use aptos_std::table;
-    use aptos_std::table::Table;
     use aptos_framework::event;
     use aptos_framework::transaction_context;
+    use std::layout_reference::{LayoutReference, Self};
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
     use aptos_experimental::order_book_types::{OrderIdType, new_order_id_type};
@@ -26,8 +25,6 @@ module aptos_experimental::market_types {
     const EINVALID_SETTLE_RESULT: u64 = 2;
     const EINVALID_TIME_IN_FORCE: u64 = 3;
     const EORDER_DOES_NOT_EXIST: u64 = 6;
-
-    const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
 
     enum OrderStatus has drop, copy, store {
         /// Order has been accepted by the engine.
@@ -323,7 +320,7 @@ module aptos_experimental::market_types {
             /// Pre cancellation tracker for the market, it is wrapped inside a table
             /// as otherwise any insertion/deletion from the tracker would cause conflict
             /// with the order book.
-            pre_cancellation_tracker: Table<u8, PreCancellationTracker>,
+            pre_cancellation_tracker: LayoutReference<PreCancellationTracker>,
         }
     }
 
@@ -437,11 +434,7 @@ module aptos_experimental::market_types {
         // requiring signers, and not addresses, purely to guarantee different dexes
         // cannot polute events to each other, accidentally or maliciously.
         let pre_cancellation_window = config.pre_cancellation_window_secs;
-        let pre_cancellation_tracker = table::new();
-        pre_cancellation_tracker.add(
-            PRE_CANCELLATION_TRACKER_KEY,
-            new_pre_cancellation_tracker(pre_cancellation_window)
-        );
+        let pre_cancellation_tracker = layout_reference::new_external_table(new_pre_cancellation_tracker(pre_cancellation_window));
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
@@ -737,7 +730,7 @@ module aptos_experimental::market_types {
     public(friend) fun get_pre_cancellation_tracker_mut<M: store + copy + drop>(
         self: &mut Market<M>
     ): &mut PreCancellationTracker {
-        self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
+        self.pre_cancellation_tracker.borrow_mut()
     }
 
 
@@ -752,8 +745,7 @@ module aptos_experimental::market_types {
             pre_cancellation_tracker,
         } = self;
         let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_secs: _ } = config;
-        destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
-        pre_cancellation_tracker.drop_unchecked();
+        destroy_tracker(pre_cancellation_tracker.destroy());
         order_book.destroy_order_book()
     }
 
