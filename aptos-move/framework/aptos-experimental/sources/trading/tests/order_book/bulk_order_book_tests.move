@@ -1529,6 +1529,12 @@ module aptos_experimental::bulk_order_book_tests {
         // First order should have previous sequence number of 1 (from setup_test order)
         assert!(previous_seq_num_option1.is_some());
         let previous_seq_num1 = previous_seq_num_option1.destroy_some();
+        assert!(previous_seq_num1 == 1);
+
+        let bulk_order = order_book.get_bulk_order(TEST_ACCOUNT_1);
+        assert!(bulk_order.get_sequence_number() == 10);
+
+        // Test that we can place an order with even higher sequence number
         let order_req2 = create_test_order_request_with_sequence(
             TEST_ACCOUNT_1, 15, vector[100], vector[10], vector[200], vector[10]
         );
