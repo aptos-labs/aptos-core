@@ -300,7 +300,7 @@ impl RunConfig {
                         do_not_delegate,
                     ),
                 )]),
-                default_asset: None, // Will default to DEFAULT_ASSET_NAME ("apt")
+                default_asset: MintFunderConfig::get_default_asset_name(),
                 amount_to_fund: 100_000_000_000,
             }),
             handler_config: HandlerConfig {

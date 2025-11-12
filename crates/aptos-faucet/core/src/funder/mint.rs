@@ -38,7 +38,7 @@ use super::common::{
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MintAssetConfig {
     #[serde(flatten)]
-    pub base: AssetConfig,
+    pub default: AssetConfig,
 
     /// Address of the account to send transactions from. On localnet, for
     /// example, this is a550c18. If not given, we use the account address
@@ -52,20 +52,20 @@ pub struct MintAssetConfig {
 
 impl MintAssetConfig {
     pub fn new(
-        base: AssetConfig,
+        default: AssetConfig,
         mint_account_address: Option<AccountAddress>,
         do_not_delegate: bool,
     ) -> Self {
         Self {
-            base,
+            default,
             mint_account_address,
             do_not_delegate,
         }
     }
 
-    /// Delegate to the base AssetConfig's get_key method.
+    /// Delegate to the default AssetConfig's get_key method.
     pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
-        self.base.get_key()
+        self.default.get_key()
     }
 }
 
@@ -82,8 +82,8 @@ pub struct MintFunderConfig {
 
     /// Default asset to use when no asset is specified in requests.
     /// If not provided, defaults to "apt".
-    #[serde(default)]
-    pub default_asset: Option<String>,
+    #[serde(default = "MintFunderConfig::get_default_asset_name")]
+    pub default_asset: String,
 
     pub amount_to_fund: u64,
 }
@@ -95,16 +95,11 @@ impl MintFunderConfig {
             return Err(anyhow::anyhow!("No assets configured"));
         }
 
-        // Resolve default asset: use configured value or fall back to constant
-        let default_asset = self
-            .default_asset
-            .unwrap_or_else(|| DEFAULT_ASSET_NAME.to_string());
-
         // Validate that the default asset exists in the assets map
-        let default_asset_config = self.assets.get(&default_asset).ok_or_else(|| {
+        let default_asset_config = self.assets.get(&self.default_asset).ok_or_else(|| {
             anyhow::anyhow!(
                 "Default asset '{}' is not configured in assets map",
-                default_asset
+                self.default_asset
             )
         })?;
 
@@ -127,7 +122,7 @@ impl MintFunderConfig {
             self.transaction_submission_config,
             initial_account,
             self.assets.clone(),
-            default_asset,
+            self.default_asset,
             self.amount_to_fund,
         );
 
@@ -140,6 +135,10 @@ impl MintFunderConfig {
         }
 
         Ok(minter)
+    }
+
+    pub fn get_default_asset_name() -> String {
+        DEFAULT_ASSET_NAME.to_string()
     }
 }
 

@@ -460,7 +460,7 @@ impl AssetConfig {
             )
         })?;
         // decode as bcs first, fall back to a file of hex
-        let result = aptos_sdk::bcs::from_bytes(&key_bytes); //.with_context(|| "bad bcs");
+        let result = aptos_sdk::bcs::from_bytes(&key_bytes);
         if let Ok(x) = result {
             return Ok(x);
         }
