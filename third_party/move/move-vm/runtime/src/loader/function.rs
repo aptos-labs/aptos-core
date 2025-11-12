@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    instr::Instruction,
+    instr::{BytecodeTransformer, Instruction},
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -60,6 +60,12 @@ lazy_static! {
     ]);
 }
 
+#[allow(dead_code)]
+pub enum CallType {
+    Regular,
+    Inline,
+}
+
 /// A runtime function definition representation.
 pub struct Function {
     #[allow(unused)]
@@ -87,6 +93,8 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
+    #[allow(unused)]
+    pub(crate) call_type: CallType,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -607,6 +615,7 @@ impl Function {
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
         struct_names: &[StructIdentifier],
+        bytecode_transformer: &BytecodeTransformer,
     ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
@@ -631,7 +640,11 @@ impl Function {
 
         // Native functions do not have a code unit
         let code = match &def.code {
-            Some(code) => code.code.iter().map(|b| b.clone().into()).collect(),
+            Some(code) => code
+                .code
+                .iter()
+                .map(|b| bytecode_transformer.transform(b.clone()))
+                .collect(),
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();
@@ -671,6 +684,7 @@ impl Function {
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
+            call_type: CallType::Regular,
         })
     }
 

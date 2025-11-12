@@ -1,16 +1,46 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::loader::{
+    FieldHandle, FieldInstantiation, StructDef, StructInstantiation, StructVariantInfo,
+};
 use move_binary_format::file_format::{
     Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
     FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex, SignatureIndex,
     StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
     StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+    VariantIndex,
 };
 use move_core_types::{
     function::ClosureMask,
     int256::{I256, U256},
 };
+use move_vm_types::loaded_data::{
+    runtime_types::{AbilityInfo, Type, TypeBuilder},
+    struct_name_indexing::StructNameIndex,
+};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct TestVariantV2 {
+    pub variant_idx: VariantIndex,
+    pub struct_name_idx: StructNameIndex,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BorrowFieldV2 {
+    pub is_mut: bool,
+    pub field_offset: usize,
+    pub struct_name_idx: StructNameIndex,
+    pub field_ty: Type,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PackV2 {
+    pub is_generic: bool,
+    pub field_count: u16,
+    pub struct_ty: Type,
+    pub field_tys: Vec<Type>,
+}
 
 /// The VM's internal representation of instructions.
 ///
@@ -124,117 +154,328 @@ pub enum Instruction {
     CastI128,
     CastI256,
     Negate,
+
+    VecLenV2,
+    TestVariantV2(TestVariantV2),
+    BorrowFieldV2(Box<BorrowFieldV2>),
+    PackV2(Box<PackV2>),
 }
 
-impl From<Bytecode> for Instruction {
-    fn from(bytecode: Bytecode) -> Self {
+pub(crate) struct BytecodeTransformer<'a> {
+    pub(crate) use_fast_instructions: bool,
+
+    pub(crate) ty_builder: TypeBuilder,
+
+    pub(crate) structs: &'a [StructDef],
+    pub(crate) struct_instantiations: &'a [StructInstantiation],
+
+    pub(crate) struct_variant_infos: &'a [StructVariantInfo],
+    pub(crate) struct_variant_instantiation_infos: &'a [StructVariantInfo],
+
+    pub(crate) field_handles: &'a [FieldHandle],
+    pub(crate) field_instantiations: &'a [FieldInstantiation],
+}
+
+impl<'a> BytecodeTransformer<'a> {
+    pub fn new(
+        structs: &'a [StructDef],
+        struct_instantiations: &'a [StructInstantiation],
+        struct_variant_infos: &'a [StructVariantInfo],
+        struct_variant_instantiation_infos: &'a [StructVariantInfo],
+        field_handles: &'a [FieldHandle],
+        field_instantiations: &'a [FieldInstantiation],
+    ) -> Self {
+        Self {
+            use_fast_instructions: true,
+            ty_builder: TypeBuilder::with_limits(128, 20), // TODO: get this from config
+            structs,
+            struct_instantiations,
+            struct_variant_infos,
+            struct_variant_instantiation_infos,
+            field_handles,
+            field_instantiations,
+        }
+    }
+
+    fn transform_vec_len(&self, idx: SignatureIndex) -> Instruction {
+        if self.use_fast_instructions {
+            Instruction::VecLenV2
+        } else {
+            Instruction::VecLen(idx)
+        }
+    }
+
+    fn transform_test_variant(&self, idx: StructVariantHandleIndex) -> Instruction {
+        if self.use_fast_instructions {
+            let info = &self.struct_variant_infos[idx.0 as usize];
+            Instruction::TestVariantV2(TestVariantV2 {
+                variant_idx: info.variant,
+                struct_name_idx: info.definition_struct_type.idx,
+            })
+        } else {
+            Instruction::TestVariant(idx)
+        }
+    }
+
+    fn transform_test_variant_generic(&self, idx: StructVariantInstantiationIndex) -> Instruction {
+        if self.use_fast_instructions {
+            let info = &self.struct_variant_instantiation_infos[idx.0 as usize];
+            Instruction::TestVariantV2(TestVariantV2 {
+                variant_idx: info.variant,
+                struct_name_idx: info.definition_struct_type.idx,
+            })
+        } else {
+            Instruction::TestVariantGeneric(idx)
+        }
+    }
+
+    #[allow(clippy::collapsible_else_if)]
+    fn transform_borrow_field(&self, is_mut: bool, idx: FieldHandleIndex) -> Instruction {
+        if self.use_fast_instructions {
+            let handle = &self.field_handles[idx.0 as usize];
+
+            Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
+                is_mut,
+                field_offset: handle.offset,
+                struct_name_idx: handle.definition_struct_type.idx,
+                field_ty: handle.field_ty.clone(),
+            }))
+        } else {
+            if is_mut {
+                Instruction::MutBorrowField(idx)
+            } else {
+                Instruction::ImmBorrowField(idx)
+            }
+        }
+    }
+
+    #[allow(clippy::collapsible_else_if)]
+    fn transform_borrow_field_generic(
+        &self,
+        is_mut: bool,
+        idx: FieldInstantiationIndex,
+    ) -> Instruction {
+        if self.use_fast_instructions {
+            let field_inst = &self.field_instantiations[idx.0 as usize];
+
+            // TODO: used cached result -- we're already computing this during module loading
+            let is_concrete = field_inst.instantiation.iter().all(|ty| ty.is_concrete());
+            if !is_concrete {
+                return if is_mut {
+                    Instruction::MutBorrowFieldGeneric(idx)
+                } else {
+                    Instruction::ImmBorrowFieldGeneric(idx)
+                };
+            }
+
+            let field_ty = self
+                .ty_builder
+                .create_ty_with_subst(
+                    &field_inst.uninstantiated_field_ty,
+                    &field_inst.instantiation,
+                )
+                .expect("Failed to create field type"); // TODO: handle error
+
+            Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
+                is_mut,
+                field_offset: field_inst.offset,
+                struct_name_idx: field_inst.definition_struct_type.idx,
+                field_ty,
+            }))
+        } else {
+            if is_mut {
+                Instruction::MutBorrowFieldGeneric(idx)
+            } else {
+                Instruction::ImmBorrowFieldGeneric(idx)
+            }
+        }
+    }
+
+    fn transform_pack(&self, idx: StructDefinitionIndex) -> Instruction {
+        if self.use_fast_instructions {
+            let struct_def = &self.structs[idx.0 as usize];
+
+            let field_tys = struct_def
+                .definition_struct_type
+                .fields(None)
+                .expect("Failed to get fields") // TODO: handle error
+                .iter()
+                .map(|(_, ty)| ty.clone())
+                .collect();
+
+            let struct_ty = self.ty_builder.create_struct_ty(
+                struct_def.definition_struct_type.idx,
+                AbilityInfo::struct_(struct_def.definition_struct_type.abilities),
+            );
+
+            // TODO: check depth
+
+            Instruction::PackV2(Box::new(PackV2 {
+                is_generic: false,
+                field_count: struct_def.field_count,
+                struct_ty,
+                field_tys,
+            }))
+        } else {
+            Instruction::Pack(idx)
+        }
+    }
+
+    fn transform_pack_generic(&self, idx: StructDefInstantiationIndex) -> Instruction {
+        if self.use_fast_instructions {
+            let struct_inst = &self.struct_instantiations[idx.0 as usize];
+
+            let is_concrete = struct_inst.instantiation.iter().all(|ty| ty.is_concrete());
+            if !is_concrete {
+                return Instruction::PackGeneric(idx);
+            }
+
+            let mut field_tys = vec![];
+            for (_, ty) in struct_inst
+                .definition_struct_type
+                .fields(None)
+                .expect("Failed to get fields")
+            // TODO: handle error
+            {
+                field_tys.push(
+                    self.ty_builder
+                        .create_ty_with_subst(ty, &struct_inst.instantiation)
+                        .expect("Failed to create field type"), // TODO: handle error
+                );
+            }
+
+            // TODO: check depth
+            let struct_ty = Type::StructInstantiation {
+                idx: struct_inst.definition_struct_type.idx,
+                ty_args: triomphe::Arc::new(struct_inst.instantiation.clone()),
+                ability: AbilityInfo::generic_struct(
+                    struct_inst.definition_struct_type.abilities,
+                    struct_inst
+                        .definition_struct_type
+                        .phantom_ty_params_mask
+                        .clone(),
+                ),
+            };
+
+            Instruction::PackV2(Box::new(PackV2 {
+                is_generic: true,
+                field_count: struct_inst.field_count,
+                struct_ty,
+                field_tys,
+            }))
+        } else {
+            Instruction::PackGeneric(idx)
+        }
+    }
+
+    pub fn transform(&self, bytecode: Bytecode) -> Instruction {
         use Bytecode as B;
-        use Instruction as O;
+        use Instruction as I;
 
         match bytecode {
-            B::Pop => O::Pop,
-            B::Ret => O::Ret,
-            B::BrTrue(offset) => O::BrTrue(offset),
-            B::BrFalse(offset) => O::BrFalse(offset),
-            B::Branch(offset) => O::Branch(offset),
-            B::LdU8(val) => O::LdU8(val),
-            B::LdU64(val) => O::LdU64(val),
-            B::LdU128(val) => O::LdU128(Box::new(val)),
-            B::CastU8 => O::CastU8,
-            B::CastU64 => O::CastU64,
-            B::CastU128 => O::CastU128,
-            B::LdConst(idx) => O::LdConst(idx),
-            B::LdTrue => O::LdTrue,
-            B::LdFalse => O::LdFalse,
-            B::CopyLoc(idx) => O::CopyLoc(idx),
-            B::MoveLoc(idx) => O::MoveLoc(idx),
-            B::StLoc(idx) => O::StLoc(idx),
-            B::Call(idx) => O::Call(idx),
-            B::CallGeneric(idx) => O::CallGeneric(idx),
-            B::Pack(idx) => O::Pack(idx),
-            B::PackGeneric(idx) => O::PackGeneric(idx),
-            B::PackVariant(idx) => O::PackVariant(idx),
-            B::PackVariantGeneric(idx) => O::PackVariantGeneric(idx),
-            B::Unpack(idx) => O::Unpack(idx),
-            B::UnpackGeneric(idx) => O::UnpackGeneric(idx),
-            B::UnpackVariant(idx) => O::UnpackVariant(idx),
-            B::UnpackVariantGeneric(idx) => O::UnpackVariantGeneric(idx),
-            B::TestVariant(idx) => O::TestVariant(idx),
-            B::TestVariantGeneric(idx) => O::TestVariantGeneric(idx),
-            B::ReadRef => O::ReadRef,
-            B::WriteRef => O::WriteRef,
-            B::FreezeRef => O::FreezeRef,
-            B::MutBorrowLoc(idx) => O::MutBorrowLoc(idx),
-            B::ImmBorrowLoc(idx) => O::ImmBorrowLoc(idx),
-            B::MutBorrowField(idx) => O::MutBorrowField(idx),
-            B::MutBorrowVariantField(idx) => O::MutBorrowVariantField(idx),
-            B::MutBorrowFieldGeneric(idx) => O::MutBorrowFieldGeneric(idx),
-            B::MutBorrowVariantFieldGeneric(idx) => O::MutBorrowVariantFieldGeneric(idx),
-            B::ImmBorrowField(idx) => O::ImmBorrowField(idx),
-            B::ImmBorrowVariantField(idx) => O::ImmBorrowVariantField(idx),
-            B::ImmBorrowFieldGeneric(idx) => O::ImmBorrowFieldGeneric(idx),
-            B::ImmBorrowVariantFieldGeneric(idx) => O::ImmBorrowVariantFieldGeneric(idx),
-            B::MutBorrowGlobal(idx) => O::MutBorrowGlobal(idx),
-            B::MutBorrowGlobalGeneric(idx) => O::MutBorrowGlobalGeneric(idx),
-            B::ImmBorrowGlobal(idx) => O::ImmBorrowGlobal(idx),
-            B::ImmBorrowGlobalGeneric(idx) => O::ImmBorrowGlobalGeneric(idx),
-            B::Add => O::Add,
-            B::Sub => O::Sub,
-            B::Mul => O::Mul,
-            B::Mod => O::Mod,
-            B::Div => O::Div,
-            B::BitOr => O::BitOr,
-            B::BitAnd => O::BitAnd,
-            B::Xor => O::Xor,
-            B::Or => O::Or,
-            B::And => O::And,
-            B::Not => O::Not,
-            B::Eq => O::Eq,
-            B::Neq => O::Neq,
-            B::Lt => O::Lt,
-            B::Gt => O::Gt,
-            B::Le => O::Le,
-            B::Ge => O::Ge,
-            B::Abort => O::Abort,
-            B::Nop => O::Nop,
-            B::Exists(idx) => O::Exists(idx),
-            B::ExistsGeneric(idx) => O::ExistsGeneric(idx),
-            B::MoveFrom(idx) => O::MoveFrom(idx),
-            B::MoveFromGeneric(idx) => O::MoveFromGeneric(idx),
-            B::MoveTo(idx) => O::MoveTo(idx),
-            B::MoveToGeneric(idx) => O::MoveToGeneric(idx),
-            B::Shl => O::Shl,
-            B::Shr => O::Shr,
-            B::VecPack(idx, n) => O::VecPack(idx, n),
-            B::VecLen(idx) => O::VecLen(idx),
-            B::VecImmBorrow(idx) => O::VecImmBorrow(idx),
-            B::VecMutBorrow(idx) => O::VecMutBorrow(idx),
-            B::VecPushBack(idx) => O::VecPushBack(idx),
-            B::VecPopBack(idx) => O::VecPopBack(idx),
-            B::VecUnpack(idx, n) => O::VecUnpack(idx, n),
-            B::VecSwap(idx) => O::VecSwap(idx),
-            B::PackClosure(idx, mask) => O::PackClosure(idx, mask),
-            B::PackClosureGeneric(idx, mask) => O::PackClosureGeneric(idx, mask),
-            B::CallClosure(idx) => O::CallClosure(idx),
-            B::LdU16(val) => O::LdU16(val),
-            B::LdU32(val) => O::LdU32(val),
-            B::LdU256(val) => O::LdU256(Box::new(val)),
-            B::CastU16 => O::CastU16,
-            B::CastU32 => O::CastU32,
-            B::CastU256 => O::CastU256,
-            B::LdI8(val) => O::LdI8(val),
-            B::LdI16(val) => O::LdI16(val),
-            B::LdI32(val) => O::LdI32(val),
-            B::LdI64(val) => O::LdI64(val),
-            B::LdI128(val) => O::LdI128(Box::new(val)),
-            B::LdI256(val) => O::LdI256(Box::new(val)),
-            B::CastI8 => O::CastI8,
-            B::CastI16 => O::CastI16,
-            B::CastI32 => O::CastI32,
-            B::CastI64 => O::CastI64,
-            B::CastI128 => O::CastI128,
-            B::CastI256 => O::CastI256,
-            B::Negate => O::Negate,
+            B::Pop => I::Pop,
+            B::Ret => I::Ret,
+            B::BrTrue(offset) => I::BrTrue(offset),
+            B::BrFalse(offset) => I::BrFalse(offset),
+            B::Branch(offset) => I::Branch(offset),
+            B::LdU8(val) => I::LdU8(val),
+            B::LdU64(val) => I::LdU64(val),
+            B::LdU128(val) => I::LdU128(Box::new(val)),
+            B::CastU8 => I::CastU8,
+            B::CastU64 => I::CastU64,
+            B::CastU128 => I::CastU128,
+            B::LdConst(idx) => I::LdConst(idx),
+            B::LdTrue => I::LdTrue,
+            B::LdFalse => I::LdFalse,
+            B::CopyLoc(idx) => I::CopyLoc(idx),
+            B::MoveLoc(idx) => I::MoveLoc(idx),
+            B::StLoc(idx) => I::StLoc(idx),
+            B::Call(idx) => I::Call(idx),
+            B::CallGeneric(idx) => I::CallGeneric(idx),
+            B::Pack(idx) => self.transform_pack(idx),
+            B::PackGeneric(idx) => self.transform_pack_generic(idx),
+            B::PackVariant(idx) => I::PackVariant(idx),
+            B::PackVariantGeneric(idx) => I::PackVariantGeneric(idx),
+            B::Unpack(idx) => I::Unpack(idx),
+            B::UnpackGeneric(idx) => I::UnpackGeneric(idx),
+            B::UnpackVariant(idx) => I::UnpackVariant(idx),
+            B::UnpackVariantGeneric(idx) => I::UnpackVariantGeneric(idx),
+            B::TestVariant(idx) => self.transform_test_variant(idx),
+            B::TestVariantGeneric(idx) => self.transform_test_variant_generic(idx),
+            B::ReadRef => I::ReadRef,
+            B::WriteRef => I::WriteRef,
+            B::FreezeRef => I::FreezeRef,
+            B::MutBorrowLoc(idx) => I::MutBorrowLoc(idx),
+            B::ImmBorrowLoc(idx) => I::ImmBorrowLoc(idx),
+            B::MutBorrowField(idx) => self.transform_borrow_field(true, idx),
+            B::MutBorrowVariantField(idx) => I::MutBorrowVariantField(idx),
+            B::MutBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(true, idx),
+            B::MutBorrowVariantFieldGeneric(idx) => I::MutBorrowVariantFieldGeneric(idx),
+            B::ImmBorrowField(idx) => self.transform_borrow_field(false, idx),
+            B::ImmBorrowVariantField(idx) => I::ImmBorrowVariantField(idx),
+            B::ImmBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(false, idx),
+            B::ImmBorrowVariantFieldGeneric(idx) => I::ImmBorrowVariantFieldGeneric(idx),
+            B::MutBorrowGlobal(idx) => I::MutBorrowGlobal(idx),
+            B::MutBorrowGlobalGeneric(idx) => I::MutBorrowGlobalGeneric(idx),
+            B::ImmBorrowGlobal(idx) => I::ImmBorrowGlobal(idx),
+            B::ImmBorrowGlobalGeneric(idx) => I::ImmBorrowGlobalGeneric(idx),
+            B::Add => I::Add,
+            B::Sub => I::Sub,
+            B::Mul => I::Mul,
+            B::Mod => I::Mod,
+            B::Div => I::Div,
+            B::BitOr => I::BitOr,
+            B::BitAnd => I::BitAnd,
+            B::Xor => I::Xor,
+            B::Or => I::Or,
+            B::And => I::And,
+            B::Not => I::Not,
+            B::Eq => I::Eq,
+            B::Neq => I::Neq,
+            B::Lt => I::Lt,
+            B::Gt => I::Gt,
+            B::Le => I::Le,
+            B::Ge => I::Ge,
+            B::Abort => I::Abort,
+            B::Nop => I::Nop,
+            B::Exists(idx) => I::Exists(idx),
+            B::ExistsGeneric(idx) => I::ExistsGeneric(idx),
+            B::MoveFrom(idx) => I::MoveFrom(idx),
+            B::MoveFromGeneric(idx) => I::MoveFromGeneric(idx),
+            B::MoveTo(idx) => I::MoveTo(idx),
+            B::MoveToGeneric(idx) => I::MoveToGeneric(idx),
+            B::Shl => I::Shl,
+            B::Shr => I::Shr,
+            B::VecPack(idx, n) => I::VecPack(idx, n),
+            B::VecLen(idx) => self.transform_vec_len(idx),
+            B::VecImmBorrow(idx) => I::VecImmBorrow(idx),
+            B::VecMutBorrow(idx) => I::VecMutBorrow(idx),
+            B::VecPushBack(idx) => I::VecPushBack(idx),
+            B::VecPopBack(idx) => I::VecPopBack(idx),
+            B::VecUnpack(idx, n) => I::VecUnpack(idx, n),
+            B::VecSwap(idx) => I::VecSwap(idx),
+            B::PackClosure(idx, mask) => I::PackClosure(idx, mask),
+            B::PackClosureGeneric(idx, mask) => I::PackClosureGeneric(idx, mask),
+            B::CallClosure(idx) => I::CallClosure(idx),
+            B::LdU16(val) => I::LdU16(val),
+            B::LdU32(val) => I::LdU32(val),
+            B::LdU256(val) => I::LdU256(Box::new(val)),
+            B::CastU16 => I::CastU16,
+            B::CastU32 => I::CastU32,
+            B::CastU256 => I::CastU256,
+            B::LdI8(val) => I::LdI8(val),
+            B::LdI16(val) => I::LdI16(val),
+            B::LdI32(val) => I::LdI32(val),
+            B::LdI64(val) => I::LdI64(val),
+            B::LdI128(val) => I::LdI128(Box::new(val)),
+            B::LdI256(val) => I::LdI256(Box::new(val)),
+            B::CastI8 => I::CastI8,
+            B::CastI16 => I::CastI16,
+            B::CastI32 => I::CastI32,
+            B::CastI64 => I::CastI64,
+            B::CastI128 => I::CastI128,
+            B::CastI256 => I::CastI256,
+            B::Negate => I::Negate,
         }
     }
 }

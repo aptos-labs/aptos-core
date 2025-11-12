@@ -432,6 +432,11 @@ macro_rules! paranoid_failure {
 }
 
 impl Type {
+    pub fn is_concrete(&self) -> bool {
+        self.preorder_traversal()
+            .all(|ty| !matches!(ty, Type::TyParam(_)))
+    }
+
     pub fn verify_ty_arg_abilities<'a, I>(
         ty_param_abilities: I,
         ty_args: &[Self],
@@ -639,6 +644,60 @@ impl Type {
         let msg = format!(
             "Expected a (mutable: {}) vector reference, got {}",
             IS_MUT, self
+        );
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_is_any_vec_ref_ty<const IS_MUT: bool>(&self) -> PartialVMResult<()> {
+        match self {
+            Self::MutableReference(inner_ty) => {
+                if let Self::Vector(_elem_ty) = inner_ty.as_ref() {
+                    return Ok(());
+                }
+            },
+            Self::Reference(inner_ty) if !IS_MUT => {
+                if let Self::Vector(_elem_ty) = inner_ty.as_ref() {
+                    return Ok(());
+                }
+            },
+            _ => (),
+        }
+        let msg = format!(
+            "Expected a (mutable: {}) vector reference, got {}",
+            IS_MUT, self
+        );
+        paranoid_failure!(msg)
+    }
+
+    pub fn paranoid_check_struct_ref_name_eq<const IS_MUT: bool>(
+        &self,
+        expected_struct_name_idx: StructNameIndex,
+    ) -> PartialVMResult<()> {
+        match self {
+            Self::MutableReference(inner_ty) => {
+                if let Self::Struct { idx, .. } | Self::StructInstantiation { idx, .. } =
+                    inner_ty.as_ref()
+                {
+                    if *idx == expected_struct_name_idx {
+                        return Ok(());
+                    }
+                }
+            },
+            Self::Reference(inner_ty) if !IS_MUT => {
+                if let Self::Struct { idx, .. } | Self::StructInstantiation { idx, .. } =
+                    inner_ty.as_ref()
+                {
+                    if *idx == expected_struct_name_idx {
+                        return Ok(());
+                    }
+                }
+            },
+            _ => (),
+        }
+
+        let msg = format!(
+            "Expected a struct reference type with name index {}, got {}",
+            expected_struct_name_idx, self
         );
         paranoid_failure!(msg)
     }

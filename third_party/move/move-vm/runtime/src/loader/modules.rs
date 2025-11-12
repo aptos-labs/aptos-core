@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    instr::BytecodeTransformer,
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
         single_signature_loader::load_single_signatures_for_module,
@@ -258,6 +259,44 @@ impl Module {
             })
         }
 
+        for field_handle in module.field_handles() {
+            let def_idx = field_handle.owner;
+            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
+            let offset = field_handle.field as usize;
+            let ty = definition_struct_type.field_at(None, offset)?.1.clone();
+            field_handles.push(FieldHandle {
+                offset,
+                field_ty: ty,
+                definition_struct_type,
+            });
+        }
+
+        for field_inst in module.field_instantiations() {
+            let fh_idx = field_inst.handle;
+            let offset = field_handles[fh_idx.0 as usize].offset;
+            let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
+            let uninstantiated_ty = owner_struct_def
+                .definition_struct_type
+                .field_at(None, offset)?
+                .1
+                .clone();
+            field_instantiations.push(FieldInstantiation {
+                offset,
+                uninstantiated_field_ty: uninstantiated_ty,
+                instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
+                definition_struct_type: owner_struct_def.definition_struct_type.clone(),
+            });
+        }
+
+        let bytecode_transformer = BytecodeTransformer::new(
+            &structs,
+            &struct_instantiations,
+            &struct_variant_infos,
+            &struct_variant_instantiation_infos,
+            &field_handles,
+            &field_instantiations,
+        );
+
         for (idx, _) in module.function_defs().iter().enumerate() {
             let findex = FunctionDefinitionIndex(idx as TableIndex);
             let function = Function::new(
@@ -266,6 +305,7 @@ impl Module {
                 &module,
                 signature_table.as_slice(),
                 &struct_names,
+                &bytecode_transformer,
             )?;
 
             function_map.insert(function.name.to_owned(), idx);
@@ -308,35 +348,6 @@ impl Module {
                 handle,
                 instantiation,
                 ty_args_id,
-            });
-        }
-
-        for field_handle in module.field_handles() {
-            let def_idx = field_handle.owner;
-            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
-            let offset = field_handle.field as usize;
-            let ty = definition_struct_type.field_at(None, offset)?.1.clone();
-            field_handles.push(FieldHandle {
-                offset,
-                field_ty: ty,
-                definition_struct_type,
-            });
-        }
-
-        for field_inst in module.field_instantiations() {
-            let fh_idx = field_inst.handle;
-            let offset = field_handles[fh_idx.0 as usize].offset;
-            let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
-            let uninstantiated_ty = owner_struct_def
-                .definition_struct_type
-                .field_at(None, offset)?
-                .1
-                .clone();
-            field_instantiations.push(FieldInstantiation {
-                offset,
-                uninstantiated_field_ty: uninstantiated_ty,
-                instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
-                definition_struct_type: owner_struct_def.definition_struct_type.clone(),
             });
         }
 

@@ -412,6 +412,11 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Instruction::MutBorrowVariantFieldGeneric(_)
             | Instruction::ImmBorrowVariantField(_)
             | Instruction::ImmBorrowVariantFieldGeneric(_) => (),
+
+            Instruction::VecLenV2 => (),
+            Instruction::TestVariantV2(_) => (),
+            Instruction::BorrowFieldV2(_) => (),
+            Instruction::PackV2(_) => (),
         };
         Ok(())
     }
@@ -943,6 +948,39 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack
                     .pop_ty()?
                     .paranoid_check_is_vec_ref_ty::<true>(ty)?;
+            },
+            Instruction::VecLenV2 => {
+                operand_stack
+                    .pop_ty()?
+                    .paranoid_check_is_any_vec_ref_ty::<false>()?;
+                let u64_ty = ty_builder.create_u64_ty();
+                operand_stack.push_ty(u64_ty)?;
+            },
+            Instruction::TestVariantV2(instr) => {
+                let struct_ref_ty = operand_stack.pop_ty()?;
+                struct_ref_ty.paranoid_check_struct_ref_name_eq::<false>(instr.struct_name_idx)?;
+                operand_stack.push_ty(ty_builder.create_bool_ty())?;
+            },
+            Instruction::BorrowFieldV2(instr) => {
+                let struct_ref_ty = operand_stack.pop_ty()?;
+                if instr.is_mut {
+                    struct_ref_ty
+                        .paranoid_check_struct_ref_name_eq::<true>(instr.struct_name_idx)?;
+                } else {
+                    struct_ref_ty
+                        .paranoid_check_struct_ref_name_eq::<false>(instr.struct_name_idx)?;
+                }
+
+                let field_ref_ty = ty_builder.create_ref_ty(&instr.field_ty, instr.is_mut)?;
+                operand_stack.push_ty(field_ref_ty)?;
+            },
+            Instruction::PackV2(instr) => {
+                verify_pack(
+                    operand_stack,
+                    instr.field_count,
+                    instr.field_tys.iter(),
+                    instr.struct_ty.clone(),
+                )?;
             },
         }
         Ok(())

@@ -5,7 +5,10 @@ use super::{
     convert_tok_to_type, single_signature_loader::load_single_signatures_for_script, Function,
     FunctionHandle, FunctionInstantiation,
 };
-use crate::loader::type_loader::convert_toks_to_types;
+use crate::{
+    instr::BytecodeTransformer,
+    loader::{function::CallType, type_loader::convert_toks_to_types},
+};
 use move_binary_format::{
     access::ScriptAccess,
     binary_views::BinaryIndexedView,
@@ -103,7 +106,13 @@ impl Script {
             });
         }
 
-        let code = script.code.code.iter().map(|b| b.clone().into()).collect();
+        let bytecode_transformer = BytecodeTransformer::new(&[], &[], &[], &[], &[], &[]);
+        let code = script
+            .code
+            .code
+            .iter()
+            .map(|b| bytecode_transformer.transform(b.clone()))
+            .collect();
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters
@@ -139,6 +148,7 @@ impl Script {
             is_persistent: false,
             has_module_reentrancy_lock: false,
             is_trusted: false,
+            call_type: CallType::Regular,
         });
 
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;

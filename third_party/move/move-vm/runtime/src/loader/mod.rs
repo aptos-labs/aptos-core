@@ -13,7 +13,10 @@ pub(crate) use function::{
 
 mod modules;
 pub use modules::Module;
-pub(crate) use modules::{StructVariantInfo, VariantFieldInfo};
+pub(crate) use modules::{
+    FieldHandle, FieldInstantiation, StructDef, StructInstantiation, StructVariantInfo,
+    VariantFieldInfo,
+};
 
 mod script;
 pub use script::Script;

@@ -2905,6 +2905,46 @@ impl Frame {
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;
                     },
+
+                    Instruction::VecLenV2 => {
+                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        gas_meter.charge_vec_len()?;
+                        let value = vec_ref.len()?;
+                        interpreter.operand_stack.push(value)?;
+                    },
+                    Instruction::TestVariantV2(instr) => {
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        gas_meter.charge_simple_instr(S::TestVariant)?;
+                        interpreter
+                            .operand_stack
+                            .push(reference.test_variant(instr.variant_idx)?)?;
+                    },
+                    Instruction::BorrowFieldV2(instr) => {
+                        gas_meter.charge_simple_instr(
+                            if instr.is_mut {
+                                S::MutBorrowField
+                            } else {
+                                S::ImmBorrowField
+                            },
+                        )?;
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        interpreter
+                            .operand_stack
+                            .push(reference.borrow_field(instr.field_offset)?)?;
+                    },
+                    Instruction::PackV2(instr) => {
+                        gas_meter.charge_pack(
+                            instr.is_generic,
+                            interpreter
+                                .operand_stack
+                                .last_n(instr.field_count as usize)?,
+                        )?;
+                        let args = interpreter.operand_stack.popn(instr.field_count)?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::struct_(Struct::pack(args)))?;
+                    },
                 }
                 trace_recorder.record_successful_instruction(instruction);
 

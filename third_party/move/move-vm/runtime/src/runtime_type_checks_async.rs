@@ -408,7 +408,11 @@ where
                 | Instruction::Negate
                 | Instruction::CastU16
                 | Instruction::CastU32
-                | Instruction::CastU256 => (),
+                | Instruction::CastU256
+                | Instruction::VecLenV2
+                | Instruction::TestVariantV2(_)
+                | Instruction::BorrowFieldV2(_)
+                | Instruction::PackV2(_) => (),
             }
 
             RTTCheck::post_execution_type_stack_transition(
