@@ -25,6 +25,7 @@ pub mod secp256k1_ecdsa;
 pub mod secp256r1_ecdsa;
 pub mod test_utils;
 pub mod traits;
+pub mod utils;
 pub mod validatable;
 pub mod x25519;
 

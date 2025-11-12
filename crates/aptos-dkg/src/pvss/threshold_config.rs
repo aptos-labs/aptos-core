@@ -3,9 +3,10 @@
 
 use crate::{
     algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::{traits, traits::ThresholdConfig, Player},
+    pvss::Player,
 };
 use anyhow::anyhow;
+use aptos_crypto::traits::{self, ThresholdConfig as _};
 use rand::{seq::IteratorRandom, Rng};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -134,7 +135,8 @@ impl traits::ThresholdConfig for ThresholdConfigBlstrs {
 
 #[cfg(test)]
 mod test {
-    use crate::pvss::{traits::ThresholdConfig, ThresholdConfigBlstrs};
+    use crate::pvss::ThresholdConfigBlstrs;
+    use aptos_crypto::traits::ThresholdConfig as _;
 
     #[test]
     fn create_many_configs() {

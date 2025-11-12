@@ -35,7 +35,11 @@ pub trait AbstractFunction: for<'a> Tid<'a> {
 }
 
 /// A closure, consisting of an abstract function descriptor and the captured arguments.
-pub struct Closure(pub(crate) Box<dyn AbstractFunction>, pub(crate) Vec<Value>);
+#[allow(clippy::box_collection)]
+pub struct Closure(
+    pub(crate) Box<dyn AbstractFunction>,
+    pub(crate) Box<Vec<Value>>,
+);
 
 /// The representation of a function in storage.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
@@ -54,7 +58,7 @@ pub struct SerializedFunctionData {
 
 impl Closure {
     pub fn pack(fun: Box<dyn AbstractFunction>, captured: impl IntoIterator<Item = Value>) -> Self {
-        Self(fun, captured.into_iter().collect())
+        Self(fun, Box::new(captured.into_iter().collect()))
     }
 
     pub fn unpack(self) -> (Box<dyn AbstractFunction>, impl Iterator<Item = Value>) {
@@ -128,7 +132,7 @@ impl serde::Serialize for SerializationReadyValue<'_, '_, '_, (), Closure> {
         seq.serialize_element(&data.fun_id)?;
         seq.serialize_element(&data.ty_args)?;
         seq.serialize_element(&data.mask)?;
-        for (layout, value) in data.captured_layouts.into_iter().zip(captured) {
+        for (layout, value) in data.captured_layouts.into_iter().zip(captured.iter()) {
             seq.serialize_element(&layout)?;
             seq.serialize_element(&SerializationReadyValue {
                 ctx: self.ctx,
@@ -201,7 +205,7 @@ impl<'d, 'c> serde::de::Visitor<'d> for ClosureVisitor<'c> {
                 captured_layouts,
             })
             .map_err(A::Error::custom)?;
-        Ok(Closure(fun, captured))
+        Ok(Closure(fun, Box::new(captured)))
     }
 }
 

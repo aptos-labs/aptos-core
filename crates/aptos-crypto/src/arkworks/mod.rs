@@ -17,6 +17,7 @@ use ark_poly::EvaluationDomain;
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]
+/// TODO: Ought to be slightly faster than using `powers()` from `utils`, but haven't tested this
 pub fn powers_of_two<F: Field>(ell: usize) -> Vec<F> {
     (0..ell).map(|j| F::from(1u64 << j)).collect()
 }

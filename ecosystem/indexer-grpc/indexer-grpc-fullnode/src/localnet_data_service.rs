@@ -68,6 +68,7 @@ impl RawData for LocalnetDataService {
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
+                None,
             );
             while coordinator.current_version < coordinator.end_version {
                 // Processes and sends batch of transactions to client

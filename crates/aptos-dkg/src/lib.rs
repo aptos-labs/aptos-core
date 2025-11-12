@@ -20,7 +20,7 @@
 use crate::pvss::{traits, Player};
 use aptos_crypto::arkworks::{
     random::{sample_field_element, UniformRand},
-    shamir::{ShamirShare, ThresholdConfig},
+    shamir::ShamirThresholdConfig,
 };
 pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
 use ark_ec::pairing::Pairing;
@@ -94,27 +94,23 @@ impl<E: Pairing> UniformRand for Scalar<E> {
     }
 }
 
-impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Scalar<E> {
+// TODO: maybe move the Reconstructable trait to the SecretSharingConfig in the PVSS trait, with associated Scalar equal to InputSecret
+// then make the existing implementation of `fn reconstruct()` part of a trait... and then we can remove the trivial implementation below!
+impl<E: Pairing> traits::Reconstructable<ShamirThresholdConfig<E::ScalarField>> for Scalar<E> {
     type Share = Scalar<E>;
 
-    // TODO: converting between Vec<(Player, Self::Share)> and Vec<ShamirShare<E::ScalarField>> feels bulky,
-    // one of them needs to go
     fn reconstruct(
-        sc: &ThresholdConfig<E::ScalarField>,
+        sc: &ShamirThresholdConfig<E::ScalarField>,
         shares: &Vec<(Player, Self::Share)>,
     ) -> Self {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
 
-        // Convert shares to a Vec of ShamirShare // TODO: get rid of this?
-        let shamir_shares: Vec<ShamirShare<E::ScalarField>> = shares
+        let shares_destructured: Vec<(Player, E::ScalarField)> = shares
             .iter()
-            .map(|(p, share)| ShamirShare {
-                x: E::ScalarField::from(p.id as u64),
-                y: share.0,
-            })
+            .map(|(player, scalar)| (*player, scalar.0))
             .collect();
 
-        Scalar(sc.reconstruct(&shamir_shares).unwrap())
+        Scalar(sc.reconstruct(&shares_destructured).unwrap())
     }
 }
