@@ -1,0 +1,12 @@
+remote_endpoint: ~
+name: "v1.38-v-m-binary-format-v9"
+proposals:
+  - name: v_m_binary_format_v9
+    metadata:
+      title: "Proposal to enable bytecode format v9"
+      description: "See https://github.com/aptos-foundation/AIPs/blob/main/aips/aip-130.md"
+    execution_mode: MultiStep
+    update_sequence:
+      - FeatureFlag:
+          enabled:
+            - v_m_binary_format_v9
