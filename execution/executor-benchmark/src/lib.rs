@@ -290,6 +290,7 @@ where
         overall_measuring.start_time = Instant::now();
     }
     generator.drop_sender();
+
     info!("Done creating workload");
     pipeline.start_pipeline_processing();
     info!("Waiting for pipeline to finish");
@@ -615,7 +616,7 @@ pub fn run_single_with_default_params(
     };
     let num_accounts = match mode {
         SingleRunMode::TEST => 100,
-        SingleRunMode::BENCHMARK { .. } => 100000,
+        SingleRunMode::BENCHMARK { .. } => 25000,
         SingleRunMode::EXACT {
             num_init_accounts, ..
         } => num_init_accounts,
@@ -687,18 +688,25 @@ pub fn run_single_with_default_params(
         ..Default::default()
     };
 
-    create_db_with_accounts::<AptosVMBlockExecutor>(
-        num_accounts,       /* num_accounts */
-        100000 * 100000000, /* init_account_balance */
-        10000,              /* block_size */
-        &storage_dir,
-        NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
-        verify_sequence_numbers,
-        true,
-        init_pipeline_config,
-        features.clone(),
-        is_keyless,
-    );
+    if storage_dir.exists() {
+        println!(
+            "storage-dir {} already exists, skipping create_db_with_accounts()",
+            storage_dir.display()
+        );
+    } else {
+        create_db_with_accounts::<AptosVMBlockExecutor>(
+            num_accounts,       /* num_accounts */
+            100000 * 100000000, /* init_account_balance */
+            10000,              /* block_size */
+            &storage_dir,
+            NO_OP_STORAGE_PRUNER_CONFIG, /* prune_window */
+            verify_sequence_numbers,
+            true,
+            init_pipeline_config,
+            features.clone(),
+            is_keyless,
+        );
+    }
 
     println!("run_benchmark");
 
