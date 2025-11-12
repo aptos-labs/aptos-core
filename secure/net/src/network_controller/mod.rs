@@ -13,6 +13,7 @@ use std::{
 };
 use tokio::{runtime::Runtime, sync::oneshot};
 
+#[allow(dead_code)] // TODO: remove.
 mod error;
 mod inbound_handler;
 pub(crate) mod metrics;
