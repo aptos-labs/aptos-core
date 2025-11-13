@@ -36,9 +36,7 @@ pub fn all_n_lagrange_coefficients(dom: &BatchEvaluationDomain, alpha: &Scalar) 
     let lhs_numerator = N_inverse * one_minus_alpha_to_N; // (1 - \alpha^N) / N
     let omegas = dom.get_all_roots_of_unity(); // \omega^i, for all i
     let mut denominators = omegas.clone(); // clone
-    for i in 0..dom.N() {
-        denominators[i] -= alpha // \omega^i - \alpha
-    }
+    denominators.iter_mut().for_each(|d| *d -= alpha);
 
     denominators.batch_invert(); // (\omega^i - \alpha)^{-1}
 
@@ -107,9 +105,9 @@ pub fn all_lagrange_denominators(
     // If `include_zero`, need to:
     if include_zero {
         // 1. Augment A'(\omega_i) = A'(\omega_i) * \omega^i, for all i\ in [0, n)
-        for i in 0..n {
-            denoms[i] *= batch_dom.get_root_of_unity(i);
-        }
+        denoms.iter_mut()
+            .enumerate()
+            .for_each(|(i, d)| *d *= batch_dom.get_root_of_unity(i));
 
         // 2. Compute A'(0) = \prod_{j \in [0, n)} (0 - \omega^j)
         denoms.push((0..n).map(|i| -batch_dom.get_root_of_unity(i)).product());
@@ -219,7 +217,7 @@ fn accumulator_poly_helper(dom: &BatchEvaluationDomain, T: &[usize]) -> Vec<Scal
     //
     // We do this to avoid complicating our Lagrange coefficients API and our BatchEvaluationDomain
     // API (e.g., forbid N out of N Lagrange reconstruction by returning a `Result::Err`).
-    let Z = if set.len() < dom.N() {
+    if set.len() < dom.N() {
         accumulator_poly(&set, dom, FFT_THRESH)
     } else {
         // We handle |set| = 1 manually, since the `else` branch would yield an empty `lhs` vector
@@ -236,15 +234,13 @@ fn accumulator_poly_helper(dom: &BatchEvaluationDomain, T: &[usize]) -> Vec<Scal
 
             poly_mul_slow(&lhs, &rhs)
         }
-    };
-
-    Z
+    }
 }
 
 /// Let $Z_i(X) = Z(X) / (X - \omega^i)$. Returns a vector of $Z_i(0)$'s, for all $i\in T$.
 /// Here, `Z_0` is $Z(0)$.
 #[allow(non_snake_case)]
-fn compute_numerators_at_zero(omegas: &Vec<Scalar>, T: &[usize], Z_0: &Scalar) -> Vec<Scalar> {
+fn compute_numerators_at_zero(omegas: &[Scalar], T: &[usize], Z_0: &Scalar) -> Vec<Scalar> {
     let N = omegas.len();
 
     let mut numerators = Vec::with_capacity(T.len());
@@ -302,9 +298,9 @@ fn compute_numerators(
     // (\alpha - \omega^i)^{-1}
     numerators.batch_invert();
 
-    for i in 0..numerators.len() {
-        // Z(\alpha) / (\alpha - \omega^i)^{-1}
-        numerators[i].mul_assign(Z_of_alpha);
+    for numerator in numerators.iter_mut() {
+        // Z(α) / (α - ω^i)^{-1}
+        numerator.mul_assign(Z_of_alpha);
     }
 
     numerators

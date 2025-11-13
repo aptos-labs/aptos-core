@@ -35,7 +35,7 @@ pub trait Reconstructable<SSC: traits::SecretSharingConfig>: Sized {
     type ShareValue: Clone;
 
     /// The reconstruct function
-    fn reconstruct(sc: &SSC, shares: &Vec<ShamirShare<Self::ShareValue>>) -> Result<Self>;
+    fn reconstruct(sc: &SSC, shares: &[ShamirShare<Self::ShareValue>]) -> Result<Self>;
 }
 
 /// Configuration for a threshold cryptography scheme. Usually one restricts `F` to `Primefield`
@@ -302,13 +302,13 @@ impl<T: WeightedSum> Reconstructable<ShamirThresholdConfig<T::Scalar>> for T {
 
     fn reconstruct(
         sc: &ShamirThresholdConfig<T::Scalar>,
-        shares: &Vec<ShamirShare<Self::ShareValue>>,
+        shares: &[ShamirShare<Self::ShareValue>],
     ) -> Result<Self> {
         if shares.len() != sc.t {
             Err(anyhow!("Incorrect number of shares provided"))
         } else {
             let (roots_of_unity_indices, bases): (Vec<usize>, Vec<Self::ShareValue>) = shares
-                .into_iter()
+                .iter()
                 .map(|(p, g_y)| (p.get_id(), g_y))
                 .collect();
 
