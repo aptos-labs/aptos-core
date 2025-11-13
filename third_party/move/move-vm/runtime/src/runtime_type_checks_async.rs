@@ -594,6 +594,7 @@ where
             CallType::Regular,
             self.vm_config,
             function,
+            None,
             locals,
             frame_cache,
         )
@@ -640,6 +641,7 @@ where
             call_type,
             self.vm_config,
             callee,
+            None,
             locals,
             callee_frame_cache,
         )?;

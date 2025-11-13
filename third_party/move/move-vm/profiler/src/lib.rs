@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_vm_types::instr::Instruction;
-#[cfg(feature = "probe-profiler")]
+use move_vm_types::{instr::Instruction, values::AbstractFunction};
 use once_cell::sync::Lazy;
 #[cfg(feature = "probe-profiler")]
 use probe::ProbeProfiler;
@@ -11,14 +10,24 @@ use probe::ProbeProfiler;
 pub mod probe;
 
 #[cfg(feature = "probe-profiler")]
-pub static VM_PROFILER: Lazy<ProbeProfiler> = Lazy::new(ProbeProfiler::default);
+pub type ActiveProfiler = ProbeProfiler;
 
 #[cfg(not(feature = "probe-profiler"))]
-pub static VM_PROFILER: NoopProfiler = NoopProfiler;
+pub type ActiveProfiler = NoopProfiler;
+
+pub type FnGuard = <ActiveProfiler as Profiler>::FnGuard;
+
+pub static VM_PROFILER: Lazy<ActiveProfiler> = Lazy::new(ActiveProfiler::default);
 
 /// A function that can be profiled.
 pub trait ProfilerFunction {
     fn name(&self) -> String;
+}
+
+impl ProfilerFunction for Box<dyn AbstractFunction> {
+    fn name(&self) -> String {
+        self.to_canonical_string()
+    }
 }
 
 pub trait Profiler {
@@ -32,6 +41,7 @@ pub trait Profiler {
     fn instruction(&self, instruction: &Instruction) -> Self::InstrGuard;
 }
 
+#[derive(Default)]
 pub struct NoopProfiler;
 
 impl Profiler for NoopProfiler {
