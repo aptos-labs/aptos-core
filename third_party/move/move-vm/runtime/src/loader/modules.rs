@@ -117,6 +117,7 @@ pub(crate) struct StructInstantiation {
     pub(crate) field_count: u16,
     pub(crate) definition_struct_type: Arc<StructType>,
     pub(crate) instantiation: Vec<Type>,
+    pub(crate) is_fully_instantiated: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -142,6 +143,7 @@ pub(crate) struct FieldInstantiation {
     pub(crate) uninstantiated_field_ty: Type,
     pub(crate) definition_struct_type: Arc<StructType>,
     pub(crate) instantiation: Vec<Type>,
+    pub(crate) is_fully_instantiated: bool,
 }
 
 // Information about to support both generic and non-generic variant fields.
@@ -228,10 +230,12 @@ impl Module {
         for struct_inst in module.struct_instantiations() {
             let def = struct_inst.def.0 as usize;
             let struct_def = &structs[def];
+            let sig_idx = struct_inst.type_parameters.0 as usize;
             struct_instantiations.push(StructInstantiation {
                 field_count: struct_def.definition_struct_type.field_count(None),
-                instantiation: signature_table[struct_inst.type_parameters.0 as usize].clone(),
+                instantiation: signature_table[sig_idx].clone(),
                 definition_struct_type: struct_def.definition_struct_type.clone(),
+                is_fully_instantiated: is_fully_instantiated_signature[sig_idx],
             });
         }
 
@@ -280,11 +284,13 @@ impl Module {
                 .field_at(None, offset)?
                 .1
                 .clone();
+            let sig_idx = field_inst.type_parameters.0 as usize;
             field_instantiations.push(FieldInstantiation {
                 offset,
                 uninstantiated_field_ty: uninstantiated_ty,
-                instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
+                instantiation: signature_table[sig_idx].clone(),
                 definition_struct_type: owner_struct_def.definition_struct_type.clone(),
+                is_fully_instantiated: is_fully_instantiated_signature[sig_idx],
             });
         }
 

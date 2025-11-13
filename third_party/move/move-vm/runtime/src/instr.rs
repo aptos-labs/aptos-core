@@ -23,6 +23,10 @@ use move_vm_types::loaded_data::{
     runtime_types::{AbilityInfo, Type, TypeBuilder},
     struct_name_indexing::StructNameIndex,
 };
+use std::{
+    cell::RefCell,
+    collections::{hash_map::Entry, HashMap},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TestVariantV2 {
@@ -178,6 +182,10 @@ pub(crate) struct BytecodeTransformer<'a> {
 
     pub(crate) field_handles: &'a [FieldHandle],
     pub(crate) field_instantiations: &'a [FieldInstantiation],
+
+    // Caches for expensive type instantiation operations
+    field_ty_cache: RefCell<HashMap<FieldInstantiationIndex, Type>>,
+    pack_field_tys_cache: RefCell<HashMap<StructDefInstantiationIndex, Vec<Type>>>,
 }
 
 impl<'a> BytecodeTransformer<'a> {
@@ -190,7 +198,7 @@ impl<'a> BytecodeTransformer<'a> {
         field_instantiations: &'a [FieldInstantiation],
     ) -> Self {
         Self {
-            use_v2_instructions: true,
+            use_v2_instructions: true, // TODO: get this from config/feature flag
             ty_builder: TypeBuilder::with_limits(128, 20), // TODO: get this from config
             structs,
             struct_instantiations,
@@ -198,6 +206,8 @@ impl<'a> BytecodeTransformer<'a> {
             struct_variant_instantiation_infos,
             field_handles,
             field_instantiations,
+            field_ty_cache: RefCell::new(HashMap::new()),
+            pack_field_tys_cache: RefCell::new(HashMap::new()),
         }
     }
 
@@ -317,7 +327,7 @@ impl<'a> BytecodeTransformer<'a> {
                 // - PackGeneric: requires concrete instantiation for V2
                 PackGeneric(idx) => {
                     let struct_inst = &self.struct_instantiations[idx.0 as usize];
-                    if !struct_inst.instantiation.iter().all(|ty| ty.is_concrete()) {
+                    if !struct_inst.is_fully_instantiated {
                         return false;
                     }
                     // TODO: check depth
@@ -327,7 +337,7 @@ impl<'a> BytecodeTransformer<'a> {
                 // - MutBorrowFieldGeneric/ImmBorrowFieldGeneric: require concrete instantiation for V2
                 MutBorrowFieldGeneric(idx) | ImmBorrowFieldGeneric(idx) => {
                     let field_inst = &self.field_instantiations[idx.0 as usize];
-                    if !field_inst.instantiation.iter().all(|ty| ty.is_concrete()) {
+                    if !field_inst.is_fully_instantiated {
                         return false;
                     }
                 },
@@ -421,24 +431,31 @@ impl<'a> BytecodeTransformer<'a> {
 
         let field_inst = &self.field_instantiations[idx.0 as usize];
 
-        // TODO: used cached result -- we already compute this during module loading
-        let is_concrete = field_inst.instantiation.iter().all(|ty| ty.is_concrete());
-        if !is_concrete {
+        if !field_inst.is_fully_instantiated {
             // TODO: invariant violation if inline is true
             return fallback();
         }
 
-        // TODO: cache this
-        let field_ty = self
-            .ty_builder
-            .create_ty_with_subst(
-                &field_inst.uninstantiated_field_ty,
-                &field_inst.instantiation,
-            )
-            .map_err(|e| {
-                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
-                    .with_message(format!("Failed to create field type: {}", e))
-            })?;
+        // Check cache first
+        let field_ty = {
+            let mut cache = self.field_ty_cache.borrow_mut();
+            match cache.entry(idx) {
+                Entry::Occupied(entry) => entry.get().clone(),
+                Entry::Vacant(entry) => {
+                    let ty = self
+                        .ty_builder
+                        .create_ty_with_subst(
+                            &field_inst.uninstantiated_field_ty,
+                            &field_inst.instantiation,
+                        )
+                        .map_err(|e| {
+                            PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                                .with_message(format!("Failed to create field type: {}", e))
+                        })?;
+                    entry.insert(ty.clone()).clone()
+                },
+            }
+        };
 
         Ok(Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
             is_mut,
@@ -467,7 +484,6 @@ impl<'a> BytecodeTransformer<'a> {
                 struct_def.definition_struct_type.idx,
                 AbilityInfo::struct_(struct_def.definition_struct_type.abilities),
             );
-
             // TODO: check depth
 
             Instruction::PackV2(Box::new(PackV2 {
@@ -495,23 +511,32 @@ impl<'a> BytecodeTransformer<'a> {
 
         let struct_inst = &self.struct_instantiations[idx.0 as usize];
 
-        let is_concrete = struct_inst.instantiation.iter().all(|ty| ty.is_concrete());
-        if !is_concrete {
+        if !struct_inst.is_fully_instantiated {
             // TODO: invariant violation if inline is true
             return fallback();
         }
 
-        let mut field_tys = vec![];
-        for (_, ty) in struct_inst.definition_struct_type.fields(None)? {
-            field_tys.push(
-                self.ty_builder
-                    .create_ty_with_subst(ty, &struct_inst.instantiation)
-                    .map_err(|e| {
-                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
-                            .with_message(format!("Failed to create field type: {}", e))
-                    })?,
-            );
-        }
+        // Check cache first
+        let field_tys = {
+            let mut cache = self.pack_field_tys_cache.borrow_mut();
+            match cache.entry(idx) {
+                Entry::Occupied(entry) => entry.get().clone(),
+                Entry::Vacant(entry) => {
+                    let mut tys = vec![];
+                    for (_, ty) in struct_inst.definition_struct_type.fields(None)? {
+                        tys.push(
+                            self.ty_builder
+                                .create_ty_with_subst(ty, &struct_inst.instantiation)
+                                .map_err(|e| {
+                                    PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                                        .with_message(format!("Failed to create field type: {}", e))
+                                })?,
+                        );
+                    }
+                    entry.insert(tys.clone()).clone()
+                },
+            }
+        };
 
         // TODO: check depth
         let struct_ty = Type::StructInstantiation {
