@@ -21,7 +21,7 @@ pub fn fft_assign(poly: &mut Vec<Scalar>, dom: &EvaluationDomain) {
 }
 
 /// Computes the forward Fast Fourier Transform (FFT) of a polynomial.
-pub fn fft(poly: &Vec<Scalar>, dom: &EvaluationDomain) -> Vec<Scalar> {
+pub fn fft(poly: &[Scalar], dom: &EvaluationDomain) -> Vec<Scalar> {
     let mut evals = Vec::with_capacity(dom.N);
     evals.resize(poly.len(), Scalar::ZERO);
     evals.copy_from_slice(poly);

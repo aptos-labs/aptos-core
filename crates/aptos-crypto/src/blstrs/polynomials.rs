@@ -167,7 +167,7 @@ pub fn get_nonzero_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {
 }
 
 /// Returns the size of the evaluation domain needed to multiply these two polynomials via FFT.
-pub fn get_evaluation_dom_size_for_multiplication(f: &Vec<Scalar>, g: &Vec<Scalar>) -> usize {
+pub fn get_evaluation_dom_size_for_multiplication(f: &[Scalar], g: &[Scalar]) -> usize {
     //println!("get_eval_dom: |f| = {}, |g| = {}", f.len(), g.len());
     let f_deg = f.len() - 1;
     let g_deg = g.len() - 1;
@@ -175,13 +175,11 @@ pub fn get_evaluation_dom_size_for_multiplication(f: &Vec<Scalar>, g: &Vec<Scala
     // The degree $d$ of $f \cdot g$ will be $\deg{f} + \deg{g}$.
     let fg_deg = f_deg + g_deg;
     // But we need $d+1$ evaluations to interpolate a degree $d$ polynomial.
-    let num_evals = fg_deg + 1;
-
-    num_evals
+    fg_deg + 1
 }
 
 /// Returns an evaluation domain for an FFT of size the number of coefficients in the polynomial $f(X) \cdot g(X)$.
-pub fn get_evaluation_dom_for_multiplication(f: &Vec<Scalar>, g: &Vec<Scalar>) -> EvaluationDomain {
+pub fn get_evaluation_dom_for_multiplication(f: &[Scalar], g: &[Scalar]) -> EvaluationDomain {
     let num_evals = get_evaluation_dom_size_for_multiplication(f, g);
     EvaluationDomain::new(num_evals).unwrap()
 }
@@ -224,8 +222,8 @@ pub fn poly_sub_assign(f: &mut Vec<Scalar>, g: &[Scalar]) {
 }
 
 /// Returns $g(X) = a f(X)$.
-pub fn poly_mul_scalar(f: &Vec<Scalar>, a: Scalar) -> Vec<Scalar> {
-    let mut g = f.clone();
+pub fn poly_mul_scalar(f: &[Scalar], a: Scalar) -> Vec<Scalar> {
+    let mut g = f.to_owned();
     for c in g.iter_mut() {
         c.mul_assign(&a);
     }
@@ -284,20 +282,20 @@ pub fn poly_mul_assign_fft_with_dom(
     debug_assert!(!g.is_empty());
     debug_assert_eq!((f.len() - 1) + (g.len() - 1) + 1, dom.n);
 
-    fft::fft_assign(f, &dom);
-    fft::fft_assign(g, &dom);
+    fft::fft_assign(f, dom);
+    fft::fft_assign(g, dom);
     for i in 0..dom.N {
         f[i].mul_assign(g[i]);
     }
 
-    fft::ifft_assign(f, &dom);
+    fft::ifft_assign(f, dom);
     f.truncate(dom.n);
 }
 
 /// Like `poly_mul_assign_fft` but slower in time $\deg(f) \cdot \deg(g)$ and returns the product in
 /// `out`, leaving `f` and `g` untouched.
 /// TODO(Performance): Can we do this in-place over `f` or `g` without a separate `out`.
-pub fn poly_mul_assign_slow(f: &[Scalar], g: &Vec<Scalar>, out: &mut Vec<Scalar>) {
+pub fn poly_mul_assign_slow(f: &[Scalar], g: &[Scalar], out: &mut Vec<Scalar>) {
     assert!(!f.is_empty());
     assert!(!g.is_empty());
 
