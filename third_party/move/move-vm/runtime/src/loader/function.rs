@@ -644,7 +644,7 @@ impl Function {
                 .code
                 .iter()
                 .map(|b| bytecode_transformer.transform(b.clone()))
-                .collect(),
+                .collect::<PartialVMResult<Vec<_>>>()?,
             None => vec![],
         };
         let ty_param_abilities = handle.type_parameters.clone();

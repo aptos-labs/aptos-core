@@ -4,16 +4,20 @@
 use crate::loader::{
     FieldHandle, FieldInstantiation, StructDef, StructInstantiation, StructVariantInfo,
 };
-use move_binary_format::file_format::{
-    Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
-    FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex, SignatureIndex,
-    StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
-    StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
-    VariantIndex,
+use move_binary_format::{
+    errors::{PartialVMError, PartialVMResult},
+    file_format::{
+        Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
+        FunctionHandle, FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex,
+        SignatureIndex, StructDefInstantiationIndex, StructDefinitionIndex,
+        StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
+        VariantFieldInstantiationIndex, VariantIndex,
+    },
 };
 use move_core_types::{
     function::ClosureMask,
     int256::{I256, U256},
+    vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::{
     runtime_types::{AbilityInfo, Type, TypeBuilder},
@@ -197,16 +201,19 @@ impl<'a> BytecodeTransformer<'a> {
         }
     }
 
-    fn transform_vec_len(&self, idx: SignatureIndex) -> Instruction {
-        if self.use_fast_instructions {
+    fn transform_vec_len(&self, idx: SignatureIndex) -> PartialVMResult<Instruction> {
+        Ok(if self.use_fast_instructions {
             Instruction::VecLenV2
         } else {
             Instruction::VecLen(idx)
-        }
+        })
     }
 
-    fn transform_test_variant(&self, idx: StructVariantHandleIndex) -> Instruction {
-        if self.use_fast_instructions {
+    fn transform_test_variant(
+        &self,
+        idx: StructVariantHandleIndex,
+    ) -> PartialVMResult<Instruction> {
+        Ok(if self.use_fast_instructions {
             let info = &self.struct_variant_infos[idx.0 as usize];
             Instruction::TestVariantV2(TestVariantV2 {
                 variant_idx: info.variant,
@@ -214,11 +221,14 @@ impl<'a> BytecodeTransformer<'a> {
             })
         } else {
             Instruction::TestVariant(idx)
-        }
+        })
     }
 
-    fn transform_test_variant_generic(&self, idx: StructVariantInstantiationIndex) -> Instruction {
-        if self.use_fast_instructions {
+    fn transform_test_variant_generic(
+        &self,
+        idx: StructVariantInstantiationIndex,
+    ) -> PartialVMResult<Instruction> {
+        Ok(if self.use_fast_instructions {
             let info = &self.struct_variant_instantiation_infos[idx.0 as usize];
             Instruction::TestVariantV2(TestVariantV2 {
                 variant_idx: info.variant,
@@ -226,27 +236,28 @@ impl<'a> BytecodeTransformer<'a> {
             })
         } else {
             Instruction::TestVariantGeneric(idx)
-        }
+        })
     }
 
     #[allow(clippy::collapsible_else_if)]
-    fn transform_borrow_field(&self, is_mut: bool, idx: FieldHandleIndex) -> Instruction {
-        if self.use_fast_instructions {
+    fn transform_borrow_field(
+        &self,
+        is_mut: bool,
+        idx: FieldHandleIndex,
+    ) -> PartialVMResult<Instruction> {
+        Ok(if self.use_fast_instructions {
             let handle = &self.field_handles[idx.0 as usize];
-
             Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
                 is_mut,
                 field_offset: handle.offset,
                 struct_name_idx: handle.definition_struct_type.idx,
                 field_ty: handle.field_ty.clone(),
             }))
+        } else if is_mut {
+            Instruction::MutBorrowField(idx)
         } else {
-            if is_mut {
-                Instruction::MutBorrowField(idx)
-            } else {
-                Instruction::ImmBorrowField(idx)
-            }
-        }
+            Instruction::ImmBorrowField(idx)
+        })
     }
 
     #[allow(clippy::collapsible_else_if)]
@@ -254,18 +265,18 @@ impl<'a> BytecodeTransformer<'a> {
         &self,
         is_mut: bool,
         idx: FieldInstantiationIndex,
-    ) -> Instruction {
+    ) -> PartialVMResult<Instruction> {
         if self.use_fast_instructions {
             let field_inst = &self.field_instantiations[idx.0 as usize];
 
             // TODO: used cached result -- we're already computing this during module loading
             let is_concrete = field_inst.instantiation.iter().all(|ty| ty.is_concrete());
             if !is_concrete {
-                return if is_mut {
+                return Ok(if is_mut {
                     Instruction::MutBorrowFieldGeneric(idx)
                 } else {
                     Instruction::ImmBorrowFieldGeneric(idx)
-                };
+                });
             }
 
             let field_ty = self
@@ -274,31 +285,33 @@ impl<'a> BytecodeTransformer<'a> {
                     &field_inst.uninstantiated_field_ty,
                     &field_inst.instantiation,
                 )
-                .expect("Failed to create field type"); // TODO: handle error
+                .map_err(|e| {
+                    PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                        .with_message(format!("Failed to create field type: {}", e))
+                })?;
 
-            Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
+            Ok(Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
                 is_mut,
                 field_offset: field_inst.offset,
                 struct_name_idx: field_inst.definition_struct_type.idx,
                 field_ty,
-            }))
+            })))
         } else {
-            if is_mut {
+            Ok(if is_mut {
                 Instruction::MutBorrowFieldGeneric(idx)
             } else {
                 Instruction::ImmBorrowFieldGeneric(idx)
-            }
+            })
         }
     }
 
-    fn transform_pack(&self, idx: StructDefinitionIndex) -> Instruction {
-        if self.use_fast_instructions {
+    fn transform_pack(&self, idx: StructDefinitionIndex) -> PartialVMResult<Instruction> {
+        Ok(if self.use_fast_instructions {
             let struct_def = &self.structs[idx.0 as usize];
 
             let field_tys = struct_def
                 .definition_struct_type
-                .fields(None)
-                .expect("Failed to get fields") // TODO: handle error
+                .fields(None)?
                 .iter()
                 .map(|(_, ty)| ty.clone())
                 .collect();
@@ -318,29 +331,30 @@ impl<'a> BytecodeTransformer<'a> {
             }))
         } else {
             Instruction::Pack(idx)
-        }
+        })
     }
 
-    fn transform_pack_generic(&self, idx: StructDefInstantiationIndex) -> Instruction {
+    fn transform_pack_generic(
+        &self,
+        idx: StructDefInstantiationIndex,
+    ) -> PartialVMResult<Instruction> {
         if self.use_fast_instructions {
             let struct_inst = &self.struct_instantiations[idx.0 as usize];
 
             let is_concrete = struct_inst.instantiation.iter().all(|ty| ty.is_concrete());
             if !is_concrete {
-                return Instruction::PackGeneric(idx);
+                return Ok(Instruction::PackGeneric(idx));
             }
 
             let mut field_tys = vec![];
-            for (_, ty) in struct_inst
-                .definition_struct_type
-                .fields(None)
-                .expect("Failed to get fields")
-            // TODO: handle error
-            {
+            for (_, ty) in struct_inst.definition_struct_type.fields(None)? {
                 field_tys.push(
                     self.ty_builder
                         .create_ty_with_subst(ty, &struct_inst.instantiation)
-                        .expect("Failed to create field type"), // TODO: handle error
+                        .map_err(|e| {
+                            PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                                .with_message(format!("Failed to create field type: {}", e))
+                        })?,
                 );
             }
 
@@ -357,22 +371,22 @@ impl<'a> BytecodeTransformer<'a> {
                 ),
             };
 
-            Instruction::PackV2(Box::new(PackV2 {
+            Ok(Instruction::PackV2(Box::new(PackV2 {
                 is_generic: true,
                 field_count: struct_inst.field_count,
                 struct_ty,
                 field_tys,
-            }))
+            })))
         } else {
-            Instruction::PackGeneric(idx)
+            Ok(Instruction::PackGeneric(idx))
         }
     }
 
-    pub fn transform(&self, bytecode: Bytecode) -> Instruction {
+    pub fn transform(&self, bytecode: Bytecode) -> PartialVMResult<Instruction> {
         use Bytecode as B;
         use Instruction as I;
 
-        match bytecode {
+        Ok(match bytecode {
             B::Pop => I::Pop,
             B::Ret => I::Ret,
             B::BrTrue(offset) => I::BrTrue(offset),
@@ -392,28 +406,28 @@ impl<'a> BytecodeTransformer<'a> {
             B::StLoc(idx) => I::StLoc(idx),
             B::Call(idx) => I::Call(idx),
             B::CallGeneric(idx) => I::CallGeneric(idx),
-            B::Pack(idx) => self.transform_pack(idx),
-            B::PackGeneric(idx) => self.transform_pack_generic(idx),
+            B::Pack(idx) => self.transform_pack(idx)?,
+            B::PackGeneric(idx) => self.transform_pack_generic(idx)?,
             B::PackVariant(idx) => I::PackVariant(idx),
             B::PackVariantGeneric(idx) => I::PackVariantGeneric(idx),
             B::Unpack(idx) => I::Unpack(idx),
             B::UnpackGeneric(idx) => I::UnpackGeneric(idx),
             B::UnpackVariant(idx) => I::UnpackVariant(idx),
             B::UnpackVariantGeneric(idx) => I::UnpackVariantGeneric(idx),
-            B::TestVariant(idx) => self.transform_test_variant(idx),
-            B::TestVariantGeneric(idx) => self.transform_test_variant_generic(idx),
+            B::TestVariant(idx) => self.transform_test_variant(idx)?,
+            B::TestVariantGeneric(idx) => self.transform_test_variant_generic(idx)?,
             B::ReadRef => I::ReadRef,
             B::WriteRef => I::WriteRef,
             B::FreezeRef => I::FreezeRef,
             B::MutBorrowLoc(idx) => I::MutBorrowLoc(idx),
             B::ImmBorrowLoc(idx) => I::ImmBorrowLoc(idx),
-            B::MutBorrowField(idx) => self.transform_borrow_field(true, idx),
+            B::MutBorrowField(idx) => self.transform_borrow_field(true, idx)?,
             B::MutBorrowVariantField(idx) => I::MutBorrowVariantField(idx),
-            B::MutBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(true, idx),
+            B::MutBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(true, idx)?,
             B::MutBorrowVariantFieldGeneric(idx) => I::MutBorrowVariantFieldGeneric(idx),
-            B::ImmBorrowField(idx) => self.transform_borrow_field(false, idx),
+            B::ImmBorrowField(idx) => self.transform_borrow_field(false, idx)?,
             B::ImmBorrowVariantField(idx) => I::ImmBorrowVariantField(idx),
-            B::ImmBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(false, idx),
+            B::ImmBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(false, idx)?,
             B::ImmBorrowVariantFieldGeneric(idx) => I::ImmBorrowVariantFieldGeneric(idx),
             B::MutBorrowGlobal(idx) => I::MutBorrowGlobal(idx),
             B::MutBorrowGlobalGeneric(idx) => I::MutBorrowGlobalGeneric(idx),
@@ -447,7 +461,7 @@ impl<'a> BytecodeTransformer<'a> {
             B::Shl => I::Shl,
             B::Shr => I::Shr,
             B::VecPack(idx, n) => I::VecPack(idx, n),
-            B::VecLen(idx) => self.transform_vec_len(idx),
+            B::VecLen(idx) => self.transform_vec_len(idx)?,
             B::VecImmBorrow(idx) => I::VecImmBorrow(idx),
             B::VecMutBorrow(idx) => I::VecMutBorrow(idx),
             B::VecPushBack(idx) => I::VecPushBack(idx),
@@ -476,7 +490,7 @@ impl<'a> BytecodeTransformer<'a> {
             B::CastI128 => I::CastI128,
             B::CastI256 => I::CastI256,
             B::Negate => I::Negate,
-        }
+        })
     }
 }
 
