@@ -1,7 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! A profiler that emits USDT probes.
+//! A profiler that emits USDT (Userland Statically Defined Tracing) probes.
+//! See [usdt](https://crates.io/crates/usdt).
 
 use crate::Profiler;
 use move_vm_types::instr::Instruction;
