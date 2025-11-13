@@ -66,8 +66,6 @@ pub(crate) fn update_dependency(
                         status
                         ));
     }
-    fetch_latest_origin_rev(git_path, dep_name)?;
-    checkout_rev(git_path, git_rev, dep_name)?;
     Ok(())
 }
 
