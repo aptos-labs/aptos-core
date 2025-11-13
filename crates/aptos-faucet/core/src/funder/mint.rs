@@ -133,13 +133,9 @@ impl MintFunderConfig {
 
         let asset_names: Vec<String> = minter.assets.keys().cloned().collect();
         for asset_name in asset_names {
-            let (asset_config, account_rwlock) =
-                minter.assets.get(&asset_name).unwrap_or_else(|| {
-                    panic!(
-                        "Asset '{}' does not exist - this should never happen",
-                        asset_name
-                    )
-                });
+            let (asset_config, _) = minter
+                .get_asset(&asset_name)
+                .with_context(|| format!("Asset '{}' not found", asset_name))?;
 
             if !asset_config.do_not_delegate {
                 // Delegate permissions to a new account
@@ -151,7 +147,12 @@ impl MintFunderConfig {
                     })?;
 
                 // Update the account in the assets map
-                *account_rwlock.write().await = delegated_account;
+                minter
+                    .update_asset_account(&asset_name, delegated_account)
+                    .await
+                    .with_context(|| {
+                        format!("Failed to update asset account for '{}'", asset_name)
+                    })?;
             }
         }
 
@@ -338,6 +339,20 @@ impl MintFunder {
     /// Returns an error if the asset doesn't exist.
     fn get_asset_config(&self, asset_name: &str) -> Result<&MintAssetConfig, AptosTapError> {
         self.get_asset(asset_name).map(|(config, _)| config)
+    }
+
+    /// Update the account for a given asset name.
+    /// This is useful after delegating mint capabilities to a new account.
+    pub async fn update_asset_account(
+        &self,
+        asset_name: &str,
+        new_account: LocalAccount,
+    ) -> Result<()> {
+        let account_rwlock = self
+            .get_asset_account(asset_name)
+            .map_err(|e| anyhow::anyhow!("{}", e))?;
+        *account_rwlock.write().await = new_account;
+        Ok(())
     }
 
     /// Core processing logic that handles sequence numbers and transaction submission.

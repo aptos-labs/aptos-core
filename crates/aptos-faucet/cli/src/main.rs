@@ -119,10 +119,16 @@ impl FaucetCliArgs {
         );
 
         // Create an account that we'll delegate mint functionality to, then use it.
-        mint_funder
+        let delegated_account = mint_funder
             .use_delegated_account(DEFAULT_ASSET_NAME)
             .await
             .context("Failed to make MintFunder use delegated account")?;
+
+        // Update the assets map with the delegated account that has mint capabilities
+        mint_funder
+            .update_asset_account(DEFAULT_ASSET_NAME, delegated_account)
+            .await
+            .context("Failed to update asset account with delegated account")?;
 
         let accounts: HashSet<AccountAddress> = self
             .accounts
