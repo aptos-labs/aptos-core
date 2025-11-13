@@ -116,6 +116,11 @@ macro_rules! set_err_info {
     }};
 }
 
+// TODO(fastcall):
+// - Fix async paranoid mode
+// - Fix tracing
+// - Check error location of inlined code
+
 /// `Interpreter` instances can execute Move functions.
 ///
 /// An `Interpreter` instance is a stand alone execution context for a function.
@@ -474,6 +479,31 @@ where
                     )
                     .map_err(|err| set_err_info!(current_frame, err))?;
 
+                    if function.function.is_inlineable {
+                        let code = &function.function.code[function.function.param_tys.len()..];
+
+                        let exit_code = current_frame
+                            .execute_inline_code::<RTTCheck, RTRCheck>(
+                                &mut self,
+                                data_cache,
+                                gas_meter,
+                                traversal_context,
+                                trace_recorder,
+                                code,
+                            )
+                            .map_err(|err| {
+                                self.attach_state_if_invariant_violation(err, &current_frame)
+                            })?;
+                        current_frame.pc += 1;
+
+                        // TODO: record successful instruction?
+                        trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
+
+                        assert!(matches!(exit_code, ExitCode::Return));
+
+                        continue;
+                    }
+
                     // Charge gas
                     gas_meter
                         .charge_call(
@@ -567,6 +597,26 @@ where
                         CallType::Regular,
                     )
                     .map_err(|err| set_err_info!(current_frame, err))?;
+
+                    if function.function.is_inlineable {
+                        let code = &function.function.code[function.function.param_tys.len()..];
+
+                        let exit_code = current_frame.execute_inline_code::<RTTCheck, RTRCheck>(
+                            &mut self,
+                            data_cache,
+                            gas_meter,
+                            traversal_context,
+                            trace_recorder,
+                            code,
+                        )?;
+                        current_frame.pc += 1;
+
+                        // TODO: record successful instruction?
+                        trace_recorder
+                            .record_successful_instruction(&Instruction::CallGeneric(idx));
+                        assert!(matches!(exit_code, ExitCode::Return));
+                        continue;
+                    }
 
                     // Charge gas
                     gas_meter
@@ -1897,8 +1947,51 @@ impl Frame {
             gas_meter,
             traversal_context,
             trace_recorder,
+            None,
         )
         .map_err(|e| {
+            let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                e.with_exec_state(interpreter.get_internal_state())
+            } else {
+                e
+            };
+            if is_tracing_for!(TraceCategory::VMError) {
+                let mut str = String::new();
+                if let Err(print_err) = interpreter
+                    .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
+                {
+                    str = format!("<while printing stack trace>: {}", print_err);
+                }
+                eprintln!("trace vm_error {}:\n{}", e, str)
+            }
+            set_err_info!(self, e)
+        })
+    }
+
+    fn execute_inline_code<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
+        &mut self,
+        interpreter: &mut InterpreterImpl<impl Loader>,
+        data_cache: &mut impl MoveVmDataCache,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        trace_recorder: &mut impl TraceRecorder,
+        code: &[Instruction],
+    ) -> VMResult<ExitCode> {
+        let old_pc = self.pc;
+        self.pc = 0;
+
+        let res = self.execute_code_impl::<RTTCheck, RTRCheck>(
+            interpreter,
+            data_cache,
+            gas_meter,
+            traversal_context,
+            trace_recorder,
+            Some(code),
+        );
+
+        self.pc = old_pc;
+
+        res.map_err(|e| {
             let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
                 e.with_exec_state(interpreter.get_internal_state())
             } else {
@@ -1924,14 +2017,16 @@ impl Frame {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         trace_recorder: &mut impl TraceRecorder,
+        code: Option<&[Instruction]>,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
 
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
-        let code = self.function.code();
+        let code = code.unwrap_or_else(|| self.function.code());
         loop {
             for instruction in &code[self.pc as usize..] {
+                /*
                 trace!(
                     &self.function,
                     &self.locals,
@@ -1940,6 +2035,7 @@ impl Frame {
                     interpreter.loader.runtime_environment(),
                     interpreter
                 );
+                */
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(
