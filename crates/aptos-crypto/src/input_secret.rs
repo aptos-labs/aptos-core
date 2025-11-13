@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{blstrs::random_scalar, Uniform};
+use crate::{blstrs::random_scalar, Uniform};
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use blstrs::Scalar;
 use ff::Field;

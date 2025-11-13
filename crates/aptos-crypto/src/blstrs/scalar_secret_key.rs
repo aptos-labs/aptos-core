@@ -1,19 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    algebra::lagrange::lagrange_coefficients,
-    pvss::{traits::Reconstructable, Player, ThresholdConfigBlstrs},
-};
-use aptos_crypto::traits::{SecretSharingConfig as _, ThresholdConfig as _};
+use crate::traits::{SecretSharingConfig as _, ThresholdConfig as _};
+use crate::arkworks::shamir::Reconstructable;
+use crate::{player::Player, blstrs::threshold_config::ThresholdConfigBlstrs};
+use crate::blstrs::lagrange::lagrange_coefficients;
 use blstrs::Scalar;
 use ff::Field;
 use more_asserts::{assert_ge, assert_le};
 
 impl Reconstructable<ThresholdConfigBlstrs> for Scalar {
-    type Share = Scalar;
+    type ShareValue = Scalar;
 
-    fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<(Player, Self::Share)>) -> Self {
+    fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<(Player, Self::ShareValue)>) -> anyhow::Result<Self> {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
 
@@ -28,12 +27,13 @@ impl Reconstructable<ThresholdConfigBlstrs> for Scalar {
             .map(|(_, share)| *share)
             .collect::<Vec<Scalar>>();
 
+        // TODO should this return a 
         assert_eq!(lagr.len(), shares.len());
 
-        shares
+        Ok(shares
             .iter()
             .zip(lagr.iter())
             .map(|(&share, &lagr)| share * lagr)
-            .sum::<Scalar>()
+            .sum::<Scalar>())
     }
 }

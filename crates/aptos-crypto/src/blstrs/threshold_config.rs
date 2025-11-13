@@ -2,15 +2,16 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::Player,
+    blstrs::{evaluation_domain::{BatchEvaluationDomain, EvaluationDomain}, random::random_scalars}, 
+    traits::{self, ThresholdConfig as _},
+    input_secret::InputSecret, player::Player, 
 };
 use anyhow::anyhow;
-use aptos_crypto::traits::{self, ThresholdConfig as _};
 use rand::{seq::IteratorRandom, Rng};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::fmt::{Display, Formatter};
+use blstrs::Scalar;
 
 /// Encodes the *threshold configuration* for a normal/unweighted PVSS: i.e., the threshold $t$ and
 /// the number of players $n$ such that any $t$ or more players can reconstruct a dealt secret given
@@ -19,9 +20,9 @@ use std::fmt::{Display, Formatter};
 pub struct ThresholdConfigBlstrs {
     /// The reconstruction threshold $t$ that must be exceeded in order to reconstruct the dealt
     /// secret; i.e., $t$ or more shares are needed
-    pub(crate) t: usize,
+    pub t: usize,
     /// The total number of players involved in the PVSS protocol
-    pub(crate) n: usize,
+    pub n: usize,
     /// Evaluation domain consisting of the $N$th root of unity and other auxiliary information
     /// needed to compute an FFT of size $N$.
     #[serde(skip)]
@@ -133,10 +134,32 @@ impl traits::ThresholdConfig for ThresholdConfigBlstrs {
     }
 }
 
+/// Deals a secret `s` in a `t`-out-of-`n` fashion (as per `sc`) returning (1) the degree `t-1`
+/// polynomial encoding the secret and (2) its evaluations at all the `n` $N$th roots-of-unity where
+/// $N$ is the smallest power of two $\ge n$.
+///
+/// Any `t` evaluations are sufficient to reconstruct the secret `s`.
+pub fn shamir_secret_share<
+    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+>(
+    sc: &ThresholdConfigBlstrs,
+    s: &InputSecret,
+    rng: &mut R,
+) -> (Vec<Scalar>, Vec<Scalar>) {
+    // A random, degree t-1 polynomial $f(X) = [a_0, \dots, a_{t-1}]$, with $a_0$ set to `s.a`
+    let mut f = random_scalars(sc.t, rng);
+    f[0] = *s.get_secret_a();
+
+    // Evaluate $f$ at all the $N$th roots of unity.
+    let mut f_evals = crate::blstrs::fft::fft(&f, sc.get_evaluation_domain());
+    f_evals.truncate(sc.n);
+    (f, f_evals)
+}
+
 #[cfg(test)]
 mod test {
-    use crate::pvss::ThresholdConfigBlstrs;
-    use aptos_crypto::traits::ThresholdConfig as _;
+    use crate::blstrs::threshold_config::ThresholdConfigBlstrs;
+    use crate::traits::ThresholdConfig as _;
 
     #[test]
     fn create_many_configs() {

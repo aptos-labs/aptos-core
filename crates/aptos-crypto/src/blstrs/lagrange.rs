@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::{
+use crate::blstrs::{
     evaluation_domain::BatchEvaluationDomain,
     fft::{fft, fft_assign},
     polynomials::{accumulator_poly, poly_differentiate, poly_eval, poly_mul_slow},
@@ -311,15 +311,15 @@ fn compute_numerators(
 #[cfg(test)]
 mod test {
     use crate::{
-        algebra::{
+        blstrs::{
             evaluation_domain::BatchEvaluationDomain,
             fft::fft_assign,
             lagrange::{all_n_lagrange_coefficients, lagrange_coefficients, FFT_THRESH},
             polynomials::poly_eval,
+            random::random_scalars,
         },
-        utils::random::random_scalars,
     };
-    use aptos_crypto::blstrs::random_scalar;
+    use crate::blstrs::random_scalar;
     use blstrs::Scalar;
     use ff::Field;
     use rand::{seq::IteratorRandom, thread_rng};

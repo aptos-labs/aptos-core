@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::CryptoMaterialError;
+use crate::CryptoMaterialError;
 use blstrs::Scalar;
 use ff::{Field, PrimeField};
 use more_asserts::{assert_gt, assert_le};

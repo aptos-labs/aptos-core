@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::{Player, ThresholdConfigBlstrs},
+    arkworks::shamir::Reconstructable, blstrs::{evaluation_domain::{BatchEvaluationDomain, EvaluationDomain}, threshold_config::ThresholdConfigBlstrs}, player::Player, traits::{self, SecretSharingConfig as _, ThresholdConfig as _}
 };
 use anyhow::anyhow;
-use aptos_crypto::traits::{self, SecretSharingConfig as _, ThresholdConfig as _};
 use more_asserts::assert_lt;
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
@@ -317,10 +315,41 @@ impl traits::SecretSharingConfig for WeightedConfig {
     }
 }
 
+/// Implements weighted reconstruction of a secret `SK` through the existing unweighted reconstruction
+/// implementation of `SK`.
+impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig> for SK {
+    type ShareValue = Vec<SK::ShareValue>;
+
+    fn reconstruct(sc: &WeightedConfig, shares: &Vec<(Player, Self::ShareValue)>) -> anyhow::Result<Self> {
+        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
+
+        // println!();
+        for (player, sub_shares) in shares {
+            // println!(
+            //     "Flattening {} share(s) for player {player}",
+            //     sub_shares.len()
+            // );
+            for (pos, share) in sub_shares.iter().enumerate() {
+                let virtual_player = sc.get_virtual_player(player, pos);
+
+                // println!(
+                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
+                //     share
+                // );
+                // TODO(Performance): Avoiding the cloning here might be nice
+                let tuple = (virtual_player, share.clone());
+                flattened_shares.push(tuple);
+            }
+        }
+
+        SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
+    }
+}
+
 #[cfg(test)]
 mod test {
-    use crate::pvss::WeightedConfig;
-    use aptos_crypto::traits::SecretSharingConfig as _;
+    use crate::blstrs::weighted_config::WeightedConfig;
+    use crate::traits::SecretSharingConfig as _;
 
     #[test]
     fn bvt() {

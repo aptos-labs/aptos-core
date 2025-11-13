@@ -4,29 +4,37 @@
 //! Contains a version of shamir secret sharing and `ThresholdConfig` for arkworks
 
 use crate::{
-    arkworks::{differentiate::DifferentiableFn, vanishing_poly},
+    arkworks::{differentiate::DifferentiableFn, vanishing_poly, weighted_sum::WeightedSum},
     player::Player,
     traits,
     traits::SecretSharingConfig,
 };
 use anyhow::{anyhow, Result};
-use ark_ec::CurveGroup;
+use ark_ec::{CurveGroup};
 use ark_ff::{batch_inversion, FftField, Field, PrimeField};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
+use ark_ff::{Fp, FpConfig};
 use rand::{seq::IteratorRandom, Rng};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{HashMap, HashSet};
 
-/// A pair corresponding to a player (i.e., an index into the roots of unity) and a field element
-/// evaluation
-#[allow(type_alias_bounds)]
-pub type ShamirShare<F: PrimeField> = (Player, F);
-/// A pair corresponding to a player (i.e., an index into the roots of unity) and a group element
-/// whose exponent is an evaluation
-#[allow(type_alias_bounds)]
-pub type ShamirGroupShare<G: CurveGroup> = (Player, G::Affine);
+
+type ShamirShare<F: WeightedSum> = (Player, F);
+type ShamirGroupShare<G: CurveGroup> = ShamirShare<G>;
+
+/// All dealt secret keys should be reconstructable from a subset of \[dealt secret key\] shares.
+/// TODO: Should we keep Vec<(Player, Self::Share)> ? Vec<ShamirShare> looks simpler / more descriptive
+pub trait Reconstructable<SSC: traits::SecretSharingConfig> : Sized {
+    /// The "share" type. Minor nit: this is a slight misnomer; you can't actually reconstruct
+    /// using just a vec of shares, you need a vec of pairs (Player, Self::Share). So the pair
+    /// itself corresponds more closely to the definition of a share
+    type ShareValue: Clone;
+
+    /// The reconstruct function
+    fn reconstruct(sc: &SSC, shares: &Vec<(Player, Self::ShareValue)>) -> Result<Self>;
+}
 
 /// Configuration for a threshold cryptography scheme. Usually one restricts `F` to `Primefield`
 /// but any field is theoretically possible.
@@ -264,8 +272,7 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
 
         // Step 3b: Only keep the relevant evaluations, then perform a batch inversion
         let domain_vec: Vec<F> = self.domain.elements().collect();
-        let derivative_map: HashMap<F, F> = domain_vec.into_iter().zip(derivative_evals).collect();
-        let mut denominators: Vec<F> = xs_vec.iter().map(|x| derivative_map[x]).collect();
+        let mut denominators: Vec<F> = indices.iter().map(|i| derivative_evals[*i]).collect();
         batch_inversion(&mut denominators);
 
         // Step 4: compute Lagrange coefficients
@@ -282,58 +289,38 @@ impl<F: PrimeField> ShamirThresholdConfig<F> {
     /// it outside of this file so it won't depend on the specific version of the `rand` crate.
     /// 2. The polynomial is evaluated over the `domain` using FFT to produce all evaluations,
     ///    which are subsequently trunked.
-    pub fn share(&self, coeffs: &[F]) -> Vec<ShamirShare<F>> {
+    pub fn share(&self, coeffs: &[F]) -> Vec<(Player, F)> {
         debug_assert_eq!(coeffs.len(), self.t);
         let evals = self.domain.fft(coeffs);
         (0..self.n).map(|i| self.get_player(i)).zip(evals).collect()
     }
+}
 
-    /// This method uses Lagrange interpolation to recover the original secret
-    /// from exactly `t` shares. Each share is an `(x, y)` point on the secret-sharing
-    /// polynomial. The interpolation coefficients are computed over the field `F`.
-    pub fn reconstruct(&self, shares: &[ShamirShare<F>]) -> Result<F> {
-        if shares.len() != self.t {
+
+
+impl<T: WeightedSum> Reconstructable<ShamirThresholdConfig<T::Scalar>> for T {
+    type ShareValue = T;
+
+    fn reconstruct(sc: &ShamirThresholdConfig<T::Scalar>, shares: &Vec<(Player, Self::ShareValue)>) -> Result<Self> {
+        if shares.len() != sc.t {
             Err(anyhow!("Incorrect number of shares provided"))
         } else {
-            let mut sum = F::zero();
+            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<Self::ShareValue>) =
+                shares.into_iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
 
-            let roots_of_unity_indices: Vec<usize> =
-                shares.iter().map(|(p, _)| p.get_id()).collect();
-            let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
+            let lagrange_coeffs = sc.lagrange_for_subset(&roots_of_unity_indices);
 
-            for (l_i, (_, y)) in lagrange_coeffs.into_iter().zip(shares) {
-                sum += l_i * y;
-            }
-
-            Ok(sum)
-        }
-    }
-
-    /// Same as above, but in the exponent.
-    pub fn reconstruct_in_exponent<G: CurveGroup<ScalarField = F>>(
-        &self,
-        shares: &[ShamirGroupShare<G>],
-    ) -> Result<G::Affine> {
-        if shares.len() != self.t {
-            Err(anyhow!("Incorrect number of shares provided"))
-        } else {
-            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<G::Affine>) =
-                shares.iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
-
-            let lagrange_coeffs = self.lagrange_for_subset(&roots_of_unity_indices);
-
-            Ok(G::msm(&bases, &lagrange_coeffs)
-                .expect("MSM failed during reconstruct_in_exponent()")
-                .into())
+            Ok(T::weighted_sum(&bases, &lagrange_coeffs))
         }
     }
 }
+
 
 #[cfg(test)]
 mod shamir_tests {
     use super::*;
     use crate::arkworks::random::sample_field_elements;
-    use ark_bn254::{Fr, G1Affine, G1Projective};
+    use ark_bn254::{Fr, G1Affine};
     use ark_ec::AffineRepr as _;
     use ark_ff::One;
     use itertools::Itertools;
@@ -387,7 +374,7 @@ mod shamir_tests {
         rng: &mut impl rand::RngCore,
         t: usize,
         n: usize,
-    ) -> (ShamirThresholdConfig<Fr>, Fr, Vec<ShamirShare<Fr>>) {
+    ) -> (ShamirThresholdConfig<Fr>, Fr, Vec<(Player, Fr)>) {
         let sharing_scheme = ShamirThresholdConfig::new(t, n);
 
         let coeffs = sample_field_elements(t, rng);
@@ -405,11 +392,11 @@ mod shamir_tests {
                 let (sharing_scheme, secret, shares) = sample_shares(&mut rng, t, n);
 
                 for reconstruct_shares in shares.iter().combinations(t) {
-                    let reconstruct_shares_vec: Vec<ShamirShare<Fr>> =
+                    let reconstruct_shares_vec: Vec<(Player, Fr)> =
                         reconstruct_shares.into_iter().cloned().collect();
 
                     assert_eq!(
-                        sharing_scheme.reconstruct(&reconstruct_shares_vec).unwrap(),
+                        Fr::reconstruct(&sharing_scheme, &reconstruct_shares_vec).unwrap(),
                         secret
                     );
                 }
@@ -424,15 +411,14 @@ mod shamir_tests {
             for t in 1..=n {
                 let (sharing_scheme, secret, shares) = sample_shares(&mut rng, t, n);
 
-                let shares_g1: Vec<ShamirGroupShare<G1Projective>> = shares
+                let shares_g1: Vec<ShamirGroupShare<G1Affine>> = shares
                     .into_iter()
                     .map(|(player, y)| (player, (G1Affine::generator() * y).into()))
                     .collect();
 
                 for reconstruct_shares_g1 in shares_g1.into_iter().combinations(t) {
                     assert_eq!(
-                        sharing_scheme
-                            .reconstruct_in_exponent::<G1Projective>(&reconstruct_shares_g1)
+                        G1Affine::reconstruct(&sharing_scheme, &reconstruct_shares_g1)
                             .unwrap(),
                         G1Affine::generator() * secret
                     );
