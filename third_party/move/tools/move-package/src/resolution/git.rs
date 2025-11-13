@@ -147,7 +147,6 @@ fn fetch_latest_origin_rev(repo_path: &str, dep_name: PackageName) -> anyhow::Re
     cmd
         .status()
         .map_err(|_| {
-            println!("failed");
             anyhow::anyhow!(
                 "Failed to fetch latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps",
                 dep_name
