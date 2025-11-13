@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::evaluation_domain::EvaluationDomain;
+use crate::blstrs::evaluation_domain::EvaluationDomain;
 use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
 use std::ops::{AddAssign, MulAssign, SubAssign};
@@ -199,11 +199,11 @@ pub fn serial_fft_assign_g2(a: &mut [G2Projective], omega: &Scalar, log_n: u32) 
 #[cfg(test)]
 mod test {
     use crate::{
-        algebra::{
+        blstrs::{
             evaluation_domain::{smallest_power_of_2_greater_than_or_eq, EvaluationDomain},
             fft::fft_assign,
+            random::random_scalars,
         },
-        utils::random::random_scalars,
     };
     use rand::thread_rng;
 

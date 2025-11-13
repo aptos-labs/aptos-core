@@ -1,8 +1,17 @@
-// Copyright (c) Aptos Foundation
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Helper functions and constants for blstrs code.
+pub mod evaluation_domain;
+pub mod fft;
+pub mod lagrange;
+pub mod polynomials;
+pub mod threshold_config;
+pub mod weighted_config;
+pub mod random;
+pub mod scalar_secret_key;
 
+use ark_ec::{pairing::Pairing, AffineRepr};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use crate::CryptoMaterialError;
 use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};
 use ff::Field;
@@ -12,6 +21,23 @@ use num_integer::Integer;
 use num_traits::Zero;
 use once_cell::sync::Lazy;
 use pairing::{MillerLoopResult, MultiMillerLoop};
+
+
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct GroupGenerators<E: Pairing> {
+    pub g1: E::G1Affine,
+    pub g2: E::G2Affine,
+}
+
+impl<E: Pairing> Default for GroupGenerators<E> {
+    fn default() -> Self {
+        Self {
+            g1: E::G1Affine::generator(),
+            g2: E::G2Affine::generator(),
+        }
+    }
+}
+
 
 /// The size in bytes of a scalar.
 pub const SCALAR_NUM_BYTES: usize = 32;

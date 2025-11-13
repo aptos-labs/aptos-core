@@ -10,6 +10,7 @@ pub mod scrape;
 pub mod serialization;
 pub mod shamir;
 pub mod vanishing_poly;
+pub mod weighted_sum;
 
 use ark_ec::AffineRepr;
 use ark_ff::{BigInteger, FftField, Field, PrimeField};

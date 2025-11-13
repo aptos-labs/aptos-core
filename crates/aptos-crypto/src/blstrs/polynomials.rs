@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{
+    blstrs::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         fft,
     },
-    pvss::{input_secret::InputSecret, ThresholdConfigBlstrs},
-    utils::{is_power_of_two, random::random_scalars},
 };
 use ark_ff::Field;
 use blstrs::Scalar;
@@ -15,7 +13,12 @@ use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 
-pub(crate) fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
+#[inline]
+pub fn is_power_of_two(n: usize) -> bool {
+    n != 0 && (n & (n - 1) == 0)
+}
+
+pub fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
     let degree = coeffs.len().saturating_sub(1);
     let mut result = Vec::with_capacity(degree);
 
@@ -26,7 +29,7 @@ pub(crate) fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
     result
 }
 
-pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
+pub fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
     for i in 0..degree {
         coeffs[i] = coeffs[i + 1].mul(F::from((i + 1) as u64));
@@ -51,7 +54,7 @@ pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
 /// # Returns
 /// A `Vec<F>` containing the evaluations of `(f_i - y) / (x_i - x)` for each index `i`.
 /// Or will panic if one of the `x_i` equals `x`.
-pub(crate) fn quotient_evaluations_batch<F: Field>(
+pub fn quotient_evaluations_batch<F: Field>(
     f_vals: &[F],
     x_vals: &[F],
     x: F,
@@ -641,24 +644,3 @@ fn accumulator_poly_scheduled_inner(
     b1
 }
 
-/// Deals a secret `s` in a `t`-out-of-`n` fashion (as per `sc`) returning (1) the degree `t-1`
-/// polynomial encoding the secret and (2) its evaluations at all the `n` $N$th roots-of-unity where
-/// $N$ is the smallest power of two $\ge n$.
-///
-/// Any `t` evaluations are sufficient to reconstruct the secret `s`.
-pub fn shamir_secret_share<
-    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
->(
-    sc: &ThresholdConfigBlstrs,
-    s: &InputSecret,
-    rng: &mut R,
-) -> (Vec<Scalar>, Vec<Scalar>) {
-    // A random, degree t-1 polynomial $f(X) = [a_0, \dots, a_{t-1}]$, with $a_0$ set to `s.a`
-    let mut f = random_scalars(sc.t, rng);
-    f[0] = *s.get_secret_a();
-
-    // Evaluate $f$ at all the $N$th roots of unity.
-    let mut f_evals = fft::fft(&f, sc.get_evaluation_domain());
-    f_evals.truncate(sc.n);
-    (f, f_evals)
-}

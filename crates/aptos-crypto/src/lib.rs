@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #![forbid(unsafe_code)]
-#![deny(missing_docs)]
 
 //! A library supplying various cryptographic primitives
 pub mod arkworks;
@@ -18,6 +17,7 @@ pub mod encoding_type;
 pub mod error;
 pub mod hash;
 pub mod hkdf;
+pub mod input_secret;
 pub mod multi_ed25519;
 pub mod noise;
 pub mod player;
