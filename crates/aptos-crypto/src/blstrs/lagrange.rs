@@ -281,7 +281,7 @@ fn compute_numerators_at_zero(omegas: &[Scalar], T: &[usize], Z_0: &Scalar) -> V
 #[allow(non_snake_case)]
 fn compute_numerators(
     Z: &Vec<Scalar>,
-    omegas: &Vec<Scalar>,
+    omegas: &[Scalar],
     ids: &[usize],
     alpha: &Scalar,
 ) -> Vec<Scalar> {
