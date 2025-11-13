@@ -4,6 +4,9 @@ cloud: EKS
 # -- Default image tag to use for all aptos images
 imageTag: devnet
 
+# -- Arbitrary value to force a helm upgrade, in case we run genesis multiple times on the same chain ID, era pair
+arbitraryValue: 0
+
 genesis:
   # -- Validator username prefix, used to get genesis secrets. This should be the fullname for the aptos-node helm release
   username_prefix: aptos-node
@@ -11,6 +14,11 @@ genesis:
   numValidators:
   # -- Aptos Chain ID
   chain_id:
+
+tools:
+  image:
+    repo: aptoslabs/tools
+    tag:
 
 waypoint:
   image:
@@ -55,3 +63,5 @@ ingress:
   enableStickyness: true
   # -- If stickiness is enabled, how long the session cookie should last
   cookieDurationSeconds: 86400
+  # -- Whether to route to the Node API as a fallback
+  routeToNodeApi: false
