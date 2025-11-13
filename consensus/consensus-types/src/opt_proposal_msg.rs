@@ -120,6 +120,6 @@ impl OptProposalMsg {
         qc_verify_result?;
 
         // Note that we postpone the verification of SyncInfo until it's being used.
-        self.block_data.verify_well_formed()
+        self.verify_well_formed()
     }
 }
