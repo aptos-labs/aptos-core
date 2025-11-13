@@ -105,7 +105,8 @@ pub fn all_lagrange_denominators(
     // If `include_zero`, need to:
     if include_zero {
         // 1. Augment A'(\omega_i) = A'(\omega_i) * \omega^i, for all i\ in [0, n)
-        denoms.iter_mut()
+        denoms
+            .iter_mut()
             .enumerate()
             .for_each(|(i, d)| *d *= batch_dom.get_root_of_unity(i));
 

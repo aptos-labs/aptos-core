@@ -307,10 +307,8 @@ impl<T: WeightedSum> Reconstructable<ShamirThresholdConfig<T::Scalar>> for T {
         if shares.len() != sc.t {
             Err(anyhow!("Incorrect number of shares provided"))
         } else {
-            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<Self::ShareValue>) = shares
-                .iter()
-                .map(|(p, g_y)| (p.get_id(), g_y))
-                .collect();
+            let (roots_of_unity_indices, bases): (Vec<usize>, Vec<Self::ShareValue>) =
+                shares.iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
 
             let lagrange_coeffs = sc.lagrange_for_subset(&roots_of_unity_indices);
 

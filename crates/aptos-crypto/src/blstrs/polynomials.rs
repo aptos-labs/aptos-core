@@ -255,12 +255,12 @@ pub fn poly_mul_assign_fft(f: &mut Vec<Scalar>, g: &mut Vec<Scalar>) {
 }
 
 /// Like `poly_mul_assign` but returns the result, instead of modifying the arguments.
-pub fn poly_mul_fft(f: &Vec<Scalar>, g: &Vec<Scalar>) -> Vec<Scalar> {
+pub fn poly_mul_fft(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     debug_assert!(!f.is_empty());
     debug_assert!(!g.is_empty());
 
-    let mut f_copy = f.clone();
-    let mut g_copy = g.clone();
+    let mut f_copy = f.to_owned();
+    let mut g_copy = g.to_owned();
 
     poly_mul_assign_fft_with_dom(
         &mut f_copy,
@@ -318,7 +318,7 @@ pub fn poly_mul_assign_slow(f: &[Scalar], g: &[Scalar], out: &mut Vec<Scalar>) {
 /// Returns the product, leaving `f` and `g` untouched.
 ///
 /// Performance notes: Beats FFT for $t \ge 32$.
-pub fn poly_mul_slow(f: &Vec<Scalar>, g: &Vec<Scalar>) -> Vec<Scalar> {
+pub fn poly_mul_slow(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     let mut out = Vec::with_capacity(get_evaluation_dom_size_for_multiplication(f, g));
     // println!(
     //     "poly_mul_slow: |f| = {}, |g| = {}, |out| = {}",
