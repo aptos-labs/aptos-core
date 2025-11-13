@@ -1,3 +1,6 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 use crate::source_package::parsed_manifest::PackageName;
 use anyhow::bail;
 use std::process::{Command, ExitStatus, Stdio};
