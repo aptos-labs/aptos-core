@@ -4,7 +4,6 @@
 //! This submodule implements the *public parameters* for this "chunked_elgamal_field" PVSS scheme.
 
 use crate::{
-    algebra::GroupGenerators,
     dlog,
     pvss::{
         chunky::{
@@ -20,6 +19,7 @@ use aptos_crypto::{
     arkworks::{
         hashing,
         serialization::{ark_de, ark_se},
+        GroupGenerators,
     },
     utils, CryptoMaterialError, ValidCryptoMaterial,
 };

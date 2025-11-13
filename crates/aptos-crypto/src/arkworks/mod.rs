@@ -12,9 +12,28 @@ pub mod shamir;
 pub mod vanishing_poly;
 pub mod weighted_sum;
 
-use ark_ec::AffineRepr;
+use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
 use ark_poly::EvaluationDomain;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+
+/// A pair of canonical group generators for a pairing-friendly elliptic curve.
+#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
+pub struct GroupGenerators<E: Pairing> {
+    /// The generator of the G₁ group (affine coordinates).
+    pub g1: E::G1Affine,
+    /// The generator of the G₂ group (affine coordinates).
+    pub g2: E::G2Affine,
+}
+
+impl<E: Pairing> Default for GroupGenerators<E> {
+    fn default() -> Self {
+        Self {
+            g1: E::G1Affine::generator(),
+            g2: E::G2Affine::generator(),
+        }
+    }
+}
 
 /// Returns the first `ell` powers of two as scalar field elements, so
 /// [1, 2, 4, 8, 16, ..., 2^{ell - 1}]

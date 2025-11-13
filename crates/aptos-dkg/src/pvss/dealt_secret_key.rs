@@ -13,8 +13,8 @@ macro_rules! dealt_secret_key_impl {
         use crate::{
             algebra::lagrange::lagrange_coefficients,
             pvss::{
-                dealt_secret_key_share::$gt::DealtSecretKeyShare, Player,
-                threshold_config::ThresholdConfigBlstrs, traits,
+                dealt_secret_key_share::$gt::DealtSecretKeyShare,
+                threshold_config::ThresholdConfigBlstrs,
             },
             utils::{$gt_multi_exp},
         };
@@ -26,6 +26,7 @@ macro_rules! dealt_secret_key_impl {
         use aptos_crypto::traits::{SecretSharingConfig as _};
         use aptos_crypto::traits::{ThresholdConfig as _};
         use aptos_crypto::arkworks::shamir::Reconstructable;
+        use aptos_crypto::arkworks::shamir::ShamirShare;
 
         /// The size of a serialized *dealt secret key*.
         pub(crate) const DEALT_SK_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;
@@ -87,7 +88,7 @@ macro_rules! dealt_secret_key_impl {
 
             /// Reconstructs the `DealtSecretKey` given a sufficiently-large subset of shares from players.
             /// Mainly used for testing the PVSS transcript dealing and decryption.
-            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<(Player, Self::ShareValue)>) -> anyhow::Result<Self> {
+            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<ShamirShare<Self::ShareValue>>) -> anyhow::Result<Self> {
                 assert_ge!(shares.len(), sc.get_threshold());
                 assert_le!(shares.len(), sc.get_total_num_players());
 

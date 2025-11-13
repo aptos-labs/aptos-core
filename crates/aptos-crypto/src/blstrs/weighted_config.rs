@@ -1,8 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Weighted threshold secret sharing configuration for BLSTRS-based PVSS.
+
 use crate::{
-    arkworks::shamir::Reconstructable, blstrs::{evaluation_domain::{BatchEvaluationDomain, EvaluationDomain}, threshold_config::ThresholdConfigBlstrs}, player::Player, traits::{self, SecretSharingConfig as _, ThresholdConfig as _}
+    arkworks::shamir::{Reconstructable, ShamirShare},
+    blstrs::{
+        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
+        threshold_config::ThresholdConfigBlstrs,
+    },
+    player::Player,
+    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
 };
 use anyhow::anyhow;
 use more_asserts::assert_lt;
@@ -77,6 +85,7 @@ impl WeightedConfig {
         })
     }
 
+    /// Returns the minimum weight among all players in this weighted secret sharing configuration.
     pub fn get_min_weight(&self) -> usize {
         self.min_weight
     }
@@ -111,26 +120,32 @@ impl WeightedConfig {
         }
     }
 
+    /// Returns the maximum weight among all players in this weighted secret sharing configuration.
     pub fn get_max_weight(&self) -> usize {
         self.max_weight
     }
 
+    /// Returns a reference to the underlying unweighted threshold configuration.
     pub fn get_threshold_config(&self) -> &ThresholdConfigBlstrs {
         &self.tc
     }
 
+    /// Returns the threshold weight required to reconstruct the secret.
     pub fn get_threshold_weight(&self) -> usize {
         self.tc.t
     }
 
+    /// Returns the total weight of all players combined.
     pub fn get_total_weight(&self) -> usize {
         self.tc.n
     }
 
+    /// Returns the weight of a specific player.
     pub fn get_player_weight(&self, player: &Player) -> usize {
         self.weight[player.id]
     }
 
+    /// Returns the starting index of a player's shares in the flattened vector of all weighted shares.
     pub fn get_player_starting_index(&self, player: &Player) -> usize {
         self.starting_index[player.id]
     }
@@ -149,6 +164,7 @@ impl WeightedConfig {
         Player { id }
     }
 
+    /// Returns all "virtual" players corresponding to a given player based on their weight.
     pub fn get_all_virtual_players(&self, player: &Player) -> Vec<Player> {
         let w = self.get_player_weight(player);
 
@@ -169,10 +185,12 @@ impl WeightedConfig {
         }
     }
 
+    /// Returns a reference to the precomputed batch evaluation domain.
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
         &self.tc.get_batch_evaluation_domain()
     }
 
+    /// Returns a reference to the primary evaluation domain.
     pub fn get_evaluation_domain(&self) -> &EvaluationDomain {
         &self.tc.get_evaluation_domain()
     }
@@ -203,6 +221,7 @@ impl WeightedConfig {
         self.pop_eligible_subset(&mut player_and_weights)
     }
 
+    /// Computes the average size of a randomly selected eligible subset of players.
     pub fn get_average_size_of_eligible_subset<R: RngCore + CryptoRng>(
         &self,
         sample_size: usize,
@@ -320,7 +339,10 @@ impl traits::SecretSharingConfig for WeightedConfig {
 impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig> for SK {
     type ShareValue = Vec<SK::ShareValue>;
 
-    fn reconstruct(sc: &WeightedConfig, shares: &Vec<(Player, Self::ShareValue)>) -> anyhow::Result<Self> {
+    fn reconstruct(
+        sc: &WeightedConfig,
+        shares: &Vec<ShamirShare<Self::ShareValue>>,
+    ) -> anyhow::Result<Self> {
         let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
 
         // println!();
@@ -348,8 +370,7 @@ impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig>
 
 #[cfg(test)]
 mod test {
-    use crate::blstrs::weighted_config::WeightedConfig;
-    use crate::traits::SecretSharingConfig as _;
+    use crate::{blstrs::weighted_config::WeightedConfig, traits::SecretSharingConfig as _};
 
     #[test]
     fn bvt() {

@@ -471,7 +471,8 @@ impl DKGTrait for RealDKG {
         let reconstructed_secret = <WTrx as Transcript>::DealtSecretKey::reconstruct(
             &pub_params.pvss_config.wconfig,
             &player_share_pairs,
-        ).unwrap();
+        )
+        .unwrap();
         if input_player_share_pairs
             .clone()
             .into_iter()
@@ -485,7 +486,8 @@ impl DKGTrait for RealDKG {
             let fast_reconstructed_secret = <WTrx as Transcript>::DealtSecretKey::reconstruct(
                 pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
                 &fast_player_share_pairs,
-            ).unwrap();
+            )
+            .unwrap();
             ensure!(
                 reconstructed_secret == fast_reconstructed_secret,
                 "real_dkg::reconstruct_secret_from_shares failed with inconsistent dealt secrets."

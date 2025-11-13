@@ -41,6 +41,7 @@ pub mod range_proofs;
 pub mod sigma_protocol;
 pub mod utils;
 pub mod weighted_vuf;
+use aptos_crypto::arkworks::shamir::ShamirShare;
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
 ///
@@ -106,7 +107,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
     fn reconstruct(
         sc: &ShamirThresholdConfig<E::ScalarField>,
-        shares: &Vec<(Player, Self::ShareValue)>,
+        shares: &Vec<ShamirShare<Self::ShareValue>>,
     ) -> anyhow::Result<Self> {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
