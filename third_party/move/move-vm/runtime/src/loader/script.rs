@@ -111,7 +111,7 @@ impl Script {
             .code
             .code
             .iter()
-            .map(|b| bytecode_transformer.transform(b.clone()))
+            .map(|b| bytecode_transformer.transform(b.clone(), false))
             .collect::<PartialVMResult<Vec<_>>>()?;
         let parameters = script.signature_at(script.parameters).clone();
 

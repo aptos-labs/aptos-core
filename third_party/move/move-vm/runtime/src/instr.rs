@@ -8,10 +8,10 @@ use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
     file_format::{
         Bytecode, CodeOffset, ConstantPoolIndex, FieldHandleIndex, FieldInstantiationIndex,
-        FunctionHandle, FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex,
-        SignatureIndex, StructDefInstantiationIndex, StructDefinitionIndex,
-        StructVariantHandleIndex, StructVariantInstantiationIndex, VariantFieldHandleIndex,
-        VariantFieldInstantiationIndex, VariantIndex,
+        FunctionHandleIndex, FunctionInstantiationIndex, LocalIndex, SignatureIndex,
+        StructDefInstantiationIndex, StructDefinitionIndex, StructVariantHandleIndex,
+        StructVariantInstantiationIndex, VariantFieldHandleIndex, VariantFieldInstantiationIndex,
+        VariantIndex,
     },
 };
 use move_core_types::{
@@ -166,7 +166,7 @@ pub enum Instruction {
 }
 
 pub(crate) struct BytecodeTransformer<'a> {
-    pub(crate) use_fast_instructions: bool,
+    pub(crate) use_v2_instructions: bool,
 
     pub(crate) ty_builder: TypeBuilder,
 
@@ -190,7 +190,7 @@ impl<'a> BytecodeTransformer<'a> {
         field_instantiations: &'a [FieldInstantiation],
     ) -> Self {
         Self {
-            use_fast_instructions: true,
+            use_v2_instructions: true,
             ty_builder: TypeBuilder::with_limits(128, 20), // TODO: get this from config
             structs,
             struct_instantiations,
@@ -201,8 +201,146 @@ impl<'a> BytecodeTransformer<'a> {
         }
     }
 
-    fn transform_vec_len(&self, idx: SignatureIndex) -> PartialVMResult<Instruction> {
-        Ok(if self.use_fast_instructions {
+    pub fn is_function_inlineable(&self, num_params: usize, code: &[Bytecode]) -> bool {
+        use Bytecode::*;
+
+        // Function must have at least `num_params + 1` instructions.
+        if code.len() < num_params + 1 {
+            return false;
+        }
+
+        // Last instruction must be `ret`.
+        if code.last().expect("last is always present") != &Bytecode::Ret {
+            return false;
+        }
+
+        // At the beginning, there must be a series of `move_loc` instructions that
+        // get the args back on stack.
+        for i in 0..num_params {
+            if code[i] != MoveLoc((num_params - i - 1) as u8) {
+                return false;
+            }
+        }
+
+        for i in num_params..code.len() - 1 {
+            match &code[i] {
+                // Disallow local operations (after the initial move_loc sequence)
+                CopyLoc(_) | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) => {
+                    return false;
+                },
+                // Disallow global operations
+                MutBorrowGlobal(_)
+                | MutBorrowGlobalGeneric(_)
+                | ImmBorrowGlobal(_)
+                | ImmBorrowGlobalGeneric(_)
+                | Exists(_)
+                | ExistsGeneric(_)
+                | MoveFrom(_)
+                | MoveFromGeneric(_)
+                | MoveTo(_)
+                | MoveToGeneric(_) => {
+                    return false;
+                },
+                // Disallow branches (requires PC + rewriting offsets)
+                BrTrue(_) | BrFalse(_) | Branch(_) => {
+                    return false;
+                },
+                // Disallow regular calls (requires recursive loading/reasoning)
+                Call(_) | CallGeneric(_) | CallClosure(_) => {
+                    return false;
+                },
+                // Disallow closures (for now, for simplicity)
+                PackClosure(_, _) | PackClosureGeneric(_, _) => {
+                    return false;
+                },
+                // Disallow abort (complicates error reporting)
+                Abort => {
+                    return false;
+                },
+                // Disallow ret (can only appear once at the end)
+                Ret => {
+                    return false;
+                },
+                // Disallow LdConst (not supported yet -- needs new instruction)
+                LdConst(_) => {
+                    return false;
+                },
+                // Disallow unpack, variant pack/unpack (not supported yet -- needs new instruction)
+                PackVariant(_)
+                | PackVariantGeneric(_)
+                | Unpack(_)
+                | UnpackGeneric(_)
+                | UnpackVariant(_)
+                | UnpackVariantGeneric(_) => {
+                    return false;
+                },
+                // Disallow variant field borrowing (not supported yet -- needs new instruction)
+                MutBorrowVariantField(_)
+                | MutBorrowVariantFieldGeneric(_)
+                | ImmBorrowVariantField(_)
+                | ImmBorrowVariantFieldGeneric(_) => {
+                    return false;
+                },
+                // Disallow vector operations other than VecLen (not supported yet -- needs new instruction)
+                VecPack(_, _)
+                | VecImmBorrow(_)
+                | VecMutBorrow(_)
+                | VecPushBack(_)
+                | VecPopBack(_)
+                | VecUnpack(_, _)
+                | VecSwap(_) => {
+                    return false;
+                },
+                // Allow all stack-only operations:
+                // - Stack manipulation
+                Pop | Nop => {},
+                // - Constants
+                LdU8(_) | LdU16(_) | LdU32(_) | LdU64(_) | LdU128(_) | LdU256(_) | LdI8(_)
+                | LdI16(_) | LdI32(_) | LdI64(_) | LdI128(_) | LdI256(_) | LdTrue | LdFalse => {},
+                // - Casting
+                CastU8 | CastU16 | CastU32 | CastU64 | CastU128 | CastU256 | CastI8 | CastI16
+                | CastI32 | CastI64 | CastI128 | CastI256 => {},
+                // - Arithmetic
+                Add | Sub | Mul | Div | Mod => {},
+                // - Bitwise
+                BitOr | BitAnd | Xor | Shl | Shr => {},
+                // - Boolean
+                Or | And | Not => {},
+                // - Comparison
+                Eq | Neq | Lt | Gt | Le | Ge => {},
+                // - Negate
+                Negate => {},
+                // - References (stack-only operations)
+                ReadRef | WriteRef | FreezeRef => {},
+                // - Struct operations (stack-only)
+                Pack(_) | TestVariant(_) | TestVariantGeneric(_) => {},
+                // - PackGeneric: requires concrete instantiation for V2
+                PackGeneric(idx) => {
+                    let struct_inst = &self.struct_instantiations[idx.0 as usize];
+                    if !struct_inst.instantiation.iter().all(|ty| ty.is_concrete()) {
+                        return false;
+                    }
+                    // TODO: check depth
+                },
+                // - Field borrowing (stack-only, operates on references)
+                MutBorrowField(_) | ImmBorrowField(_) => {},
+                // - MutBorrowFieldGeneric/ImmBorrowFieldGeneric: require concrete instantiation for V2
+                MutBorrowFieldGeneric(idx) | ImmBorrowFieldGeneric(idx) => {
+                    let field_inst = &self.field_instantiations[idx.0 as usize];
+                    if !field_inst.instantiation.iter().all(|ty| ty.is_concrete()) {
+                        return false;
+                    }
+                },
+                // - Vector operations (only VecLen is supported, for now)
+                VecLen(_) => {},
+            }
+        }
+
+        true
+    }
+
+    fn transform_vec_len(&self, idx: SignatureIndex, inline: bool) -> PartialVMResult<Instruction> {
+        Ok(if self.use_v2_instructions || inline {
             Instruction::VecLenV2
         } else {
             Instruction::VecLen(idx)
@@ -212,8 +350,9 @@ impl<'a> BytecodeTransformer<'a> {
     fn transform_test_variant(
         &self,
         idx: StructVariantHandleIndex,
+        inline: bool,
     ) -> PartialVMResult<Instruction> {
-        Ok(if self.use_fast_instructions {
+        Ok(if self.use_v2_instructions || inline {
             let info = &self.struct_variant_infos[idx.0 as usize];
             Instruction::TestVariantV2(TestVariantV2 {
                 variant_idx: info.variant,
@@ -227,8 +366,9 @@ impl<'a> BytecodeTransformer<'a> {
     fn transform_test_variant_generic(
         &self,
         idx: StructVariantInstantiationIndex,
+        inline: bool,
     ) -> PartialVMResult<Instruction> {
-        Ok(if self.use_fast_instructions {
+        Ok(if self.use_v2_instructions || inline {
             let info = &self.struct_variant_instantiation_infos[idx.0 as usize];
             Instruction::TestVariantV2(TestVariantV2 {
                 variant_idx: info.variant,
@@ -239,13 +379,13 @@ impl<'a> BytecodeTransformer<'a> {
         })
     }
 
-    #[allow(clippy::collapsible_else_if)]
     fn transform_borrow_field(
         &self,
         is_mut: bool,
         idx: FieldHandleIndex,
+        inline: bool,
     ) -> PartialVMResult<Instruction> {
-        Ok(if self.use_fast_instructions {
+        Ok(if self.use_v2_instructions || inline {
             let handle = &self.field_handles[idx.0 as usize];
             Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
                 is_mut,
@@ -260,53 +400,60 @@ impl<'a> BytecodeTransformer<'a> {
         })
     }
 
-    #[allow(clippy::collapsible_else_if)]
     fn transform_borrow_field_generic(
         &self,
         is_mut: bool,
         idx: FieldInstantiationIndex,
+        inline: bool,
     ) -> PartialVMResult<Instruction> {
-        if self.use_fast_instructions {
-            let field_inst = &self.field_instantiations[idx.0 as usize];
-
-            // TODO: used cached result -- we're already computing this during module loading
-            let is_concrete = field_inst.instantiation.iter().all(|ty| ty.is_concrete());
-            if !is_concrete {
-                return Ok(if is_mut {
-                    Instruction::MutBorrowFieldGeneric(idx)
-                } else {
-                    Instruction::ImmBorrowFieldGeneric(idx)
-                });
-            }
-
-            let field_ty = self
-                .ty_builder
-                .create_ty_with_subst(
-                    &field_inst.uninstantiated_field_ty,
-                    &field_inst.instantiation,
-                )
-                .map_err(|e| {
-                    PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
-                        .with_message(format!("Failed to create field type: {}", e))
-                })?;
-
-            Ok(Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
-                is_mut,
-                field_offset: field_inst.offset,
-                struct_name_idx: field_inst.definition_struct_type.idx,
-                field_ty,
-            })))
-        } else {
+        // Fallback to original bytecode instruction
+        let fallback = || {
             Ok(if is_mut {
                 Instruction::MutBorrowFieldGeneric(idx)
             } else {
                 Instruction::ImmBorrowFieldGeneric(idx)
             })
+        };
+
+        if !(self.use_v2_instructions || inline) {
+            return fallback();
         }
+
+        let field_inst = &self.field_instantiations[idx.0 as usize];
+
+        // TODO: used cached result -- we already compute this during module loading
+        let is_concrete = field_inst.instantiation.iter().all(|ty| ty.is_concrete());
+        if !is_concrete {
+            // TODO: invariant violation if inline is true
+            return fallback();
+        }
+
+        // TODO: cache this
+        let field_ty = self
+            .ty_builder
+            .create_ty_with_subst(
+                &field_inst.uninstantiated_field_ty,
+                &field_inst.instantiation,
+            )
+            .map_err(|e| {
+                PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                    .with_message(format!("Failed to create field type: {}", e))
+            })?;
+
+        Ok(Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
+            is_mut,
+            field_offset: field_inst.offset,
+            struct_name_idx: field_inst.definition_struct_type.idx,
+            field_ty,
+        })))
     }
 
-    fn transform_pack(&self, idx: StructDefinitionIndex) -> PartialVMResult<Instruction> {
-        Ok(if self.use_fast_instructions {
+    fn transform_pack(
+        &self,
+        idx: StructDefinitionIndex,
+        inline: bool,
+    ) -> PartialVMResult<Instruction> {
+        Ok(if self.use_v2_instructions || inline {
             let struct_def = &self.structs[idx.0 as usize];
 
             let field_tys = struct_def
@@ -337,52 +484,57 @@ impl<'a> BytecodeTransformer<'a> {
     fn transform_pack_generic(
         &self,
         idx: StructDefInstantiationIndex,
+        inline: bool,
     ) -> PartialVMResult<Instruction> {
-        if self.use_fast_instructions {
-            let struct_inst = &self.struct_instantiations[idx.0 as usize];
+        // Fallback to original bytecode instruction
+        let fallback = || Ok(Instruction::PackGeneric(idx));
 
-            let is_concrete = struct_inst.instantiation.iter().all(|ty| ty.is_concrete());
-            if !is_concrete {
-                return Ok(Instruction::PackGeneric(idx));
-            }
-
-            let mut field_tys = vec![];
-            for (_, ty) in struct_inst.definition_struct_type.fields(None)? {
-                field_tys.push(
-                    self.ty_builder
-                        .create_ty_with_subst(ty, &struct_inst.instantiation)
-                        .map_err(|e| {
-                            PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
-                                .with_message(format!("Failed to create field type: {}", e))
-                        })?,
-                );
-            }
-
-            // TODO: check depth
-            let struct_ty = Type::StructInstantiation {
-                idx: struct_inst.definition_struct_type.idx,
-                ty_args: triomphe::Arc::new(struct_inst.instantiation.clone()),
-                ability: AbilityInfo::generic_struct(
-                    struct_inst.definition_struct_type.abilities,
-                    struct_inst
-                        .definition_struct_type
-                        .phantom_ty_params_mask
-                        .clone(),
-                ),
-            };
-
-            Ok(Instruction::PackV2(Box::new(PackV2 {
-                is_generic: true,
-                field_count: struct_inst.field_count,
-                struct_ty,
-                field_tys,
-            })))
-        } else {
-            Ok(Instruction::PackGeneric(idx))
+        if !(self.use_v2_instructions || inline) {
+            return fallback();
         }
+
+        let struct_inst = &self.struct_instantiations[idx.0 as usize];
+
+        let is_concrete = struct_inst.instantiation.iter().all(|ty| ty.is_concrete());
+        if !is_concrete {
+            // TODO: invariant violation if inline is true
+            return fallback();
+        }
+
+        let mut field_tys = vec![];
+        for (_, ty) in struct_inst.definition_struct_type.fields(None)? {
+            field_tys.push(
+                self.ty_builder
+                    .create_ty_with_subst(ty, &struct_inst.instantiation)
+                    .map_err(|e| {
+                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                            .with_message(format!("Failed to create field type: {}", e))
+                    })?,
+            );
+        }
+
+        // TODO: check depth
+        let struct_ty = Type::StructInstantiation {
+            idx: struct_inst.definition_struct_type.idx,
+            ty_args: triomphe::Arc::new(struct_inst.instantiation.clone()),
+            ability: AbilityInfo::generic_struct(
+                struct_inst.definition_struct_type.abilities,
+                struct_inst
+                    .definition_struct_type
+                    .phantom_ty_params_mask
+                    .clone(),
+            ),
+        };
+
+        Ok(Instruction::PackV2(Box::new(PackV2 {
+            is_generic: true,
+            field_count: struct_inst.field_count,
+            struct_ty,
+            field_tys,
+        })))
     }
 
-    pub fn transform(&self, bytecode: Bytecode) -> PartialVMResult<Instruction> {
+    pub fn transform(&self, bytecode: Bytecode, inline: bool) -> PartialVMResult<Instruction> {
         use Bytecode as B;
         use Instruction as I;
 
@@ -406,28 +558,32 @@ impl<'a> BytecodeTransformer<'a> {
             B::StLoc(idx) => I::StLoc(idx),
             B::Call(idx) => I::Call(idx),
             B::CallGeneric(idx) => I::CallGeneric(idx),
-            B::Pack(idx) => self.transform_pack(idx)?,
-            B::PackGeneric(idx) => self.transform_pack_generic(idx)?,
+            B::Pack(idx) => self.transform_pack(idx, inline)?,
+            B::PackGeneric(idx) => self.transform_pack_generic(idx, inline)?,
             B::PackVariant(idx) => I::PackVariant(idx),
             B::PackVariantGeneric(idx) => I::PackVariantGeneric(idx),
             B::Unpack(idx) => I::Unpack(idx),
             B::UnpackGeneric(idx) => I::UnpackGeneric(idx),
             B::UnpackVariant(idx) => I::UnpackVariant(idx),
             B::UnpackVariantGeneric(idx) => I::UnpackVariantGeneric(idx),
-            B::TestVariant(idx) => self.transform_test_variant(idx)?,
-            B::TestVariantGeneric(idx) => self.transform_test_variant_generic(idx)?,
+            B::TestVariant(idx) => self.transform_test_variant(idx, inline)?,
+            B::TestVariantGeneric(idx) => self.transform_test_variant_generic(idx, inline)?,
             B::ReadRef => I::ReadRef,
             B::WriteRef => I::WriteRef,
             B::FreezeRef => I::FreezeRef,
             B::MutBorrowLoc(idx) => I::MutBorrowLoc(idx),
             B::ImmBorrowLoc(idx) => I::ImmBorrowLoc(idx),
-            B::MutBorrowField(idx) => self.transform_borrow_field(true, idx)?,
+            B::MutBorrowField(idx) => self.transform_borrow_field(true, idx, inline)?,
             B::MutBorrowVariantField(idx) => I::MutBorrowVariantField(idx),
-            B::MutBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(true, idx)?,
+            B::MutBorrowFieldGeneric(idx) => {
+                self.transform_borrow_field_generic(true, idx, inline)?
+            },
             B::MutBorrowVariantFieldGeneric(idx) => I::MutBorrowVariantFieldGeneric(idx),
-            B::ImmBorrowField(idx) => self.transform_borrow_field(false, idx)?,
+            B::ImmBorrowField(idx) => self.transform_borrow_field(false, idx, inline)?,
             B::ImmBorrowVariantField(idx) => I::ImmBorrowVariantField(idx),
-            B::ImmBorrowFieldGeneric(idx) => self.transform_borrow_field_generic(false, idx)?,
+            B::ImmBorrowFieldGeneric(idx) => {
+                self.transform_borrow_field_generic(false, idx, inline)?
+            },
             B::ImmBorrowVariantFieldGeneric(idx) => I::ImmBorrowVariantFieldGeneric(idx),
             B::MutBorrowGlobal(idx) => I::MutBorrowGlobal(idx),
             B::MutBorrowGlobalGeneric(idx) => I::MutBorrowGlobalGeneric(idx),
@@ -461,7 +617,7 @@ impl<'a> BytecodeTransformer<'a> {
             B::Shl => I::Shl,
             B::Shr => I::Shr,
             B::VecPack(idx, n) => I::VecPack(idx, n),
-            B::VecLen(idx) => self.transform_vec_len(idx)?,
+            B::VecLen(idx) => self.transform_vec_len(idx, inline)?,
             B::VecImmBorrow(idx) => I::VecImmBorrow(idx),
             B::VecMutBorrow(idx) => I::VecMutBorrow(idx),
             B::VecPushBack(idx) => I::VecPushBack(idx),

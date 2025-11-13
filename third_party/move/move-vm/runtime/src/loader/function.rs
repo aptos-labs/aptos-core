@@ -643,7 +643,7 @@ impl Function {
             Some(code) => code
                 .code
                 .iter()
-                .map(|b| bytecode_transformer.transform(b.clone()))
+                .map(|b| bytecode_transformer.transform(b.clone(), false))
                 .collect::<PartialVMResult<Vec<_>>>()?,
             None => vec![],
         };
