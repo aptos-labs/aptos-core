@@ -36,6 +36,7 @@ use crate::{
     },
     ty_invariant_analysis::TypeUnificationAdapter,
     well_known,
+    well_known::PUBLIC_STRUCT_DELIMITER,
 };
 use anyhow::bail;
 use codespan::{ByteIndex, ByteOffset, ColumnOffset, FileId, Files, LineOffset, Location, Span};
@@ -1946,6 +1947,8 @@ impl GlobalEnv {
             variants: None,
             spec: RefCell::new(Spec::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
         }
     }
 
@@ -2136,6 +2139,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         };
         assert!(self
             .module_data
@@ -2202,6 +2206,7 @@ impl GlobalEnv {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         }
     }
 
@@ -3259,6 +3264,26 @@ impl<'env> ModuleEnv<'env> {
                     deps.insert(used_mod_id);
                 }
             }
+            // Obtain used structs and enums for package visibility of structs/enums
+            if self
+                .env
+                .language_version()
+                .language_version_for_public_struct()
+            {
+                for used_struct in fun_env.get_used_structs_with_transitive_inline() {
+                    let used_mod_id = used_struct.module_id;
+                    if self.get_id() == used_struct.module_id {
+                        continue;
+                    }
+                    let used_mod_env = self.env.get_module(used_mod_id);
+                    let used_struct_env = used_mod_env.get_struct(used_struct.id);
+                    if used_struct_env.has_package_visibility()
+                        && self.can_call_package_fun_in(&used_mod_env)
+                    {
+                        deps.insert(used_mod_id);
+                    }
+                }
+            }
         }
         deps
     }
@@ -3757,6 +3782,13 @@ pub struct StructData {
 
     /// Whether this struct is native
     pub is_native: bool,
+
+    /// Visibility of this struct
+    pub visibility: Visibility,
+
+    /// Whether this struct has package visibility before the transformation.
+    /// Invariant: when true, visibility is always friend.
+    pub(crate) has_package_visibility: bool,
 }
 
 impl StructData {
@@ -3773,6 +3805,8 @@ impl StructData {
             variants: None,
             spec: RefCell::new(Default::default()),
             is_native: false,
+            visibility: Visibility::Private,
+            has_package_visibility: false,
         }
     }
 }
@@ -3830,6 +3864,26 @@ impl<'env> StructEnv<'env> {
             "{}::{}",
             self.module_env.get_full_name_str(),
             self.get_name().display(self.symbol_pool())
+        )
+    }
+
+    /// Get full name for constructing public api.
+    pub fn get_full_name_for_public_api(&self) -> String {
+        let address = self.module_env.get_name().addr();
+        let module_name = self
+            .module_env
+            .get_name()
+            .name()
+            .display(self.symbol_pool())
+            .to_string();
+        let struct_name = self.get_name().display(self.symbol_pool()).to_string();
+        format!(
+            "{}{}{}{}{}",
+            self.module_env.env.display(address),
+            PUBLIC_STRUCT_DELIMITER,
+            module_name,
+            PUBLIC_STRUCT_DELIMITER,
+            struct_name
         )
     }
 
@@ -4129,6 +4183,14 @@ impl<'env> StructEnv<'env> {
     /// Whether the current struct/enum is Option
     pub fn is_option_type(&self) -> bool {
         self.module_env.is_option() && self.get_full_name_str() == "option::Option"
+    }
+
+    pub fn get_visibility(&self) -> Visibility {
+        self.data.visibility
+    }
+
+    pub fn has_package_visibility(&self) -> bool {
+        self.data.has_package_visibility
     }
 }
 
@@ -4514,6 +4576,9 @@ pub struct FunctionData {
 
     /// A cache for used functions including ones obtained by transitively traversing used inline functions.
     pub(crate) used_functions_with_transitive_inline: RefCell<Option<BTreeSet<QualifiedId<FunId>>>>,
+
+    /// A cache for used structs.
+    pub(crate) used_structs: RefCell<Option<BTreeSet<QualifiedId<StructId>>>>,
 }
 
 impl FunctionData {
@@ -4542,6 +4607,7 @@ impl FunctionData {
             using_funs: RefCell::new(None),
             transitive_closure_of_used_funs: RefCell::new(None),
             used_functions_with_transitive_inline: RefCell::new(None),
+            used_structs: RefCell::new(None),
         }
     }
 }
@@ -4582,6 +4648,97 @@ impl<'env> FunctionEnv<'env> {
             self.get_name_str()
         )
     }
+
+    /// Split function name by spliter. If spliter does not exist in the string, return None.
+    pub fn get_and_split_fun_name(&self, spliter: char) -> Option<Vec<String>> {
+        let full_name = self.get_name_str();
+        if full_name.contains(spliter) {
+            Some(
+                full_name
+                    .split(spliter)
+                    .map(|s| s.to_string())
+                    .collect_vec(),
+            )
+        } else {
+            None
+        }
+    }
+
+    // /// Safely split `s` into (prefix of exactly `n` chars, remainder).
+    // fn take_chars<'a>(&self, s: &'a str, n: usize) -> Option<(&'a str, &'a str)> {
+    //     if n == 0 {
+    //         return Some(("", s));
+    //     }
+    //     let mut it = s.char_indices();
+    //     // advance to the start index of the (n)th character
+    //     let split_idx = (0..n).try_fold(0usize, |_, _| it.next().map(|(i, _)| i))?;
+    //     // Now move one more to get the end byte index
+    //     let end = it.next().map(|(i, _)| i).unwrap_or_else(|| s.len());
+    //     Some((&s[split_idx..end], &s[end..]))
+    // }
+
+    // /// Parse `_[oper]_[address]_[m]_[module]_[n]_[structname]_...`
+    // pub fn retrieve_struct_full_name_for_public_api(&self) -> Option<[String; 4]> {
+    //     let s = self.get_name_str();
+    //     if !s.starts_with('_') {
+    //         return None;
+    //     }
+    //     let mut cur = &s[1..]; // drop leading '_'
+
+    //     // 1) oper
+    //     let i = cur.find('_')?;
+    //     let oper = &cur[..i];
+    //     if oper.is_empty() {
+    //         return None;
+    //     }
+    //     cur = &cur[i + 1..];
+
+    //     // 2) address
+    //     let i = cur.find('_')?;
+    //     let address = &cur[..i];
+    //     if address.is_empty() {
+    //         return None;
+    //     }
+    //     cur = &cur[i + 1..];
+
+    //     // 3) m (len of module, in chars)
+    //     let i = cur.find('_')?;
+    //     let m_str = &cur[..i];
+    //     let m: usize = m_str.parse().ok()?;
+    //     cur = &cur[i + 1..];
+
+    //     // 4) module: exactly m chars (can contain underscores)
+    //     let (module, rest) = self.take_chars(cur, m)?;
+    //     if module.is_empty() {
+    //         return None;
+    //     }
+    //     cur = rest;
+
+    //     // next must be '_' before n
+    //     if !cur.starts_with('_') {
+    //         return None;
+    //     }
+    //     cur = &cur[1..];
+
+    //     // 5) n
+    //     let i = cur.find('_')?;
+    //     let n_str = &cur[..i];
+    //     let n: usize = n_str.parse().ok()?;
+    //     cur = &cur[i + 1..];
+
+    //     // 6) structname: exactly n chars (can contain underscores)
+    //     let (structname, _tail) = self.take_chars(cur, n)?;
+    //     if structname.is_empty() {
+    //         return None;
+    //     }
+
+    //     Some([
+    //         oper.to_string(),
+    //         address.to_string(),
+    //         module.to_string(),
+    //         structname.to_string(),
+    //     ])
+    // }
 
     /// Gets full name with module address as string.
     pub fn get_full_name_with_address(&self) -> String {
@@ -5244,6 +5401,31 @@ impl<'env> FunctionEnv<'env> {
             }
         }
         *self.data.used_functions_with_transitive_inline.borrow_mut() = Some(set.clone());
+        set
+    }
+
+    /// Get used structs/enums including ones obtained by transitively traversing used inline functions
+    pub fn get_used_structs_with_transitive_inline(&self) -> BTreeSet<QualifiedId<StructId>> {
+        if let Some(used_structs) = &*self.data.used_structs.borrow() {
+            return used_structs.clone();
+        }
+
+        let mut set = BTreeSet::new();
+        let mut reachable_funcs = VecDeque::new();
+        reachable_funcs.push_back(self.clone());
+
+        while let Some(fnc) = reachable_funcs.pop_front() {
+            if let Some(def) = fnc.get_def() {
+                def.struct_usage(self.module_env.env, &mut set);
+            }
+            for callee in fnc.get_used_functions().expect("call info available") {
+                let f = self.module_env.env.get_function(*callee);
+                if f.is_inline() {
+                    reachable_funcs.push_back(f.clone());
+                }
+            }
+        }
+        *self.data.used_structs.borrow_mut() = Some(set.clone());
         set
     }
 
