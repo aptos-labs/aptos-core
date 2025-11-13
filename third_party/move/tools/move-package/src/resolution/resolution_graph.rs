@@ -2,10 +2,9 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::resolution::git;
 use crate::{
     package_hooks,
-    resolution::digest::compute_digest,
+    resolution::{digest::compute_digest, git},
     source_package::{
         layout::SourcePackageLayout,
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
@@ -600,7 +599,6 @@ impl ResolvingGraph {
                 } else {
                     git::fetch_new_dependency(git_url, git_path, git_rev, dep_name)?;
                 }
-
             } else if !skip_fetch_latest_git_deps {
                 // Confirm git is available.
                 git::confirm_git_available()?;
