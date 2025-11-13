@@ -1,12 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    blstrs::{
-        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-        fft,
-    },
-};
+use crate::{blstrs::{
+        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain}, fft, random::random_scalars, threshold_config::ThresholdConfigBlstrs
+    }, input_secret::InputSecret};
 use ark_ff::Field;
 use blstrs::Scalar;
 use ff::Field as FieldOld;
@@ -644,3 +641,24 @@ fn accumulator_poly_scheduled_inner(
     b1
 }
 
+/// Deals a secret `s` in a `t`-out-of-`n` fashion (as per `sc`) returning (1) the degree `t-1`
+/// polynomial encoding the secret and (2) its evaluations at all the `n` $N$th roots-of-unity where
+/// $N$ is the smallest power of two $\ge n$.
+///
+/// Any `t` evaluations are sufficient to reconstruct the secret `s`.
+pub fn shamir_secret_share<
+    R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
+>(
+    sc: &ThresholdConfigBlstrs,
+    s: &InputSecret,
+    rng: &mut R,
+) -> (Vec<Scalar>, Vec<Scalar>) {
+    // A random, degree t-1 polynomial $f(X) = [a_0, \dots, a_{t-1}]$, with $a_0$ set to `s.a`
+    let mut f = random_scalars(sc.t, rng);
+    f[0] = *s.get_secret_a();
+
+    // Evaluate $f$ at all the $N$th roots of unity.
+    let mut f_evals = crate::blstrs::fft::fft(&f, sc.get_evaluation_domain());
+    f_evals.truncate(sc.n);
+    (f, f_evals)
+}
