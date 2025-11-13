@@ -16,11 +16,19 @@ pub static VM_PROFILER: Lazy<ProbeProfiler> = Lazy::new(ProbeProfiler::default);
 #[cfg(not(feature = "probe-profiler"))]
 pub static VM_PROFILER: NoopProfiler = NoopProfiler;
 
+/// A function that can be profiled.
+pub trait ProfilerFunction {
+    fn name(&self) -> String;
+}
+
 pub trait Profiler {
     type FnGuard;
     type InstrGuard;
 
-    fn function(&self, function: String) -> Self::FnGuard;
+    fn function<F>(&self, function: &F) -> Self::FnGuard
+    where
+        F: ProfilerFunction;
+
     fn instruction(&self, instruction: &Instruction) -> Self::InstrGuard;
 }
 
@@ -30,20 +38,32 @@ impl Profiler for NoopProfiler {
     type FnGuard = ();
     type InstrGuard = ();
 
-    fn function(&self, _function: String) -> Self::FnGuard {}
+    fn function<F>(&self, _function: &F) -> Self::FnGuard
+    where
+        F: ProfilerFunction,
+    {
+    }
 
     fn instruction(&self, _instruction: &Instruction) -> Self::InstrGuard {}
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{Profiler, VM_PROFILER};
+    use crate::{Profiler, ProfilerFunction, VM_PROFILER};
     use move_vm_types::instr::Instruction;
     use std::{thread::sleep, time::Duration};
 
+    struct DummyFunction<'a>(&'a str);
+
+    impl ProfilerFunction for DummyFunction {
+        fn name(&self) -> String {
+            self.0.to_string()
+        }
+    }
+
     #[test]
     fn test_profiler() {
-        let _fg = VM_PROFILER.function("foo".to_string());
+        let _fg = VM_PROFILER.function(&DummyFunction("foo"));
         sleep(Duration::from_millis(100));
         execute_instruction(&Instruction::And);
         execute_instruction(&Instruction::Or);

@@ -25,6 +25,7 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_profiler::ProfilerFunction;
 use move_vm_types::{
     gas::DependencyGasMeter,
     instr::Instruction,
@@ -141,6 +142,13 @@ pub struct LoadedFunction {
     pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
     pub function: Arc<Function>,
+}
+
+impl ProfilerFunction for LoadedFunction {
+    #[inline]
+    fn name(&self) -> String {
+        self.name_as_pretty_string()
+    }
 }
 
 impl LoadedFunction {

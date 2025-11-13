@@ -119,7 +119,7 @@ impl MoveVM {
         let return_values = {
             let _timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
 
-            let _guard = VM_PROFILER.function(function.name_as_pretty_string());
+            let _guard = VM_PROFILER.function(&function);
 
             Interpreter::entrypoint(
                 function,

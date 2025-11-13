@@ -4,7 +4,7 @@
 //! A profiler that emits USDT (Userland Statically Defined Tracing) probes.
 //! See [usdt](https://crates.io/crates/usdt).
 
-use crate::Profiler;
+use crate::{Profiler, ProfilerFunction};
 use move_vm_types::instr::Instruction;
 use std::time::Instant;
 
@@ -31,7 +31,10 @@ impl Profiler for ProbeProfiler {
     type InstrGuard = InstructionProbe;
 
     #[inline]
-    fn function(&self, function: String) -> Self::FnGuard {
+    fn function<F>(&self, function: &F) -> Self::FnGuard
+    where
+        F: ProfilerFunction,
+    {
         FunctionProbe::new(function)
     }
 
@@ -48,7 +51,12 @@ pub struct FunctionProbe {
 
 impl FunctionProbe {
     #[must_use]
-    fn new(function: String) -> Self {
+    fn new<F>(function: &F) -> Self
+    where
+        F: ProfilerFunction,
+    {
+        let function = function.name();
+
         vm_profiler::function_entry!(|| &function);
 
         Self {
