@@ -4,3 +4,4 @@
 
 mod digest;
 pub mod resolution_graph;
+pub(crate) mod git;
