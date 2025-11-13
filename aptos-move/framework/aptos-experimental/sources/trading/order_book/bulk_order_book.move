@@ -59,7 +59,7 @@ module aptos_experimental::bulk_order_book {
     use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_type};
     use aptos_experimental::order_book_types::{
         OrderIdType,
-        new_order_id_type, new_unique_idx_type
+        next_order_id, new_unique_idx_type
     };
 
     // Error codes for various failure scenarios
@@ -353,7 +353,7 @@ module aptos_experimental::bulk_order_book {
             cancel_active_orders(price_time_idx, &old_order);
             (old_order.get_order_id(), std::option::some(existing_sequence_number))
         } else {
-            let order_id = new_order_id_type(transaction_context::monotonically_increasing_counter());
+            let order_id = next_order_id();
             self.order_id_to_address.add(order_id, account);
             (order_id, std::option::none())
         };

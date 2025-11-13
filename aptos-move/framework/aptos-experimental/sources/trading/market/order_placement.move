@@ -67,14 +67,14 @@ module aptos_experimental::order_placement {
         is_pre_cancelled
     };
     use aptos_experimental::order_book_types::{
-        OrderIdType, OrderMatchDetails, single_order_type, OrderType
+        OrderIdType, OrderMatchDetails, single_order_type, next_order_id, OrderType
     };
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book_types::{TimeInForce, immediate_or_cancel, post_only};
     use aptos_experimental::market_types::{
         Self,
         MarketClearinghouseCallbacks,
-        Market, CallbackResult, new_callback_result_not_available, next_order_id
+        Market, CallbackResult, new_callback_result_not_available
     };
     use aptos_framework::transaction_context;
 
