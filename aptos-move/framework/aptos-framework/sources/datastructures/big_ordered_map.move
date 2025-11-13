@@ -273,8 +273,8 @@ module aptos_std::big_ordered_map {
             min_leaf_index: ROOT_INDEX,
             max_leaf_index: ROOT_INDEX,
             constant_kv_size: false, // Will be initialized in validate_static_size_and_init_max_degrees below.
-            inner_max_degree: inner_max_degree,
-            leaf_max_degree: leaf_max_degree
+            inner_max_degree,
+            leaf_max_degree
         };
         self.validate_static_size_and_init_max_degrees();
         self
@@ -307,11 +307,7 @@ module aptos_std::big_ordered_map {
 
     /// Returns true iff the BigOrderedMap is empty.
     public fun is_empty<K: store, V: store>(self: &BigOrderedMap<K, V>): bool {
-        if (self.root.is_leaf) {
-            self.root.children.is_empty()
-        } else {
-            false
-        }
+        self.root.is_leaf && self.root.children.is_empty()
     }
 
     /// Returns the number of elements in the BigOrderedMap.
@@ -501,11 +497,12 @@ module aptos_std::big_ordered_map {
         let node = self.borrow_node(leaf);
         assert!(node.is_leaf, error::invalid_state(EINTERNAL_INVARIANT_BROKEN));
 
-        let child_lower_bound = node.children.internal_lower_bound(key);
-        if (child_lower_bound.iter_is_end(&node.children)) {
+        let children = &node.children;
+        let child_lower_bound = children.internal_lower_bound(key);
+        if (child_lower_bound.iter_is_end(children)) {
             self.internal_new_end_iter()
         } else {
-            let iter_key = *child_lower_bound.iter_borrow_key(&node.children);
+            let iter_key = *child_lower_bound.iter_borrow_key(children);
             new_iter(leaf, child_lower_bound, iter_key)
         }
     }
@@ -562,10 +559,8 @@ module aptos_std::big_ordered_map {
         let internal_lower_bound = self.internal_lower_bound(key);
         if (internal_lower_bound.iter_is_end(self)) {
             false
-        } else if (&internal_lower_bound.key == key) {
-            true
         } else {
-            false
+            &internal_lower_bound.key == key
         }
     }
 
@@ -610,10 +605,20 @@ module aptos_std::big_ordered_map {
         (key, it.iter_borrow(self))
     }
 
+    public fun front_key<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>): K {
+        let it = self.internal_new_begin_iter();
+        *it.iter_borrow_key()
+    }
+
     public fun borrow_back<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>): (K, &V) {
         let it = self.internal_new_end_iter().iter_prev(self);
         let key = *it.iter_borrow_key();
         (key, it.iter_borrow(self))
+    }
+
+    public fun back_key<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>): K {
+        let it = self.internal_new_end_iter().iter_prev(self);
+        *it.iter_borrow_key()
     }
 
     public fun prev_key<K: drop + copy + store, V: store>(self: &BigOrderedMap<K, V>, key: &K): Option<K> {
@@ -1119,7 +1124,7 @@ module aptos_std::big_ordered_map {
 
     fun new_node<K: store, V: store>(is_leaf: bool): Node<K, V> {
         Node::V1 {
-            is_leaf: is_leaf,
+            is_leaf,
             children: ordered_map::new(),
             prev: NULL_INDEX,
             next: NULL_INDEX,
@@ -1128,8 +1133,8 @@ module aptos_std::big_ordered_map {
 
     fun new_node_with_children<K: store, V: store>(is_leaf: bool, children: OrderedMap<K, Child<V>>): Node<K, V> {
         Node::V1 {
-            is_leaf: is_leaf,
-            children: children,
+            is_leaf,
+            children,
             prev: NULL_INDEX,
             next: NULL_INDEX,
         }
@@ -1137,21 +1142,21 @@ module aptos_std::big_ordered_map {
 
     fun new_inner_child<V: store>(node_index: StoredSlot): Child<V> {
         Child::Inner {
-            node_index: node_index,
+            node_index,
         }
     }
 
     fun new_leaf_child<V: store>(value: V): Child<V> {
         Child::Leaf {
-            value: value,
+            value,
         }
     }
 
     fun new_iter<K>(node_index: u64, child_iter: ordered_map::IteratorPtr, key: K): IteratorPtr<K> {
         IteratorPtr::Some {
-            node_index: node_index,
-            child_iter: child_iter,
-            key: key,
+            node_index,
+            child_iter,
+            key,
         }
     }
 

@@ -111,7 +111,7 @@ module aptos_experimental::market_types {
             /// validate_settlement_update_f arguments: order_info, size
             validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
-            validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| ValidationResult has drop + copy,
+            validate_bulk_order_placement_f: |address, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &M| ValidationResult has drop + copy,
             /// place_maker_order_f arguments: order_info, size
             place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
             /// cleanup_order_f arguments: order_info, cleanup_size, is_taker
@@ -121,7 +121,7 @@ module aptos_experimental::market_types {
             /// decrease_order_size_f arguments: order_info, size
             decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
             /// get a string representation of order metadata to be used in events
-            get_order_metadata_bytes: |M| vector<u8> has drop + copy
+            get_order_metadata_bytes: |&M| vector<u8> has drop + copy
         }
     }
 
@@ -152,7 +152,7 @@ module aptos_experimental::market_types {
         actions: Option<R>
     ): PlaceMakerOrderResult<R> {
         PlaceMakerOrderResult::V1 {
-            cancellation_reason: cancellation_reason,
+            cancellation_reason,
             action: actions
         }
     }
@@ -160,12 +160,12 @@ module aptos_experimental::market_types {
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
         settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
         validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
-        validate_bulk_order_placement_f: |address, vector<u64>, vector<u64>, vector<u64>, vector<u64>, M| ValidationResult has drop + copy,
+        validate_bulk_order_placement_f: |address, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &M| ValidationResult has drop + copy,
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
         cleanup_order_f: |MarketClearinghouseOrderInfo<M>, u64, bool| has drop + copy,
         cleanup_bulk_order_at_price_f: |address, OrderIdType, bool, u64, u64| has drop + copy,
         decrease_order_size_f: |MarketClearinghouseOrderInfo<M>, u64| has drop + copy,
-        get_order_metadata_bytes: |M| vector<u8> has drop + copy
+        get_order_metadata_bytes: |&M| vector<u8> has drop + copy
     ): MarketClearinghouseCallbacks<M, R> {
         MarketClearinghouseCallbacks::V1 {
             settle_trade_f,
@@ -220,11 +220,7 @@ module aptos_experimental::market_types {
     }
 
     public fun should_stop_matching<R: store + copy + drop>(self: &CallbackResult<R>): bool {
-        match (self) {
-            CallbackResult::CONTINUE_MATCHING { result: _ } => false,
-            CallbackResult::STOP_MATCHING { result: _ } => true,
-            CallbackResult::NOT_AVAILABLE => false,
-        }
+        self is CallbackResult::STOP_MATCHING
     }
 
     public fun new_callback_result_continue_matching<R: store + copy + drop>(result: R): CallbackResult<R> {
@@ -261,11 +257,11 @@ module aptos_experimental::market_types {
     public fun validate_bulk_order_placement<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
         account: address,
-        bids_prices: vector<u64>,
-        bids_sizes: vector<u64>,
-        asks_prices: vector<u64>,
-        asks_sizes: vector<u64>,
-        order_metadata: M
+        bids_prices: &vector<u64>,
+        bids_sizes: &vector<u64>,
+        asks_prices: &vector<u64>,
+        asks_sizes: &vector<u64>,
+        order_metadata: &M
     ): ValidationResult {
         (self.validate_bulk_order_placement_f)(account, bids_prices, bids_sizes, asks_prices, asks_sizes, order_metadata)
     }
@@ -306,7 +302,8 @@ module aptos_experimental::market_types {
 
     public fun get_order_metadata_bytes<M: store + copy + drop, R: store + copy + drop>(
         self: &MarketClearinghouseCallbacks<M, R>,
-        order_metadata: M): vector<u8> {
+        order_metadata: &M,
+    ): vector<u8> {
         (self.get_order_metadata_bytes)(order_metadata)
     }
 
@@ -454,7 +451,7 @@ module aptos_experimental::market_types {
         }
     }
 
-    public fun next_order_id<M: store + copy + drop>(self: &mut Market<M>): OrderIdType {
+    public fun next_order_id(): OrderIdType {
         new_order_id_type(transaction_context::monotonically_increasing_counter())
     }
 
@@ -577,7 +574,7 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             let metadata_bytes =
-                callbacks.get_order_metadata_bytes(metadata);
+                callbacks.get_order_metadata_bytes(&metadata);
             event::emit(
                 OrderEvent {
                     parent: self.parent,

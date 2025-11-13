@@ -132,7 +132,7 @@ module aptos_experimental::bulk_order_book {
         let order_address = self.order_id_to_address.get(&order_id).destroy_some();
         let order = self.orders.remove(&order_address);
         let order_match = new_bulk_order_match<M>(
-            &mut order,
+            &order,
             !is_bid,
             matched_size,
         );
@@ -291,11 +291,9 @@ module aptos_experimental::bulk_order_book {
         self: &BulkOrderBook<M>,
         account: address
     ): BulkOrder<M> {
-        if (!self.orders.contains(&account)) {
-            abort EORDER_NOT_FOUND;
-        };
-
-        self.orders.get(&account).destroy_some()
+        let result = self.orders.get(&account);
+        assert!(result.is_some(), EORDER_NOT_FOUND);
+        result.destroy_some()
     }
 
     public(friend) fun get_remaining_size<M: store + copy + drop>(
