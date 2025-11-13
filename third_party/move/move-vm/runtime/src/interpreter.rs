@@ -533,6 +533,13 @@ where
                     .map_err(|err| set_err_info!(current_frame, err))?;
 
                     if function.function.is_inlineable {
+                        println!(
+                            ">>> fast call! -- {}::{}",
+                            function.owner_as_module()?.self_id(),
+                            function.function.name(),
+                        );
+                        trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
+
                         let code = &function.function.code[function.function.param_tys.len()..];
 
                         let exit_code = current_frame
@@ -550,7 +557,6 @@ where
                         current_frame.pc += 1;
 
                         // TODO: record successful instruction?
-                        trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
 
                         assert!(matches!(exit_code, ExitCode::Return));
 
@@ -587,6 +593,12 @@ where
                         }
                         continue;
                     }
+
+                    println!(
+                        ">>> regular call! -- {}::{}",
+                        function.owner_as_module()?.self_id(),
+                        function.function.name()
+                    );
 
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
@@ -652,6 +664,14 @@ where
                     .map_err(|err| set_err_info!(current_frame, err))?;
 
                     if function.function.is_inlineable {
+                        println!(
+                            ">>> fast call! -- {}::{}",
+                            function.owner_as_module()?.self_id(),
+                            function.function.name(),
+                        );
+                        trace_recorder
+                            .record_successful_instruction(&Instruction::CallGeneric(idx));
+
                         let code = &function.function.code[function.function.param_tys.len()..];
 
                         let exit_code = current_frame.execute_inline_code::<RTTCheck, RTRCheck>(
@@ -664,9 +684,6 @@ where
                         )?;
                         current_frame.pc += 1;
 
-                        // TODO: record successful instruction?
-                        trace_recorder
-                            .record_successful_instruction(&Instruction::CallGeneric(idx));
                         assert!(matches!(exit_code, ExitCode::Return));
                         continue;
                     }
@@ -709,6 +726,12 @@ where
                         }
                         continue;
                     }
+
+                    println!(
+                        ">>> regular call! -- {}::{}",
+                        function.owner_as_module()?.self_id(),
+                        function.function.name()
+                    );
 
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,

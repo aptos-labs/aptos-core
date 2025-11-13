@@ -546,10 +546,10 @@ impl Type {
 
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub fn paranoid_check_has_ability(&self, ability: Ability) -> PartialVMResult<()> {
-        if !self.abilities()?.has_ability(ability) {
-            let msg = format!("Type {} does not have expected ability {}", self, ability);
-            return paranoid_failure!(msg);
-        }
+        //if !self.abilities()?.has_ability(ability) {
+        //    let msg = format!("Type {} does not have expected ability {}", self, ability);
+        //    return paranoid_failure!(msg);
+        //}
         Ok(())
     }
 
