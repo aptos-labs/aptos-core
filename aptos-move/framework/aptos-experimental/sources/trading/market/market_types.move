@@ -107,7 +107,7 @@ module aptos_experimental::market_types {
     enum MarketClearinghouseCallbacks<M: store + copy + drop, R: store + copy + drop> has drop {
         V1 {
             /// settle_trade_f arguments: market, taker, maker, fill_id, settled_price, settled_size,
-            settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
+            settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u128, u64, u64| SettleTradeResult<R> has drop + copy,
             /// validate_settlement_update_f arguments: order_info, size
             validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
             /// Validate the bulk order placement arguments: account, bids_prices, bids_sizes, asks_prices, asks_sizes
@@ -158,7 +158,7 @@ module aptos_experimental::market_types {
     }
 
     public fun new_market_clearinghouse_callbacks<M: store + copy + drop, R: store + copy + drop>(
-        settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u64, u64, u64| SettleTradeResult<R> has drop + copy,
+        settle_trade_f:  |&mut Market<M>, MarketClearinghouseOrderInfo<M>,  MarketClearinghouseOrderInfo<M>, u128, u64, u64| SettleTradeResult<R> has drop + copy,
         validate_order_placement_f: | MarketClearinghouseOrderInfo<M>, u64| ValidationResult has drop + copy,
         validate_bulk_order_placement_f: |address, &vector<u64>, &vector<u64>, &vector<u64>, &vector<u64>, &M| ValidationResult has drop + copy,
         place_maker_order_f: |MarketClearinghouseOrderInfo<M>, u64| PlaceMakerOrderResult<R> has drop + copy,
@@ -241,7 +241,7 @@ module aptos_experimental::market_types {
         market: &mut Market<M>,
         taker: MarketClearinghouseOrderInfo<M>,
         maker: MarketClearinghouseOrderInfo<M>,
-        fill_id: u64,
+        fill_id: u128,
         settled_price: u64,
         settled_size: u64): SettleTradeResult<R> {
         (self.settle_trade_f)(market, taker, maker, fill_id, settled_price, settled_size)
@@ -315,8 +315,6 @@ module aptos_experimental::market_types {
             parent: address,
             /// Address of the market object of this market.
             market: address,
-            // Incremental fill id for matched orders
-            next_fill_id: u64,
             config: MarketConfig,
             order_book: OrderBook<M>,
             /// Pre cancellation tracker for the market, it is wrapped inside a table
@@ -444,7 +442,6 @@ module aptos_experimental::market_types {
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
-            next_fill_id: 0,
             config,
             order_book: new_order_book(),
             pre_cancellation_tracker,
@@ -453,12 +450,6 @@ module aptos_experimental::market_types {
 
     public fun next_order_id(): OrderIdType {
         new_order_id_type(transaction_context::monotonically_increasing_counter())
-    }
-
-    public fun next_fill_id<M: store + copy + drop>(self: &mut Market<M>): u64 {
-        let next_fill_id = self.next_fill_id;
-        self.next_fill_id += 1;
-        next_fill_id
     }
 
     public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &OrderBook<M> {
@@ -753,7 +744,6 @@ module aptos_experimental::market_types {
         let Market::V1 {
             parent: _parent,
             market: _market,
-            next_fill_id: _next_fill_id,
             config,
             order_book,
             pre_cancellation_tracker,
