@@ -22,36 +22,6 @@ pub struct GenericWeighting<T> {
     trx: T,
 }
 
-/// Implements weighted reconstruction of a secret `SK` through the existing unweighted reconstruction
-/// implementation of `SK`.
-impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig> for SK {
-    type Share = Vec<SK::Share>;
-
-    fn reconstruct(sc: &WeightedConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
-        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
-
-        // println!();
-        for (player, sub_shares) in shares {
-            // println!(
-            //     "Flattening {} share(s) for player {player}",
-            //     sub_shares.len()
-            // );
-            for (pos, share) in sub_shares.iter().enumerate() {
-                let virtual_player = sc.get_virtual_player(player, pos);
-
-                // println!(
-                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
-                //     share
-                // );
-                // TODO(Performance): Avoiding the cloning here might be nice
-                let tuple = (virtual_player, share.clone());
-                flattened_shares.push(tuple);
-            }
-        }
-
-        SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
-    }
-}
 
 impl<T: Transcript> ValidCryptoMaterial for GenericWeighting<T> {
     const AIP_80_PREFIX: &'static str = "";
