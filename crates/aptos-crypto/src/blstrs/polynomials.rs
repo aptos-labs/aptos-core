@@ -297,7 +297,7 @@ pub fn poly_mul_assign_fft_with_dom(
 /// Like `poly_mul_assign_fft` but slower in time $\deg(f) \cdot \deg(g)$ and returns the product in
 /// `out`, leaving `f` and `g` untouched.
 /// TODO(Performance): Can we do this in-place over `f` or `g` without a separate `out`.
-pub fn poly_mul_assign_slow(f: &Vec<Scalar>, g: &Vec<Scalar>, out: &mut Vec<Scalar>) {
+pub fn poly_mul_assign_slow(f: &[Scalar], g: &Vec<Scalar>, out: &mut Vec<Scalar>) {
     assert!(!f.is_empty());
     assert!(!g.is_empty());
 
@@ -405,7 +405,7 @@ pub fn poly_mul_less_slow(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     poly_add_assign(&mut u, &y);
     poly_add_assign(&mut u, &z);
 
-    u.into()
+    u
 }
 /// Sets $f(X) = f(X) \cdot X^n$, by simply shifting the coefficients.
 /// As always we assume $\deg{f}$ is `f.len() - 1`.
@@ -425,15 +425,13 @@ pub fn poly_xnmul_assign(f: &mut Vec<Scalar>, n: usize) {
     }
 
     // Set the last n coefficients $f_{n-1}, \cdots, f_0$ to 0.
-    for i in 0..n {
-        f[i] = Scalar::ZERO;
-    }
+    f.fill(Scalar::ZERO);
 }
 
 /// Like `poly_mul_by_xn_assign` but returns the result.
-pub fn poly_xnmul(f: &Vec<Scalar>, n: usize) -> Vec<Scalar> {
+pub fn poly_xnmul(f: &[Scalar], n: usize) -> Vec<Scalar> {
     if n == 0 {
-        return f.clone();
+        return f.to_owned();
     }
 
     let len = n + f.len();

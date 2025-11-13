@@ -107,7 +107,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
     fn reconstruct(
         sc: &ShamirThresholdConfig<E::ScalarField>,
-        shares: &Vec<ShamirShare<Self::ShareValue>>,
+        shares: &[ShamirShare<Self::ShareValue>],
     ) -> anyhow::Result<Self> {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());

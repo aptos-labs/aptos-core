@@ -24,7 +24,7 @@ pub fn fft_assign(poly: &mut Vec<Scalar>, dom: &EvaluationDomain) {
 pub fn fft(poly: &Vec<Scalar>, dom: &EvaluationDomain) -> Vec<Scalar> {
     let mut evals = Vec::with_capacity(dom.N);
     evals.resize(poly.len(), Scalar::ZERO);
-    evals.copy_from_slice(&poly);
+    evals.copy_from_slice(poly);
 
     fft_assign(&mut evals, dom);
 

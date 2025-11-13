@@ -187,12 +187,12 @@ impl WeightedConfig {
 
     /// Returns a reference to the precomputed batch evaluation domain.
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
-        &self.tc.get_batch_evaluation_domain()
+        self.tc.get_batch_evaluation_domain()
     }
 
     /// Returns a reference to the primary evaluation domain.
     pub fn get_evaluation_domain(&self) -> &EvaluationDomain {
-        &self.tc.get_evaluation_domain()
+        self.tc.get_evaluation_domain()
     }
 
     /// NOTE: RNG is passed in to maintain function signature compatibility with
@@ -341,7 +341,7 @@ impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig>
 
     fn reconstruct(
         sc: &WeightedConfig,
-        shares: &Vec<ShamirShare<Self::ShareValue>>,
+        shares: &[ShamirShare<Self::ShareValue>],
     ) -> anyhow::Result<Self> {
         let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
 

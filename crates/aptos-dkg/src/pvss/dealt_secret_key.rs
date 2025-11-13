@@ -88,7 +88,7 @@ macro_rules! dealt_secret_key_impl {
 
             /// Reconstructs the `DealtSecretKey` given a sufficiently-large subset of shares from players.
             /// Mainly used for testing the PVSS transcript dealing and decryption.
-            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<ShamirShare<Self::ShareValue>>) -> anyhow::Result<Self> {
+            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &[ShamirShare<Self::ShareValue>]) -> anyhow::Result<Self> {
                 assert_ge!(shares.len(), sc.get_threshold());
                 assert_le!(shares.len(), sc.get_total_num_players());
 
