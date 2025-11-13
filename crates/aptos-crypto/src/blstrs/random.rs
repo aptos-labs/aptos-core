@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Utilities for generating random scalars and elliptic curve points for BLS12-381.
+
 use crate::blstrs::{
     biguint_to_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_FIELD_ORDER, SCALAR_NUM_BYTES,
 };
@@ -26,6 +28,7 @@ use std::ops::Mul;
 /// Domain-separator for hash-based randomness generation that works around `rand_core_hell`.
 pub const DST_RAND_CORE_HELL: &[u8; 24] = b"APTOS_RAND_CORE_HELL_DST";
 
+/// Returns a random non-zero `blstrs::Scalar`.
 pub fn random_nonzero_scalar<R>(rng: &mut R) -> Scalar
 where
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
@@ -33,6 +36,7 @@ where
     crate::blstrs::random_scalar_internal(rng, true)
 }
 
+/// Generates a `blstrs::Scalar` from a uniform byte array.
 pub fn random_scalar_from_uniform_bytes(bytes: &[u8; 2 * SCALAR_NUM_BYTES]) -> Scalar {
     let bignum = BigUint::from_bytes_le(&bytes[..]);
     let remainder = bignum.mod_floor(&SCALAR_FIELD_ORDER);
@@ -40,6 +44,7 @@ pub fn random_scalar_from_uniform_bytes(bytes: &[u8; 2 * SCALAR_NUM_BYTES]) -> S
     biguint_to_scalar(&remainder)
 }
 
+/// Generates a random 128-bit `blstrs::Scalar`.
 pub fn random_128bit_scalar<R>(rng: &mut R) -> Scalar
 where
     R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,

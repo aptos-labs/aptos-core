@@ -99,6 +99,7 @@ fn test_pvss_transcript_size() {
     }
 }
 
+#[cfg(test)]
 fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingConfig, size: usize) {
     let name = T::scheme_name();
     println!("{size_type:8} transcript size for {sc} {name}: {size} bytes");
@@ -112,6 +113,7 @@ fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingCo
 ///  1. Deals a secret, creating a transcript
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
+#[cfg(test)]
 fn pvss_deal_verify_and_reconstruct<T: Transcript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
@@ -147,6 +149,7 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript>(
     }
 }
 
+#[cfg(test)]
 fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
     let mut rng = thread_rng();
 
@@ -160,6 +163,7 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
     actual_size
 }
 
+#[cfg(test)]
 fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>>(
     sc: &ThresholdConfigBlstrs,
 ) -> usize {

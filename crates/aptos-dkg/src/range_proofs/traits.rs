@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::GroupGenerators;
-use aptos_crypto::arkworks::random::UniformRand;
+use aptos_crypto::arkworks::{random::UniformRand, GroupGenerators};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};

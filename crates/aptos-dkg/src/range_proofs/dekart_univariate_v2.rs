@@ -4,7 +4,7 @@
 // This file implements the range proof described here: https://alinush.github.io/dekart
 
 use crate::{
-    algebra::{polynomials, GroupGenerators},
+    algebra::polynomials,
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
     sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
@@ -15,6 +15,7 @@ use aptos_crypto::arkworks::{
     random::{
         sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
     },
+    GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
 use ark_ff::{AdditiveGroup, Field};

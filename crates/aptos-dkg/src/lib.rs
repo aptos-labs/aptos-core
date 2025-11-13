@@ -22,14 +22,16 @@ use aptos_crypto::arkworks::{
     random::{sample_field_element, UniformRand},
     shamir::{Reconstructable, ShamirThresholdConfig},
 };
-pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
+pub use aptos_crypto::{
+    blstrs as algebra,
+    blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
+};
 use ark_ec::pairing::Pairing;
 use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use more_asserts::{assert_ge, assert_le};
 use rand::Rng;
 pub use utils::random::DST_RAND_CORE_HELL;
-pub use aptos_crypto::blstrs as algebra;
 
 pub mod dlog;
 pub(crate) mod fiat_shamir;
@@ -39,6 +41,7 @@ pub mod range_proofs;
 pub mod sigma_protocol;
 pub mod utils;
 pub mod weighted_vuf;
+use aptos_crypto::arkworks::shamir::ShamirShare;
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
 ///
@@ -97,12 +100,14 @@ impl<E: Pairing> UniformRand for Scalar<E> {
 
 // TODO: maybe move the Reconstructable trait to the SecretSharingConfig in the PVSS trait, with associated Scalar equal to InputSecret
 // then make the existing implementation of `fn reconstruct()` part of a trait... and then we can remove the trivial implementation below!
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P,N>>> Reconstructable<ShamirThresholdConfig<E::ScalarField>> for Scalar<E> {
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+    Reconstructable<ShamirThresholdConfig<E::ScalarField>> for Scalar<E>
+{
     type ShareValue = Scalar<E>;
 
     fn reconstruct(
         sc: &ShamirThresholdConfig<E::ScalarField>,
-        shares: &Vec<(Player, Self::ShareValue)>,
+        shares: &Vec<ShamirShare<Self::ShareValue>>,
     ) -> anyhow::Result<Self> {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
@@ -112,6 +117,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P,N>>> Reconstr
             .map(|(player, scalar)| (*player, scalar.0))
             .collect();
 
-        Ok(Scalar(E::ScalarField::reconstruct(&sc, &shares_destructured)?))
+        Ok(Scalar(E::ScalarField::reconstruct(
+            &sc,
+            &shares_destructured,
+        )?))
     }
 }

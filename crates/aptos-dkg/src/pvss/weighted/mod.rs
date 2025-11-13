@@ -3,5 +3,5 @@
 
 pub mod generic_weighting;
 
-pub use generic_weighting::GenericWeighting;
 pub use aptos_crypto::blstrs::weighted_config::WeightedConfig;
+pub use generic_weighting::GenericWeighting;

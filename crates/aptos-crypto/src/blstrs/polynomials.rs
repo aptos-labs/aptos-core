@@ -1,20 +1,30 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{blstrs::{
-        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain}, fft, random::random_scalars, threshold_config::ThresholdConfigBlstrs
-    }, input_secret::InputSecret};
+//! Polynomial utilities and threshold secret sharing for BLSTRS-based cryptography.
+
+use crate::{
+    blstrs::{
+        evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
+        fft,
+        random::random_scalars,
+        threshold_config::ThresholdConfigBlstrs,
+    },
+    input_secret::InputSecret,
+};
 use ark_ff::Field;
 use blstrs::Scalar;
 use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 
+/// Checks whether a given `usize` is a power of two.
 #[inline]
 pub fn is_power_of_two(n: usize) -> bool {
     n != 0 && (n & (n - 1) == 0)
 }
 
+/// Computes the derivative of a polynomial given its coefficients.
 pub fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
     let degree = coeffs.len().saturating_sub(1);
     let mut result = Vec::with_capacity(degree);
@@ -26,6 +36,7 @@ pub fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
     result
 }
 
+/// Computes the derivative of a polynomial in-place, modifying the input vector.
 pub fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
     for i in 0..degree {
@@ -51,12 +62,7 @@ pub fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
 /// # Returns
 /// A `Vec<F>` containing the evaluations of `(f_i - y) / (x_i - x)` for each index `i`.
 /// Or will panic if one of the `x_i` equals `x`.
-pub fn quotient_evaluations_batch<F: Field>(
-    f_vals: &[F],
-    x_vals: &[F],
-    x: F,
-    y: F,
-) -> Vec<F> {
+pub fn quotient_evaluations_batch<F: Field>(f_vals: &[F], x_vals: &[F], x: F, y: F) -> Vec<F> {
     assert_eq!(f_vals.len(), x_vals.len());
 
     // Step 1: compute denominators x_i - x
@@ -339,6 +345,7 @@ pub fn poly_mul_assign_less_slow(f: &Vec<Scalar>, g: &Vec<Scalar>, out: &mut Vec
     out.append(&mut result);
 }
 
+/// Multiplies two polynomials over the scalar field using a divide-and-conquer approach.
 pub fn poly_mul_less_slow(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     let n = f.len();
     assert!(is_power_of_two(n));
@@ -658,7 +665,7 @@ pub fn shamir_secret_share<
     f[0] = *s.get_secret_a();
 
     // Evaluate $f$ at all the $N$th roots of unity.
-    let mut f_evals = crate::blstrs::fft::fft(&f, sc.get_evaluation_domain());
+    let mut f_evals = fft::fft(&f, sc.get_evaluation_domain());
     f_evals.truncate(sc.n);
     (f, f_evals)
 }

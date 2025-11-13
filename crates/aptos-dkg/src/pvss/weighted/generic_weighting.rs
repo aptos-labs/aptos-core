@@ -6,7 +6,7 @@
 /// WARNING: This will **NOT** necessarily be secure for any PVSS scheme, since it will reuse encryption
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
-    traits::{transcript::MalleableTranscript, Reconstructable, Transcript},
+    traits::{transcript::MalleableTranscript, Transcript},
     Player, ThresholdConfigBlstrs, WeightedConfig,
 };
 use aptos_crypto::{traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial};
@@ -21,7 +21,6 @@ use serde::{Deserialize, Serialize};
 pub struct GenericWeighting<T> {
     trx: T,
 }
-
 
 impl<T: Transcript> ValidCryptoMaterial for GenericWeighting<T> {
     const AIP_80_PREFIX: &'static str = "";

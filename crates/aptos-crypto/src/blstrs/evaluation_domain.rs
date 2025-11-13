@@ -1,6 +1,8 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Evaluation domains and batched evaluation domains for radix-2 FFTs over the BLS12-381 scalar field.
+
 use crate::CryptoMaterialError;
 use blstrs::Scalar;
 use ff::{Field, PrimeField};
@@ -150,6 +152,7 @@ impl BatchEvaluationDomain {
         }
     }
 
+    /// Returns the size `N` of the batch evaluation domain.
     #[allow(non_snake_case)]
     pub fn N(&self) -> usize {
         self.omegas.len()
