@@ -361,12 +361,14 @@ impl<'a> BytecodeTransformer<'a> {
 
         // At the beginning, there must be a series of `move_loc` instructions that
         // get the args back on stack.
+        #[allow(clippy::needless_range_loop)]
         for i in 0..num_params {
-            if code[i] != MoveLoc((num_params - i - 1) as u8) {
+            if code[i] != MoveLoc(i as u8) {
                 return Ok(false);
             }
         }
 
+        #[allow(clippy::needless_range_loop)]
         for i in num_params..code.len() - 1 {
             match &code[i] {
                 // Disallow local operations (after the initial move_loc sequence)
@@ -420,8 +422,7 @@ impl<'a> BytecodeTransformer<'a> {
                 | VecMutBorrow(_)
                 | VecPushBack(_)
                 | VecPopBack(_)
-                | VecUnpack(_, _)
-                | VecSwap(_) => {
+                | VecUnpack(_, _) => {
                     return Ok(false);
                 },
                 // Allow all stack-only operations:
@@ -486,7 +487,7 @@ impl<'a> BytecodeTransformer<'a> {
                     }
                 },
                 // - Vector operations (only VecLen is supported, for now)
-                VecLen(_) => {},
+                VecLen(_) | VecSwap(_) => {},
             }
         }
 

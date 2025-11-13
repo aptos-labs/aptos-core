@@ -117,8 +117,6 @@ macro_rules! set_err_info {
 }
 
 // TODO(fastcall):
-// - Fix async paranoid mode
-// - Fix tracing
 // - Check error location of inlined code
 
 /// `Interpreter` instances can execute Move functions.
@@ -533,6 +531,8 @@ where
                     .map_err(|err| set_err_info!(current_frame, err))?;
 
                     if function.function.is_inlineable {
+                        trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
+
                         let code = &function.function.code[function.function.param_tys.len()..];
 
                         let exit_code = current_frame
@@ -549,10 +549,8 @@ where
                             })?;
                         current_frame.pc += 1;
 
-                        // TODO: record successful instruction?
-                        trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
-
                         assert!(matches!(exit_code, ExitCode::Return));
+                        trace_recorder.record_successful_instruction(&Instruction::Ret);
 
                         continue;
                     }
@@ -652,6 +650,9 @@ where
                     .map_err(|err| set_err_info!(current_frame, err))?;
 
                     if function.function.is_inlineable {
+                        trace_recorder
+                            .record_successful_instruction(&Instruction::CallGeneric(idx));
+
                         let code = &function.function.code[function.function.param_tys.len()..];
 
                         let exit_code = current_frame.execute_inline_code::<RTTCheck, RTRCheck>(
@@ -664,10 +665,9 @@ where
                         )?;
                         current_frame.pc += 1;
 
-                        // TODO: record successful instruction?
-                        trace_recorder
-                            .record_successful_instruction(&Instruction::CallGeneric(idx));
                         assert!(matches!(exit_code, ExitCode::Return));
+                        trace_recorder.record_successful_instruction(&Instruction::Ret);
+
                         continue;
                     }
 
@@ -2076,6 +2076,7 @@ impl Frame {
 
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
+        let is_inline_code = code.is_some();
         let code = code.unwrap_or_else(|| self.function.code());
         loop {
             for instruction in &code[self.pc as usize..] {
@@ -2115,6 +2116,7 @@ impl Frame {
                     &mut interpreter.operand_stack,
                     instruction,
                     frame_cache,
+                    is_inline_code,
                 )?;
                 RTRCheck::pre_execution_transition(self, instruction, &mut interpreter.ref_state)?;
 

@@ -157,7 +157,7 @@ where
             .map_err(|err| err.finish(Location::Undefined))?;
         loop {
             let exit = self
-                .execute_instructions::<RTTCheck>(cursor, &mut current_frame)
+                .execute_instructions::<RTTCheck>(cursor, &mut current_frame, None)
                 .map_err(|err| set_err_info!(current_frame, err))?;
             match exit {
                 ExitCode::Done => return Ok(()),
@@ -177,6 +177,24 @@ where
                     let (callee, callee_frame_cache) = self
                         .load_function(&mut current_frame, idx)
                         .map_err(|err| set_err_info!(current_frame, err))?;
+
+                    if callee.function.is_inlineable {
+                        RTTCheck::check_call_visibility(
+                            &current_frame.function,
+                            &callee,
+                            CallType::Regular,
+                        )
+                        .map_err(|err| set_err_info!(current_frame, err))?;
+
+                        self.execute_inline_code::<RTTCheck>(
+                            cursor,
+                            &mut current_frame,
+                            &callee.function.code[callee.function.param_tys.len()..],
+                        )?;
+                        current_frame.pc += 1;
+                        continue;
+                    }
+
                     self.execute_regular_call::<RTTCheck>(
                         cursor,
                         &mut current_frame,
@@ -188,6 +206,24 @@ where
                     let (callee, callee_frame_cache) = self
                         .load_function_generic(&mut current_frame, idx)
                         .map_err(|err| set_err_info!(current_frame, err))?;
+
+                    if callee.function.is_inlineable {
+                        RTTCheck::check_call_visibility(
+                            &current_frame.function,
+                            &callee,
+                            CallType::Regular,
+                        )
+                        .map_err(|err| set_err_info!(current_frame, err))?;
+
+                        self.execute_inline_code::<RTTCheck>(
+                            cursor,
+                            &mut current_frame,
+                            &callee.function.code[callee.function.param_tys.len()..],
+                        )?;
+                        current_frame.pc += 1;
+                        continue;
+                    }
+
                     self.execute_regular_call::<RTTCheck>(
                         cursor,
                         &mut current_frame,
@@ -219,18 +255,21 @@ where
         &mut self,
         cursor: &mut TraceCursor,
         frame: &mut Frame,
+        code: Option<&[Instruction]>,
     ) -> PartialVMResult<ExitCode>
     where
         RTTCheck: RuntimeTypeCheck,
     {
+        let is_inline_code = code.is_some();
+        let code = code.unwrap_or(&frame.function.function.code);
         loop {
             let pc = frame.pc as usize;
-            if pc >= frame.function.function.code.len() {
+            if pc >= code.len() {
                 return Err(PartialVMError::new_invariant_violation(
                     "PC cannot overflow when replaying the trace",
                 ));
             }
-            let instr = &frame.function.function.code[pc];
+            let instr = &code[pc];
 
             // Check if we need to execute this instruction, if so, decrement the number of
             // remaining instructions to replay.
@@ -245,6 +284,7 @@ where
                 &mut self.type_stack,
                 instr,
                 &mut frame_cache,
+                is_inline_code,
             )?;
 
             // After pre-execution transition, we need to check for control flow instructions to
@@ -503,6 +543,30 @@ where
                 // Preserving same behavior as interpreter.
                 err.finish(self.call_stack.current_location())
             })?;
+        Ok(())
+    }
+
+    fn execute_inline_code<RTTCheck>(
+        &mut self,
+        cursor: &mut TraceCursor,
+        current_frame: &mut Frame,
+        code: &[Instruction],
+    ) -> VMResult<()>
+    where
+        RTTCheck: RuntimeTypeCheck,
+    {
+        let pc = current_frame.pc;
+        current_frame.pc = 0;
+
+        println!("execute_inline_code: {:?}", code);
+
+        self.execute_instructions::<RTTCheck>(cursor, current_frame, Some(code))
+            .map_err(|err| {
+                // Preserving same behavior as interpreter.
+                err.finish(self.call_stack.current_location())
+            })?;
+
+        current_frame.pc = pc;
         Ok(())
     }
 

@@ -20,6 +20,7 @@ pub(crate) trait RuntimeTypeCheck {
         operand_stack: &mut Stack,
         instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
+        is_inline_code: bool,
     ) -> PartialVMResult<()>;
 
     /// Paranoid type checks to perform after instruction execution.
@@ -231,6 +232,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
         _operand_stack: &mut Stack,
         _instruction: &Instruction,
         _ty_cache: &mut FrameTypeCache,
+        _is_inline_code: bool,
     ) -> PartialVMResult<()> {
         Ok(())
     }
@@ -282,6 +284,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
         operand_stack: &mut Stack,
         instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
+        is_inlined_code: bool,
     ) -> PartialVMResult<()> {
         match instruction {
             // Call instruction will be checked at execute_main.
@@ -300,7 +303,9 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             },
             Instruction::Branch(_) => (),
             Instruction::Ret => {
-                frame.check_local_tys_have_drop_ability()?;
+                if !is_inlined_code {
+                    frame.check_local_tys_have_drop_ability()?;
+                }
             },
             Instruction::Abort => {
                 operand_stack.pop_ty()?;
@@ -964,7 +969,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                 operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
                 operand_stack
                     .pop_ty()?
-                    .paranoid_check_is_any_vec_ref_ty::<false>()?;
+                    .paranoid_check_is_any_vec_ref_ty::<true>()?;
             },
             Instruction::TestVariantV2(instr) => {
                 let struct_ref_ty = operand_stack.pop_ty()?;
@@ -1076,6 +1081,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         operand_stack: &mut Stack,
         instruction: &Instruction,
         ty_cache: &mut FrameTypeCache,
+        is_inline_code: bool,
     ) -> PartialVMResult<()> {
         if frame.untrusted_code() {
             FullRuntimeTypeCheck::pre_execution_type_stack_transition(
@@ -1083,6 +1089,7 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
                 operand_stack,
                 instruction,
                 ty_cache,
+                is_inline_code,
             )
         } else {
             Ok(())

@@ -57,8 +57,6 @@ impl InterpreterFunctionCaches {
         &mut self,
         function: &LoadedFunction,
     ) -> Rc<RefCell<FrameTypeCache>> {
-        //debug_assert!(!function.ty_args().is_empty());
-
         let ptr = GenericFunctionPtr::from_loaded_function(function);
         self.generic_function_instruction_caches
             .entry(ptr)
