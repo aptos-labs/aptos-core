@@ -1,0 +1,464 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Wrapper {
+        V1 {
+            0: u64,
+            1: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x, Add<u64>(x, 1))
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun foo(_x: &mut u64,_y: &mut u64) {
+        Tuple()
+    }
+    private fun test_1() {
+        {
+          let x: m::Wrapper = m::make(22);
+          {
+            let x_0: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x));
+            {
+              let x_1: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.1<m::Wrapper>(x));
+              n::foo(x_0, x_1);
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun test_2() {
+        {
+          let x: m::Wrapper = m::make(22);
+          {
+            let x_0: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x));
+            {
+              let x_1: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.1<m::Wrapper>(x));
+              x_0 = 23;
+              x_1 = 24;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun test_match() {
+        {
+          let x: m::Wrapper = m::make(22);
+          match (Borrow(Mutable)(x)) {
+            m::Wrapper::V2{ 0: _ } => {
+              Tuple()
+            }
+            m::Wrapper::V1{ 0: x_0, 1: x_1 } => {
+              n::foo(x_0, x_1);
+              Tuple()
+            }
+          }
+
+        }
+    }
+    private fun test_no_err() {
+        {
+          let x: m::Wrapper = m::make(22);
+          select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x) = 23;
+          select_variants m::Wrapper.V1.1<m::Wrapper>(x) = 24;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    enum Wrapper has drop {
+        V1 {
+            0: u64,
+            1: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        Wrapper::V1(x, x + 1)
+    }
+}
+module 0xc0ffee::n {
+    use 0xc0ffee::m;
+    use 0xc0ffee::m;
+    fun foo(_x: &mut u64, _y: &mut u64) {
+    }
+    fun test_1() {
+        let x = m::make(22);
+        let x_0 = &mut x.0;
+        let x_1 = &mut x.1;
+        foo(x_0, x_1);
+    }
+    fun test_2() {
+        let x = m::make(22);
+        let x_0 = &mut x.0;
+        let x_1 = &mut x.1;
+        *x_0 = 23;
+        *x_1 = 24;
+    }
+    fun test_match() {
+        let x = m::make(22);
+        match (&mut x) {
+            m::Wrapper::V2(_) => (),
+            m::Wrapper::V1(x_0, x_1) => {
+                foo(x_0, x_1);
+            },
+        }
+    }
+    fun test_no_err() {
+        let x = m::make(22);
+        x.0 = 23;
+        x.1 = 24;
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::make($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := infer($t0)
+  1: $t4 := infer($t0)
+  2: $t5 := 1
+  3: $t3 := +($t4, $t5)
+  4: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t2, $t3)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun n::foo($t0: &mut u64, $t1: &mut u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun n::test_1() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut 0xc0ffee::m::Wrapper
+     var $t4: &mut u64
+     var $t5: &mut 0xc0ffee::m::Wrapper
+     var $t6: &mut u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t3)
+  4: $t5 := borrow_local($t0)
+  5: $t4 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t5)
+  6: $t6 := infer($t2)
+  7: n::foo($t6, $t4)
+  8: return ()
+}
+
+
+[variant baseline]
+fun n::test_2() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut 0xc0ffee::m::Wrapper
+     var $t4: &mut u64
+     var $t5: &mut 0xc0ffee::m::Wrapper
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t3)
+  4: $t5 := borrow_local($t0)
+  5: $t4 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t5)
+  6: $t6 := 23
+  7: write_ref($t2, $t6)
+  8: $t7 := 24
+  9: write_ref($t4, $t7)
+ 10: return ()
+}
+
+
+[variant baseline]
+fun n::test_match() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: &mut 0xc0ffee::m::Wrapper
+     var $t3: bool
+     var $t4: &mut u64
+     var $t5: &mut u64
+     var $t6: &mut u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t2 := borrow_local($t0)
+  3: $t3 := test_variant 0xc0ffee::m::Wrapper::V2($t2)
+  4: if ($t3) goto 5 else goto 7
+  5: label L2
+  6: goto 19
+  7: label L1
+  8: $t3 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
+  9: if ($t3) goto 10 else goto 16
+ 10: label L4
+ 11: $t4 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.0($t2)
+ 12: $t5 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t2)
+ 13: $t6 := infer($t4)
+ 14: n::foo($t6, $t5)
+ 15: goto 19
+ 16: label L3
+ 17: $t7 := 14566554180833181697
+ 18: abort($t7)
+ 19: label L0
+ 20: return ()
+}
+
+
+[variant baseline]
+fun n::test_no_err() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: &mut 0xc0ffee::m::Wrapper
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: &mut 0xc0ffee::m::Wrapper
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t2 := 23
+  3: $t4 := borrow_local($t0)
+  4: $t3 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t4)
+  5: write_ref($t3, $t2)
+  6: $t5 := 24
+  7: $t7 := borrow_local($t0)
+  8: $t6 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t7)
+  9: write_ref($t6, $t5)
+ 10: return ()
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    enum Wrapper {
+        V1 {
+            0: u64,
+            1: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x, Add<u64>(x, 1))
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun foo(_x: &mut u64,_y: &mut u64) {
+        Tuple()
+    }
+    private fun test_1() {
+        {
+          let x: m::Wrapper = m::make(22);
+          {
+            let x_0: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x));
+            {
+              let x_1: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.1<m::Wrapper>(x));
+              n::foo(x_0, x_1);
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun test_2() {
+        {
+          let x: m::Wrapper = m::make(22);
+          {
+            let x_0: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x));
+            {
+              let x_1: &mut u64 = Borrow(Mutable)(select_variants m::Wrapper.V1.1<m::Wrapper>(x));
+              x_0 = 23;
+              x_1 = 24;
+              Tuple()
+            }
+          }
+        }
+    }
+    private fun test_match() {
+        {
+          let x: m::Wrapper = m::make(22);
+          match (Borrow(Mutable)(x)) {
+            m::Wrapper::V2{ 0: _ } => {
+              Tuple()
+            }
+            m::Wrapper::V1{ 0: x_0, 1: x_1 } => {
+              n::foo(x_0, x_1);
+              Tuple()
+            }
+          }
+
+        }
+    }
+    private fun test_no_err() {
+        {
+          let x: m::Wrapper = m::make(22);
+          select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x) = 23;
+          select_variants m::Wrapper.V1.1<m::Wrapper>(x) = 24;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::make($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := infer($t0)
+  1: $t4 := infer($t0)
+  2: $t5 := 1
+  3: $t3 := +($t4, $t5)
+  4: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t2, $t3)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun n::foo($t0: &mut u64, $t1: &mut u64) {
+  0: return ()
+}
+
+
+[variant baseline]
+fun n::test_1() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut 0xc0ffee::m::Wrapper
+     var $t4: &mut u64
+     var $t5: &mut 0xc0ffee::m::Wrapper
+     var $t6: &mut u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t3)
+  4: $t5 := borrow_local($t0)
+  5: $t4 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t5)
+  6: $t6 := infer($t2)
+  7: n::foo($t6, $t4)
+  8: return ()
+}
+
+
+[variant baseline]
+fun n::test_2() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: &mut 0xc0ffee::m::Wrapper
+     var $t4: &mut u64
+     var $t5: &mut 0xc0ffee::m::Wrapper
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t3 := borrow_local($t0)
+  3: $t2 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t3)
+  4: $t5 := borrow_local($t0)
+  5: $t4 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t5)
+  6: $t6 := 23
+  7: write_ref($t2, $t6)
+  8: $t7 := 24
+  9: write_ref($t4, $t7)
+ 10: return ()
+}
+
+
+[variant baseline]
+fun n::test_match() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: &mut 0xc0ffee::m::Wrapper
+     var $t3: bool
+     var $t4: &mut u64
+     var $t5: &mut u64
+     var $t6: &mut u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t2 := borrow_local($t0)
+  3: $t3 := test_variant 0xc0ffee::m::Wrapper::V2($t2)
+  4: if ($t3) goto 5 else goto 7
+  5: label L2
+  6: goto 19
+  7: label L1
+  8: $t3 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
+  9: if ($t3) goto 10 else goto 16
+ 10: label L4
+ 11: $t4 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.0($t2)
+ 12: $t5 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t2)
+ 13: $t6 := infer($t4)
+ 14: n::foo($t6, $t5)
+ 15: goto 19
+ 16: label L3
+ 17: $t7 := 14566554180833181697
+ 18: abort($t7)
+ 19: label L0
+ 20: return ()
+}
+
+
+[variant baseline]
+fun n::test_no_err() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: u64
+     var $t3: &mut u64
+     var $t4: &mut 0xc0ffee::m::Wrapper
+     var $t5: u64
+     var $t6: &mut u64
+     var $t7: &mut 0xc0ffee::m::Wrapper
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t2 := 23
+  3: $t4 := borrow_local($t0)
+  4: $t3 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t4)
+  5: write_ref($t3, $t2)
+  6: $t5 := 24
+  7: $t7 := borrow_local($t0)
+  8: $t6 := borrow_variant_field<0xc0ffee::m::Wrapper::V1>.1($t7)
+  9: write_ref($t6, $t5)
+ 10: return ()
+}
+
+
+Diagnostics:
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:16:9
+   │
+16 │     fun test_1() {
+   │         ^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_borrow_field_err.move:41:9
+   │
+41 │     fun test_match() {
+   │         ^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
