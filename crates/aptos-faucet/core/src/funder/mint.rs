@@ -96,23 +96,29 @@ impl MintFunderConfig {
         }
 
         // Validate that the default asset exists in the assets map
-        let default_asset_config = self.assets.get(&self.default_asset).ok_or_else(|| {
+        self.assets.get(&self.default_asset).ok_or_else(|| {
             anyhow::anyhow!(
                 "Default asset '{}' is not configured in assets map",
                 self.default_asset
             )
         })?;
 
-        let key = default_asset_config.get_key()?;
-        let initial_account = LocalAccount::new(
-            default_asset_config
-                .mint_account_address
-                .unwrap_or_else(|| {
+        let mut assets_with_accounts = HashMap::new();
+
+        for (asset_name, asset_config) in self.assets {
+            let key = asset_config.get_key()?;
+
+            // Create the mint account
+            let mint_account = LocalAccount::new(
+                asset_config.mint_account_address.unwrap_or_else(|| {
                     AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
                 }),
-            key,
-            0,
-        );
+                key,
+                0,
+            );
+
+            assets_with_accounts.insert(asset_name, (asset_config, RwLock::new(mint_account)));
+        }
 
         let minter = MintFunder::new(
             self.api_connection_config.node_url.clone(),
@@ -120,18 +126,33 @@ impl MintFunderConfig {
             self.api_connection_config.additional_headers.clone(),
             self.api_connection_config.chain_id,
             self.transaction_submission_config,
-            initial_account,
-            self.assets.clone(),
+            assets_with_accounts,
             self.default_asset,
             self.amount_to_fund,
         );
 
-        // If default asset needs delegation, do it once at startup
-        if !default_asset_config.do_not_delegate {
-            minter
-                .use_delegated_account()
-                .await
-                .context("Failed to make MintFunder use delegated account")?;
+        let asset_names: Vec<String> = minter.assets.keys().cloned().collect();
+        for asset_name in asset_names {
+            let (asset_config, account_rwlock) =
+                minter.assets.get(&asset_name).unwrap_or_else(|| {
+                    panic!(
+                        "Asset '{}' does not exist - this should never happen",
+                        asset_name
+                    )
+                });
+
+            if !asset_config.do_not_delegate {
+                // Delegate permissions to a new account
+                let delegated_account = minter
+                    .use_delegated_account(&asset_name)
+                    .await
+                    .with_context(|| {
+                        format!("Failed to delegate account for asset '{}'", asset_name)
+                    })?;
+
+                // Update the account in the assets map
+                *account_rwlock.write().await = delegated_account;
+            }
         }
 
         Ok(minter)
@@ -150,8 +171,6 @@ pub struct MintFunder {
 
     txn_config: TransactionSubmissionConfig,
 
-    faucet_account: RwLock<LocalAccount>,
-
     transaction_factory: TransactionFactory,
 
     gas_unit_price_manager: GasUnitPriceManager,
@@ -161,7 +180,7 @@ pub struct MintFunder {
     outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
 
     // Multi-asset support: store asset configs
-    assets: HashMap<String, MintAssetConfig>,
+    assets: HashMap<String, (MintAssetConfig, RwLock<LocalAccount>)>,
     default_asset: String,
     amount_to_fund: u64,
 }
@@ -173,8 +192,7 @@ impl MintFunder {
         node_additional_headers: Option<HashMap<String, String>>,
         chain_id: ChainId,
         txn_config: TransactionSubmissionConfig,
-        faucet_account: LocalAccount,
-        assets: HashMap<String, MintAssetConfig>,
+        assets: HashMap<String, (MintAssetConfig, RwLock<LocalAccount>)>,
         default_asset: String,
         amount_to_fund: u64,
     ) -> Self {
@@ -188,7 +206,6 @@ impl MintFunder {
             node_api_key,
             node_additional_headers,
             txn_config,
-            faucet_account: RwLock::new(faucet_account),
             transaction_factory,
             gas_unit_price_manager,
             outstanding_requests: RwLock::new(vec![]),
@@ -221,7 +238,7 @@ impl MintFunder {
     /// Performs the delegated account creation and delegation. The (Aptos) coin::mint function that
     /// used in the MintFunder expects the caller to have the MintCapability.
     /// So we need to create a new account and delegate the MintCapability to it.
-    pub async fn use_delegated_account(&self) -> Result<()> {
+    pub async fn use_delegated_account(&self, asset_name: &str) -> Result<LocalAccount> {
         // Build a client.
         let client = self.get_api_client();
 
@@ -238,6 +255,7 @@ impl MintFunder {
                 .account_address(),
             false,
             true,
+            asset_name,
         )
         .await
         .context("Failed to create new account")?;
@@ -249,7 +267,7 @@ impl MintFunder {
 
         // Delegate minting to the account
         {
-            let faucet_account = self.faucet_account.write().await;
+            let faucet_account = self.get_asset_account(asset_name)?.read().await;
             client
                 .submit_and_wait(&faucet_account.sign_with_transaction_builder(
                     transaction_factory.payload(aptos_stdlib::aptos_coin_delegate_mint_capability(
@@ -269,14 +287,12 @@ impl MintFunder {
             .context("Failed to claim the minting capability")?;
 
         info!(
-            "Successfully configured MintFunder to use delegated account: {}",
+            "Successfully configured MintFunder to use delegated account for asset '{}': {}",
+            asset_name,
             delegated_account.address()
         );
 
-        let mut faucet_account = self.faucet_account.write().await;
-        *faucet_account = delegated_account;
-
-        Ok(())
+        Ok(delegated_account)
     }
 
     /// Within a single request we should just call this once and use this client
@@ -298,6 +314,32 @@ impl MintFunder {
         builder.build()
     }
 
+    /// Get the asset config and account for a given asset name.
+    /// Returns an error if the asset doesn't exist (should never happen in normal operation).
+    fn get_asset(
+        &self,
+        asset_name: &str,
+    ) -> Result<&(MintAssetConfig, RwLock<LocalAccount>), AptosTapError> {
+        self.assets.get(asset_name).ok_or_else(|| {
+            AptosTapError::new(
+                format!("Asset '{}' not found", asset_name),
+                AptosTapErrorCode::InvalidRequest,
+            )
+        })
+    }
+
+    /// Get the account RwLock for a given asset name.
+    /// Returns an error if the asset doesn't exist.
+    fn get_asset_account(&self, asset_name: &str) -> Result<&RwLock<LocalAccount>, AptosTapError> {
+        self.get_asset(asset_name).map(|(_, account)| account)
+    }
+
+    /// Get the asset config for a given asset name.
+    /// Returns an error if the asset doesn't exist.
+    fn get_asset_config(&self, asset_name: &str) -> Result<&MintAssetConfig, AptosTapError> {
+        self.get_asset(asset_name).map(|(config, _)| config)
+    }
+
     /// Core processing logic that handles sequence numbers and transaction submission.
     pub async fn process(
         &self,
@@ -306,10 +348,11 @@ impl MintFunder {
         receiver_address: AccountAddress,
         check_only: bool,
         wait_for_transactions: bool,
+        asset_name: &str,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
         let (_faucet_seq, receiver_seq) = update_sequence_numbers(
             client,
-            &self.faucet_account,
+            self.get_asset_account(asset_name)?,
             &self.outstanding_requests,
             receiver_address,
             amount,
@@ -333,7 +376,7 @@ impl MintFunder {
 
         let txn =
             {
-                let faucet_account = self.faucet_account.write().await;
+                let faucet_account = self.get_asset_account(asset_name)?.write().await;
                 let transaction_factory = self.get_transaction_factory().await?;
                 faucet_account.sign_with_transaction_builder(transaction_factory.script(
                     Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![
@@ -346,7 +389,7 @@ impl MintFunder {
         Ok(vec![
             submit_transaction(
                 client,
-                &self.faucet_account,
+                self.get_asset_account(asset_name)?,
                 txn,
                 &receiver_address,
                 wait_for_transactions,
@@ -369,38 +412,8 @@ impl FunderTrait for MintFunder {
         // Resolve asset (use configured default if not specified)
         let asset_name = asset.as_deref().unwrap_or(&self.default_asset);
 
-        // Get asset config
-        let asset_config = self.assets.get(asset_name).ok_or_else(|| {
-            AptosTapError::new(
-                format!("Asset '{}' is not configured", asset_name),
-                AptosTapErrorCode::InvalidRequest,
-            )
-        })?;
-
-        // Only set faucet_account if it's NOT the default asset
-        // (default asset is already set and delegated at startup)
-        if asset_name != self.default_asset {
-            let key = asset_config.get_key().map_err(|e| {
-                AptosTapError::new_with_error_code(e, AptosTapErrorCode::InvalidRequest)
-            })?;
-            let account_address = asset_config.mint_account_address.unwrap_or_else(|| {
-                AuthenticationKey::ed25519(&Ed25519PublicKey::from(&key)).account_address()
-            });
-
-            let mint_account = LocalAccount::new(account_address, key, 0);
-            {
-                let mut faucet_account = self.faucet_account.write().await;
-                *faucet_account = mint_account;
-            }
-        }
-
-        // Only delegate if it's NOT the default asset
-        // (default asset is already delegated at startup)
-        if !asset_config.do_not_delegate && asset_name != self.default_asset {
-            self.use_delegated_account().await.map_err(|e| {
-                AptosTapError::new_with_error_code(e, AptosTapErrorCode::InternalError)
-            })?;
-        }
+        // Validate asset exists
+        self.get_asset_config(asset_name)?;
 
         let client = self.get_api_client();
         let amount = self.get_amount(amount, did_bypass_checkers);
@@ -410,6 +423,7 @@ impl FunderTrait for MintFunder {
             receiver_address,
             check_only,
             self.txn_config.wait_for_transactions,
+            asset_name,
         )
         .await
     }
@@ -428,7 +442,18 @@ impl FunderTrait for MintFunder {
 
     /// Assert the funder account actually exists.
     async fn is_healthy(&self) -> FunderHealthMessage {
-        let account_address = self.faucet_account.read().await.address();
+        let account_address = match self.get_asset_account(&self.default_asset) {
+            Ok(account) => account.read().await.address(),
+            Err(e) => {
+                return FunderHealthMessage {
+                    can_process_requests: false,
+                    message: Some(format!(
+                        "Default asset '{}' not found: {}",
+                        self.default_asset, e
+                    )),
+                };
+            },
+        };
         let client = self.get_api_client();
         match client.get_account_bcs(account_address).await {
             Ok(_) => FunderHealthMessage {

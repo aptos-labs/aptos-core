@@ -19,6 +19,7 @@ use std::{
     path::PathBuf,
     str::FromStr,
 };
+use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -100,7 +101,10 @@ impl FaucetCliArgs {
 
         // Build assets map with the default asset
         let mut assets = HashMap::new();
-        assets.insert(DEFAULT_ASSET_NAME.to_string(), mint_asset_config);
+        assets.insert(
+            DEFAULT_ASSET_NAME.to_string(),
+            (mint_asset_config, RwLock::new(faucet_account)),
+        );
 
         // Build the MintFunder service.
         let mint_funder = MintFunder::new(
@@ -109,7 +113,6 @@ impl FaucetCliArgs {
             self.api_connection_args.additional_headers.clone(),
             self.api_connection_args.chain_id,
             transaction_submission_config,
-            faucet_account,
             assets,
             DEFAULT_ASSET_NAME.to_string(),
             self.amount,
@@ -117,7 +120,7 @@ impl FaucetCliArgs {
 
         // Create an account that we'll delegate mint functionality to, then use it.
         mint_funder
-            .use_delegated_account()
+            .use_delegated_account(DEFAULT_ASSET_NAME)
             .await
             .context("Failed to make MintFunder use delegated account")?;
 
