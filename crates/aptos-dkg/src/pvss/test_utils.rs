@@ -4,13 +4,14 @@
 use crate::pvss::{
     traits::{
         transcript::{Transcript, WithMaxNumShares},
-        Convert, HasEncryptionPublicParams, Reconstructable,
+        Convert, HasEncryptionPublicParams, 
     },
     Player, ThresholdConfigBlstrs, WeightedConfig,
 };
 use aptos_crypto::{
     traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
     SigningKey, Uniform,
+    arkworks::shamir::Reconstructable,
 };
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
@@ -251,5 +252,5 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    T::DealtSecretKey::reconstruct(sc, &players_and_shares)
+    T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }
