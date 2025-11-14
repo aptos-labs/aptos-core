@@ -9,56 +9,56 @@ struct Predicate<T0> has copy + drop
   _0: |&T0|bool has copy + drop
 
 // Function definition at index 0
-public fun pack$Holder<T0>(l0: Predicate<T0>): Holder<T0>
+#[pack] public fun pack$Holder<T0>(l0: Predicate<T0>): Holder<T0>
     local l1: Predicate<T0>
     move_loc l0
     pack Holder<T0>
     ret
 
 // Function definition at index 1
-public fun unpack$Holder<T0>(l0: Holder<T0>): Predicate<T0>
+#[unpack] public fun unpack$Holder<T0>(l0: Holder<T0>): Predicate<T0>
     local l1: Holder<T0>
     move_loc l0
     unpack Holder<T0>
     ret
 
 // Function definition at index 2
-public fun borrow$Holder$0<T0>(l0: &Holder<T0>): &Predicate<T0>
+#[borrow] public fun borrow$Holder$0<T0>(l0: &Holder<T0>): &Predicate<T0>
     local l1: &Holder<T0>
     move_loc l0
     borrow_field Holder<T0>, _0
     ret
 
 // Function definition at index 3
-public fun borrow_mut$Holder$0<T0>(l0: &mut Holder<T0>): &mut Predicate<T0>
+#[borrow_mut] public fun borrow_mut$Holder$0<T0>(l0: &mut Holder<T0>): &mut Predicate<T0>
     local l1: &mut Holder<T0>
     move_loc l0
     mut_borrow_field Holder<T0>, _0
     ret
 
 // Function definition at index 4
-public fun pack$Predicate<T0>(l0: |&T0|bool has copy + drop): Predicate<T0>
+#[pack] public fun pack$Predicate<T0>(l0: |&T0|bool has copy + drop): Predicate<T0>
     local l1: |&T0|bool has copy + drop
     move_loc l0
     pack Predicate<T0>
     ret
 
 // Function definition at index 5
-public fun unpack$Predicate<T0>(l0: Predicate<T0>): |&T0|bool has copy + drop
+#[unpack] public fun unpack$Predicate<T0>(l0: Predicate<T0>): |&T0|bool has copy + drop
     local l1: Predicate<T0>
     move_loc l0
     unpack Predicate<T0>
     ret
 
 // Function definition at index 6
-public fun borrow$Predicate$0<T0>(l0: &Predicate<T0>): &|&T0|bool has copy + drop
+#[borrow] public fun borrow$Predicate$0<T0>(l0: &Predicate<T0>): &|&T0|bool has copy + drop
     local l1: &Predicate<T0>
     move_loc l0
     borrow_field Predicate<T0>, _0
     ret
 
 // Function definition at index 7
-public fun borrow_mut$Predicate$0<T0>(l0: &mut Predicate<T0>): &mut |&T0|bool has copy + drop
+#[borrow_mut] public fun borrow_mut$Predicate$0<T0>(l0: &mut Predicate<T0>): &mut |&T0|bool has copy + drop
     local l1: &mut Predicate<T0>
     move_loc l0
     mut_borrow_field Predicate<T0>, _0

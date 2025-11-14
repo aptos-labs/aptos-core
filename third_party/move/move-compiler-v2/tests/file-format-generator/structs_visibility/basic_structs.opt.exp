@@ -14,49 +14,49 @@ struct S2
   s: S
 
 // Function definition at index 0
-friend fun pack$Empty(l0: bool): Empty
+#[pack] friend fun pack$Empty(l0: bool): Empty
     local l1: bool
     move_loc l0
     pack Empty
     ret
 
 // Function definition at index 1
-friend fun unpack$Empty(l0: Empty): bool
+#[unpack] friend fun unpack$Empty(l0: Empty): bool
     local l1: Empty
     move_loc l0
     unpack Empty
     ret
 
 // Function definition at index 2
-public fun pack$S(l0: u64): S
+#[pack] public fun pack$S(l0: u64): S
     local l1: u64
     move_loc l0
     pack S
     ret
 
 // Function definition at index 3
-public fun unpack$S(l0: S): u64
+#[unpack] public fun unpack$S(l0: S): u64
     local l1: S
     move_loc l0
     unpack S
     ret
 
 // Function definition at index 4
-public fun borrow$S$0(l0: &S): &u64
+#[borrow] public fun borrow$S$0(l0: &S): &u64
     local l1: &S
     move_loc l0
     borrow_field S, x
     ret
 
 // Function definition at index 5
-public fun borrow_mut$S$0(l0: &mut S): &mut u64
+#[borrow_mut] public fun borrow_mut$S$0(l0: &mut S): &mut u64
     local l1: &mut S
     move_loc l0
     mut_borrow_field S, x
     ret
 
 // Function definition at index 6
-friend fun pack$S2(l0: u64, l1: S): S2
+#[pack] friend fun pack$S2(l0: u64, l1: S): S2
     local l2: u64
     local l3: S
     move_loc l0
@@ -65,35 +65,35 @@ friend fun pack$S2(l0: u64, l1: S): S2
     ret
 
 // Function definition at index 7
-friend fun unpack$S2(l0: S2): (u64, S)
+#[unpack] friend fun unpack$S2(l0: S2): (u64, S)
     local l1: S2
     move_loc l0
     unpack S2
     ret
 
 // Function definition at index 8
-friend fun borrow$S2$0(l0: &S2): &u64
+#[borrow] friend fun borrow$S2$0(l0: &S2): &u64
     local l1: &S2
     move_loc l0
     borrow_field S2, x
     ret
 
 // Function definition at index 9
-friend fun borrow$S2$1(l0: &S2): &S
+#[borrow] friend fun borrow$S2$1(l0: &S2): &S
     local l1: &S2
     move_loc l0
     borrow_field S2, s
     ret
 
 // Function definition at index 10
-friend fun borrow_mut$S2$0(l0: &mut S2): &mut u64
+#[borrow_mut] friend fun borrow_mut$S2$0(l0: &mut S2): &mut u64
     local l1: &mut S2
     move_loc l0
     mut_borrow_field S2, x
     ret
 
 // Function definition at index 11
-friend fun borrow_mut$S2$1(l0: &mut S2): &mut S
+#[borrow_mut] friend fun borrow_mut$S2$1(l0: &mut S2): &mut S
     local l1: &mut S2
     move_loc l0
     mut_borrow_field S2, s
@@ -106,28 +106,28 @@ struct T
   x: u64
 
 // Function definition at index 0
-friend fun pack$T(l0: u64): T
+#[pack] friend fun pack$T(l0: u64): T
     local l1: u64
     move_loc l0
     pack T
     ret
 
 // Function definition at index 1
-friend fun unpack$T(l0: T): u64
+#[unpack] friend fun unpack$T(l0: T): u64
     local l1: T
     move_loc l0
     unpack T
     ret
 
 // Function definition at index 2
-friend fun borrow$T$0(l0: &T): &u64
+#[borrow] friend fun borrow$T$0(l0: &T): &u64
     local l1: &T
     move_loc l0
     borrow_field T, x
     ret
 
 // Function definition at index 3
-friend fun borrow_mut$T$0(l0: &mut T): &mut u64
+#[borrow_mut] friend fun borrow_mut$T$0(l0: &mut T): &mut u64
     local l1: &mut T
     move_loc l0
     mut_borrow_field T, x

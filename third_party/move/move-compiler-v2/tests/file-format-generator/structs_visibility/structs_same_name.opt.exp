@@ -7,28 +7,28 @@ struct S<T0: copy>
   f: T0
 
 // Function definition at index 0
-friend fun pack$S<T0: copy>(l0: T0): S<T0>
+#[pack] friend fun pack$S<T0: copy>(l0: T0): S<T0>
     local l1: T0
     move_loc l0
     pack S<T0>
     ret
 
 // Function definition at index 1
-friend fun unpack$S<T0: copy>(l0: S<T0>): T0
+#[unpack] friend fun unpack$S<T0: copy>(l0: S<T0>): T0
     local l1: S<T0>
     move_loc l0
     unpack S<T0>
     ret
 
 // Function definition at index 2
-friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
+#[borrow] friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
     local l1: &S<T0>
     move_loc l0
     borrow_field S<T0>, f
     ret
 
 // Function definition at index 3
-friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
+#[borrow_mut] friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, f
@@ -41,28 +41,28 @@ struct S<T0: copy>
   f: T0
 
 // Function definition at index 0
-friend fun pack$S<T0: copy>(l0: T0): S<T0>
+#[pack] friend fun pack$S<T0: copy>(l0: T0): S<T0>
     local l1: T0
     move_loc l0
     pack S<T0>
     ret
 
 // Function definition at index 1
-friend fun unpack$S<T0: copy>(l0: S<T0>): T0
+#[unpack] friend fun unpack$S<T0: copy>(l0: S<T0>): T0
     local l1: S<T0>
     move_loc l0
     unpack S<T0>
     ret
 
 // Function definition at index 2
-friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
+#[borrow] friend fun borrow$S$0<T0: copy>(l0: &S<T0>): &T0
     local l1: &S<T0>
     move_loc l0
     borrow_field S<T0>, f
     ret
 
 // Function definition at index 3
-friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
+#[borrow_mut] friend fun borrow_mut$S$0<T0: copy>(l0: &mut S<T0>): &mut T0
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, f

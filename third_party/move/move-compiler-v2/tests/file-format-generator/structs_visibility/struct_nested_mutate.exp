@@ -9,56 +9,56 @@ struct S has copy + drop
   x: T
 
 // Function definition at index 0
-public fun pack$T(l0: u64): T
+#[pack] public fun pack$T(l0: u64): T
     local l1: u64
     move_loc l0
     pack T
     ret
 
 // Function definition at index 1
-public fun unpack$T(l0: T): u64
+#[unpack] public fun unpack$T(l0: T): u64
     local l1: T
     move_loc l0
     unpack T
     ret
 
 // Function definition at index 2
-public fun borrow$T$0(l0: &T): &u64
+#[borrow] public fun borrow$T$0(l0: &T): &u64
     local l1: &T
     move_loc l0
     borrow_field T, y
     ret
 
 // Function definition at index 3
-public fun borrow_mut$T$0(l0: &mut T): &mut u64
+#[borrow_mut] public fun borrow_mut$T$0(l0: &mut T): &mut u64
     local l1: &mut T
     move_loc l0
     mut_borrow_field T, y
     ret
 
 // Function definition at index 4
-public fun pack$S(l0: T): S
+#[pack] public fun pack$S(l0: T): S
     local l1: T
     move_loc l0
     pack S
     ret
 
 // Function definition at index 5
-public fun unpack$S(l0: S): T
+#[unpack] public fun unpack$S(l0: S): T
     local l1: S
     move_loc l0
     unpack S
     ret
 
 // Function definition at index 6
-public fun borrow$S$0(l0: &S): &T
+#[borrow] public fun borrow$S$0(l0: &S): &T
     local l1: &S
     move_loc l0
     borrow_field S, x
     ret
 
 // Function definition at index 7
-public fun borrow_mut$S$0(l0: &mut S): &mut T
+#[borrow_mut] public fun borrow_mut$S$0(l0: &mut S): &mut T
     local l1: &mut S
     move_loc l0
     mut_borrow_field S, x

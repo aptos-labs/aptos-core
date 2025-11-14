@@ -29,8 +29,7 @@ use crate::{
 use fail::fail_point;
 use itertools::Itertools;
 use move_binary_format::{
-    errors,
-    errors::*,
+    errors::{self, *},
     file_format::{AccessKind, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
 };
 use move_core_types::{

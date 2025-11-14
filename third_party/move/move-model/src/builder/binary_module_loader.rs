@@ -318,6 +318,7 @@ impl<'a> BinaryModuleLoader<'a> {
                 new = true;
                 StructData {
                     abilities: handle_view.abilities(),
+                    is_empty_struct: None,
                     ..StructData::new(struct_id.symbol(), loc.clone())
                 }
             });
@@ -459,25 +460,41 @@ impl<'a> BinaryModuleLoader<'a> {
 
         // add attributes to the function
         let mut attributes = vec![];
+        let mut add_attribute = |well_known_name: &str| {
+            let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+            let sym = self.env.symbol_pool().make(well_known_name);
+            attributes.push(Attribute::Apply(node_id, sym, vec![]));
+        };
         for attr in handle_view.attributes() {
             match attr {
                 FunctionAttribute::Persistent => {
                     if !visibility.is_public() {
-                        let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
-                        let sym = self
-                            .env
-                            .symbol_pool()
-                            .make(well_known::PERSISTENT_ATTRIBUTE);
-                        attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                        add_attribute(well_known::PERSISTENT_ATTRIBUTE);
                     }
                 },
                 FunctionAttribute::ModuleLock => {
-                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
-                    let sym = self
-                        .env
-                        .symbol_pool()
-                        .make(well_known::MODULE_LOCK_ATTRIBUTE);
-                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    add_attribute(well_known::MODULE_LOCK_ATTRIBUTE);
+                },
+                FunctionAttribute::Pack => {
+                    add_attribute(well_known::PACK);
+                },
+                FunctionAttribute::PackVariant(_) => {
+                    add_attribute(well_known::PACK_VARIANT);
+                },
+                FunctionAttribute::Unpack => {
+                    add_attribute(well_known::UNPACK);
+                },
+                FunctionAttribute::UnpackVariant(_) => {
+                    add_attribute(well_known::UNPACK_VARIANT);
+                },
+                FunctionAttribute::TestVariant(_) => {
+                    add_attribute(well_known::TEST_VARIANT);
+                },
+                FunctionAttribute::BorrowFieldImmutable(_) => {
+                    add_attribute(well_known::BORROW_NAME);
+                },
+                FunctionAttribute::BorrowFieldMutable(_) => {
+                    add_attribute(well_known::BORROW_MUT_NAME);
                 },
             }
         }
