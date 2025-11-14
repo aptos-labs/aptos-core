@@ -27,6 +27,10 @@ fi
 set -e
 set -x
 
+cat /etc/os-release
+CV=$(clang --version)
+echo "clang version: ${CV}"
+
 # Run clippy with the aptos-core specific configuration.
 cargo xclippy
 
