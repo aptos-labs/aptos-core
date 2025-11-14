@@ -18,9 +18,9 @@ pub mod traits;
 pub mod weighted;
 
 pub use aptos_crypto::blstrs::scalar_secret_key;
+pub use aptos_crypto::blstrs::threshold_config;
+pub use aptos_crypto::blstrs::threshold_config::ThresholdConfigBlstrs;
 pub use aptos_crypto::input_secret;
 pub use aptos_crypto::player::Player;
 pub use low_degree_test::LowDegreeTest;
-pub use aptos_crypto::blstrs::threshold_config::ThresholdConfigBlstrs;
-pub use aptos_crypto::blstrs::threshold_config;
 pub use weighted::{GenericWeighting, WeightedConfig};

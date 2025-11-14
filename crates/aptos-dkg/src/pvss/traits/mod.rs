@@ -17,4 +17,3 @@ pub trait HasEncryptionPublicParams {
 
     fn get_encryption_public_params(&self) -> &Self::EncryptionPublicParameters;
 }
-

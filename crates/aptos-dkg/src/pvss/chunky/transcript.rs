@@ -98,7 +98,9 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
     }
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P,N>>> traits::Transcript for Transcript<E> {
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
+    for Transcript<E>
+{
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
     type DealtSecretKey = Scalar<E>;
@@ -492,7 +494,9 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
     (Cs, Rs, sharing_proof)
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P,N>>> MalleableTranscript for Transcript<E> {
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> MalleableTranscript
+    for Transcript<E>
+{
     fn maul_signature<A: Serialize + Clone>(
         &mut self,
         _ssk: &Self::SigningSecretKey,

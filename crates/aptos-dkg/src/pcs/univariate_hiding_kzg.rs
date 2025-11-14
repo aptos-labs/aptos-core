@@ -207,11 +207,10 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         } = vk;
         let OpeningProof { pi_1, pi_2 } = pi;
 
-        let check = E::multi_pairing(vec![C.0 - one_1 * y, -pi_1.0, -pi_2], vec![
-            one_2,
-            (tau_2 - one_2 * x).into_affine(),
-            xi_2,
-        ]);
+        let check = E::multi_pairing(
+            vec![C.0 - one_1 * y, -pi_1.0, -pi_2],
+            vec![one_2, (tau_2 - one_2 * x).into_affine(), xi_2],
+        );
         ensure!(
             PairingOutput::<E>::ZERO == check,
             "Hiding KZG verification failed"

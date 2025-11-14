@@ -4,14 +4,14 @@
 use crate::pvss::{
     traits::{
         transcript::{Transcript, WithMaxNumShares},
-        Convert, HasEncryptionPublicParams, 
+        Convert, HasEncryptionPublicParams,
     },
     Player, ThresholdConfigBlstrs, WeightedConfig,
 };
 use aptos_crypto::{
+    arkworks::shamir::Reconstructable,
     traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
     SigningKey, Uniform,
-    arkworks::shamir::Reconstructable,
 };
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};

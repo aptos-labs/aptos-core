@@ -22,7 +22,6 @@ pub struct GenericWeighting<T> {
     trx: T,
 }
 
-
 impl<T: Transcript> ValidCryptoMaterial for GenericWeighting<T> {
     const AIP_80_PREFIX: &'static str = "";
 
