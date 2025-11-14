@@ -17,7 +17,7 @@ use aptos_consensus_types::{
     opt_proposal_msg::OptProposalMsg,
     order_vote_msg::OrderVoteMsg,
     pipeline::{commit_decision::CommitDecision, commit_vote::CommitVote},
-    proof_of_store::{BatchInfo, ProofOfStoreMsg, SignedBatchInfoMsg},
+    proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
     sync_info::SyncInfo,
@@ -91,6 +91,11 @@ pub enum ConsensusMsg {
     BlockRetrievalRequest(Box<BlockRetrievalRequest>),
     /// OptProposalMsg contains the optimistic proposal and sync info.
     OptProposalMsg(Box<OptProposalMsg>),
+    /// Quorum Store: Send a signed batch digest with BatchInfoExt. This is a vote for the batch and a promise that
+    /// the batch of transactions was received and will be persisted until batch expiration.
+    SignedBatchInfoMsgV2(Box<SignedBatchInfoMsg<BatchInfoExt>>),
+    /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes) with BatchInfoExt.
+    ProofOfStoreMsgV2(Box<ProofOfStoreMsg<BatchInfoExt>>),
 }
 
 /// Network type for consensus
@@ -121,6 +126,8 @@ impl ConsensusMsg {
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
             ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
             ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::SignedBatchInfoMsgV2(_) => "SignedBatchInfoMsgV2",
+            ConsensusMsg::ProofOfStoreMsgV2(_) => "ProofOfStoreMsgV2",
         }
     }
 }
