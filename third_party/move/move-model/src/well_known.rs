@@ -29,6 +29,8 @@ pub fn is_verify_only_attribute_name(s: &str) -> bool {
 pub const PUBLIC_STRUCT_DELIMITER: &str = "$";
 pub const PACK: &str = "pack";
 pub const UNPACK: &str = "unpack";
+pub const PACK_VARIANT: &str = "pack_variant";
+pub const UNPACK_VARIANT: &str = "unpack_variant";
 pub const TEST_VARIANT: &str = "test_variant";
 pub const PARAM_NAME_FOR_STRUCT_API: &str = "_s";
 
