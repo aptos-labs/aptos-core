@@ -1149,7 +1149,7 @@ fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::valid_ref_resource
 use 0x1::signer
 struct S1 has copy + drop + key

@@ -578,22 +578,67 @@ impl AsmParser {
     }
 
     fn attributes(&mut self) -> AsmResult<Vec<FunctionAttribute>> {
+        let function_attribute_para_parser = |parser: &mut AsmParser| -> AsmResult<u16> {
+            parser.advance()?;
+            if let Token::Number(num) = &parser.next {
+                let num = *num;
+                Ok(num.repr().as_u16())
+            } else {
+                Err(error(parser.next_loc, "expected number"))
+            }
+        };
         if self.is_special("#") && self.lookahead_special("[") {
             self.advance()?;
             self.advance()?;
             let attrs = self.list(
                 |parser| {
+                    let mut advance = false;
                     let attr = if parser.is_soft_kw("persistent") {
+                        advance = true;
                         FunctionAttribute::Persistent
                     } else if parser.is_soft_kw("module_lock") {
+                        advance = true;
                         FunctionAttribute::ModuleLock
                     } else {
-                        return Err(error(
-                            parser.next_loc,
-                            "expected function attribute `persistent` or `module_lock`",
-                        ));
+                        let attr = parser.ident()?;
+                        match attr.as_str() {
+                            "pack" => FunctionAttribute::Pack,
+                            "pack_variant" => FunctionAttribute::PackVariant(
+                                function_attribute_para_parser(parser)?,
+                            ),
+                            "unpack" => FunctionAttribute::Unpack,
+                            "unpack_variant" => {
+                                advance = true;
+                                FunctionAttribute::UnpackVariant(function_attribute_para_parser(
+                                    parser,
+                                )?)
+                            },
+                            "test_variant" => {
+                                advance = true;
+                                FunctionAttribute::TestVariant(function_attribute_para_parser(
+                                    parser,
+                                )?)
+                            },
+                            "borrow" => {
+                                advance = true;
+                                FunctionAttribute::BorrowFieldImmutable(
+                                    function_attribute_para_parser(parser)?,
+                                )
+                            },
+                            "borrow_mut" => {
+                                advance = true;
+                                FunctionAttribute::BorrowFieldMutable(
+                                    function_attribute_para_parser(parser)?,
+                                )
+                            },
+                            _ => {
+                                return Err(error(parser.next_loc, "unknown function attribute"));
+                            },
+                        }
                     };
-                    parser.advance()?;
+                    if advance {
+                        parser.advance()?;
+                    }
                     Ok(attr)
                 },
                 ",",

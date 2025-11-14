@@ -318,6 +318,7 @@ impl<'a> BinaryModuleLoader<'a> {
                 new = true;
                 StructData {
                     abilities: handle_view.abilities(),
+                    is_empty_struct: None,
                     ..StructData::new(struct_id.symbol(), loc.clone())
                 }
             });
@@ -477,6 +478,41 @@ impl<'a> BinaryModuleLoader<'a> {
                         .env
                         .symbol_pool()
                         .make(well_known::MODULE_LOCK_ATTRIBUTE);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+                FunctionAttribute::Pack => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self.env.symbol_pool().make(well_known::PACK);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+                FunctionAttribute::PackVariant(_) => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self.env.symbol_pool().make(well_known::PACK_VARIANT);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+                FunctionAttribute::Unpack => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self.env.symbol_pool().make(well_known::UNPACK);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+                FunctionAttribute::UnpackVariant(_) => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self.env.symbol_pool().make(well_known::UNPACK_VARIANT);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+                FunctionAttribute::TestVariant(_) => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self.env.symbol_pool().make(well_known::TEST_VARIANT);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+                FunctionAttribute::BorrowFieldImmutable(_) => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self.env.symbol_pool().make(well_known::BORROW_NAME);
+                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                },
+                FunctionAttribute::BorrowFieldMutable(_) => {
+                    let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
+                    let sym = self.env.symbol_pool().make(well_known::BORROW_MUT_NAME);
                     attributes.push(Attribute::Apply(node_id, sym, vec![]));
                 },
             }
