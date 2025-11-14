@@ -34,6 +34,7 @@ macro_rules! debug_writeln {
 pub mod code;
 pub mod delayed_values;
 pub mod gas;
+pub mod instr;
 pub mod interner;
 pub mod loaded_data;
 pub mod module_id_interner;
@@ -45,6 +46,5 @@ pub mod value_traversal;
 pub mod values;
 pub mod views;
 
-pub mod instr;
 #[cfg(test)]
 mod unit_tests;
