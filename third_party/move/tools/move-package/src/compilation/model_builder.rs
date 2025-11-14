@@ -33,15 +33,6 @@ impl ModelBuilder {
     // TODO: In the future we will need a better way to do this to support renaming in packages
     // where we want to support building a Move model.
     pub fn build_model(&self) -> Result<GlobalEnv> {
-        // Make sure no renamings have been performed
-        if let Some(pkg_name) = self.resolution_graph.contains_renaming() {
-            anyhow::bail!(
-                "Found address renaming in package '{}' when \
-                    building Move model -- this is currently not supported",
-                pkg_name
-            )
-        }
-
         // Targets are all files in the root package
         let root_name = &self.resolution_graph.root_package.package.name;
         let root_package = self.resolution_graph.get_package(root_name).clone();
