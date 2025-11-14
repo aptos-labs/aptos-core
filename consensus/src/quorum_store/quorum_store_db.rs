@@ -4,11 +4,15 @@
 use crate::{
     error::DbError,
     quorum_store::{
-        schema::{BatchIdSchema, BatchSchema, BATCH_CF_NAME, BATCH_ID_CF_NAME},
+        schema::{
+            BatchIdSchema, BatchSchema, BatchV2Schema, BATCH_CF_NAME, BATCH_ID_CF_NAME,
+            BATCH_V2_CF_NAME,
+        },
         types::PersistedValue,
     },
 };
 use anyhow::Result;
+use aptos_consensus_types::proof_of_store::{BatchInfo, BatchInfoExt, TBatchInfo};
 use aptos_crypto::HashValue;
 use aptos_logger::prelude::*;
 use aptos_schemadb::{
@@ -22,11 +26,22 @@ use std::{collections::HashMap, path::Path, time::Instant};
 pub trait QuorumStoreStorage: Sync + Send {
     fn delete_batches(&self, digests: Vec<HashValue>) -> Result<(), DbError>;
 
-    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>>;
+    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfo>>>;
 
-    fn save_batch(&self, batch: PersistedValue) -> Result<(), DbError>;
+    fn save_batch(&self, batch: PersistedValue<BatchInfo>) -> Result<(), DbError>;
 
-    fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError>;
+    fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue<BatchInfo>>, DbError>;
+
+    fn delete_batches_v2(&self, digests: Vec<HashValue>) -> Result<(), DbError>;
+
+    fn get_all_batches_v2(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfoExt>>>;
+
+    fn save_batch_v2(&self, batch: PersistedValue<BatchInfoExt>) -> Result<(), DbError>;
+
+    fn get_batch_v2(
+        &self,
+        digest: &HashValue,
+    ) -> Result<Option<PersistedValue<BatchInfoExt>>, DbError>;
 
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError>;
 
@@ -44,7 +59,7 @@ pub struct QuorumStoreDB {
 
 impl QuorumStoreDB {
     pub(crate) fn new<P: AsRef<Path> + Clone>(db_root_path: P) -> Self {
-        let column_families = vec![BATCH_CF_NAME, BATCH_ID_CF_NAME];
+        let column_families = vec![BATCH_CF_NAME, BATCH_ID_CF_NAME, BATCH_V2_CF_NAME];
 
         // TODO: this fails twins tests because it assumes a unique path per process
         let path = db_root_path.as_ref().join(QUORUM_STORE_DB_NAME);
@@ -85,14 +100,14 @@ impl QuorumStoreStorage for QuorumStoreDB {
         Ok(())
     }
 
-    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
+    fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfo>>> {
         let mut iter = self.db.iter::<BatchSchema>()?;
         iter.seek_to_first();
         iter.map(|res| res.map_err(Into::into))
-            .collect::<Result<HashMap<HashValue, PersistedValue>>>()
+            .collect::<Result<HashMap<HashValue, PersistedValue<BatchInfo>>>>()
     }
 
-    fn save_batch(&self, batch: PersistedValue) -> Result<(), DbError> {
+    fn save_batch(&self, batch: PersistedValue<BatchInfo>) -> Result<(), DbError> {
         trace!(
             "QS: db persists digest {} expiration {:?}",
             batch.digest(),
@@ -101,8 +116,41 @@ impl QuorumStoreStorage for QuorumStoreDB {
         self.put::<BatchSchema>(batch.digest(), &batch)
     }
 
-    fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue>, DbError> {
+    fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue<BatchInfo>>, DbError> {
         Ok(self.db.get::<BatchSchema>(digest)?)
+    }
+
+    fn delete_batches_v2(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
+        let mut batch = SchemaBatch::new();
+        for digest in digests.iter() {
+            trace!("QS: db delete digest {}", digest);
+            batch.delete::<BatchV2Schema>(digest)?;
+        }
+        self.db.write_schemas_relaxed(batch)?;
+        Ok(())
+    }
+
+    fn get_all_batches_v2(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfoExt>>> {
+        let mut iter = self.db.iter::<BatchV2Schema>()?;
+        iter.seek_to_first();
+        iter.map(|res| res.map_err(Into::into))
+            .collect::<Result<HashMap<HashValue, PersistedValue<BatchInfoExt>>>>()
+    }
+
+    fn save_batch_v2(&self, batch: PersistedValue<BatchInfoExt>) -> Result<(), DbError> {
+        trace!(
+            "QS: db persists digest {} expiration {:?}",
+            batch.digest(),
+            batch.expiration()
+        );
+        self.put::<BatchV2Schema>(batch.digest(), &batch)
+    }
+
+    fn get_batch_v2(
+        &self,
+        digest: &HashValue,
+    ) -> Result<Option<PersistedValue<BatchInfoExt>>, DbError> {
+        Ok(self.db.get::<BatchV2Schema>(digest)?)
     }
 
     fn delete_batch_id(&self, epoch: u64) -> Result<(), DbError> {
@@ -160,15 +208,15 @@ pub mod mock {
             Ok(())
         }
 
-        fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue>> {
+        fn get_all_batches(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfo>>> {
             Ok(HashMap::new())
         }
 
-        fn save_batch(&self, _: PersistedValue) -> Result<(), DbError> {
+        fn save_batch(&self, _: PersistedValue<BatchInfo>) -> Result<(), DbError> {
             Ok(())
         }
 
-        fn get_batch(&self, _: &HashValue) -> Result<Option<PersistedValue>, DbError> {
+        fn get_batch(&self, _: &HashValue) -> Result<Option<PersistedValue<BatchInfo>>, DbError> {
             Ok(None)
         }
 
@@ -182,6 +230,25 @@ pub mod mock {
 
         fn save_batch_id(&self, _: u64, _: BatchId) -> Result<(), DbError> {
             Ok(())
+        }
+
+        fn delete_batches_v2(&self, _digests: Vec<HashValue>) -> Result<(), DbError> {
+            Ok(())
+        }
+
+        fn get_all_batches_v2(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfoExt>>> {
+            Ok(HashMap::new())
+        }
+
+        fn save_batch_v2(&self, _batch: PersistedValue<BatchInfoExt>) -> Result<(), DbError> {
+            Ok(())
+        }
+
+        fn get_batch_v2(
+            &self,
+            _digest: &HashValue,
+        ) -> Result<Option<PersistedValue<BatchInfoExt>>, DbError> {
+            Ok(None)
         }
     }
 }
