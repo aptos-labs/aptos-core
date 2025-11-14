@@ -368,18 +368,41 @@ pub enum FunctionAttribute {
     Persistent,
     /// During execution of the function, a module reentrancy lock is established.
     ModuleLock,
+    Pack,
+    PackVariant,
+    Unpack,
+    UnpackVariant,
+    TestVariant,
+    BorrowFieldImmutable(u8),
+    BorrowFieldMutable(u8),
 }
 
 impl FunctionAttribute {
     /// Returns true if the attributes in `with` are compatible with
     /// the attributes in `this`. Typically, `this` is an imported
     /// function handle and `with` the matching definition. Currently,
-    /// only the `Persistent` attribute is relevant for this check.
+    /// `Persistent` and all public struct related attributes are relevant for this check.
     pub fn is_compatible_with(this: &[Self], with: &[Self]) -> bool {
-        if this.contains(&FunctionAttribute::Persistent) {
-            with.contains(&FunctionAttribute::Persistent)
-        } else {
-            true
+        for attr in this {
+            if attr.cannot_be_removed() {
+                if !with.contains(attr) {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    /// Returns true if the attribute cannot be removed from the function handle once added.
+    pub fn cannot_be_removed(&self) -> bool {
+        match self {
+            FunctionAttribute::ModuleLock => false,
+            FunctionAttribute::Pack | FunctionAttribute::PackVariant => true,
+            FunctionAttribute::Unpack | FunctionAttribute::UnpackVariant => true,
+            FunctionAttribute::TestVariant => true,
+            FunctionAttribute::BorrowFieldImmutable(_) => true,
+            FunctionAttribute::BorrowFieldMutable(_) => true,
+            FunctionAttribute::Persistent => true,
         }
     }
 }
@@ -389,6 +412,21 @@ impl fmt::Display for FunctionAttribute {
         match self {
             FunctionAttribute::Persistent => write!(f, "persistent"),
             FunctionAttribute::ModuleLock => write!(f, "module_lock"),
+            FunctionAttribute::Pack | FunctionAttribute::PackVariant => {
+                write!(f, "pack")
+            },
+            FunctionAttribute::Unpack | FunctionAttribute::UnpackVariant => {
+                write!(f, "unpack")
+            },
+            FunctionAttribute::TestVariant => {
+                write!(f, "test_variant")
+            },
+            FunctionAttribute::BorrowFieldImmutable(_) => {
+                write!(f, "borrow")
+            },
+            FunctionAttribute::BorrowFieldMutable(_) => {
+                write!(f, "borrow_mut")
+            },
         }
     }
 }

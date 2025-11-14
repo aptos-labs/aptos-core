@@ -1,6 +1,6 @@
 processed 1 task
 task 0 lines 3-14:  print-bytecode --input=module [module 0xc0ffee::m {]
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 // Function definition at index 0
 fun id_mut<T0>(l0: &mut T0): &mut T0
