@@ -231,28 +231,28 @@ struct Lazy has drop
   _0: || has drop
 
 // Function definition at index 0
-friend fun pack$Lazy(l0: || has drop): Lazy
+#[pack] friend fun pack$Lazy(l0: || has drop): Lazy
     local l1: || has drop
     move_loc l0
     pack Lazy
     ret
 
 // Function definition at index 1
-friend fun unpack$Lazy(l0: Lazy): || has drop
+#[unpack] friend fun unpack$Lazy(l0: Lazy): || has drop
     local l1: Lazy
     move_loc l0
     unpack Lazy
     ret
 
 // Function definition at index 2
-friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
+#[borrow] friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
     local l1: &Lazy
     move_loc l0
     borrow_field Lazy, _0
     ret
 
 // Function definition at index 3
-friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
+#[borrow_mut] friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
     local l1: &mut Lazy
     move_loc l0
     mut_borrow_field Lazy, _0
@@ -275,28 +275,28 @@ struct Lazy has drop
   _0: || has drop
 
 // Function definition at index 0
-friend fun pack$Lazy(l0: || has drop): Lazy
+#[pack] friend fun pack$Lazy(l0: || has drop): Lazy
     local l1: || has drop
     move_loc l0
     pack Lazy
     ret
 
 // Function definition at index 1
-friend fun unpack$Lazy(l0: Lazy): || has drop
+#[unpack] friend fun unpack$Lazy(l0: Lazy): || has drop
     local l1: Lazy
     move_loc l0
     unpack Lazy
     ret
 
 // Function definition at index 2
-friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
+#[borrow] friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
     local l1: &Lazy
     move_loc l0
     borrow_field Lazy, _0
     ret
 
 // Function definition at index 3
-friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
+#[borrow_mut] friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
     local l1: &mut Lazy
     move_loc l0
     mut_borrow_field Lazy, _0

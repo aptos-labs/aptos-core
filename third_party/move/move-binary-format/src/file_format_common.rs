@@ -222,6 +222,13 @@ pub enum SerializedNativeStructFlag {
 pub enum SerializedFunctionAttribute {
     PERSISTENT   = 0x1,
     MODULE_LOCK  = 0x2,
+    PACK         = 0x3,
+    PACK_VARIANT = 0x4,
+    UNPACK       = 0x5,
+    UNPACK_VARIANT = 0x6,
+    TEST_VARIANT = 0x7,
+    BORROW_FIELD_IMMUTABLE = 0x8,
+    BORROW_FIELD_MUTABLE = 0x9,
 }
 
 /// List of opcodes constants.
@@ -556,6 +563,7 @@ pub const VERSION_9: u32 = 9;
 
 /// Version 10: changes compared to version 9
 /// + abort with message instruction
+/// + new attributes for structs api
 pub const VERSION_10: u32 = 10;
 
 /// Mark which oldest version is supported.

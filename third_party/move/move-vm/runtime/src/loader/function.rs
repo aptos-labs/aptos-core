@@ -15,7 +15,9 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility},
+    file_format::{
+        CompiledModule, FunctionAttribute, FunctionDefinitionIndex, MemberCount, Visibility,
+    },
 };
 use move_core_types::{
     ability::AbilitySet,
@@ -89,6 +91,9 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
+    // This field is set when the function is a non-private struct/enum API for mutably borrowing a field.
+    // which will be used to bypass the runtime ref checks
+    pub(crate) borrow_field_mut_api_at_offset: Option<MemberCount>,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -629,6 +634,19 @@ impl Debug for Function {
 }
 
 impl Function {
+    fn load_and_check_field_mut_attribute(
+        handle: &move_binary_format::file_format::FunctionHandle,
+    ) -> Option<u16> {
+        let mut borrow_field_mut_api_offset_opt = None;
+        for attr in &handle.attributes {
+            if let FunctionAttribute::BorrowFieldMutable(offset) = attr {
+                borrow_field_mut_api_offset_opt = Some(*offset);
+                break;
+            }
+        }
+        borrow_field_mut_api_offset_opt
+    }
+
     pub(crate) fn new(
         natives: &NativeFunctions,
         index: FunctionDefinitionIndex,
@@ -681,6 +699,8 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
+        let borrow_field_mut_api_at_offset = Self::load_and_check_field_mut_attribute(handle);
+
         Ok(Self {
             file_format_version: module.version(),
             index,
@@ -697,6 +717,7 @@ impl Function {
             param_tys,
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
+            borrow_field_mut_api_at_offset,
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
         })
@@ -743,6 +764,10 @@ impl Function {
 
     pub fn is_persistent(&self) -> bool {
         self.is_persistent || self.is_public()
+    }
+
+    pub fn borrow_field_mut_api_at_offset(&self) -> Option<MemberCount> {
+        self.borrow_field_mut_api_at_offset
     }
 
     pub fn has_module_lock(&self) -> bool {

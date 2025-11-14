@@ -1,0 +1,78 @@
+//! Test that borrow field mut API functions with proper attributes work correctly.
+//! This test verifies that when functions are marked with #[borrow_mut] attributes,
+//! the runtime correctly identifies them as API functions and skips the standard reference
+//! checks (which are performed at the field borrow site instead). This test should succeed
+//! because the borrow_mut$S$0 and borrow_mut$S$1 functions have the correct attributes.
+
+// Bytecode version v10
+//# publish
+module 0x42::m1
+struct T<T0: drop + store> has copy + drop + store
+  h: T0
+
+struct S<T0: drop + store> has drop
+  f: u64
+  g: T<T0>
+
+public fun pack$T<T0: drop + store>(l0: T0): T<T0>
+    local l1: T0
+    move_loc l0
+    pack T<T0>
+    ret
+
+public fun pack$S<T0: drop + store>(l0: u64, l1: T<T0>): S<T0>
+    local l2: u64
+    local l3: T<T0>
+    move_loc l0
+    move_loc l1
+    pack S<T0>
+    ret
+
+#[borrow_mut 0] public fun borrow_mut$S$0<T0: drop + store>(l0: &mut S<T0>): &mut u64
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, f
+    ret
+
+#[borrow_mut 1] public fun borrow_mut$S$1<T0: drop + store>(l0: &mut S<T0>): &mut T<T0>
+    local l1: &mut S<T0>
+    move_loc l0
+    mut_borrow_field S<T0>, g
+    ret
+
+// Bytecode version v10
+//# publish
+module 0x42::m2
+use 0x42::m1 as m1
+// Function definition at index 0
+#[persistent] public fun try_unpack_mut_ref()
+    local l0: m1::T<u64>
+    local l1: m1::S<u64>
+    local l2: &mut m1::S<u64>
+    local l3: &mut m1::T<u64>
+    local l4: u64
+    local l5: &mut u64
+    ld_u64 9
+    call m1::pack$T<u64>
+    st_loc l0
+    ld_u64 8
+    move_loc l0
+    // @5
+    call m1::pack$S<u64>
+    st_loc l1
+    mut_borrow_loc l1
+    st_loc l2
+    copy_loc l2
+    // @10
+    call m1::borrow_mut$S$0<u64>
+    move_loc l2
+    call m1::borrow_mut$S$1<u64>
+    pop
+    st_loc l5
+    // @15
+    ld_u64 88
+    move_loc l5
+    write_ref
+    ret
+
+//# run 0x42::m2::try_unpack_mut_ref
