@@ -1132,7 +1132,7 @@ impl TypeBuilder {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
         let inner_ty = self
-            .clone_impl(inner_ty, &mut count, 2, check)
+            .clone_impl::<_, false>(inner_ty, &mut count, 2, check)
             .map_err(|e| {
                 e.append_message_with_separator(
                     '.',
@@ -1157,7 +1157,7 @@ impl TypeBuilder {
         let mut count = 1;
         let check = |c: &mut u64, d: u64| self.check(c, d);
         let elem_ty = self
-            .clone_impl(elem_ty, &mut count, 2, check)
+            .clone_impl::<_, false>(elem_ty, &mut count, 2, check)
             .map_err(|e| {
                 e.append_message_with_separator(
                     '.',
@@ -1194,7 +1194,7 @@ impl TypeBuilder {
             .iter()
             .map(|ty| {
                 // Note that depth is 2 because we accounted for the parent struct type.
-                self.subst_impl(ty, ty_args, &mut count, 2, check)
+                self.subst_impl::<_, false>(ty, ty_args, &mut count, 2, check)
                     .map_err(|e| {
                         e.append_message_with_separator(
                             '.',
@@ -1247,7 +1247,17 @@ impl TypeBuilder {
     pub fn create_ty_with_subst(&self, ty: &Type, ty_args: &[Type]) -> PartialVMResult<Type> {
         let mut count = 0;
         let check = |c: &mut u64, d: u64| self.check(c, d);
-        self.subst_impl(ty, ty_args, &mut count, 1, check)
+        self.subst_impl::<_, false>(ty, ty_args, &mut count, 1, check)
+    }
+
+    pub fn create_ty_with_subst_allow_ty_params(
+        &self,
+        ty: &Type,
+        ty_args: &[Type],
+    ) -> PartialVMResult<Type> {
+        let mut count = 0;
+        let check = |c: &mut u64, d: u64| self.check(c, d);
+        self.subst_impl::<_, true>(ty, ty_args, &mut count, 1, check)
     }
 
     #[inline]
@@ -1335,7 +1345,7 @@ impl TypeBuilder {
         })
     }
 
-    fn subst_impl<G>(
+    fn subst_impl<G, const ALLOW_TY_PARAMS: bool>(
         &self,
         ty: &Type,
         ty_args: &[Type],
@@ -1349,7 +1359,7 @@ impl TypeBuilder {
         Self::apply_subst(
             ty,
             |idx, c, d| match ty_args.get(idx as usize) {
-                Some(ty) => self.clone_impl(ty, c, d, check),
+                Some(ty) => self.clone_impl::<G, ALLOW_TY_PARAMS>(ty, c, d, check),
                 None => Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
@@ -1365,7 +1375,7 @@ impl TypeBuilder {
         )
     }
 
-    fn clone_impl<G>(
+    fn clone_impl<G, const ALLOW_TY_PARAMS: bool>(
         &self,
         ty: &Type,
         count: &mut u64,
@@ -1381,13 +1391,17 @@ impl TypeBuilder {
                 // The type cannot contain type parameters anymore (it also does not make
                 // sense to have them!), and so it is the caller's responsibility to ensure
                 // type substitution has been performed.
-                Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!(
+                if ALLOW_TY_PARAMS {
+                    Ok(Type::TyParam(idx))
+                } else {
+                    Err(
+                        PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                            .with_message(format!(
                         "There is an unresolved type parameter (index: {}) when cloning type {}",
                         idx, ty
                     )),
-                )
+                    )
+                }
             },
             count,
             depth,

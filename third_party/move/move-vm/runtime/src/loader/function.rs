@@ -638,7 +638,7 @@ impl Function {
         let (code, is_inlineable) = match &def.code {
             Some(code) => {
                 let is_inlineable =
-                    bytecode_transformer.is_function_inlineable(param_tys.len(), &code.code);
+                    bytecode_transformer.is_function_inlineable(param_tys.len(), &code.code)?;
 
                 let code = code
                     .code

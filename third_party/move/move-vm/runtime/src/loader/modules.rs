@@ -143,7 +143,6 @@ pub(crate) struct FieldInstantiation {
     pub(crate) uninstantiated_field_ty: Type,
     pub(crate) definition_struct_type: Arc<StructType>,
     pub(crate) instantiation: Vec<Type>,
-    pub(crate) is_fully_instantiated: bool,
 }
 
 // Information about to support both generic and non-generic variant fields.
@@ -290,7 +289,6 @@ impl Module {
                 uninstantiated_field_ty: uninstantiated_ty,
                 instantiation: signature_table[sig_idx].clone(),
                 definition_struct_type: owner_struct_def.definition_struct_type.clone(),
-                is_fully_instantiated: is_fully_instantiated_signature[sig_idx],
             });
         }
 

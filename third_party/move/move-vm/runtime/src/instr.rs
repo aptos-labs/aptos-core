@@ -184,7 +184,7 @@ pub(crate) struct BytecodeTransformer<'a> {
     pub(crate) field_instantiations: &'a [FieldInstantiation],
 
     // Caches for expensive type instantiation operations
-    field_ty_cache: RefCell<HashMap<FieldInstantiationIndex, Type>>,
+    field_ty_cache: RefCell<HashMap<FieldInstantiationIndex, (Type, bool)>>,
     pack_field_tys_cache: RefCell<HashMap<StructDefInstantiationIndex, Vec<Type>>>,
 }
 
@@ -211,24 +211,53 @@ impl<'a> BytecodeTransformer<'a> {
         }
     }
 
-    pub fn is_function_inlineable(&self, num_params: usize, code: &[Bytecode]) -> bool {
+    fn get_field_instantiation_ty(
+        &self,
+        idx: FieldInstantiationIndex,
+    ) -> PartialVMResult<(Type, bool)> {
+        let mut cache = self.field_ty_cache.borrow_mut();
+        match cache.entry(idx) {
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Vacant(entry) => {
+                let field_inst = &self.field_instantiations[idx.0 as usize];
+                let ty = self
+                    .ty_builder
+                    .create_ty_with_subst_allow_ty_params(
+                        &field_inst.uninstantiated_field_ty,
+                        &field_inst.instantiation,
+                    )
+                    .map_err(|e| {
+                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                            .with_message(format!("Failed to create field type: {}", e))
+                    })?;
+                let is_fully_instantiated = ty.is_concrete();
+                Ok(entry.insert((ty.clone(), is_fully_instantiated)).clone())
+            },
+        }
+    }
+
+    pub fn is_function_inlineable(
+        &self,
+        num_params: usize,
+        code: &[Bytecode],
+    ) -> PartialVMResult<bool> {
         use Bytecode::*;
 
         // Function must have at least `num_params + 1` instructions.
         if code.len() < num_params + 1 {
-            return false;
+            return Ok(false);
         }
 
         // Last instruction must be `ret`.
         if code.last().expect("last is always present") != &Bytecode::Ret {
-            return false;
+            return Ok(false);
         }
 
         // At the beginning, there must be a series of `move_loc` instructions that
         // get the args back on stack.
         for i in 0..num_params {
             if code[i] != MoveLoc((num_params - i - 1) as u8) {
-                return false;
+                return Ok(false);
             }
         }
 
@@ -236,7 +265,7 @@ impl<'a> BytecodeTransformer<'a> {
             match &code[i] {
                 // Disallow local operations (after the initial move_loc sequence)
                 CopyLoc(_) | MoveLoc(_) | StLoc(_) | MutBorrowLoc(_) | ImmBorrowLoc(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow global operations
                 MutBorrowGlobal(_)
@@ -249,31 +278,31 @@ impl<'a> BytecodeTransformer<'a> {
                 | MoveFromGeneric(_)
                 | MoveTo(_)
                 | MoveToGeneric(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow branches (requires PC + rewriting offsets)
                 BrTrue(_) | BrFalse(_) | Branch(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow regular calls (requires recursive loading/reasoning)
                 Call(_) | CallGeneric(_) | CallClosure(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow closures (for now, for simplicity)
                 PackClosure(_, _) | PackClosureGeneric(_, _) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow abort (complicates error reporting)
                 Abort => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow ret (can only appear once at the end)
                 Ret => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow LdConst (not supported yet -- needs new instruction)
                 LdConst(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow unpack, variant pack/unpack (not supported yet -- needs new instruction)
                 PackVariant(_)
@@ -282,14 +311,14 @@ impl<'a> BytecodeTransformer<'a> {
                 | UnpackGeneric(_)
                 | UnpackVariant(_)
                 | UnpackVariantGeneric(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow variant field borrowing (not supported yet -- needs new instruction)
                 MutBorrowVariantField(_)
                 | MutBorrowVariantFieldGeneric(_)
                 | ImmBorrowVariantField(_)
                 | ImmBorrowVariantFieldGeneric(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Disallow vector operations other than VecLen (not supported yet -- needs new instruction)
                 VecPack(_, _)
@@ -299,7 +328,7 @@ impl<'a> BytecodeTransformer<'a> {
                 | VecPopBack(_)
                 | VecUnpack(_, _)
                 | VecSwap(_) => {
-                    return false;
+                    return Ok(false);
                 },
                 // Allow all stack-only operations:
                 // - Stack manipulation
@@ -328,7 +357,7 @@ impl<'a> BytecodeTransformer<'a> {
                 PackGeneric(idx) => {
                     let struct_inst = &self.struct_instantiations[idx.0 as usize];
                     if !struct_inst.is_fully_instantiated {
-                        return false;
+                        return Ok(false);
                     }
                     // TODO: check depth
                 },
@@ -336,9 +365,10 @@ impl<'a> BytecodeTransformer<'a> {
                 MutBorrowField(_) | ImmBorrowField(_) => {},
                 // - MutBorrowFieldGeneric/ImmBorrowFieldGeneric: require concrete instantiation for V2
                 MutBorrowFieldGeneric(idx) | ImmBorrowFieldGeneric(idx) => {
-                    let field_inst = &self.field_instantiations[idx.0 as usize];
-                    if !field_inst.is_fully_instantiated {
-                        return false;
+                    let (_, is_fully_instantiated) = self.get_field_instantiation_ty(*idx)?;
+
+                    if !is_fully_instantiated {
+                        return Ok(false);
                     }
                 },
                 // - Vector operations (only VecLen is supported, for now)
@@ -346,7 +376,7 @@ impl<'a> BytecodeTransformer<'a> {
             }
         }
 
-        true
+        Ok(true)
     }
 
     fn transform_vec_len(&self, idx: SignatureIndex, inline: bool) -> PartialVMResult<Instruction> {
@@ -430,32 +460,12 @@ impl<'a> BytecodeTransformer<'a> {
         }
 
         let field_inst = &self.field_instantiations[idx.0 as usize];
+        let (field_ty, is_fully_instantiated) = self.get_field_instantiation_ty(idx)?;
 
-        if !field_inst.is_fully_instantiated {
+        if !is_fully_instantiated {
             // TODO: invariant violation if inline is true
             return fallback();
         }
-
-        // Check cache first
-        let field_ty = {
-            let mut cache = self.field_ty_cache.borrow_mut();
-            match cache.entry(idx) {
-                Entry::Occupied(entry) => entry.get().clone(),
-                Entry::Vacant(entry) => {
-                    let ty = self
-                        .ty_builder
-                        .create_ty_with_subst(
-                            &field_inst.uninstantiated_field_ty,
-                            &field_inst.instantiation,
-                        )
-                        .map_err(|e| {
-                            PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
-                                .with_message(format!("Failed to create field type: {}", e))
-                        })?;
-                    entry.insert(ty.clone()).clone()
-                },
-            }
-        };
 
         Ok(Instruction::BorrowFieldV2(Box::new(BorrowFieldV2 {
             is_mut,
