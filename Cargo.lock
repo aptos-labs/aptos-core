@@ -3426,7 +3426,7 @@ dependencies = [
 
 [[package]]
 name = "aptos-node"
-version = "1.38.1"
+version = "1.38.2"
 dependencies = [
  "anyhow",
  "aptos-admin-service",
