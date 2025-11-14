@@ -2,6 +2,9 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 set -e
+set -x
+
+cat /etc/os-release
 
 PROFILE=${PROFILE:-release}
 
