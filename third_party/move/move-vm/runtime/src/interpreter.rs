@@ -636,8 +636,6 @@ where
                         .map_err(|e| set_err_info!(current_frame, e))?
                         .unpack();
 
-                    let fn_guard = VM_PROFILER.function(&fun);
-
                     let lazy_function = LazyLoadedFunction::expect_this_impl(fun.as_ref())
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     let mask = lazy_function.closure_mask();
@@ -663,6 +661,8 @@ where
                     let callee = lazy_function
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    let fn_guard = VM_PROFILER.function(&fun);
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
