@@ -22,8 +22,10 @@ use aptos_crypto::arkworks::{
     random::{sample_field_element, UniformRand},
     shamir::{Reconstructable, ShamirThresholdConfig},
 };
-pub use aptos_crypto::blstrs as algebra;
-pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
+pub use aptos_crypto::{
+    blstrs as algebra,
+    blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
+};
 use ark_ec::pairing::Pairing;
 use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};

@@ -52,8 +52,10 @@ use crate::pvss::{
     Player,
 };
 use anyhow::bail;
-use aptos_crypto::arkworks::shamir::Reconstructable;
-use aptos_crypto::{SecretSharingConfig, SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
+use aptos_crypto::{
+    arkworks::shamir::Reconstructable, SecretSharingConfig, SigningKey, Uniform,
+    ValidCryptoMaterial, VerifyingKey,
+};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};

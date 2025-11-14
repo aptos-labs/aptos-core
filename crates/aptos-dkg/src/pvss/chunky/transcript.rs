@@ -41,8 +41,7 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AffineRepr, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::AdditiveGroup;
-use ark_ff::{Fp, FpConfig};
+use ark_ff::{AdditiveGroup, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
