@@ -1078,6 +1078,9 @@ if [[ "$SKIP_PRE_COMMIT" == "false" ]]; then
   fi
 fi
 
+CV=$(clang --version)
+echo "clang version: ${CV}"
+
 if [[ "${BATCH_MODE}" == "false" ]]; then
   cat <<EOF
 Finished installing all dependencies.
