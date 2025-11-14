@@ -39,7 +39,7 @@ module 0xc0ffee::m {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 // Function definition at index 0
 #[persistent] public fun compute(): u64

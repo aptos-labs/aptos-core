@@ -49,7 +49,7 @@ module 0xc0ffee::m {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 // Function definition at index 0
 fun callee(l0: u64, l1: u64): u64
