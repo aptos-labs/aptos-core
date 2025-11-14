@@ -968,7 +968,7 @@ install_pkg wget "$PACKAGE_MANAGER"
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
   install_pkg cmake "$PACKAGE_MANAGER"
-  install_pkg clang "$PACKAGE_MANAGER"
+  install_pkg clang-15 "$PACKAGE_MANAGER"
   install_pkg llvm "$PACKAGE_MANAGER"
 
   install_openssl_dev "$PACKAGE_MANAGER"
