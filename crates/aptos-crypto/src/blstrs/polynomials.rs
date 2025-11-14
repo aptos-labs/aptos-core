@@ -411,19 +411,7 @@ pub fn poly_xnmul_assign(f: &mut Vec<Scalar>, n: usize) {
     if n == 0 {
         return;
     }
-
-    let old_len = f.len();
-
-    // extend with zero coefficients for X^n, X^{n-1}, \dots, X
-    f.resize(old_len + n, Scalar::ZERO);
-
-    // Shift coefficients by `n` positions
-    for i in (0..old_len).rev() {
-        f[i + n] = f[i]
-    }
-
-    // Set the last n coefficients $f_{n-1}, \cdots, f_0$ to 0.
-    f.fill(Scalar::ZERO);
+    f.splice(0..0, std::iter::repeat(Scalar::ZERO).take(n));
 }
 
 /// Like `poly_mul_by_xn_assign` but returns the result.
