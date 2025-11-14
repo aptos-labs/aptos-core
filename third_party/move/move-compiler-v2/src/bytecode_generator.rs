@@ -6,13 +6,14 @@ use crate::{Options, COMPILER_BUG_REPORT_MSG};
 use codespan_reporting::diagnostic::Severity;
 use ethnum::{I256, U256};
 use itertools::Itertools;
+use move_binary_format::file_format::Visibility;
 use move_core_types::ability::Ability;
 use move_model::{
     ast::{Exp, ExpData, MatchArm, Operation, Pattern, SpecBlockTarget, TempIndex, Value},
     exp_rewriter::{ExpRewriter, ExpRewriterFunctions, RewriteTarget},
     metadata::LanguageVersion,
     model::{
-        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, NodeId, Parameter, QualifiedId,
+        FieldId, FunId, FunctionEnv, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, StructId,
     },
     symbol::Symbol,
@@ -325,6 +326,13 @@ impl<'env> Generator<'env> {
             &format!("compiler internal error: {}", msg.as_ref()),
             vec![COMPILER_BUG_REPORT_MSG.to_string()],
         );
+    }
+
+    /// Check if the current module is at least version 2.4.
+    fn check_version_for_cross_module_access(&self) -> bool {
+        self.env()
+            .language_version()
+            .language_version_for_public_struct()
     }
 
     fn diag(&self, id: NodeId, severity: Severity, msg: impl AsRef<str>) {
@@ -685,18 +693,17 @@ impl Generator<'_> {
             let raw_fun_temp = self.new_temp(raw_fun_ty);
             // This here should be well-defined because only structs can be wrappers.
             let (wrapper_struct, inst) = fun_ty.get_struct(self.env()).unwrap();
+            let inst: Vec<Type> = inst.to_vec();
             let struct_id = wrapper_struct.get_qualified_id();
-            if struct_id.module_id != self.func_env.module_env.get_id() {
-                self.error(
-                    id,
-                    format!(
-                    "cannot unpack a wrapper struct `{}` (defined in a different module `{}`) and invoke the wrapped function value ",
-                    wrapper_struct.get_full_name_str(),
-                    self.func_env.env().get_module(struct_id.module_id).get_full_name_str(),
-                    ),
-                )
-            }
-            let inst = inst.to_vec();
+            self.check_pack_unpack_wrapper(
+                id,
+                self.func_env.module_env.get_id(),
+                fun_ty,
+                struct_id.module_id,
+                struct_id.id,
+                "unpack",
+                " and invoke the wrapped function value",
+            );
             self.emit_with(id, |attr| {
                 Bytecode::Call(
                     attr,
@@ -894,16 +901,15 @@ impl Generator<'_> {
                 );
                 let target_ty = self.temp_type(targets[0]).clone();
                 if let Type::Struct(wrapper_mid, wrapper_sid, wrapper_inst) = target_ty.clone() {
-                    if wrapper_mid != *mid {
-                        self.error(
-                            id,
-                            format!(
-                                "cannot implicitly pack a wrapper struct `{}` defined in a different module `{}`",
-                                target_ty.display(&self.func_env.get_type_display_ctx()),
-                                self.func_env.env().get_module(wrapper_mid).get_full_name_str(),
-                                ),
-                        );
-                    }
+                    self.check_pack_unpack_wrapper(
+                        id,
+                        *mid,
+                        target_ty,
+                        wrapper_mid,
+                        wrapper_sid,
+                        "pack",
+                        "",
+                    );
                     // Implicitly convert to a function wrapper.
                     let fun_ty = self
                         .env()
@@ -1012,6 +1018,61 @@ impl Generator<'_> {
                 id,
                 format!("unsupported specification construct: `{:?}`", op),
             ),
+        }
+    }
+
+    /// Check whether we can pack/unpack a wrapper struct
+    /// if public struct is not supported, pack/unpack can only happen in the module that defines the wrapper struct
+    /// otherwise, error is raised when either the struct is private or the struct is package/friend
+    /// and pack/unpack happens in modules that are not a friend of the module that defines the wrapper struct
+    fn check_pack_unpack_wrapper(
+        &mut self,
+        id: NodeId,
+        mid: ModuleId,
+        target_ty: Type,
+        wrapper_mid: ModuleId,
+        wrapper_sid: StructId,
+        oper: &str,
+        extra_msg: &str,
+    ) {
+        let wrapper_struct = self.env().get_struct(wrapper_mid.qualified(wrapper_sid));
+        let different_module = wrapper_mid != mid;
+        let lang_pub_api = self.check_version_for_cross_module_access();
+        if different_module {
+            let wrapper_name = wrapper_struct.get_full_name_str();
+            let module_name = self
+                .func_env
+                .env()
+                .get_module(wrapper_mid)
+                .get_full_name_str();
+
+            let err_msg = if !lang_pub_api || wrapper_struct.get_visibility() == Visibility::Private
+            {
+                Some(format!(
+                    "cannot implicitly {} a wrapper struct `{}` defined in a different module `{}`{}",
+                    oper,
+                    target_ty.display(&self.func_env.get_type_display_ctx()),
+                    module_name,
+                    extra_msg,
+                ))
+            } else if wrapper_struct.get_visibility() == Visibility::Friend
+                && !wrapper_struct.module_env.has_friend(&mid)
+            {
+                let visibility_str = if wrapper_struct.has_package_visibility() {
+                    "package"
+                } else {
+                    "friend"
+                };
+                Some(format!(
+                            "cannot implicitly {} a wrapper struct `{}` defined in a different module `{}`{} because it has {} visibility",
+                            oper, wrapper_name, module_name, extra_msg, visibility_str,
+                        ))
+            } else {
+                None
+            };
+            if let Some(msg) = err_msg {
+                self.error(id, msg);
+            }
         }
     }
 

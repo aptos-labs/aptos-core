@@ -218,6 +218,7 @@ pub struct StructDefinition {
     pub name: StructName,
     pub type_parameters: Vec<StructTypeParameter>,
     pub layout: StructLayout,
+    pub visibility: Visibility,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -245,6 +246,7 @@ new_name!(FunctionName);
 
 pub const NATIVE_MODIFIER: &str = "native";
 pub const ENTRY_MODIFIER: &str = "entry";
+pub const ENUM_MODIFIER: &str = "enum";
 
 /// An access specifier describes the resources being accessed by a function.
 /// In contrast to regular `NameAccessChain`, the identifiers inside of the
@@ -1369,6 +1371,7 @@ impl AstDebug for StructDefinition {
             name,
             type_parameters,
             layout,
+            visibility,
         } = self;
         attributes.ast_debug(w);
 
@@ -1381,7 +1384,7 @@ impl AstDebug for StructDefinition {
             w.write("native ");
         }
 
-        w.write(format!("struct {}", name));
+        w.write(format!("{} struct {}", visibility, name));
         type_parameters.ast_debug(w);
         match layout {
             StructLayout::Singleton(fields, _) => w.block(|w| {
