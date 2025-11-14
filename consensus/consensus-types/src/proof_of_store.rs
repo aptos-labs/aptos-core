@@ -203,7 +203,68 @@ pub enum BatchInfoExt {
 }
 
 impl BatchInfoExt {
+    pub fn new_v1(
+        author: PeerId,
+        batch_id: BatchId,
+        epoch: u64,
+        expiration: u64,
+        digest: HashValue,
+        num_txns: u64,
+        num_bytes: u64,
+        gas_bucket_start: u64,
+    ) -> Self {
+        Self::V1 {
+            info: BatchInfo::new(
+                author,
+                batch_id,
+                epoch,
+                expiration,
+                digest,
+                num_txns,
+                num_bytes,
+                gas_bucket_start,
+            ),
+        }
+    }
+
+    pub fn new_v2(
+        author: PeerId,
+        batch_id: BatchId,
+        epoch: u64,
+        expiration: u64,
+        digest: HashValue,
+        num_txns: u64,
+        num_bytes: u64,
+        gas_bucket_start: u64,
+        kind: BatchKind,
+    ) -> Self {
+        Self::V2 {
+            info: BatchInfo::new(
+                author,
+                batch_id,
+                epoch,
+                expiration,
+                digest,
+                num_txns,
+                num_bytes,
+                gas_bucket_start,
+            ),
+            extra: ExtraBatchInfo { batch_kind: kind },
+        }
+    }
+
     pub fn info(&self) -> &BatchInfo {
+        match self {
+            BatchInfoExt::V1 { info } => info,
+            BatchInfoExt::V2 { info, .. } => info,
+        }
+    }
+
+    pub fn is_v2(&self) -> bool {
+        matches!(self, Self::V2 { .. })
+    }
+
+    pub fn unpack_info(self) -> BatchInfo {
         match self {
             BatchInfoExt::V1 { info } => info,
             BatchInfoExt::V2 { info, .. } => info,
@@ -435,6 +496,27 @@ impl From<SignedBatchInfo<BatchInfo>> for SignedBatchInfo<BatchInfoExt> {
             signer,
             signature,
         }
+    }
+}
+
+impl TryFrom<SignedBatchInfo<BatchInfoExt>> for SignedBatchInfo<BatchInfo> {
+    type Error = anyhow::Error;
+
+    fn try_from(signed_batch_info: SignedBatchInfo<BatchInfoExt>) -> Result<Self, Self::Error> {
+        ensure!(
+            matches!(signed_batch_info.batch_info(), &BatchInfoExt::V1 { .. }),
+            "Batch must be V1 type"
+        );
+        let SignedBatchInfo {
+            info,
+            signer,
+            signature,
+        } = signed_batch_info;
+        Ok(Self {
+            info: info.unpack_info(),
+            signer,
+            signature,
+        })
     }
 }
 

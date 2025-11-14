@@ -15,7 +15,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_config::config::BatchTransactionFilterConfig;
-use aptos_consensus_types::payload::TDataInfo;
+use aptos_consensus_types::proof_of_store::{BatchInfoExt, TBatchInfo};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
@@ -28,7 +28,7 @@ use tokio::sync::{
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
     Shutdown(oneshot::Sender<()>),
-    NewBatches(PeerId, Vec<Batch>),
+    NewBatches(PeerId, Vec<Batch<BatchInfoExt>>),
 }
 
 /// The `BatchCoordinator` is responsible for coordinating the receipt and persistence of batches.
@@ -77,7 +77,7 @@ impl BatchCoordinator {
 
     fn persist_and_send_digests(
         &self,
-        persist_requests: Vec<PersistedValue>,
+        persist_requests: Vec<PersistedValue<BatchInfoExt>>,
         approx_created_ts_usecs: u64,
     ) {
         if persist_requests.is_empty() {
@@ -93,19 +93,40 @@ impl BatchCoordinator {
                 .iter()
                 .map(|persisted_value| {
                     (
-                        persisted_value.batch_info().clone().into(),
+                        persisted_value.batch_info().clone(),
                         persisted_value.summary(),
                     )
                 })
                 .collect();
-            let signed_batch_infos = batch_store.persist(persist_requests);
-            if !signed_batch_infos.is_empty() {
-                if approx_created_ts_usecs > 0 {
-                    observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+
+            if persist_requests[0].batch_info().is_v2() {
+                let signed_batch_infos = batch_store.persist(persist_requests);
+                if !signed_batch_infos.is_empty() {
+                    if approx_created_ts_usecs > 0 {
+                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                    }
+                    network_sender
+                        .send_signed_batch_info_msg_v2(signed_batch_infos, vec![peer_id])
+                        .await;
                 }
-                network_sender
-                    .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
-                    .await;
+            } else {
+                let signed_batch_infos = batch_store.persist(persist_requests);
+                if !signed_batch_infos.is_empty() {
+                    assert!(!signed_batch_infos
+                        .first()
+                        .expect("must not be empty")
+                        .is_v2());
+                    if approx_created_ts_usecs > 0 {
+                        observe_batch(approx_created_ts_usecs, peer_id, BatchStage::SIGNED);
+                    }
+                    let signed_batch_infos = signed_batch_infos
+                        .into_iter()
+                        .map(|sbi| sbi.try_into().expect("Batch must be V1 batch"))
+                        .collect();
+                    network_sender
+                        .send_signed_batch_info_msg(signed_batch_infos, vec![peer_id])
+                        .await;
+                }
             }
             let _ = sender_to_proof_manager
                 .send(ProofManagerCommand::ReceiveBatches(batches))
@@ -113,7 +134,7 @@ impl BatchCoordinator {
         });
     }
 
-    fn ensure_max_limits(&self, batches: &[Batch]) -> anyhow::Result<()> {
+    fn ensure_max_limits(&self, batches: &[Batch<BatchInfoExt>]) -> anyhow::Result<()> {
         let mut total_txns = 0;
         let mut total_bytes = 0;
         for batch in batches.iter() {
@@ -149,7 +170,11 @@ impl BatchCoordinator {
         Ok(())
     }
 
-    pub(crate) async fn handle_batches_msg(&mut self, author: PeerId, batches: Vec<Batch>) {
+    pub(crate) async fn handle_batches_msg(
+        &mut self,
+        author: PeerId,
+        batches: Vec<Batch<BatchInfoExt>>,
+    ) {
         if let Err(e) = self.ensure_max_limits(&batches) {
             error!("Batch from {}: {}", author, e);
             counters::RECEIVED_BATCH_MAX_LIMIT_FAILED.inc();
