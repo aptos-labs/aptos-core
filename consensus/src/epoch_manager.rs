@@ -1758,6 +1758,9 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                         p.proposer(),
                         p.timestamp_usecs(),
                     );
+                    pending_blocks
+                        .lock()
+                        .insert_opt_block(p.block_data().clone());
                 }
 
                 Self::forward_event_to(buffered_proposal_tx, peer_id, opt_proposal_event)
