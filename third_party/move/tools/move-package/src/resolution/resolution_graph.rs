@@ -320,13 +320,17 @@ impl ResolvingGraph {
         for (name, addr_opt) in package.addresses.clone().unwrap_or_default().into_iter() {
             match resolution_table.get(&name) {
                 Some(other) => {
-                    other.unify(addr_opt).with_context(|| {
-                        format!(
-                            "Unable to resolve named address '{}' in \
+                    if is_root_package {
+                        other.unify(addr_opt).with_context(|| {
+                            format!(
+                                "Unable to resolve named address '{}' in \
                              package '{}' when resolving dependencies",
-                            name, package_name
-                        )
-                    })?;
+                                name, package_name
+                            )
+                        })?;
+                    } else {
+                        // keep old (root) value
+                    }
                 },
                 None => {
                     resolution_table.insert(name, ResolvingNamedAddress::new(addr_opt));
