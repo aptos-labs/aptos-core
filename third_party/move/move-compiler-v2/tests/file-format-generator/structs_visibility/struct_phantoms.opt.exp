@@ -9,28 +9,28 @@ struct S<phantom T0> has drop
   addr: address
 
 // Function definition at index 0
-public fun pack$S<T0>(l0: address): S<T0>
+#[pack] public fun pack$S<T0>(l0: address): S<T0>
     local l1: address
     move_loc l0
     pack S<T0>
     ret
 
 // Function definition at index 1
-public fun unpack$S<T0>(l0: S<T0>): address
+#[unpack] public fun unpack$S<T0>(l0: S<T0>): address
     local l1: S<T0>
     move_loc l0
     unpack S<T0>
     ret
 
 // Function definition at index 2
-public fun borrow$S$0<T0>(l0: &S<T0>): &address
+#[borrow] public fun borrow$S$0<T0>(l0: &S<T0>): &address
     local l1: &S<T0>
     move_loc l0
     borrow_field S<T0>, addr
     ret
 
 // Function definition at index 3
-public fun borrow_mut$S$0<T0>(l0: &mut S<T0>): &mut address
+#[borrow_mut] public fun borrow_mut$S$0<T0>(l0: &mut S<T0>): &mut address
     local l1: &mut S<T0>
     move_loc l0
     mut_borrow_field S<T0>, addr
