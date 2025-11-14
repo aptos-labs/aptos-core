@@ -8,9 +8,11 @@ and the [usdt](https://docs.rs/usdt) crate.
 
 ## Usage
 
-To use this profiler, attach an external tracing tool (e.g. `dtrace` on macOS or `bpftrace` on Linux).
+To use this profiler, build the binary with the `probe-profiler` feature enabled, and attach an external tracing tool
+(e.g. `dtrace` on macOS or `bpftrace` on Linux).
 
 Example using **DTrace**:
 
 ```bash
 sudo dtrace -s trace_vm_all.d -c <COMPILED_BINARY>
+```
