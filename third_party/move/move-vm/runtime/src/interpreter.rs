@@ -29,8 +29,7 @@ use crate::{
 use fail::fail_point;
 use itertools::Itertools;
 use move_binary_format::{
-    errors,
-    errors::*,
+    errors::{self, *},
     file_format::{AccessKind, FunctionHandleIndex, FunctionInstantiationIndex, SignatureIndex},
 };
 use move_core_types::{
@@ -2042,7 +2041,12 @@ impl Frame {
                     instruction,
                     frame_cache,
                 )?;
-                RTRCheck::pre_execution_transition(self, instruction, &mut interpreter.ref_state)?;
+                RTRCheck::pre_execution_transition(
+                    self.function.as_ref(),
+                    self,
+                    instruction,
+                    &mut interpreter.ref_state,
+                )?;
 
                 match instruction {
                     Instruction::Pop => {
@@ -3034,6 +3038,7 @@ impl Frame {
                     frame_cache,
                 )?;
                 RTRCheck::post_execution_transition(
+                    self.function.as_ref(),
                     self,
                     instruction,
                     &mut interpreter.ref_state,

@@ -1,62 +1,9 @@
 processed 8 tasks
 task 0 lines 2-13:  publish [module 0x42::m1 {]
 task 1 lines 15-100:  publish [module 0x42::m2 {]
-Error: compilation errors:
- bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
-Error message: none
-   ┌─ TEMPFILE1:64:13
-   │
-64 │         let S { f, g } = &mut s;
-   │             ^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
-
-
 task 2 lines 102-102:  run 0x42::m2::try_immut_borrow_fields
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 3 lines 104-104:  run 0x42::m2::try_immut_from_mut
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 4 lines 106-106:  run 0x42::m2::try_mut_borrow_seq
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 5 lines 108-108:  run 0x42::m2::try_immut_and_mut_diff_fields
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 6 lines 110-110:  run 0x42::m2::try_reborrow_same_field_seq
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 7 lines 112-112:  run 0x42::m2::try_unpack_mut_ref
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}

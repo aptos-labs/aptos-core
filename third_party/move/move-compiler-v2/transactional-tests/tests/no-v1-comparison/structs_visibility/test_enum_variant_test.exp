@@ -2,62 +2,12 @@ processed 9 tasks
 task 0 lines 2-5:  publish [module 0x42::m2 {]
 task 1 lines 7-24:  publish [module 0x42::m {]
 task 2 lines 26-77:  publish [module 0x42::m2 {]
-Error: compilation errors:
- bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
-Error message: none
-   ┌─ TEMPFILE2:61:7
-   │
-61 │       Data2::V2{y, x} if (*y == 43) => {
-   │       ^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
-
-
 task 3 lines 79-79:  run 0x42::m2::test_v1
-Error: Function execution failed with VMError: {
-    major_status: FUNCTION_RESOLUTION_FAILURE,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
+return values: true
 task 4 lines 81-81:  run 0x42::m2::test_v1v3
-Error: Function execution failed with VMError: {
-    major_status: FUNCTION_RESOLUTION_FAILURE,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
+return values: true
 task 5 lines 83-83:  run 0x42::m2::test_v1v3_ref
-Error: Function execution failed with VMError: {
-    major_status: FUNCTION_RESOLUTION_FAILURE,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
+return values: true
 task 6 lines 85-85:  run 0x42::m2::test_v1_mut_borrow
-Error: Function execution failed with VMError: {
-    major_status: FUNCTION_RESOLUTION_FAILURE,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 7 lines 87-87:  run 0x42::m2::test_v2_mut_borrow_2
-Error: Function execution failed with VMError: {
-    major_status: FUNCTION_RESOLUTION_FAILURE,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 8 lines 89-89:  run 0x42::m2::test_match_mut_borrow
-Error: Function execution failed with VMError: {
-    major_status: FUNCTION_RESOLUTION_FAILURE,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
