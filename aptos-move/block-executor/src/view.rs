@@ -41,6 +41,7 @@ use aptos_mvhashmap::{
 use aptos_types::{
     error::{code_invariant_error, expect_ok, PanicError, PanicOr},
     executable::ModulePath,
+    on_chain_config::CurrentTimeMicroseconds,
     state_store::{
         errors::StateViewError,
         state_storage_usage::StateStorageUsage,
@@ -1070,6 +1071,7 @@ impl<T: Transaction> ViewState<'_, T> {
 /// In the Sync case, also records captured reads for later validation. latest_txn_idx
 /// must be set according to the latest transaction that the worker was / is executing.
 pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
+    timestamp: Option<StateValue>,
     base_view: &'a S,
     pub(crate) global_module_cache:
         &'a GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>,
@@ -1080,6 +1082,7 @@ pub(crate) struct LatestView<'a, T: Transaction, S: TStateView<Key = T::Key>> {
 
 impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
     pub(crate) fn new(
+        timestamp: Option<u64>,
         base_view: &'a S,
         global_module_cache: &'a GlobalModuleCache<
             ModuleId,
@@ -1091,7 +1094,13 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         latest_view: ViewState<'a, T>,
         txn_idx: TxnIndex,
     ) -> Self {
+        let timestamp = timestamp.map(|microseconds| {
+            let bytes = bcs::to_bytes(&CurrentTimeMicroseconds { microseconds }).unwrap();
+            // Not fully correct, but works for benchmarks.
+            StateValue::new_legacy(bytes.into())
+        });
         Self {
+            timestamp,
             base_view,
             global_module_cache,
             runtime_environment,
@@ -1534,6 +1543,31 @@ impl<'a, T: Transaction, S: TStateView<Key = T::Key>> LatestView<'a, T, S> {
         );
 
         let state = self.latest_view.get_resource_state();
+
+        if state_key.is_current_time_microseconds() && self.txn_idx > 0 {
+            if let Some(timestamp) = &self.timestamp {
+                let read = match kind {
+                    ReadKind::Exists => ReadResult::Exists(true),
+                    ReadKind::Metadata => ReadResult::Metadata(Some(timestamp.metadata().clone())),
+                    ReadKind::ResourceSize => {
+                        ReadResult::ResourceSize(Some(timestamp.bytes().len() as u64))
+                    },
+                    ReadKind::MetadataAndResourceSize => {
+                        unreachable!("Cannot read metadata and size")
+                    },
+                    ReadKind::Value => ReadResult::Value(Some(timestamp.clone()), None),
+                };
+                // match &self.latest_view {
+                //     ViewState::Sync(s) => {
+                //         s.captured_reads.borrow_mut().capture_data_read()
+                //     }
+                //     ViewState::Unsync(s) => {
+                //         s.read_set.borrow_mut().resource_reads.insert(state_key.clone());
+                //     }
+                // }
+                return Ok(read);
+            }
+        }
 
         let mut ret = state.read_cached_data_by_kind(
             self.txn_idx,
@@ -2669,6 +2703,7 @@ mod test {
         let global_module_cache = GlobalModuleCache::empty();
 
         let latest_view = LatestView::<TestTransactionType, MockStateView<KeyType<u32>>>::new(
+            None,
             &base_view,
             &global_module_cache,
             &runtime_environment,
@@ -2956,6 +2991,7 @@ mod test {
             SequentialState::new(&h.unsync_map, *h.counter.borrow(), &h.counter);
 
         LatestView::<'a, TestTransactionType, MockStateView<KeyType<u32>>>::new(
+            None,
             &h.base_view,
             &h.empty_global_module_cache,
             &h.runtime_environment,
@@ -2998,6 +3034,7 @@ mod test {
             let latest_view_seq = create_sequential_latest_view(&self.holder);
             let latest_view_par =
                 LatestView::<TestTransactionType, MockStateView<KeyType<u32>>>::new(
+                    None,
                     &self.base_view,
                     &self.holder.empty_global_module_cache,
                     &self.runtime_environment,

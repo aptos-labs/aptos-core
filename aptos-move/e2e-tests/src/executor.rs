@@ -974,7 +974,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             local: BlockExecutorLocalConfig {
                 blockstm_v2: false,
                 concurrency_level: 1,
-                allow_fallback: self.allow_block_executor_fallback,
+                allow_fallback: false,
                 discard_failed_blocks: false,
                 module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
             },
@@ -1021,6 +1021,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
             // use the number of threads specified in the executor thread pool as specified at construction time
             config.local.concurrency_level = self.executor_thread_pool.current_num_threads();
+            println!("cc: {}", config.local.concurrency_level);
             Some(self.execute_transaction_block_impl_with_state_view(
                 sig_verified_block,
                 state_view,

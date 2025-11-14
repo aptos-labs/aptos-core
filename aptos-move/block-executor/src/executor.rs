@@ -97,6 +97,7 @@ where
     block_limit_processor: &'a ExplicitSyncWrapper<BlockGasLimitProcessor<T>>,
     final_results: &'a ExplicitSyncWrapper<Vec<E::Output>>,
     maybe_block_epilogue_txn_idx: &'a ExplicitSyncWrapper<Option<TxnIndex>>,
+    timestamp: Option<u64>,
 }
 
 pub struct BlockExecutor<T, E, S, L, TP, A> {
@@ -106,6 +107,7 @@ pub struct BlockExecutor<T, E, S, L, TP, A> {
     executor_thread_pool: Arc<rayon::ThreadPool>,
     transaction_commit_hook: Option<L>,
     phantom: PhantomData<fn() -> (T, E, S, L, TP, A)>,
+    timestamp: ExplicitSyncWrapper<Option<u64>>,
 }
 
 impl<T, E, S, L, TP, A> BlockExecutor<T, E, S, L, TP, A>
@@ -136,6 +138,7 @@ where
             executor_thread_pool,
             transaction_commit_hook,
             phantom: PhantomData,
+            timestamp: ExplicitSyncWrapper::new(None),
         }
     }
 
@@ -387,6 +390,7 @@ where
         Ok(())
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn execute_v2(
         worker_id: u32,
         idx_to_execute: TxnIndex,
@@ -396,13 +400,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
-        base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        shared_sync_params: &SharedSyncParams<T, E, S>,
         runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T>,
         scheduler: &SchedulerV2,
@@ -412,8 +410,9 @@ where
 
         let mut abort_manager = AbortManager::new(idx_to_execute, incarnation, scheduler);
         let sync_view = LatestView::new(
-            base_view,
-            global_module_cache,
+            shared_sync_params.timestamp,
+            shared_sync_params.base_view,
+            shared_sync_params.global_module_cache,
             runtime_environment,
             ViewState::Sync(parallel_state),
             idx_to_execute,
@@ -517,7 +516,7 @@ where
                 scheduler,
                 &module_validation_requirements,
                 last_input_output,
-                global_module_cache,
+                shared_sync_params.global_module_cache,
                 versioned_cache,
             )?;
             scheduler.finish_cold_validation_requirement(
@@ -541,13 +540,7 @@ where
         last_input_output: &TxnLastInputOutput<T, E::Output>,
         versioned_cache: &MVHashMap<T::Key, T::Tag, T::Value, DelayedFieldID>,
         executor: &E,
-        base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        shared_sync_params: &SharedSyncParams<T, E, S>,
         runtime_environment: &RuntimeEnvironment,
         parallel_state: ParallelState<T>,
         block_gas_limit_type: &BlockGasLimitType,
@@ -556,8 +549,9 @@ where
 
         // VM execution.
         let sync_view = LatestView::new(
-            base_view,
-            global_module_cache,
+            shared_sync_params.timestamp,
+            shared_sync_params.base_view,
+            shared_sync_params.global_module_cache,
             runtime_environment,
             ViewState::Sync(parallel_state),
             idx_to_execute,
@@ -905,13 +899,7 @@ where
         start_shared_counter: u32,
         shared_counter: &AtomicU32,
         executor: &E,
-        base_view: &S,
-        global_module_cache: &GlobalModuleCache<
-            ModuleId,
-            CompiledModule,
-            Module,
-            AptosModuleExtension,
-        >,
+        shared_sync_params: &SharedSyncParams<T, E, S>,
         runtime_environment: &RuntimeEnvironment,
         block_gas_limit_type: &BlockGasLimitType,
     ) -> Result<(), PanicError> {
@@ -936,8 +924,7 @@ where
                     last_input_output,
                     versioned_cache,
                     executor,
-                    base_view,
-                    global_module_cache,
+                    shared_sync_params,
                     runtime_environment,
                     parallel_state,
                     block_gas_limit_type,
@@ -953,8 +940,7 @@ where
                     last_input_output,
                     versioned_cache,
                     executor,
-                    base_view,
-                    global_module_cache,
+                    shared_sync_params,
                     runtime_environment,
                     parallel_state,
                     scheduler,
@@ -1034,8 +1020,7 @@ where
                 shared_sync_params.start_shared_counter,
                 shared_sync_params.delayed_field_id_counter,
                 executor,
-                shared_sync_params.base_view,
-                global_module_cache,
+                shared_sync_params,
                 runtime_environment,
                 &self.config.onchain.block_gas_limit_type,
             )?;
@@ -1169,6 +1154,7 @@ where
             // TODO(BlockSTMv2): we could still provide the latest incarnation.
         );
         let latest_view = LatestView::new(
+            shared_sync_params.timestamp,
             shared_sync_params.base_view,
             shared_sync_params.global_module_cache,
             environment.runtime_environment(),
@@ -1302,8 +1288,6 @@ where
 
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
-        let base_view = shared_sync_params.base_view;
-        let global_module_cache = shared_sync_params.global_module_cache;
         let scheduler_wrapper = SchedulerWrapper::V1(scheduler, skip_module_reads_validation);
 
         let _timer = WORK_WITH_TASK_SECONDS.start_timer();
@@ -1368,7 +1352,7 @@ where
                     let valid = Self::validate(
                         txn_idx,
                         last_input_output,
-                        global_module_cache,
+                        shared_sync_params.global_module_cache,
                         versioned_cache,
                         skip_module_reads_validation.load(Ordering::Relaxed),
                     );
@@ -1395,8 +1379,7 @@ where
                     last_input_output,
                     versioned_cache,
                     executor,
-                    base_view,
-                    global_module_cache,
+                    shared_sync_params,
                     runtime_environment,
                     ParallelState::new(
                         versioned_cache,
@@ -1447,7 +1430,6 @@ where
         let runtime_environment = environment.runtime_environment();
 
         let scheduler_wrapper = SchedulerWrapper::V2(scheduler, worker_id);
-        let base_view = shared_sync_params.base_view;
         let versioned_cache = shared_sync_params.versioned_cache;
         let last_input_output = shared_sync_params.last_input_output;
         let global_module_cache = shared_sync_params.global_module_cache;
@@ -1491,8 +1473,7 @@ where
                         last_input_output,
                         versioned_cache,
                         executor,
-                        base_view,
-                        shared_sync_params.global_module_cache,
+                        shared_sync_params,
                         runtime_environment,
                         ParallelState::new(
                             versioned_cache,
@@ -1565,7 +1546,6 @@ where
         let last_input_output = shared_sync_params.last_input_output;
         let start_shared_counter = 0;
         let shared_counter = shared_sync_params.delayed_field_id_counter;
-        let base_view = shared_sync_params.base_view;
         let block_limit_processor = shared_sync_params.block_limit_processor;
 
         if has_remaining_commit_tasks {
@@ -1647,7 +1627,6 @@ where
                     code_invariant_error("Block epilogue txn requires executor to be initialized")
                 })?;
 
-                let module_cache = shared_sync_params.global_module_cache;
                 let runtime_environment = environment.runtime_environment();
 
                 let incarnation = scheduler.prepare_for_block_epilogue::<T, E>(
@@ -1667,8 +1646,7 @@ where
                     start_shared_counter,
                     shared_counter,
                     executor,
-                    base_view,
-                    module_cache,
+                    shared_sync_params,
                     runtime_environment,
                     &self.config.onchain.block_gas_limit_type,
                 )?;
@@ -1752,6 +1730,7 @@ where
             block_limit_processor: &block_limit_processor,
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
+            timestamp: *self.timestamp.acquire(),
         };
 
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
@@ -1912,6 +1891,7 @@ where
             block_limit_processor: &block_limit_processor,
             final_results: &final_results,
             maybe_block_epilogue_txn_idx: &block_epilogue_txn_idx,
+            timestamp: *self.timestamp.acquire(),
         };
 
         let async_runtime_checks_enabled = should_perform_async_runtime_checks_for_block(
@@ -2225,6 +2205,7 @@ where
             };
             let auxiliary_info = signature_verified_block.get_auxiliary_info(idx as TxnIndex);
             let latest_view = LatestView::<T, S>::new(
+                None, // we do not care about conflicts on timestamp here.
                 base_view,
                 module_cache_manager_guard.module_cache(),
                 runtime_environment,
@@ -2554,6 +2535,12 @@ where
         module_cache_manager_guard: &mut AptosModuleCacheManagerGuard,
     ) -> BlockExecutionResult<BlockOutput<T, E::Output>, E::Error> {
         let _timer = BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK.start_timer();
+
+        if signature_verified_block.num_txns() > 0 {
+            if let Some(timestamp) = signature_verified_block.get_txn(0).timestamp() {
+                *self.timestamp.acquire() = Some(timestamp);
+            }
+        }
 
         if self.config.local.concurrency_level > 1 {
             let parallel_result = if self.config.local.blockstm_v2 {

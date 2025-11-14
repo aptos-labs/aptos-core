@@ -102,6 +102,20 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
         }
     }
 
+    fn timestamp(&self) -> Option<u64> {
+        Some(match self {
+            SignatureVerifiedTransaction::Valid(Transaction::BlockMetadata(metadata)) => {
+                metadata.timestamp_usecs()
+            },
+            SignatureVerifiedTransaction::Valid(Transaction::BlockMetadataExt(metadata)) => {
+                metadata.timestamp_usecs()
+            },
+            _ => {
+                return None;
+            },
+        })
+    }
+
     fn try_as_signed_user_txn(&self) -> Option<&SignedTransaction> {
         match self {
             SignatureVerifiedTransaction::Valid(Transaction::UserTransaction(txn)) => Some(txn),
