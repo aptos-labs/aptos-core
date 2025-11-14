@@ -1,6 +1,6 @@
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 friend 0xc0ffee::n
 friend 0xc0ffee::n2
@@ -16,56 +16,56 @@ enum Wrapper has drop
     _0: u64
 
 // Function definition at index 0
-friend fun test_variant$Wrapper$V1(l0: &Wrapper): bool
+#[test_variant] friend fun test_variant$Wrapper$V1(l0: &Wrapper): bool
     local l1: &Wrapper
     move_loc l0
     test_variant Wrapper, V1
     ret
 
 // Function definition at index 1
-friend fun test_variant$Wrapper$V2(l0: &Wrapper): bool
+#[test_variant] friend fun test_variant$Wrapper$V2(l0: &Wrapper): bool
     local l1: &Wrapper
     move_loc l0
     test_variant Wrapper, V2
     ret
 
 // Function definition at index 2
-friend fun pack$Wrapper$V1(l0: u64): Wrapper
+#[pack_variant] friend fun pack$Wrapper$V1(l0: u64): Wrapper
     local l1: u64
     move_loc l0
     pack_variant Wrapper, V1
     ret
 
 // Function definition at index 3
-friend fun pack$Wrapper$V2(l0: u64): Wrapper
+#[pack_variant] friend fun pack$Wrapper$V2(l0: u64): Wrapper
     local l1: u64
     move_loc l0
     pack_variant Wrapper, V2
     ret
 
 // Function definition at index 4
-friend fun unpack$Wrapper$V1(l0: Wrapper): u64
+#[unpack_variant] friend fun unpack$Wrapper$V1(l0: Wrapper): u64
     local l1: Wrapper
     move_loc l0
     unpack_variant Wrapper, V1
     ret
 
 // Function definition at index 5
-friend fun unpack$Wrapper$V2(l0: Wrapper): u64
+#[unpack_variant] friend fun unpack$Wrapper$V2(l0: Wrapper): u64
     local l1: Wrapper
     move_loc l0
     unpack_variant Wrapper, V2
     ret
 
 // Function definition at index 6
-friend fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
+#[borrow] friend fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
     local l1: &Wrapper
     move_loc l0
     borrow_variant_field Wrapper, V1::_0, V2::_0
     ret
 
 // Function definition at index 7
-friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
+#[borrow_mut] friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
     local l1: &mut Wrapper
     move_loc l0
     mut_borrow_variant_field Wrapper, V1::_0, V2::_0
@@ -77,7 +77,7 @@ friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
     pack_variant Wrapper, V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n
 use 0xc0ffee::m
 // Function definition at index 0
@@ -99,7 +99,7 @@ l0: ld_u64 1
     abort
 l1: ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n2
 use 0xc0ffee::m
 // Function definition at index 0
@@ -109,7 +109,7 @@ fun test_pack()
     pop
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n3
 use 0xc0ffee::m
 // Function definition at index 0
@@ -119,7 +119,7 @@ fun test_unpack(l0: m::Wrapper)
     pop
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n4
 use 0xc0ffee::m
 // Function definition at index 0
@@ -129,7 +129,7 @@ fun test_select_variant(l0: m::Wrapper): u64
     read_ref
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n5
 use 0xc0ffee::m
 // Function definition at index 0
@@ -138,7 +138,7 @@ fun test_test_variant(l0: m::Wrapper): bool
     call m::test_variant$Wrapper$V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n6
 use 0xc0ffee::m
 // Function definition at index 0
@@ -154,7 +154,7 @@ fun test_test_variant_mut_borrow(l0: &mut m::Wrapper): bool
     call m::test_variant$Wrapper$V1
     ret
 
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::n7
 use 0xc0ffee::m
 // Function definition at index 0

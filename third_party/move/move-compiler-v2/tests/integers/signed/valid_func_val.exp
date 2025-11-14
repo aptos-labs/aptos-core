@@ -2167,7 +2167,7 @@ fun valid_fv::__lambda__1__test2($t0: i128): i128 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::valid_fv
 enum E1 has copy + drop
   V1

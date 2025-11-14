@@ -222,6 +222,13 @@ pub enum SerializedNativeStructFlag {
 pub enum SerializedFunctionAttribute {
     PERSISTENT   = 0x1,
     MODULE_LOCK  = 0x2,
+    PACK         = 0x3,
+    PACK_VARIANT = 0x4,
+    UNPACK       = 0x5,
+    UNPACK_VARIANT = 0x6,
+    TEST_VARIANT = 0x7,
+    BORROW_FIELD_IMMUTABLE = 0x8,
+    BORROW_FIELD_MUTABLE = 0x9,
 }
 
 /// List of opcodes constants.
@@ -552,8 +559,12 @@ pub const VERSION_8: u32 = 8;
 /// + allow `$` in identifiers
 pub const VERSION_9: u32 = 9;
 
+/// Version 10: changes compared to version 9
+/// + new attributes for structs api
+pub const VERSION_10: u32 = 10;
+
 /// Mark which version is the latest version.
-pub const VERSION_MAX: u32 = VERSION_9;
+pub const VERSION_MAX: u32 = VERSION_10;
 
 /// Mark which version is the default version. This is the version used by default by tools like
 /// the compiler. Notice that this version might be different from the one supported on nodes.
@@ -565,6 +576,9 @@ pub const VERSION_DEFAULT_LANG_V2: u32 = VERSION_8;
 
 /// Mark which version is the default version if compiling with language version 2.3
 pub const VERSION_DEFAULT_LANG_V2_3: u32 = VERSION_9;
+
+/// Mark which version is the default version if compiling with language version 2.4
+pub const VERSION_DEFAULT_LANG_V2_4: u32 = VERSION_10;
 
 // Mark which oldest version is supported.
 pub const VERSION_MIN: u32 = VERSION_5;

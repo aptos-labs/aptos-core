@@ -22,9 +22,9 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        MemberCount, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
-        VariantIndex,
+        Bytecode, CodeOffset, FunctionAttribute, FunctionDefinitionIndex, FunctionHandle,
+        IdentifierIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinition,
+        StructVariantHandle, VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -61,7 +61,6 @@ pub(crate) fn verify<'a>(
     meter: &mut impl Meter,
 ) -> PartialVMResult<()> {
     let initial_state = AbstractState::new(function_view);
-
     let mut verifier = ReferenceSafetyAnalysis::new(resolver, function_view, name_def_map);
     verifier.analyze_function(initial_state, function_view, meter)
 }
@@ -443,12 +442,43 @@ fn execute_inner(
 
         Bytecode::Call(idx) => {
             let function_handle = verifier.resolver.function_handle_at(*idx);
-            call(verifier, state, offset, function_handle, meter)?
+            let mut is_borrow_field_mutable = false;
+            for attr in function_handle.attributes.iter() {
+                // When calling a borrow field mut api, we assume the body only
+                // borrows the field at field_offset thus call borrow_field
+                // we need this special case because of reference semantics of mutable references
+                // passing to a function, which is not necessary for immutable references.
+                // same for call generic below.
+                if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
+                    let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+                    let value = state.borrow_field(offset, true, id, *field_offset)?;
+                    verifier.stack.push(value);
+                    is_borrow_field_mutable = true;
+                    break;
+                }
+            }
+            if !is_borrow_field_mutable {
+                call(verifier, state, offset, function_handle, meter)?
+            }
         },
         Bytecode::CallGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
-            call(verifier, state, offset, function_handle, meter)?
+            let mut is_borrow_field_mutable = false;
+            for attr in function_handle.attributes.iter() {
+                // When calling a borrow field mut api, we assume the body only
+                // borrows the field at field_offset thus call borrow_field
+                if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
+                    let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+                    let value = state.borrow_field(offset, true, id, *field_offset)?;
+                    verifier.stack.push(value);
+                    is_borrow_field_mutable = true;
+                    break;
+                }
+            }
+            if !is_borrow_field_mutable {
+                call(verifier, state, offset, function_handle, meter)?
+            }
         },
 
         Bytecode::Ret => {

@@ -15,7 +15,9 @@ use move_binary_format::{
     access::ModuleAccess,
     binary_views::BinaryIndexedView,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
-    file_format::{CompiledModule, FunctionAttribute, FunctionDefinitionIndex, Visibility},
+    file_format::{
+        CompiledModule, FunctionAttribute, FunctionDefinitionIndex, MemberCount, Visibility,
+    },
 };
 use move_core_types::{
     ability::AbilitySet,
@@ -89,6 +91,7 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
+    pub(crate) borrow_field_mut_api_offset_opt: Option<MemberCount>,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -681,6 +684,13 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
+        let mut is_borrow_field_mut_api_with_offset = None;
+        for attr in &handle.attributes {
+            if let FunctionAttribute::BorrowFieldMutable(offset) = attr {
+                is_borrow_field_mut_api_with_offset = Some(*offset);
+                break;
+            }
+        }
         Ok(Self {
             file_format_version: module.version(),
             index,
@@ -697,6 +707,7 @@ impl Function {
             param_tys,
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
+            borrow_field_mut_api_offset_opt: is_borrow_field_mut_api_with_offset,
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
         })
@@ -743,6 +754,10 @@ impl Function {
 
     pub fn is_persistent(&self) -> bool {
         self.is_persistent || self.is_public()
+    }
+
+    pub fn borrow_field_mut_api_offset_opt(&self) -> Option<MemberCount> {
+        self.borrow_field_mut_api_offset_opt
     }
 
     pub fn has_module_lock(&self) -> bool {

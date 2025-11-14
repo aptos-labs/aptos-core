@@ -1,22 +1,4 @@
 processed 3 tasks
 task 0 lines 2-14:  publish [module 0x42::pack_unpack_ref {]
 task 1 lines 16-39:  publish [module 0x42::test_pack_unpack_ref {]
-Error: compilation errors:
- bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
-Error message: none
-   ┌─ TEMPFILE1:23:13
-   │
-23 │         let G{ x1, x2, s  } = &mut g;
-   │             ^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
-
-
 task 2 lines 41-41:  run  0x42::test_pack_unpack_ref::unpack_ref_G
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
