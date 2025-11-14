@@ -1135,6 +1135,7 @@ where
                     ty_args_id,
                 )?;
 
+                // Note: the profiler begins measuring at this point, so it captures only execution time, not loading time.
                 let fn_guard = VM_PROFILER.function(&target_func);
 
                 RTTCheck::check_call_visibility(
