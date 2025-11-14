@@ -76,7 +76,8 @@ impl Write for SizeRollingFileAppender {
         if self.current_log_size + buf.len() as u64 > self.max_log_file_size {
             self.rotate();
         }
-        let bytes_written = self.current_log_file.write(buf)?;
+        let mut bytes_written = self.current_log_file.write(buf)?;
+        bytes_written += self.current_log_file.write_all(b"\n")?;
         self.current_log_size += bytes_written as u64;
         Ok(bytes_written)
     }
