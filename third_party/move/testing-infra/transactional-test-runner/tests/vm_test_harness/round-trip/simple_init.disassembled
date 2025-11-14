@@ -3,10 +3,10 @@
 //# init --addresses A=0x42 K=0x19
 
 //# publish
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::M
 
 
 //# publish
-// Bytecode version v9
+// Bytecode version v10
 module 0x19::S
