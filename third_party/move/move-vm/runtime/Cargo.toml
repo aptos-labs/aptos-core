@@ -51,6 +51,7 @@ test-case = { workspace = true }
 default = [
     "inline-callstack",
 ]
+profiling = ["move-vm-profiler/probe-profiler"]
 testing = []
 fuzzing = ["move-vm-types/fuzzing"]
 failpoints = ["fail/failpoints"]

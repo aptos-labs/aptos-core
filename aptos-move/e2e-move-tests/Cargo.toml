@@ -52,3 +52,7 @@ tokio = { workspace = true }
 
 [lib]
 doctest = false
+
+[features]
+default = []
+profiling = ["aptos-vm/profiling"]
