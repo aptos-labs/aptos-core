@@ -1,0 +1,19 @@
+processed 5 tasks
+task 0 lines 3-25:  publish [module 0xc0ffee::m {]
+task 1 lines 28-58:  publish [module 0xc0ffee::test_m {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE1:31:17
+   │
+31 │     fun consume(p0: u64) {
+   │                 ^^
+
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE1:34:18
+   │
+34 │     fun consume_(p0: m::W) {
+   │                  ^^
+
+
+task 2 lines 61-61:  run 0xc0ffee::test_m::test1 --args 42
+task 3 lines 63-63:  run 0xc0ffee::test_m::test2 --args 42
+task 4 lines 65-65:  run 0xc0ffee::test_m::test5

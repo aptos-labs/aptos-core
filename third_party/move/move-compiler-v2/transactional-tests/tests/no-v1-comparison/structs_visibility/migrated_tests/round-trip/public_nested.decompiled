@@ -1,0 +1,188 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_nested.move`
+
+//# publish
+module 0x42::test {
+    enum E has drop {
+        V1 {
+            _0: u8,
+            _1: S1<u8, bool>,
+        }
+        V2 {
+            x: u8,
+            y: S0<u8, bool>,
+        }
+    }
+    struct S1<T0, T1> has drop {
+        x: T0,
+        y: T1,
+    }
+    struct S0<T0, T1> has drop {
+        _0: T0,
+        _1: T1,
+    }
+    #[test_variant]
+    public fun test_variant_0x42_test_E_V1(p0: &E): bool {
+        p0 is V1
+    }
+    #[test_variant]
+    public fun test_variant_0x42_test_E_V2(p0: &E): bool {
+        p0 is V2
+    }
+    #[pack]
+    public fun pack_0x42_test_E_V1(p0: u8, p1: S1<u8, bool>): E {
+        E::V1{_0: p0, _1: p1}
+    }
+    #[pack]
+    public fun pack_0x42_test_E_V2(p0: u8, p1: S0<u8, bool>): E {
+        E::V2{x: p0, y: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_E_V1(p0: E): (u8, S1<u8, bool>) {
+        let E::V1{_0: _v0, _1: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0x42_test_E_V2(p0: E): (u8, S0<u8, bool>) {
+        let E::V2{x: _v0, y: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_test_E_0_0(p0: &E): &u8 {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_E_1_1(p0: &E): &S1<u8, bool> {
+        &p0._1
+    }
+    #[borrow]
+    public fun borrow_0x42_test_E_x_0(p0: &E): &u8 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_test_E_y_1(p0: &E): &S0<u8, bool> {
+        &p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_E_0_0(p0: &mut E): &mut u8 {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_E_1_1(p0: &mut E): &mut S1<u8, bool> {
+        &mut p0._1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_E_x_0(p0: &mut E): &mut u8 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_E_y_1(p0: &mut E): &mut S0<u8, bool> {
+        &mut p0.y
+    }
+    #[pack]
+    public fun pack_0x42_test_S0<T0, T1>(p0: T0, p1: T1): S0<T0, T1> {
+        S0<T0,T1>{_0: p0, _1: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_S0<T0, T1>(p0: S0<T0, T1>): (T0, T1) {
+        let S0<T0,T1>{_0: _v0, _1: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S0_0_0<T0, T1>(p0: &S0<T0, T1>): &T0 {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S0_1_1<T0, T1>(p0: &S0<T0, T1>): &T1 {
+        &p0._1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S0_0_0<T0, T1>(p0: &mut S0<T0, T1>): &mut T0 {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S0_1_1<T0, T1>(p0: &mut S0<T0, T1>): &mut T1 {
+        &mut p0._1
+    }
+    #[pack]
+    public fun pack_0x42_test_S1<T0, T1>(p0: T0, p1: T1): S1<T0, T1> {
+        S1<T0,T1>{x: p0, y: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_S1<T0, T1>(p0: S1<T0, T1>): (T0, T1) {
+        let S1<T0,T1>{x: _v0, y: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S1_x_0<T0, T1>(p0: &S1<T0, T1>): &T0 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S1_y_1<T0, T1>(p0: &S1<T0, T1>): &T1 {
+        &p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S1_x_0<T0, T1>(p0: &mut S1<T0, T1>): &mut T0 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S1_y_1<T0, T1>(p0: &mut S1<T0, T1>): &mut T1 {
+        &mut p0.y
+    }
+}
+
+
+//# publish
+module 0x42::test_nested {
+    use 0x42::test;
+    fun extract_first_u8(p0: &test::E): u8 {
+        let _v0 = test::test_variant_0x42_test_E_V1(p0);
+        loop {
+            if (!_v0) {
+                if (test::test_variant_0x42_test_E_V2(p0)) break;
+                abort 14566554180833181697
+            };
+            return *test::borrow_0x42_test_E_0_0(p0)
+        };
+        *test::borrow_0x42_test_E_x_0(p0)
+    }
+    fun extract_last_u8(p0: &test::E): u8 {
+        let _v0 = test::test_variant_0x42_test_E_V1(p0);
+        loop {
+            if (!_v0) {
+                if (test::test_variant_0x42_test_E_V2(p0)) break;
+                abort 14566554180833181697
+            };
+            return *test::borrow_0x42_test_S1_x_0<u8,bool>(test::borrow_0x42_test_E_1_1(p0))
+        };
+        *test::borrow_0x42_test_S0_0_0<u8,bool>(test::borrow_0x42_test_E_y_1(p0))
+    }
+    fun test1(): u8 {
+        let _v0 = test::pack_0x42_test_S1<u8,bool>(43u8, true);
+        let _v1 = test::pack_0x42_test_E_V1(42u8, _v0);
+        extract_first_u8(&_v1)
+    }
+    fun test2(): u8 {
+        let _v0 = test::pack_0x42_test_S0<u8,bool>(43u8, true);
+        let _v1 = test::pack_0x42_test_E_V2(42u8, _v0);
+        extract_first_u8(&_v1)
+    }
+    fun test3(): u8 {
+        let _v0 = test::pack_0x42_test_S1<u8,bool>(43u8, true);
+        let _v1 = test::pack_0x42_test_E_V1(42u8, _v0);
+        extract_last_u8(&_v1)
+    }
+    fun test4(): u8 {
+        let _v0 = test::pack_0x42_test_S0<u8,bool>(43u8, true);
+        let _v1 = test::pack_0x42_test_E_V2(42u8, _v0);
+        extract_last_u8(&_v1)
+    }
+}
+
+
+//# run --verbose -- 0x42::test_nested::test1
+
+//# run --verbose -- 0x42::test_nested::test2
+
+//# run --verbose -- 0x42::test_nested::test3
+
+//# run --verbose -- 0x42::test_nested::test4

@@ -1,0 +1,309 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_assign_field.move`
+
+//# publish
+module 0x42::test {
+    enum E has drop {
+        V1 {
+            _0: u8,
+            _1: bool,
+        }
+        V2 {
+            _0: S3,
+        }
+    }
+    struct S3 has drop {
+        _0: S2,
+        _1: S0,
+        _2: S2,
+    }
+    struct S2 has copy, drop {
+        _0: S0,
+        _1: u8,
+    }
+    struct S0 has copy, drop {
+        x: u8,
+    }
+    struct S1 has drop {
+        _0: u64,
+        _1: bool,
+    }
+    #[test_variant]
+    public fun test_variant_0x42_test_E_V1(p0: &E): bool {
+        p0 is V1
+    }
+    #[test_variant]
+    public fun test_variant_0x42_test_E_V2(p0: &E): bool {
+        p0 is V2
+    }
+    #[pack]
+    public fun pack_0x42_test_E_V1(p0: u8, p1: bool): E {
+        E::V1{_0: p0, _1: p1}
+    }
+    #[pack]
+    public fun pack_0x42_test_E_V2(p0: S3): E {
+        E::V2{_0: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_E_V1(p0: E): (u8, bool) {
+        let E::V1{_0: _v0, _1: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0x42_test_E_V2(p0: E): S3 {
+        let E::V2{_0: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_E_1_1(p0: &E): &bool {
+        &p0._1
+    }
+    #[borrow]
+    public fun borrow_0x42_test_E_0_0_V1(p0: &E): &u8 {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_E_0_0_V2(p0: &E): &S3 {
+        &p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_E_1_1(p0: &mut E): &mut bool {
+        &mut p0._1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_E_0_0_V1(p0: &mut E): &mut u8 {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_E_0_0_V2(p0: &mut E): &mut S3 {
+        &mut p0._0
+    }
+    #[pack]
+    public fun pack_0x42_test_S0(p0: u8): S0 {
+        S0{x: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_S0(p0: S0): u8 {
+        let S0{x: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S0_x_0(p0: &S0): &u8 {
+        &p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S0_x_0(p0: &mut S0): &mut u8 {
+        &mut p0.x
+    }
+    #[pack]
+    public fun pack_0x42_test_S1(p0: u64, p1: bool): S1 {
+        S1{_0: p0, _1: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_S1(p0: S1): (u64, bool) {
+        let S1{_0: _v0, _1: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S1_0_0(p0: &S1): &u64 {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S1_1_1(p0: &S1): &bool {
+        &p0._1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S1_0_0(p0: &mut S1): &mut u64 {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S1_1_1(p0: &mut S1): &mut bool {
+        &mut p0._1
+    }
+    #[pack]
+    public fun pack_0x42_test_S2(p0: S0, p1: u8): S2 {
+        S2{_0: p0, _1: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_S2(p0: S2): (S0, u8) {
+        let S2{_0: _v0, _1: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S2_0_0(p0: &S2): &S0 {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S2_1_1(p0: &S2): &u8 {
+        &p0._1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S2_0_0(p0: &mut S2): &mut S0 {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S2_1_1(p0: &mut S2): &mut u8 {
+        &mut p0._1
+    }
+    #[pack]
+    public fun pack_0x42_test_S3(p0: S2, p1: S0, p2: S2): S3 {
+        S3{_0: p0, _1: p1, _2: p2}
+    }
+    #[unpack]
+    public fun unpack_0x42_test_S3(p0: S3): (S2, S0, S2) {
+        let S3{_0: _v0, _1: _v1, _2: _v2} = p0;
+        (_v0, _v1, _v2)
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S3_0_0(p0: &S3): &S2 {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S3_1_1(p0: &S3): &S0 {
+        &p0._1
+    }
+    #[borrow]
+    public fun borrow_0x42_test_S3_2_2(p0: &S3): &S2 {
+        &p0._2
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S3_0_0(p0: &mut S3): &mut S2 {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S3_1_1(p0: &mut S3): &mut S0 {
+        &mut p0._1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_test_S3_2_2(p0: &mut S3): &mut S2 {
+        &mut p0._2
+    }
+}
+
+
+//# publish
+module 0x42::test_assign_field {
+    use 0x42::test;
+    fun assign0(p0: u64, p1: bool): test::S1 {
+        let _v0 = test::pack_0x42_test_S1(p0, p1);
+        while (*test::borrow_0x42_test_S1_1_1(&_v0)) {
+            let _v1 = *test::borrow_0x42_test_S1_0_0(&_v0) - 1;
+            let _v2 = *test::borrow_0x42_test_S1_0_0(&_v0);
+            _v0 = test::pack_0x42_test_S1(_v1, _v2 >= 2);
+            continue
+        };
+        _v0
+    }
+    fun assign1(p0: test::S1): u64 {
+        let _v0 = 0;
+        loop {
+            let _v1;
+            if (!*test::borrow_0x42_test_S1_1_1(&p0)) break;
+            if (*test::borrow_0x42_test_S1_0_0(&p0) > 0) _v1 = *test::borrow_0x42_test_S1_0_0(&p0) - 1 else _v1 = 0;
+            p0 = test::pack_0x42_test_S1(_v1, _v1 >= 1);
+            _v0 = _v0 + 1;
+            continue
+        };
+        _v0
+    }
+    fun assign_chained(p0: test::S3): test::S3 {
+        let _v0 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_0_0(&p0)));
+        let _v1 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S3_1_1(&p0));
+        let _v2 = _v0 + _v1;
+        let _v3 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_2_2(&p0)));
+        let _v4 = _v2 + _v3;
+        let _v5 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(&mut p0)));
+        *_v5 = 0u8;
+        let _v6 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S3_1_1(&mut p0));
+        *_v6 = 1u8;
+        let _v7 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(&mut p0)));
+        *_v7 = 2u8;
+        p0
+    }
+    fun assign_enum(p0: &mut test::E) {
+        let _v0 = test::test_variant_0x42_test_E_V1(freeze(p0));
+        loop {
+            if (!_v0) {
+                if (test::test_variant_0x42_test_E_V2(freeze(p0))) break;
+                abort 14566554180833181697
+            };
+            let _v1 = test::borrow_mut_0x42_test_E_0_0_V1(p0);
+            let _v2 = test::borrow_mut_0x42_test_E_1_1(p0);
+            *_v1 = 42u8;
+            *_v2 = true;
+            return ()
+        };
+        let _v3 = test::borrow_mut_0x42_test_E_0_0_V2(p0);
+        let _v4 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(_v3)));
+        *_v4 = 0u8;
+        let _v5 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S3_1_1(_v3));
+        *_v5 = 1u8;
+        let _v6 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(_v3)));
+        *_v6 = 2u8;
+    }
+    fun simple(p0: test::S1): test::S1 {
+        let _v0 = test::borrow_mut_0x42_test_S1_0_0(&mut p0);
+        *_v0 = 42;
+        let _v1 = test::borrow_mut_0x42_test_S1_1_1(&mut p0);
+        *_v1 = true;
+        p0
+    }
+    fun simple_ref(p0: &mut test::S1) {
+        let _v0 = test::borrow_mut_0x42_test_S1_0_0(p0);
+        *_v0 = 42;
+        let _v1 = test::borrow_mut_0x42_test_S1_1_1(p0);
+        *_v1 = true;
+    }
+    fun test_assign0(): test::S1 {
+        assign0(4, true)
+    }
+    fun test_assign1(): u64 {
+        assign1(test::pack_0x42_test_S1(4, true))
+    }
+    fun test_assign_chained(): test::S3 {
+        let _v0 = test::pack_0x42_test_S0(42u8);
+        let _v1 = test::pack_0x42_test_S2(_v0, 42u8);
+        assign_chained(test::pack_0x42_test_S3(_v1, _v0, _v1))
+    }
+    fun test_assign_enum_1(): bool {
+        let _v0 = test::pack_0x42_test_S0(43u8);
+        let _v1 = test::pack_0x42_test_S2(_v0, 42u8);
+        let _v2 = test::pack_0x42_test_E_V2(test::pack_0x42_test_S3(_v1, _v0, _v1));
+        assign_enum(&mut _v2);
+        let _v3 = test::pack_0x42_test_S0(0u8);
+        let _v4 = test::pack_0x42_test_S0(1u8);
+        let _v5 = test::pack_0x42_test_S0(2u8);
+        let _v6 = test::pack_0x42_test_S2(_v3, 42u8);
+        let _v7 = test::pack_0x42_test_S2(_v5, 42u8);
+        let _v8 = test::pack_0x42_test_E_V2(test::pack_0x42_test_S3(_v6, _v4, _v7));
+        _v2 == _v8
+    }
+    fun test_assign_enum_2(): bool {
+        let _v0 = test::pack_0x42_test_E_V1(0u8, false);
+        assign_enum(&mut _v0);
+        let _v1 = test::pack_0x42_test_E_V1(42u8, true);
+        _v0 == _v1
+    }
+    fun test_simple(): test::S1 {
+        simple(test::pack_0x42_test_S1(0, false))
+    }
+    fun test_simple_ref(): test::S1 {
+        let _v0 = test::pack_0x42_test_S1(0, false);
+        simple_ref(&mut _v0);
+        _v0
+    }
+}
+
+
+//# run --verbose -- 0x42::test_assign_field::test_simple
+
+//# run --verbose -- 0x42::test_assign_field::test_simple_ref
+
+//# run --verbose -- 0x42::test_assign_field::test_assign0
+
+//# run --verbose -- 0x42::test_assign_field::test_assign1
+
+//# run --verbose -- 0x42::test_assign_field::test_assign_chained
+
+//# run --verbose -- 0x42::test_assign_field::test_assign_enum_1
+
+//# run --verbose -- 0x42::test_assign_field::test_assign_enum_2

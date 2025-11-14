@@ -154,6 +154,8 @@ pub enum FeatureFlag {
     /// If enabled, new single session is used by the VM to avoid squashing write-sets and cache
     /// reads between sessions (e.g., between transaction prologue, user session and epilogue).
     SESSION_CONTINUATION = 104,
+    /// Enables bytecode version v10
+    VM_BINARY_FORMAT_V10 = 105,
 }
 
 impl FeatureFlag {
@@ -259,6 +261,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VM_BINARY_FORMAT_V9,
             FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
+            FeatureFlag::VM_BINARY_FORMAT_V10,
         ]
     }
 }
@@ -473,7 +476,9 @@ impl Features {
     }
 
     pub fn get_max_binary_format_version(&self) -> u32 {
-        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
+        if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V10) {
+            file_format_common::VERSION_10
+        } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V9) {
             file_format_common::VERSION_9
         } else if self.is_enabled(FeatureFlag::VM_BINARY_FORMAT_V8) {
             file_format_common::VERSION_8
@@ -531,7 +536,7 @@ mod test {
             file_format_common::VERSION_MIN
         );
         assert_eq!(
-            file_format_common::VERSION_9,
+            file_format_common::VERSION_10,
             file_format_common::VERSION_MAX
         );
     }

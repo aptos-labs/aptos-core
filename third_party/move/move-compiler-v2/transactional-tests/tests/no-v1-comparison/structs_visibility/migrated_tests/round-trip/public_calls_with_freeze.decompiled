@@ -1,0 +1,57 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_calls_with_freeze.move`
+
+//# publish
+module 0x42::m {
+    struct S has drop {
+        x: u64,
+    }
+    #[pack]
+    public fun pack_0x42_m_S(p0: u64): S {
+        S{x: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_S(p0: S): u64 {
+        let S{x: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m_S_x_0(p0: &S): &u64 {
+        &p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_S_x_0(p0: &mut S): &mut u64 {
+        &mut p0.x
+    }
+}
+
+
+//# publish
+module 0x42::m_calls_with_freeze {
+    use 0x42::m;
+    fun sum(p0: &m::S, p1: &m::S): u64 {
+        let _v0 = *m::borrow_0x42_m_S_x_0(p0);
+        let _v1 = *m::borrow_0x42_m_S_x_0(p1);
+        _v0 + _v1
+    }
+    fun test(): u64 {
+        test_arg_freeze(m::pack_0x42_m_S(2))
+    }
+    fun test_arg_freeze(p0: m::S): u64 {
+        let _v0 = &mut p0;
+        let _v1 = m::pack_0x42_m_S(4);
+        let _v2 = &mut _v1;
+        let _v3 = freeze(_v0);
+        let _v4 = freeze(_v2);
+        let _v5 = sum(_v3, _v4);
+        let _v6 = freeze(_v0);
+        let _v7 = freeze(_v0);
+        let _v8 = sum(_v6, _v7);
+        let _v9 = &p0;
+        let _v10 = freeze(_v2);
+        let _v11 = sum(_v9, _v10);
+        _v5 + _v8 + _v11
+    }
+}
+
+
+//# run 0x42::m_calls_with_freeze::test

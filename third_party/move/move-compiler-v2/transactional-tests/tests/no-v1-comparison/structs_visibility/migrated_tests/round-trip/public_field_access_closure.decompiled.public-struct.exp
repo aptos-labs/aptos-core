@@ -1,0 +1,9 @@
+processed 5 tasks
+task 0 lines 3-96:  publish [module 0xc0ffee::m {]
+task 1 lines 99-134:  publish [module 0xc0ffee::m2 {]
+task 2 lines 137-137:  run 0xc0ffee::m2::test1
+return values: 42
+task 3 lines 139-139:  run 0xc0ffee::m2::test2
+return values: 87
+task 4 lines 141-141:  run 0xc0ffee::m2::test3
+return values: 42

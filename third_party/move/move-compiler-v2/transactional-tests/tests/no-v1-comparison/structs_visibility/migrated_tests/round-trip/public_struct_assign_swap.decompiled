@@ -1,0 +1,77 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_struct_assign_swap.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct S {
+        f: u32,
+        g: u32,
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_S(p0: u32, p1: u32): S {
+        S{f: p0, g: p1}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_S(p0: S): (u32, u32) {
+        let S{f: _v0, g: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_m_S_f_0(p0: &S): &u32 {
+        &p0.f
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_m_S_g_1(p0: &S): &u32 {
+        &p0.g
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_m_S_f_0(p0: &mut S): &mut u32 {
+        &mut p0.f
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_m_S_g_1(p0: &mut S): &mut u32 {
+        &mut p0.g
+    }
+}
+
+
+//# publish
+module 0xc0ffee::test_m {
+    use 0xc0ffee::m;
+    fun swap1(p0: u32, p1: u32): (u32, u32) {
+        let (_v0,_v1) = m::unpack_0xc0ffee_m_S(m::pack_0xc0ffee_m_S(p1, p0));
+        (_v0, _v1)
+    }
+    fun swap2(): (u32, u32) {
+        let (_v0,_v1) = m::unpack_0xc0ffee_m_S(m::pack_0xc0ffee_m_S(55u32, 44u32));
+        (55u32, 44u32)
+    }
+    fun swap3(p0: u32, p1: u32): (u32, u32) {
+        let (_v0,_v1) = m::unpack_0xc0ffee_m_S(m::pack_0xc0ffee_m_S(p0, p1));
+        (_v1, _v0)
+    }
+    fun swap4(p0: u32, p1: u32): (u32, u32) {
+        let (_v0,_v1) = m::unpack_0xc0ffee_m_S(m::pack_0xc0ffee_m_S(p0, p1));
+        (_v1, _v0)
+    }
+    fun test1(): (u32, u32) {
+        let (_v0,_v1) = swap1(1u32, 2u32);
+        (_v0, _v1)
+    }
+    fun test3(): (u32, u32) {
+        let (_v0,_v1) = swap3(1u32, 2u32);
+        (_v0, _v1)
+    }
+    fun test4(): (u32, u32) {
+        let (_v0,_v1) = swap4(1u32, 2u32);
+        (_v0, _v1)
+    }
+}
+
+
+//# run 0xc0ffee::test_m::test1
+
+//# run 0xc0ffee::test_m::swap2
+
+//# run 0xc0ffee::test_m::test3
+
+//# run 0xc0ffee::test_m::test4

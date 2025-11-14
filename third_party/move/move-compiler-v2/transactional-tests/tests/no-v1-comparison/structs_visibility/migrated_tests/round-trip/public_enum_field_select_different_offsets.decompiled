@@ -1,0 +1,141 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_enum_field_select_different_offsets.move`
+
+//# publish
+module 0x42::m {
+    enum Data has drop {
+        V1 {
+            x: u64,
+        }
+        V2 {
+            y: bool,
+            x: u64,
+        }
+        V3 {
+            z: u8,
+            x: u64,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Data_V1(p0: &Data): bool {
+        p0 is V1
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Data_V2(p0: &Data): bool {
+        p0 is V2
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Data_V3(p0: &Data): bool {
+        p0 is V3
+    }
+    #[pack]
+    public fun pack_0x42_m_Data_V1(p0: u64): Data {
+        Data::V1{x: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m_Data_V2(p0: bool, p1: u64): Data {
+        Data::V2{y: p0, x: p1}
+    }
+    #[pack]
+    public fun pack_0x42_m_Data_V3(p0: u8, p1: u64): Data {
+        Data::V3{z: p0, x: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Data_V1(p0: Data): u64 {
+        let Data::V1{x: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Data_V2(p0: Data): (bool, u64) {
+        let Data::V2{y: _v0, x: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Data_V3(p0: Data): (u8, u64) {
+        let Data::V3{z: _v0, x: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Data_x_0(p0: &Data): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Data_x_1(p0: &Data): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Data_y_0(p0: &Data): &bool {
+        &p0.y
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Data_z_0(p0: &Data): &u8 {
+        &p0.z
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Data_x_0(p0: &mut Data): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Data_x_1(p0: &mut Data): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Data_y_0(p0: &mut Data): &mut bool {
+        &mut p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Data_z_0(p0: &mut Data): &mut u8 {
+        &mut p0.z
+    }
+}
+
+
+//# publish
+module 0x42::test_m {
+    use 0x42::m;
+    fun test_get_x_v1(): u64 {
+        let _v0;
+        let _v1 = m::pack_0x42_m_Data_V1(43);
+        let _v2 = &_v1;
+        if (m::test_variant_0x42_m_Data_V2(_v2) || m::test_variant_0x42_m_Data_V3(_v2)) _v0 = m::borrow_0x42_m_Data_x_1(_v2) else _v0 = m::borrow_0x42_m_Data_x_0(_v2);
+        *_v0
+    }
+    fun test_get_x_v2(): u64 {
+        let _v0;
+        let _v1 = m::pack_0x42_m_Data_V2(false, 43);
+        let _v2 = &_v1;
+        if (m::test_variant_0x42_m_Data_V2(_v2) || m::test_variant_0x42_m_Data_V3(_v2)) _v0 = m::borrow_0x42_m_Data_x_1(_v2) else _v0 = m::borrow_0x42_m_Data_x_0(_v2);
+        *_v0
+    }
+    fun test_get_x_v3(): u64 {
+        let _v0;
+        let _v1 = m::pack_0x42_m_Data_V3(1u8, 43);
+        let _v2 = &_v1;
+        if (m::test_variant_0x42_m_Data_V2(_v2) || m::test_variant_0x42_m_Data_V3(_v2)) _v0 = m::borrow_0x42_m_Data_x_1(_v2) else _v0 = m::borrow_0x42_m_Data_x_0(_v2);
+        *_v0
+    }
+    fun test_get_y_v1(): bool {
+        let _v0 = m::pack_0x42_m_Data_V1(43);
+        *m::borrow_0x42_m_Data_y_0(&_v0)
+    }
+    fun test_get_y_v2(): bool {
+        let _v0 = m::pack_0x42_m_Data_V2(true, 43);
+        *m::borrow_0x42_m_Data_y_0(&_v0)
+    }
+    fun test_get_y_v3(): bool {
+        let _v0 = m::pack_0x42_m_Data_V3(1u8, 43);
+        *m::borrow_0x42_m_Data_y_0(&_v0)
+    }
+}
+
+
+//# run 0x42::test_m::test_get_x_v1
+
+//# run 0x42::test_m::test_get_x_v2
+
+//# run 0x42::test_m::test_get_x_v3
+
+//# run 0x42::test_m::test_get_y_v1
+
+//# run 0x42::test_m::test_get_y_v2
+
+//# run 0x42::test_m::test_get_y_v3

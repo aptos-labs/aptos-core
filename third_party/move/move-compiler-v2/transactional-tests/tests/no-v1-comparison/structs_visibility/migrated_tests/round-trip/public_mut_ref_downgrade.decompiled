@@ -1,0 +1,19 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_mut_ref_downgrade.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct NoCopy has drop {
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_NoCopy(p0: bool): NoCopy {
+        NoCopy{}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_NoCopy(p0: NoCopy): bool {
+        let NoCopy{} = p0;
+        _v0
+    }
+}
+
+
+//# run 0xc0ffee::m_mut_ref_downgrade::foo

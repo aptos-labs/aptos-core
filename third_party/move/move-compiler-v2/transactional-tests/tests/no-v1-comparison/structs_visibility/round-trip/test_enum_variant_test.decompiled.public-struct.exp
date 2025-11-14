@@ -1,0 +1,64 @@
+processed 9 tasks
+task 0 lines 3-5:  publish [module 0x42::m2 {]
+task 1 lines 8-147:  publish [module 0x42::m {]
+task 2 lines 150-249:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ error: cannot transfer mutable local `_v1` since it is borrowed
+    ┌─ TEMPFILE2:160:27
+    │
+159 │                 let _v3 = m::borrow_mut_0x42_m_Data2_y_0(_v1);
+    │                           ----------------------------------- previously mutably borrowed here
+160 │                 let _v4 = m::borrow_mut_0x42_m_Data2_x_1(_v1);
+    │                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+161 │                 if (*_v3 == 43) {
+    │                     ---- conflicting reference `_v3` used here
+
+
+task 3 lines 252-252:  run 0x42::m2::test_v1
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 254-254:  run 0x42::m2::test_v1v3
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 256-256:  run 0x42::m2::test_v1v3_ref
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 258-258:  run 0x42::m2::test_v1_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 260-260:  run 0x42::m2::test_v2_mut_borrow_2
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 8 lines 262-262:  run 0x42::m2::test_match_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

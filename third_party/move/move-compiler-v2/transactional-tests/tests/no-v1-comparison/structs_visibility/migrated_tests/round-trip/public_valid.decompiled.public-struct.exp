@@ -1,0 +1,11 @@
+processed 10 tasks
+task 0 lines 3-45:  publish [module 0x42::test {]
+task 1 lines 48-201:  publish [module 0x42::test_valid {]
+task 2 lines 204-204:  run --verbose -- 0x42::test_valid::test1
+task 3 lines 206-206:  run --verbose -- 0x42::test_valid::test2
+task 4 lines 208-208:  run --verbose -- 0x42::test_valid::test3
+task 5 lines 210-210:  run --verbose -- 0x42::test_valid::test4
+task 6 lines 212-212:  run --verbose -- 0x42::test_valid::test5
+task 7 lines 214-214:  run --verbose -- 0x42::test_valid::test6
+task 8 lines 216-216:  run --verbose -- 0x42::test_valid::test7
+task 9 lines 218-218:  run --verbose -- 0x42::test_valid::test8

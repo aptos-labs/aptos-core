@@ -1,0 +1,71 @@
+processed 3 tasks
+task 0 lines 3-55:  publish [module 0x42::m1 {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+   ┌─ TEMPFILE:41:10
+   │
+41 │         &p0._0
+   │          ^^
+   │
+   = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+   ┌─ TEMPFILE:45:10
+   │
+45 │         &p0._0
+   │          ^^
+   │
+   = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+   ┌─ TEMPFILE:49:14
+   │
+49 │         &mut p0._0
+   │              ^^
+   │
+   = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+   ┌─ TEMPFILE:53:14
+   │
+53 │         &mut p0._0
+   │              ^^
+   │
+   = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+
+task 1 lines 58-67:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ error: unbound module
+   ┌─ TEMPFILE1:60:9
+   │
+60 │     use 0x42::m1;
+   │         ^^^^^^^^ Invalid 'use'. Unbound module: '0x42::m1'
+
+error: unbound module
+   ┌─ TEMPFILE1:62:19
+   │
+62 │         let _v0 = m1::pack_0x42_m1_Result_Ok<u64,u64>(42);
+   │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+   ┌─ TEMPFILE1:63:19
+   │
+63 │         let _v1 = m1::pack_0x42_m1_Result_Ok<u64,u64>(42);
+   │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+   ┌─ TEMPFILE1:65:17
+   │
+65 │         assert!(m1::unpack_0x42_m1_Result_Err<u64,u64>(_v0) == 42, 2);
+   │                 ^^ Unbound module or type alias 'm1'
+
+
+task 2 lines 70-70:  run 0x42::m2::test_pack_unpack_abort
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

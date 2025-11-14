@@ -1,0 +1,298 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_match_critical_edge.move`
+
+//# publish
+module 0x815::m {
+    enum Admin has drop {
+        Superuser,
+        User {
+            _0: u64,
+        }
+    }
+    enum Entity has drop {
+        Person {
+            id: u64,
+        }
+        Institution {
+            id: u64,
+            admin: Admin,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0x815_m_Admin_Superuser(p0: &Admin): bool {
+        p0 is Superuser
+    }
+    #[test_variant]
+    public fun test_variant_0x815_m_Admin_User(p0: &Admin): bool {
+        p0 is User
+    }
+    #[pack]
+    public fun pack_0x815_m_Admin_Superuser(): Admin {
+        Admin::Superuser{}
+    }
+    #[pack]
+    public fun pack_0x815_m_Admin_User(p0: u64): Admin {
+        Admin::User{_0: p0}
+    }
+    #[unpack]
+    public fun unpack_0x815_m_Admin_Superuser(p0: Admin) {
+        let Admin::Superuser{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0x815_m_Admin_User(p0: Admin): u64 {
+        let Admin::User{_0: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x815_m_Admin_0_0(p0: &Admin): &u64 {
+        &p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x815_m_Admin_0_0(p0: &mut Admin): &mut u64 {
+        &mut p0._0
+    }
+    #[test_variant]
+    public fun test_variant_0x815_m_Entity_Person(p0: &Entity): bool {
+        p0 is Person
+    }
+    #[test_variant]
+    public fun test_variant_0x815_m_Entity_Institution(p0: &Entity): bool {
+        p0 is Institution
+    }
+    #[pack]
+    public fun pack_0x815_m_Entity_Person(p0: u64): Entity {
+        Entity::Person{id: p0}
+    }
+    #[pack]
+    public fun pack_0x815_m_Entity_Institution(p0: u64, p1: Admin): Entity {
+        Entity::Institution{id: p0, admin: p1}
+    }
+    #[unpack]
+    public fun unpack_0x815_m_Entity_Person(p0: Entity): u64 {
+        let Entity::Person{id: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x815_m_Entity_Institution(p0: Entity): (u64, Admin) {
+        let Entity::Institution{id: _v0, admin: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x815_m_Entity_id_0(p0: &Entity): &u64 {
+        &p0.id
+    }
+    #[borrow]
+    public fun borrow_0x815_m_Entity_admin_1(p0: &Entity): &Admin {
+        &p0.admin
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x815_m_Entity_id_0(p0: &mut Entity): &mut u64 {
+        &mut p0.id
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x815_m_Entity_admin_1(p0: &mut Entity): &mut Admin {
+        &mut p0.admin
+    }
+}
+
+
+//# publish
+module 0x815::m_bug_14733_match_critical_edge {
+    use 0x815::m;
+    fun admin_id(p0: &m::Entity): u64 {
+        let _v0;
+        let _v1;
+        let _v2 = m::test_variant_0x815_m_Entity_Institution(p0);
+        'l5: loop {
+            let _v3;
+            'l4: loop {
+                'l3: loop {
+                    let _v4;
+                    'l0: loop {
+                        'l1: loop {
+                            let _v5;
+                            'l2: loop {
+                                if (!(_v2 && m::test_variant_0x815_m_Admin_Superuser(m::borrow_0x815_m_Entity_admin_1(p0)))) {
+                                    let _v6 = m::test_variant_0x815_m_Entity_Institution(p0);
+                                    loop {
+                                        let _v7;
+                                        if (_v6) {
+                                            _v7 = m::borrow_0x815_m_Entity_admin_1(p0);
+                                            if (m::test_variant_0x815_m_Admin_User(_v7)) {
+                                                _v4 = m::borrow_0x815_m_Admin_0_0(_v7);
+                                                if (*_v4 > 10) break
+                                            }
+                                        };
+                                        let _v8 = m::test_variant_0x815_m_Entity_Institution(p0);
+                                        loop {
+                                            if (_v8) {
+                                                _v7 = m::borrow_0x815_m_Entity_admin_1(p0);
+                                                if (m::test_variant_0x815_m_Admin_User(_v7)) {
+                                                    if (*m::borrow_0x815_m_Admin_0_0(_v7) <= 10) break}
+                                            };
+                                            _v5 = p0;
+                                            if (m::test_variant_0x815_m_Entity_Person(_v5)) {
+                                                assert!(m::test_variant_0x815_m_Entity_Person(_v5), 14566554180833181697);
+                                                _v4 = m::borrow_0x815_m_Entity_id_0(_v5);
+                                                if (*_v4 > 10) break 'l0
+                                            };
+                                            if (!m::test_variant_0x815_m_Entity_Institution(_v5)) break 'l1;
+                                            if (m::test_variant_0x815_m_Entity_Institution(_v5)) break 'l2;
+                                            abort 14566554180833181697
+                                        };
+                                        _v5 = p0;
+                                        if (m::test_variant_0x815_m_Entity_Person(_v5)) {
+                                            assert!(m::test_variant_0x815_m_Entity_Person(_v5), 14566554180833181697);
+                                            _v4 = m::borrow_0x815_m_Entity_id_0(_v5);
+                                            if (*_v4 > 10) {
+                                                _v3 = *_v4;
+                                                break 'l3
+                                            }
+                                        };
+                                        if (!m::test_variant_0x815_m_Entity_Institution(_v5)) {
+                                            _v3 = 0;
+                                            break 'l3
+                                        };
+                                        assert!(m::test_variant_0x815_m_Entity_Institution(_v5), 14566554180833181697);
+                                        _v3 = *m::borrow_0x815_m_Entity_id_0(_v5);
+                                        break 'l3
+                                    };
+                                    _v1 = *_v4;
+                                    _v5 = p0;
+                                    if (m::test_variant_0x815_m_Entity_Person(_v5)) {
+                                        assert!(m::test_variant_0x815_m_Entity_Person(_v5), 14566554180833181697);
+                                        _v4 = m::borrow_0x815_m_Entity_id_0(_v5);
+                                        if (*_v4 > 10) {
+                                            _v3 = *_v4;
+                                            break 'l4
+                                        }
+                                    };
+                                    if (!m::test_variant_0x815_m_Entity_Institution(_v5)) {
+                                        _v3 = 0;
+                                        break 'l4
+                                    };
+                                    assert!(m::test_variant_0x815_m_Entity_Institution(_v5), 14566554180833181697);
+                                    _v3 = *m::borrow_0x815_m_Entity_id_0(_v5);
+                                    break 'l4
+                                };
+                                _v0 = 1;
+                                if (m::test_variant_0x815_m_Entity_Person(p0)) {
+                                    assert!(m::test_variant_0x815_m_Entity_Person(p0), 14566554180833181697);
+                                    _v4 = m::borrow_0x815_m_Entity_id_0(p0);
+                                    if (*_v4 > 10) {
+                                        _v1 = *_v4;
+                                        break 'l5
+                                    }
+                                };
+                                if (!m::test_variant_0x815_m_Entity_Institution(p0)) {
+                                    _v1 = 0;
+                                    break 'l5
+                                };
+                                assert!(m::test_variant_0x815_m_Entity_Institution(p0), 14566554180833181697);
+                                _v1 = *m::borrow_0x815_m_Entity_id_0(p0);
+                                break 'l5
+                            };
+                            return *m::borrow_0x815_m_Entity_id_0(_v5)
+                        };
+                        return 0
+                    };
+                    return *_v4
+                };
+                return _v3 + 5
+            };
+            return _v1 + _v3
+        };
+        _v0 + _v1
+    }
+    fun test1(): u64 {
+        let _v0;
+        let _v1 = m::pack_0x815_m_Entity_Person(22);
+        let _v2 = &_v1;
+        let _v3 = m::test_variant_0x815_m_Entity_Person(_v2);
+        loop {
+            if (_v3) {
+                assert!(m::test_variant_0x815_m_Entity_Person(_v2), 14566554180833181697);
+                _v0 = m::borrow_0x815_m_Entity_id_0(_v2);
+                if (*_v0 > 10) break
+            };
+            if (m::test_variant_0x815_m_Entity_Institution(_v2)) {
+                assert!(m::test_variant_0x815_m_Entity_Institution(_v2), 14566554180833181697);
+                return *m::borrow_0x815_m_Entity_id_0(_v2)
+            };
+            return 0
+        };
+        *_v0
+    }
+    fun test2(): u64 {
+        let _v0;
+        let _v1 = m::pack_0x815_m_Entity_Person(10);
+        let _v2 = &_v1;
+        let _v3 = m::test_variant_0x815_m_Entity_Person(_v2);
+        loop {
+            if (_v3) {
+                assert!(m::test_variant_0x815_m_Entity_Person(_v2), 14566554180833181697);
+                _v0 = m::borrow_0x815_m_Entity_id_0(_v2);
+                if (*_v0 > 10) break
+            };
+            if (m::test_variant_0x815_m_Entity_Institution(_v2)) {
+                assert!(m::test_variant_0x815_m_Entity_Institution(_v2), 14566554180833181697);
+                return *m::borrow_0x815_m_Entity_id_0(_v2)
+            };
+            return 0
+        };
+        *_v0
+    }
+    fun test3(): u64 {
+        let _v0;
+        let _v1 = m::pack_0x815_m_Admin_Superuser();
+        let _v2 = m::pack_0x815_m_Entity_Institution(10, _v1);
+        let _v3 = &_v2;
+        let _v4 = m::test_variant_0x815_m_Entity_Person(_v3);
+        loop {
+            if (_v4) {
+                assert!(m::test_variant_0x815_m_Entity_Person(_v3), 14566554180833181697);
+                _v0 = m::borrow_0x815_m_Entity_id_0(_v3);
+                if (*_v0 > 10) break
+            };
+            if (m::test_variant_0x815_m_Entity_Institution(_v3)) {
+                assert!(m::test_variant_0x815_m_Entity_Institution(_v3), 14566554180833181697);
+                return *m::borrow_0x815_m_Entity_id_0(_v3)
+            };
+            return 0
+        };
+        *_v0
+    }
+    fun test4(): u64 {
+        let _v0 = m::pack_0x815_m_Admin_Superuser();
+        let _v1 = m::pack_0x815_m_Entity_Institution(20, _v0);
+        admin_id(&_v1)
+    }
+    fun test5(): u64 {
+        let _v0 = m::pack_0x815_m_Admin_User(23);
+        let _v1 = m::pack_0x815_m_Entity_Institution(20, _v0);
+        admin_id(&_v1)
+    }
+    fun test6(): u64 {
+        let _v0 = m::pack_0x815_m_Admin_User(8);
+        let _v1 = m::pack_0x815_m_Entity_Institution(20, _v0);
+        admin_id(&_v1)
+    }
+    fun test7(): u64 {
+        let _v0 = m::pack_0x815_m_Entity_Person(15);
+        admin_id(&_v0)
+    }
+}
+
+
+//# run 0x815::m_bug_14733_match_critical_edge::test1
+
+//# run 0x815::m_bug_14733_match_critical_edge::test2
+
+//# run 0x815::m_bug_14733_match_critical_edge::test3
+
+//# run 0x815::m_bug_14733_match_critical_edge::test4
+
+//# run 0x815::m_bug_14733_match_critical_edge::test5
+
+//# run 0x815::m_bug_14733_match_critical_edge::test6
+
+//# run 0x815::m_bug_14733_match_critical_edge::test7

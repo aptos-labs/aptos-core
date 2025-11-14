@@ -1,0 +1,897 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_match_cover.move`
+
+//# publish
+module 0xc0ffee::m {
+    enum A has drop {
+        V1 {
+            a: Q,
+            b: R,
+        }
+    }
+    enum Q has drop {
+        Q1,
+        Q2,
+    }
+    enum R has drop {
+        R1,
+        R2,
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_m_A_V1(p0: &A): bool {
+        p0 is V1
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_A_V1(p0: Q, p1: R): A {
+        A::V1{a: p0, b: p1}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_A_V1(p0: A): (Q, R) {
+        let A::V1{a: _v0, b: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_m_A_a_0(p0: &A): &Q {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_m_A_b_1(p0: &A): &R {
+        &p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_m_A_a_0(p0: &mut A): &mut Q {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_m_A_b_1(p0: &mut A): &mut R {
+        &mut p0.b
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_m_Q_Q1(p0: &Q): bool {
+        p0 is Q1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_m_Q_Q2(p0: &Q): bool {
+        p0 is Q2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_Q_Q1(): Q {
+        Q::Q1{}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_Q_Q2(): Q {
+        Q::Q2{}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_Q_Q1(p0: Q) {
+        let Q::Q1{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_Q_Q2(p0: Q) {
+        let Q::Q2{} = p0;
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_m_R_R1(p0: &R): bool {
+        p0 is R1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_m_R_R2(p0: &R): bool {
+        p0 is R2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_R_R1(): R {
+        R::R1{}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_R_R2(): R {
+        R::R2{}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_R_R1(p0: R) {
+        let R::R1{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_R_R2(p0: R) {
+        let R::R2{} = p0;
+    }
+}
+
+
+//# publish
+module 0xc0ffee::test_m {
+    use 0xc0ffee::m;
+    public fun test1(p0: m::A) {
+        let _v0 = &p0;
+        if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q1(m::borrow_0xc0ffee_m_A_a_0(_v0)))) {
+            if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_R_R1(m::borrow_0xc0ffee_m_A_b_1(_v0)))) {
+                let _v1 = m::test_variant_0xc0ffee_m_A_V1(_v0);
+                loop {
+                    if (_v1) {
+                        let _v2 = m::borrow_0xc0ffee_m_A_a_0(_v0);
+                        let _v3 = m::borrow_0xc0ffee_m_A_b_1(_v0);
+                        if (m::test_variant_0xc0ffee_m_Q_Q2(_v2)) {
+                            if (m::test_variant_0xc0ffee_m_R_R2(_v3)) break}
+                    };
+                    abort 14566554180833181697
+                };
+                let (_v4,_v5) = m::unpack_0xc0ffee_m_A_V1(p0);
+                m::unpack_0xc0ffee_m_Q_Q2(_v4);
+                m::unpack_0xc0ffee_m_R_R2(_v5);
+                return ()
+            };
+            let (_v6,_v7) = m::unpack_0xc0ffee_m_A_V1(p0);
+            m::unpack_0xc0ffee_m_R_R1(_v7);
+            return ()
+        };
+        let (_v8,_v9) = m::unpack_0xc0ffee_m_A_V1(p0);
+        m::unpack_0xc0ffee_m_Q_Q1(_v8);
+    }
+    public fun test2(p0: m::A) {
+        let _v0 = &p0;
+        if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q1(m::borrow_0xc0ffee_m_A_a_0(_v0)))) {
+            if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_R_R1(m::borrow_0xc0ffee_m_A_b_1(_v0)))) {
+                assert!(m::test_variant_0xc0ffee_m_A_V1(_v0), 14566554180833181697);
+                let (_v1,_v2) = m::unpack_0xc0ffee_m_A_V1(p0);
+                return ()
+            };
+            let (_v3,_v4) = m::unpack_0xc0ffee_m_A_V1(p0);
+            m::unpack_0xc0ffee_m_R_R1(_v4);
+            return ()
+        };
+        let (_v5,_v6) = m::unpack_0xc0ffee_m_A_V1(p0);
+        m::unpack_0xc0ffee_m_Q_Q1(_v5);
+    }
+    public fun test3(p0: m::A) {
+        let _v0 = &p0;
+        if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q1(m::borrow_0xc0ffee_m_A_a_0(_v0)))) {
+            if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_R_R1(m::borrow_0xc0ffee_m_A_b_1(_v0)))) return ();
+            let (_v1,_v2) = m::unpack_0xc0ffee_m_A_V1(p0);
+            m::unpack_0xc0ffee_m_R_R1(_v2);
+            return ()
+        };
+        let (_v3,_v4) = m::unpack_0xc0ffee_m_A_V1(p0);
+        m::unpack_0xc0ffee_m_Q_Q1(_v3);
+    }
+    public fun test4(p0: m::A) {
+        let _v0 = &p0;
+        if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q1(m::borrow_0xc0ffee_m_A_a_0(_v0)))) {
+            assert!(m::test_variant_0xc0ffee_m_A_V1(_v0), 14566554180833181697);
+            let (_v1,_v2) = m::unpack_0xc0ffee_m_A_V1(p0);
+            return ()
+        };
+        let (_v3,_v4) = m::unpack_0xc0ffee_m_A_V1(p0);
+        m::unpack_0xc0ffee_m_Q_Q1(_v3);
+    }
+    public fun test5(p0: m::A) {
+        let _v0 = &p0;
+        if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q1(m::borrow_0xc0ffee_m_A_a_0(_v0)))) {
+            assert!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q2(m::borrow_0xc0ffee_m_A_a_0(_v0)), 14566554180833181697);
+            let (_v1,_v2) = m::unpack_0xc0ffee_m_A_V1(p0);
+            m::unpack_0xc0ffee_m_Q_Q2(_v1);
+            return ()
+        };
+        let (_v3,_v4) = m::unpack_0xc0ffee_m_A_V1(p0);
+        m::unpack_0xc0ffee_m_Q_Q1(_v3);
+    }
+    public fun test6(p0: m::A) {
+        let _v0 = &p0;
+        if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q1(m::borrow_0xc0ffee_m_A_a_0(_v0)))) {
+            if (!(m::test_variant_0xc0ffee_m_A_V1(_v0) && m::test_variant_0xc0ffee_m_Q_Q2(m::borrow_0xc0ffee_m_A_a_0(_v0)))) return ();
+            let (_v1,_v2) = m::unpack_0xc0ffee_m_A_V1(p0);
+            m::unpack_0xc0ffee_m_Q_Q2(_v1);
+            return ()
+        };
+        let (_v3,_v4) = m::unpack_0xc0ffee_m_A_V1(p0);
+        m::unpack_0xc0ffee_m_Q_Q1(_v3);
+    }
+}
+
+
+//# publish
+module 0xc0ffee::n {
+    enum A has drop {
+        V1 {
+            a: P,
+            b: Q,
+            c: R,
+        }
+    }
+    enum P has drop {
+        P1,
+        P2,
+    }
+    enum Q has drop {
+        Q1,
+        Q2,
+    }
+    enum R has drop {
+        R1,
+        R2,
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_n_A_V1(p0: &A): bool {
+        p0 is V1
+    }
+    #[pack]
+    public fun pack_0xc0ffee_n_A_V1(p0: P, p1: Q, p2: R): A {
+        A::V1{a: p0, b: p1, c: p2}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_n_A_V1(p0: A): (P, Q, R) {
+        let A::V1{a: _v0, b: _v1, c: _v2} = p0;
+        (_v0, _v1, _v2)
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_n_A_a_0(p0: &A): &P {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_n_A_b_1(p0: &A): &Q {
+        &p0.b
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_n_A_c_2(p0: &A): &R {
+        &p0.c
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_n_A_a_0(p0: &mut A): &mut P {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_n_A_b_1(p0: &mut A): &mut Q {
+        &mut p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_n_A_c_2(p0: &mut A): &mut R {
+        &mut p0.c
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_n_P_P1(p0: &P): bool {
+        p0 is P1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_n_P_P2(p0: &P): bool {
+        p0 is P2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_n_P_P1(): P {
+        P::P1{}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_n_P_P2(): P {
+        P::P2{}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_n_P_P1(p0: P) {
+        let P::P1{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_n_P_P2(p0: P) {
+        let P::P2{} = p0;
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_n_Q_Q1(p0: &Q): bool {
+        p0 is Q1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_n_Q_Q2(p0: &Q): bool {
+        p0 is Q2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_n_Q_Q1(): Q {
+        Q::Q1{}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_n_Q_Q2(): Q {
+        Q::Q2{}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_n_Q_Q1(p0: Q) {
+        let Q::Q1{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_n_Q_Q2(p0: Q) {
+        let Q::Q2{} = p0;
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_n_R_R1(p0: &R): bool {
+        p0 is R1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_n_R_R2(p0: &R): bool {
+        p0 is R2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_n_R_R1(): R {
+        R::R1{}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_n_R_R2(): R {
+        R::R2{}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_n_R_R1(p0: R) {
+        let R::R1{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_n_R_R2(p0: R) {
+        let R::R2{} = p0;
+    }
+}
+
+
+//# publish
+module 0xc0ffee::test_n {
+    use 0xc0ffee::n;
+    public fun test(p0: n::A) {
+        let _v0 = &p0;
+        if (!(n::test_variant_0xc0ffee_n_A_V1(_v0) && n::test_variant_0xc0ffee_n_P_P1(n::borrow_0xc0ffee_n_A_a_0(_v0)))) {
+            if (!(n::test_variant_0xc0ffee_n_A_V1(_v0) && n::test_variant_0xc0ffee_n_Q_Q1(n::borrow_0xc0ffee_n_A_b_1(_v0)))) {
+                if (!(n::test_variant_0xc0ffee_n_A_V1(_v0) && n::test_variant_0xc0ffee_n_R_R1(n::borrow_0xc0ffee_n_A_c_2(_v0)))) {
+                    let _v1 = n::test_variant_0xc0ffee_n_A_V1(_v0);
+                    loop {
+                        if (_v1) {
+                            let _v2 = n::borrow_0xc0ffee_n_A_a_0(_v0);
+                            let _v3 = n::borrow_0xc0ffee_n_A_b_1(_v0);
+                            let _v4 = n::borrow_0xc0ffee_n_A_c_2(_v0);
+                            if (n::test_variant_0xc0ffee_n_P_P2(_v2)) {
+                                if (n::test_variant_0xc0ffee_n_Q_Q2(_v3)) {
+                                    if (n::test_variant_0xc0ffee_n_R_R2(_v4)) break}}
+                        };
+                        abort 14566554180833181697
+                    };
+                    let (_v5,_v6,_v7) = n::unpack_0xc0ffee_n_A_V1(p0);
+                    n::unpack_0xc0ffee_n_P_P2(_v5);
+                    n::unpack_0xc0ffee_n_Q_Q2(_v6);
+                    n::unpack_0xc0ffee_n_R_R2(_v7);
+                    return ()
+                };
+                let (_v8,_v9,_v10) = n::unpack_0xc0ffee_n_A_V1(p0);
+                n::unpack_0xc0ffee_n_R_R1(_v10);
+                return ()
+            };
+            let (_v11,_v12,_v13) = n::unpack_0xc0ffee_n_A_V1(p0);
+            n::unpack_0xc0ffee_n_Q_Q1(_v12);
+            return ()
+        };
+        let (_v14,_v15,_v16) = n::unpack_0xc0ffee_n_A_V1(p0);
+        n::unpack_0xc0ffee_n_P_P1(_v14);
+    }
+}
+
+
+//# publish
+module 0xc0ffee::o {
+    enum E has drop {
+        V1 {
+            a: F,
+            b: G,
+        }
+        V2 {
+            a: F,
+            b: G,
+            c: H,
+        }
+    }
+    enum F has drop {
+        F1,
+        F2 {
+            a: G,
+        }
+    }
+    enum G has drop {
+        G1 {
+            a: H,
+            b: H,
+        }
+        G2 {
+            a: H,
+        }
+    }
+    enum H has drop {
+        H1 {
+            a: u64,
+        }
+        H2 {
+            b: u64,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_E_V1(p0: &E): bool {
+        p0 is V1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_E_V2(p0: &E): bool {
+        p0 is V2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_E_V1(p0: F, p1: G): E {
+        E::V1{a: p0, b: p1}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_E_V2(p0: F, p1: G, p2: H): E {
+        E::V2{a: p0, b: p1, c: p2}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_E_V1(p0: E): (F, G) {
+        let E::V1{a: _v0, b: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_E_V2(p0: E): (F, G, H) {
+        let E::V2{a: _v0, b: _v1, c: _v2} = p0;
+        (_v0, _v1, _v2)
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_E_a_0(p0: &E): &F {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_E_b_1(p0: &E): &G {
+        &p0.b
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_E_c_2(p0: &E): &H {
+        &p0.c
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_E_a_0(p0: &mut E): &mut F {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_E_b_1(p0: &mut E): &mut G {
+        &mut p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_E_c_2(p0: &mut E): &mut H {
+        &mut p0.c
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_F_F1(p0: &F): bool {
+        p0 is F1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_F_F2(p0: &F): bool {
+        p0 is F2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_F_F1(): F {
+        F::F1{}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_F_F2(p0: G): F {
+        F::F2{a: p0}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_F_F1(p0: F) {
+        let F::F1{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_F_F2(p0: F): G {
+        let F::F2{a: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_F_a_0(p0: &F): &G {
+        &p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_F_a_0(p0: &mut F): &mut G {
+        &mut p0.a
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_G_G1(p0: &G): bool {
+        p0 is G1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_G_G2(p0: &G): bool {
+        p0 is G2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_G_G1(p0: H, p1: H): G {
+        G::G1{a: p0, b: p1}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_G_G2(p0: H): G {
+        G::G2{a: p0}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_G_G1(p0: G): (H, H) {
+        let G::G1{a: _v0, b: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_G_G2(p0: G): H {
+        let G::G2{a: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_G_a_0(p0: &G): &H {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_G_b_1(p0: &G): &H {
+        &p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_G_a_0(p0: &mut G): &mut H {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_G_b_1(p0: &mut G): &mut H {
+        &mut p0.b
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_H_H1(p0: &H): bool {
+        p0 is H1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_H_H2(p0: &H): bool {
+        p0 is H2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_H_H1(p0: u64): H {
+        H::H1{a: p0}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_H_H2(p0: u64): H {
+        H::H2{b: p0}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_H_H1(p0: H): u64 {
+        let H::H1{a: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_H_H2(p0: H): u64 {
+        let H::H2{b: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_H_a_0(p0: &H): &u64 {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_H_b_0(p0: &H): &u64 {
+        &p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_H_a_0(p0: &mut H): &mut u64 {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_H_b_0(p0: &mut H): &mut u64 {
+        &mut p0.b
+    }
+}
+
+
+//# publish
+module 0xc0ffee::test_o {
+    use 0xc0ffee::o;
+    public fun test1(p0: o::E) {
+        let _v0 = &p0;
+        let _v1 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+        loop {
+            if (!_v1) {
+                if (o::test_variant_0xc0ffee_o_E_V2(_v0)) break;
+                abort 14566554180833181697
+            };
+            let (_v2,_v3) = o::unpack_0xc0ffee_o_E_V1(p0);
+            return ()
+        };
+        let (_v4,_v5,_v6) = o::unpack_0xc0ffee_o_E_V2(p0);
+    }
+    public fun test2(p0: o::E) {
+        let _v0 = &p0;
+        let _v1 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+        loop {
+            let _v2;
+            if (_v1) {
+                assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                _v2 = o::borrow_0xc0ffee_o_E_b_1(_v0);
+                if (o::test_variant_0xc0ffee_o_G_G1(_v2)) {
+                    assert!(o::test_variant_0xc0ffee_o_G_G1(_v2), 14566554180833181697);
+                    if (o::test_variant_0xc0ffee_o_H_H1(o::borrow_0xc0ffee_o_G_a_0(_v2))) break
+                }
+            };
+            let _v3 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+            loop {
+                if (_v3) {
+                    assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                    _v2 = o::borrow_0xc0ffee_o_E_b_1(_v0);
+                    if (o::test_variant_0xc0ffee_o_G_G1(_v2)) {
+                        if (o::test_variant_0xc0ffee_o_H_H1(o::borrow_0xc0ffee_o_G_b_1(_v2))) break}
+                };
+                let _v4 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+                loop {
+                    if (_v4) {
+                        assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                        if (o::test_variant_0xc0ffee_o_F_F1(o::borrow_0xc0ffee_o_E_a_0(_v0))) break
+                    };
+                    let _v5 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+                    loop {
+                        if (_v5) {
+                            assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                            if (o::test_variant_0xc0ffee_o_F_F2(o::borrow_0xc0ffee_o_E_a_0(_v0))) break
+                        };
+                        assert!(o::test_variant_0xc0ffee_o_E_V2(_v0), 14566554180833181697);
+                        let (_v6,_v7,_v8) = o::unpack_0xc0ffee_o_E_V2(p0);
+                        return ()
+                    };
+                    let (_v9,_v10) = o::unpack_0xc0ffee_o_E_V1(p0);
+                    let _v11 = o::unpack_0xc0ffee_o_F_F2(_v9);
+                    return ()
+                };
+                let (_v12,_v13) = o::unpack_0xc0ffee_o_E_V1(p0);
+                o::unpack_0xc0ffee_o_F_F1(_v12);
+                return ()
+            };
+            let (_v14,_v15) = o::unpack_0xc0ffee_o_E_V1(p0);
+            let (_v16,_v17) = o::unpack_0xc0ffee_o_G_G1(_v15);
+            let _v18 = o::unpack_0xc0ffee_o_H_H1(_v17);
+            return ()
+        };
+        let (_v19,_v20) = o::unpack_0xc0ffee_o_E_V1(p0);
+        let (_v21,_v22) = o::unpack_0xc0ffee_o_G_G1(_v20);
+        let _v23 = o::unpack_0xc0ffee_o_H_H1(_v21);
+    }
+    public fun test3(p0: o::E) {
+        let _v0 = &p0;
+        let _v1 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+        loop {
+            if (_v1) {
+                assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                if (o::test_variant_0xc0ffee_o_G_G1(o::borrow_0xc0ffee_o_E_b_1(_v0))) break
+            };
+            let _v2 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+            loop {
+                if (_v2) {
+                    assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                    if (o::test_variant_0xc0ffee_o_F_F2(o::borrow_0xc0ffee_o_E_a_0(_v0))) break
+                };
+                let _v3 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+                loop {
+                    if (_v3) {
+                        assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                        let _v4 = o::borrow_0xc0ffee_o_E_a_0(_v0);
+                        assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                        let _v5 = o::borrow_0xc0ffee_o_E_b_1(_v0);
+                        if (o::test_variant_0xc0ffee_o_F_F1(_v4)) {
+                            if (o::test_variant_0xc0ffee_o_G_G2(_v5)) {
+                                assert!(o::test_variant_0xc0ffee_o_G_G2(_v5), 14566554180833181697);
+                                if (o::test_variant_0xc0ffee_o_H_H2(o::borrow_0xc0ffee_o_G_a_0(_v5))) break
+                            }}
+                    };
+                    let _v6 = o::test_variant_0xc0ffee_o_E_V1(_v0);
+                    loop {
+                        if (_v6) {
+                            assert!(o::test_variant_0xc0ffee_o_E_V1(_v0), 14566554180833181697);
+                            if (o::test_variant_0xc0ffee_o_F_F1(o::borrow_0xc0ffee_o_E_a_0(_v0))) break
+                        };
+                        assert!(o::test_variant_0xc0ffee_o_E_V2(_v0), 14566554180833181697);
+                        let (_v7,_v8,_v9) = o::unpack_0xc0ffee_o_E_V2(p0);
+                        return ()
+                    };
+                    let (_v10,_v11) = o::unpack_0xc0ffee_o_E_V1(p0);
+                    o::unpack_0xc0ffee_o_F_F1(_v10);
+                    return ()
+                };
+                let (_v12,_v13) = o::unpack_0xc0ffee_o_E_V1(p0);
+                o::unpack_0xc0ffee_o_F_F1(_v12);
+                let _v14 = o::unpack_0xc0ffee_o_H_H2(o::unpack_0xc0ffee_o_G_G2(_v13));
+                return ()
+            };
+            let (_v15,_v16) = o::unpack_0xc0ffee_o_E_V1(p0);
+            let _v17 = o::unpack_0xc0ffee_o_F_F2(_v15);
+            return ()
+        };
+        let (_v18,_v19) = o::unpack_0xc0ffee_o_E_V1(p0);
+        let (_v20,_v21) = o::unpack_0xc0ffee_o_G_G1(_v19);
+    }
+}
+
+
+//# publish
+module 0xc0ffee::o_fail {
+    enum E has drop {
+        V1 {
+            a: F,
+            b: G,
+        }
+        V2 {
+            a: F,
+            b: G,
+            c: H,
+        }
+    }
+    enum F has drop {
+        F1,
+        F2 {
+            a: G,
+        }
+    }
+    enum G has drop {
+        G1 {
+            a: H,
+            b: H,
+        }
+        G2 {
+            a: H,
+        }
+    }
+    enum H has drop {
+        H1 {
+            a: u64,
+        }
+        H2 {
+            b: u64,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_E_V1(p0: &E): bool {
+        p0 is V1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_E_V2(p0: &E): bool {
+        p0 is V2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_E_V1(p0: F, p1: G): E {
+        E::V1{a: p0, b: p1}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_E_V2(p0: F, p1: G, p2: H): E {
+        E::V2{a: p0, b: p1, c: p2}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_E_V1(p0: E): (F, G) {
+        let E::V1{a: _v0, b: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_E_V2(p0: E): (F, G, H) {
+        let E::V2{a: _v0, b: _v1, c: _v2} = p0;
+        (_v0, _v1, _v2)
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_E_a_0(p0: &E): &F {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_E_b_1(p0: &E): &G {
+        &p0.b
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_E_c_2(p0: &E): &H {
+        &p0.c
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_E_a_0(p0: &mut E): &mut F {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_E_b_1(p0: &mut E): &mut G {
+        &mut p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_E_c_2(p0: &mut E): &mut H {
+        &mut p0.c
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_F_F1(p0: &F): bool {
+        p0 is F1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_F_F2(p0: &F): bool {
+        p0 is F2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_F_F1(): F {
+        F::F1{}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_F_F2(p0: G): F {
+        F::F2{a: p0}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_F_F1(p0: F) {
+        let F::F1{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_F_F2(p0: F): G {
+        let F::F2{a: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_F_a_0(p0: &F): &G {
+        &p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_F_a_0(p0: &mut F): &mut G {
+        &mut p0.a
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_G_G1(p0: &G): bool {
+        p0 is G1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_G_G2(p0: &G): bool {
+        p0 is G2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_G_G1(p0: H, p1: H): G {
+        G::G1{a: p0, b: p1}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_G_G2(p0: H): G {
+        G::G2{a: p0}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_G_G1(p0: G): (H, H) {
+        let G::G1{a: _v0, b: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_G_G2(p0: G): H {
+        let G::G2{a: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_G_a_0(p0: &G): &H {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_G_b_1(p0: &G): &H {
+        &p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_G_a_0(p0: &mut G): &mut H {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_G_b_1(p0: &mut G): &mut H {
+        &mut p0.b
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_H_H1(p0: &H): bool {
+        p0 is H1
+    }
+    #[test_variant]
+    public fun test_variant_0xc0ffee_o_fail_H_H2(p0: &H): bool {
+        p0 is H2
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_H_H1(p0: u64): H {
+        H::H1{a: p0}
+    }
+    #[pack]
+    public fun pack_0xc0ffee_o_fail_H_H2(p0: u64): H {
+        H::H2{b: p0}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_H_H1(p0: H): u64 {
+        let H::H1{a: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_o_fail_H_H2(p0: H): u64 {
+        let H::H2{b: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_H_a_0(p0: &H): &u64 {
+        &p0.a
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_o_fail_H_b_0(p0: &H): &u64 {
+        &p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_H_a_0(p0: &mut H): &mut u64 {
+        &mut p0.a
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_o_fail_H_b_0(p0: &mut H): &mut u64 {
+        &mut p0.b
+    }
+}

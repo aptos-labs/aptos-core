@@ -1,0 +1,191 @@
+processed 6 tasks
+task 0 lines 3-148:  publish [module 0x42::m1 {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+    ┌─ TEMPFILE:134:10
+    │
+134 │         &p0._0
+    │          ^^
+    │
+    = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+    ┌─ TEMPFILE:138:10
+    │
+138 │         &p0._0
+    │          ^^
+    │
+    = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+    ┌─ TEMPFILE:142:14
+    │
+142 │         &mut p0._0
+    │              ^^
+    │
+    = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+error: cannot select field `_0` since it has different types in variants of enum `Result<T0, T1>`
+    ┌─ TEMPFILE:146:14
+    │
+146 │         &mut p0._0
+    │              ^^
+    │
+    = field `_0` has type `T1` in variant `Err` and type `T0` in variant `Ok`
+
+
+task 1 lines 151-187:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ error: unbound module
+    ┌─ TEMPFILE1:153:9
+    │
+153 │     use 0x42::m1;
+    │         ^^^^^^^^ Invalid 'use'. Unbound module: '0x42::m1'
+
+error: unbound module
+    ┌─ TEMPFILE1:155:17
+    │
+155 │         assert!(m1::unpack_0x42_m1_Result_Err<u64,u8>(m1::pack_0x42_m1_Result_Err<u64,u8>(7u8)) == 7u8, 3);
+    │                 ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:155:55
+    │
+155 │         assert!(m1::unpack_0x42_m1_Result_Err<u64,u8>(m1::pack_0x42_m1_Result_Err<u64,u8>(7u8)) == 7u8, 3);
+    │                                                       ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:158:19
+    │
+158 │         let _v0 = m1::pack_0x42_m1_Result_Ok<u64,u64>(42);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:159:19
+    │
+159 │         let _v1 = m1::pack_0x42_m1_Result_Ok<u64,u64>(42);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:161:17
+    │
+161 │         assert!(m1::unpack_0x42_m1_Result_Ok<u64,u64>(_v0) == 42, 2);
+    │                 ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:164:19
+    │
+164 │         let _v0 = m1::pack_0x42_m1_E_A(100);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:165:19
+    │
+165 │         let _v1 = m1::pack_0x42_m1_E_B(200);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:166:17
+    │
+166 │         assert!(m1::unpack_0x42_m1_E_A(_v0) == 100, 4);
+    │                 ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:167:17
+    │
+167 │         assert!(m1::unpack_0x42_m1_E_B(_v1) == 200, 5);
+    │                 ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:172:19
+    │
+172 │         let _v2 = m1::pack_0x42_m1_Inner_Inner1(10);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:173:19
+    │
+173 │         let _v3 = m1::pack_0x42_m1_Inner_Inner2(20, 30);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:175:13
+    │
+175 │         if (m1::test_variant_0x42_m1_Inner_Inner1(_v4)) _v1 = m1::unpack_0x42_m1_Inner_Inner1(_v2) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v4)) {
+    │             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:175:63
+    │
+175 │         if (m1::test_variant_0x42_m1_Inner_Inner1(_v4)) _v1 = m1::unpack_0x42_m1_Inner_Inner1(_v2) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v4)) {
+    │                                                               ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:175:109
+    │
+175 │         if (m1::test_variant_0x42_m1_Inner_Inner1(_v4)) _v1 = m1::unpack_0x42_m1_Inner_Inner1(_v2) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v4)) {
+    │                                                                                                             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:176:29
+    │
+176 │             let (_v5,_v6) = m1::unpack_0x42_m1_Inner_Inner2(_v2);
+    │                             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:180:13
+    │
+180 │         if (m1::test_variant_0x42_m1_Inner_Inner1(_v7)) _v0 = m1::unpack_0x42_m1_Inner_Inner1(_v3) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v7)) {
+    │             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:180:63
+    │
+180 │         if (m1::test_variant_0x42_m1_Inner_Inner1(_v7)) _v0 = m1::unpack_0x42_m1_Inner_Inner1(_v3) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v7)) {
+    │                                                               ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:180:109
+    │
+180 │         if (m1::test_variant_0x42_m1_Inner_Inner1(_v7)) _v0 = m1::unpack_0x42_m1_Inner_Inner1(_v3) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v7)) {
+    │                                                                                                             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:181:29
+    │
+181 │             let (_v8,_v9) = m1::unpack_0x42_m1_Inner_Inner2(_v3);
+    │                             ^^ Unbound module or type alias 'm1'
+
+
+task 2 lines 190-190:  run 0x42::m2::test_pack_unpack_result_ok
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 192-192:  run 0x42::m2::test_pack_unpack_result_err
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 194-194:  run 0x42::m2::test_unpack_enum_e
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 196-196:  run 0x42::m2::test_unpack_inner
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

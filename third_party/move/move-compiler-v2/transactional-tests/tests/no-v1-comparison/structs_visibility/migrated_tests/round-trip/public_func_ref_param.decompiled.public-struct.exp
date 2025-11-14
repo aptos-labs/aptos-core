@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-25:  publish [module 0x77::m {]
+task 1 lines 28-41:  publish [module 0x77::m_func_ref_param {]
+task 2 lines 44-44:  run 0x77::m_func_ref_param::test

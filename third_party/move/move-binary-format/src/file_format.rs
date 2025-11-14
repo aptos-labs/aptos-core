@@ -368,6 +368,13 @@ pub enum FunctionAttribute {
     Persistent,
     /// During execution of the function, a module reentrancy lock is established.
     ModuleLock,
+    Pack,
+    PackVariant,
+    Unpack,
+    UnpackVariant,
+    TestVariant,
+    BorrowFieldImmutable(u8),
+    BorrowFieldMutable(u8),
 }
 
 impl FunctionAttribute {
@@ -389,6 +396,21 @@ impl fmt::Display for FunctionAttribute {
         match self {
             FunctionAttribute::Persistent => write!(f, "persistent"),
             FunctionAttribute::ModuleLock => write!(f, "module_lock"),
+            FunctionAttribute::Pack | FunctionAttribute::PackVariant => {
+                write!(f, "pack")
+            },
+            FunctionAttribute::Unpack | FunctionAttribute::UnpackVariant => {
+                write!(f, "unpack")
+            },
+            FunctionAttribute::TestVariant => {
+                write!(f, "test_variant")
+            },
+            FunctionAttribute::BorrowFieldImmutable(_) => {
+                write!(f, "borrow")
+            },
+            FunctionAttribute::BorrowFieldMutable(_) => {
+                write!(f, "borrow_mut")
+            },
         }
     }
 }

@@ -1,0 +1,11 @@
+processed 6 tasks
+task 0 lines 3-131:  publish [module 0x42::test {]
+task 1 lines 134-179:  publish [module 0x42::test_nested {]
+task 2 lines 182-182:  run --verbose -- 0x42::test_nested::test1
+return values: 42
+task 3 lines 184-184:  run --verbose -- 0x42::test_nested::test2
+return values: 42
+task 4 lines 186-186:  run --verbose -- 0x42::test_nested::test3
+return values: 43
+task 5 lines 188-188:  run --verbose -- 0x42::test_nested::test4
+return values: 43

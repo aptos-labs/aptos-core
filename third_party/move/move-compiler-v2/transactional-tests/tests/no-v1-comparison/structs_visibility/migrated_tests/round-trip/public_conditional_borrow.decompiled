@@ -1,0 +1,69 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_conditional_borrow.move`
+
+//# publish
+module 0x8675::M {
+    struct S has copy, drop {
+        f: u64,
+    }
+    #[pack]
+    public fun pack_0x8675_M_S(p0: u64): S {
+        S{f: p0}
+    }
+    #[unpack]
+    public fun unpack_0x8675_M_S(p0: S): u64 {
+        let S{f: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x8675_M_S_f_0(p0: &S): &u64 {
+        &p0.f
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x8675_M_S_f_0(p0: &mut S): &mut u64 {
+        &mut p0.f
+    }
+}
+
+
+//# publish
+module 0x8675::test_M {
+    use 0x8675::M;
+    fun test1b(p0: M::S): u64 {
+        let _v0;
+        let _v1 = M::pack_0x8675_M_S(3);
+        if (*M::borrow_0x8675_M_S_f_0(&p0) < 4) _v0 = p0 else _v0 = _v1;
+        let _v2 = &mut _v0;
+        let _v3 = *_v2;
+        let _v4 = M::borrow_mut_0x8675_M_S_f_0(&mut _v3);
+        *_v4 = 10;
+        let _v5 = p0;
+        _v2 = &mut _v5;
+        let _v6 = *_v2;
+        let _v7 = *M::borrow_0x8675_M_S_f_0(&_v6) + 1;
+        let _v8 = *_v2;
+        let _v9 = M::borrow_mut_0x8675_M_S_f_0(&mut _v8);
+        *_v9 = _v7;
+        let _v10 = _v5;
+        let _v11 = M::borrow_mut_0x8675_M_S_f_0(&mut _v10);
+        *_v11 = *_v11 + 1;
+        let _v12 = _v10;
+        let _v13 = *M::borrow_0x8675_M_S_f_0(&_v12);
+        _v11 = &mut _v13;
+        *_v11 = *_v11 + 1;
+        let _v14 = *M::borrow_0x8675_M_S_f_0(&_v12);
+        _v11 = &mut _v14;
+        *_v11 = *_v11 + 8;
+        let _v15 = *M::borrow_0x8675_M_S_f_0(&_v12);
+        _v11 = &mut _v15;
+        *_v11 = *_v11 + 16;
+        *M::borrow_0x8675_M_S_f_0(&_v12)
+    }
+    public fun testb(): u64 {
+        let _v0 = test1b(M::pack_0x8675_M_S(7));
+        let _v1 = test1b(M::pack_0x8675_M_S(2));
+        _v0 + _v1
+    }
+}
+
+
+//# run 0x8675::test_M::testb

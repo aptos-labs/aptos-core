@@ -1,0 +1,262 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_fv_enum.move`
+
+//# publish
+module 0x66::fv_enum_basic {
+    enum Action has drop {
+        Noop,
+        Call {
+            _0: |u64|(u64) has drop,
+        }
+    }
+    enum FunVec<T0> has drop {
+        V1 {
+            v1: vector<|&mut T0|(T0) has copy + drop + store>,
+        }
+        V2 {
+            v0: u64,
+            v1: vector<|&mut T0|(T0) has copy + drop + store>,
+        }
+    }
+    enum Mapper<T0, T1> has drop {
+        Id {
+            _0: |T0|(T1) has copy + drop + store,
+        }
+        Twice {
+            _0: Version<T0, T1>,
+        }
+    }
+    enum Version<T0, T1> has copy, drop, store {
+        V1 {
+            v1: |T0|(T1) has copy + drop + store,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0x66_fv_enum_basic_Action_Noop(p0: &Action): bool {
+        p0 is Noop
+    }
+    #[test_variant]
+    public fun test_variant_0x66_fv_enum_basic_Action_Call(p0: &Action): bool {
+        p0 is Call
+    }
+    #[pack]
+    public fun pack_0x66_fv_enum_basic_Action_Noop(): Action {
+        Action::Noop{}
+    }
+    #[pack]
+    public fun pack_0x66_fv_enum_basic_Action_Call(p0: |u64|(u64) has drop): Action {
+        Action::Call{_0: p0}
+    }
+    #[unpack]
+    public fun unpack_0x66_fv_enum_basic_Action_Noop(p0: Action) {
+        let Action::Noop{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0x66_fv_enum_basic_Action_Call(p0: Action): |u64|(u64) has drop {
+        let Action::Call{_0: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x66_fv_enum_basic_Action_0_0(p0: &Action): &|u64|(u64) has drop {
+        &p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x66_fv_enum_basic_Action_0_0(p0: &mut Action): &mut |u64|(u64) has drop {
+        &mut p0._0
+    }
+    #[test_variant]
+    public fun test_variant_0x66_fv_enum_basic_FunVec_V1<T0>(p0: &FunVec<T0>): bool {
+        p0 is V1
+    }
+    #[test_variant]
+    public fun test_variant_0x66_fv_enum_basic_FunVec_V2<T0>(p0: &FunVec<T0>): bool {
+        p0 is V2
+    }
+    #[pack]
+    public fun pack_0x66_fv_enum_basic_FunVec_V1<T0>(p0: vector<|&mut T0|(T0) has copy + drop + store>): FunVec<T0> {
+        FunVec::V1<T0>{v1: p0}
+    }
+    #[pack]
+    public fun pack_0x66_fv_enum_basic_FunVec_V2<T0>(p0: u64, p1: vector<|&mut T0|(T0) has copy + drop + store>): FunVec<T0> {
+        FunVec::V2<T0>{v0: p0, v1: p1}
+    }
+    #[unpack]
+    public fun unpack_0x66_fv_enum_basic_FunVec_V1<T0>(p0: FunVec<T0>): vector<|&mut T0|(T0) has copy + drop + store> {
+        let FunVec::V1<T0>{v1: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x66_fv_enum_basic_FunVec_V2<T0>(p0: FunVec<T0>): (u64, vector<|&mut T0|(T0) has copy + drop + store>) {
+        let FunVec::V2<T0>{v0: _v0, v1: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x66_fv_enum_basic_FunVec_v1_0<T0>(p0: &FunVec<T0>): &vector<|&mut T0|(T0) has copy + drop + store> {
+        &p0.v1
+    }
+    #[borrow]
+    public fun borrow_0x66_fv_enum_basic_FunVec_v1_1<T0>(p0: &FunVec<T0>): &vector<|&mut T0|(T0) has copy + drop + store> {
+        &p0.v1
+    }
+    #[borrow]
+    public fun borrow_0x66_fv_enum_basic_FunVec_v0_0<T0>(p0: &FunVec<T0>): &u64 {
+        &p0.v0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x66_fv_enum_basic_FunVec_v1_0<T0>(p0: &mut FunVec<T0>): &mut vector<|&mut T0|(T0) has copy + drop + store> {
+        &mut p0.v1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x66_fv_enum_basic_FunVec_v1_1<T0>(p0: &mut FunVec<T0>): &mut vector<|&mut T0|(T0) has copy + drop + store> {
+        &mut p0.v1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x66_fv_enum_basic_FunVec_v0_0<T0>(p0: &mut FunVec<T0>): &mut u64 {
+        &mut p0.v0
+    }
+    #[test_variant]
+    public fun test_variant_0x66_fv_enum_basic_Mapper_Id<T0, T1>(p0: &Mapper<T0, T1>): bool {
+        p0 is Id
+    }
+    #[test_variant]
+    public fun test_variant_0x66_fv_enum_basic_Mapper_Twice<T0, T1>(p0: &Mapper<T0, T1>): bool {
+        p0 is Twice
+    }
+    #[pack]
+    public fun pack_0x66_fv_enum_basic_Mapper_Id<T0, T1>(p0: |T0|(T1) has copy + drop + store): Mapper<T0, T1> {
+        Mapper::Id<T0,T1>{_0: p0}
+    }
+    #[pack]
+    public fun pack_0x66_fv_enum_basic_Mapper_Twice<T0, T1>(p0: Version<T0, T1>): Mapper<T0, T1> {
+        Mapper::Twice<T0,T1>{_0: p0}
+    }
+    #[unpack]
+    public fun unpack_0x66_fv_enum_basic_Mapper_Id<T0, T1>(p0: Mapper<T0, T1>): |T0|(T1) has copy + drop + store {
+        let Mapper::Id<T0,T1>{_0: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x66_fv_enum_basic_Mapper_Twice<T0, T1>(p0: Mapper<T0, T1>): Version<T0, T1> {
+        let Mapper::Twice<T0,T1>{_0: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x66_fv_enum_basic_Mapper_0_0_Id<T0, T1>(p0: &Mapper<T0, T1>): &|T0|(T1) has copy + drop + store {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x66_fv_enum_basic_Mapper_0_0_Twice<T0, T1>(p0: &Mapper<T0, T1>): &Version<T0, T1> {
+        &p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x66_fv_enum_basic_Mapper_0_0_Id<T0, T1>(p0: &mut Mapper<T0, T1>): &mut |T0|(T1) has copy + drop + store {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x66_fv_enum_basic_Mapper_0_0_Twice<T0, T1>(p0: &mut Mapper<T0, T1>): &mut Version<T0, T1> {
+        &mut p0._0
+    }
+    #[test_variant]
+    public fun test_variant_0x66_fv_enum_basic_Version_V1<T0, T1>(p0: &Version<T0, T1>): bool {
+        p0 is V1
+    }
+    #[pack]
+    public fun pack_0x66_fv_enum_basic_Version_V1<T0, T1>(p0: |T0|(T1) has copy + drop + store): Version<T0, T1> {
+        Version::V1<T0,T1>{v1: p0}
+    }
+    #[unpack]
+    public fun unpack_0x66_fv_enum_basic_Version_V1<T0, T1>(p0: Version<T0, T1>): |T0|(T1) has copy + drop + store {
+        let Version::V1<T0,T1>{v1: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x66_fv_enum_basic_Version_v1_0<T0, T1>(p0: &Version<T0, T1>): &|T0|(T1) has copy + drop + store {
+        &p0.v1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x66_fv_enum_basic_Version_v1_0<T0, T1>(p0: &mut Version<T0, T1>): &mut |T0|(T1) has copy + drop + store {
+        &mut p0.v1
+    }
+}
+
+
+//# publish
+module 0x66::fv_enum_basic_public {
+    use 0x66::fv_enum_basic;
+    #[persistent]
+    fun add_k_persistent(p0: u64, p1: u64): u64 {
+        p0 + p1
+    }
+    #[persistent]
+    fun add_k_persistent_ref(p0: &mut u64, p1: u64): u64 {
+        *p0 = *p0 + 1;
+        *p0 + p1
+    }
+    fun call_square(p0: u64) {
+        let _v0;
+        let _v1 = fv_enum_basic::pack_0x66_fv_enum_basic_Action_Call(|arg0| square(arg0));
+        if (fv_enum_basic::test_variant_0x66_fv_enum_basic_Action_Call(&_v1)) {
+            let _v2 = fv_enum_basic::unpack_0x66_fv_enum_basic_Action_Call(_v1);
+            _v0 = _v2(p0)
+        } else _v0 = 0;
+        assert!(_v0 == 49, 14566554180833181696);
+    }
+    fun square(p0: u64): u64 {
+        p0 * p0
+    }
+    fun test_enum_in_another_enum() {
+        let _v0;
+        let _v1 = fv_enum_basic::pack_0x66_fv_enum_basic_Mapper_Twice<u64,u64>(fv_enum_basic::pack_0x66_fv_enum_basic_Version_V1<u64,u64>(|arg0| add_k_persistent(arg0, 3)));
+        let _v2 = &mut _v1;
+        if (fv_enum_basic::test_variant_0x66_fv_enum_basic_Mapper_Twice<u64,u64>(freeze(_v2))) {
+            let _v3 = fv_enum_basic::borrow_mut_0x66_fv_enum_basic_Mapper_0_0_Twice<u64,u64>(_v2);
+            let _v4 = *fv_enum_basic::borrow_0x66_fv_enum_basic_Version_v1_0<u64,u64>(freeze(_v3));
+            let _v5 = _v4(10);
+            let _v6 = *fv_enum_basic::borrow_0x66_fv_enum_basic_Version_v1_0<u64,u64>(freeze(_v3));
+            _v0 = _v6(_v5)
+        } else if (fv_enum_basic::test_variant_0x66_fv_enum_basic_Mapper_Id<u64,u64>(freeze(_v2))) {
+            let _v7 = *fv_enum_basic::borrow_mut_0x66_fv_enum_basic_Mapper_0_0_Id<u64,u64>(_v2);
+            _v0 = _v7(10)
+        } else abort 14566554180833181697;
+        assert!(_v0 == 16, 99);
+    }
+    fun test_fun_vec() {
+        let _v0: |&mut u64|(u64) has copy + drop + store = |arg0| add_k_persistent_ref(arg0, 3);
+        let _v1 = 0x1::vector::empty<|&mut u64|(u64) has copy + drop + store>();
+        let _v2 = &mut _v1;
+        0x1::vector::push_back<|&mut u64|(u64) has copy + drop + store>(_v2, _v0);
+        0x1::vector::push_back<|&mut u64|(u64) has copy + drop + store>(_v2, _v0);
+        let _v3 = fv_enum_basic::pack_0x66_fv_enum_basic_FunVec_V1<u64>(_v1);
+        let _v4 = &_v3;
+        let _v5 = fv_enum_basic::test_variant_0x66_fv_enum_basic_FunVec_V1<u64>(_v4);
+        'l0: loop {
+            let _v6;
+            loop {
+                if (_v5) {
+                    _v6 = fv_enum_basic::unpack_0x66_fv_enum_basic_FunVec_V1<u64>(_v3);
+                    _v0 = 0x1::vector::pop_back<|&mut u64|(u64) has copy + drop + store>(&mut _v6);
+                    let _v7 = 3;
+                    let _v8 = &mut _v7;
+                    let _v9 = _v0(_v8);
+                    assert!(_v7 == 4, 0);
+                    if (_v9 == 7) break;
+                    abort 1
+                };
+                assert!(fv_enum_basic::test_variant_0x66_fv_enum_basic_FunVec_V2<u64>(_v4), 14566554180833181697);
+                let (_v10,_v11) = fv_enum_basic::unpack_0x66_fv_enum_basic_FunVec_V2<u64>(_v3);
+                0x1::vector::destroy_empty<|&mut u64|(u64) has copy + drop + store>(_v11);
+                if (false) break 'l0;
+                abort 2
+            };
+            0x1::vector::push_back<|&mut u64|(u64) has copy + drop + store>(&mut _v6, _v0);
+            let _v12 = fv_enum_basic::pack_0x66_fv_enum_basic_FunVec_V2<u64>(10, _v6);
+            return ()
+        };
+    }
+}
+
+
+//# run 0x66::fv_enum_basic_public::call_square --args 7
+
+//# run 0x66::fv_enum_basic_public::test_enum_in_another_enum
+
+//# run 0x66::fv_enum_basic_public::test_fun_vec

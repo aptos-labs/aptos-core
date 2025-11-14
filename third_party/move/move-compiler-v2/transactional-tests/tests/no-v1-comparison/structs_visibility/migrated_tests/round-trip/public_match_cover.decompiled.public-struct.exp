@@ -1,0 +1,8 @@
+processed 7 tasks
+task 0 lines 3-96:  publish [module 0xc0ffee::m {]
+task 1 lines 99-186:  publish [module 0xc0ffee::test_m {]
+task 2 lines 189-319:  publish [module 0xc0ffee::n {]
+task 3 lines 322-359:  publish [module 0xc0ffee::test_n {]
+task 4 lines 362-565:  publish [module 0xc0ffee::o {]
+task 5 lines 568-691:  publish [module 0xc0ffee::test_o {]
+task 6 lines 694-897:  publish [module 0xc0ffee::o_fail {]

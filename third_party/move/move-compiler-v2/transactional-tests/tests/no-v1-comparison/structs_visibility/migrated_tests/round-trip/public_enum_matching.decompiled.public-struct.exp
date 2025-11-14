@@ -1,0 +1,31 @@
+processed 16 tasks
+task 0 lines 3-247:  publish [module 0x42::m {]
+task 1 lines 250-476:  publish [module 0x42::test_m {]
+task 2 lines 479-479:  run 0x42::test_m::t1_is_inner1
+return values: true
+task 3 lines 481-481:  run 0x42::test_m::t2_is_inner1
+return values: false
+task 4 lines 483-483:  run 0x42::test_m::t1_inner_value
+return values: 7
+task 5 lines 485-485:  run 0x42::test_m::t1_outer_value
+return values: 0
+task 6 lines 487-487:  run 0x42::test_m::t2_outer_value
+return values: 3
+task 7 lines 489-489:  run 0x42::test_m::t3_outer_value
+return values: 8
+task 8 lines 491-491:  run 0x42::test_m::t1_outer_value_nested
+return values: 27
+task 9 lines 493-493:  run 0x42::test_m::t2_outer_value_nested
+return values: 12
+task 10 lines 495-495:  run 0x42::test_m::t1_outer_value_with_cond
+return values: 1
+task 11 lines 497-497:  run 0x42::test_m::t1_outer_value_with_cond_ref
+return values: true
+task 12 lines 499-499:  run 0x42::test_m::t1_is_some
+return values: false
+task 13 lines 501-501:  run 0x42::test_m::t2_is_some
+return values: true
+task 14 lines 503-503:  run 0x42::test_m::t1_is_some_specialized
+return values: false
+task 15 lines 505-505:  run 0x42::test_m::t2_is_some_specialized
+return values: true

@@ -1,0 +1,254 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/test_struct_pack_unpack_api.move`
+
+//# publish
+module 0x42::m1 {
+    struct T<T0: drop + store> has copy, drop, store {
+        h: T0,
+    }
+    struct Inner<T0: drop + store> has drop {
+        t: T0,
+    }
+    struct Nested<T0: copy + drop + store> has copy, drop, store {
+        inner: T<V<T0>>,
+    }
+    struct V<T0: drop + store> has copy, drop, store {
+        items: vector<T0>,
+    }
+    struct NoFields has drop {
+    }
+    struct P<phantom T0> has drop {
+        p: u64,
+    }
+    struct S<T0: drop + store> has drop {
+        f: u64,
+        g: T<T0>,
+    }
+    #[pack]
+    public fun pack_0x42_m1_T<T0: drop + store>(p0: T0): T<T0> {
+        T<T0>{h: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_T<T0: drop + store>(p0: T<T0>): T0 {
+        let T<T0>{h: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_T_h_0<T0: drop + store>(p0: &T<T0>): &T0 {
+        &p0.h
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_T_h_0<T0: drop + store>(p0: &mut T<T0>): &mut T0 {
+        &mut p0.h
+    }
+    #[pack]
+    public fun pack_0x42_m1_Nested<T0: copy + drop + store>(p0: T<V<T0>>): Nested<T0> {
+        Nested<T0>{inner: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_Nested<T0: copy + drop + store>(p0: Nested<T0>): T<V<T0>> {
+        let Nested<T0>{inner: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_Nested_inner_0<T0: copy + drop + store>(p0: &Nested<T0>): &T<V<T0>> {
+        &p0.inner
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_Nested_inner_0<T0: copy + drop + store>(p0: &mut Nested<T0>): &mut T<V<T0>> {
+        &mut p0.inner
+    }
+    #[pack]
+    public fun pack_0x42_m1_NoFields(p0: bool): NoFields {
+        NoFields{}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_NoFields(p0: NoFields): bool {
+        let NoFields{} = p0;
+        _v0
+    }
+    #[pack]
+    public fun pack_0x42_m1_P<T0>(p0: u64): P<T0> {
+        P<T0>{p: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_P<T0>(p0: P<T0>): u64 {
+        let P<T0>{p: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_P_p_0<T0>(p0: &P<T0>): &u64 {
+        &p0.p
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_P_p_0<T0>(p0: &mut P<T0>): &mut u64 {
+        &mut p0.p
+    }
+    #[pack]
+    public fun pack_0x42_m1_S<T0: drop + store>(p0: u64, p1: T<T0>): S<T0> {
+        S<T0>{f: p0, g: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_S<T0: drop + store>(p0: S<T0>): (u64, T<T0>) {
+        let S<T0>{f: _v0, g: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_S_f_0<T0: drop + store>(p0: &S<T0>): &u64 {
+        &p0.f
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_S_g_1<T0: drop + store>(p0: &S<T0>): &T<T0> {
+        &p0.g
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_S_f_0<T0: drop + store>(p0: &mut S<T0>): &mut u64 {
+        &mut p0.f
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_S_g_1<T0: drop + store>(p0: &mut S<T0>): &mut T<T0> {
+        &mut p0.g
+    }
+    #[pack]
+    public fun pack_0x42_m1_V<T0: drop + store>(p0: vector<T0>): V<T0> {
+        V<T0>{items: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_V<T0: drop + store>(p0: V<T0>): vector<T0> {
+        let V<T0>{items: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_V_items_0<T0: drop + store>(p0: &V<T0>): &vector<T0> {
+        &p0.items
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_V_items_0<T0: drop + store>(p0: &mut V<T0>): &mut vector<T0> {
+        &mut p0.items
+    }
+}
+
+
+//# publish
+module 0x42::m3 {
+    use 0x42::m1;
+    struct S<T0: drop + store> has drop {
+        f: u64,
+        g: m1::T<T0>,
+    }
+    #[pack]
+    public fun pack_0x42_m3_S<T0: drop + store>(p0: u64, p1: m1::T<T0>): S<T0> {
+        S<T0>{f: p0, g: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m3_S<T0: drop + store>(p0: S<T0>): (u64, m1::T<T0>) {
+        let S<T0>{f: _v0, g: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m3_S_f_0<T0: drop + store>(p0: &S<T0>): &u64 {
+        &p0.f
+    }
+    #[borrow]
+    public fun borrow_0x42_m3_S_g_1<T0: drop + store>(p0: &S<T0>): &m1::T<T0> {
+        &p0.g
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m3_S_f_0<T0: drop + store>(p0: &mut S<T0>): &mut u64 {
+        &mut p0.f
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m3_S_g_1<T0: drop + store>(p0: &mut S<T0>): &mut m1::T<T0> {
+        &mut p0.g
+    }
+}
+
+
+//# publish
+module 0x42::m2 {
+    use 0x42::m1;
+    use 0x42::m3;
+    public fun return_struct(): m1::S<u64> {
+        let _v0 = m1::pack_0x42_m1_T<u64>(88);
+        m1::pack_0x42_m1_S<u64>(77, _v0)
+    }
+    public fun take_struct(p0: m1::S<vector<u8>>) {
+        assert!(*0x1::vector::borrow<u8>(m1::borrow_0x42_m1_T_h_0<vector<u8>>(m1::borrow_0x42_m1_S_g_1<vector<u8>>(&p0)), 0) == 255u8, 12);
+    }
+    public fun try_nested_pack() {
+        let _v0 = m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[1, 2, 3])));
+        assert!(*0x1::vector::borrow<u64>(m1::borrow_0x42_m1_V_items_0<u64>(m1::borrow_0x42_m1_T_h_0<m1::V<u64>>(m1::borrow_0x42_m1_Nested_inner_0<u64>(&_v0))), 2) == 3, 7);
+    }
+    public fun try_pack() {
+        let _v0 = m1::pack_0x42_m1_T<u64>(42);
+        assert!(*m1::borrow_0x42_m1_T_h_0<u64>(&_v0) == 42, 1);
+        let _v1 = m1::pack_0x42_m1_S<u64>(43, _v0);
+        assert!(*m1::borrow_0x42_m1_S_f_0<u64>(&_v1) == 43, 2);
+    }
+    public fun try_pack_S3() {
+        let _v0 = m1::pack_0x42_m1_T<u64>(42);
+        assert!(*m1::borrow_0x42_m1_T_h_0<u64>(&_v0) == 42, 1);
+        let _v1 = m3::pack_0x42_m3_S<u64>(43, _v0);
+        assert!(*m3::borrow_0x42_m3_S_f_0<u64>(&_v1) == 43, 13);
+        assert!(*m1::borrow_0x42_m1_T_h_0<u64>(m3::borrow_0x42_m3_S_g_1<u64>(&_v1)) == 42, 14);
+    }
+    public fun try_pack_unpack_no_fields() {
+        let _v0 = m1::unpack_0x42_m1_NoFields(m1::pack_0x42_m1_NoFields(false));
+    }
+    public fun try_pack_unpack_phantom() {
+        let _v0 = m1::pack_0x42_m1_P<m1::Inner<u64>>(42);
+        assert!(*m1::borrow_0x42_m1_P_p_0<m1::Inner<u64>>(&_v0) == 42, 1);
+        assert!(m1::unpack_0x42_m1_P<m1::Inner<u64>>(_v0) == 42, 4);
+    }
+    public fun try_pack_vector() {
+        let _v0 = m1::pack_0x42_m1_T<vector<u64>>(vector[42]);
+        assert!(*0x1::vector::borrow<u64>(m1::borrow_0x42_m1_T_h_0<vector<u64>>(&_v0), 0) == 42, 3);
+    }
+    public fun try_pass_struct_as_arg() {
+        let _v0 = m1::pack_0x42_m1_T<vector<u8>>(vector[255u8]);
+        take_struct(m1::pack_0x42_m1_S<vector<u8>>(1, _v0));
+    }
+    public fun try_return_struct() {
+        let (_v0,_v1) = m1::unpack_0x42_m1_S<u64>(return_struct());
+        let _v2 = m1::unpack_0x42_m1_T<u64>(_v1);
+        assert!(_v0 == 77, 10);
+        assert!(_v2 == 88, 11);
+    }
+    public fun try_unpack() {
+        let _v0 = m1::pack_0x42_m1_T<u64>(42);
+        let (_v1,_v2) = m1::unpack_0x42_m1_S<u64>(m1::pack_0x42_m1_S<u64>(43, _v0));
+        let _v3 = m1::unpack_0x42_m1_T<u64>(_v2);
+        assert!(_v1 == 43, 4);
+        assert!(_v3 == 42, 5);
+    }
+    public fun try_unpack_nested() {
+        let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+        assert!(*0x1::vector::borrow<u64>(&_v0, 0) == 10, 8);
+        assert!(*0x1::vector::borrow<u64>(&_v0, 1) == 20, 9);
+    }
+    public fun try_unpack_with_let_ignore() {
+        let _v0 = m1::pack_0x42_m1_T<u64>(7);
+        let (_v1,_v2) = m1::unpack_0x42_m1_S<u64>(m1::pack_0x42_m1_S<u64>(100, _v0));
+        assert!(_v1 == 100, 6);
+    }
+}
+
+
+//# run 0x42::m2::try_pack
+
+//# run 0x42::m2::try_pack_vector
+
+//# run 0x42::m2::try_unpack
+
+//# run 0x42::m2::try_unpack_with_let_ignore
+
+//# run 0x42::m2::try_nested_pack
+
+//# run 0x42::m2::try_unpack_nested
+
+//# run 0x42::m2::try_return_struct
+
+//# run 0x42::m2::try_pass_struct_as_arg
+
+//# run 0x42::m2::try_pack_unpack_phantom
+
+//# run 0x42::m2::try_pack_S3

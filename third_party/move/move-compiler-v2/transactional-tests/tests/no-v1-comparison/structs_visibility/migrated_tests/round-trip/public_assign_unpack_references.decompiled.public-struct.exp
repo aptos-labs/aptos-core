@@ -1,0 +1,31 @@
+processed 4 tasks
+task 0 lines 3-54:  publish [module 0x42::m {]
+task 1 lines 57-86:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ error: cannot transfer mutable local `_v3` since it is borrowed
+   ┌─ TEMPFILE1:76:19
+   │
+75 │         let _v4 = m::borrow_mut_0x42_m_R_s1_0(_v3);
+   │                   -------------------------------- previously mutably borrowed here
+76 │         let _v5 = m::borrow_mut_0x42_m_R_s2_1(_v3);
+   │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+77 │         assert!(*m::borrow_mut_0x42_m_S_f_0(_v4) == 0, 0);
+   │                  ------------------------------- conflicting reference `_v4` used here
+
+
+task 2 lines 89-89:  run 0x42::m2::t1
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 91-91:  run 0x42::m2::t2
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

@@ -257,7 +257,7 @@ fun m::main() {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x32::m
 // Function definition at index 0
 fun main()

@@ -1,0 +1,79 @@
+processed 10 tasks
+task 0 lines 3-103:  publish [module 0x42::m1 {]
+task 1 lines 106-176:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ error: cannot transfer mutable local `_v3` since it is borrowed
+    ┌─ TEMPFILE1:156:19
+    │
+155 │         let _v4 = m1::borrow_mut_0x42_m1_NestedPair_0_0<u64>(_v3);
+    │                   ----------------------------------------------- previously mutably borrowed here
+156 │         let _v5 = m1::borrow_mut_0x42_m1_NestedPair_1_1<u64>(_v3);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+157 │         let _v6 = m1::borrow_mut_0x42_m1_Pair_0_0(_v4);
+    │                   ------------------------------------ conflicting reference `_v4` used here
+
+
+task 2 lines 179-179:  run 0x42::m2::test_borrow_pair_fields
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 181-181:  run 0x42::m2::test_borrow_wrapper_field
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 183-183:  run 0x42::m2::test_borrow_nested_pair_fields
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 185-185:  run 0x42::m2::test_borrow_vecwrap_element
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 187-187:  run 0x42::m2::test_mut_borrow_pair
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 189-189:  run 0x42::m2::test_mut_borrow_vecwrap_element
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 8 lines 191-191:  run 0x42::m2::test_mut_borrow_nestedpair
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 9 lines 193-193:  run 0x42::m2::test_mut_borrow_nestedpair_2
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

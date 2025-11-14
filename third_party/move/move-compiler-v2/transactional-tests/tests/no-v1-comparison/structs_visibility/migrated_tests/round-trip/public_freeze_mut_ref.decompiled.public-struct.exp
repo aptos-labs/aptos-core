@@ -1,0 +1,9 @@
+processed 8 tasks
+task 0 lines 3-25:  publish [module 0x42::freeze_mut_ref {]
+task 1 lines 28-86:  publish [module 0x42::test_freeze_mut_ref {]
+task 2 lines 89-89:  run 0x42::test_freeze_mut_ref::test_1
+task 3 lines 91-91:  run 0x42::test_freeze_mut_ref::test_2
+task 4 lines 93-93:  run 0x42::test_freeze_mut_ref::test_3
+task 5 lines 95-95:  run 0x42::test_freeze_mut_ref::test_5
+task 6 lines 97-97:  run 0x42::test_freeze_mut_ref::test_6
+task 7 lines 99-99:  run 0x42::test_freeze_mut_ref::test_7

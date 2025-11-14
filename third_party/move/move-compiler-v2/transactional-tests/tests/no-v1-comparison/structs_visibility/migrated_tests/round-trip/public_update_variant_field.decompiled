@@ -1,0 +1,126 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_update_variant_field.move`
+
+//# publish
+module 0x815::m {
+    enum CommonFields has drop {
+        Foo {
+            x: u64,
+            y: u8,
+        }
+        Bar {
+            x: u64,
+            y: u8,
+            z: u32,
+        }
+        Baz {
+            y: u8,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0x815_m_CommonFields_Foo(p0: &CommonFields): bool {
+        p0 is Foo
+    }
+    #[test_variant]
+    public fun test_variant_0x815_m_CommonFields_Bar(p0: &CommonFields): bool {
+        p0 is Bar
+    }
+    #[test_variant]
+    public fun test_variant_0x815_m_CommonFields_Baz(p0: &CommonFields): bool {
+        p0 is Baz
+    }
+    #[pack]
+    public fun pack_0x815_m_CommonFields_Foo(p0: u64, p1: u8): CommonFields {
+        CommonFields::Foo{x: p0, y: p1}
+    }
+    #[pack]
+    public fun pack_0x815_m_CommonFields_Bar(p0: u64, p1: u8, p2: u32): CommonFields {
+        CommonFields::Bar{x: p0, y: p1, z: p2}
+    }
+    #[pack]
+    public fun pack_0x815_m_CommonFields_Baz(p0: u8): CommonFields {
+        CommonFields::Baz{y: p0}
+    }
+    #[unpack]
+    public fun unpack_0x815_m_CommonFields_Foo(p0: CommonFields): (u64, u8) {
+        let CommonFields::Foo{x: _v0, y: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0x815_m_CommonFields_Bar(p0: CommonFields): (u64, u8, u32) {
+        let CommonFields::Bar{x: _v0, y: _v1, z: _v2} = p0;
+        (_v0, _v1, _v2)
+    }
+    #[unpack]
+    public fun unpack_0x815_m_CommonFields_Baz(p0: CommonFields): u8 {
+        let CommonFields::Baz{y: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x815_m_CommonFields_x_0(p0: &CommonFields): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x815_m_CommonFields_y_0(p0: &CommonFields): &u8 {
+        &p0.y
+    }
+    #[borrow]
+    public fun borrow_0x815_m_CommonFields_y_1(p0: &CommonFields): &u8 {
+        &p0.y
+    }
+    #[borrow]
+    public fun borrow_0x815_m_CommonFields_z_2(p0: &CommonFields): &u32 {
+        &p0.z
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x815_m_CommonFields_x_0(p0: &mut CommonFields): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x815_m_CommonFields_y_0(p0: &mut CommonFields): &mut u8 {
+        &mut p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x815_m_CommonFields_y_1(p0: &mut CommonFields): &mut u8 {
+        &mut p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x815_m_CommonFields_z_2(p0: &mut CommonFields): &mut u32 {
+        &mut p0.z
+    }
+}
+
+
+//# publish
+module 0x815::m_bug_14300_update_variant_field {
+    use 0x815::m;
+    fun update_common_field(): u64 {
+        let _v0 = m::pack_0x815_m_CommonFields_Bar(30, 40u8, 50u32);
+        let _v1 = m::borrow_mut_0x815_m_CommonFields_x_0(&mut _v0);
+        *_v1 = 15;
+        *m::borrow_0x815_m_CommonFields_x_0(&_v0)
+    }
+    fun update_common_field_different_offset(): u8 {
+        let _v0;
+        let _v1;
+        let _v2 = m::pack_0x815_m_CommonFields_Bar(30, 40u8, 50u32);
+        let _v3 = &mut _v2;
+        if (m::test_variant_0x815_m_CommonFields_Foo(freeze(_v3)) || m::test_variant_0x815_m_CommonFields_Bar(freeze(_v3))) _v1 = m::borrow_mut_0x815_m_CommonFields_y_1(_v3) else _v1 = m::borrow_mut_0x815_m_CommonFields_y_0(_v3);
+        *_v1 = 15u8;
+        let _v4 = &_v2;
+        if (m::test_variant_0x815_m_CommonFields_Foo(_v4) || m::test_variant_0x815_m_CommonFields_Bar(_v4)) _v0 = m::borrow_0x815_m_CommonFields_y_1(_v4) else _v0 = m::borrow_0x815_m_CommonFields_y_0(_v4);
+        *_v0
+    }
+    fun update_non_common_field(): u32 {
+        let _v0 = m::pack_0x815_m_CommonFields_Bar(30, 40u8, 50u32);
+        let _v1 = m::borrow_mut_0x815_m_CommonFields_z_2(&mut _v0);
+        *_v1 = 15u32;
+        *m::borrow_0x815_m_CommonFields_z_2(&_v0)
+    }
+}
+
+
+//# run 0x815::m_bug_14300_update_variant_field::update_common_field
+
+//# run 0x815::m_bug_14300_update_variant_field::update_non_common_field
+
+//# run 0x815::m_bug_14300_update_variant_field::update_common_field_different_offset

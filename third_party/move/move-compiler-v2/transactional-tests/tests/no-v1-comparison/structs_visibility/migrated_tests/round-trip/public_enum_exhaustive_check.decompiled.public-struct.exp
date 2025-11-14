@@ -1,0 +1,81 @@
+processed 2 tasks
+task 0 lines 3-105:  publish [module 0x42::test {]
+Error: compilation errors:
+ error: cannot select field `y` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:53:10
+   │
+53 │         &p0.y
+   │          ^^
+   │
+   = field `y` has type `S0` in variant `V2` and type `S1<u8, bool>` in variant `V1`
+
+error: cannot select field `y` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:57:10
+   │
+57 │         &p0.y
+   │          ^^
+   │
+   = field `y` has type `S0` in variant `V2` and type `S1<u8, bool>` in variant `V1`
+
+error: cannot select field `y` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:65:14
+   │
+65 │         &mut p0.y
+   │              ^^
+   │
+   = field `y` has type `S0` in variant `V2` and type `S1<u8, bool>` in variant `V1`
+
+error: cannot select field `y` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:69:14
+   │
+69 │         &mut p0.y
+   │              ^^
+   │
+   = field `y` has type `S0` in variant `V2` and type `S1<u8, bool>` in variant `V1`
+
+error: undeclared `_v0`
+   ┌─ TEMPFILE:78:9
+   │
+78 │         _v0
+   │         ^^^
+
+
+task 1 lines 108-122:  publish [module 0x42::test_bug_14296 {]
+Error: compilation errors:
+ error: unbound module
+    ┌─ TEMPFILE1:110:9
+    │
+110 │     use 0x42::test;
+    │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '0x42::test'
+
+error: unbound module
+    ┌─ TEMPFILE1:111:30
+    │
+111 │     fun extract_last_u8(p0: &test::E): u8 {
+    │                              ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:112:19
+    │
+112 │         let _v0 = test::test_variant_0x42_test_E_V1(p0);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:115:21
+    │
+115 │                 if (test::test_variant_0x42_test_E_V2(p0)) break;
+    │                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:118:21
+    │
+118 │             return *test::borrow_0x42_test_S1_x_0<u8,bool>(test::borrow_0x42_test_E_y_1_V1(p0))
+    │                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:118:60
+    │
+118 │             return *test::borrow_0x42_test_S1_x_0<u8,bool>(test::borrow_0x42_test_E_y_1_V1(p0))
+    │                                                            ^^^^ Unbound module or type alias 'test'
+
+

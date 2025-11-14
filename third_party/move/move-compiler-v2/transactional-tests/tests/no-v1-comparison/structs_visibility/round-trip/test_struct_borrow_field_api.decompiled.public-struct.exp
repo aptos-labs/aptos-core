@@ -1,0 +1,73 @@
+processed 8 tasks
+task 0 lines 3-54:  publish [module 0x42::m1 {]
+task 1 lines 57-140:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ error: cannot transfer mutable local `_v2` since it is borrowed
+    ┌─ TEMPFILE1:105:19
+    │
+104 │         let _v3 = m1::borrow_mut_0x42_m1_S_f_0<u64>(_v2);
+    │                   -------------------------------------- previously mutably borrowed here
+105 │         let _v4 = m1::borrow_mut_0x42_m1_S_g_1<u64>(_v2);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+106 │         let _v5 = _v3;
+    │                   --- conflicting reference `_v3` used here
+
+error: cannot transfer mutable local `_v2` since it is borrowed
+    ┌─ TEMPFILE1:121:19
+    │
+120 │         let _v8 = m1::borrow_mut_0x42_m1_S_f_0<u64>(_v2);
+    │                   -------------------------------------- previously mutably borrowed here
+121 │         let _v9 = m1::borrow_mut_0x42_m1_S_g_1<u64>(_v2);
+    │                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ transfer attempted here
+122 │         *_v8 = 101;
+    │         ---------- conflicting reference `_v8` used here
+
+
+task 2 lines 143-143:  run 0x42::m2::try_immut_borrow_fields
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 145-145:  run 0x42::m2::try_immut_from_mut
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 147-147:  run 0x42::m2::try_mut_borrow_seq
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 149-149:  run 0x42::m2::try_immut_and_mut_diff_fields
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 151-151:  run 0x42::m2::try_reborrow_same_field_seq
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 153-153:  run 0x42::m2::try_unpack_mut_ref
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
