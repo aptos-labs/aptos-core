@@ -549,7 +549,7 @@ fn serialize_function_handle(
         ));
     }
     if major_version >= VERSION_8 {
-        serialize_function_attributes(binary, &function_handle.attributes)
+        serialize_function_attributes(binary, &function_handle.attributes, major_version)
     } else if !function_handle.attributes.is_empty() {
         Err(anyhow!(
             "Function attributes not supported in bytecode version {}",
@@ -867,22 +867,94 @@ fn serialize_ability_sets(binary: &mut BinaryData, sets: &[AbilitySet]) -> Resul
 fn serialize_function_attributes(
     binary: &mut BinaryData,
     attributes: &[FunctionAttribute],
+    version: u32,
 ) -> Result<()> {
     write_as_uleb128(binary, attributes.len() as u64, ATTRIBUTE_COUNT_MAX)?;
     for attr in attributes {
-        serialize_function_attribute(binary, attr)?;
+        serialize_function_attribute(binary, attr, version)?;
     }
     Ok(())
+}
+
+fn serialize_function_attribute_if_supported<F>(
+    bytecode_version: u32,
+    binary: &mut BinaryData,
+    f: F,
+    attr_name: &str,
+) -> Result<()>
+where
+    F: Fn(&mut BinaryData) -> Result<()>,
+{
+    if bytecode_version < VERSION_10 {
+        Err(anyhow!(
+            "{} attribute not supported in bytecode version {}",
+            attr_name,
+            bytecode_version
+        ))
+    } else {
+        f(binary)
+    }
 }
 
 fn serialize_function_attribute(
     binary: &mut BinaryData,
     attribute: &FunctionAttribute,
+    version: u32,
 ) -> Result<()> {
     use FunctionAttribute::*;
     match attribute {
         Persistent => binary.push(SerializedFunctionAttribute::PERSISTENT as u8),
         ModuleLock => binary.push(SerializedFunctionAttribute::MODULE_LOCK as u8),
+        Pack => serialize_function_attribute_if_supported(
+            version,
+            binary,
+            |binary| -> Result<()> { binary.push(SerializedFunctionAttribute::PACK as u8) },
+            "Pack",
+        ),
+        PackVariant => serialize_function_attribute_if_supported(
+            version,
+            binary,
+            |binary| -> Result<()> { binary.push(SerializedFunctionAttribute::PACK_VARIANT as u8) },
+            "PackVariant",
+        ),
+        Unpack => serialize_function_attribute_if_supported(
+            version,
+            binary,
+            |binary| -> Result<()> { binary.push(SerializedFunctionAttribute::UNPACK as u8) },
+            "Unpack",
+        ),
+        UnpackVariant => serialize_function_attribute_if_supported(
+            version,
+            binary,
+            |binary| -> Result<()> {
+                binary.push(SerializedFunctionAttribute::UNPACK_VARIANT as u8)
+            },
+            "UnpackVariant",
+        ),
+        TestVariant => serialize_function_attribute_if_supported(
+            version,
+            binary,
+            |binary| -> Result<()> { binary.push(SerializedFunctionAttribute::TEST_VARIANT as u8) },
+            "TestVariant",
+        ),
+        BorrowFieldImmutable(offset) => serialize_function_attribute_if_supported(
+            version,
+            binary,
+            |binary| -> Result<()> {
+                binary.push(SerializedFunctionAttribute::BORROW_FIELD_IMMUTABLE as u8)?;
+                binary.push(*offset)
+            },
+            "BorrowFieldImmutable",
+        ),
+        BorrowFieldMutable(offset) => serialize_function_attribute_if_supported(
+            version,
+            binary,
+            |binary| -> Result<()> {
+                binary.push(SerializedFunctionAttribute::BORROW_FIELD_MUTABLE as u8)?;
+                binary.push(*offset)
+            },
+            "BorrowFieldMutable",
+        ),
     }
 }
 
