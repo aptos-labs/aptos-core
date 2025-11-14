@@ -11,6 +11,9 @@ echo "PROFILE: $PROFILE"
 echo "FEATURES: $FEATURES"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
+CLANG_VER=$(clang --version)
+echo "clang version: ${CLANG_VER}"
+
 PACKAGES=(
     aptos-node
     aptos-forge-cli
