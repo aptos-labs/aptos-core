@@ -628,28 +628,39 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         incarnation: Incarnation,
         value: ValueWithLayout<V>,
         dependencies: BTreeMap<TxnIndex, Incarnation>,
-    ) {
+    ) -> Result<(), PanicError> {
+        let value_clone = value.clone();
         let prev_entry = versioned_values.versioned_map.insert(
             ShiftedTxnIndex::new(txn_idx),
             CachePadded::new(new_write_entry(incarnation, value, dependencies)),
         );
 
-        // Assert that the previous entry for txn_idx, if present, had lower incarnation.
-        assert!(prev_entry.is_none_or(|entry| -> bool {
+        // Check that the previous entry for txn_idx, if present, had lower incarnation.
+        if !prev_entry.is_none_or(|entry| -> bool {
             if let EntryCell::ResourceWrite {
                 incarnation: prev_incarnation,
+                value_with_layout: prev_value,
                 ..
             } = &entry.value
             {
                 // For BlockSTMv1, the dependencies are always empty.
                 *prev_incarnation < incarnation
+                    || (incarnation == 0
+                        && prev_value.extract_value_no_layout()
+                            == value_clone.extract_value_no_layout())
                 // TODO(BlockSTMv2): when AggregatorV1 is deprecated, we can assert that
                 // prev_dependencies is empty: they must have been drained beforehand
                 // (into dependencies) if there was an entry at the same index before.
             } else {
                 true
             }
-        }));
+        }) {
+            return Err(code_invariant_error(format!(
+                "Previous entry for txn_idx {} had invalid incarnation. Current incarnation: {}",
+                txn_idx, incarnation
+            )));
+        }
+        Ok(())
     }
 
     pub fn write(
@@ -659,7 +670,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
         incarnation: Incarnation,
         data: Arc<V>,
         maybe_layout: Option<Arc<MoveTypeLayout>>,
-    ) {
+    ) -> Result<(), PanicError> {
         let mut v = self.values.entry(key).or_default();
         Self::write_impl(
             &mut v,
@@ -667,7 +678,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             incarnation,
             ValueWithLayout::Exchanged(data, maybe_layout),
             BTreeMap::new(),
-        );
+        )
     }
 
     /// Write a value at a given key (and version) for BlockSTMv2.
@@ -706,7 +717,7 @@ impl<K: Hash + Clone + Debug + Eq, V: TransactionWrite + PartialEq> VersionedDat
             incarnation,
             ValueWithLayout::Exchanged(data, maybe_layout),
             deps_to_retain,
-        );
+        )?;
 
         Ok(deps_to_return)
     }
@@ -1449,13 +1460,15 @@ mod tests {
         let versioned_data = VersionedData::<(), TestValueWithMetadata>::empty();
 
         // Add an entry at index 0
-        versioned_data.write(
-            (),
-            0,
-            0,
-            Arc::new(TestValueWithMetadata::new(10, 100)),
-            None,
-        );
+        versioned_data
+            .write(
+                (),
+                0,
+                0,
+                Arc::new(TestValueWithMetadata::new(10, 100)),
+                None,
+            )
+            .unwrap();
 
         // Try to remove a non-existent entry at index 1
         assert_err!(versioned_data.remove_v2::<_, false>(&(), 1));
