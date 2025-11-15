@@ -12,21 +12,25 @@ pub type EvalProof = Vec<u8>;
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub enum EncryptedPayload {
     Encrypted {
+        #[serde(with = "serde_bytes")]
         ciphertext: CipherText,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
     },
     FailedDecryption {
+        #[serde(with = "serde_bytes")]
         ciphertext: CipherText,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
-
+        #[serde(with = "serde_bytes")]
         eval_proof: EvalProof,
     },
     Decrypted {
+        #[serde(with = "serde_bytes")]
         ciphertext: CipherText,
         extra_config: TransactionExtraConfig,
         payload_hash: HashValue,
+        #[serde(with = "serde_bytes")]
         eval_proof: EvalProof,
 
         // decrypted things
