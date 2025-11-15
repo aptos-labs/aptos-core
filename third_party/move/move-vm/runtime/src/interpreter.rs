@@ -11,7 +11,7 @@ use crate::{
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     instr::Instruction,
     interpreter_caches::InterpreterFunctionCaches,
-    loader::LazyLoadedFunction,
+    loader::{FunctionHandle, LazyLoadedFunction},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -25,7 +25,7 @@ use crate::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
     },
-    trace, LoadedFunction, RuntimeEnvironment,
+    trace, LoadedFunction, LoadedFunctionOwner, RuntimeEnvironment,
 };
 use fail::fail_point;
 use itertools::Itertools;
@@ -292,19 +292,72 @@ where
         current_frame: &Frame,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
-        let (ty_args, ty_args_id) = current_frame
-            .instantiate_generic_function(self.ty_pool, Some(gas_meter), idx)
-            .map_err(|e| set_err_info!(current_frame, e))?;
-        let function = current_frame
-            .build_loaded_function_from_instantiation_and_ty_args(
-                self.loader,
-                gas_meter,
-                traversal_context,
-                idx,
-                ty_args,
-                ty_args_id,
-            )
-            .map_err(|e| self.set_location(e))?;
+        macro_rules! make_ty_args_and_id {
+            ($function:ident) => {
+                if $function.is_inlineable {
+                    (vec![], self.ty_pool.intern_ty_args(&[]))
+                } else {
+                    current_frame
+                        .instantiate_generic_function(self.ty_pool, Some(gas_meter), idx)
+                        .map_err(|e| set_err_info!(current_frame, e))?
+                }
+            };
+        }
+
+        macro_rules! build_loaded_function_from_name {
+            ($module:ident, $name:ident) => {{
+                let (module, function) = self.loader.load_function_definition(
+                    gas_meter,
+                    traversal_context,
+                    $module,
+                    $name,
+                )?;
+
+                let (ty_args, ty_args_id) = make_ty_args_and_id!(function);
+
+                Ok(LoadedFunction {
+                    owner: LoadedFunctionOwner::Module(module),
+                    ty_args,
+                    ty_args_id,
+                    function,
+                })
+            }};
+        }
+
+        let res = match current_frame.function.owner() {
+            LoadedFunctionOwner::Module(module) => {
+                let handle = module.function_instantiation_handle_at(idx.0);
+                match handle {
+                    FunctionHandle::Local(function) => {
+                        let (ty_args, ty_args_id) = make_ty_args_and_id!(function);
+
+                        Ok(LoadedFunction {
+                            owner: LoadedFunctionOwner::Module(module.clone()),
+                            ty_args,
+                            ty_args_id,
+                            function: function.clone(),
+                        })
+                    },
+                    FunctionHandle::Remote { module, name } => {
+                        build_loaded_function_from_name!(module, name)
+                    },
+                }
+            },
+            LoadedFunctionOwner::Script(script) => {
+                let handle = script.function_instantiation_handle_at(idx.0);
+                match handle {
+                    FunctionHandle::Local(_) => Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    )
+                    .with_message("Scripts never have local functions".to_string())),
+                    FunctionHandle::Remote { module, name } => {
+                        build_loaded_function_from_name!(module, name)
+                    },
+                }
+            },
+        };
+
+        let function = res.map_err(|e| self.set_location(e))?;
         Ok(function)
     }
 

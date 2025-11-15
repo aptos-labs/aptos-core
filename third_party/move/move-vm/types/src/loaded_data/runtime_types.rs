@@ -1602,7 +1602,7 @@ impl TypeBuilder {
         let mut count = 0;
 
         let check = |c: &mut u64, d: u64| self.check(c, d);
-        self.subst_impl(ty, ty_args, &mut count, 1, check)?;
+        self.subst_impl::<_, false>(ty, ty_args, &mut count, 1, check)?;
         Ok(count as usize)
     }
 }
