@@ -12,29 +12,8 @@ enum Color
 
 // Function definition at index 0
 fun test_red(l0: &Color): bool
-    local l1: bool
-    local l2: &Color
-    copy_loc l0
-    test_variant Color, Red
-    br_false l0
     move_loc l0
-    pop
-    // @5
-    ld_true
-    st_loc l1
-    branch l1
-l0: move_loc l0
-    st_loc l2
-    // @10
-    move_loc l2
-    pop
-    ld_false
-    st_loc l1
-    branch l1
-    // @15
-    ld_u64 14566554180833181697
-    abort
-l1: move_loc l1
+    test_variant Color, Red
     ret
 
 // Function definition at index 1

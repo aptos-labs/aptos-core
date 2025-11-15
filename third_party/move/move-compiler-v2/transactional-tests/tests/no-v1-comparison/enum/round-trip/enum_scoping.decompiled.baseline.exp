@@ -1,4 +1,11 @@
 processed 2 tasks
-task 0 lines 3-51:  publish [module 0x42::m {]
-task 1 lines 54-54:  run 0x42::m::t1_check_scoping
+task 0 lines 3-50:  publish [module 0x42::m {]
+warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
+   ┌─ TEMPFILE:27:30
+   │
+27 │     public fun check_scoping(p0: &Inner): u64 {
+   │                              ^^
+
+
+task 1 lines 53-53:  run 0x42::m::t1_check_scoping
 return values: 3

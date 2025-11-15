@@ -82,7 +82,7 @@ module aptos_experimental::price_time_index {
         if (self.buys.is_empty()) {
             option::none()
         } else {
-            let (back_key, _back_value) = self.buys.borrow_back();
+            let back_key = self.buys.back_key();
             option::some(back_key.price)
         }
     }
@@ -93,21 +93,21 @@ module aptos_experimental::price_time_index {
         if (self.sells.is_empty()) {
             option::none()
         } else {
-            let (front_key, _front_value) = self.sells.borrow_front();
+            let front_key = self.sells.front_key();
             option::some(front_key.price)
         }
     }
 
-    fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
-        let best_bid = self.best_bid_price();
-        let best_ask = self.best_ask_price();
-        if (best_bid.is_none() || best_ask.is_none()) {
-            option::none()
-        } else {
-            option::some(
-                (best_bid.destroy_some() + best_ask.destroy_some()) / 2
-            )
-        }
+    /// Returns the mid price (i.e. the average of the highest bid (buy) price and the lowest ask (sell) price. If
+    /// there are o buys / sells, returns None.
+    public(friend) fun get_mid_price(self: &PriceTimeIndex): Option<u64> {
+        if (self.sells.is_empty() || self.buys.is_empty()) {
+            return option::none();
+        };
+
+        let best_ask = self.sells.front_key().price;
+        let best_bid = self.buys.back_key().price;
+        option::some((best_bid + best_ask) / 2)
     }
 
     public(friend) fun get_slippage_price(
@@ -146,13 +146,11 @@ module aptos_experimental::price_time_index {
     ): u64 {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
         let key = PriceTime { price, tie_breaker };
-        let value =
-            if (is_bid) {
-                self.buys.remove(&key)
-            } else {
-                self.sells.remove(&key)
-            };
-        value.size
+        if (is_bid) {
+            self.buys.remove(&key).size
+        } else {
+            self.sells.remove(&key).size
+        }
     }
 
     public(friend) fun is_active_order(
@@ -162,7 +160,7 @@ module aptos_experimental::price_time_index {
         is_bid: bool
     ): bool {
         let tie_breaker = get_tie_breaker(unique_priority_idx, is_bid);
-        let key = PriceTime { price: price, tie_breaker };
+        let key = PriceTime { price, tie_breaker };
         if (is_bid) {
             self.buys.contains(&key)
         } else {
@@ -193,29 +191,23 @@ module aptos_experimental::price_time_index {
 
         let matched_size_for_this_order =
             if (is_cur_match_fully_consumed) {
+                orders.remove(&cur_key);
                 cur_value.size
             } else {
+                modify_order_data(
+                    orders, &cur_key, |order_data| {
+                        order_data.size -= remaining_size;
+                    }
+                );
                 remaining_size
             };
 
-        let result =
-            new_active_matched_order(
-                cur_value.order_id,
-                matched_size_for_this_order, // Matched size on the maker order
-                cur_value.size - matched_size_for_this_order, // Remaining size on the maker order
-                cur_value.order_book_type
-            );
-
-        if (is_cur_match_fully_consumed) {
-            orders.remove(&cur_key);
-        } else {
-            modify_order_data(
-                orders, &cur_key, |order_data| {
-                    order_data.size -= matched_size_for_this_order;
-                }
-            );
-        };
-        result
+        new_active_matched_order(
+            cur_value.order_id,
+            matched_size_for_this_order, // Matched size on the maker order
+            cur_value.size - matched_size_for_this_order, // Remaining size on the maker order
+            cur_value.order_book_type
+        )
     }
 
     fun get_single_match_for_buy_order(
@@ -247,9 +239,8 @@ module aptos_experimental::price_time_index {
     inline fun modify_order_data(
         orders: &mut BigOrderedMap<PriceTime, OrderData>, key: &PriceTime, modify_fn: |&mut  OrderData|
     ) {
-        let order = *orders.borrow(key);
-        modify_fn(&mut order);
-        orders.upsert(*key, order);
+        let order = orders.borrow_mut(key);
+        modify_fn(order);
     }
 
     public(friend) fun get_single_match_result(
