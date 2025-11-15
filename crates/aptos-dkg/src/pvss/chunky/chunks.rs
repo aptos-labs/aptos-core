@@ -4,7 +4,6 @@
 use ark_ff::{BigInteger, PrimeField};
 
 /// Converts a field element into little-endian chunks of `num_bits` bits.
-#[allow(dead_code)]
 pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
     assert!(
         num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64,
@@ -30,7 +29,6 @@ pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Ve
 }
 
 /// Reconstructs a field element from `num_bits`-bit chunks (little-endian order).
-#[allow(dead_code)]
 pub(crate) fn le_chunks_to_scalar<F: PrimeField>(num_bits: u8, chunks: &[F]) -> F {
     assert!(
         num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64, // TODO: so make num_bits a u8?

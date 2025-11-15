@@ -216,7 +216,7 @@ pub trait VerifyingKey:
     /// The associated signature type for this verifying key.
     type SignatureMaterial: Signature<VerifyingKeyMaterial = Self>;
 
-    /// We provide the striaghtfoward implementation which dispatches to the signature.
+    /// We provide the straightforward implementation which dispatches to the signature.
     fn verify_struct_signature<T: CryptoHash + Serialize>(
         &self,
         message: &T,
