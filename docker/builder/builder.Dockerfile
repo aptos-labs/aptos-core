@@ -1,6 +1,6 @@
 #syntax=docker/dockerfile:1.4
 
-FROM rust as rust-base
+FROM rust:trixie as rust-base
 WORKDIR /aptos
 
 
