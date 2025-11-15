@@ -50,6 +50,7 @@ use std::ops::{Mul, Sub};
 /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
 pub const DST: &[u8; 32] = b"APTOS_CHUNK_EG_FIELD_PVSS_FS_DST";
 
+// TODO: Should SoKs be added here?
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)] // Removed CryptoHasher - not compatible with <E: Pairing> and doesn't seem to be used?
 pub struct Transcript<E: Pairing> {
@@ -84,7 +85,8 @@ impl<E: Pairing> ValidCryptoMaterial for Transcript<E> {
     const AIP_80_PREFIX: &'static str = "";
 
     fn to_bytes(&self) -> Vec<u8> {
-        bcs::to_bytes(&self).expect("unexpected error during PVSS transcript serialization")
+        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
+        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
     }
 }
 
@@ -472,7 +474,7 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
         "Number of encrypted chunks must equal number of players"
     );
 
-    // Generate the batch range proof, given the `range_proof_commitment` produced during the PoK
+    // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
     let range_proof = dekart_univariate_v2::Proof::prove(
         &pp.pk_range_proof,
         &f_evals_chunked_flat,

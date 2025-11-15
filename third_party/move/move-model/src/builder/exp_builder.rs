@@ -14,7 +14,10 @@ use crate::{
         },
         module_builder::{ModuleBuilder, SpecBlockContext},
     },
-    metadata::{lang_feature_versions::SINT_LANGUAGE_VERSION_VALUE, LanguageVersion},
+    metadata::{
+        lang_feature_versions::{LANGUAGE_VERSION_FOR_RAC, SINT_LANGUAGE_VERSION_VALUE},
+        LanguageVersion,
+    },
     model::{
         FieldData, FieldId, FunctionKind, GlobalEnv, Loc, ModuleId, NodeId, Parameter, QualifiedId,
         QualifiedInstId, SpecFunId, StructId, TypeParameter, TypeParameterKind,
@@ -1241,7 +1244,7 @@ impl ExpTranslator<'_, '_, '_> {
                 self.check_language_version(
                     &loc,
                     "read/write access specifiers.",
-                    LanguageVersion::V2_3,
+                    LANGUAGE_VERSION_FOR_RAC,
                 )?;
             },
         }
