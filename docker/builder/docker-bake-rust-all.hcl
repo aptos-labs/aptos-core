@@ -67,8 +67,8 @@ group "forge-images" {
 target "debian-base" {
   dockerfile = "docker/builder/debian-base.Dockerfile"
   contexts = {
-    # Run `docker buildx imagetools inspect debian:bullseye` to find the latest multi-platform hash
-    debian = "docker-image://debian:bullseye@sha256:25c0cab214b810db1b3c8adef5a12a92596979abddf86bb364e8d9c9d111df9f"
+    # Run `docker buildx imagetools inspect debian:bookworm` to find the latest multi-platform hash
+    debian = "docker-image://debian:bookworm@sha256:d2f03914f2800ec623ae75d365543fc079bf8ec9d68279248e61fafd5cea13a9"
   }
 }
 
@@ -77,8 +77,8 @@ target "builder-base" {
   target     = "builder-base"
   context    = "."
   contexts = {
-    # Run `docker buildx imagetools inspect rust:1.80.1-bullseye` to find the latest multi-platform hash
-    rust = "docker-image://rust:1.80.1-bullseye@sha256:f6f599d3f027a97fb60cb87854199fcde390e25cee216712c3f9eede545b052e"
+    # Run `docker buildx imagetools inspect rust:1.91.1-bookworm` to find the latest multi-platform hash
+    rust = "docker-image://rust:1.91.1-bookworm@sha256:7f393e2a624aa44bc3c8d98b09357e2f3ff6a863e84b845dd717f07fd99b08c7"
   }
   args = {
     PROFILE            = "${PROFILE}"
