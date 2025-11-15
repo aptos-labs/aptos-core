@@ -75,7 +75,9 @@ A set of inline utility methods is provided instead, to provide guaranteed valid
 -  [Function `get_and_map`](#0x1_big_ordered_map_get_and_map)
 -  [Function `borrow_mut`](#0x1_big_ordered_map_borrow_mut)
 -  [Function `borrow_front`](#0x1_big_ordered_map_borrow_front)
+-  [Function `front_key`](#0x1_big_ordered_map_front_key)
 -  [Function `borrow_back`](#0x1_big_ordered_map_borrow_back)
+-  [Function `back_key`](#0x1_big_ordered_map_back_key)
 -  [Function `prev_key`](#0x1_big_ordered_map_prev_key)
 -  [Function `next_key`](#0x1_big_ordered_map_next_key)
 -  [Function `to_ordered_map`](#0x1_big_ordered_map_to_ordered_map)
@@ -887,8 +889,8 @@ Together with <code>allocate_spare_slots</code>, it allows to preallocate slots 
         min_leaf_index: <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>,
         max_leaf_index: <a href="big_ordered_map.md#0x1_big_ordered_map_ROOT_INDEX">ROOT_INDEX</a>,
         constant_kv_size: <b>false</b>, // Will be initialized in validate_static_size_and_init_max_degrees below.
-        inner_max_degree: inner_max_degree,
-        leaf_max_degree: leaf_max_degree
+        inner_max_degree,
+        leaf_max_degree
     };
     self.<a href="big_ordered_map.md#0x1_big_ordered_map_validate_static_size_and_init_max_degrees">validate_static_size_and_init_max_degrees</a>();
     self
@@ -1001,11 +1003,7 @@ Returns true iff the BigOrderedMap is empty.
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>&lt;K: store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): bool {
-    <b>if</b> (self.root.is_leaf) {
-        self.root.children.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()
-    } <b>else</b> {
-        <b>false</b>
-    }
+    self.root.is_leaf && self.root.children.<a href="big_ordered_map.md#0x1_big_ordered_map_is_empty">is_empty</a>()
 }
 </code></pre>
 
@@ -1454,11 +1452,12 @@ key, or an end iterator if such element doesn't exist.
     <b>let</b> node = self.<a href="big_ordered_map.md#0x1_big_ordered_map_borrow_node">borrow_node</a>(leaf);
     <b>assert</b>!(node.is_leaf, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="big_ordered_map.md#0x1_big_ordered_map_EINTERNAL_INVARIANT_BROKEN">EINTERNAL_INVARIANT_BROKEN</a>));
 
-    <b>let</b> child_lower_bound = node.children.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_lower_bound">internal_lower_bound</a>(key);
-    <b>if</b> (child_lower_bound.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(&node.children)) {
+    <b>let</b> children = &node.children;
+    <b>let</b> child_lower_bound = children.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_lower_bound">internal_lower_bound</a>(key);
+    <b>if</b> (child_lower_bound.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(children)) {
         self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_new_end_iter">internal_new_end_iter</a>()
     } <b>else</b> {
-        <b>let</b> iter_key = *child_lower_bound.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(&node.children);
+        <b>let</b> iter_key = *child_lower_bound.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>(children);
         <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>(leaf, child_lower_bound, iter_key)
     }
 }
@@ -1594,10 +1593,8 @@ Returns true iff the key exists in the map.
     <b>let</b> internal_lower_bound = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_lower_bound">internal_lower_bound</a>(key);
     <b>if</b> (internal_lower_bound.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_is_end">iter_is_end</a>(self)) {
         <b>false</b>
-    } <b>else</b> <b>if</b> (&internal_lower_bound.key == key) {
-        <b>true</b>
     } <b>else</b> {
-        <b>false</b>
+        &internal_lower_bound.key == key
     }
 }
 </code></pre>
@@ -1748,6 +1745,31 @@ In case of variable size, use either <code>borrow</code>, <code><b>copy</b></cod
 
 </details>
 
+<a id="0x1_big_ordered_map_front_key"></a>
+
+## Function `front_key`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_front_key">front_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): K
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_front_key">front_key</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): K {
+    <b>let</b> it = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_new_begin_iter">internal_new_begin_iter</a>();
+    *it.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>()
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x1_big_ordered_map_borrow_back"></a>
 
 ## Function `borrow_back`
@@ -1767,6 +1789,31 @@ In case of variable size, use either <code>borrow</code>, <code><b>copy</b></cod
     <b>let</b> it = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_new_end_iter">internal_new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(self);
     <b>let</b> key = *it.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>();
     (key, it.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow">iter_borrow</a>(self))
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_big_ordered_map_back_key"></a>
+
+## Function `back_key`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_back_key">back_key</a>&lt;K: <b>copy</b>, drop, store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">big_ordered_map::BigOrderedMap</a>&lt;K, V&gt;): K
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_back_key">back_key</a>&lt;K: drop + <b>copy</b> + store, V: store&gt;(self: &<a href="big_ordered_map.md#0x1_big_ordered_map_BigOrderedMap">BigOrderedMap</a>&lt;K, V&gt;): K {
+    <b>let</b> it = self.<a href="big_ordered_map.md#0x1_big_ordered_map_internal_new_end_iter">internal_new_end_iter</a>().<a href="big_ordered_map.md#0x1_big_ordered_map_iter_prev">iter_prev</a>(self);
+    *it.<a href="big_ordered_map.md#0x1_big_ordered_map_iter_borrow_key">iter_borrow_key</a>()
 }
 </code></pre>
 
@@ -2956,7 +3003,7 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_node">new_node</a>&lt;K: store, V: store&gt;(is_leaf: bool): <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
     Node::V1 {
-        is_leaf: is_leaf,
+        is_leaf,
         children: <a href="ordered_map.md#0x1_ordered_map_new">ordered_map::new</a>(),
         prev: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
         next: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
@@ -2985,8 +3032,8 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_node_with_children">new_node_with_children</a>&lt;K: store, V: store&gt;(is_leaf: bool, children: OrderedMap&lt;K, <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt;&gt;): <a href="big_ordered_map.md#0x1_big_ordered_map_Node">Node</a>&lt;K, V&gt; {
     Node::V1 {
-        is_leaf: is_leaf,
-        children: children,
+        is_leaf,
+        children,
         prev: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
         next: <a href="big_ordered_map.md#0x1_big_ordered_map_NULL_INDEX">NULL_INDEX</a>,
     }
@@ -3014,7 +3061,7 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_inner_child">new_inner_child</a>&lt;V: store&gt;(node_index: StoredSlot): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt; {
     Child::Inner {
-        node_index: node_index,
+        node_index,
     }
 }
 </code></pre>
@@ -3040,7 +3087,7 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_leaf_child">new_leaf_child</a>&lt;V: store&gt;(value: V): <a href="big_ordered_map.md#0x1_big_ordered_map_Child">Child</a>&lt;V&gt; {
     Child::Leaf {
-        value: value,
+        value,
     }
 }
 </code></pre>
@@ -3066,9 +3113,9 @@ Borrow a node mutably, given an index. Works for both root (i.e. inline) node an
 
 <pre><code><b>fun</b> <a href="big_ordered_map.md#0x1_big_ordered_map_new_iter">new_iter</a>&lt;K&gt;(node_index: u64, child_iter: <a href="ordered_map.md#0x1_ordered_map_IteratorPtr">ordered_map::IteratorPtr</a>, key: K): <a href="big_ordered_map.md#0x1_big_ordered_map_IteratorPtr">IteratorPtr</a>&lt;K&gt; {
     IteratorPtr::Some {
-        node_index: node_index,
-        child_iter: child_iter,
-        key: key,
+        node_index,
+        child_iter,
+        key,
     }
 }
 </code></pre>

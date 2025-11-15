@@ -15,14 +15,16 @@ use legacy_move_compiler::unit_test::{
     ExpectedFailure, ModuleTestPlan, NamedOrBytecodeModule, TestCase, TestPlan,
 };
 use move_binary_format::{
+    access::ModuleAccess,
     errors::{Location, VMResult},
-    file_format::CompiledModule,
+    file_format::{CompiledModule, StructFieldInformation},
 };
 use move_bytecode_utils::Modules;
 use move_core_types::{
     account_address::AccountAddress,
     effects::{ChangeSet, Op},
     identifier::IdentStr,
+    language_storage::{OPTION_MODULE_ID, OPTION_STRUCT_NAME_STR},
     value::serialize_values,
     vm_status::StatusCode,
 };
@@ -134,21 +136,51 @@ impl TestRunner {
                 move_stdlib::natives::GasParameters::zeros(),
             )
         });
-        let runtime_environment = RuntimeEnvironment::new_for_move_third_party_tests(
-            native_function_table,
-            enable_enum_option,
-        );
 
         let source_files = tests
             .files
             .values()
             .map(|(filepath, _)| filepath.to_string())
             .collect();
-        let modules = tests.module_info.values().map(|info| match info {
-            NamedOrBytecodeModule::Named(named_compiled_module) => &named_compiled_module.module,
-            NamedOrBytecodeModule::Bytecode(compiled_module) => compiled_module,
-        });
-        let mut starting_storage_state = setup_test_storage(modules, runtime_environment)?;
+        let modules = tests
+            .module_info
+            .values()
+            .map(|info| match info {
+                NamedOrBytecodeModule::Named(named_compiled_module) => {
+                    &named_compiled_module.module
+                },
+                NamedOrBytecodeModule::Bytecode(compiled_module) => compiled_module,
+            })
+            .collect::<Vec<&CompiledModule>>();
+        let mut option_found = false;
+        let mut enable_framework_for_option = true;
+        for module in &modules {
+            if module.self_name() == OPTION_MODULE_ID.name()
+                && module.self_addr() == OPTION_MODULE_ID.address()
+            {
+                for struct_def in &module.struct_defs {
+                    let handle = module.struct_handle_at(struct_def.struct_handle);
+                    if module.identifier_at(handle.name).as_str() == OPTION_STRUCT_NAME_STR {
+                        option_found = true;
+                        enable_framework_for_option = matches!(
+                            struct_def.field_information,
+                            StructFieldInformation::DeclaredVariants(_)
+                        );
+                        break;
+                    }
+                }
+                if option_found {
+                    break;
+                }
+            }
+        }
+        let runtime_environment = RuntimeEnvironment::new_for_move_third_party_tests(
+            native_function_table,
+            enable_enum_option,
+            enable_framework_for_option,
+        );
+        let mut starting_storage_state =
+            setup_test_storage(modules.into_iter(), runtime_environment)?;
         if let Some(genesis_state) = genesis_state {
             starting_storage_state.apply(genesis_state)?;
         }
