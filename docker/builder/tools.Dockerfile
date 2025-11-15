@@ -7,19 +7,19 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     install \
     wget \
     curl \
-    perl-base=5.32.1-4+deb11u4 \
-    libtinfo6=6.2+20201114-2+deb11u2 \
+    perl-base=5.40.1-6 \
+    libtinfo6=6.5+20250216-2 \
     git \
-            socat \
-    python3-botocore/bullseye \
-    awscli/bullseye \
+    socat \
+    python3-botocore/trixie \
+    awscli/trixie \
     gnupg2 \
     pigz
 
-RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
-    curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
-    apt-get -y update && \
-    apt-get -y install google-cloud-sdk
+# RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
+#     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
+#     apt-get -y update && \
+#     apt-get -y install google-cloud-sdk
 
 RUN ln -s /usr/bin/python3 /usr/local/bin/python
 COPY --link docker/tools/boto.cfg /etc/boto.cfg
