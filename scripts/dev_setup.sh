@@ -968,7 +968,20 @@ install_pkg wget "$PACKAGE_MANAGER"
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
   install_pkg cmake "$PACKAGE_MANAGER"
+
   install_pkg clang "$PACKAGE_MANAGER"
+  # Our execution-performance tests still run on a very old Ubuntu system (20.04).
+  # The default clang (clang-10) is very old and does not support `-march=x86-64-v3`.
+  # So we temporarily hack here to install a newer version.
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    LATEST_CLANG_VERSION=$(apt-cache search --names-only '^clang-[0-9][0-9]$' | awk '{print $1}' | sed 's/^clang-//' | sort -V | tail -1)
+    install_pkg "clang-$LATEST_CLANG_VERSION" "$PACKAGE_MANAGER"
+    "${PRE_COMMAND[@]}" update-alternatives --install \
+      /usr/bin/clang clang /usr/bin/clang-${LATEST_CLANG_VERSION} 100 \
+      --slave /usr/bin/clang++ clang++ /usr/bin/clang++-${LATEST_CLANG_VERSION}
+    "${PRE_COMMAND[@]}" update-alternatives --set clang /usr/bin/clang-${LATEST_CLANG_VERSION}
+  fi
+
   install_pkg llvm "$PACKAGE_MANAGER"
 
   install_openssl_dev "$PACKAGE_MANAGER"
