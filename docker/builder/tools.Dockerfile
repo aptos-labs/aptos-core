@@ -11,8 +11,8 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     libtinfo6=6.2+20201114-2+deb11u2 \
     git \
             socat \
-    python3-botocore/bullseye \
-    awscli/bullseye \
+    python3-botocore/bookworm \
+    awscli/bookworm \
     gnupg2 \
     pigz
 
