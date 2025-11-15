@@ -3,6 +3,7 @@
 
 use crate::loader::{
     FieldHandle, FieldInstantiation, StructDef, StructInstantiation, StructVariantInfo,
+    VariantFieldInfo,
 };
 use move_binary_format::{
     errors::{PartialVMError, PartialVMResult},
@@ -20,7 +21,7 @@ use move_core_types::{
     vm_status::StatusCode,
 };
 use move_vm_types::loaded_data::{
-    runtime_types::{AbilityInfo, Type, TypeBuilder},
+    runtime_types::{AbilityInfo, StructType, Type, TypeBuilder},
     struct_name_indexing::StructNameIndex,
 };
 use std::{
@@ -48,6 +49,15 @@ pub struct PackV2 {
     pub field_count: u16,
     pub struct_ty: Type,
     pub field_tys: Vec<Type>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BorrowVariantFieldV2 {
+    pub is_mut: bool,
+    pub def_struct_ty: std::sync::Arc<StructType>,
+    pub variants: Vec<u16>,
+    pub field_offset: usize,
+    pub field_ty: Type,
 }
 
 /// The VM's internal representation of instructions.
@@ -167,6 +177,7 @@ pub enum Instruction {
     TestVariantV2(TestVariantV2),
     BorrowFieldV2(Box<BorrowFieldV2>),
     PackV2(Box<PackV2>),
+    BorrowVariantFieldV2(Box<BorrowVariantFieldV2>),
 }
 
 pub(crate) struct BytecodeTransformer<'a> {
@@ -183,6 +194,8 @@ pub(crate) struct BytecodeTransformer<'a> {
     pub(crate) field_handles: &'a [FieldHandle],
     pub(crate) field_instantiations: &'a [FieldInstantiation],
 
+    pub(crate) variant_field_infos: &'a [VariantFieldInfo],
+
     // Caches for expensive type instantiation operations
     field_ty_cache: RefCell<HashMap<FieldInstantiationIndex, (Type, bool)>>,
     pack_field_tys_cache: RefCell<HashMap<StructDefInstantiationIndex, Vec<Type>>>,
@@ -196,6 +209,7 @@ impl<'a> BytecodeTransformer<'a> {
         struct_variant_instantiation_infos: &'a [StructVariantInfo],
         field_handles: &'a [FieldHandle],
         field_instantiations: &'a [FieldInstantiation],
+        variant_field_infos: &'a [VariantFieldInfo],
     ) -> Self {
         Self {
             use_v2_instructions: true, // TODO: get this from config/feature flag
@@ -206,6 +220,7 @@ impl<'a> BytecodeTransformer<'a> {
             struct_variant_instantiation_infos,
             field_handles,
             field_instantiations,
+            variant_field_infos,
             field_ty_cache: RefCell::new(HashMap::new()),
             pack_field_tys_cache: RefCell::new(HashMap::new()),
         }
@@ -314,10 +329,7 @@ impl<'a> BytecodeTransformer<'a> {
                     return Ok(false);
                 },
                 // Disallow variant field borrowing (not supported yet -- needs new instruction)
-                MutBorrowVariantField(_)
-                | MutBorrowVariantFieldGeneric(_)
-                | ImmBorrowVariantField(_)
-                | ImmBorrowVariantFieldGeneric(_) => {
+                MutBorrowVariantFieldGeneric(_) | ImmBorrowVariantFieldGeneric(_) => {
                     return Ok(false);
                 },
                 // Disallow vector operations other than VecLen (not supported yet -- needs new instruction)
@@ -371,6 +383,8 @@ impl<'a> BytecodeTransformer<'a> {
                         return Ok(false);
                     }
                 },
+                // - Variant field borrowing (stack-only, operates on references)
+                MutBorrowVariantField(_) | ImmBorrowVariantField(_) => {},
                 // - Vector operations (only VecLen is supported, for now)
                 VecLen(_) => {},
             }
@@ -569,6 +583,28 @@ impl<'a> BytecodeTransformer<'a> {
         })))
     }
 
+    fn transform_borrow_variant_field(
+        &self,
+        is_mut: bool,
+        idx: VariantFieldHandleIndex,
+        inline: bool,
+    ) -> PartialVMResult<Instruction> {
+        Ok(if self.use_v2_instructions || inline {
+            let variant_field_info = &self.variant_field_infos[idx.0 as usize];
+            Instruction::BorrowVariantFieldV2(Box::new(BorrowVariantFieldV2 {
+                is_mut,
+                def_struct_ty: variant_field_info.definition_struct_type.clone(),
+                variants: variant_field_info.variants.clone(),
+                field_offset: variant_field_info.offset,
+                field_ty: variant_field_info.uninstantiated_field_ty.clone(),
+            }))
+        } else if is_mut {
+            Instruction::MutBorrowVariantField(idx)
+        } else {
+            Instruction::ImmBorrowVariantField(idx)
+        })
+    }
+
     pub fn transform(&self, bytecode: Bytecode, inline: bool) -> PartialVMResult<Instruction> {
         use Bytecode as B;
         use Instruction as I;
@@ -609,13 +645,17 @@ impl<'a> BytecodeTransformer<'a> {
             B::MutBorrowLoc(idx) => I::MutBorrowLoc(idx),
             B::ImmBorrowLoc(idx) => I::ImmBorrowLoc(idx),
             B::MutBorrowField(idx) => self.transform_borrow_field(true, idx, inline)?,
-            B::MutBorrowVariantField(idx) => I::MutBorrowVariantField(idx),
+            B::MutBorrowVariantField(idx) => {
+                self.transform_borrow_variant_field(true, idx, inline)?
+            },
             B::MutBorrowFieldGeneric(idx) => {
                 self.transform_borrow_field_generic(true, idx, inline)?
             },
             B::MutBorrowVariantFieldGeneric(idx) => I::MutBorrowVariantFieldGeneric(idx),
             B::ImmBorrowField(idx) => self.transform_borrow_field(false, idx, inline)?,
-            B::ImmBorrowVariantField(idx) => I::ImmBorrowVariantField(idx),
+            B::ImmBorrowVariantField(idx) => {
+                self.transform_borrow_variant_field(false, idx, inline)?
+            },
             B::ImmBorrowFieldGeneric(idx) => {
                 self.transform_borrow_field_generic(false, idx, inline)?
             },

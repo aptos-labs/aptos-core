@@ -292,6 +292,45 @@ impl Module {
             });
         }
 
+        for variant_handle in module.variant_field_handles() {
+            let def_idx = variant_handle.struct_index;
+            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
+            let offset = variant_handle.field as usize;
+            let variants = variant_handle.variants.clone();
+            let ty = definition_struct_type
+                .field_at(Some(variants[0]), offset)?
+                .1
+                .clone();
+            variant_field_infos.push(VariantFieldInfo {
+                offset,
+                variants,
+                definition_struct_type,
+                uninstantiated_field_ty: ty,
+                instantiation: vec![],
+            });
+        }
+
+        for variant_inst in module.variant_field_instantiations() {
+            let variant_info = &variant_field_infos[variant_inst.handle.0 as usize];
+            let definition_struct_type = variant_info.definition_struct_type.clone();
+            let variants = variant_info.variants.clone();
+            let offset = variant_info.offset;
+            let instantiation = signature_table[variant_inst.type_parameters.0 as usize].clone();
+            // We can select one representative variant for finding the field type, all
+            // must have the same type as the verifier ensured.
+            let uninstantiated_ty = definition_struct_type
+                .field_at(Some(variants[0]), offset)?
+                .1
+                .clone();
+            variant_field_instantiation_infos.push(VariantFieldInfo {
+                offset,
+                uninstantiated_field_ty: uninstantiated_ty,
+                variants,
+                definition_struct_type,
+                instantiation,
+            });
+        }
+
         let bytecode_transformer = BytecodeTransformer::new(
             &structs,
             &struct_instantiations,
@@ -299,6 +338,7 @@ impl Module {
             &struct_variant_instantiation_infos,
             &field_handles,
             &field_instantiations,
+            &variant_field_infos,
         );
 
         for (idx, _) in module.function_defs().iter().enumerate() {
@@ -352,45 +392,6 @@ impl Module {
                 handle,
                 instantiation,
                 ty_args_id,
-            });
-        }
-
-        for variant_handle in module.variant_field_handles() {
-            let def_idx = variant_handle.struct_index;
-            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
-            let offset = variant_handle.field as usize;
-            let variants = variant_handle.variants.clone();
-            let ty = definition_struct_type
-                .field_at(Some(variants[0]), offset)?
-                .1
-                .clone();
-            variant_field_infos.push(VariantFieldInfo {
-                offset,
-                variants,
-                definition_struct_type,
-                uninstantiated_field_ty: ty,
-                instantiation: vec![],
-            });
-        }
-
-        for variant_inst in module.variant_field_instantiations() {
-            let variant_info = &variant_field_infos[variant_inst.handle.0 as usize];
-            let definition_struct_type = variant_info.definition_struct_type.clone();
-            let variants = variant_info.variants.clone();
-            let offset = variant_info.offset;
-            let instantiation = signature_table[variant_inst.type_parameters.0 as usize].clone();
-            // We can select one representative variant for finding the field type, all
-            // must have the same type as the verifier ensured.
-            let uninstantiated_ty = definition_struct_type
-                .field_at(Some(variants[0]), offset)?
-                .1
-                .clone();
-            variant_field_instantiation_infos.push(VariantFieldInfo {
-                offset,
-                uninstantiated_field_ty: uninstantiated_ty,
-                variants,
-                definition_struct_type,
-                instantiation,
             });
         }
 

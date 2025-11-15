@@ -3041,6 +3041,23 @@ impl Frame {
                             .operand_stack
                             .push(Value::struct_(Struct::pack(args)))?;
                     },
+                    Instruction::BorrowVariantFieldV2(instr) => {
+                        gas_meter.charge_simple_instr(
+                            if instr.is_mut {
+                                S::MutBorrowVariantField
+                            } else {
+                                S::ImmBorrowVariantField
+                            },
+                        )?;
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let field_ref = reference.borrow_variant_field(
+                            &instr.variants,
+                            instr.field_offset,
+                            &|v| instr.def_struct_ty.variant_name_for_message(v),
+                        )?;
+                        interpreter.operand_stack.push(field_ref)?;
+                    },
                 }
                 trace_recorder.record_successful_instruction(instruction);
 

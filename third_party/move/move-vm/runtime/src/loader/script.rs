@@ -103,7 +103,7 @@ impl Script {
             });
         }
 
-        let bytecode_transformer = BytecodeTransformer::new(&[], &[], &[], &[], &[], &[]);
+        let bytecode_transformer = BytecodeTransformer::new(&[], &[], &[], &[], &[], &[], &[]);
         let code = script
             .code
             .code
