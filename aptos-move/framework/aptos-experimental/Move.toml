@@ -3,7 +3,7 @@ name = "AptosExperimental"
 version = "1.0.0"
 
 [addresses]
-aptos_experimental = "0x7"
+aptos_experimental = "0x81535b820dcf336f8ef316d027f31b75eda6a6504818d49da71988eb3ac75a6c"
 
 [dependencies]
 AptosFramework = { local = "../aptos-framework" }
