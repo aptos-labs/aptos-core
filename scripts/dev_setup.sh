@@ -120,6 +120,29 @@ function install_build_essentials {
   #fi
 }
 
+function install_clang {
+  PACKAGE_MANAGER=$1
+  install_pkg clang "$PACKAGE_MANAGER"
+
+  # Our execution-performance tests still run on a very old Ubuntu system (20.04).
+  # The default clang (clang-10) is very old and does not support `-march=x86-64-v3`.
+  # So we temporarily hack here to install a newer version. We need at least clang-12.
+  CLANG_VERSION=$(clang -dM -E -x c - </dev/null | sed -n 's/^#define __clang_major__ //p')
+  if [[ "$BATCH_MODE" == "true" && "$PACKAGE_MANAGER" == "apt-get" && "$CLANG_VERSION" -le 11 ]]; then
+    LATEST_CLANG_VERSION=$(apt-cache search --names-only '^clang-[0-9][0-9]$' | awk '{print $1}' | sed 's/^clang-//' | sort -V | tail -1)
+    if [[ "$LATEST_CLANG_VERSION" -le 11 ]]; then
+      echo "Latest clang is clang-${LATEST_CLANG_VERSION}. Need at least clang-12".
+      exit 1
+    fi
+
+    install_pkg "clang-$LATEST_CLANG_VERSION" "$PACKAGE_MANAGER"
+    "${PRE_COMMAND[@]}" update-alternatives --install \
+      /usr/bin/clang clang /usr/bin/clang-${LATEST_CLANG_VERSION} 100 \
+      --slave /usr/bin/clang++ clang++ /usr/bin/clang++-${LATEST_CLANG_VERSION}
+    "${PRE_COMMAND[@]}" update-alternatives --set clang /usr/bin/clang-${LATEST_CLANG_VERSION}
+  fi
+}
+
 function install_protoc {
   INSTALL_PROTOC="true"
   echo "Installing protoc and plugins"
@@ -968,7 +991,7 @@ install_pkg wget "$PACKAGE_MANAGER"
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
   install_pkg cmake "$PACKAGE_MANAGER"
-  install_pkg clang "$PACKAGE_MANAGER"
+  install_clang "$PACKAGE_MANAGER"
   install_pkg llvm "$PACKAGE_MANAGER"
 
   install_openssl_dev "$PACKAGE_MANAGER"
