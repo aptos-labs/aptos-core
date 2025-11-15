@@ -1,13 +1,12 @@
 #syntax=docker/dockerfile:1.4
 
-FROM rust as rust-base
+FROM rust:bookworm as rust-base
 WORKDIR /aptos
 
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list &&  \
     apt update && apt-get --no-install-recommends install -y \
         binutils \
         clang \
