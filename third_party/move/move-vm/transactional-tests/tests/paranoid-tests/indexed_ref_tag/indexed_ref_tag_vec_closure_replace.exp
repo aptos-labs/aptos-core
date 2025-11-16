@@ -1,0 +1,12 @@
+processed 2 tasks
+task 0 lines 11-61:  publish [module 0xc0ffe6::vector_closure_confusion]
+task 1 lines 63-63:  run 0xc0ffe6::vector_closure_confusion::stale_vec_closure_replace --verbose
+Error: Function execution failed with VMError: {
+    message: invalid enum tag,
+    major_status: UNKNOWN_INVARIANT_VIOLATION_ERROR,
+    sub_status: None,
+    location: 0xc0ffe6::vector_closure_confusion,
+    indices: [],
+    offsets: [(FunctionDefinitionIndex(2), 18)],
+    exec_state: Some(ExecutionState { stack_trace: [] }),
+}

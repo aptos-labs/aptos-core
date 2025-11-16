@@ -1,0 +1,25 @@
+// Ensures the verifier rejects borrowing a field directly from an enum variant.
+// Without this failure, callers could bypass tag-aware `borrow_variant_field`.
+//# publish
+module 0xcafe1::enum_borrow
+
+enum Foo has drop
+  A
+    x: u64
+
+public fun borrow_field_fail()
+    local foo: Foo
+    local r: &u64
+
+    ld_u64 17
+    pack_variant Foo, A
+    st_loc foo
+
+    borrow_loc foo
+    borrow_field Foo, x
+    st_loc r
+
+    ret
+
+//# run 0xcafe1::enum_borrow::borrow_field_fail --verbose
+

@@ -1,0 +1,4 @@
+processed 2 tasks
+task 0 lines 9-26:  publish [module 0xc0ffe1::indexed_tag_happy]
+task 1 lines 28-28:  run 0xc0ffe1::indexed_tag_happy::read_tag_ok --verbose
+return values: 42

@@ -1,0 +1,25 @@
+//# publish
+module 0xcafe::vec_alias
+
+public fun alias_fail()
+    local v: vector<u64>
+    local r_mut: &mut u64
+    local r_imm: &u64
+
+    ld_const<vector<u64>> [10, 20]
+    st_loc v
+
+    mut_borrow_loc v
+    ld_u64 0
+    vec_mut_borrow<u64>
+    st_loc r_mut
+
+    borrow_loc v
+    ld_u64 0
+    vec_borrow<u64>
+    st_loc r_imm
+
+    ret
+
+//# run 0xcafe::vec_alias::alias_fail --verbose
+

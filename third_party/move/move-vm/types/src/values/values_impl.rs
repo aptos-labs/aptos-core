@@ -176,6 +176,7 @@ pub(crate) enum GlobalDataStatus {
 pub(crate) struct IndexedRef {
     idx: usize,
     container_ref: ContainerRef,
+    tag: Option<u16>,
 }
 
 /// An umbrella enum for references. It is used to hide the internals of the public type
@@ -662,11 +663,133 @@ impl Container {
 }
 
 impl IndexedRef {
+    /*
+     * Runtime enum-variant tag guard for IndexedRef
+     *
+     * Motivation
+     * ----------
+     * Move’s bytecode verifier enforces reference-safety (no aliasing violations, no destructive
+     * updates through aliases, etc.). However, if a verifier bug allows an enum value to be overwritten
+     * via a mutable alias while an immutable field reference to that enum is still live, a classic “stale field reference”
+     * can arise: the reference was created when the enum had variant A, but later the enum is rewritten to variant B, so reading
+     * the field at payload index 1 would be a type confusion.
+     *
+     * Idea
+     * ----
+     * Whenever a field reference is created via `borrow_variant_field`, the VM captures the
+     * current enum variant tag (a u16 stored at field 0 in the Struct backing the enum) and
+     * stores it in the `IndexedRef` (as `self.tag = Some(tag)`). On every later use of that
+     * `IndexedRef`, we re-read the current tag from the same Struct and compare it with the
+     * stored tag. If they differ, we abort with an invariant violation (“invalid enum tag”).
+     *
+     * Scope
+     * -----
+     * - Tagging applies only to `IndexedRef`s produced by `borrow_variant_field`. Other
+     *   `IndexedRef`s (e.g., from locals, generic/specialized vectors of primitives, closures)
+     *   have `self.tag = None` and skip this check.
+     * - The check is enforced at all observable uses of a tagged `IndexedRef`:
+     *   `read_ref`, `write_ref`, `equals`, `compare`, and value swaps that operate on
+     *   `IndexedRef`s.
+     *
+     * Precision and Non-Goals
+     * -----------------------
+     * - This is a local, value-layer guard. It does not replace the verifier or the runtime
+     *   alias checker; it simply makes the “stale enum-field reference” primitive harmless by
+     *   refusing to read/write through it after a variant change.
+     * - Moving containers (e.g., `mem::swap` of locals, `vec_swap` of inner vectors) does not
+     *   change the Struct content or its tag. Because `container_ref` points to the Struct
+     *   itself (not the outer vector slot), such moves do not trigger the guard and uses
+     *   continue to succeed.
+     * - Overwriting an enum in place through a mutable alias (e.g., `vec_mut_borrow` + `write_ref`,
+     *   or a mutable local/field ref) changes the tag. Any later use of the previously created,
+     *   tagged `IndexedRef` will abort before a type-confusing read or write can occur.
+     * - Reborrows/forwarding preserve the stored tag (we copy the `IndexedRef`, including its tag),
+     *   so the guard still triggers on use if the variant changes in the meantime.
+     *
+     * Error Semantics
+     * ---------------
+     * - On mismatch we return `UNKNOWN_INVARIANT_VIOLATION_ERROR` with message "invalid enum tag".
+     *   This reflects an internal safety violation observable only when code mutates an enum
+     *   behind a live, tagged reference.
+     *
+     * Examples
+     * --------
+     * 1) Variant overwrite (should abort):
+     *    - r = borrow_variant_field Foo, A::x         // r.tag = Some(A)
+     *    - ... obtain &mut to the same enum ...
+     *    - pack_variant Foo, B; write_ref             // rewrite enum to variant B
+     *    - read_ref r                                 // abort: "invalid enum tag"
+     *
+     * 2) Container moves (should succeed):
+     *    - r = borrow_variant_field Foo, A::x         // r.tag = Some(A)
+     *    - vec_swap<vector<Foo>> / mem::swap          // move containers; do not rewrite enum
+     *    - read_ref r                                 // OK: tag unchanged
+     *
+     * Relationship to the bytecodeverifier
+     * ---------------------------------------------------
+     * If the verifier’s aliasing rules hold, this guard is redundant and always passes. If, however,
+     * an implementation defect allows a destructive update through an alias (e.g., a bytecode verifier bug
+     * ), this guard dynamically prevents the resulting type confusion at the point of use.
+     *
+     * Clarification on “trusted code” (runtime)
+     * ------------------------------------------------------
+     * This tag guard is implemented in the value layer and is unconditional: it runs regardless
+     * of whether a function is marked trusted or which paranoid flags are enabled.
+     *
+     */
+    fn check_tag(&self) -> PartialVMResult<()> {
+        if let Some(tag) = &self.tag {
+            let current_tag = match self.container_ref.container() {
+                Container::Struct(vals) => {
+                    let vals = vals.borrow();
+                    vals.first()
+                        .and_then(|v| match v {
+                            Value::U16(x) => Some(*x),
+                            _ => None,
+                        })
+                        .ok_or_else(|| {
+                            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        })
+                },
+                Container::Locals(_)
+                | Container::Vec(_)
+                | Container::VecU8(_)
+                | Container::VecU64(_)
+                | Container::VecU128(_)
+                | Container::VecBool(_)
+                | Container::VecAddress(_)
+                | Container::VecU16(_)
+                | Container::VecU32(_)
+                | Container::VecU256(_)
+                | Container::VecI8(_)
+                | Container::VecI16(_)
+                | Container::VecI32(_)
+                | Container::VecI64(_)
+                | Container::VecI128(_)
+                | Container::VecI256(_) => {
+                    return Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    ))
+                },
+            }?;
+
+            if current_tag != *tag {
+                let msg = "invalid enum tag".to_string();
+                return Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(msg),
+                );
+            }
+        }
+        Ok(())
+    }
+
     #[cfg_attr(feature = "force-inline", inline(always))]
     fn copy_by_ref(&self) -> Self {
         Self {
             idx: self.idx,
             container_ref: self.container_ref.copy_by_ref(),
+            tag: self.tag,
         }
     }
 }
@@ -1070,6 +1193,8 @@ impl IndexedRef {
     fn equals(&self, other: &Self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<bool> {
         use Container::*;
 
+        self.check_tag()?;
+        other.check_tag()?;
         check_depth(depth, max_depth)?;
         let res = match (
             self.container_ref.container(),
@@ -1234,6 +1359,9 @@ impl IndexedRef {
         max_depth: Option<u64>,
     ) -> PartialVMResult<Ordering> {
         use Container::*;
+
+        self.check_tag()?;
+        other.check_tag()?;
 
         let res = match (
             self.container_ref.container(),
@@ -1412,6 +1540,7 @@ impl IndexedRef {
     fn read_ref(self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Value> {
         use Container::*;
 
+        self.check_tag()?;
         let res = match self.container_ref.container() {
             Vec(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
             Struct(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
@@ -1544,6 +1673,7 @@ impl ContainerRef {
 impl IndexedRef {
     fn write_ref(self, x: Value) -> PartialVMResult<()> {
         x.check_valid_for_indexed_ref(&self)?;
+        self.check_tag()?;
         match (self.container_ref.container(), &x) {
             (Container::Locals(r), _) | (Container::Vec(r), _) | (Container::Struct(r), _) => {
                 let mut v = r.borrow_mut();
@@ -1723,6 +1853,9 @@ impl ContainerRef {
 impl IndexedRef {
     fn swap_values(self, other: Self) -> PartialVMResult<()> {
         use Container::*;
+
+        self.check_tag()?;
+        other.check_tag()?;
 
         macro_rules! swap {
             ($r1:ident, $r2:ident) => {{
@@ -1908,7 +2041,7 @@ impl Reference {
 
 impl ContainerRef {
     #[cfg_attr(feature = "force-inline", inline(always))]
-    fn borrow_elem(&self, idx: usize) -> PartialVMResult<Value> {
+    fn borrow_elem(&self, idx: usize, tag: Option<u16>) -> PartialVMResult<Value> {
         let len = self.container().len();
         if idx >= len {
             return Err(
@@ -1938,6 +2071,7 @@ impl ContainerRef {
                 Value::IndexedRef(IndexedRef {
                     idx,
                     container_ref: self.copy_by_ref(),
+                    tag,
                 })
             };
         }
@@ -2033,7 +2167,7 @@ impl ContainerRef {
 
 impl StructRef {
     pub fn borrow_field(&self, idx: usize) -> PartialVMResult<Value> {
-        self.0.borrow_elem(idx)
+        self.0.borrow_elem(idx, None)
     }
 
     pub fn borrow_variant_field(
@@ -2044,7 +2178,7 @@ impl StructRef {
     ) -> PartialVMResult<Value> {
         let tag = self.get_variant_tag()?;
         if allowed.contains(&tag) {
-            Ok(self.0.borrow_elem(idx + 1)?)
+            Ok(self.0.borrow_elem(idx + 1, Some(tag))?)
         } else {
             Err(
                 PartialVMError::new(StatusCode::STRUCT_VARIANT_MISMATCH).with_message(format!(
@@ -2133,6 +2267,7 @@ impl Locals {
             | Value::DelayedFieldID { .. } => Ok(Value::IndexedRef(IndexedRef {
                 idx,
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
+                tag: None,
             })),
 
             Value::ContainerRef(_) | Value::Invalid | Value::IndexedRef(_) => Err(
@@ -2145,7 +2280,7 @@ impl Locals {
 
 impl SignerRef {
     pub fn borrow_signer(&self) -> PartialVMResult<Value> {
-        self.0.borrow_elem(1)
+        self.0.borrow_elem(1, None)
     }
 
     pub fn is_permissioned(&self) -> PartialVMResult<bool> {
@@ -3615,7 +3750,7 @@ impl VectorRef {
             return Err(PartialVMError::new(StatusCode::VECTOR_OPERATION_ERROR)
                 .with_sub_status(INDEX_OUT_OF_BOUNDS));
         }
-        self.0.borrow_elem(idx)
+        self.0.borrow_elem(idx, None)
     }
 
     /// Returns a RefCell reference to the underlying vector of a `&vector<u8>` value.
@@ -6023,4 +6158,129 @@ fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
         return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));
     }
     Ok(())
+}
+
+#[cfg(all(test, feature = "fuzzing"))]
+mod indexed_ref_prop_tests {
+    use super::*;
+    use move_core_types::vm_status::StatusCode;
+    use proptest::prelude::*;
+    use std::{cell::RefCell, rc::Rc};
+
+    #[derive(Clone, Debug)]
+    struct Mutation {
+        change_tag: bool,
+        new_tag: u16,
+        payload: u64,
+    }
+
+    fn mutation_strategy() -> impl Strategy<Value = Mutation> {
+        (any::<bool>(), any::<u16>(), any::<u64>()).prop_map(|(change_tag, new_tag, payload)| {
+            Mutation {
+                change_tag,
+                new_tag,
+                payload,
+            }
+        })
+    }
+
+    fn enum_fields(tag: u16, payload: u64) -> Vec<Value> {
+        vec![Value::u16(tag), Value::u64(payload)]
+    }
+
+    fn apply_mutation(
+        fields: &Rc<RefCell<Vec<Value>>>,
+        current_tag: u16,
+        mutation: &Mutation,
+    ) -> u16 {
+        let mut borrow = fields.borrow_mut();
+
+        let next_tag = if mutation.change_tag {
+            let mut candidate = mutation.new_tag;
+            if candidate == current_tag {
+                candidate = candidate.wrapping_add(1);
+            }
+            candidate
+        } else {
+            current_tag
+        };
+
+        borrow[0] = Value::u16(next_tag);
+        borrow[1] = Value::u64(mutation.payload);
+        next_tag
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(2000))]
+        #[test]
+        fn indexed_ref_tag_guard(mutations in proptest::collection::vec(mutation_strategy(), 0..6)) {
+            let stored_tag = 7u16;
+            let initial_payload = 55u64;
+
+            let fields = Rc::new(RefCell::new(enum_fields(stored_tag, initial_payload)));
+
+            let mut current_tag = stored_tag;
+            for mutation in &mutations {
+                current_tag = apply_mutation(&fields, current_tag, mutation);
+            }
+
+            let expect_ok = current_tag == stored_tag;
+
+            let indexed = IndexedRef {
+                idx: 1,
+                container_ref: ContainerRef::Local(Container::Struct(Rc::clone(&fields))),
+                tag: Some(stored_tag),
+            };
+
+            let read_result = indexed
+                .copy_by_ref()
+                .read_ref(1, Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH));
+            if expect_ok {
+                prop_assert!(read_result.is_ok());
+            } else {
+                let err = read_result.expect_err("tag mismatch should error");
+                prop_assert_eq!(err.major_status(), StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR);
+            }
+
+            let write_result = indexed
+                .copy_by_ref()
+                .write_ref(Value::u64(999));
+            if expect_ok {
+                prop_assert!(write_result.is_ok());
+            } else {
+                let err = write_result.expect_err("tag mismatch should error");
+                prop_assert_eq!(err.major_status(), StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR);
+            }
+
+            let other = IndexedRef {
+                idx: 1,
+                container_ref: indexed.container_ref.copy_by_ref(),
+                tag: Some(stored_tag),
+            };
+
+            let eq_result = indexed.equals(
+                &other,
+                1,
+                Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+            );
+            if expect_ok {
+                prop_assert!(eq_result.is_ok());
+            } else {
+                let err = eq_result.expect_err("tag mismatch should error");
+                prop_assert_eq!(err.major_status(), StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR);
+            }
+
+            let cmp_result = indexed.compare(
+                &other,
+                1,
+                Some(DEFAULT_MAX_VM_VALUE_NESTED_DEPTH),
+            );
+            if expect_ok {
+                prop_assert!(cmp_result.is_ok());
+            } else {
+                let err = cmp_result.expect_err("tag mismatch should error");
+                prop_assert_eq!(err.major_status(), StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR);
+            }
+        }
+    }
 }

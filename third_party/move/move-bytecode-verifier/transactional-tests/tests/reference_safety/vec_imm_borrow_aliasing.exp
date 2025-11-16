@@ -1,0 +1,19 @@
+processed 2 tasks
+task 0 lines 1-22:  publish [module 0xcafe::vec_alias]
+Error: Unable to publish module '000000000000000000000000000000000000000000000000000000000000cafe::vec_alias'. Got VMError: {
+    major_status: BORROWLOC_EXISTS_BORROW_ERROR,
+    sub_status: None,
+    location: 0xcafe::vec_alias,
+    indices: [(FunctionDefinition, 0)],
+    offsets: [(FunctionDefinitionIndex(0), 6)],
+}
+task 1 lines 24-24:  run 0xcafe::vec_alias::alias_fail --verbose
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 000000000000000000000000000000000000000000000000000000000000cafe::vec_alias doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

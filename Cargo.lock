@@ -6593,17 +6593,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3ac9f8b63eca6fd385229b3675f6cc0dc5c8a5c8a54a59d4f52ffd670d87b0c"
 
 [[package]]
-name = "bytecode-verifier-libfuzzer"
-version = "0.0.0"
-dependencies = [
- "arbitrary",
- "libfuzzer-sys",
- "move-binary-format",
- "move-bytecode-verifier",
- "move-core-types",
-]
-
-[[package]]
 name = "bytecode-verifier-tests"
 version = "0.1.0"
 dependencies = [
