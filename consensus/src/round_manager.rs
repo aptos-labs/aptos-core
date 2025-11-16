@@ -45,7 +45,7 @@ use aptos_consensus_types::{
     order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
     pipelined_block::PipelinedBlock,
-    proof_of_store::{ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
+    proof_of_store::{BatchInfo, ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     round_timeout::{RoundTimeout, RoundTimeoutMsg, RoundTimeoutReason},
@@ -95,8 +95,8 @@ pub enum UnverifiedEvent {
     OrderVoteMsg(Box<OrderVoteMsg>),
     SyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
-    SignedBatchInfo(Box<SignedBatchInfoMsg>),
-    ProofOfStoreMsg(Box<ProofOfStoreMsg>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfo>>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfo>>),
     OptProposalMsg(Box<OptProposalMsg>),
 }
 
@@ -107,7 +107,7 @@ impl UnverifiedEvent {
         self,
         peer_id: PeerId,
         validator: &ValidatorVerifier,
-        proof_cache: &ProofCache,
+        proof_cache: &ProofCache<BatchInfo>,
         quorum_store_enabled: bool,
         self_message: bool,
         max_num_batches: usize,
@@ -240,8 +240,8 @@ pub enum VerifiedEvent {
     OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
-    SignedBatchInfo(Box<SignedBatchInfoMsg>),
-    ProofOfStoreMsg(Box<ProofOfStoreMsg>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfo>>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfo>>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener

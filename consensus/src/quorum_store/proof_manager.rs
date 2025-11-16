@@ -21,7 +21,7 @@ use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
-    ReceiveProofs(ProofOfStoreMsg),
+    ReceiveProofs(ProofOfStoreMsg<BatchInfo>),
     ReceiveBatches(Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>),
     CommitNotification(u64, Vec<BatchInfo>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
@@ -62,7 +62,7 @@ impl ProofManager {
         }
     }
 
-    pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
+    pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore<BatchInfo>>) {
         for proof in proofs.into_iter() {
             self.batch_proof_queue.insert_proof(proof);
         }
