@@ -254,7 +254,10 @@ where
         );
 
         // benchmarks the sequence of WVUF::verify_share calls on shares from a specific subset of players
-        let bc: Vec<(fn(&WeightedConfigBlstrs, &mut ThreadRng) -> Vec<Player>, String)> = vec![
+        let bc: Vec<(
+            fn(&WeightedConfigBlstrs, &mut ThreadRng) -> Vec<Player>,
+            String,
+        )> = vec![
             (
                 WeightedConfigBlstrs::get_random_eligible_subset_of_players,
                 "random".to_string(),

@@ -172,7 +172,9 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
     wcs.push(WeightedConfigBlstrs::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
 
     // 7-out-of-15, weights [0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]
-    wcs.push(WeightedConfigBlstrs::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap());
+    wcs.push(
+        WeightedConfigBlstrs::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap(),
+    );
 
     wcs
 }
