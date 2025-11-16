@@ -49,7 +49,6 @@ pub type WeightedConfigBlstrs = WeightedConfig<ThresholdConfigBlstrs>;
 #[allow(type_alias_bounds)]
 pub type WeightedConfigArkworks<F: FftField> = WeightedConfig<ShamirThresholdConfig<F>>;
 
-
 impl<TC: ThresholdConfig> WeightedConfig<TC> {
     #[allow(non_snake_case)]
     /// Initializes a weighted secret sharing configuration with threshold weight `threshold_weight`
@@ -194,7 +193,6 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
         }
     }
 
-
     /// NOTE: RNG is passed in to maintain function signature compatibility with
     /// `SecretSharingConfig::get_random_eligible_subset_of_players`, so as to easily benchmark
     /// with different methods of sampling subsets.
@@ -276,13 +274,14 @@ impl WeightedConfigBlstrs {
     }
 }
 
-
 impl<TC: ThresholdConfig> Display for WeightedConfig<TC> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "weighted/{}-out-of-{}/{}-players",
-            self.tc.get_threshold(), self.tc.get_total_num_shares(), self.num_players
+            self.tc.get_threshold(),
+            self.tc.get_total_num_shares(),
+            self.num_players
         )
     }
 }
@@ -409,7 +408,8 @@ mod test {
         assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).id, 1);
 
         // 3-out-of-5, some weights are 0.
-        let wc = WeightedConfigBlstrs::new(1, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap();
+        let wc = WeightedConfigBlstrs::new(1, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0])
+            .unwrap();
         assert_eq!(
             vec![0, 0, 0, 0, 2, 4, 6, 6, 6, 6, 9, 12, 15, 15, 15],
             wc.starting_index
