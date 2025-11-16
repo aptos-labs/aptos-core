@@ -46,6 +46,7 @@ pub struct WeightedConfig<TC: ThresholdConfig> {
 pub type WeightedConfigBlstrs = WeightedConfig<ThresholdConfigBlstrs>;
 
 /// Weighted config for the Arkworks-based PVSS
+#[allow(type_alias_bounds)]
 pub type WeightedConfigArkworks<F: FftField> = WeightedConfig<ShamirThresholdConfig<F>>;
 
 
