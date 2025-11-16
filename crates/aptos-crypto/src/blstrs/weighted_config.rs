@@ -4,15 +4,16 @@
 //! Weighted threshold secret sharing configuration for BLSTRS-based PVSS.
 
 use crate::{
-    arkworks::shamir::{Reconstructable, ShamirShare},
+    arkworks::shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
     blstrs::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         threshold_config::ThresholdConfigBlstrs,
     },
     player::Player,
-    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
+    traits::{self, SecretSharingConfig as _, ThresholdConfig},
 };
 use anyhow::anyhow;
+use ark_ff::FftField;
 use more_asserts::assert_lt;
 use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
@@ -24,10 +25,10 @@ use std::fmt::{Display, Formatter};
 /// dealt secret given a PVSS transcript.
 #[allow(non_snake_case)]
 #[derive(Clone, Deserialize, Serialize, Debug, PartialEq, Eq)]
-pub struct WeightedConfig {
+pub struct WeightedConfig<TC: ThresholdConfig> {
     /// A weighted config is a $w$-out-of-$W$ threshold config, where $w$ is the minimum weight
     /// needed to reconstruct the secret and $W$ is the total weight.
-    tc: ThresholdConfigBlstrs,
+    tc: TC,
     /// The total number of players in the protocol.
     num_players: usize,
     /// Each player's weight
@@ -41,7 +42,14 @@ pub struct WeightedConfig {
     min_weight: usize,
 }
 
-impl WeightedConfig {
+/// Weighted config for the BLSTRS-based PVSS
+pub type WeightedConfigBlstrs = WeightedConfig<ThresholdConfigBlstrs>;
+
+/// Weighted config for the Arkworks-based PVSS
+pub type WeightedConfigArkworks<F: FftField> = WeightedConfig<ShamirThresholdConfig<F>>;
+
+
+impl<TC: ThresholdConfig> WeightedConfig<TC> {
     #[allow(non_snake_case)]
     /// Initializes a weighted secret sharing configuration with threshold weight `threshold_weight`
     /// and the $i$th player's weight stored in `weight[i]`.
@@ -74,7 +82,7 @@ impl WeightedConfig {
             starting_index.push(starting_index.last().unwrap() + w);
         }
 
-        let tc = ThresholdConfigBlstrs::new(threshold_weight, W)?;
+        let tc = TC::new(threshold_weight, W)?;
         Ok(WeightedConfig {
             tc,
             num_players: n,
@@ -126,18 +134,18 @@ impl WeightedConfig {
     }
 
     /// Returns a reference to the underlying unweighted threshold configuration.
-    pub fn get_threshold_config(&self) -> &ThresholdConfigBlstrs {
+    pub fn get_threshold_config(&self) -> &TC {
         &self.tc
     }
 
     /// Returns the threshold weight required to reconstruct the secret.
     pub fn get_threshold_weight(&self) -> usize {
-        self.tc.t
+        self.tc.get_threshold()
     }
 
     /// Returns the total weight of all players combined.
     pub fn get_total_weight(&self) -> usize {
-        self.tc.n
+        self.tc.get_total_num_shares()
     }
 
     /// Returns the weight of a specific player.
@@ -185,15 +193,6 @@ impl WeightedConfig {
         }
     }
 
-    /// Returns a reference to the precomputed batch evaluation domain.
-    pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
-        self.tc.get_batch_evaluation_domain()
-    }
-
-    /// Returns a reference to the primary evaluation domain.
-    pub fn get_evaluation_domain(&self) -> &EvaluationDomain {
-        self.tc.get_evaluation_domain()
-    }
 
     /// NOTE: RNG is passed in to maintain function signature compatibility with
     /// `SecretSharingConfig::get_random_eligible_subset_of_players`, so as to easily benchmark
@@ -251,7 +250,7 @@ impl WeightedConfig {
         let mut picked_players = vec![];
 
         let mut current_weight = 0;
-        while current_weight < self.tc.t {
+        while current_weight < self.tc.get_threshold() {
             let (player, weight) = player_and_weights.pop().unwrap();
 
             picked_players.push(player);
@@ -264,17 +263,30 @@ impl WeightedConfig {
     }
 }
 
-impl Display for WeightedConfig {
+impl WeightedConfigBlstrs {
+    /// Returns a reference to the precomputed batch evaluation domain.
+    pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
+        self.tc.get_batch_evaluation_domain()
+    }
+
+    /// Returns a reference to the primary evaluation domain.
+    pub fn get_evaluation_domain(&self) -> &EvaluationDomain {
+        self.tc.get_evaluation_domain()
+    }
+}
+
+
+impl<TC: ThresholdConfig> Display for WeightedConfig<TC> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
             "weighted/{}-out-of-{}/{}-players",
-            self.tc.t, self.tc.n, self.num_players
+            self.tc.get_threshold(), self.tc.get_total_num_shares(), self.num_players
         )
     }
 }
 
-impl traits::SecretSharingConfig for WeightedConfig {
+impl<TC: ThresholdConfig> traits::SecretSharingConfig for WeightedConfig<TC> {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where
@@ -300,7 +312,7 @@ impl traits::SecretSharingConfig for WeightedConfig {
             .collect::<Vec<(usize, usize)>>();
         let mut current_weight = 0;
 
-        while current_weight < self.tc.t {
+        while current_weight < self.tc.get_threshold() {
             // pick a random player, and move it to the picked set
             let idx = rng.gen_range(0, player_and_weights.len());
             let (player_id, weight) = player_and_weights[idx];
@@ -330,17 +342,17 @@ impl traits::SecretSharingConfig for WeightedConfig {
     }
 
     fn get_total_num_shares(&self) -> usize {
-        self.tc.n
+        self.tc.get_total_num_shares()
     }
 }
 
 /// Implements weighted reconstruction of a secret `SK` through the existing unweighted reconstruction
 /// implementation of `SK`.
-impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig> for SK {
+impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfigBlstrs> for SK {
     type ShareValue = Vec<SK::ShareValue>;
 
     fn reconstruct(
-        sc: &WeightedConfig,
+        sc: &WeightedConfigBlstrs,
         shares: &[ShamirShare<Self::ShareValue>],
     ) -> anyhow::Result<Self> {
         let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
@@ -370,25 +382,25 @@ impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig>
 
 #[cfg(test)]
 mod test {
-    use crate::{blstrs::weighted_config::WeightedConfig, traits::SecretSharingConfig as _};
+    use crate::{blstrs::weighted_config::WeightedConfigBlstrs, traits::SecretSharingConfig as _};
 
     #[test]
     fn bvt() {
         // 1-out-of-1 weighted
-        let wc = WeightedConfig::new(1, vec![1]).unwrap();
+        let wc = WeightedConfigBlstrs::new(1, vec![1]).unwrap();
         assert_eq!(wc.starting_index.len(), 1);
         assert_eq!(wc.starting_index[0], 0);
         assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
 
         // 1-out-of-2, weights 2
-        let wc = WeightedConfig::new(1, vec![2]).unwrap();
+        let wc = WeightedConfigBlstrs::new(1, vec![2]).unwrap();
         assert_eq!(wc.starting_index.len(), 1);
         assert_eq!(wc.starting_index[0], 0);
         assert_eq!(wc.get_virtual_player(&wc.get_player(0), 0).id, 0);
         assert_eq!(wc.get_virtual_player(&wc.get_player(0), 1).id, 1);
 
         // 1-out-of-2, weights 1, 1
-        let wc = WeightedConfig::new(1, vec![1, 1]).unwrap();
+        let wc = WeightedConfigBlstrs::new(1, vec![1, 1]).unwrap();
         assert_eq!(wc.starting_index.len(), 2);
         assert_eq!(wc.starting_index[0], 0);
         assert_eq!(wc.starting_index[1], 1);
@@ -396,7 +408,7 @@ mod test {
         assert_eq!(wc.get_virtual_player(&wc.get_player(1), 0).id, 1);
 
         // 3-out-of-5, some weights are 0.
-        let wc = WeightedConfig::new(1, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap();
+        let wc = WeightedConfigBlstrs::new(1, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap();
         assert_eq!(
             vec![0, 0, 0, 0, 2, 4, 6, 6, 6, 6, 9, 12, 15, 15, 15],
             wc.starting_index

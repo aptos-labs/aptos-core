@@ -23,4 +23,4 @@ pub use aptos_crypto::{
     player::Player,
 };
 pub use low_degree_test::LowDegreeTest;
-pub use weighted::{GenericWeighting, WeightedConfig};
+pub use weighted::{GenericWeighting, WeightedConfigBlstrs};
