@@ -3,5 +3,5 @@
 // SPDX-License-Identifier: Apache-2.0
 
 mod digest;
-pub mod resolution_graph;
 mod git;
+pub mod resolution_graph;

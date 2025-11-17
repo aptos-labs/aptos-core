@@ -4,7 +4,7 @@
 
 use crate::{
     package_hooks,
-    resolution::digest::compute_digest,
+    resolution::{digest::compute_digest, git},
     source_package::{
         layout::SourcePackageLayout,
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
@@ -34,7 +34,6 @@ use std::{
     process::{Command, Stdio},
     rc::Rc,
 };
-use crate::resolution::git;
 
 pub type ResolvedTable = ResolutionTable<AccountAddress>;
 pub type ResolvedPackage = ResolutionPackage<AccountAddress>;
@@ -597,7 +596,6 @@ impl ResolvingGraph {
                 // If the cached folder does not exist, download and clone accordingly
                 git::clone(git_url, git_path, dep_name)?;
                 git::checkout(git_path, git_rev, dep_name)?;
-
             } else if !skip_fetch_latest_git_deps {
                 // Confirm git is available.
                 git::confirm_git_available()?;
