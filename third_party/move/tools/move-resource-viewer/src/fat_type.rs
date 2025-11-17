@@ -9,7 +9,10 @@ use move_core_types::{
     ability::AbilitySet,
     account_address::AccountAddress,
     identifier::Identifier,
-    language_storage::{FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag},
+    language_storage::{
+        FunctionParamOrReturnTag, FunctionTag, StructTag, TypeTag, TABLE_MODULE_ID,
+        TABLE_STRUCT_NAME,
+    },
     value::{MoveStructLayout, MoveTypeLayout},
     vm_status::StatusCode,
 };
@@ -49,6 +52,10 @@ pub(crate) struct FatStructType {
     pub abilities: WrappedAbilitySet,
     pub ty_args: Vec<FatType>,
     pub layout: FatStructLayout,
+    // Whether this struct transitively contains 0x1::table::Table types. This
+    // is true if this here is a table itself. Extends to the type arguments and
+    // the layout.
+    pub contains_tables: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialOrd, Ord, PartialEq, Eq)]
@@ -111,6 +118,14 @@ pub(crate) struct FatStructRef {
     rc: Rc<FatStructType>,
 }
 
+/// Used as a key for caching struct related info.
+#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
+pub(crate) struct StructName {
+    pub address: AccountAddress,
+    pub module: Identifier,
+    pub name: Identifier,
+}
+
 impl FatStructRef {
     pub(crate) fn new(data: FatStructType) -> Self {
         FatStructRef { rc: Rc::new(data) }
@@ -160,11 +175,19 @@ impl FatStructType {
     pub fn subst(
         &self,
         ty_args: &[FatType],
+        subst_struct: &impl Fn(
+            &FatStructType,
+            &[FatType],
+            &mut Limiter,
+        ) -> PartialVMResult<FatStructRef>,
         limiter: &mut Limiter,
     ) -> PartialVMResult<FatStructType> {
         limiter.charge(std::mem::size_of::<AccountAddress>())?;
         limiter.charge(self.module.as_bytes().len())?;
         limiter.charge(self.name.as_bytes().len())?;
+        // self.contains_tables already reflects tables directly used in field types, we
+        // only need to combine it here with tables used in type arguments.
+        let contains_tables = self.contains_tables || ty_args.iter().any(|t| t.contains_tables());
         Ok(Self {
             address: self.address,
             module: self.module.clone(),
@@ -173,13 +196,13 @@ impl FatStructType {
             ty_args: self
                 .ty_args
                 .iter()
-                .map(|ty| ty.subst(ty_args, limiter))
+                .map(|ty| ty.subst(ty_args, subst_struct, limiter))
                 .collect::<PartialVMResult<_>>()?,
             layout: match &self.layout {
                 FatStructLayout::Singleton(fields) => FatStructLayout::Singleton(
                     fields
                         .iter()
-                        .map(|ty| ty.subst(ty_args, limiter))
+                        .map(|ty| ty.subst(ty_args, subst_struct, limiter))
                         .collect::<PartialVMResult<_>>()?,
                 ),
                 FatStructLayout::Variants(variants) => FatStructLayout::Variants(
@@ -188,13 +211,22 @@ impl FatStructType {
                         .map(|fields| {
                             fields
                                 .iter()
-                                .map(|ty| ty.subst(ty_args, limiter))
+                                .map(|ty| ty.subst(ty_args, subst_struct, limiter))
                                 .collect::<PartialVMResult<_>>()
                         })
                         .collect::<PartialVMResult<_>>()?,
                 ),
             },
+            contains_tables,
         })
+    }
+
+    pub fn struct_name(&self) -> StructName {
+        StructName {
+            address: self.address,
+            module: self.module.clone(),
+            name: self.name.clone(),
+        }
     }
 
     pub fn struct_tag(&self, limiter: &mut Limiter) -> PartialVMResult<StructTag> {
@@ -215,6 +247,13 @@ impl FatStructType {
             type_args: ty_args,
         })
     }
+
+    pub fn is_table(&self) -> bool {
+        let table_id = &*TABLE_MODULE_ID;
+        self.address == table_id.address
+            && self.module == table_id.name
+            && self.name == *TABLE_STRUCT_NAME
+    }
 }
 
 impl FatFunctionType {
@@ -231,10 +270,19 @@ impl FatFunctionType {
         })
     }
 
-    pub fn subst(&self, ty_args: &[FatType], limiter: &mut Limiter) -> PartialVMResult<Self> {
+    pub fn subst(
+        &self,
+        ty_args: &[FatType],
+        subst_struct: &impl Fn(
+            &FatStructType,
+            &[FatType],
+            &mut Limiter,
+        ) -> PartialVMResult<FatStructRef>,
+        limiter: &mut Limiter,
+    ) -> PartialVMResult<Self> {
         let subst_slice = |limiter: &mut Limiter, tys: &[FatType]| {
             tys.iter()
-                .map(|ty| ty.subst(ty_args, limiter))
+                .map(|ty| ty.subst(ty_args, subst_struct, limiter))
                 .collect::<PartialVMResult<Vec<_>>>()
         };
         Ok(FatFunctionType {
@@ -306,7 +354,16 @@ impl FatType {
         tys.iter().map(|ty| ty.clone_with_limit(limit)).collect()
     }
 
-    pub fn subst(&self, ty_args: &[FatType], limit: &mut Limiter) -> PartialVMResult<FatType> {
+    pub fn subst(
+        &self,
+        ty_args: &[FatType],
+        subst_struct: &impl Fn(
+            &FatStructType,
+            &[FatType],
+            &mut Limiter,
+        ) -> PartialVMResult<FatStructRef>,
+        limit: &mut Limiter,
+    ) -> PartialVMResult<FatType> {
         use FatType::*;
 
         let res = match self {
@@ -339,23 +396,33 @@ impl FatType {
             I256 => I256,
             Address => Address,
             Signer => Signer,
-            Vector(ty) => Vector(Box::new(ty.subst(ty_args, limit)?)),
-            Reference(ty) => Reference(Box::new(ty.subst(ty_args, limit)?)),
-            MutableReference(ty) => MutableReference(Box::new(ty.subst(ty_args, limit)?)),
+            Vector(ty) => Vector(Box::new(ty.subst(ty_args, subst_struct, limit)?)),
+            Reference(ty) => Reference(Box::new(ty.subst(ty_args, subst_struct, limit)?)),
+            MutableReference(ty) => {
+                MutableReference(Box::new(ty.subst(ty_args, subst_struct, limit)?))
+            },
 
-            Struct(struct_ty) => Struct(FatStructRef::new(struct_ty.subst(ty_args, limit)?)),
+            Struct(struct_ty) => {
+                if struct_ty.ty_args.is_empty() {
+                    // If the struct has no type parameters, it's field types cannot be effected
+                    // by type substitution.
+                    Struct(struct_ty.clone())
+                } else {
+                    Struct((*subst_struct)(struct_ty, ty_args, limit)?)
+                }
+            },
 
-            Function(fun_ty) => Function(Box::new(fun_ty.subst(ty_args, limit)?)),
+            Function(fun_ty) => Function(Box::new(fun_ty.subst(ty_args, subst_struct, limit)?)),
             Runtime(tys) => Runtime(
                 tys.iter()
-                    .map(|ty| ty.subst(ty_args, limit))
+                    .map(|ty| ty.subst(ty_args, subst_struct, limit))
                     .collect::<PartialVMResult<Vec<_>>>()?,
             ),
             RuntimeVariants(vars) => RuntimeVariants(
                 vars.iter()
                     .map(|tys| {
                         tys.iter()
-                            .map(|ty| ty.subst(ty_args, limit))
+                            .map(|ty| ty.subst(ty_args, subst_struct, limit))
                             .collect::<PartialVMResult<Vec<_>>>()
                     })
                     .collect::<PartialVMResult<Vec<Vec<_>>>>()?,
@@ -459,73 +526,32 @@ impl FatType {
             .map(|l| Self::from_runtime_layout(l, limit))
             .collect()
     }
-}
 
-impl From<&TypeTag> for FatType {
-    fn from(tag: &TypeTag) -> FatType {
-        use FatType::*;
-        match tag {
-            TypeTag::Bool => Bool,
-            TypeTag::U8 => U8,
-            TypeTag::U16 => U16,
-            TypeTag::U32 => U32,
-            TypeTag::U64 => U64,
-            TypeTag::U128 => U128,
-            TypeTag::I8 => I8,
-            TypeTag::I16 => I16,
-            TypeTag::I32 => I32,
-            TypeTag::I64 => I64,
-            TypeTag::I128 => I128,
-            TypeTag::I256 => I256,
-            TypeTag::Address => Address,
-            TypeTag::Signer => Signer,
-            TypeTag::Vector(inner) => Vector(Box::new(inner.as_ref().into())),
-            TypeTag::Struct(inner) => Struct(FatStructRef::new(inner.as_ref().into())),
-            TypeTag::Function(inner) => Function(Box::new(inner.as_ref().into())),
-            TypeTag::U256 => U256,
-        }
-    }
-}
-
-impl From<&StructTag> for FatStructType {
-    fn from(struct_tag: &StructTag) -> FatStructType {
-        FatStructType {
-            address: struct_tag.address,
-            module: struct_tag.module.clone(),
-            name: struct_tag.name.clone(),
-            abilities: WrappedAbilitySet(AbilitySet::EMPTY), // We can't get abilities from a struct tag
-            ty_args: struct_tag
-                .type_args
-                .iter()
-                .map(|inner| inner.into())
-                .collect(),
-            layout: FatStructLayout::Singleton(vec![]), // We can't get field types from struct tag
-        }
-    }
-}
-
-impl From<&FunctionParamOrReturnTag> for FatType {
-    fn from(tag: &FunctionParamOrReturnTag) -> FatType {
-        use FatType::*;
-        match tag {
-            FunctionParamOrReturnTag::Reference(tag) => Reference(Box::new(tag.into())),
-            FunctionParamOrReturnTag::MutableReference(tag) => {
-                MutableReference(Box::new(tag.into()))
+    pub(crate) fn contains_tables(&self) -> bool {
+        match self {
+            FatType::Struct(st) => st.contains_tables,
+            FatType::MutableReference(ty) | FatType::Reference(ty) | FatType::Vector(ty) => {
+                ty.contains_tables()
             },
-            FunctionParamOrReturnTag::Value(tag) => tag.into(),
-        }
-    }
-}
-
-impl From<&FunctionTag> for FatFunctionType {
-    fn from(fun_tag: &FunctionTag) -> FatFunctionType {
-        let into_slice = |tys: &[FunctionParamOrReturnTag]| {
-            tys.iter().map(|ty| ty.into()).collect::<Vec<FatType>>()
-        };
-        FatFunctionType {
-            args: into_slice(&fun_tag.args),
-            results: into_slice(&fun_tag.results),
-            abilities: fun_tag.abilities,
+            FatType::Runtime(tys) => tys.iter().any(|ty| ty.contains_tables()),
+            FatType::RuntimeVariants(vars) => vars.iter().flatten().any(|ty| ty.contains_tables()),
+            FatType::Bool
+            | FatType::U8
+            | FatType::U64
+            | FatType::U128
+            | FatType::Address
+            | FatType::Signer
+            | FatType::TyParam(_)
+            | FatType::U16
+            | FatType::U32
+            | FatType::U256
+            | FatType::Function(_)
+            | FatType::I8
+            | FatType::I16
+            | FatType::I32
+            | FatType::I64
+            | FatType::I128
+            | FatType::I256 => false,
         }
     }
 }
