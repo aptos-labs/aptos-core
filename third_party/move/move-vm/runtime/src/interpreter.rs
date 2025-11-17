@@ -662,7 +662,7 @@ where
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    let fn_guard = VM_PROFILER.function_start(&fun);
+                    let fn_guard = VM_PROFILER.function_start(callee.as_ref());
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,

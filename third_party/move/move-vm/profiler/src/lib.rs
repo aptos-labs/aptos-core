@@ -24,12 +24,6 @@ pub trait ProfilerFunction {
     fn name(&self) -> String;
 }
 
-impl ProfilerFunction for Box<dyn AbstractFunction> {
-    fn name(&self) -> String {
-        self.to_canonical_string()
-    }
-}
-
 /// An instruction that can be profiled.
 pub trait ProfilerInstruction {
     fn name(&self) -> String;
