@@ -14,5 +14,5 @@ To use this profiler, build the binary with the `probe-profiler` feature enabled
 Example using **DTrace**:
 
 ```bash
-sudo dtrace -s trace_vm_all.d -c <COMPILED_BINARY>
+sudo dtrace -s <DTRACE_SCRIPT> -c <COMPILED_BINARY>
 ```
