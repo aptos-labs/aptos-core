@@ -16,7 +16,7 @@ use move_core_types::{
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, StructTag, TypeTag},
     transaction_argument::TransactionArgument,
-    value::{MoveTypeLayout, MoveValue},
+    value::{MoveStruct, MoveTypeLayout, MoveValue},
 };
 use move_resource_viewer::MoveValueAnnotator;
 pub use move_resource_viewer::{
@@ -30,6 +30,16 @@ impl<'a, S: StateView> AptosValueAnnotator<'a, S> {
     pub fn new(state_view: &'a S) -> Self {
         let view = ModuleView::new(state_view);
         Self(MoveValueAnnotator::new(view))
+    }
+
+    /// Collect information about tables contained in the value represented by the blob.
+    pub fn collect_table_info(
+        &self,
+        ty_tag: &TypeTag,
+        blob: &[u8],
+        infos: &mut Vec<(StructTag, MoveStruct)>,
+    ) -> anyhow::Result<()> {
+        self.0.collect_table_info(ty_tag, blob, infos)
     }
 
     pub fn view_value(&self, ty_tag: &TypeTag, blob: &[u8]) -> anyhow::Result<AnnotatedMoveValue> {

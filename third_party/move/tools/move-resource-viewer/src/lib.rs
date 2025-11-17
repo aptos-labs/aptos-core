@@ -3,14 +3,15 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::fat_type::{
-    FatFunctionType, FatStructLayout, FatStructRef, FatStructType, FatType, WrappedAbilitySet,
+    FatFunctionType, FatStructLayout, FatStructRef, FatStructType, FatType, StructName,
+    WrappedAbilitySet,
 };
 use anyhow::{anyhow, bail};
 pub use limit::Limiter;
 use move_binary_format::{
     access::{ModuleAccess, ScriptAccess},
     binary_views::BinaryIndexedView,
-    errors::{Location, PartialVMError},
+    errors::{Location, PartialVMError, PartialVMResult},
     file_format::{
         CompiledScript, FieldDefinition, Signature, SignatureToken, StructDefinitionIndex,
         StructFieldInformation, StructHandleIndex,
@@ -25,7 +26,9 @@ use move_core_types::{
     function::{ClosureMask, MoveClosure},
     identifier::{IdentStr, Identifier},
     int256,
-    language_storage::{FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag},
+    language_storage::{
+        FunctionParamOrReturnTag, ModuleId, StructTag, TypeTag, TABLE_MODULE_ID, TABLE_STRUCT_NAME,
+    },
     transaction_argument::{convert_txn_args, TransactionArgument},
     value::{MoveStruct, MoveTypeLayout, MoveValue},
     vm_status::VMStatus,
@@ -111,13 +114,8 @@ pub struct MoveValueAnnotator<V> {
     /// A cache for fat type info for struct instantiations. This cache is build from
     /// substituting parameters for the uninstantiated types in `fat_struct_def_cache`.
     fat_struct_inst_cache: RefCell<BTreeMap<(StructName, Vec<FatType>), FatStructRef>>,
-}
-
-#[derive(Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Hash)]
-struct StructName {
-    address: AccountAddress,
-    module: Identifier,
-    name: Identifier,
+    /// A cache for whether type tags represent types with tables
+    contains_tables_cache: RefCell<BTreeMap<TypeTag, bool>>,
 }
 
 impl<V: CompiledModuleView> MoveValueAnnotator<V> {
@@ -126,6 +124,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             module_viewer,
             fat_struct_def_cache: RefCell::default(),
             fat_struct_inst_cache: RefCell::default(),
+            contains_tables_cache: RefCell::default(),
         }
     }
 
@@ -231,18 +230,54 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             args.len(),
         );
 
-        // Make an approximation at the fat types for the type arguments
-        let ty_args: Vec<FatType> = ty_args.iter().map(|inner| inner.into()).collect();
-
-        types
+        // Convert type args
+        let ty_args: Vec<FatType> = ty_args
             .iter()
-            .enumerate()
-            .map(|(i, ty)| {
-                ty.subst(&ty_args, limit)
-                    .map_err(anyhow::Error::from)
-                    .and_then(|fat_type| self.view_value_by_fat_type(&fat_type, &args[i], limit))
-            })
-            .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
+            .map(|ty| self.resolve_type_impl(ty, limit))
+            .collect::<anyhow::Result<_>>()?;
+
+        if ty_args.is_empty() {
+            types
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| self.view_value_by_fat_type(ty, &args[i], limit))
+                .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
+        } else {
+            types
+                .iter()
+                .enumerate()
+                .map(|(i, ty)| {
+                    ty.subst(&ty_args, &self.struct_substitutor(), limit)
+                        .map_err(anyhow::Error::from)
+                        .and_then(|fat_type| {
+                            self.view_value_by_fat_type(&fat_type, &args[i], limit)
+                        })
+                })
+                .collect::<anyhow::Result<Vec<AnnotatedMoveValue>>>()
+        }
+    }
+
+    fn struct_substitutor(
+        &self,
+    ) -> impl Fn(&FatStructType, &[FatType], &mut Limiter) -> PartialVMResult<FatStructRef> {
+        |st, ty_args, limiter| {
+            assert!(
+                !ty_args.is_empty(),
+                "Type arguments cannot be empty for substitution"
+            );
+            let st_ty_args = st
+                .ty_args
+                .iter()
+                .map(|ty| ty.subst(ty_args, &self.struct_substitutor(), limiter))
+                .collect::<PartialVMResult<Vec<_>>>()?;
+            self.resolve_generic_struct(st.struct_name(), st_ty_args, limiter)
+                .map_err(|e| {
+                    PartialVMError::new_invariant_violation(format!(
+                        "cannot annotate generic value: {}",
+                        e
+                    ))
+                })
+        }
     }
 
     fn resolve_function_types<F>(
@@ -376,9 +411,13 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
             return Ok(fat_ty.clone());
         }
         let base_type = self.resolve_basic_struct(&name_and_args.0, limit)?;
-        let inst_type = FatStructRef::new(base_type.subst(&name_and_args.1, limit).map_err(
-            |e: PartialVMError| anyhow!("type {:?} cannot be resolved: {:?}", name_and_args, e),
-        )?);
+        let inst_type = FatStructRef::new(
+            base_type
+                .subst(&name_and_args.1, &self.struct_substitutor(), limit)
+                .map_err(|e: PartialVMError| {
+                    anyhow!("type {:?} cannot be resolved: {:?}", name_and_args, e)
+                })?,
+        );
         self.fat_struct_inst_cache
             .borrow_mut()
             .insert(name_and_args, inst_type.clone());
@@ -427,43 +466,58 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         limit.charge(module_name.as_bytes().len())?;
         limit.charge(name.as_bytes().len())?;
 
-        let make_fields =
+        let table_id = &*TABLE_MODULE_ID;
+        let mut contains_tables = address == table_id.address
+            && module_name == table_id.name
+            && name == *TABLE_STRUCT_NAME;
+        let mut make_fields =
             |fields: &[FieldDefinition], limit: &mut Limiter| -> anyhow::Result<Vec<FatType>> {
                 fields
                     .iter()
                     .map(|field_def| {
-                        self.resolve_signature(
+                        let ty = self.resolve_signature(
                             BinaryIndexedView::Module(module),
                             &field_def.signature.0,
                             limit,
-                        )
+                        );
+                        if !contains_tables {
+                            contains_tables =
+                                ty.as_ref().map(|ty| ty.contains_tables()).unwrap_or(false)
+                        };
+                        ty
                     })
                     .collect::<anyhow::Result<_>>()
             };
 
         match &struct_def.field_information {
             StructFieldInformation::Native => Err(anyhow!("Unexpected Native Struct")),
-            StructFieldInformation::Declared(fields) => Ok(FatStructType {
-                address,
-                module: module_name,
-                name,
-                abilities: WrappedAbilitySet(abilities),
-                ty_args,
-                layout: FatStructLayout::Singleton(make_fields(fields, limit)?),
-            }),
-            StructFieldInformation::DeclaredVariants(variants) => Ok(FatStructType {
-                address,
-                module: module_name,
-                name,
-                abilities: WrappedAbilitySet(abilities),
-                ty_args,
-                layout: FatStructLayout::Variants(
-                    variants
-                        .iter()
-                        .map(|variant| make_fields(&variant.fields, limit))
-                        .collect::<anyhow::Result<_>>()?,
-                ),
-            }),
+            StructFieldInformation::Declared(fields) => {
+                let fat_fields = make_fields(fields, limit)?;
+                Ok(FatStructType {
+                    address,
+                    module: module_name,
+                    name,
+                    abilities: WrappedAbilitySet(abilities),
+                    ty_args,
+                    layout: FatStructLayout::Singleton(fat_fields),
+                    contains_tables,
+                })
+            },
+            StructFieldInformation::DeclaredVariants(variants) => {
+                let fat_variants = variants
+                    .iter()
+                    .map(|variant| make_fields(&variant.fields, limit))
+                    .collect::<anyhow::Result<_>>()?;
+                Ok(FatStructType {
+                    address,
+                    module: module_name,
+                    name,
+                    abilities: WrappedAbilitySet(abilities),
+                    ty_args,
+                    layout: FatStructLayout::Variants(fat_variants),
+                    contains_tables,
+                })
+            },
         }
     }
 
@@ -625,6 +679,37 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         let mut limit = Limiter::default();
         let ty = self.resolve_type_impl(ty_tag, &mut limit)?;
         self.view_value_by_fat_type(&ty, blob, &mut limit)
+    }
+
+    /// Collect information about tables contained in the value represented by the blob.
+    pub fn collect_table_info(
+        &self,
+        ty_tag: &TypeTag,
+        blob: &[u8],
+        infos: &mut Vec<(StructTag, MoveStruct)>,
+    ) -> anyhow::Result<()> {
+        if !self.contains_tables(ty_tag)? {
+            return Ok(());
+        }
+        let mut limit = Limiter::default();
+        let fat_ty = self.resolve_type_impl(ty_tag, &mut limit)?;
+        let layout = (&fat_ty).try_into().map_err(into_vm_status)?;
+        let move_value = MoveValue::simple_deserialize(blob, &layout)?;
+        let mut limit = Limiter::default();
+        self.collect_table_info_from_value(&fat_ty, move_value, &mut limit, infos)
+    }
+
+    fn contains_tables(&self, ty_tag: &TypeTag) -> anyhow::Result<bool> {
+        if let Some(contains) = self.contains_tables_cache.borrow().get(ty_tag) {
+            return Ok(*contains);
+        }
+        let mut limit = Limiter::default();
+        let ty = self.resolve_type_impl(ty_tag, &mut limit)?;
+        let contains = ty.contains_tables();
+        self.contains_tables_cache
+            .borrow_mut()
+            .insert(ty_tag.clone(), contains);
+        Ok(contains)
     }
 
     fn view_value_by_fat_type(
@@ -858,6 +943,99 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 ));
             },
         })
+    }
+
+    #[allow(clippy::only_used_in_recursion)]
+    fn collect_table_info_from_value(
+        &self,
+        ty: &FatType,
+        val: MoveValue,
+        limit: &mut Limiter,
+        infos: &mut Vec<(StructTag, MoveStruct)>,
+    ) -> anyhow::Result<()> {
+        match (ty, val) {
+            (FatType::Vector(elem_ty), MoveValue::Vector(elem_vals)) => {
+                if elem_ty.contains_tables() {
+                    for val in elem_vals {
+                        self.collect_table_info_from_value(elem_ty, val, limit, infos)?
+                    }
+                }
+                Ok(())
+            },
+            (FatType::Struct(sty), MoveValue::Struct(sval)) => {
+                if sty.is_table() {
+                    let tag = sty.struct_tag(limit)?;
+                    infos.push((tag, sval));
+                    Ok(())
+                } else if sty.contains_tables {
+                    match (&sty.layout, sval) {
+                        (
+                            FatStructLayout::Singleton(field_tys),
+                            MoveStruct::Runtime(field_vals),
+                        ) => {
+                            for (ty, val) in field_tys.iter().zip(field_vals) {
+                                self.collect_table_info_from_value(ty, val, limit, infos)?
+                            }
+                            Ok(())
+                        },
+                        (
+                            FatStructLayout::Variants(variants),
+                            MoveStruct::RuntimeVariant(tag, field_vals),
+                        ) if (tag as usize) < variants.len() => {
+                            for (ty, val) in variants[tag as usize].iter().zip(field_vals) {
+                                self.collect_table_info_from_value(ty, val, limit, infos)?
+                            }
+                            Ok(())
+                        },
+                        (_, sval) => {
+                            bail!("invalid type/value while extracting table info: type={:?}, value={:?}", sty, sval)
+                        },
+                    }
+                } else {
+                    Ok(())
+                }
+            },
+            (FatType::Runtime(tys), MoveValue::Struct(MoveStruct::Runtime(vals))) => {
+                for (ty, val) in tys.iter().zip(vals) {
+                    self.collect_table_info_from_value(ty, val, limit, infos)?
+                }
+                Ok(())
+            },
+            (
+                FatType::RuntimeVariants(vars),
+                MoveValue::Struct(MoveStruct::RuntimeVariant(tag, vals)),
+            ) if (tag as usize) < vars.len() => {
+                for (ty, val) in vars[tag as usize].iter().zip(vals) {
+                    self.collect_table_info_from_value(ty, val, limit, infos)?
+                }
+                Ok(())
+            },
+
+            // Every other combo cannot harbor tables.
+            (FatType::Bool, _)
+            | (FatType::U8, _)
+            | (FatType::U16, _)
+            | (FatType::U32, _)
+            | (FatType::U64, _)
+            | (FatType::U128, _)
+            | (FatType::U256, _)
+            | (FatType::Address, _)
+            | (FatType::Signer, _)
+            | (FatType::Vector(_), _)
+            | (FatType::Struct(_), _)
+            | (FatType::Reference(_), _)
+            | (FatType::MutableReference(_), _)
+            | (FatType::TyParam(_), _)
+            | (FatType::Runtime(_), _)
+            | (FatType::RuntimeVariants(_), _)
+            | (FatType::Function(_), _)
+            | (FatType::I8, _)
+            | (FatType::I16, _)
+            | (FatType::I32, _)
+            | (FatType::I64, _)
+            | (FatType::I128, _)
+            | (FatType::I256, _) => Ok(()),
+        }
     }
 }
 
