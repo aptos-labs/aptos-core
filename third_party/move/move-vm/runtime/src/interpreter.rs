@@ -344,7 +344,7 @@ where
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
-        let fn_guard = VM_PROFILER.function(function.as_ref());
+        let fn_guard = VM_PROFILER.function_start(function.as_ref());
 
         let num_locals = function.local_tys().len();
         let mut locals = Locals::new(num_locals);
@@ -471,7 +471,7 @@ where
                         (function, frame_cache)
                     };
 
-                    let fn_guard = VM_PROFILER.function(function.as_ref());
+                    let fn_guard = VM_PROFILER.function_start(function.as_ref());
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
@@ -568,7 +568,7 @@ where
                         (function, frame_cache)
                     };
 
-                    let fn_guard = VM_PROFILER.function(function.as_ref());
+                    let fn_guard = VM_PROFILER.function_start(function.as_ref());
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
@@ -662,7 +662,7 @@ where
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
 
-                    let fn_guard = VM_PROFILER.function(&fun);
+                    let fn_guard = VM_PROFILER.function_start(&fun);
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
@@ -1136,7 +1136,7 @@ where
                 )?;
 
                 // Note: the profiler begins measuring at this point, so it captures only execution time, not loading time.
-                let fn_guard = VM_PROFILER.function(&target_func);
+                let fn_guard = VM_PROFILER.function_start(&target_func);
 
                 RTTCheck::check_call_visibility(
                     function,
@@ -1971,7 +1971,7 @@ impl Frame {
                     )
                 });
 
-                let _guard = VM_PROFILER.instruction(instruction);
+                let _guard = VM_PROFILER.instruction_start(instruction);
 
                 // Paranoid Mode: Perform the type stack transition check to make sure all type safety requirements has been met.
                 //

@@ -48,13 +48,13 @@ pub trait Profiler {
 
     /// Start profiling a function and return a guard.
     /// The guard ends profiling when dropped, so it should be held for the duration of the function execution.
-    fn function<F>(&self, function: &F) -> Self::FnGuard
+    fn function_start<F>(&self, function: &F) -> Self::FnGuard
     where
         F: ProfilerFunction;
 
     /// Start profiling an instruction and return a guard.
     /// The guard ends profiling when dropped, so it should be held for the duration of the instruction execution.
-    fn instruction<I>(&self, instruction: &I) -> Self::InstrGuard
+    fn instruction_start<I>(&self, instruction: &I) -> Self::InstrGuard
     where
         I: ProfilerInstruction;
 }
@@ -70,14 +70,14 @@ impl Profiler for NoopProfiler {
     type FnGuard = NoopFnGuard;
     type InstrGuard = NoopInstrGuard;
 
-    fn function<F>(&self, _function: &F) -> Self::FnGuard
+    fn function_start<F>(&self, _function: &F) -> Self::FnGuard
     where
         F: ProfilerFunction,
     {
         NoopFnGuard
     }
 
-    fn instruction<I>(&self, _instruction: &I) -> Self::InstrGuard
+    fn instruction_start<I>(&self, _instruction: &I) -> Self::InstrGuard
     where
         I: ProfilerInstruction,
     {
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn test_profiler() {
-        let _fg = VM_PROFILER.function(&DummyFunction("foo"));
+        let _fg = VM_PROFILER.function_start(&DummyFunction("foo"));
         sleep(Duration::from_millis(100));
         execute_instruction(&Instruction::And);
         execute_instruction(&Instruction::Or);
@@ -110,7 +110,7 @@ mod tests {
     }
 
     fn execute_instruction(instr: &Instruction) {
-        let _ig = VM_PROFILER.instruction(instr);
+        let _ig = VM_PROFILER.instruction_start(instr);
         sleep(Duration::from_millis(100));
     }
 }

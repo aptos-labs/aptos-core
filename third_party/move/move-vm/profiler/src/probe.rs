@@ -36,7 +36,7 @@ impl Profiler for ProbeProfiler {
     type InstrGuard = ProbeInstrGuard;
 
     #[inline]
-    fn function<F>(&self, function: &F) -> Self::FnGuard
+    fn function_start<F>(&self, function: &F) -> Self::FnGuard
     where
         F: ProfilerFunction,
     {
@@ -44,7 +44,7 @@ impl Profiler for ProbeProfiler {
     }
 
     #[inline]
-    fn instruction<I>(&self, instruction: &I) -> Self::InstrGuard
+    fn instruction_start<I>(&self, instruction: &I) -> Self::InstrGuard
     where
         I: ProfilerInstruction,
     {
