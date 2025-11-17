@@ -4,7 +4,7 @@
 use anyhow::ensure;
 use aptos_consensus_types::{
     common::{BatchPayload, TxnSummaryWithExpiration},
-    proof_of_store::BatchInfo,
+    proof_of_store::{BatchInfo, TBatchInfo},
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
@@ -18,8 +18,8 @@ use std::{
 };
 
 #[derive(Clone, Eq, Deserialize, Serialize, PartialEq, Debug)]
-pub struct PersistedValue {
-    info: BatchInfo,
+pub struct PersistedValue<T> {
+    info: T,
     maybe_payload: Option<Vec<SignedTransaction>>,
 }
 
@@ -29,8 +29,8 @@ pub(crate) enum StorageMode {
     MemoryAndPersisted,
 }
 
-impl PersistedValue {
-    pub(crate) fn new(info: BatchInfo, maybe_payload: Option<Vec<SignedTransaction>>) -> Self {
+impl<T: TBatchInfo> PersistedValue<T> {
+    pub(crate) fn new(info: T, maybe_payload: Option<Vec<SignedTransaction>>) -> Self {
         Self {
             info,
             maybe_payload,
@@ -53,7 +53,7 @@ impl PersistedValue {
         self.maybe_payload = None;
     }
 
-    pub fn batch_info(&self) -> &BatchInfo {
+    pub fn batch_info(&self) -> &T {
         &self.info
     }
 
@@ -78,23 +78,23 @@ impl PersistedValue {
         vec![]
     }
 
-    pub fn unpack(self) -> (BatchInfo, Option<Vec<SignedTransaction>>) {
+    pub fn unpack(self) -> (T, Option<Vec<SignedTransaction>>) {
         (self.info, self.maybe_payload)
     }
 }
 
-impl Deref for PersistedValue {
-    type Target = BatchInfo;
+impl<T: TBatchInfo> Deref for PersistedValue<T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.info
     }
 }
 
-impl TryFrom<PersistedValue> for Batch {
+impl<T: TBatchInfo> TryFrom<PersistedValue<T>> for Batch<T> {
     type Error = anyhow::Error;
 
-    fn try_from(value: PersistedValue) -> Result<Self, Self::Error> {
+    fn try_from(value: PersistedValue<T>) -> Result<Self, Self::Error> {
         let author = value.author();
         Ok(Batch {
             batch_info: value.info,
@@ -125,12 +125,12 @@ mod tests {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct Batch {
-    batch_info: BatchInfo,
+pub struct Batch<T: TBatchInfo> {
+    batch_info: T,
     payload: BatchPayload,
 }
 
-impl Batch {
+impl Batch<BatchInfo> {
     pub fn new(
         batch_id: BatchId,
         payload: Vec<SignedTransaction>,
@@ -150,6 +150,12 @@ impl Batch {
             payload.num_bytes() as u64,
             gas_bucket_start,
         );
+        Self::new_generic(batch_info, payload)
+    }
+}
+
+impl<T: TBatchInfo> Batch<T> {
+    pub fn new_generic(batch_info: T, payload: BatchPayload) -> Self {
         Self {
             batch_info,
             payload,
@@ -204,13 +210,13 @@ impl Batch {
         self.payload.txns()
     }
 
-    pub fn batch_info(&self) -> &BatchInfo {
+    pub fn batch_info(&self) -> &T {
         &self.batch_info
     }
 }
 
-impl Deref for Batch {
-    type Target = BatchInfo;
+impl<T: TBatchInfo> Deref for Batch<T> {
+    type Target = T;
 
     fn deref(&self) -> &Self::Target {
         &self.batch_info
@@ -268,8 +274,8 @@ impl BatchRequest {
     }
 }
 
-impl From<Batch> for PersistedValue {
-    fn from(value: Batch) -> Self {
+impl<T: TBatchInfo> From<Batch<T>> for PersistedValue<T> {
+    fn from(value: Batch<T>) -> Self {
         let Batch {
             batch_info,
             payload,
@@ -279,18 +285,18 @@ impl From<Batch> for PersistedValue {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub enum BatchResponse {
-    Batch(Batch),
+pub enum BatchResponse<T: TBatchInfo> {
+    Batch(Batch<T>),
     NotFound(LedgerInfoWithSignatures),
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
-pub struct BatchMsg {
-    batches: Vec<Batch>,
+pub struct BatchMsg<T: TBatchInfo> {
+    batches: Vec<Batch<T>>,
 }
 
-impl BatchMsg {
-    pub fn new(batches: Vec<Batch>) -> Self {
+impl<T: TBatchInfo> BatchMsg<T> {
+    pub fn new(batches: Vec<Batch<T>>) -> Self {
         Self { batches }
     }
 
@@ -342,7 +348,7 @@ impl BatchMsg {
         self.batches.first().map(|batch| batch.author())
     }
 
-    pub fn take(self) -> Vec<Batch> {
+    pub fn take(self) -> Vec<Batch<T>> {
         self.batches
     }
 }

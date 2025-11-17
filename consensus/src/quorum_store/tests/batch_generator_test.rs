@@ -35,13 +35,16 @@ impl MockBatchWriter {
 }
 
 impl BatchWriter for MockBatchWriter {
-    fn persist(&self, _persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo<BatchInfo>> {
+    fn persist(
+        &self,
+        _persist_requests: Vec<PersistedValue<BatchInfo>>,
+    ) -> Vec<SignedBatchInfo<BatchInfo>> {
         vec![]
     }
 
     fn persist_v2(
         &self,
-        _persist_requests: Vec<PersistedValue>,
+        _persist_requests: Vec<PersistedValue<BatchInfo>>,
     ) -> Vec<SignedBatchInfo<aptos_consensus_types::proof_of_store::BatchInfoExt>> {
         vec![]
     }

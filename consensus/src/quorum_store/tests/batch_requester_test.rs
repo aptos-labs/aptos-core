@@ -34,11 +34,11 @@ use tokio::sync::oneshot;
 
 #[derive(Clone)]
 struct MockBatchRequester {
-    return_value: BatchResponse,
+    return_value: BatchResponse<BatchInfo>,
 }
 
 impl MockBatchRequester {
-    fn new(return_value: BatchResponse) -> Self {
+    fn new(return_value: BatchResponse<BatchInfo>) -> Self {
         Self { return_value }
     }
 }
@@ -50,7 +50,7 @@ impl QuorumStoreSender for MockBatchRequester {
         _request: BatchRequest,
         _recipient: Author,
         _timeout: Duration,
-    ) -> anyhow::Result<BatchResponse> {
+    ) -> anyhow::Result<BatchResponse<BatchInfo>> {
         Ok(self.return_value.clone())
     }
 
@@ -70,7 +70,7 @@ impl QuorumStoreSender for MockBatchRequester {
         unimplemented!()
     }
 
-    async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch>) {
+    async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch<BatchInfo>>) {
         unimplemented!()
     }
 

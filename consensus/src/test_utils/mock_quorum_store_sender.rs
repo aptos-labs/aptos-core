@@ -33,7 +33,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         _request: BatchRequest,
         _recipient: Author,
         _timeout: Duration,
-    ) -> anyhow::Result<BatchResponse> {
+    ) -> anyhow::Result<BatchResponse<BatchInfo>> {
         unimplemented!();
     }
 
@@ -69,7 +69,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
             .expect("could not send");
     }
 
-    async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch>) {
+    async fn broadcast_batch_msg(&mut self, _batches: Vec<Batch<BatchInfo>>) {
         unimplemented!()
     }
 

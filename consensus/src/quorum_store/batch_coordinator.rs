@@ -15,7 +15,7 @@ use crate::{
 };
 use anyhow::ensure;
 use aptos_config::config::BatchTransactionFilterConfig;
-use aptos_consensus_types::payload::TDataInfo;
+use aptos_consensus_types::{payload::TDataInfo, proof_of_store::BatchInfo};
 use aptos_logger::prelude::*;
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;
@@ -28,7 +28,7 @@ use tokio::sync::{
 #[derive(Debug)]
 pub enum BatchCoordinatorCommand {
     Shutdown(oneshot::Sender<()>),
-    NewBatches(PeerId, Vec<Batch>),
+    NewBatches(PeerId, Vec<Batch<BatchInfo>>),
 }
 
 /// The `BatchCoordinator` is responsible for coordinating the receipt and persistence of batches.
@@ -80,7 +80,7 @@ impl BatchCoordinator {
 
     fn persist_and_send_digests(
         &self,
-        persist_requests: Vec<PersistedValue>,
+        persist_requests: Vec<PersistedValue<BatchInfo>>,
         approx_created_ts_usecs: u64,
     ) {
         if persist_requests.is_empty() {
@@ -130,7 +130,7 @@ impl BatchCoordinator {
         });
     }
 
-    fn ensure_max_limits(&self, batches: &[Batch]) -> anyhow::Result<()> {
+    fn ensure_max_limits(&self, batches: &[Batch<BatchInfo>]) -> anyhow::Result<()> {
         let mut total_txns = 0;
         let mut total_bytes = 0;
         for batch in batches.iter() {
@@ -166,7 +166,11 @@ impl BatchCoordinator {
         Ok(())
     }
 
-    pub(crate) async fn handle_batches_msg(&mut self, author: PeerId, batches: Vec<Batch>) {
+    pub(crate) async fn handle_batches_msg(
+        &mut self,
+        author: PeerId,
+        batches: Vec<Batch<BatchInfo>>,
+    ) {
         if let Err(e) = self.ensure_max_limits(&batches) {
             error!("Batch from {}: {}", author, e);
             counters::RECEIVED_BATCH_MAX_LIMIT_FAILED.inc();
