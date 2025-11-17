@@ -88,10 +88,10 @@ impl<DKG: DKGTrait + 'static> TAggTranscriptProducer<DKG> for AggTranscriptProdu
     }
 }
 
-#[cfg(test)]
+/// Dummy implementation for testing purposes.
+/// Can be used in tests both within this crate and in external crates.
 pub struct DummyAggTranscriptProducer {}
 
-#[cfg(test)]
 impl<DKG: DKGTrait> TAggTranscriptProducer<DKG> for DummyAggTranscriptProducer {
     fn start_produce(
         &self,

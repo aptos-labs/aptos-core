@@ -1,9 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-mod agg_trx_producer;
+pub mod agg_trx_producer;
 mod counters;
-mod dkg_manager;
+pub mod dkg_manager;
 pub mod epoch_manager;
 pub mod network;
 pub mod network_interface;
@@ -21,7 +21,14 @@ use aptos_network::application::interface::{NetworkClient, NetworkServiceEvents}
 use aptos_validator_transaction_pool::VTxnPoolState;
 use move_core_types::account_address::AccountAddress;
 use tokio::runtime::Runtime;
-pub use types::DKGMessage;
+// Re-export commonly used types for external use
+pub use agg_trx_producer::DummyAggTranscriptProducer;
+pub use dkg_manager::{DKGManager, InnerState};
+pub use network::{DummyRpcResponseSender, IncomingRpcRequest};
+pub use types::{DKGMessage, DKGTranscriptRequest};
+pub use transcript_aggregation::TranscriptAggregationState;
+// Re-export DKGStartEvent from aptos_types for convenience
+pub use aptos_types::dkg::DKGStartEvent;
 
 pub fn start_dkg_runtime(
     my_addr: AccountAddress,
