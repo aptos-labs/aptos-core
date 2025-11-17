@@ -9,16 +9,25 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
     apt update && apt-get --no-install-recommends install -y \
         binutils \
-        clang \
         cmake \
         curl \
         git \
+        gnupg \
         libdw-dev \
         libpq-dev \
         libssl-dev \
         libudev-dev \
         lld \
-        pkg-config
+        lsb-release \
+        pkg-config \
+        software-properties-common \
+        wget
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh 20
+RUN update-alternatives --install /usr/bin/clang clang /usr/bin/clang-20 100
+RUN update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-20 100
+
 
 ### Build Rust code ###
 FROM rust-base as builder-base
