@@ -10,11 +10,11 @@ use std::time::Instant;
 
 #[usdt::provider]
 mod vm_profiler {
-    fn function_entry(function: &str) {}
-    fn function_exit(function: &str, nanos: u64) {}
+    fn function_entry(function_name: &str) {}
+    fn function_exit(function_name: &str, nanos: u64) {}
 
-    fn instruction_entry(instruction: &str) {}
-    fn instruction_exit(instruction: &str, nanos: u64) {}
+    fn instruction_entry(instruction_name: &str) {}
+    fn instruction_exit(instruction_name: &str, nanos: u64) {}
 }
 
 pub struct ProbeProfiler;
@@ -45,8 +45,8 @@ impl Profiler for ProbeProfiler {
 }
 
 pub struct FunctionProbe {
-    function: String,
-    t0: Instant,
+    function_name: String,
+    start: Instant,
 }
 
 impl FunctionProbe {
@@ -55,48 +55,52 @@ impl FunctionProbe {
     where
         F: ProfilerFunction,
     {
-        let function = function.name();
+        let function_name = function.name();
 
-        vm_profiler::function_entry!(|| &function);
+        vm_profiler::function_entry!(|| &function_name);
 
         Self {
-            function,
-            t0: Instant::now(),
+            function_name,
+            start: Instant::now(),
         }
     }
 }
 
 impl Drop for FunctionProbe {
     fn drop(&mut self) {
-        let dt = self.t0.elapsed();
-        let nanos = dt.as_nanos() as u64;
-        vm_profiler::function_exit!(|| (&self.function, nanos));
+        vm_profiler::function_exit!(|| {
+            let dt = self.start.elapsed();
+            let nanos = dt.as_nanos() as u64;
+            (&self.function_name, nanos)
+        });
     }
 }
 
 pub struct InstructionProbe {
-    instruction: String,
-    t0: Instant,
+    instruction_name: String,
+    start: Instant,
 }
 
 impl InstructionProbe {
     #[must_use]
     fn new(instruction: &Instruction) -> Self {
-        let instruction = format!("{instruction:?}");
+        let instruction_name = format!("{instruction:?}");
 
-        vm_profiler::instruction_entry!(|| &instruction);
+        vm_profiler::instruction_entry!(|| &instruction_name);
 
         Self {
-            instruction,
-            t0: Instant::now(),
+            instruction_name,
+            start: Instant::now(),
         }
     }
 }
 
 impl Drop for InstructionProbe {
     fn drop(&mut self) {
-        let dt = self.t0.elapsed();
-        let nanos = dt.as_nanos() as u64;
-        vm_profiler::instruction_exit!(|| (&self.instruction, nanos));
+        vm_profiler::instruction_exit!(|| {
+            let dt = self.start.elapsed();
+            let nanos = dt.as_nanos() as u64;
+            (&self.instruction_name, nanos)
+        });
     }
 }
