@@ -174,7 +174,7 @@ pub(crate) enum GlobalDataStatus {
 /// vectors of integers or an integer field in a struct.
 #[derive(Debug)]
 pub(crate) struct IndexedRef {
-    idx: usize,
+    idx: u16,
     container_ref: ContainerRef,
     tag: Option<u16>,
 }
@@ -738,7 +738,7 @@ impl IndexedRef {
      *
      */
     fn check_tag(&self) -> PartialVMResult<()> {
-        if let Some(tag) = &self.tag {
+        if let Some(tag) = self.tag {
             let current_tag = match self.container_ref.container() {
                 Container::Struct(vals) => {
                     let vals = vals.borrow();
@@ -773,7 +773,7 @@ impl IndexedRef {
                 },
             }?;
 
-            if current_tag != *tag {
+            if current_tag != tag {
                 let msg = "invalid enum tag".to_string();
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
@@ -1196,6 +1196,8 @@ impl IndexedRef {
         self.check_tag()?;
         other.check_tag()?;
         check_depth(depth, max_depth)?;
+        let self_index = usize::from(self.idx);
+        let other_index = usize::from(other.idx);
         let res = match (
             self.container_ref.container(),
             other.container_ref.container(),
@@ -1209,124 +1211,124 @@ impl IndexedRef {
             | (Struct(r1), Locals(r2))
             | (Locals(r1), Vec(r2))
             | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => r1.borrow()[self.idx].equals_with_depth(
-                &r2.borrow()[other.idx],
+            | (Locals(r1), Locals(r2)) => r1.borrow()[self_index].equals_with_depth(
+                &r2.borrow()[other_index],
                 depth + 1,
                 max_depth,
             )?,
 
-            (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU32(r1), VecU32(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU64(r1), VecU64(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU128(r1), VecU128(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecU256(r1), VecU256(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecI8(r1), VecI8(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecI16(r1), VecI16(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecI32(r1), VecI32(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecI64(r1), VecI64(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecI128(r1), VecI128(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecI256(r1), VecI256(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecBool(r1), VecBool(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
-            (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx] == r2.borrow()[other.idx],
+            (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecU16(r1), VecU16(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecU32(r1), VecU32(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecU64(r1), VecU64(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecU128(r1), VecU128(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecU256(r1), VecU256(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecI8(r1), VecI8(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecI16(r1), VecI16(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecI32(r1), VecI32(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecI64(r1), VecI64(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecI128(r1), VecI128(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecI256(r1), VecI256(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecBool(r1), VecBool(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
+            (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self_index] == r2.borrow()[other_index],
 
             // Equality between a generic and a specialized container.
             (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u8>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<u8>()? == r2.borrow()[other_index]
             },
             (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u8>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<u8>()?
             },
 
             (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u16>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<u16>()? == r2.borrow()[other_index]
             },
             (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u16>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<u16>()?
             },
 
             (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u32>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<u32>()? == r2.borrow()[other_index]
             },
             (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u32>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<u32>()?
             },
 
             (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u64>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<u64>()? == r2.borrow()[other_index]
             },
             (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u64>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<u64>()?
             },
 
             (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<u128>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<u128>()? == r2.borrow()[other_index]
             },
             (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<u128>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<u128>()?
             },
 
             (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<int256::U256>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<int256::U256>()? == r2.borrow()[other_index]
             },
             (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<int256::U256>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<int256::U256>()?
             },
 
             (Locals(r1), VecI8(r2)) | (Struct(r1), VecI8(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<i8>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<i8>()? == r2.borrow()[other_index]
             },
             (VecI8(r1), Locals(r2)) | (VecI8(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<i8>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<i8>()?
             },
 
             (Locals(r1), VecI16(r2)) | (Struct(r1), VecI16(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<i16>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<i16>()? == r2.borrow()[other_index]
             },
             (VecI16(r1), Locals(r2)) | (VecI16(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<i16>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<i16>()?
             },
 
             (Locals(r1), VecI32(r2)) | (Struct(r1), VecI32(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<i32>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<i32>()? == r2.borrow()[other_index]
             },
             (VecI32(r1), Locals(r2)) | (VecI32(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<i32>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<i32>()?
             },
 
             (Locals(r1), VecI64(r2)) | (Struct(r1), VecI64(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<i64>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<i64>()? == r2.borrow()[other_index]
             },
             (VecI64(r1), Locals(r2)) | (VecI64(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<i64>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<i64>()?
             },
 
             (Locals(r1), VecI128(r2)) | (Struct(r1), VecI128(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<i128>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<i128>()? == r2.borrow()[other_index]
             },
             (VecI128(r1), Locals(r2)) | (VecI128(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<i128>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<i128>()?
             },
 
             (Locals(r1), VecI256(r2)) | (Struct(r1), VecI256(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<int256::I256>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<int256::I256>()? == r2.borrow()[other_index]
             },
             (VecI256(r1), Locals(r2)) | (VecI256(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<int256::I256>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<int256::I256>()?
             },
 
             (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<bool>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<bool>()? == r2.borrow()[other_index]
             },
             (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<bool>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<bool>()?
             },
 
             (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => {
-                *r1.borrow()[self.idx].as_value_ref::<AccountAddress>()? == r2.borrow()[other.idx]
+                *r1.borrow()[self_index].as_value_ref::<AccountAddress>()? == r2.borrow()[other_index]
             },
             (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
-                r1.borrow()[self.idx] == *r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?
+                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<AccountAddress>()?
             },
 
             // All other combinations are illegal.
@@ -1362,6 +1364,8 @@ impl IndexedRef {
 
         self.check_tag()?;
         other.check_tag()?;
+        let self_index = usize::from(self.idx);
+        let other_index = usize::from(other.idx);
 
         let res = match (
             self.container_ref.container(),
@@ -1376,124 +1380,127 @@ impl IndexedRef {
             | (Struct(r1), Locals(r2))
             | (Locals(r1), Vec(r2))
             | (Locals(r1), Struct(r2))
-            | (Locals(r1), Locals(r2)) => r1.borrow()[self.idx].compare_with_depth(
-                &r2.borrow()[other.idx],
+            | (Locals(r1), Locals(r2)) => r1.borrow()[self_index].compare_with_depth(
+                &r2.borrow()[other_index],
                 depth + 1,
                 max_depth,
             )?,
 
-            (VecU8(r1), VecU8(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU16(r1), VecU16(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU32(r1), VecU32(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU64(r1), VecU64(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU128(r1), VecU128(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecU256(r1), VecU256(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecI8(r1), VecI8(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecI16(r1), VecI16(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecI32(r1), VecI32(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecI64(r1), VecI64(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecI128(r1), VecI128(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecI256(r1), VecI256(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecBool(r1), VecBool(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
-            (VecAddress(r1), VecAddress(r2)) => r1.borrow()[self.idx].cmp(&r2.borrow()[other.idx]),
+            (VecU8(r1), VecU8(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecU16(r1), VecU16(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecU32(r1), VecU32(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecU64(r1), VecU64(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecU128(r1), VecU128(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecU256(r1), VecU256(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecI8(r1), VecI8(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecI16(r1), VecI16(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecI32(r1), VecI32(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecI64(r1), VecI64(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecI128(r1), VecI128(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecI256(r1), VecI256(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecBool(r1), VecBool(r2)) => r1.borrow()[self_index].cmp(&r2.borrow()[other_index]),
+            (VecAddress(r1), VecAddress(r2)) => {
+                r1.borrow()[self_index].cmp(&r2.borrow()[other_index])
+            },
 
             // Comparison between a generic and a specialized container.
-            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU8(r2)) | (Struct(r1), VecU8(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<u8>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecU8(r1), Locals(r2)) | (VecU8(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u8>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<u8>()?)
             },
 
-            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU16(r2)) | (Struct(r1), VecU16(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<u16>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecU16(r1), Locals(r2)) | (VecU16(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u16>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<u16>()?)
             },
 
-            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU32(r2)) | (Struct(r1), VecU32(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<u32>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecU32(r1), Locals(r2)) | (VecU32(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u32>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<u32>()?)
             },
 
-            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU64(r2)) | (Struct(r1), VecU64(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<u64>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecU64(r1), Locals(r2)) | (VecU64(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u64>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<u64>()?)
             },
 
-            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU128(r2)) | (Struct(r1), VecU128(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<u128>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecU128(r1), Locals(r2)) | (VecU128(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<u128>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<u128>()?)
             },
 
-            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<int256::U256>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<int256::U256>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<int256::U256>()?)
             },
 
-            (Locals(r1), VecI8(r2)) | (Struct(r1), VecI8(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecI8(r2)) | (Struct(r1), VecI8(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<i8>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecI8(r1), Locals(r2)) | (VecI8(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<i8>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<i8>()?)
             },
 
-            (Locals(r1), VecI16(r2)) | (Struct(r1), VecI16(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecI16(r2)) | (Struct(r1), VecI16(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<i16>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecI16(r1), Locals(r2)) | (VecI16(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<i16>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<i16>()?)
             },
 
-            (Locals(r1), VecI32(r2)) | (Struct(r1), VecI32(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecI32(r2)) | (Struct(r1), VecI32(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<i32>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecI32(r1), Locals(r2)) | (VecI32(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<i32>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<i32>()?)
             },
 
-            (Locals(r1), VecI64(r2)) | (Struct(r1), VecI64(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecI64(r2)) | (Struct(r1), VecI64(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<i64>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecI64(r1), Locals(r2)) | (VecI64(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<i64>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<i64>()?)
             },
 
-            (Locals(r1), VecI128(r2)) | (Struct(r1), VecI128(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecI128(r2)) | (Struct(r1), VecI128(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<i128>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecI128(r1), Locals(r2)) | (VecI128(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<i128>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<i128>()?)
             },
 
-            (Locals(r1), VecI256(r2)) | (Struct(r1), VecI256(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecI256(r2)) | (Struct(r1), VecI256(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<int256::I256>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecI256(r1), Locals(r2)) | (VecI256(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<int256::I256>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<int256::I256>()?)
             },
 
-            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<bool>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecBool(r1), Locals(r2)) | (VecBool(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<bool>()?)
+                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<bool>()?)
             },
 
-            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.borrow()[self.idx]
+            (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<AccountAddress>()?
-                .cmp(&r2.borrow()[other.idx]),
+                .cmp(&r2.borrow()[other_index]),
             (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
-                r1.borrow()[self.idx].cmp(r2.borrow()[other.idx].as_value_ref::<AccountAddress>()?)
+                r1.borrow()[self_index]
+                    .cmp(r2.borrow()[other_index].as_value_ref::<AccountAddress>()?)
             },
 
             // All other combinations are illegal.
@@ -1541,26 +1548,27 @@ impl IndexedRef {
         use Container::*;
 
         self.check_tag()?;
+        let index = usize::from(self.idx);
         let res = match self.container_ref.container() {
-            Vec(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
-            Struct(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
+            Vec(r) => r.borrow()[index].copy_value(depth + 1, max_depth)?,
+            Struct(r) => r.borrow()[index].copy_value(depth + 1, max_depth)?,
 
-            VecU8(r) => Value::U8(r.borrow()[self.idx]),
-            VecU16(r) => Value::U16(r.borrow()[self.idx]),
-            VecU32(r) => Value::U32(r.borrow()[self.idx]),
-            VecU64(r) => Value::U64(r.borrow()[self.idx]),
-            VecU128(r) => Value::U128(r.borrow()[self.idx]),
-            VecU256(r) => Value::U256(Box::new(r.borrow()[self.idx])),
-            VecI8(r) => Value::I8(r.borrow()[self.idx]),
-            VecI16(r) => Value::I16(r.borrow()[self.idx]),
-            VecI32(r) => Value::I32(r.borrow()[self.idx]),
-            VecI64(r) => Value::I64(r.borrow()[self.idx]),
-            VecI128(r) => Value::I128(r.borrow()[self.idx]),
-            VecI256(r) => Value::I256(Box::new(r.borrow()[self.idx])),
-            VecBool(r) => Value::Bool(r.borrow()[self.idx]),
-            VecAddress(r) => Value::Address(Box::new(r.borrow()[self.idx])),
+            VecU8(r) => Value::U8(r.borrow()[index]),
+            VecU16(r) => Value::U16(r.borrow()[index]),
+            VecU32(r) => Value::U32(r.borrow()[index]),
+            VecU64(r) => Value::U64(r.borrow()[index]),
+            VecU128(r) => Value::U128(r.borrow()[index]),
+            VecU256(r) => Value::U256(Box::new(r.borrow()[index])),
+            VecI8(r) => Value::I8(r.borrow()[index]),
+            VecI16(r) => Value::I16(r.borrow()[index]),
+            VecI32(r) => Value::I32(r.borrow()[index]),
+            VecI64(r) => Value::I64(r.borrow()[index]),
+            VecI128(r) => Value::I128(r.borrow()[index]),
+            VecI256(r) => Value::I256(Box::new(r.borrow()[index])),
+            VecBool(r) => Value::Bool(r.borrow()[index]),
+            VecAddress(r) => Value::Address(Box::new(r.borrow()[index])),
 
-            Locals(r) => r.borrow()[self.idx].copy_value(depth + 1, max_depth)?,
+            Locals(r) => r.borrow()[index].copy_value(depth + 1, max_depth)?,
         };
         res.check_valid_for_indexed_ref(&self)?;
         Ok(res)
@@ -1674,25 +1682,26 @@ impl IndexedRef {
     fn write_ref(self, x: Value) -> PartialVMResult<()> {
         x.check_valid_for_indexed_ref(&self)?;
         self.check_tag()?;
+        let index = usize::from(self.idx);
         match (self.container_ref.container(), &x) {
             (Container::Locals(r), _) | (Container::Vec(r), _) | (Container::Struct(r), _) => {
                 let mut v = r.borrow_mut();
-                v[self.idx] = x;
+                v[index] = x;
             },
-            (Container::VecU8(r), Value::U8(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU16(r), Value::U16(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU32(r), Value::U32(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU64(r), Value::U64(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU128(r), Value::U128(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecU256(r), Value::U256(x)) => r.borrow_mut()[self.idx] = **x,
-            (Container::VecI8(r), Value::I8(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecI16(r), Value::I16(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecI32(r), Value::I32(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecI64(r), Value::I64(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecI128(r), Value::I128(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecI256(r), Value::I256(x)) => r.borrow_mut()[self.idx] = **x,
-            (Container::VecBool(r), Value::Bool(x)) => r.borrow_mut()[self.idx] = *x,
-            (Container::VecAddress(r), Value::Address(x)) => r.borrow_mut()[self.idx] = **x,
+            (Container::VecU8(r), Value::U8(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecU16(r), Value::U16(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecU32(r), Value::U32(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecU64(r), Value::U64(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecU128(r), Value::U128(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecU256(r), Value::U256(x)) => r.borrow_mut()[index] = **x,
+            (Container::VecI8(r), Value::I8(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecI16(r), Value::I16(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecI32(r), Value::I32(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecI64(r), Value::I64(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecI128(r), Value::I128(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecI256(r), Value::I256(x)) => r.borrow_mut()[index] = **x,
+            (Container::VecBool(r), Value::Bool(x)) => r.borrow_mut()[index] = *x,
+            (Container::VecAddress(r), Value::Address(x)) => r.borrow_mut()[index] = **x,
 
             (Container::VecU8(_), _)
             | (Container::VecU16(_), _)
@@ -1856,11 +1865,13 @@ impl IndexedRef {
 
         self.check_tag()?;
         other.check_tag()?;
+        let self_index = usize::from(self.idx);
+        let other_index = usize::from(other.idx);
 
         macro_rules! swap {
             ($r1:ident, $r2:ident) => {{
                 if Rc::ptr_eq($r1, $r2) {
-                    if self.idx == other.idx {
+                    if self_index == other_index {
                         return Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
                             .with_message(format!(
                                 "cannot swap references to the same item {:?}",
@@ -1868,11 +1879,11 @@ impl IndexedRef {
                             )));
                     }
 
-                    $r1.borrow_mut().swap(self.idx, other.idx);
+                    $r1.borrow_mut().swap(self_index, other_index);
                 } else {
                     mem::swap(
-                        &mut $r1.borrow_mut()[self.idx],
-                        &mut $r2.borrow_mut()[other.idx],
+                        &mut $r1.borrow_mut()[self_index],
+                        &mut $r2.borrow_mut()[other_index],
                     )
                 }
             }};
@@ -1883,9 +1894,9 @@ impl IndexedRef {
                 let mut r1 = $r1.borrow_mut();
                 let mut r2 = $r2.borrow_mut();
 
-                let v1 = *r1[self.idx].as_value_ref()?;
-                r1[self.idx] = Value::from_primitive(r2[other.idx]);
-                r2[other.idx] = v1;
+                let v1 = *r1[self_index].as_value_ref()?;
+                r1[self_index] = Value::from_primitive(r2[other_index]);
+                r2[other_index] = v1;
             }};
         }
 
@@ -1894,9 +1905,9 @@ impl IndexedRef {
                 let mut r1 = $r1.borrow_mut();
                 let mut r2 = $r2.borrow_mut();
 
-                let v2 = *r2[other.idx].as_value_ref()?;
-                r2[other.idx] = Value::from_primitive(r1[self.idx]);
-                r1[self.idx] = v2;
+                let v2 = *r2[other_index].as_value_ref()?;
+                r2[other_index] = Value::from_primitive(r1[self_index]);
+                r1[self_index] = v2;
             }};
         }
 
@@ -2054,6 +2065,11 @@ impl ContainerRef {
             );
         }
 
+        let idx_u16 = u16::try_from(idx).map_err(|_| {
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                .with_message("index too large".to_string())
+        })?;
+
         macro_rules! container_ref {
             ($container:ident) => {
                 Value::ContainerRef(match self {
@@ -2069,7 +2085,7 @@ impl ContainerRef {
         macro_rules! indexed_ref {
             () => {
                 Value::IndexedRef(IndexedRef {
-                    idx,
+                    idx: idx_u16,
                     container_ref: self.copy_by_ref(),
                     tag,
                 })
@@ -2265,7 +2281,10 @@ impl Locals {
             | Value::Address(_)
             | Value::ClosureValue(_)
             | Value::DelayedFieldID { .. } => Ok(Value::IndexedRef(IndexedRef {
-                idx,
+                idx: u16::try_from(idx).map_err(|_| {
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message("index too large".to_string())
+                })?,
                 container_ref: ContainerRef::Local(Container::Locals(Rc::clone(&self.0))),
                 tag: None,
             })),
@@ -4745,7 +4764,7 @@ pub mod debug {
     }
 
     fn print_indexed_ref<B: Write>(buf: &mut B, r: &IndexedRef) -> PartialVMResult<()> {
-        let idx = r.idx;
+        let idx = usize::from(r.idx);
         match r.container_ref.container() {
             Container::Locals(r) | Container::Vec(r) | Container::Struct(r) => {
                 print_slice_elem(buf, &r.borrow(), idx, print_value_impl)
@@ -5574,13 +5593,11 @@ impl IndexedRef {
     fn visit_impl(&self, visitor: &mut impl ValueVisitor, depth: u64) -> PartialVMResult<()> {
         use ContainerRef::*;
 
-        let (container, is_global) = match &self.container_ref {
-            Local(container) => (container, false),
-            Global { container, .. } => (container, false),
-        };
+        let is_global = matches!(self.container_ref, Global { .. });
+        let container = self.container_ref.container();
 
         if visitor.visit_ref(depth, is_global)? {
-            container.visit_indexed(visitor, depth, self.idx)?;
+            container.visit_indexed(visitor, depth, usize::from(self.idx))?;
         }
         Ok(())
     }
@@ -5702,7 +5719,10 @@ impl Reference {
 
                 match self.0 {
                     ContainerRef(r) => r.container().visit_impl(visitor, 0),
-                    IndexedRef(r) => r.container_ref.container().visit_indexed(visitor, 0, r.idx),
+                    IndexedRef(r) => r
+                        .container_ref
+                        .container()
+                        .visit_indexed(visitor, 0, usize::from(r.idx)),
                 }
             }
         }
