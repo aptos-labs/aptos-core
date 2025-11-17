@@ -403,6 +403,9 @@ impl<'a, S: StateView> MoveConverter<'a, S> {
             },
             // Deprecated.
             ModuleBundle(_) => bail!("Module bundle payload has been removed"),
+            EncryptedPayload(_) => {
+                bail!("Encrypted payload isn't supported yet")
+            },
         };
         Ok(ret)
     }

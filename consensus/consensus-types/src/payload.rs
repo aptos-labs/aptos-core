@@ -13,7 +13,7 @@ use std::{
 
 pub type OptBatches = BatchPointer<BatchInfo>;
 
-pub type ProofBatches = BatchPointer<ProofOfStore>;
+pub type ProofBatches = BatchPointer<ProofOfStore<BatchInfo>>;
 
 pub trait TDataInfo {
     fn num_txns(&self) -> u64;
@@ -386,7 +386,7 @@ impl OptQuorumStorePayload {
         &self.inline_batches
     }
 
-    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore> {
+    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore<BatchInfo>> {
         &self.proofs
     }
 

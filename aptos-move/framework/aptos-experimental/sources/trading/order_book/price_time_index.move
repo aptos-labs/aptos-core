@@ -82,7 +82,7 @@ module aptos_experimental::price_time_index {
         if (self.buys.is_empty()) {
             option::none()
         } else {
-            let back_key = self.buys.back_key();
+            let (back_key, _) = self.buys.borrow_back();
             option::some(back_key.price)
         }
     }
@@ -93,7 +93,7 @@ module aptos_experimental::price_time_index {
         if (self.sells.is_empty()) {
             option::none()
         } else {
-            let front_key = self.sells.front_key();
+            let (front_key, _) = self.sells.borrow_front();
             option::some(front_key.price)
         }
     }
@@ -105,8 +105,10 @@ module aptos_experimental::price_time_index {
             return option::none();
         };
 
-        let best_ask = self.sells.front_key().price;
-        let best_bid = self.buys.back_key().price;
+        let (front_key, _) = self.sells.borrow_front();
+        let best_ask = front_key.price;
+        let (back_key, _) = self.buys.borrow_back();
+        let best_bid = back_key.price;
         option::some((best_bid + best_ask) / 2)
     }
 

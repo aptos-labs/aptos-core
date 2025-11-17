@@ -47,6 +47,10 @@ pub static OPTION_STRUCT_NAME: Lazy<Identifier> =
     Lazy::new(|| Identifier::from(ident_str!(OPTION_STRUCT_NAME_STR)));
 pub static MEM_MODULE_ID: Lazy<ModuleId> =
     Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("mem"))));
+pub static TABLE_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("table"))));
+pub static TABLE_STRUCT_NAME: Lazy<Identifier> =
+    Lazy::new(|| Identifier::from(ident_str!("Table")));
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
