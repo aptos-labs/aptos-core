@@ -248,7 +248,7 @@ Returns None if there are no buys
     <b>if</b> (self.buys.is_empty()) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
-        <b>let</b> back_key = self.buys.back_key();
+        <b>let</b> (back_key, _) = self.buys.borrow_back();
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(back_key.price)
     }
 }
@@ -279,7 +279,7 @@ Returns None if there are no sells
     <b>if</b> (self.sells.is_empty()) {
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
     } <b>else</b> {
-        <b>let</b> front_key = self.sells.front_key();
+        <b>let</b> (front_key, _) = self.sells.borrow_front();
         <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>(front_key.price)
     }
 }
@@ -311,8 +311,10 @@ there are o buys / sells, returns None.
         <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>();
     };
 
-    <b>let</b> best_ask = self.sells.front_key().price;
-    <b>let</b> best_bid = self.buys.back_key().price;
+    <b>let</b> (front_key, _) = self.sells.borrow_front();
+    <b>let</b> best_ask = front_key.price;
+    <b>let</b> (back_key, _) = self.buys.borrow_back();
+    <b>let</b> best_bid = back_key.price;
     <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_some">option::some</a>((best_bid + best_ask) / 2)
 }
 </code></pre>
