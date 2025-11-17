@@ -10,7 +10,7 @@ use aptos_db_indexer_schemas::{
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
 use aptos_logger::{info, sample, sample::SampleRate};
-use aptos_resource_viewer::AptosValueAnnotator;
+use aptos_resource_viewer::{AptosValueAnnotator, MoveTableInfo};
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
@@ -28,10 +28,7 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use dashmap::{DashMap, DashSet};
-use move_core_types::{
-    language_storage::{StructTag, TypeTag},
-    value::{MoveStruct, MoveValue},
-};
+use move_core_types::language_storage::{StructTag, TypeTag};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -301,22 +298,17 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
         Ok(())
     }
 
-    fn process_table_infos(&mut self, infos: Vec<(StructTag, MoveStruct)>) -> Result<()> {
-        for (tag, val) in infos {
-            let StructTag { mut type_args, .. } = tag;
-            if type_args.len() == 2
-                && let MoveStruct::Runtime(vals) = &val
-                && let Some(MoveValue::Address(handle)) = vals.first()
-            {
-                let value_type = type_args.pop().unwrap();
-                let key_type = type_args.pop().unwrap();
-                self.save_table_info(TableHandle(*handle), TableInfo {
-                    key_type,
-                    value_type,
-                })?
-            } else {
-                bail!("Table struct malformed. {:?}", val)
-            }
+    fn process_table_infos(&mut self, infos: Vec<MoveTableInfo>) -> Result<()> {
+        for MoveTableInfo {
+            key_type,
+            value_type,
+            handle,
+        } in infos
+        {
+            self.save_table_info(TableHandle(handle), TableInfo {
+                key_type,
+                value_type,
+            })?
         }
         Ok(())
     }
