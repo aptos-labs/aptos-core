@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use move_vm_types::{instr::Instruction, values::AbstractFunction};
+use move_vm_types::instr::Instruction;
 use once_cell::sync::Lazy;
 #[cfg(feature = "probe-profiler")]
 use probe::ProbeProfiler;
