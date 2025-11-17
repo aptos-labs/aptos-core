@@ -41,20 +41,26 @@ pub trait Profiler {
     fn instruction(&self, instruction: &Instruction) -> Self::InstrGuard;
 }
 
+pub struct NoopFnGuard;
+pub struct NoopInstrGuard;
+
 #[derive(Default)]
 pub struct NoopProfiler;
 
 impl Profiler for NoopProfiler {
-    type FnGuard = ();
-    type InstrGuard = ();
+    type FnGuard = NoopFnGuard;
+    type InstrGuard = NoopInstrGuard;
 
     fn function<F>(&self, _function: &F) -> Self::FnGuard
     where
         F: ProfilerFunction,
     {
+        NoopFnGuard
     }
 
-    fn instruction(&self, _instruction: &Instruction) -> Self::InstrGuard {}
+    fn instruction(&self, _instruction: &Instruction) -> Self::InstrGuard {
+        NoopInstrGuard
+    }
 }
 
 #[cfg(test)]
@@ -65,7 +71,7 @@ mod tests {
 
     struct DummyFunction<'a>(&'a str);
 
-    impl ProfilerFunction for DummyFunction {
+    impl ProfilerFunction for DummyFunction<'_> {
         fn name(&self) -> String {
             self.0.to_string()
         }
