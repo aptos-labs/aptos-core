@@ -37,7 +37,7 @@ struct QueueItem {
 
     /// Contains the proof associated with the batch.
     /// It is optional as the proof can be updated after the summary.
-    proof: Option<ProofOfStore>,
+    proof: Option<ProofOfStore<BatchInfo>>,
     /// The time when the proof is inserted into this item.
     proof_insertion_time: Option<Instant>,
 }
@@ -173,7 +173,7 @@ impl BatchProofQueue {
     }
 
     /// Add the ProofOfStore to proof queue.
-    pub(crate) fn insert_proof(&mut self, proof: ProofOfStore) {
+    pub(crate) fn insert_proof(&mut self, proof: ProofOfStore<BatchInfo>) {
         if proof.expiration() <= self.latest_block_timestamp {
             counters::inc_rejected_pos_count(counters::POS_EXPIRED_LABEL);
             return;
@@ -342,7 +342,7 @@ impl BatchProofQueue {
     fn log_remaining_data_after_pull(
         &self,
         excluded_batches: &HashSet<BatchInfo>,
-        pulled_proofs: &[ProofOfStore],
+        pulled_proofs: &[ProofOfStore<BatchInfo>],
     ) {
         let mut num_proofs_remaining_after_pull = 0;
         let mut num_txns_remaining_after_pull = 0;
@@ -406,7 +406,7 @@ impl BatchProofQueue {
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (Vec<ProofOfStore>, PayloadTxnsSize, u64, bool) {
+    ) -> (Vec<ProofOfStore<BatchInfo>>, PayloadTxnsSize, u64, bool) {
         let (result, all_txns, unique_txns, is_full) = self.pull_internal(
             false,
             excluded_batches,

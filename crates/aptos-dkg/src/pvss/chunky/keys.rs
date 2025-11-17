@@ -43,7 +43,6 @@ impl<E: Pairing> TryFrom<&[u8]> for EncryptPubKey<E> {
 }
 
 /// The *decryption (secret) key* used by each PVSS player to decrypt their share of the dealt secret.
-#[allow(dead_code)]
 #[derive(SilentDisplay, SilentDebug)]
 pub struct DecryptPrivKey<E: Pairing> {
     /// A scalar $dk \in F$.
@@ -86,12 +85,10 @@ impl<E: Pairing> DealtPubKey<E> {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>); // Should review this at some point!!
+pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>); // TODO: Copied from `das`, but should review this at some point!!
 
 impl<E: Pairing> DealtPubKeyShare<E> {
-    #[allow(dead_code)]
     pub fn new(dealt_pk: DealtPubKey<E>) -> Self {
         DealtPubKeyShare(dealt_pk)
     }

@@ -594,18 +594,22 @@ impl Value {
 
 impl Container {
     fn copy_value(&self, depth: u64, max_depth: Option<u64>) -> PartialVMResult<Self> {
-        let copy_rc_ref_vec_val = |r: &Rc<RefCell<Vec<Value>>>| {
-            Ok(Rc::new(RefCell::new(
-                r.borrow()
-                    .iter()
-                    .map(|v| v.copy_value(depth + 1, max_depth))
-                    .collect::<PartialVMResult<_>>()?,
-            )))
-        };
+        fn copy_rc_ref_vec_val(
+            r: &Rc<RefCell<Vec<Value>>>,
+            depth: u64,
+            max_depth: Option<u64>,
+        ) -> PartialVMResult<Rc<RefCell<Vec<Value>>>> {
+            let vals = r.borrow();
+            let mut copied_vals = Vec::with_capacity(vals.len());
+            for val in vals.iter() {
+                copied_vals.push(val.copy_value(depth + 1, max_depth)?);
+            }
+            Ok(Rc::new(RefCell::new(copied_vals)))
+        }
 
         Ok(match self {
-            Self::Vec(r) => Self::Vec(copy_rc_ref_vec_val(r)?),
-            Self::Struct(r) => Self::Struct(copy_rc_ref_vec_val(r)?),
+            Self::Vec(r) => Self::Vec(copy_rc_ref_vec_val(r, depth, max_depth)?),
+            Self::Struct(r) => Self::Struct(copy_rc_ref_vec_val(r, depth, max_depth)?),
 
             Self::VecU8(r) => Self::VecU8(Rc::new(RefCell::new(r.borrow().clone()))),
             Self::VecU16(r) => Self::VecU16(Rc::new(RefCell::new(r.borrow().clone()))),
@@ -6013,7 +6017,7 @@ fn try_get_variant_field_layouts<'a>(
     None
 }
 
-#[cfg_attr(feature = "force-inline", inline(always))]
+#[inline]
 fn check_depth(depth: u64, max_depth: Option<u64>) -> PartialVMResult<()> {
     if max_depth.is_some_and(|max_depth| depth > max_depth) {
         return Err(PartialVMError::new(StatusCode::VM_MAX_VALUE_DEPTH_REACHED));

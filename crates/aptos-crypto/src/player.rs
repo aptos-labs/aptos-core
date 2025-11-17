@@ -25,6 +25,7 @@ pub struct Player {
 
 /// The point of Player is to provide type-safety: ensure nobody creates out-of-range player IDs.
 /// So there is no `new()` method; only the SecretSharingConfig trait is allowed to create them.
+// TODO: AFAIK the only way to really enforce this is to put both traits inside the same module (or use unsafe Rust)
 impl Player {
     /// Returns the numeric ID of the player.
     pub fn get_id(&self) -> usize {

@@ -23,7 +23,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     /// Setup generates the prover and verifier keys used in the batched range proof.
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: usize,
+        max_ell: usize, // TODO: change this to u8?
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (Self::ProverKey, Self::VerificationKey);
@@ -47,7 +47,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     fn prove<R: rand_core::RngCore + rand_core::CryptoRng>(
         pk: &Self::ProverKey,
         values: &[Self::Input],
-        ell: usize,
+        ell: usize, // TODO: change this to u8?
         comm: &Self::Commitment,
         r: &Self::CommitmentRandomness,
         fs_transcript: &mut merlin::Transcript,

@@ -1,0 +1,758 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+    }
+    struct S2 {
+        x: u64,
+        s: S,
+    }
+    enum Wrapper {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct T {
+        x: u64,
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    private fun test() {
+        {
+          let x: m::Wrapper = m::make(22);
+          if Eq<u64>(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x), 22) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_pack() {
+        {
+          let _x: m::Wrapper = pack m::Wrapper::V1(22);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n2
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_unpack(w: m::Wrapper) {
+        {
+          let m::Wrapper::V1{ 0: _x } = w;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n3
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_select_variant(w: m::Wrapper): u64 {
+        select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(w)
+    }
+} // end 0xc0ffee::n4
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_test_variant(w: m::Wrapper): bool {
+        test_variants m::Wrapper::V1(w)
+    }
+} // end 0xc0ffee::n5
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_match(w: m::Wrapper): bool {
+        match (w) {
+          m::Wrapper::V1{ 0: _ } => {
+            true
+          }
+          m::Wrapper::V2{ 0: _ } => {
+            false
+          }
+        }
+
+    }
+} // end 0xc0ffee::n6
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n7
+module 0xc0ffee::n8 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        {
+          let (): ();
+          pack m::S(22)
+        }
+    }
+    private inline fun test_pack_struct_inline(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n8
+module 0xc0ffee::n9 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    use 0xc0ffee::m::{S2}; // resolved as: 0xc0ffee::m
+    private inline fun test_inline(x: ||) {
+        (x)()
+    }
+    private fun test_pack_unpack_struct_in_lambda() {
+        {
+          let (): ();
+          {
+            let (): ();
+            {
+              let x: m::S2 = pack m::S2(22, pack m::S(33));
+              {
+                let m::S2{ x: _x, s: m::S{ x: _y } } = x;
+                Tuple()
+              }
+            }
+          }
+        }
+    }
+} // end 0xc0ffee::n9
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend::{T}; // resolved as: 0xc0ffee::m_friend
+    private fun test_pack_friend_struct(): m_friend::T {
+        pack m_friend::T(22)
+    }
+} // end 0xc0ffee::n_friend
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    friend 0xc0ffee::n;
+    friend 0xc0ffee::n2;
+    friend 0xc0ffee::n3;
+    friend 0xc0ffee::n4;
+    friend 0xc0ffee::n5;
+    friend 0xc0ffee::n6;
+    friend 0xc0ffee::n7;
+    friend 0xc0ffee::n8;
+    friend 0xc0ffee::n9;
+    struct S {
+        x: u64,
+    }
+    struct S2 {
+        x: u64,
+        s: S,
+    }
+    enum Wrapper has drop {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        Wrapper::V1(x)
+    }
+}
+module 0xc0ffee::m_friend {
+    friend 0xc0ffee::n_friend;
+    struct T {
+        x: u64,
+    }
+}
+module 0xc0ffee::n {
+    use 0xc0ffee::m;
+    fun test() {
+        let x = m::make(22);
+        if (x.0 == 22) () else abort 1;
+    }
+}
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m;
+    fun test_pack() {
+        let _x = m::Wrapper::V1(22);
+    }
+}
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m;
+    fun test_unpack(w: m::Wrapper) {
+        let m::Wrapper::V1(_x) = w;
+    }
+}
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m;
+    fun test_select_variant(w: m::Wrapper): u64 {
+        w.0
+    }
+}
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m;
+    fun test_test_variant(w: m::Wrapper): bool {
+        w is V1
+    }
+}
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m;
+    fun test_match(w: m::Wrapper): bool {
+        match (w) {
+            m::Wrapper::V1(_) => true,
+            m::Wrapper::V2(_) => false,
+        }
+    }
+}
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m;
+    fun test_pack_struct(): m::S {
+        m::S{x: 22}
+    }
+}
+module 0xc0ffee::n8 {
+    use 0xc0ffee::m;
+    fun test_pack_struct(): m::S {
+        let ();
+        m::S{x: 22}
+    }
+    inline fun test_pack_struct_inline(): m::S {
+        m::S{x: 22}
+    }
+}
+module 0xc0ffee::n9 {
+    use 0xc0ffee::m;
+    use 0xc0ffee::m;
+    inline fun test_inline(x: ||) {
+        x()
+    }
+    fun test_pack_unpack_struct_in_lambda() {
+        let ();
+        let ();
+        let x = m::S2{x: 22, s: m::S{x: 33}};
+        let m::S2{x: _x, s: m::S{x: _y}} = x;
+    }
+}
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend;
+    fun test_pack_friend_struct(): m_friend::T {
+        m_friend::T{x: 22}
+    }
+}
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::make($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun n::test() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: &0xc0ffee::m::Wrapper
+     var $t5: &u64
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t4 := borrow_local($t0)
+  3: $t5 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t4)
+  4: $t3 := read_ref($t5)
+  5: $t6 := 22
+  6: $t2 := ==($t3, $t6)
+  7: if ($t2) goto 8 else goto 10
+  8: label L0
+  9: goto 13
+ 10: label L1
+ 11: $t7 := 1
+ 12: abort($t7)
+ 13: label L2
+ 14: return ()
+}
+
+
+[variant baseline]
+fun n2::test_pack() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack_variant 0xc0ffee::m::Wrapper::V1($t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun n3::test_unpack($t0: 0xc0ffee::m::Wrapper) {
+     var $t1: u64
+  0: $t1 := unpack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun n4::test_select_variant($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: &u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t2)
+  2: $t1 := read_ref($t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+  0: $t2 := borrow_local($t0)
+  1: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun n6::test_match($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
+  2: if ($t3) goto 3 else goto 7
+  3: label L2
+  4: $t4 := unpack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  5: $t1 := true
+  6: goto 17
+  7: label L1
+  8: $t3 := test_variant 0xc0ffee::m::Wrapper::V2($t2)
+  9: if ($t3) goto 10 else goto 14
+ 10: label L4
+ 11: $t5 := unpack_variant 0xc0ffee::m::Wrapper::V2($t0)
+ 12: $t1 := false
+ 13: goto 17
+ 14: label L3
+ 15: $t6 := 14566554180833181697
+ 16: abort($t6)
+ 17: label L0
+ 18: return $t1
+}
+
+
+[variant baseline]
+fun n7::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack 0xc0ffee::m::S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n8::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack 0xc0ffee::m::S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n9::test_pack_unpack_struct_in_lambda() {
+     var $t0: 0xc0ffee::m::S2
+     var $t1: u64
+     var $t2: 0xc0ffee::m::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: 0xc0ffee::m::S
+  0: $t1 := 22
+  1: $t3 := 33
+  2: $t2 := pack 0xc0ffee::m::S($t3)
+  3: $t0 := pack 0xc0ffee::m::S2($t1, $t2)
+  4: ($t4, $t6) := unpack 0xc0ffee::m::S2($t0)
+  5: $t5 := unpack 0xc0ffee::m::S($t6)
+  6: return ()
+}
+
+
+[variant baseline]
+fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
+     var $t0: 0xc0ffee::m_friend::T
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack 0xc0ffee::m_friend::T($t1)
+  2: return $t0
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::m {
+    struct S {
+        x: u64,
+    }
+    struct S2 {
+        x: u64,
+        s: S,
+    }
+    enum Wrapper {
+        V1 {
+            0: u64,
+        }
+        V2 {
+            0: u64,
+        }
+    }
+    public fun make(x: u64): Wrapper {
+        pack m::Wrapper::V1(x)
+    }
+} // end 0xc0ffee::m
+module 0xc0ffee::m_friend {
+    struct T {
+        x: u64,
+    }
+} // end 0xc0ffee::m_friend
+module 0xc0ffee::n {
+    use 0xc0ffee::m; // resolved as: 0xc0ffee::m
+    private fun test() {
+        {
+          let x: m::Wrapper = m::make(22);
+          if Eq<u64>(select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(x), 22) {
+            Tuple()
+          } else {
+            Abort(1)
+          };
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::n2 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_pack() {
+        {
+          let _x: m::Wrapper = pack m::Wrapper::V1(22);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n2
+module 0xc0ffee::n3 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_unpack(w: m::Wrapper) {
+        {
+          let m::Wrapper::V1{ 0: _x } = w;
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n3
+module 0xc0ffee::n4 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_select_variant(w: m::Wrapper): u64 {
+        select_variants m::Wrapper.V1.0|m::Wrapper.V2.0<m::Wrapper>(w)
+    }
+} // end 0xc0ffee::n4
+module 0xc0ffee::n5 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_test_variant(w: m::Wrapper): bool {
+        test_variants m::Wrapper::V1(w)
+    }
+} // end 0xc0ffee::n5
+module 0xc0ffee::n6 {
+    use 0xc0ffee::m::{Wrapper}; // resolved as: 0xc0ffee::m
+    private fun test_match(w: m::Wrapper): bool {
+        match (w) {
+          m::Wrapper::V1{ 0: _ } => {
+            true
+          }
+          m::Wrapper::V2{ 0: _ } => {
+            false
+          }
+        }
+
+    }
+} // end 0xc0ffee::n6
+module 0xc0ffee::n7 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n7
+module 0xc0ffee::n8 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    private fun test_pack_struct(): m::S {
+        pack m::S(22)
+    }
+    private inline fun test_pack_struct_inline(): m::S {
+        pack m::S(22)
+    }
+} // end 0xc0ffee::n8
+module 0xc0ffee::n9 {
+    use 0xc0ffee::m::{S}; // resolved as: 0xc0ffee::m
+    use 0xc0ffee::m::{S2}; // resolved as: 0xc0ffee::m
+    private inline fun test_inline(x: ||) {
+        (x)()
+    }
+    private fun test_pack_unpack_struct_in_lambda() {
+        {
+          let x: m::S2 = pack m::S2(22, pack m::S(33));
+          {
+            let m::S2{ x: _x, s: m::S{ x: _y } } = x;
+            Tuple()
+          }
+        }
+    }
+} // end 0xc0ffee::n9
+module 0xc0ffee::n_friend {
+    use 0xc0ffee::m_friend::{T}; // resolved as: 0xc0ffee::m_friend
+    private fun test_pack_friend_struct(): m_friend::T {
+        pack m_friend::T(22)
+    }
+} // end 0xc0ffee::n_friend
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+public fun m::make($t0: u64): 0xc0ffee::m::Wrapper {
+     var $t1: 0xc0ffee::m::Wrapper
+  0: $t1 := pack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return $t1
+}
+
+
+[variant baseline]
+fun n::test() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+     var $t2: bool
+     var $t3: u64
+     var $t4: &0xc0ffee::m::Wrapper
+     var $t5: &u64
+     var $t6: u64
+     var $t7: u64
+  0: $t1 := 22
+  1: $t0 := m::make($t1)
+  2: $t4 := borrow_local($t0)
+  3: $t5 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t4)
+  4: $t3 := read_ref($t5)
+  5: $t6 := 22
+  6: $t2 := ==($t3, $t6)
+  7: if ($t2) goto 8 else goto 10
+  8: label L0
+  9: goto 13
+ 10: label L1
+ 11: $t7 := 1
+ 12: abort($t7)
+ 13: label L2
+ 14: return ()
+}
+
+
+[variant baseline]
+fun n2::test_pack() {
+     var $t0: 0xc0ffee::m::Wrapper
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack_variant 0xc0ffee::m::Wrapper::V1($t1)
+  2: return ()
+}
+
+
+[variant baseline]
+fun n3::test_unpack($t0: 0xc0ffee::m::Wrapper) {
+     var $t1: u64
+  0: $t1 := unpack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  1: return ()
+}
+
+
+[variant baseline]
+fun n4::test_select_variant($t0: 0xc0ffee::m::Wrapper): u64 {
+     var $t1: u64
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: &u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := borrow_variant_field<0xc0ffee::m::Wrapper::V1|V2>.0($t2)
+  2: $t1 := read_ref($t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+  0: $t2 := borrow_local($t0)
+  1: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun n6::test_match($t0: 0xc0ffee::m::Wrapper): bool {
+     var $t1: bool
+     var $t2: &0xc0ffee::m::Wrapper
+     var $t3: bool
+     var $t4: u64
+     var $t5: u64
+     var $t6: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
+  2: if ($t3) goto 3 else goto 7
+  3: label L2
+  4: $t4 := unpack_variant 0xc0ffee::m::Wrapper::V1($t0)
+  5: $t1 := true
+  6: goto 17
+  7: label L1
+  8: $t3 := test_variant 0xc0ffee::m::Wrapper::V2($t2)
+  9: if ($t3) goto 10 else goto 14
+ 10: label L4
+ 11: $t5 := unpack_variant 0xc0ffee::m::Wrapper::V2($t0)
+ 12: $t1 := false
+ 13: goto 17
+ 14: label L3
+ 15: $t6 := 14566554180833181697
+ 16: abort($t6)
+ 17: label L0
+ 18: return $t1
+}
+
+
+[variant baseline]
+fun n7::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack 0xc0ffee::m::S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n8::test_pack_struct(): 0xc0ffee::m::S {
+     var $t0: 0xc0ffee::m::S
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack 0xc0ffee::m::S($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun n9::test_pack_unpack_struct_in_lambda() {
+     var $t0: 0xc0ffee::m::S2
+     var $t1: u64
+     var $t2: 0xc0ffee::m::S
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     var $t6: 0xc0ffee::m::S
+  0: $t1 := 22
+  1: $t3 := 33
+  2: $t2 := pack 0xc0ffee::m::S($t3)
+  3: $t0 := pack 0xc0ffee::m::S2($t1, $t2)
+  4: ($t4, $t6) := unpack 0xc0ffee::m::S2($t0)
+  5: $t5 := unpack 0xc0ffee::m::S($t6)
+  6: return ()
+}
+
+
+[variant baseline]
+fun n_friend::test_pack_friend_struct(): 0xc0ffee::m_friend::T {
+     var $t0: 0xc0ffee::m_friend::T
+     var $t1: u64
+  0: $t1 := 22
+  1: $t0 := pack 0xc0ffee::m_friend::T($t1)
+  2: return $t0
+}
+
+
+Diagnostics:
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:35:9
+   │
+35 │     fun test() {
+   │         ^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:44:9
+   │
+44 │     fun test_pack() {
+   │         ^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:52:9
+   │
+52 │     fun test_unpack(w: Wrapper) {
+   │         ^^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:60:9
+   │
+60 │     fun test_select_variant(w: Wrapper): u64 {
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:68:9
+   │
+68 │     fun test_test_variant(w: Wrapper): bool {
+   │         ^^^^^^^^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:76:9
+   │
+76 │     fun test_match(w: Wrapper): bool {
+   │         ^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:87:9
+   │
+87 │     fun test_pack_struct(): S {
+   │         ^^^^^^^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+   ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:95:9
+   │
+95 │     fun test_pack_friend_struct(): T {
+   │         ^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+    ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:107:9
+    │
+107 │     fun test_pack_struct(): S {
+    │         ^^^^^^^^^^^^^^^^
+    │
+    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
+
+bug: compiler internal error: struct not defined
+    ┌─ tests/checking-lang-v2.4/cross_module_package_access_success.move:120:9
+    │
+120 │     fun test_pack_unpack_struct_in_lambda() {
+    │         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    │
+    = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)

@@ -42,15 +42,15 @@ pub struct Proof<E: Pairing> {
 impl<E: Pairing> Proof<E> {
     /// Generates a random looking proof (but not a valid one).
     /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
-    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: usize, rng: &mut R) -> Self {
+    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
         Self {
             hatC: unsafe_random_point(rng),
             pi_PoK: two_term_msm::Proof::generate(rng),
-            Cs: unsafe_random_points(ell, rng),
+            Cs: unsafe_random_points(ell as usize, rng),
             D: unsafe_random_point(rng),
             a: sample_field_element(rng),
             a_h: sample_field_element(rng),
-            a_js: sample_field_elements(ell, rng),
+            a_js: sample_field_elements(ell as usize, rng),
             pi_gamma: univariate_hiding_kzg::OpeningProof::generate(rng),
         }
     }

@@ -1294,6 +1294,13 @@ impl TransactionsApi {
                             }
                         },
                     },
+                    TransactionPayload::EncryptedPayload(_) => {
+                        return Err(SubmitTransactionError::bad_request_with_code(
+                            "Encrypted Transaction is not supported yet",
+                            AptosErrorCode::InvalidInput,
+                            ledger_info,
+                        ));
+                    },
                 }
                 // TODO: Verify script args?
 
@@ -1580,6 +1587,18 @@ impl TransactionsApi {
             ));
         }
 
+        if txn
+            .raw_transaction_ref()
+            .payload_ref()
+            .is_encrypted_variant()
+        {
+            return Err(SubmitTransactionError::bad_request_with_code(
+                "Encrypted transactions cannot be simulated",
+                AptosErrorCode::InvalidInput,
+                &ledger_info,
+            ));
+        }
+
         // Simulate transaction
         let state_view = self.context.latest_state_view_poem(&ledger_info)?;
         let (vm_status, output) =
@@ -1638,6 +1657,9 @@ impl TransactionsApi {
                     stats_key += "unknown";
                 };
                 stats_key
+            },
+            TransactionPayload::EncryptedPayload(_) => {
+                unreachable!("Encrypted transactions must not be simulated")
             },
         };
         self.context

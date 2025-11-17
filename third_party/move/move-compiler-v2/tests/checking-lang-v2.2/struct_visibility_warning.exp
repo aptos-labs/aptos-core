@@ -1,0 +1,23 @@
+
+Diagnostics:
+warning: structs/enums with visibility modifier are only supported at version 2.4-unstable or later
+  ┌─ tests/checking-lang-v2.2/struct_visibility_warning.move:1:1
+  │
+1 │ ╭ module 0xc0ffee::m {
+2 │ │     public struct S<T> { f: T }
+3 │ │ }
+  │ ╰─^
+
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::m {
+    struct S<T> {
+        f: T,
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::m {
+    struct S<T> {
+        f: T,
+    }
+}

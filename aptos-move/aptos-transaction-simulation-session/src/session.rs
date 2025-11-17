@@ -326,6 +326,7 @@ impl Session {
                 name_from_executable(executable)
             },
             TransactionPayload::ModuleBundle(_) => unreachable!(),
+            TransactionPayload::EncryptedPayload(_) => "encrypted".to_string(),
         };
 
         let output_path = self

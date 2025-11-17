@@ -177,7 +177,11 @@ impl Batch {
             ensure!(
                 txn.gas_unit_price() >= self.gas_bucket_start(),
                 "Payload gas unit price doesn't match batch info"
-            )
+            );
+            ensure!(
+                !txn.payload().is_encrypted_variant(),
+                "Encrypted transaction is not supported yet"
+            );
         }
         Ok(())
     }
