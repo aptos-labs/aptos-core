@@ -1,12 +1,14 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Threshold secret sharing configuration for BLSTRS-based PVSS.
+
 use crate::{
-    algebra::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
-    pvss::Player,
+    blstrs::evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
+    player::Player,
+    traits::{self, ThresholdConfig as _},
 };
 use anyhow::anyhow;
-use aptos_crypto::traits::{self, ThresholdConfig as _};
 use rand::{seq::IteratorRandom, Rng};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Deserializer, Serialize};
@@ -19,9 +21,9 @@ use std::fmt::{Display, Formatter};
 pub struct ThresholdConfigBlstrs {
     /// The reconstruction threshold $t$ that must be exceeded in order to reconstruct the dealt
     /// secret; i.e., $t$ or more shares are needed
-    pub(crate) t: usize,
+    pub t: usize,
     /// The total number of players involved in the PVSS protocol
-    pub(crate) n: usize,
+    pub n: usize,
     /// Evaluation domain consisting of the $N$th root of unity and other auxiliary information
     /// needed to compute an FFT of size $N$.
     #[serde(skip)]
@@ -52,10 +54,12 @@ impl<'de> Deserialize<'de> for ThresholdConfigBlstrs {
 }
 
 impl ThresholdConfigBlstrs {
+    /// Returns a reference to the precomputed batch evaluation domain.
     pub fn get_batch_evaluation_domain(&self) -> &BatchEvaluationDomain {
         &self.batch_dom
     }
 
+    /// Returns a reference to the primary evaluation domain.
     pub fn get_evaluation_domain(&self) -> &EvaluationDomain {
         &self.dom
     }
@@ -135,8 +139,7 @@ impl traits::ThresholdConfig for ThresholdConfigBlstrs {
 
 #[cfg(test)]
 mod test {
-    use crate::pvss::ThresholdConfigBlstrs;
-    use aptos_crypto::traits::ThresholdConfig as _;
+    use crate::{blstrs::threshold_config::ThresholdConfigBlstrs, traits::ThresholdConfig as _};
 
     #[test]
     fn create_many_configs() {

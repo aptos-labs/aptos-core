@@ -102,6 +102,13 @@ pub enum AnnotatedMoveValue {
     I256(int256::I256),
 }
 
+/// Represents information about a table contained in a value.
+pub struct MoveTableInfo {
+    pub key_type: TypeTag,
+    pub value_type: TypeTag,
+    pub handle: AccountAddress,
+}
+
 pub struct MoveValueAnnotator<V> {
     module_viewer: V,
     /// A cache for fat type info for structs. For a generic struct, the uninstantiated
@@ -686,25 +693,23 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         &self,
         ty_tag: &TypeTag,
         blob: &[u8],
-        infos: &mut Vec<(StructTag, MoveStruct)>,
+        infos: &mut Vec<MoveTableInfo>,
     ) -> anyhow::Result<()> {
-        if !self.contains_tables(ty_tag)? {
+        let mut limit = Limiter::default();
+        if !self.contains_tables(ty_tag, &mut limit)? {
             return Ok(());
         }
-        let mut limit = Limiter::default();
         let fat_ty = self.resolve_type_impl(ty_tag, &mut limit)?;
         let layout = (&fat_ty).try_into().map_err(into_vm_status)?;
         let move_value = MoveValue::simple_deserialize(blob, &layout)?;
-        let mut limit = Limiter::default();
         self.collect_table_info_from_value(&fat_ty, move_value, &mut limit, infos)
     }
 
-    fn contains_tables(&self, ty_tag: &TypeTag) -> anyhow::Result<bool> {
+    fn contains_tables(&self, ty_tag: &TypeTag, limit: &mut Limiter) -> anyhow::Result<bool> {
         if let Some(contains) = self.contains_tables_cache.borrow().get(ty_tag) {
             return Ok(*contains);
         }
-        let mut limit = Limiter::default();
-        let ty = self.resolve_type_impl(ty_tag, &mut limit)?;
+        let ty = self.resolve_type_impl(ty_tag, limit)?;
         let contains = ty.contains_tables();
         self.contains_tables_cache
             .borrow_mut()
@@ -951,7 +956,7 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
         ty: &FatType,
         val: MoveValue,
         limit: &mut Limiter,
-        infos: &mut Vec<(StructTag, MoveStruct)>,
+        infos: &mut Vec<MoveTableInfo>,
     ) -> anyhow::Result<()> {
         match (ty, val) {
             (FatType::Vector(elem_ty), MoveValue::Vector(elem_vals)) => {
@@ -963,9 +968,16 @@ impl<V: CompiledModuleView> MoveValueAnnotator<V> {
                 Ok(())
             },
             (FatType::Struct(sty), MoveValue::Struct(sval)) => {
-                if sty.is_table() {
-                    let tag = sty.struct_tag(limit)?;
-                    infos.push((tag, sval));
+                if sty.is_table()
+                    && let [key_type, value_type] = sty.ty_args.as_slice()
+                    && let MoveStruct::Runtime(vals) = &sval
+                    && let Some(MoveValue::Address(handle)) = vals.first()
+                {
+                    infos.push(MoveTableInfo {
+                        key_type: key_type.type_tag(limit)?,
+                        value_type: value_type.type_tag(limit)?,
+                        handle: *handle,
+                    });
                     Ok(())
                 } else if sty.contains_tables {
                     match (&sty.layout, sval) {

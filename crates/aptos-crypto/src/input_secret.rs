@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{blstrs::random_scalar, Uniform};
+//! Input secrets for the PVSS (Publicly Verifiable Secret Sharing) dealing protocol.
+
+use crate::{blstrs::random_scalar, Uniform};
 use aptos_crypto_derive::{SilentDebug, SilentDisplay};
 use blstrs::Scalar;
 use ff::Field;
@@ -62,6 +64,7 @@ impl Zero for InputSecret {
 static_assertions::assert_not_impl_any!(InputSecret: Clone);
 
 impl InputSecret {
+    /// Returns a reference to the underlying scalar value of the input secret.
     pub fn get_secret_a(&self) -> &Scalar {
         &self.a
     }

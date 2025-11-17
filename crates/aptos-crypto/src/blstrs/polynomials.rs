@@ -1,13 +1,16 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+//! Polynomial utilities and threshold secret sharing for BLSTRS-based cryptography.
+
 use crate::{
-    algebra::{
+    blstrs::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         fft,
+        random::random_scalars,
+        threshold_config::ThresholdConfigBlstrs,
     },
-    pvss::{input_secret::InputSecret, ThresholdConfigBlstrs},
-    utils::{is_power_of_two, random::random_scalars},
+    input_secret::InputSecret,
 };
 use ark_ff::Field;
 use blstrs::Scalar;
@@ -15,7 +18,14 @@ use ff::Field as FieldOld;
 use more_asserts::debug_assert_le;
 use std::ops::{AddAssign, Mul, MulAssign, SubAssign};
 
-pub(crate) fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
+/// Checks whether a given `usize` is a power of two.
+#[inline]
+pub fn is_power_of_two(n: usize) -> bool {
+    n != 0 && (n & (n - 1) == 0)
+}
+
+/// Computes the derivative of a polynomial given its coefficients.
+pub fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
     let degree = coeffs.len().saturating_sub(1);
     let mut result = Vec::with_capacity(degree);
 
@@ -26,7 +36,8 @@ pub(crate) fn differentiate<F: Field>(coeffs: &[F]) -> Vec<F> {
     result
 }
 
-pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
+/// Computes the derivative of a polynomial in-place, modifying the input vector.
+pub fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
     let degree = coeffs.len() - 1;
     for i in 0..degree {
         coeffs[i] = coeffs[i + 1].mul(F::from((i + 1) as u64));
@@ -51,12 +62,7 @@ pub(crate) fn differentiate_in_place<F: Field>(coeffs: &mut Vec<F>) {
 /// # Returns
 /// A `Vec<F>` containing the evaluations of `(f_i - y) / (x_i - x)` for each index `i`.
 /// Or will panic if one of the `x_i` equals `x`.
-pub(crate) fn quotient_evaluations_batch<F: Field>(
-    f_vals: &[F],
-    x_vals: &[F],
-    x: F,
-    y: F,
-) -> Vec<F> {
+pub fn quotient_evaluations_batch<F: Field>(f_vals: &[F], x_vals: &[F], x: F, y: F) -> Vec<F> {
     assert_eq!(f_vals.len(), x_vals.len());
 
     // Step 1: compute denominators x_i - x
@@ -161,7 +167,7 @@ pub fn get_nonzero_powers_of_tau(tau: &Scalar, n: usize) -> Vec<Scalar> {
 }
 
 /// Returns the size of the evaluation domain needed to multiply these two polynomials via FFT.
-pub fn get_evaluation_dom_size_for_multiplication(f: &Vec<Scalar>, g: &Vec<Scalar>) -> usize {
+pub fn get_evaluation_dom_size_for_multiplication(f: &[Scalar], g: &[Scalar]) -> usize {
     //println!("get_eval_dom: |f| = {}, |g| = {}", f.len(), g.len());
     let f_deg = f.len() - 1;
     let g_deg = g.len() - 1;
@@ -169,13 +175,11 @@ pub fn get_evaluation_dom_size_for_multiplication(f: &Vec<Scalar>, g: &Vec<Scala
     // The degree $d$ of $f \cdot g$ will be $\deg{f} + \deg{g}$.
     let fg_deg = f_deg + g_deg;
     // But we need $d+1$ evaluations to interpolate a degree $d$ polynomial.
-    let num_evals = fg_deg + 1;
-
-    num_evals
+    fg_deg + 1
 }
 
 /// Returns an evaluation domain for an FFT of size the number of coefficients in the polynomial $f(X) \cdot g(X)$.
-pub fn get_evaluation_dom_for_multiplication(f: &Vec<Scalar>, g: &Vec<Scalar>) -> EvaluationDomain {
+pub fn get_evaluation_dom_for_multiplication(f: &[Scalar], g: &[Scalar]) -> EvaluationDomain {
     let num_evals = get_evaluation_dom_size_for_multiplication(f, g);
     EvaluationDomain::new(num_evals).unwrap()
 }
@@ -218,8 +222,8 @@ pub fn poly_sub_assign(f: &mut Vec<Scalar>, g: &[Scalar]) {
 }
 
 /// Returns $g(X) = a f(X)$.
-pub fn poly_mul_scalar(f: &Vec<Scalar>, a: Scalar) -> Vec<Scalar> {
-    let mut g = f.clone();
+pub fn poly_mul_scalar(f: &[Scalar], a: Scalar) -> Vec<Scalar> {
+    let mut g = f.to_owned();
     for c in g.iter_mut() {
         c.mul_assign(&a);
     }
@@ -251,12 +255,12 @@ pub fn poly_mul_assign_fft(f: &mut Vec<Scalar>, g: &mut Vec<Scalar>) {
 }
 
 /// Like `poly_mul_assign` but returns the result, instead of modifying the arguments.
-pub fn poly_mul_fft(f: &Vec<Scalar>, g: &Vec<Scalar>) -> Vec<Scalar> {
+pub fn poly_mul_fft(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     debug_assert!(!f.is_empty());
     debug_assert!(!g.is_empty());
 
-    let mut f_copy = f.clone();
-    let mut g_copy = g.clone();
+    let mut f_copy = f.to_owned();
+    let mut g_copy = g.to_owned();
 
     poly_mul_assign_fft_with_dom(
         &mut f_copy,
@@ -278,20 +282,20 @@ pub fn poly_mul_assign_fft_with_dom(
     debug_assert!(!g.is_empty());
     debug_assert_eq!((f.len() - 1) + (g.len() - 1) + 1, dom.n);
 
-    fft::fft_assign(f, &dom);
-    fft::fft_assign(g, &dom);
+    fft::fft_assign(f, dom);
+    fft::fft_assign(g, dom);
     for i in 0..dom.N {
         f[i].mul_assign(g[i]);
     }
 
-    fft::ifft_assign(f, &dom);
+    fft::ifft_assign(f, dom);
     f.truncate(dom.n);
 }
 
 /// Like `poly_mul_assign_fft` but slower in time $\deg(f) \cdot \deg(g)$ and returns the product in
 /// `out`, leaving `f` and `g` untouched.
 /// TODO(Performance): Can we do this in-place over `f` or `g` without a separate `out`.
-pub fn poly_mul_assign_slow(f: &Vec<Scalar>, g: &Vec<Scalar>, out: &mut Vec<Scalar>) {
+pub fn poly_mul_assign_slow(f: &[Scalar], g: &[Scalar], out: &mut Vec<Scalar>) {
     assert!(!f.is_empty());
     assert!(!g.is_empty());
 
@@ -314,7 +318,7 @@ pub fn poly_mul_assign_slow(f: &Vec<Scalar>, g: &Vec<Scalar>, out: &mut Vec<Scal
 /// Returns the product, leaving `f` and `g` untouched.
 ///
 /// Performance notes: Beats FFT for $t \ge 32$.
-pub fn poly_mul_slow(f: &Vec<Scalar>, g: &Vec<Scalar>) -> Vec<Scalar> {
+pub fn poly_mul_slow(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     let mut out = Vec::with_capacity(get_evaluation_dom_size_for_multiplication(f, g));
     // println!(
     //     "poly_mul_slow: |f| = {}, |g| = {}, |out| = {}",
@@ -339,6 +343,7 @@ pub fn poly_mul_assign_less_slow(f: &Vec<Scalar>, g: &Vec<Scalar>, out: &mut Vec
     out.append(&mut result);
 }
 
+/// Multiplies two polynomials over the scalar field using a divide-and-conquer approach.
 pub fn poly_mul_less_slow(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     let n = f.len();
     assert!(is_power_of_two(n));
@@ -398,8 +403,9 @@ pub fn poly_mul_less_slow(f: &[Scalar], g: &[Scalar]) -> Vec<Scalar> {
     poly_add_assign(&mut u, &y);
     poly_add_assign(&mut u, &z);
 
-    u.into()
+    u
 }
+
 /// Sets $f(X) = f(X) \cdot X^n$, by simply shifting the coefficients.
 /// As always we assume $\deg{f}$ is `f.len() - 1`.
 pub fn poly_xnmul_assign(f: &mut Vec<Scalar>, n: usize) {
@@ -413,20 +419,16 @@ pub fn poly_xnmul_assign(f: &mut Vec<Scalar>, n: usize) {
     f.resize(old_len + n, Scalar::ZERO);
 
     // Shift coefficients by `n` positions
-    for i in (0..old_len).rev() {
-        f[i + n] = f[i]
-    }
+    f.copy_within(0..old_len, n);
 
     // Set the last n coefficients $f_{n-1}, \cdots, f_0$ to 0.
-    for i in 0..n {
-        f[i] = Scalar::ZERO;
-    }
+    f[..n].fill(Scalar::ZERO);
 }
 
 /// Like `poly_mul_by_xn_assign` but returns the result.
-pub fn poly_xnmul(f: &Vec<Scalar>, n: usize) -> Vec<Scalar> {
+pub fn poly_xnmul(f: &[Scalar], n: usize) -> Vec<Scalar> {
     if n == 0 {
-        return f.clone();
+        return f.to_owned();
     }
 
     let len = n + f.len();

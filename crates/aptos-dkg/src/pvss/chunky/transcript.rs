@@ -41,7 +41,7 @@ use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AffineRepr, CurveGroup, VariableBaseMSM,
 };
-use ark_ff::AdditiveGroup;
+use ark_ff::{AdditiveGroup, Fp, FpConfig};
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
@@ -99,7 +99,9 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
     }
 }
 
-impl<E: Pairing> traits::Transcript for Transcript<E> {
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
+    for Transcript<E>
+{
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
     type DealtSecretKey = Scalar<E>;
@@ -457,8 +459,6 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
         .prove(&witness, &statement, fs_transcript, rng)
         .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
-    // TODO: we might have to add the remainder of the PoK to the FS transcript here?
-
     // Destructure the "public statement" of the above sigma protocol
     let TupleCodomainShape(
         range_proof_commitment,
@@ -495,7 +495,9 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
     (Cs, Rs, sharing_proof)
 }
 
-impl<E: Pairing> MalleableTranscript for Transcript<E> {
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> MalleableTranscript
+    for Transcript<E>
+{
     fn maul_signature<A: Serialize + Clone>(
         &mut self,
         _ssk: &Self::SigningSecretKey,

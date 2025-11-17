@@ -4,11 +4,12 @@
 use crate::pvss::{
     traits::{
         transcript::{Transcript, WithMaxNumShares},
-        Convert, HasEncryptionPublicParams, Reconstructable,
+        Convert, HasEncryptionPublicParams,
     },
     Player, ThresholdConfigBlstrs, WeightedConfig,
 };
 use aptos_crypto::{
+    arkworks::shamir::Reconstructable,
     traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
     SigningKey, Uniform,
 };
@@ -251,5 +252,5 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    T::DealtSecretKey::reconstruct(sc, &players_and_shares)
+    T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

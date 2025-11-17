@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::evaluation_domain::EvaluationDomain;
+//! Fast Fourier Transform (FFT) utilities over the BLS12-381 scalar field.
+
+use crate::blstrs::evaluation_domain::EvaluationDomain;
 use blstrs::{G1Projective, G2Projective, Scalar};
 use ff::Field;
 use std::ops::{AddAssign, MulAssign, SubAssign};
@@ -18,10 +20,11 @@ pub fn fft_assign(poly: &mut Vec<Scalar>, dom: &EvaluationDomain) {
     serial_fft_assign(poly.as_mut_slice(), &dom.omega, dom.log_N as u32)
 }
 
-pub fn fft(poly: &Vec<Scalar>, dom: &EvaluationDomain) -> Vec<Scalar> {
+/// Computes the forward Fast Fourier Transform (FFT) of a polynomial.
+pub fn fft(poly: &[Scalar], dom: &EvaluationDomain) -> Vec<Scalar> {
     let mut evals = Vec::with_capacity(dom.N);
     evals.resize(poly.len(), Scalar::ZERO);
-    evals.copy_from_slice(&poly);
+    evals.copy_from_slice(poly);
 
     fft_assign(&mut evals, dom);
 
@@ -198,12 +201,10 @@ pub fn serial_fft_assign_g2(a: &mut [G2Projective], omega: &Scalar, log_n: u32) 
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        algebra::{
-            evaluation_domain::{smallest_power_of_2_greater_than_or_eq, EvaluationDomain},
-            fft::fft_assign,
-        },
-        utils::random::random_scalars,
+    use crate::blstrs::{
+        evaluation_domain::{smallest_power_of_2_greater_than_or_eq, EvaluationDomain},
+        fft::fft_assign,
+        random::random_scalars,
     };
     use rand::thread_rng;
 

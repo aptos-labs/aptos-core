@@ -2,15 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{polynomials, GroupGenerators},
-    fiat_shamir,
-    pcs::univariate_kzg,
-    range_proofs::traits,
-    sigma_protocol::homomorphism::Trait,
-    utils, Scalar,
+    algebra::polynomials, fiat_shamir, pcs::univariate_kzg, range_proofs::traits,
+    sigma_protocol::homomorphism::Trait, utils, Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::random::sample_field_element;
+use aptos_crypto::arkworks::{random::sample_field_element, GroupGenerators};
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, PrimeGroup, VariableBaseMSM,
