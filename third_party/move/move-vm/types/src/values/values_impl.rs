@@ -1272,7 +1272,8 @@ impl IndexedRef {
                 *r1.borrow()[self_index].as_value_ref::<int256::U256>()? == r2.borrow()[other_index]
             },
             (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
-                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<int256::U256>()?
+                r1.borrow()[self_index]
+                    == *r2.borrow()[other_index].as_value_ref::<int256::U256>()?
             },
 
             (Locals(r1), VecI8(r2)) | (Struct(r1), VecI8(r2)) => {
@@ -1314,7 +1315,8 @@ impl IndexedRef {
                 *r1.borrow()[self_index].as_value_ref::<int256::I256>()? == r2.borrow()[other_index]
             },
             (VecI256(r1), Locals(r2)) | (VecI256(r1), Struct(r2)) => {
-                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<int256::I256>()?
+                r1.borrow()[self_index]
+                    == *r2.borrow()[other_index].as_value_ref::<int256::I256>()?
             },
 
             (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => {
@@ -1325,10 +1327,12 @@ impl IndexedRef {
             },
 
             (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => {
-                *r1.borrow()[self_index].as_value_ref::<AccountAddress>()? == r2.borrow()[other_index]
+                *r1.borrow()[self_index].as_value_ref::<AccountAddress>()?
+                    == r2.borrow()[other_index]
             },
             (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
-                r1.borrow()[self_index] == *r2.borrow()[other_index].as_value_ref::<AccountAddress>()?
+                r1.borrow()[self_index]
+                    == *r2.borrow()[other_index].as_value_ref::<AccountAddress>()?
             },
 
             // All other combinations are illegal.
@@ -1442,9 +1446,8 @@ impl IndexedRef {
             (Locals(r1), VecU256(r2)) | (Struct(r1), VecU256(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<int256::U256>()?
                 .cmp(&r2.borrow()[other_index]),
-            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => {
-                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<int256::U256>()?)
-            },
+            (VecU256(r1), Locals(r2)) | (VecU256(r1), Struct(r2)) => r1.borrow()[self_index]
+                .cmp(r2.borrow()[other_index].as_value_ref::<int256::U256>()?),
 
             (Locals(r1), VecI8(r2)) | (Struct(r1), VecI8(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<i8>()?
@@ -1484,9 +1487,8 @@ impl IndexedRef {
             (Locals(r1), VecI256(r2)) | (Struct(r1), VecI256(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<int256::I256>()?
                 .cmp(&r2.borrow()[other_index]),
-            (VecI256(r1), Locals(r2)) | (VecI256(r1), Struct(r2)) => {
-                r1.borrow()[self_index].cmp(r2.borrow()[other_index].as_value_ref::<int256::I256>()?)
-            },
+            (VecI256(r1), Locals(r2)) | (VecI256(r1), Struct(r2)) => r1.borrow()[self_index]
+                .cmp(r2.borrow()[other_index].as_value_ref::<int256::I256>()?),
 
             (Locals(r1), VecBool(r2)) | (Struct(r1), VecBool(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<bool>()?
@@ -1498,10 +1500,8 @@ impl IndexedRef {
             (Locals(r1), VecAddress(r2)) | (Struct(r1), VecAddress(r2)) => r1.borrow()[self_index]
                 .as_value_ref::<AccountAddress>()?
                 .cmp(&r2.borrow()[other_index]),
-            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => {
-                r1.borrow()[self_index]
-                    .cmp(r2.borrow()[other_index].as_value_ref::<AccountAddress>()?)
-            },
+            (VecAddress(r1), Locals(r2)) | (VecAddress(r1), Struct(r2)) => r1.borrow()[self_index]
+                .cmp(r2.borrow()[other_index].as_value_ref::<AccountAddress>()?),
 
             // All other combinations are illegal.
             (Vec(_), _)
@@ -5719,10 +5719,11 @@ impl Reference {
 
                 match self.0 {
                     ContainerRef(r) => r.container().visit_impl(visitor, 0),
-                    IndexedRef(r) => r
-                        .container_ref
-                        .container()
-                        .visit_indexed(visitor, 0, usize::from(r.idx)),
+                    IndexedRef(r) => {
+                        r.container_ref
+                            .container()
+                            .visit_indexed(visitor, 0, usize::from(r.idx))
+                    },
                 }
             }
         }
