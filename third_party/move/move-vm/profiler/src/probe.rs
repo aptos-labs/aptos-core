@@ -26,15 +26,15 @@ impl Default for ProbeProfiler {
 }
 
 impl Profiler for ProbeProfiler {
-    type FnGuard = FunctionProbe;
-    type InstrGuard = InstructionProbe;
+    type FnGuard = ProbeFnGuard;
+    type InstrGuard = ProbeInstrGuard;
 
     #[inline]
     fn function<F>(&self, function: &F) -> Self::FnGuard
     where
         F: ProfilerFunction,
     {
-        FunctionProbe::new(function)
+        ProbeFnGuard::new(function)
     }
 
     #[inline]
@@ -42,16 +42,16 @@ impl Profiler for ProbeProfiler {
     where
         I: ProfilerInstruction,
     {
-        InstructionProbe::new(instruction)
+        ProbeInstrGuard::new(instruction)
     }
 }
 
-pub struct FunctionProbe {
+pub struct ProbeFnGuard {
     function_name: String,
     start: Instant,
 }
 
-impl FunctionProbe {
+impl ProbeFnGuard {
     #[must_use]
     fn new<F>(function: &F) -> Self
     where
@@ -68,7 +68,7 @@ impl FunctionProbe {
     }
 }
 
-impl Drop for FunctionProbe {
+impl Drop for ProbeFnGuard {
     fn drop(&mut self) {
         vm_profiler::function_exit!(|| {
             let dt = self.start.elapsed();
@@ -78,12 +78,12 @@ impl Drop for FunctionProbe {
     }
 }
 
-pub struct InstructionProbe {
+pub struct ProbeInstrGuard {
     instruction_name: String,
     start: Instant,
 }
 
-impl InstructionProbe {
+impl ProbeInstrGuard {
     #[must_use]
     fn new<I>(instruction: &I) -> Self
     where
@@ -100,7 +100,7 @@ impl InstructionProbe {
     }
 }
 
-impl Drop for InstructionProbe {
+impl Drop for ProbeInstrGuard {
     fn drop(&mut self) {
         vm_profiler::instruction_exit!(|| {
             let dt = self.start.elapsed();
