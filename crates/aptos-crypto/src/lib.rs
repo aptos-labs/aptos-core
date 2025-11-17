@@ -29,6 +29,7 @@ pub mod traits;
 pub mod utils;
 pub mod validatable;
 pub mod x25519;
+pub mod weighted_config;
 
 pub mod blstrs;
 pub mod poseidon_bn254;

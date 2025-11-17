@@ -10,7 +10,6 @@ pub mod polynomials;
 pub mod random;
 pub mod scalar_secret_key;
 pub mod threshold_config;
-pub mod weighted_config;
 
 use crate::CryptoMaterialError;
 use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};
