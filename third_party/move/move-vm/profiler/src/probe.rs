@@ -4,8 +4,7 @@
 //! A profiler that emits USDT (Userland Statically Defined Tracing) probes.
 //! See [usdt](https://crates.io/crates/usdt).
 
-use crate::{Profiler, ProfilerFunction};
-use move_vm_types::instr::Instruction;
+use crate::{Profiler, ProfilerFunction, ProfilerInstruction};
 use std::time::Instant;
 
 #[usdt::provider]
@@ -39,7 +38,10 @@ impl Profiler for ProbeProfiler {
     }
 
     #[inline]
-    fn instruction(&self, instruction: &Instruction) -> Self::InstrGuard {
+    fn instruction<I>(&self, instruction: &I) -> Self::InstrGuard
+    where
+        I: ProfilerInstruction,
+    {
         InstructionProbe::new(instruction)
     }
 }
@@ -83,8 +85,11 @@ pub struct InstructionProbe {
 
 impl InstructionProbe {
     #[must_use]
-    fn new(instruction: &Instruction) -> Self {
-        let instruction_name = format!("{instruction:?}");
+    fn new<I>(instruction: &I) -> Self
+    where
+        I: ProfilerInstruction,
+    {
+        let instruction_name = instruction.name();
 
         vm_profiler::instruction_entry!(|| &instruction_name);
 

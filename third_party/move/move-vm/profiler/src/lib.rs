@@ -30,6 +30,17 @@ impl ProfilerFunction for Box<dyn AbstractFunction> {
     }
 }
 
+/// An instruction that can be profiled.
+pub trait ProfilerInstruction {
+    fn name(&self) -> String;
+}
+
+impl ProfilerInstruction for Instruction {
+    fn name(&self) -> String {
+        self.name().to_string()
+    }
+}
+
 pub trait Profiler {
     type FnGuard;
     type InstrGuard;
@@ -38,7 +49,9 @@ pub trait Profiler {
     where
         F: ProfilerFunction;
 
-    fn instruction(&self, instruction: &Instruction) -> Self::InstrGuard;
+    fn instruction<I>(&self, instruction: &I) -> Self::InstrGuard
+    where 
+        I: ProfilerInstruction;
 }
 
 pub struct NoopFnGuard;
@@ -58,7 +71,10 @@ impl Profiler for NoopProfiler {
         NoopFnGuard
     }
 
-    fn instruction(&self, _instruction: &Instruction) -> Self::InstrGuard {
+    fn instruction<I>(&self, _instruction: &I) -> Self::InstrGuard
+    where 
+        I: ProfilerInstruction,
+    {
         NoopInstrGuard
     }
 }
