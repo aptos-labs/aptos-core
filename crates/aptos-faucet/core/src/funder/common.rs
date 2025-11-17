@@ -193,14 +193,24 @@ impl Drop for NumOutstandingTransactionsResetter {
 
 /// This function is responsible for updating our local record of the sequence
 /// numbers of the funder and receiver accounts.
+///
+/// The queue format is unified as Vec<(String, AccountAddress, u64)> where the String
+/// is the asset name. For single-asset funders (like TransferFunder), pass
+/// DEFAULT_ASSET_NAME. For multi-asset funders (like MintFunder), pass the specific
+/// asset name. When asset_name is provided, the queue is filtered by that asset to
+/// ensure requests for different assets don't interfere with each other.
+///
+/// If asset_name is None, the function treats all queue entries as belonging to the
+/// same asset (backward compatibility mode, though this should not be used in practice).
 pub async fn update_sequence_numbers(
     client: &Client,
     funder_account: &RwLock<LocalAccount>,
-    // The value here is the requester address and amount requested.
-    outstanding_requests: &RwLock<Vec<(AccountAddress, u64)>>,
+    // The value here is (asset_name, requester address, amount requested).
+    outstanding_requests: &RwLock<Vec<(String, AccountAddress, u64)>>,
     receiver_address: AccountAddress,
     amount: u64,
     wait_for_outstanding_txns_secs: u64,
+    asset_name: Option<&str>,
 ) -> Result<(u64, Option<u64>), AptosTapError> {
     let (mut funder_seq, mut receiver_seq) =
         get_sequence_numbers(client, funder_account, receiver_address).await?;
@@ -218,6 +228,10 @@ pub async fn update_sequence_numbers(
     let _resetter = NumOutstandingTransactionsResetter;
 
     let mut set_outstanding = false;
+    // Use the provided asset_name or empty string as a sentinel for "no filtering"
+    let asset_name_str = asset_name.unwrap_or("");
+    let request_key = (asset_name_str.to_string(), receiver_address, amount);
+
     // We shouldn't have too many outstanding txns
     for _ in 0..(wait_for_outstanding_txns_secs * 2) {
         if our_funder_seq < funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
@@ -225,18 +239,44 @@ pub async fn update_sequence_numbers(
             // first. Then put the other folks to sleep to try again until the queue fills up.
             if !set_outstanding {
                 let mut requests = outstanding_requests.write().await;
-                requests.push((receiver_address, amount));
+                requests.push(request_key.clone());
                 set_outstanding = true;
             }
 
-            if outstanding_requests.read().await.first() == Some(&(receiver_address, amount)) {
+            // Check if this request is at the front of the queue
+            // If asset_name is provided, filter to only consider requests for that asset
+            let requests = outstanding_requests.read().await;
+            let is_at_front = if let Some(asset) = asset_name {
+                // Filter the queue to only consider requests for this asset when checking position
+                let asset_requests: Vec<_> =
+                    requests.iter().filter(|(a, _, _)| a == asset).collect();
+                asset_requests.first() == Some(&&request_key)
+            } else {
+                // No filtering - check if this request is at the front of the entire queue
+                requests.first() == Some(&request_key)
+            };
+
+            if is_at_front {
                 // There might have been two requests with the same parameters, so we ensure that
                 // we only pop off one of them. We do a read lock first since that is cheap,
                 // followed by a write lock.
+                drop(requests);
                 let mut requests = outstanding_requests.write().await;
-                if requests.first() == Some(&(receiver_address, amount)) {
-                    requests.remove(0);
-                    break;
+
+                if let Some(asset) = asset_name {
+                    // Find and remove the first matching request for this asset
+                    if let Some(pos) = requests.iter().position(|(a, addr, amt)| {
+                        a == asset && *addr == receiver_address && *amt == amount
+                    }) {
+                        requests.remove(pos);
+                        break;
+                    }
+                } else {
+                    // Remove the first matching request (no asset filtering)
+                    if requests.first() == Some(&request_key) {
+                        requests.remove(0);
+                        break;
+                    }
                 }
             }
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;

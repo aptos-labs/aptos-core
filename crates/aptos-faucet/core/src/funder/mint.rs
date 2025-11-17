@@ -177,8 +177,10 @@ pub struct MintFunder {
     gas_unit_price_manager: GasUnitPriceManager,
 
     /// When recovering from being overloaded, this struct ensures we handle
-    /// requests in the order they came in.
-    outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
+    /// requests in the order they came in. The tuple is (asset_name, receiver_address, amount).
+    /// This allows different assets to have independent queues while maintaining FIFO ordering
+    /// within each asset.
+    outstanding_requests: RwLock<Vec<(String, AccountAddress, u64)>>,
 
     // Multi-asset support: store asset configs
     assets: HashMap<String, (MintAssetConfig, RwLock<LocalAccount>)>,
@@ -372,6 +374,7 @@ impl MintFunder {
             receiver_address,
             amount,
             self.txn_config.wait_for_outstanding_txns_secs,
+            Some(asset_name),
         )
         .await?;
 

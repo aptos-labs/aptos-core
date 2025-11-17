@@ -113,8 +113,9 @@ pub struct TransferFunder {
     gas_unit_price_override: Option<u64>,
 
     /// When recovering from being overloaded, this struct ensures we handle
-    /// requests in the order they came in.
-    outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
+    /// requests in the order they came in. The tuple is (asset_name, receiver_address, amount).
+    /// TransferFunder uses DEFAULT_ASSET_NAME for all requests since it only handles a single asset.
+    outstanding_requests: RwLock<Vec<(String, AccountAddress, u64)>>,
 
     /// Amount of time we'll wait for the seqnum to catch up before resetting it.
     wait_for_outstanding_txns_secs: u64,
@@ -276,6 +277,7 @@ impl FunderTrait for TransferFunder {
         let amount = self.get_amount(amount, did_bypass_checkers);
 
         // Update the sequence numbers of the accounts.
+        // TransferFunder always uses DEFAULT_ASSET_NAME since it only handles a single asset.
         let (_funder_seq_num, receiver_seq_num) = update_sequence_numbers(
             &client,
             &self.faucet_account,
@@ -283,6 +285,7 @@ impl FunderTrait for TransferFunder {
             receiver_address,
             amount,
             self.wait_for_outstanding_txns_secs,
+            Some(DEFAULT_ASSET_NAME),
         )
         .await?;
 
