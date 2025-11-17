@@ -8,7 +8,9 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::Author,
-    proof_of_store::{ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg},
+    proof_of_store::{
+        BatchInfo, ProofOfStore, ProofOfStoreMsg, SignedBatchInfo, SignedBatchInfoMsg,
+    },
 };
 use std::time::Duration;
 use tokio::sync::mpsc::Sender;
@@ -37,7 +39,7 @@ impl QuorumStoreSender for MockQuorumStoreSender {
 
     async fn send_signed_batch_info_msg(
         &self,
-        signed_batch_infos: Vec<SignedBatchInfo>,
+        signed_batch_infos: Vec<SignedBatchInfo<BatchInfo>>,
         recipients: Vec<Author>,
     ) {
         self.tx
@@ -55,7 +57,10 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         unimplemented!()
     }
 
-    async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore>) {
+    async fn broadcast_proof_of_store_msg(
+        &mut self,
+        proof_of_stores: Vec<ProofOfStore<BatchInfo>>,
+    ) {
         self.tx
             .send((
                 ConsensusMsg::ProofOfStoreMsg(Box::new(ProofOfStoreMsg::new(proof_of_stores))),
@@ -65,7 +70,10 @@ impl QuorumStoreSender for MockQuorumStoreSender {
             .expect("We should be able to send the proof of store message");
     }
 
-    async fn send_proof_of_store_msg_to_self(&mut self, _proof_of_stores: Vec<ProofOfStore>) {
+    async fn send_proof_of_store_msg_to_self(
+        &mut self,
+        _proof_of_stores: Vec<ProofOfStore<BatchInfo>>,
+    ) {
         unimplemented!()
     }
 }

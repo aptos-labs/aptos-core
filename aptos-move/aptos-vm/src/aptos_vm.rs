@@ -3198,6 +3198,10 @@ impl VMValidator for AptosVM {
             }
         }
 
+        if transaction.payload().is_encrypted_variant() {
+            return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+        }
+
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {

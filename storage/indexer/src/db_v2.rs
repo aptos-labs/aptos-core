@@ -10,7 +10,7 @@ use aptos_db_indexer_schemas::{
     schema::{indexer_metadata::IndexerMetadataSchema, table_info::TableInfoSchema},
 };
 use aptos_logger::{info, sample, sample::SampleRate};
-use aptos_resource_viewer::{AnnotatedMoveValue, AptosValueAnnotator};
+use aptos_resource_viewer::{AptosValueAnnotator, MoveTableInfo};
 use aptos_schemadb::{batch::SchemaBatch, DB};
 use aptos_storage_interface::{
     db_other_bail as bail, state_store::state_view::db_state_view::DbStateViewAtVersion,
@@ -18,7 +18,6 @@ use aptos_storage_interface::{
 };
 use aptos_types::{
     access_path::Path,
-    account_address::AccountAddress,
     state_store::{
         state_key::{inner::StateKeyInner, StateKey},
         table::{TableHandle, TableInfo},
@@ -29,10 +28,7 @@ use aptos_types::{
 };
 use bytes::Bytes;
 use dashmap::{DashMap, DashSet};
-use move_core_types::{
-    ident_str,
-    language_storage::{StructTag, TypeTag},
-};
+use move_core_types::language_storage::{StructTag, TypeTag};
 use std::{
     collections::{BTreeMap, HashMap},
     fs,
@@ -98,7 +94,7 @@ impl IndexerAsyncV2 {
         let mut table_info_parser = TableInfoParser::new(self, annotator, &self.pending_on);
         for write_set in write_sets {
             for (state_key, write_op) in write_set.write_op_iter() {
-                table_info_parser.parse_write_op(state_key, write_op)?;
+                table_info_parser.collect_table_info_from_write_op(state_key, write_op)?;
             }
         }
         let mut batch = SchemaBatch::new();
@@ -231,45 +227,66 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
     }
 
     /// Parses a write operation and extracts table information from it.
-    pub fn parse_write_op(&mut self, state_key: &'a StateKey, write_op: &'a WriteOp) -> Result<()> {
+    pub fn collect_table_info_from_write_op(
+        &mut self,
+        state_key: &'a StateKey,
+        write_op: &'a WriteOp,
+    ) -> Result<()> {
         if let Some(bytes) = write_op.bytes() {
             match state_key.inner() {
                 StateKeyInner::AccessPath(access_path) => {
                     let path: Path = (&access_path.path).try_into()?;
                     match path {
                         Path::Code(_) => (),
-                        Path::Resource(struct_tag) => self.parse_struct(struct_tag, bytes)?,
-                        Path::ResourceGroup(_struct_tag) => self.parse_resource_group(bytes)?,
+                        Path::Resource(struct_tag) => {
+                            self.collect_table_info_from_struct(struct_tag, bytes)?
+                        },
+                        Path::ResourceGroup(_struct_tag) => {
+                            self.collect_table_info_from_resource_group(bytes)?
+                        },
                     }
                 },
-                StateKeyInner::TableItem { handle, .. } => self.parse_table_item(*handle, bytes)?,
+                StateKeyInner::TableItem { handle, .. } => {
+                    self.collect_table_info_from_table_item(*handle, bytes)?
+                },
                 StateKeyInner::Raw(_) => (),
             }
         }
         Ok(())
     }
 
-    fn parse_struct(&mut self, struct_tag: StructTag, bytes: &Bytes) -> Result<()> {
-        self.parse_move_value(
-            &self
-                .annotator
-                .view_value(&TypeTag::Struct(Box::new(struct_tag)), bytes)?,
-        )
+    fn collect_table_info_from_struct(
+        &mut self,
+        struct_tag: StructTag,
+        bytes: &Bytes,
+    ) -> Result<()> {
+        let ty_tag = TypeTag::Struct(Box::new(struct_tag));
+        let mut infos = vec![];
+        self.annotator
+            .collect_table_info(&ty_tag, bytes, &mut infos)?;
+        self.process_table_infos(infos)
     }
 
-    fn parse_resource_group(&mut self, bytes: &Bytes) -> Result<()> {
+    fn collect_table_info_from_resource_group(&mut self, bytes: &Bytes) -> Result<()> {
         type ResourceGroup = BTreeMap<StructTag, Bytes>;
 
         for (struct_tag, bytes) in bcs::from_bytes::<ResourceGroup>(bytes)? {
-            self.parse_struct(struct_tag, &bytes)?;
+            self.collect_table_info_from_struct(struct_tag, &bytes)?;
         }
         Ok(())
     }
 
-    fn parse_table_item(&mut self, handle: TableHandle, bytes: &Bytes) -> Result<()> {
+    fn collect_table_info_from_table_item(
+        &mut self,
+        handle: TableHandle,
+        bytes: &Bytes,
+    ) -> Result<()> {
         match self.get_table_info(handle)? {
             Some(table_info) => {
-                self.parse_move_value(&self.annotator.view_value(&table_info.value_type, bytes)?)?;
+                let mut infos = vec![];
+                self.annotator
+                    .collect_table_info(&table_info.value_type, bytes, &mut infos)?;
+                self.process_table_infos(infos)?
             },
             None => {
                 self.pending_on
@@ -281,70 +298,17 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
         Ok(())
     }
 
-    /// Parses a write operation and extracts table information from it.
-    ///
-    /// The `parse_move_value` function is a recursive method that traverses
-    /// through the `AnnotatedMoveValue` structure. Depending on the type of
-    /// `AnnotatedMoveValue` (e.g., Vector, Struct, or primitive types), it
-    /// performs different parsing actions. For Vector and Struct, it recursively
-    /// calls itself to parse each element or field. This recursive approach allows
-    /// the function to handle nested data structures in Move values.
-    fn parse_move_value(&mut self, move_value: &AnnotatedMoveValue) -> Result<()> {
-        match move_value {
-            AnnotatedMoveValue::Vector(_type_tag, items) => {
-                for item in items {
-                    self.parse_move_value(item)?;
-                }
-            },
-            AnnotatedMoveValue::Struct(struct_value) => {
-                let struct_tag = &struct_value.ty_tag;
-                if Self::is_table(struct_tag) {
-                    assert_eq!(struct_tag.type_args.len(), 2);
-                    let table_info = TableInfo {
-                        key_type: struct_tag.type_args[0].clone(),
-                        value_type: struct_tag.type_args[1].clone(),
-                    };
-                    let table_handle = match &struct_value.value[0] {
-                        (name, AnnotatedMoveValue::Address(handle)) => {
-                            assert_eq!(name.as_ref(), ident_str!("handle"));
-                            TableHandle(*handle)
-                        },
-                        _ => bail!("Table struct malformed. {:?}", struct_value),
-                    };
-                    self.save_table_info(table_handle, table_info)?;
-                } else {
-                    for (_identifier, field) in &struct_value.value {
-                        self.parse_move_value(field)?;
-                    }
-                }
-            },
-            AnnotatedMoveValue::RawStruct(struct_value) => {
-                for val in &struct_value.field_values {
-                    self.parse_move_value(val)?
-                }
-            },
-            AnnotatedMoveValue::Closure(closure_value) => {
-                for capture in &closure_value.captured {
-                    self.parse_move_value(capture)?
-                }
-            },
-
-            // there won't be tables in primitives
-            AnnotatedMoveValue::U8(_) => {},
-            AnnotatedMoveValue::U16(_) => {},
-            AnnotatedMoveValue::U32(_) => {},
-            AnnotatedMoveValue::U64(_) => {},
-            AnnotatedMoveValue::U128(_) => {},
-            AnnotatedMoveValue::U256(_) => {},
-            AnnotatedMoveValue::I8(_) => {},
-            AnnotatedMoveValue::I16(_) => {},
-            AnnotatedMoveValue::I32(_) => {},
-            AnnotatedMoveValue::I64(_) => {},
-            AnnotatedMoveValue::I128(_) => {},
-            AnnotatedMoveValue::I256(_) => {},
-            AnnotatedMoveValue::Bool(_) => {},
-            AnnotatedMoveValue::Address(_) => {},
-            AnnotatedMoveValue::Bytes(_) => {},
+    fn process_table_infos(&mut self, infos: Vec<MoveTableInfo>) -> Result<()> {
+        for MoveTableInfo {
+            key_type,
+            value_type,
+            handle,
+        } in infos
+        {
+            self.save_table_info(TableHandle(handle), TableInfo {
+                key_type,
+                value_type,
+            })?
         }
         Ok(())
     }
@@ -354,17 +318,11 @@ impl<'a, R: StateView> TableInfoParser<'a, R> {
             self.result.insert(handle, info);
             if let Some(pending_items) = self.pending_on.remove(&handle) {
                 for bytes in pending_items.1 {
-                    self.parse_table_item(handle, &bytes)?;
+                    self.collect_table_info_from_table_item(handle, &bytes)?;
                 }
             }
         }
         Ok(())
-    }
-
-    fn is_table(struct_tag: &StructTag) -> bool {
-        struct_tag.address == AccountAddress::ONE
-            && struct_tag.module.as_ident_str() == ident_str!("table")
-            && struct_tag.name.as_ident_str() == ident_str!("Table")
     }
 
     /// Retrieves table information either from the in-memory results or from the database.

@@ -30,7 +30,9 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{BatchTransactionFilterConfig, QuorumStoreConfig};
 use aptos_consensus_types::{
-    common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
+    common::Author,
+    proof_of_store::{BatchInfo, ProofCache},
+    request_response::GetPayloadCommand,
 };
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::prelude::*;
@@ -132,7 +134,7 @@ pub struct InnerBuilder {
     aptos_db: Arc<dyn DbReader>,
     network_sender: NetworkSender,
     verifier: Arc<ValidatorVerifier>,
-    proof_cache: ProofCache,
+    proof_cache: ProofCache<BatchInfo>,
     coordinator_tx: Sender<CoordinatorCommand>,
     coordinator_rx: Option<Receiver<CoordinatorCommand>>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
@@ -168,7 +170,7 @@ impl InnerBuilder {
         aptos_db: Arc<dyn DbReader>,
         network_sender: NetworkSender,
         verifier: Arc<ValidatorVerifier>,
-        proof_cache: ProofCache,
+        proof_cache: ProofCache<BatchInfo>,
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
         consensus_key: Arc<PrivateKey>,
