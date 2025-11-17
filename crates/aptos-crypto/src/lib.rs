@@ -18,6 +18,7 @@ pub mod encoding_type;
 pub mod error;
 pub mod hash;
 pub mod hkdf;
+pub mod input_secret;
 pub mod multi_ed25519;
 pub mod noise;
 pub mod player;
