@@ -1,9 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! A profiler that emits USDT (Userland Statically Defined Tracing) probes.
-//! See [usdt](https://crates.io/crates/usdt).
-
 use crate::{Profiler, ProfilerFunction, ProfilerInstruction};
 use std::time::Instant;
 
@@ -16,6 +13,15 @@ mod vm_profiler {
     fn instruction_exit(instruction_name: &str, nanos: u64) {}
 }
 
+/// A profiler that emits USDT (Userland Statically Defined Tracing) probes.
+/// See [usdt](https://crates.io/crates/usdt) for more details.
+/// 
+/// It emits the following probes for function and instruction entry/exit:
+/// - `function_entry(function_name: &str)`
+/// - `function_exit(function_name: &str, nanos: u64)`
+/// - `instruction_entry(instruction_name: &str)`
+/// - `instruction_exit(instruction_name: &str, nanos: u64)`
+/// Note that the exit probes include the elapsed time in nanoseconds.
 pub struct ProbeProfiler;
 
 impl Default for ProbeProfiler {

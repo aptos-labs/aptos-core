@@ -41,14 +41,19 @@ impl ProfilerInstruction for Instruction {
     }
 }
 
+/// A profiler for Move VM execution.
 pub trait Profiler {
     type FnGuard;
     type InstrGuard;
 
+    /// Start profiling a function and return a guard.
+    /// The guard ends profiling when dropped, so it should be held for the duration of the function execution.
     fn function<F>(&self, function: &F) -> Self::FnGuard
     where
         F: ProfilerFunction;
 
+    /// Start profiling an instruction and return a guard.
+    /// The guard ends profiling when dropped, so it should be held for the duration of the instruction execution.
     fn instruction<I>(&self, instruction: &I) -> Self::InstrGuard
     where 
         I: ProfilerInstruction;
@@ -57,6 +62,7 @@ pub trait Profiler {
 pub struct NoopFnGuard;
 pub struct NoopInstrGuard;
 
+/// A no-op profiler that does nothing.
 #[derive(Default)]
 pub struct NoopProfiler;
 
