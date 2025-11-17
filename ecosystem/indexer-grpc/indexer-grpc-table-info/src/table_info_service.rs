@@ -326,11 +326,7 @@ impl TableInfoService {
         loop {
             // NOTE: The retry is unlikely to be helpful. Put a loop here just to avoid panic and
             // allow the rest of FN functionality continue to work.
-            match Self::parse_table_info(
-                context.clone(),
-                raw_txns.clone(),
-                indexer_async_v2.clone(),
-            ) {
+            match Self::parse_table_info(context.clone(), &raw_txns, indexer_async_v2.clone()) {
                 Ok(_) => break,
                 Err(e) => {
                     error!(error = ?e, "Error during parse_table_info.");
@@ -393,7 +389,7 @@ impl TableInfoService {
     /// Parse table info from write sets,
     fn parse_table_info(
         context: Arc<ApiContext>,
-        raw_txns: Vec<TransactionOnChainData>,
+        raw_txns: &[TransactionOnChainData],
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Result<(), Error> {
         if raw_txns.is_empty() {
@@ -402,10 +398,9 @@ impl TableInfoService {
 
         let start_time = std::time::Instant::now();
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
-        let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
-        let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
+        let write_sets = raw_txns.iter().map(|txn| &txn.changes).collect::<Vec<_>>();
         indexer_async_v2
-            .index_table_info(context.db.clone(), first_version, &write_sets_slice)
+            .index_table_info(context.db.clone(), first_version, &write_sets)
             .map_err(|err| anyhow!("[Table Info] Failed to process write sets and index to the table info rocksdb: {}", err))?;
 
         info!(
