@@ -55,7 +55,7 @@ pub trait Profiler {
     /// Start profiling an instruction and return a guard.
     /// The guard ends profiling when dropped, so it should be held for the duration of the instruction execution.
     fn instruction<I>(&self, instruction: &I) -> Self::InstrGuard
-    where 
+    where
         I: ProfilerInstruction;
 }
 
@@ -78,7 +78,7 @@ impl Profiler for NoopProfiler {
     }
 
     fn instruction<I>(&self, _instruction: &I) -> Self::InstrGuard
-    where 
+    where
         I: ProfilerInstruction,
     {
         NoopInstrGuard
