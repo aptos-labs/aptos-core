@@ -26,6 +26,7 @@ use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
+    // Uncomment this to test the new PVSS, but turn off the aggregate bench below...
     // for tc in get_threshold_configs_for_benchmarking() {
     //     pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
     // }

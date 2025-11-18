@@ -109,7 +109,7 @@ fn test_pvss_transcript_size() {
     // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
     // Ideally should iterate over a vec of (t, n), not the actual threshold configs... but won't be a bottleneck
     for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
-        // Only trying 1 for now to keep tests fast
+        // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
         println!();
         let actual_size = actual_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(&sc);
         print_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(
@@ -121,7 +121,7 @@ fn test_pvss_transcript_size() {
 
     // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
     for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
-        // Only trying 1 for now to keep tests fast
+        // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
 
         println!();
         let actual_size =

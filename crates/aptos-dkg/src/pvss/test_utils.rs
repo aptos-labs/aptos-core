@@ -213,7 +213,7 @@ pub fn get_threshold_configs_for_benchmarking<T: traits::ThresholdConfig>() -> V
 pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
 
-    // This one was produced in Nov 2025
+    // This one was produced mid-Nov 2025
     let weights = vec![
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -221,8 +221,9 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
         2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
         3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 7,
     ];
-    let total_weight: usize = weights.iter().sum();
-    let threshold = total_weight * 2 / 3 + 1;
+    let threshold = 129; // slow path
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights.clone()).unwrap());
+    let threshold = 166; // fast path
     wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     let weights = vec![

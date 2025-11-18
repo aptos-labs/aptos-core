@@ -426,7 +426,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         vec![self.utrs.dealer]
     }
 
-    // TODO: Make the method return a Result (rather than mutating Self)? And return None here?
     fn aggregate_with(
         &mut self,
         _sc: &Self::SecretSharingConfig,
