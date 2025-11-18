@@ -60,6 +60,15 @@ pub struct BorrowVariantFieldV2 {
     pub field_ty: Type,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct PackVariantV2 {
+    pub is_generic: bool,
+    pub variant_idx: VariantIndex,
+    pub field_count: u16,
+    pub struct_ty: Type,
+    pub field_tys: Vec<Type>,
+}
+
 /// The VM's internal representation of instructions.
 ///
 /// Currently, it is an exact mirror of the Move bytecode, but can be extended with more
@@ -178,6 +187,7 @@ pub enum Instruction {
     BorrowFieldV2(Box<BorrowFieldV2>),
     PackV2(Box<PackV2>),
     BorrowVariantFieldV2(Box<BorrowVariantFieldV2>),
+    PackVariantV2(Box<PackVariantV2>),
 }
 
 pub(crate) struct BytecodeTransformer<'a> {
@@ -320,8 +330,7 @@ impl<'a> BytecodeTransformer<'a> {
                     return Ok(false);
                 },
                 // Disallow unpack, variant pack/unpack (not supported yet -- needs new instruction)
-                PackVariant(_)
-                | PackVariantGeneric(_)
+                PackVariantGeneric(_)
                 | Unpack(_)
                 | UnpackGeneric(_)
                 | UnpackVariant(_)
@@ -364,7 +373,7 @@ impl<'a> BytecodeTransformer<'a> {
                 // - References (stack-only operations)
                 ReadRef | WriteRef | FreezeRef => {},
                 // - Struct operations (stack-only)
-                Pack(_) | TestVariant(_) | TestVariantGeneric(_) => {},
+                Pack(_) | PackVariant(_) | TestVariant(_) | TestVariantGeneric(_) => {},
                 // - PackGeneric: requires concrete instantiation for V2
                 PackGeneric(idx) => {
                     let struct_inst = &self.struct_instantiations[idx.0 as usize];
@@ -605,6 +614,42 @@ impl<'a> BytecodeTransformer<'a> {
         })
     }
 
+    // TODO: transform_borrow_variant_field_generic
+
+    fn transform_pack_variant(
+        &self,
+        idx: StructVariantHandleIndex,
+        inline: bool,
+    ) -> PartialVMResult<Instruction> {
+        Ok(if self.use_v2_instructions || inline {
+            let info = &self.struct_variant_infos[idx.0 as usize];
+
+            let field_tys = info
+                .definition_struct_type
+                .fields(Some(info.variant))?
+                .iter()
+                .map(|(_, ty)| ty.clone())
+                .collect();
+
+            let struct_ty = self.ty_builder.create_struct_ty(
+                info.definition_struct_type.idx,
+                AbilityInfo::struct_(info.definition_struct_type.abilities),
+            );
+
+            Instruction::PackVariantV2(Box::new(PackVariantV2 {
+                is_generic: false,
+                variant_idx: info.variant,
+                field_count: info.field_count,
+                struct_ty,
+                field_tys,
+            }))
+        } else {
+            Instruction::PackVariant(idx)
+        })
+    }
+
+    // TODO: transform_pack_variant_generic
+
     pub fn transform(&self, bytecode: Bytecode, inline: bool) -> PartialVMResult<Instruction> {
         use Bytecode as B;
         use Instruction as I;
@@ -631,7 +676,7 @@ impl<'a> BytecodeTransformer<'a> {
             B::CallGeneric(idx) => I::CallGeneric(idx),
             B::Pack(idx) => self.transform_pack(idx, inline)?,
             B::PackGeneric(idx) => self.transform_pack_generic(idx, inline)?,
-            B::PackVariant(idx) => I::PackVariant(idx),
+            B::PackVariant(idx) => self.transform_pack_variant(idx, inline)?,
             B::PackVariantGeneric(idx) => I::PackVariantGeneric(idx),
             B::Unpack(idx) => I::Unpack(idx),
             B::UnpackGeneric(idx) => I::UnpackGeneric(idx),

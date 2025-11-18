@@ -433,7 +433,8 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | TestVariantV2(_)
             | BorrowFieldV2(_)
             | PackV2(_)
-            | BorrowVariantFieldV2(_) => {
+            | BorrowVariantFieldV2(_)
+            | PackVariantV2(_) => {
                 // handled in `post_execution_transition`
             },
         };
@@ -695,6 +696,10 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 } else {
                     ref_state.borrow_child_with_label::<false>(label)?;
                 }
+            },
+            PackVariantV2(instr) => {
+                ref_state.pop_many_from_shadow_stack(instr.field_count as usize)?;
+                ref_state.push_non_refs_to_shadow_stack(1);
             },
         };
         Ok(())

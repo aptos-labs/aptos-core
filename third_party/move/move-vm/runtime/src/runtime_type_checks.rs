@@ -418,6 +418,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             Instruction::BorrowFieldV2(_) => (),
             Instruction::PackV2(_) => (),
             Instruction::BorrowVariantFieldV2(_) => (),
+            Instruction::PackVariantV2(_) => (),
         };
         Ok(())
     }
@@ -989,6 +990,14 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .paranoid_check_struct_ref_name_eq::<false>(instr.def_struct_ty.idx)?;
                 let field_ref_ty = ty_builder.create_ref_ty(&instr.field_ty, instr.is_mut)?;
                 operand_stack.push_ty(field_ref_ty)?;
+            },
+            Instruction::PackVariantV2(instr) => {
+                verify_pack(
+                    operand_stack,
+                    instr.field_count,
+                    instr.field_tys.iter(),
+                    instr.struct_ty.clone(),
+                )?;
             },
         }
         Ok(())

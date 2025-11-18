@@ -413,7 +413,8 @@ where
                 | Instruction::TestVariantV2(_)
                 | Instruction::BorrowFieldV2(_)
                 | Instruction::PackV2(_)
-                | Instruction::BorrowVariantFieldV2(_) => (),
+                | Instruction::BorrowVariantFieldV2(_)
+                | Instruction::PackVariantV2(_) => (),
             }
 
             RTTCheck::post_execution_type_stack_transition(

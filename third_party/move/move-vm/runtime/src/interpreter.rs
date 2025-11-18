@@ -3111,6 +3111,21 @@ impl Frame {
                         )?;
                         interpreter.operand_stack.push(field_ref)?;
                     },
+                    Instruction::PackVariantV2(instr) => {
+                        gas_meter.charge_pack_variant(
+                            instr.is_generic,
+                            interpreter
+                                .operand_stack
+                                .last_n(instr.field_count as usize)?,
+                        )?;
+                        let args = interpreter.operand_stack.popn(instr.field_count)?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::struct_(Struct::pack_variant(
+                                instr.variant_idx,
+                                args,
+                            )))?;
+                    },
                 }
                 trace_recorder.record_successful_instruction(instruction);
 
