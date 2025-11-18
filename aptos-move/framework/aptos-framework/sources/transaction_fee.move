@@ -8,7 +8,6 @@ module aptos_framework::transaction_fee {
     use std::error;
     use std::features;
     use std::option::{Self, Option};
-    use std::signer;
     use aptos_framework::event;
 
     friend aptos_framework::block;
@@ -128,9 +127,8 @@ module aptos_framework::transaction_fee {
             EFA_GAS_CHARGING_NOT_ENABLED
         );
         system_addresses::assert_aptos_framework(aptos_framework);
-        let AptosCoinCapabilities { burn_cap } =
-            move_from<AptosCoinCapabilities>(signer::address_of(aptos_framework));
-        let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
+        let burn_cap = &AptosCoinCapabilities[@aptos_framework].burn_cap;
+        let burn_ref = coin::get_paired_burn_copy_ref(burn_cap);
         move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
     }
 
