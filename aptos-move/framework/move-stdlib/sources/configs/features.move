@@ -220,8 +220,8 @@ module std::features {
     /// Lifetime: transient
     const FEE_PAYER_ENABLED: u64 = 22;
 
-    public fun fee_payer_enabled(): bool acquires Features {
-        is_enabled(FEE_PAYER_ENABLED)
+    public fun fee_payer_enabled(): bool {
+        true
     }
 
     /// Whether enable MOVE functions to call create_auid method to create AUIDs.
@@ -253,8 +253,8 @@ module std::features {
 
     public fun get_signer_native_format_fix_feature(): u64 { SIGNER_NATIVE_FORMAT_FIX }
 
-    public fun signer_native_format_fix_enabled(): bool acquires Features {
-        is_enabled(SIGNER_NATIVE_FORMAT_FIX)
+    public fun signer_native_format_fix_enabled(): bool {
+        true
     }
 
     /// Whether emit function in `event.move` are enabled for module events.
@@ -302,8 +302,8 @@ module std::features {
 
     public fun get_sponsored_automatic_account_creation(): u64 { SPONSORED_AUTOMATIC_ACCOUNT_CREATION }
 
-    public fun sponsored_automatic_account_creation_enabled(): bool acquires Features {
-        is_enabled(SPONSORED_AUTOMATIC_ACCOUNT_CREATION)
+    public fun sponsored_automatic_account_creation_enabled(): bool {
+        true
     }
 
     const FEE_PAYER_ACCOUNT_OPTIONAL: u64 = 35;
@@ -481,8 +481,8 @@ module std::features {
 
     public fun get_transaction_context_extension_feature(): u64 { TRANSACTION_CONTEXT_EXTENSION }
 
-    public fun transaction_context_extension_enabled(): bool acquires Features {
-        is_enabled(TRANSACTION_CONTEXT_EXTENSION)
+    public fun transaction_context_extension_enabled(): bool {
+        true
     }
 
     /// Whether migration from coin to fungible asset feature is enabled.
@@ -511,8 +511,8 @@ module std::features {
 
     const AGGREGATOR_V2_IS_AT_LEAST_API: u64 = 66;
 
-    public fun aggregator_v2_is_at_least_api_enabled(): bool acquires Features {
-        is_enabled(AGGREGATOR_V2_IS_AT_LEAST_API)
+    public fun aggregator_v2_is_at_least_api_enabled(): bool {
+        true
     }
 
     /// Whether we use more efficient native implementation of computing object derived address
@@ -520,8 +520,8 @@ module std::features {
 
     public fun get_object_native_derived_address_feature(): u64 { OBJECT_NATIVE_DERIVED_ADDRESS }
 
-    public fun object_native_derived_address_enabled(): bool acquires Features {
-        is_enabled(OBJECT_NATIVE_DERIVED_ADDRESS)
+    public fun object_native_derived_address_enabled(): bool {
+        true
     }
 
     /// Whether the dispatchable fungible asset standard feature is enabled.
@@ -531,8 +531,8 @@ module std::features {
 
     public fun get_dispatchable_fungible_asset_feature(): u64 { DISPATCHABLE_FUNGIBLE_ASSET }
 
-    public fun dispatchable_fungible_asset_enabled(): bool acquires Features {
-        is_enabled(DISPATCHABLE_FUNGIBLE_ASSET)
+    public fun dispatchable_fungible_asset_enabled(): bool {
+        true
     }
 
     /// Lifetime: transient
@@ -595,8 +595,8 @@ module std::features {
 
     public fun get_transaction_simulation_enhancement_feature(): u64 { TRANSACTION_SIMULATION_ENHANCEMENT }
 
-    public fun transaction_simulation_enhancement_enabled(): bool acquires Features {
-        is_enabled(TRANSACTION_SIMULATION_ENHANCEMENT)
+    public fun transaction_simulation_enhancement_enabled(): bool {
+        true
     }
 
     const COLLECTION_OWNER: u64 = 79;
@@ -611,8 +611,8 @@ module std::features {
 
     public fun get_native_memory_operations_feature(): u64 { NATIVE_MEMORY_OPERATIONS }
 
-    public fun is_native_memory_operations_enabled(): bool acquires Features {
-        is_enabled(NATIVE_MEMORY_OPERATIONS)
+    public fun is_native_memory_operations_enabled(): bool {
+        true
     }
 
     const PERMISSIONED_SIGNER: u64 = 84;

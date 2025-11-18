@@ -1,7 +1,5 @@
 /// The `function_info` module defines the `FunctionInfo` type which simulates a function pointer.
 module aptos_framework::function_info {
-    use std::error;
-    use std::features;
     use std::signer;
     use std::string::{Self, String};
 
@@ -70,10 +68,6 @@ module aptos_framework::function_info {
         framework_function: &FunctionInfo,
         dispatch_target: &FunctionInfo,
     ): bool {
-        assert!(
-            features::dispatchable_fungible_asset_enabled(),
-            error::aborted(ENOT_ACTIVATED)
-        );
         load_function_impl(dispatch_target);
         check_dispatch_type_compatibility_impl(framework_function, dispatch_target)
     }

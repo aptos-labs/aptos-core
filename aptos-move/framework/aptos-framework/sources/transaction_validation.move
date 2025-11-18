@@ -149,8 +149,7 @@ module aptos_framework::transaction_validation {
             if (option::is_some(&txn_authentication_key)) {
                 if (
                     sender_address == gas_payer_address ||
-                    account::exists_at(sender_address) ||
-                    !features::sponsored_automatic_account_creation_enabled()
+                    account::exists_at(sender_address)
                 ) {
                     assert!(
                         txn_authentication_key == option::some(account::get_authentication_key(sender_address)),
@@ -219,7 +218,6 @@ module aptos_framework::transaction_validation {
         if (
             sender_address == gas_payer_address
                 || account::exists_at(sender_address)
-                || !features::sponsored_automatic_account_creation_enabled()
                 || txn_sequence_number > 0
         ) {
             assert!(account::exists_at(sender_address), error::invalid_argument(PROLOGUE_EACCOUNT_DOES_NOT_EXIST));
@@ -449,7 +447,6 @@ module aptos_framework::transaction_validation {
         txn_expiration_time: u64,
         chain_id: u8,
     ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
         // prologue_common and multi_agent_common_prologue with is_simulation set to false behaves identically to the
         // original fee_payer_script_prologue function.
         prologue_common(
@@ -491,7 +488,6 @@ module aptos_framework::transaction_validation {
         chain_id: u8,
         is_simulation: bool,
     ) {
-        assert!(features::fee_payer_enabled(), error::invalid_state(PROLOGUE_EFEE_PAYER_NOT_ENABLED));
         prologue_common(
             &sender,
             &create_signer::create_signer(fee_payer_address),
