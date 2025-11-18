@@ -139,8 +139,9 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         T::get_dealers(&self.trx)
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self) {
-        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)
+    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self) -> anyhow::Result<()> {
+        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)?;
+        Ok(())
     }
 
     fn get_public_key_share(

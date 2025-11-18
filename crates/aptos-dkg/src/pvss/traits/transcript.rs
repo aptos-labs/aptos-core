@@ -160,7 +160,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     fn get_dealers(&self) -> Vec<Player>;
 
     /// Aggregates two transcripts.
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self);
+    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self) -> anyhow::Result<()>;
 
     /// Helper function for aggregating a vector of transcripts
     fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
@@ -172,7 +172,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         let (first, last) = trxs.split_at_mut(1);
 
         for other in last {
-            first[0].aggregate_with(sc, other);
+            first[0].aggregate_with(sc, other)?;
         }
 
         trxs.truncate(1);

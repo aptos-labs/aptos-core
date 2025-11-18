@@ -5,7 +5,7 @@
 #![allow(clippy::needless_borrow)]
 
 use aptos_crypto::{
-    traits::{SecretSharingConfig as _, ThresholdConfig as _},
+    traits::{SecretSharingConfig as _},
     Uniform,
 };
 use aptos_dkg::{
@@ -17,7 +17,7 @@ use aptos_dkg::{
             DealingArgs, NoAux,
         },
         traits::transcript::{MalleableTranscript, Transcript, WithMaxNumShares},
-        LowDegreeTest, ThresholdConfigBlstrs, WeightedConfigBlstrs,
+        LowDegreeTest, WeightedConfigBlstrs,
     },
 };
 use criterion::{
@@ -27,6 +27,7 @@ use criterion::{
 };
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
+use aptos_dkg::pvss::test_utils::BENCHMARK_CONFIGS;
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted PVSS
@@ -50,17 +51,13 @@ pub fn all_groups(c: &mut Criterion) {
 
 pub fn ldt_group(c: &mut Criterion) {
     let mut rng = thread_rng();
+    let mut group = c.benchmark_group("ldt");
 
-    for sc in get_threshold_configs_for_benchmarking::<ThresholdConfigBlstrs>() {
-        let mut group = c.benchmark_group("ldt");
-
-        group.bench_function(format!("dual_code_word/{}", sc), move |b| {
+    for &(t, n) in BENCHMARK_CONFIGS {
+        group.bench_function(format!("dual_code_word/t{}/n{}", t, n), |b| {
             b.iter_with_setup(
                 || {
-                    let n = sc.get_total_num_players();
-                    let t = sc.get_threshold();
                     let batch_dom = BatchEvaluationDomain::new(n);
-
                     (n, t, batch_dom)
                 },
                 |(n, t, batch_dom)| {

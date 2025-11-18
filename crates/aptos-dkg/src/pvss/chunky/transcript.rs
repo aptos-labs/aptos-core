@@ -79,7 +79,7 @@ pub struct UnsignedTranscript<E: Pairing> {
     pub R: Vec<E::G1>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub sharing_proof: Option<SharingProof<E>>, // Option because these proofs don't aggregate // TODO: REMOVE THIS
+    pub sharing_proof: SharingProof<E>,
 }
 
 // ================================================================
@@ -286,7 +286,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             V,
             C,
             R,
-            sharing_proof: Some(sharing_proof),
+            sharing_proof,
         };
 
         let sgn = ssk
@@ -325,7 +325,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         self.sgn.verify(&self.utrs, &spks[self.utrs.dealer.id])?;
 
-        if let Some(proof) = &self.utrs.sharing_proof {
+        {
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
             let hom = hkzg_chunked_elgamal::Homomorphism::new(
@@ -343,13 +343,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             );
             if let Err(err) = hom.verify(
                 &TupleCodomainShape(
-                    proof.range_proof_commitment.clone(),
+                    self.utrs.sharing_proof.range_proof_commitment.clone(),
                     chunked_elgamal::CodomainShape {
                         chunks: self.utrs.C.clone(),
                         randomness: self.utrs.R.clone(),
                     },
                 ),
-                &proof.PoK,
+                &self.utrs.sharing_proof.PoK,
                 &mut fs_t,
             ) {
                 bail!("PoK verification failed: {:?}", err);
@@ -363,17 +363,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 self.utrs.dealer.id,
                 DST,
             );
-            if let Err(err) = proof.range_proof.verify(
+            if let Err(err) = self.utrs.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.n * num_chunks_per_scalar::<E>(pp.ell) as usize,
                 pp.ell as usize,
-                &proof.range_proof_commitment,
+                &self.utrs.sharing_proof.range_proof_commitment,
                 &mut fs_t,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
             }
-        } else {
-            println!("There is no sharing proof");
         }
 
         let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
@@ -427,29 +425,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     // TODO: Make the method return a Result (rather than mutating Self)? And return None here?
-    fn aggregate_with(&mut self, _sc: &Self::SecretSharingConfig, _other: &Transcript<E>) {
-        panic!("This PVSS doesn't aggregate");
-        // debug_assert_eq!(self.utrs.C.len(), sc.n);
-        // debug_assert_eq!(self.utrs.V.len(), sc.n + 1);
-        // debug_assert_eq!(self.utrs.C.len(), other.C.len());
-        // debug_assert_eq!(self.utrs.R.len(), other.R.len());
-        // debug_assert_eq!(self.utrs.V.len(), other.V.len());
-
-        // for i in 0..sc.n {
-        //     self.utrs.V[i] += other.V[i];
-        //     for j in 0..self.utrs.C[i].len() {
-        //         self.utrs.C[i][j] += other.C[i][j];
-        //     }
-        // }
-        // self.utrs.V[sc.n] += other.V[sc.n];
-
-        // for (r_self, r_other) in self.utrs.R.iter_mut().zip(&other.R) {
-        //     *r_self += r_other;
-        // }
-
-        // self.utrs.dealers.extend_from_slice(other.dealers.as_slice());
-
-        // self.utrs.sharing_proof = None; // the proofs don't aggregate
+    fn aggregate_with(&mut self, _sc: &Self::SecretSharingConfig, _other: &Transcript<E>) -> anyhow::Result<()> {
+        Err(anyhow::anyhow!("PVSS aggregation not supported"))
     }
 
     fn get_public_key_share(
@@ -529,7 +506,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 .map(|_| unsafe_random_points(num_chunks_per_share, rng))
                 .collect::<Vec<_>>(),
             R: unsafe_random_points(num_chunks_per_share, rng),
-            sharing_proof: Some(SharingProof {
+            sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),
                 ),
@@ -539,7 +516,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                     rng,
                 ),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
-            }),
+            },
         };
 
         let ssk = PrivateKey::generate(rng);
