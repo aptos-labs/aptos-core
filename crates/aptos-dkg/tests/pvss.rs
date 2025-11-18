@@ -46,8 +46,8 @@ fn test_pvss_all_unweighted() {
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
     }
 
-    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
-    let tcs = test_utils::get_threshold_configs_for_testing();
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s over BN254 instead
+    let tcs = test_utils::get_threshold_configs_for_testing_smaller();
     for tc in tcs.iter().take(20) {
         // Reduce the number of tcs to make it a bit faster?
         println!("\nTesting {tc} PVSS");
@@ -108,7 +108,8 @@ fn test_pvss_transcript_size() {
     // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254
     // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
     // Ideally should iterate over a vec of (t, n), not the actual threshold configs... but won't be a bottleneck
-    for sc in get_threshold_configs_for_benchmarking().iter().take(3) {
+    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+        // Only trying 1 for now to keep tests fast
         println!();
         let actual_size = actual_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(&sc);
         print_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(
@@ -119,9 +120,10 @@ fn test_pvss_transcript_size() {
     }
 
     // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
-    for sc in get_threshold_configs_for_benchmarking().iter().take(3) {
-        println!();
+    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+        // Only trying 1 for now to keep tests fast
 
+        println!();
         let actual_size =
             actual_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(&sc);
         print_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(

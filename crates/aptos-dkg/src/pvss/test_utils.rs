@@ -142,6 +142,20 @@ pub fn get_threshold_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<T>
     tcs
 }
 
+// When set up is slow, we reduce the number of test cases to keep the tests fast
+pub fn get_threshold_configs_for_testing_smaller<T: traits::ThresholdConfig>() -> Vec<T> {
+    let mut tcs = vec![];
+
+    for t in 1..4 {
+        for n in t..5 {
+            let tc = T::new(t, n).unwrap();
+            tcs.push(tc)
+        }
+    }
+
+    tcs
+}
+
 pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
 
@@ -198,6 +212,18 @@ pub fn get_threshold_configs_for_benchmarking<T: traits::ThresholdConfig>() -> V
 
 pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
+
+    // This one was produced in Nov 2025
+    let weights = vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 7,
+    ];
+    let total_weight: usize = weights.iter().sum();
+    let threshold = total_weight * 2 / 3 + 1;
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     let weights = vec![
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,

@@ -26,6 +26,10 @@ use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
+    // for tc in get_threshold_configs_for_benchmarking() {
+    //     pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
+    // }
+
     // unweighted PVSS
     for tc in get_threshold_configs_for_benchmarking() {
         pvss_group::<pvss::das::Transcript>(&tc, c);
