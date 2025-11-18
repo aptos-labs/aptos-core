@@ -421,6 +421,7 @@ mod tests {
                 &input_secret,
                 0,
                 &private_keys[0],
+                &public_keys[0],
             );
             let (sk, pk) = DefaultDKG::decrypt_secret_share_from_transcript(
                 &dkg_pub_params,

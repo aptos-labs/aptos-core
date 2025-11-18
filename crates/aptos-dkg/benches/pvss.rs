@@ -85,10 +85,10 @@ pub fn pvss_group<T: MalleableTranscript>(
     let d = test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
-    pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.eks, &mut group);
+    pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_aggregate::<T, WallTime>(sc, &mut group);
     pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_decrypt_own_share::<T, WallTime>(sc, &d.pp, &d.ssks, &d.dks, &d.eks, &d.s, &mut group);
+    pvss_decrypt_own_share::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group);
 
     group.finish();
 
@@ -123,6 +123,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     ssks: &Vec<T::SigningSecretKey>,
+    spks: &Vec<T::SigningPubKey>,
     eks: &Vec<T::EncryptPubKey>,
     g: &mut BenchmarkGroup<M>,
 ) {
@@ -141,6 +142,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
                     &sc,
                     &pp,
                     &ssks[0],
+                    &spks[0],
                     &eks,
                     &s,
                     &NoAux,
@@ -196,6 +198,7 @@ fn pvss_verify<T: Transcript, M: Measurement>(
                     &sc,
                     &pp,
                     &ssks[0],
+                    &spks[0],
                     &eks,
                     &s,
                     &NoAux,
@@ -243,6 +246,7 @@ fn pvss_aggregate_verify<T: MalleableTranscript, M: Measurement>(
                     &sc,
                     &pp,
                     &ssks[0],
+                    &spks[0],
                     &eks,
                     iss,
                     &NoAux,
@@ -273,6 +277,7 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     ssks: &Vec<T::SigningSecretKey>,
+    spks: &Vec<T::SigningPubKey>,
     dks: &Vec<T::DecryptPrivKey>,
     eks: &Vec<T::EncryptPubKey>,
     s: &T::InputSecret,
@@ -286,6 +291,7 @@ fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
         &sc,
         &pp,
         &ssks[0],
+        &spks[0],
         &eks,
         &s,
         &NoAux,

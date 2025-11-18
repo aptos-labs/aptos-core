@@ -237,7 +237,7 @@ where
     H::Domain: Witness<E>,
     H::Codomain: Statement,
 {
-    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method does nothing at runtime.
+    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method should do nothing at runtime.
     #[allow(non_snake_case)]
     pub fn change_lifetime<H2>(self) -> Proof<E, H2>
     where
@@ -310,7 +310,7 @@ where
     // Append the Σ-protocol separator to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(fs_t, dst);
 
-    // Append the MSM bases to the transcript
+    // Append the MSM bases to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_msm_bases(
         fs_t, hom,
     );

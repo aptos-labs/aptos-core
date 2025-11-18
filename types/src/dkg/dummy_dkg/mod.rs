@@ -19,6 +19,7 @@ pub struct DummyDKG {}
 
 impl DKGTrait for DummyDKG {
     type DealerPrivateKey = bls12381::PrivateKey;
+    type DealerPublicKey = bls12381::PublicKey;
     type DealtPubKeyShare = ();
     type DealtSecret = DummySecret;
     type DealtSecretShare = DummySecret;
@@ -48,6 +49,7 @@ impl DKGTrait for DummyDKG {
         input_secret: &Self::InputSecret,
         my_index: u64,
         _sk: &Self::DealerPrivateKey,
+        _pk: &Self::DealerPublicKey,
     ) -> Self::Transcript {
         DummyDKGTranscript {
             secret: *input_secret,

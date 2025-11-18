@@ -185,6 +185,7 @@ pub struct DealtSecretKeyShares {
 
 impl DKGTrait for RealDKG {
     type DealerPrivateKey = <WTrx as Transcript>::SigningSecretKey;
+    type DealerPublicKey = <WTrx as Transcript>::SigningPubKey;
     type DealtPubKeyShare = DealtPubKeyShares;
     type DealtSecret = <WTrx as Transcript>::DealtSecretKey;
     type DealtSecretShare = DealtSecretKeyShares;
@@ -241,6 +242,7 @@ impl DKGTrait for RealDKG {
         input_secret: &Self::InputSecret,
         my_index: u64,
         sk: &Self::DealerPrivateKey,
+        pk: &Self::DealerPublicKey,
     ) -> Self::Transcript {
         let my_index = my_index as usize;
         let my_addr = pub_params.session_metadata.dealer_validator_set[my_index].addr;
@@ -250,6 +252,7 @@ impl DKGTrait for RealDKG {
             &pub_params.pvss_config.wconfig,
             &pub_params.pvss_config.pp,
             sk,
+            pk,
             &pub_params.pvss_config.eks,
             input_secret,
             &aux,
@@ -266,6 +269,7 @@ impl DKGTrait for RealDKG {
                     fast_wconfig,
                     &pub_params.pvss_config.pp,
                     sk,
+                    pk,
                     &pub_params.pvss_config.eks,
                     input_secret,
                     &aux,
@@ -513,9 +517,10 @@ impl RealDKG {
         pub_params: &<RealDKG as DKGTrait>::PublicParams,
         my_index: u64,
         sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+        pk: &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript {
         let secret = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        Self::generate_transcript(rng, pub_params, &secret, my_index, sk)
+        Self::generate_transcript(rng, pub_params, &secret, my_index, sk, pk)
     }
 
     /// The same dealer deals twice and aggregates the transcripts.
@@ -525,11 +530,12 @@ impl RealDKG {
         pub_params: &<RealDKG as DKGTrait>::PublicParams,
         my_index: u64,
         sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+        pk: &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript {
         let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        let mut trx_0 = Self::generate_transcript(rng, pub_params, &secret_0, my_index, sk);
+        let mut trx_0 = Self::generate_transcript(rng, pub_params, &secret_0, my_index, sk, pk);
         let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        let trx_1 = Self::generate_transcript(rng, pub_params, &secret_1, my_index, sk);
+        let trx_1 = Self::generate_transcript(rng, pub_params, &secret_1, my_index, sk, pk);
         Self::aggregate_transcripts(pub_params, &mut trx_0, trx_1);
         assert_eq!(2, trx_0.main.get_dealers().len());
         trx_0
@@ -541,6 +547,7 @@ impl RealDKG {
         pub_params: &<RealDKG as DKGTrait>::PublicParams,
         my_index: u64,
         sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+        pk: &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript {
         let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
         let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
@@ -552,6 +559,7 @@ impl RealDKG {
             &pub_params.pvss_config.wconfig,
             &pub_params.pvss_config.pp,
             sk,
+            pk,
             &pub_params.pvss_config.eks,
             &secret_0,
             &aux,
@@ -568,6 +576,7 @@ impl RealDKG {
                     fast_wconfig,
                     &pub_params.pvss_config.pp,
                     sk,
+                    pk,
                     &pub_params.pvss_config.eks,
                     &secret_1,
                     &aux,

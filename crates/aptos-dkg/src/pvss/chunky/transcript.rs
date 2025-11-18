@@ -130,6 +130,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         _aux: &A,
@@ -141,6 +142,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             sc.n,
             "Number of encryption keys must equal number of players"
         );
+
+        // let ctext = ()
 
         // Initialize the PVSS Fiat-Shamir transcript
         let mut fs_transcript =
@@ -162,7 +165,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let (C, R, sharing_proof) =
             encrypt_chunked_shares(&f_evals, eks, sc, pp, &mut fs_transcript, rng);
 
-        // Add constant term for the `\mathbb{G}_2` commitment following immediately below (we're doing this
+        // Add constant term for the `\mathbb{G}_2` commitment (we're doing this
         // **after** the previous step because we're now mutating `f_evals` by enlarging it; this is a silly
         // technicality however, it has no impact on computational complexity whatsoever as we could simply
         // modify the `commit_to_scalars()` function to take another input)
@@ -299,6 +302,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         self.dealers.clone()
     }
 
+    // TODO: Make the method return a Result (rather than mutating Self)? And return None here?
     fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript<E>) {
         debug_assert_eq!(self.C.len(), sc.n);
         debug_assert_eq!(self.V.len(), sc.n + 1);

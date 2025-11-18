@@ -82,6 +82,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         _aux: &A,
