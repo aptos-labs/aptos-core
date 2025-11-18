@@ -200,30 +200,14 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
     }
 }
 
-// use aptos_crypto::bls12381::PrivateKey;
-
-// /// Returns the signing message for the given message using only serialization.
-// pub fn signing_message_simple<T: Serialize>(
-//     message: &T,
-// ) -> Result<Vec<u8>, CryptoMaterialError> {
-//     let mut bytes: Vec<u8> = Vec::new();
-
-//     bcs::serialize_into(&mut bytes, message)
-//         .map_err(|_| CryptoMaterialError::SerializationError)?;
-
-//     Ok(bytes)
-// }
-
-//     fn sign<T: Serialize>(
-//         priv_key: PrivateKey,
-//         message: &T,
-//     ) -> Result<bls12381::Signature, CryptoMaterialError> {
-//         Ok(bls12381::Signature {
-//             sig: priv_key
-//                 .privkey
-//                 .sign(&signing_message(message)?, DST_BLS_SIG_IN_G2_WITH_POP, &[]),
-//         })
-//     }
+#[allow(type_alias_bounds)]
+type FiatShamirContext<'a, A: Serialize + Clone, E: Pairing> = (
+    ShamirThresholdConfig<E::ScalarField>,
+    bls12381::PublicKey,
+    &'a A,
+    usize,
+    Vec<u8>,
+);
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
@@ -238,10 +222,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type PublicParameters = PublicParameters<E>;
     type SecretSharingConfig = ShamirThresholdConfig<E::ScalarField>;
     type SigningPubKey = bls12381::PublicKey;
-    // TODO!!!!!!!!!!!!!!!!!! NEXT PR
     type SigningSecretKey = bls12381::PrivateKey;
-
-    // TODO!!!!!!!!!!!!!!!!!! NEXT PR
 
     fn scheme_name() -> String {
         "chunky_pvss".to_string()
@@ -270,8 +251,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         );
 
         // Initialize the PVSS Fiat-Shamir transcript
-        let mut fs_t =
-            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(sc, spk, &aux, dealer.id, DST);
+        let fs_ctxt = (*sc, spk.clone(), aux, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here
 
         // Generate the Shamir secret sharing polynomial
         let mut f = vec![*s.get_secret_a()]; // constant term of polynomial
@@ -286,7 +266,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         debug_assert_eq!(f_evals.len(), sc.n);
 
         // Encrypt the chunked shares and generate the sharing proof
-        let (C, R, sharing_proof) = encrypt_chunked_shares(&f_evals, eks, sc, pp, &mut fs_t, rng);
+        let (C, R, sharing_proof) =
+            Self::encrypt_chunked_shares(&f_evals, eks, sc, pp, fs_ctxt, rng);
 
         // Add constant term for the `\mathbb{G}_2` commitment (we're doing this
         // **after** the previous step because we're now mutating `f_evals` by enlarging it; this is a silly
@@ -299,6 +280,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let V = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(V.len(), sc.n + 1);
 
+        // Construct the **unsigned** transcript struct with all computed values
         let utrs = UnsignedTranscript {
             dealer: *dealer,
             V,
@@ -309,11 +291,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         let sgn = ssk
             .sign(&utrs)
-            .expect("signing of PVSS transcript should have succeeded");
+            .expect("signing of `chunky` PVSS transcript should have succeeded");
 
-        //let sig = Transcript::sign_contribution(ssk, dealer, aux, &V[sc.n]);
-
-        // Return the transcript struct with all computed values
         Transcript { utrs, sgn }
     }
 
@@ -346,14 +325,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         self.sgn.verify(&self.utrs, &spks[self.utrs.dealer.id])?;
 
-        let mut fs_t = fiat_shamir::initialize_pvss_transcript::<_, E, Self>(
-            sc,
-            &spks[self.utrs.dealer.id],
-            &aux[self.utrs.dealer.id],
-            self.utrs.dealer.id,
-            DST,
-        );
-
         if let Some(proof) = &self.utrs.sharing_proof {
             // Verify the PoK
             let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
@@ -362,6 +333,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 pp.pk_range_proof.ck_S.xi_1,
                 &pp.pp_elgamal,
                 &eks_inner,
+            );
+            let mut fs_t = fiat_shamir::initialize_pvss_transcript::<_, E, Self>(
+                sc,
+                &spks[self.utrs.dealer.id],
+                &aux[self.utrs.dealer.id],
+                self.utrs.dealer.id,
+                DST,
             );
             if let Err(err) = hom.verify(
                 &TupleCodomainShape(
@@ -378,6 +356,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             }
 
             // Verify the range proof
+            let mut fs_t = fiat_shamir::initialize_pvss_transcript::<_, E, Self>(
+                sc,
+                &spks[self.utrs.dealer.id],
+                &aux[self.utrs.dealer.id],
+                self.utrs.dealer.id,
+                DST,
+            );
             if let Err(err) = proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.n * num_chunks_per_scalar::<E>(pp.ell) as usize,
@@ -567,88 +552,104 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 }
 
-#[allow(non_snake_case)]
-pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::CryptoRng>(
-    f_evals: &[E::ScalarField],
-    eks: &[keys::EncryptPubKey<E>],
-    sc: &ShamirThresholdConfig<E::ScalarField>,
-    pp: &PublicParameters<E>,
-    fs_t: &mut merlin::Transcript,
-    rng: &mut R,
-) -> (Vec<Vec<E::G1>>, Vec<E::G1>, SharingProof<E>) {
-    // Generate the required randomness
-    let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
+    // why are N and P needed?
+    #[allow(non_snake_case)]
+    pub fn encrypt_chunked_shares<
+        'a,
+        A: Serialize + Clone,
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    >(
+        f_evals: &[E::ScalarField],
+        eks: &[keys::EncryptPubKey<E>],
+        _sc: &ShamirThresholdConfig<E::ScalarField>,
+        pp: &PublicParameters<E>,
+        fs_ctxt: FiatShamirContext<'a, A, E>,
+        rng: &mut R,
+    ) -> (Vec<Vec<E::G1>>, Vec<E::G1>, SharingProof<E>) {
+        let (sc, spk, aux, dealer_id, dst) = fs_ctxt;
 
-    let elgamal_randomness = Scalar::vec_from_inner(chunked_elgamal::correlated_randomness(
-        rng,
-        1 << pp.ell as u64,
-        num_chunks_per_scalar::<E>(pp.ell),
-    ));
+        // Generate the required randomness
+        let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
 
-    // Chunk and flatten the shares
-    let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
-        .iter()
-        .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
-        .collect();
-    // Flatten it now before `f_evals_chunked` is consumed in the next step
-    let f_evals_chunked_flat: Vec<E::ScalarField> =
-        f_evals_chunked.iter().flatten().copied().collect();
+        let elgamal_randomness = Scalar::vec_from_inner(chunked_elgamal::correlated_randomness(
+            rng,
+            1 << pp.ell as u64,
+            num_chunks_per_scalar::<E>(pp.ell),
+        ));
 
-    // Now generate the encrypted shares and range proof commitment, together with its PoK, so:
-    // (1) Set up the witness
-    let witness = HkzgElgamalWitness {
-        hkzg_randomness,
-        chunked_plaintexts: Scalar::vecvec_from_inner(f_evals_chunked),
-        elgamal_randomness,
-    };
-    // (2) Compute its image under the corresponding homomorphism, and prove knowledge of an inverse
-    //   (2a) Set up the tuple homomorphism
-    let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
-    let hom = hkzg_chunked_elgamal::Homomorphism::new(
-        &pp.pk_range_proof.ck_S.lagr_g1,
-        pp.pk_range_proof.ck_S.xi_1,
-        &pp.pp_elgamal,
-        &eks_inner,
-    );
-    //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
-    let statement = hom.apply(&witness);
-    //   (2c) Prove knowledge of its inverse
-    let PoK = hom.prove(&witness, &statement, fs_t, rng).change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
+        // Chunk and flatten the shares
+        let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals
+            .iter()
+            .map(|f_eval| chunks::scalar_to_le_chunks(pp.ell, f_eval))
+            .collect();
+        // Flatten it now before `f_evals_chunked` is consumed in the next step
+        let f_evals_chunked_flat: Vec<E::ScalarField> =
+            f_evals_chunked.iter().flatten().copied().collect();
 
-    // Destructure the "public statement" of the above sigma protocol
-    let TupleCodomainShape(
-        range_proof_commitment,
-        chunked_elgamal::CodomainShape {
-            chunks: Cs,
-            randomness: Rs,
-        },
-    ) = statement;
+        // Now generate the encrypted shares and range proof commitment, together with its PoK, so:
+        // (1) Set up the witness
+        let witness = HkzgElgamalWitness {
+            hkzg_randomness,
+            chunked_plaintexts: Scalar::vecvec_from_inner(f_evals_chunked),
+            elgamal_randomness,
+        };
+        // (2) Compute its image under the corresponding homomorphism, and prove knowledge of an inverse
+        //   (2a) Set up the tuple homomorphism
+        let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect(); // TODO: this is a bit ugly
+        let hom = hkzg_chunked_elgamal::Homomorphism::new(
+            &pp.pk_range_proof.ck_S.lagr_g1,
+            pp.pk_range_proof.ck_S.xi_1,
+            &pp.pp_elgamal,
+            &eks_inner,
+        );
+        //   (2b) Compute its image (the public statement), so the range proof commitment and chunked_elgamal encryptions
+        let statement = hom.apply(&witness);
+        //   (2c) Prove knowledge of its inverse
+        let mut fs_t =
+            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(&sc, &spk, &aux, dealer_id, &dst);
+        let PoK = hom
+            .prove(&witness, &statement, &mut fs_t, rng)
+            .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
+                                // TODO: don't do &mut but just pass it
 
-    debug_assert_eq!(
-        Cs.len(),
-        sc.n,
-        "Number of encrypted chunks must equal number of players"
-    );
+        // Destructure the "public statement" of the above sigma protocol
+        let TupleCodomainShape(
+            range_proof_commitment,
+            chunked_elgamal::CodomainShape {
+                chunks: Cs,
+                randomness: Rs,
+            },
+        ) = statement;
 
-    // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
-    let range_proof = dekart_univariate_v2::Proof::prove(
-        &pp.pk_range_proof,
-        &f_evals_chunked_flat,
-        pp.ell as usize,
-        &range_proof_commitment,
-        &hkzg_randomness,
-        fs_t,
-        rng,
-    );
+        debug_assert_eq!(
+            Cs.len(),
+            sc.n,
+            "Number of encrypted chunks must equal number of players"
+        );
 
-    // Assemble the sharing proof
-    let sharing_proof = SharingProof {
-        PoK,
-        range_proof,
-        range_proof_commitment,
-    };
+        // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
+        let mut fs_t =
+            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(&sc, &spk, &aux, dealer_id, &dst);
+        let range_proof = dekart_univariate_v2::Proof::prove(
+            &pp.pk_range_proof,
+            &f_evals_chunked_flat,
+            pp.ell as usize,
+            &range_proof_commitment,
+            &hkzg_randomness,
+            &mut fs_t,
+            rng,
+        ); // TODO: don't do &mut fs_t but just pass it
 
-    (Cs, Rs, sharing_proof)
+        // Assemble the sharing proof
+        let sharing_proof = SharingProof {
+            PoK,
+            range_proof,
+            range_proof_commitment,
+        };
+
+        (Cs, Rs, sharing_proof)
+    }
 }
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> MalleableTranscript
