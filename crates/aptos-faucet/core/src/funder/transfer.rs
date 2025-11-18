@@ -56,7 +56,10 @@ impl TransferFunderConfig {
     pub async fn build_funder(&self) -> Result<TransferFunder> {
         // Read in private key.
         let apt_asset_config = self.assets.get(DEFAULT_ASSET_NAME).ok_or_else(|| {
-            anyhow::anyhow!("No '{}' asset configuration found", DEFAULT_ASSET_NAME)
+            anyhow::anyhow!(
+                "TransferFunder requires an '{}' asset configuration. Please add it to the assets map.",
+                DEFAULT_ASSET_NAME
+            )
         })?;
         let key = apt_asset_config.get_key()?;
 

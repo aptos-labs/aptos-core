@@ -263,21 +263,25 @@ pub async fn update_sequence_numbers(
                 drop(requests);
                 let mut requests = outstanding_requests.write().await;
 
+                // Try to find and remove the request. If it's not found, it means another
+                // thread already removed it. In either case, we should break from the loop
+                // since the request has been processed (either by us or by another thread).
                 if let Some(asset) = asset_name {
                     // Find and remove the first matching request for this asset
                     if let Some(pos) = requests.iter().position(|(a, addr, amt)| {
                         a == asset && *addr == receiver_address && *amt == amount
                     }) {
                         requests.remove(pos);
-                        break;
                     }
+                    // If not found, another thread already removed it - break either way
                 } else {
                     // Remove the first matching request (no asset filtering)
                     if requests.first() == Some(&request_key) {
                         requests.remove(0);
-                        break;
                     }
+                    // If not found, another thread already removed it - break either way
                 }
+                break;
             }
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
             continue;

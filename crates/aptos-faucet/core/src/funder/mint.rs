@@ -129,6 +129,29 @@ impl MintFunderConfig {
             )
         })?;
 
+        for (asset_name, asset_config) in &self.assets {
+            if asset_config.transaction_method == "entry_function" {
+                if asset_config.module_address.is_none() {
+                    return Err(anyhow::anyhow!(
+                        "Asset '{}' uses entry_function but module_address is not set",
+                        asset_name
+                    ));
+                }
+                if asset_config.module_name.is_none() {
+                    return Err(anyhow::anyhow!(
+                        "Asset '{}' uses entry_function but module_name is not set",
+                        asset_name
+                    ));
+                }
+                if asset_config.function_name.is_none() {
+                    return Err(anyhow::anyhow!(
+                        "Asset '{}' uses entry_function but function_name is not set",
+                        asset_name
+                    ));
+                }
+            }
+        }
+
         let mut assets_with_accounts = HashMap::new();
 
         for (asset_name, asset_config) in self.assets {
@@ -426,36 +449,12 @@ impl MintFunder {
 
             let payload = match asset_config.transaction_method.as_str() {
                 "entry_function" => {
-                    // Validate entry function fields
-                    let module_address = asset_config.module_address.ok_or_else(|| {
-                        AptosTapError::new(
-                            format!(
-                                "Asset '{}' uses entry_function but module_address is not set",
-                                asset_name
-                            ),
-                            AptosTapErrorCode::InvalidRequest,
-                        )
-                    })?;
-                    let module_name = asset_config.module_name.as_ref().ok_or_else(|| {
-                        AptosTapError::new(
-                            format!(
-                                "Asset '{}' uses entry_function but module_name is not set",
-                                asset_name
-                            ),
-                            AptosTapErrorCode::InvalidRequest,
-                        )
-                    })?;
-                    let function_name = asset_config.function_name.as_ref().ok_or_else(|| {
-                        AptosTapError::new(
-                            format!(
-                                "Asset '{}' uses entry_function but function_name is not set",
-                                asset_name
-                            ),
-                            AptosTapErrorCode::InvalidRequest,
-                        )
-                    })?;
+                    // These are guaranteed to be Some due to validation in build_funder
+                    let module_address = asset_config.module_address.unwrap();
+                    let module_name = asset_config.module_name.as_ref().unwrap();
+                    let function_name = asset_config.function_name.as_ref().unwrap();
 
-                    // Create ModuleId
+                    // Create ModuleId from module_address and module_name
                     let module_id = ModuleId::new(
                         module_address,
                         Identifier::new(module_name.as_str()).map_err(|e| {
