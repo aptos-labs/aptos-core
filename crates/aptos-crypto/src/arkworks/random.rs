@@ -19,7 +19,7 @@ pub trait UniformRand {
 
 /// NOTE: This function is "unsafe" in the sense that the caller learns the discrete log of the
 /// random point w.r.t. the generator. In many applications, this is not acceptable.
-/// It also seems rather slow, so it's not exactly ideal for testing either
+/// It also seems rather slow, so it's not exactly ideal for testing either // TODO: Remove in the near future
 pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
@@ -30,7 +30,7 @@ where
 }
 
 /// Samples `n` uniformly random elements from the group, but is unsafe in the sense
-/// that the caller learns the discrete log of the random point.
+/// that the caller learns the discrete log of the random point. // TODO: Remove in the near future
 pub fn unsafe_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
@@ -39,7 +39,7 @@ where
 }
 
 /// Faster "unsafe" random point by hashing some random bytes to the curve
-/// But still not very fast // TODO: make proper benchmarks
+/// But still not very fast // TODO: make proper benchmarks, then probably remove the other version
 pub fn unsafe_random_point_hash<C: CurveGroup, R>(rng: &mut R) -> C
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
