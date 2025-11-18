@@ -207,9 +207,9 @@ pub struct MintFunder {
 
     /// When recovering from being overloaded, this struct ensures we handle
     /// requests in the order they came in. Each asset has its own independent queue
-    /// (HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>), maintaining FIFO ordering
+    /// (HashMap<String, Vec<(AccountAddress, u64)>>), maintaining FIFO ordering
     /// within each asset without interference between assets.
-    outstanding_requests: RwLock<HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>>,
+    outstanding_requests: RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
 
     // Multi-asset support: store asset configs
     assets: HashMap<String, (MintAssetConfig, RwLock<LocalAccount>)>,

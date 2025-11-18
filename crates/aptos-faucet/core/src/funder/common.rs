@@ -194,15 +194,15 @@ impl Drop for NumOutstandingTransactionsResetter {
 /// This function is responsible for updating our local record of the sequence
 /// numbers of the funder and receiver accounts.
 ///
-/// Each asset has its own independent queue: HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>.
+/// Each asset has its own independent queue: HashMap<String, Vec<(AccountAddress, u64)>>.
 /// This ensures requests for different assets don't interfere with each other while maintaining
 /// FIFO ordering within each asset. For single-asset funders (like TransferFunder), use
 /// DEFAULT_ASSET_NAME. For multi-asset funders (like MintFunder), pass the specific asset name.
 pub async fn update_sequence_numbers(
     client: &Client,
     funder_account: &RwLock<LocalAccount>,
-    // Each asset has its own queue: HashMap<asset_name, RwLock<Vec<(AccountAddress, u64)>>>
-    outstanding_requests: &RwLock<HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>>,
+    // Each asset has its own queue: HashMap<asset_name, Vec<(AccountAddress, u64)>>
+    outstanding_requests: &RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
     receiver_address: AccountAddress,
     amount: u64,
     wait_for_outstanding_txns_secs: u64,
@@ -235,17 +235,15 @@ pub async fn update_sequence_numbers(
                 let mut requests_map = outstanding_requests.write().await;
                 let queue = requests_map
                     .entry(asset_name.to_string())
-                    .or_insert_with(|| RwLock::new(Vec::new()));
-                let mut queue_guard = queue.write().await;
-                queue_guard.push(request_key);
+                    .or_insert_with(Vec::new);
+                queue.push(request_key);
                 set_outstanding = true;
             }
 
             // Check if this request is at the front of the queue for this asset
             let requests_map = outstanding_requests.read().await;
             let is_at_front = if let Some(queue) = requests_map.get(asset_name) {
-                let queue_guard = queue.read().await;
-                queue_guard.first() == Some(&request_key)
+                queue.first() == Some(&request_key)
             } else {
                 false
             };
@@ -257,9 +255,8 @@ pub async fn update_sequence_numbers(
                 drop(requests_map);
                 let mut requests_map = outstanding_requests.write().await;
                 if let Some(queue) = requests_map.get_mut(asset_name) {
-                    let mut queue_guard = queue.write().await;
-                    if queue_guard.first() == Some(&request_key) {
-                        queue_guard.remove(0);
+                    if queue.first() == Some(&request_key) {
+                        queue.remove(0);
                     }
                 }
                 break;

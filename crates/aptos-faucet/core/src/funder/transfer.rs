@@ -118,7 +118,7 @@ pub struct TransferFunder {
     /// When recovering from being overloaded, this struct ensures we handle
     /// requests in the order they came in. TransferFunder uses DEFAULT_ASSET_NAME for all requests
     /// since it only handles a single asset. The queue format is Vec<(AccountAddress, u64)>.
-    outstanding_requests: RwLock<HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>>,
+    outstanding_requests: RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
 
     /// Amount of time we'll wait for the seqnum to catch up before resetting it.
     wait_for_outstanding_txns_secs: u64,
