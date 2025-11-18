@@ -911,9 +911,17 @@ move-vm-types = { path = "third_party/move/move-vm/types" }
 [profile.dev]
 debug = "line-tables-only"
 
+[profile.debugger]
+inherits = "dev"
+debug = true
+
 [profile.release]
 debug = "line-tables-only"
 overflow-checks = true
+
+[profile.profiler]
+inherits = "release"
+debug = true
 
 # For [build-dependencies], cargo sets `opt-level=0` independent of the actual profile used.
 # In `aptos-cached-packages` crate, we have `aptos-framework` as a build dependency. Which in a `--release` mode,
