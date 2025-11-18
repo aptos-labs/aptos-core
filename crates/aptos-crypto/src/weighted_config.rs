@@ -32,7 +32,7 @@ pub struct WeightedConfig<TC: ThresholdConfig> {
     /// The total number of players in the protocol.
     num_players: usize,
     /// Each player's weight
-    weight: Vec<usize>,
+    weights: Vec<usize>,
     /// Player's starting index `a` in a vector of all `W` shares, such that this player owns shares
     /// `W[a, a + weight[player])`. Useful during weighted secret reconstruction.
     starting_index: Vec<usize>,
@@ -86,7 +86,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
         Ok(WeightedConfig {
             tc,
             num_players: n,
-            weight: weights,
+            weights,
             starting_index,
             max_weight,
             min_weight,
@@ -101,7 +101,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     /// Returns _a_ player who has the smallest weight.
     pub fn get_min_weight_player(&self) -> Player {
         if let Some((i, _weight)) = self
-            .weight
+            .weights
             .iter()
             .enumerate()
             .min_by_key(|&(_, &weight)| weight)
@@ -116,7 +116,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     /// Returns _a_ player who has the largest weight.
     pub fn get_max_weight_player(&self) -> Player {
         if let Some((i, _weight)) = self
-            .weight
+            .weights
             .iter()
             .enumerate()
             .max_by_key(|&(_, &weight)| weight)
@@ -150,7 +150,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
 
     /// Returns the weight of a specific player.
     pub fn get_player_weight(&self, player: &Player) -> usize {
-        self.weight[player.id]
+        self.weights[player.id]
     }
 
     /// Returns the starting index of a player's shares in the flattened vector of all weighted shares.
@@ -165,7 +165,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     /// This function returns the "virtual" player associated with the $i$th sub-share of this player.
     pub fn get_virtual_player(&self, player: &Player, j: usize) -> Player {
         // println!("WeightedConfig::get_virtual_player({player}, {i})");
-        assert_lt!(j, self.weight[player.id]);
+        assert_lt!(j, self.weights[player.id]);
 
         let id = self.get_share_index(player.id, j).unwrap();
 
@@ -186,7 +186,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     ///
     /// Returns the index of this player's share in the vector of shares, or None if out of bounds.
     pub fn get_share_index(&self, i: usize, j: usize) -> Option<usize> {
-        if j < self.weight[i] {
+        if j < self.weights[i] {
             Some(self.starting_index[i] + j)
         } else {
             None
@@ -235,7 +235,7 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     fn sort_players_by_weight(&self) -> Vec<(Player, usize)> {
         // the set of remaining players that we are picking a "capable" subset from
         let mut player_and_weights = self
-            .weight
+            .weights
             .iter()
             .enumerate()
             .map(|(i, w)| (self.get_player(i), *w))
@@ -305,7 +305,7 @@ impl<TC: ThresholdConfig> traits::SecretSharingConfig for WeightedConfig<TC> {
         let mut picked_players = vec![];
         // the set of remaining players that we are picking a "capable" subset from
         let mut player_and_weights = self
-            .weight
+            .weights
             .iter()
             .enumerate()
             .map(|(i, w)| (i, *w))
