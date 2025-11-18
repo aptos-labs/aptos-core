@@ -8,10 +8,15 @@ on:
         required: true
         type: string
         description: The network to run replay verify on.
-      IMAGE_TAG:
+      GIT_SHA:
         required: false
         type: string
         description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+      IMAGE_PROFILE:
+        required: false
+        type: string
+        default: performance
+        description: Build the image with this `--profile` option.
       START_VERSION:
         required: false
         type: string
@@ -36,6 +41,11 @@ on:
         required: false
         type: string
         description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+      IMAGE_PROFILE:
+        required: false
+        type: string
+        default: performance
+        description: Build the image with this `--profile` option.
       START_VERSION:
         required: false
         type: string
@@ -56,6 +66,7 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
+      PROFILE: ${{ inputs.IMAGE_PROFILE }}
       DRY_RUN: ${{ inputs.DRY_RUN }}
 
   run-replay-verify:
@@ -70,7 +81,7 @@ jobs:
           # get the last 10 commits to find images that have been built
           # we can optionally use the IMAGE_TAG to find the exact commit to checkout
           fetch-depth: 10
-      
+
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
@@ -125,8 +136,11 @@ jobs:
             CMD="$CMD --end ${{ inputs.END_VERSION }}"  
           fi
 
-          if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
-            CMD="$CMD --image_tag ${{ inputs.IMAGE_TAG }}"  
+          if [ -n "${{ inputs.GIT_SHA }}" ]; then  
+            CMD="$CMD --image_tag ${{ inputs.GIT_SHA }}"  
+          fi
+          if [ -n "${{ inputs.IMAGE_PROFILE }}" ]; then
+            CMD="$CMD --image_profile ${{ inputs.IMAGE_PROFILE }}"
           fi
 
           eval $CMD
