@@ -494,34 +494,34 @@ mod indexed_ref_tests {
         let err = stale_read
             .read_ref()
             .expect_err("tag check must fail on read");
-        assert_eq!(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            err.major_status()
-        );
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
 
         let err = stale_write
             .write_ref(Value::u64(99))
             .expect_err("tag check must fail on write");
-        assert_eq!(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            err.major_status()
-        );
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
 
         let err = stale_eq_left
             .equals(&stale_eq_right)
             .expect_err("tag check must fail on equals");
-        assert_eq!(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            err.major_status()
-        );
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
 
         let err = stale_cmp_left
             .compare(&stale_cmp_right)
             .expect_err("tag check must fail on compare");
-        assert_eq!(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-            err.major_status()
-        );
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
 
         if let Err(err) = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str) {
             assert_eq!(StatusCode::STRUCT_VARIANT_MISMATCH, err.major_status());
