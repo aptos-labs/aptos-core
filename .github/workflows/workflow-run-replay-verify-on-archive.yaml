@@ -12,6 +12,11 @@ on:
         required: false
         type: string
         description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+      IMAGE_PROFILE:
+        required: false
+        type: string
+        description: Build the image with this `--profile` option.
+        default: performance
       START_VERSION:
         required: false
         type: string
@@ -36,6 +41,11 @@ on:
         required: false
         type: string
         description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+      IMAGE_PROFILE:
+        required: false
+        type: string
+        description: Build the image with this `--profile` option.
+        default: performance
       START_VERSION:
         required: false
         type: string
@@ -56,6 +66,7 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
+      PROFILE: ${{ inputs.IMAGE_PROFILE }}
       DRY_RUN: ${{ inputs.DRY_RUN }}
 
   run-replay-verify:
@@ -127,6 +138,9 @@ jobs:
 
           if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
             CMD="$CMD --image_tag ${{ inputs.IMAGE_TAG }}"  
+          fi
+          if [ -n "${{ inputs.IMAGE_PROFILE }}" ]; then
+            CMD="$CMD --image_profile ${{ inputs.IMAGE_PROFILE }}"
           fi
 
           eval $CMD

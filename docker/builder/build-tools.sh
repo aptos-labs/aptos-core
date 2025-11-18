@@ -3,7 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-PROFILE=cli
+# We usually just need to build with `cli` profile, but building `aptos-debugger`
+# with `performance` profile helps speed up replay-verify.
+if [[ "${PROFILE}" != "performance" ]]; then
+  PROFILE=cli
+fi
 
 echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
