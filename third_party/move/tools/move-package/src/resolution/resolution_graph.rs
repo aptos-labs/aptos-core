@@ -2,7 +2,6 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::source_package::parsed_manifest::GitInfo;
 use crate::{
     package_hooks,
     resolution::{digest::compute_digest, git},
@@ -10,7 +9,7 @@ use crate::{
         layout::SourcePackageLayout,
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
         parsed_manifest::{
-            Dependencies, Dependency, FileName, NamedAddress, PackageDigest, PackageName,
+            Dependencies, Dependency, FileName, GitInfo, NamedAddress, PackageDigest, PackageName,
             SourceManifest, SubstOrRename,
         },
         std_lib::{StdLib, StdVersion},
@@ -591,6 +590,7 @@ impl ResolvingGraph {
         skip_fetch_latest_git_deps: bool,
         writer: &mut W,
     ) -> Result<()> {
+        let use_optimized_commands = env::var("APTOS_GIT_OPT").is_ok();
         let git_url = git_info.git_url.as_str();
         let git_rev = git_info.git_rev.as_str();
         let git_path = &git_info.download_to.display().to_string();
@@ -608,6 +608,12 @@ impl ResolvingGraph {
             git::confirm_git_available()?;
 
             // If the cached folder does not exist, download and clone accordingly
+            if use_optimized_commands {
+                git::shallow_clone(git_url, git_path, dep_name)?;
+                git::shallow_fetch_origin(git_path, git_rev, dep_name)?;
+                git::switch_to_fetched_rev(git_path, dep_name)?;
+                return Ok(());
+            }
             git::clone(git_url, git_path, dep_name)?;
             git::checkout(git_path, git_rev, dep_name)?;
         } else if !skip_fetch_latest_git_deps {
@@ -641,6 +647,11 @@ impl ResolvingGraph {
             // If the current folder exists, do a fetch and reset to ensure that the branch
             // is up to date
             // NOTE: this means that you must run the package system with a working network connection
+            if use_optimized_commands {
+                git::shallow_fetch_origin(git_path, git_rev, dep_name)?;
+                git::switch_to_fetched_rev(git_path, dep_name)?;
+                return Ok(());
+            }
             git::fetch_origin(git_path, dep_name)?;
             git::reset_hard(git_path, git_rev, dep_name)?;
         }
