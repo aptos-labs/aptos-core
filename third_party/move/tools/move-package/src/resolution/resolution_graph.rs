@@ -4,7 +4,7 @@
 
 use crate::{
     package_hooks,
-    resolution::digest::compute_digest,
+    resolution::{digest::compute_digest, git},
     source_package::{
         layout::SourcePackageLayout,
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
@@ -31,7 +31,6 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     rc::Rc,
 };
 
@@ -591,55 +590,30 @@ impl ResolvingGraph {
                 )?;
 
                 // Confirm git is available.
-                confirm_git_available()?;
+                git::confirm_git_available()?;
 
                 // If the cached folder does not exist, download and clone accordingly
-                Command::new("git")
-                    .args(["clone", git_url, git_path])
-                    .output()
-                    .map_err(|_| {
-                        anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name)
-                    })?;
-                Command::new("git")
-                    .args(["-C", git_path, "checkout", git_rev])
-                    .output()
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to checkout Git reference '{}' for package '{}'",
-                            git_rev,
-                            dep_name
-                        )
-                    })?;
+                git::clone(git_url, git_path, dep_name)?;
+                git::checkout(git_path, git_rev, dep_name)?;
             } else if !skip_fetch_latest_git_deps {
                 // Confirm git is available.
-                confirm_git_available()?;
+                git::confirm_git_available()?;
 
                 // Update the git dependency
                 // Check first that it isn't a git rev (if it doesn't work, just continue with the fetch)
-                if let Ok(rev) = Command::new("git")
-                    .args(["-C", git_path, "rev-parse", "--verify", git_rev])
-                    .output()
-                {
-                    if let Ok(parsable_version) = String::from_utf8(rev.stdout) {
-                        // If it's exactly the same, then it's a git rev
-                        if parsable_version.trim().starts_with(git_rev) {
-                            return Ok(());
-                        }
+                if let Ok(parsed_rev) = git::find_rev(git_path, git_rev) {
+                    // If it's exactly the same, then it's a git rev
+                    if parsed_rev.trim().starts_with(git_rev) {
+                        return Ok(());
                     }
                 }
 
-                let tag = Command::new("git")
-                    .args(["-C", git_path, "tag", "--list", git_rev])
-                    .output();
-
-                if let Ok(tag) = tag {
-                    if let Ok(parsable_version) = String::from_utf8(tag.stdout) {
-                        // If it's exactly the same, then it's a git tag, for now tags won't be updated
-                        // Tags don't easily update locally and you can't use reset --hard to cleanup
-                        // any extra files
-                        if parsable_version.trim().starts_with(git_rev) {
-                            return Ok(());
-                        }
+                if let Ok(tag) = git::find_tag(git_path, git_rev) {
+                    // If it's exactly the same, then it's a git tag, for now tags won't be updated
+                    // Tags don't easily update locally and you can't use reset --hard to cleanup
+                    // any extra files
+                    if tag.trim().starts_with(git_rev) {
+                        return Ok(());
                     }
                 }
 
@@ -652,56 +626,8 @@ impl ResolvingGraph {
                 // If the current folder exists, do a fetch and reset to ensure that the branch
                 // is up to date
                 // NOTE: this means that you must run the package system with a working network connection
-                let status = Command::new("git")
-                    .args([
-                        "-C",
-                        git_path,
-                        "fetch",
-                        "origin",
-                    ])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to fetch latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps",
-                            dep_name
-                        )
-                    })?;
-
-                if !status.success() {
-                    return Err(anyhow::anyhow!(
-                            "Failed to fetch to latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
-                            dep_name,
-                        status
-                        ));
-                }
-                let status = Command::new("git")
-                    .args([
-                        "-C",
-                        git_path,
-                        "reset",
-                        "--hard",
-                        &format!("origin/{}", git_rev)
-                    ])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to reset to latest Git state '{}' for package '{}', to skip set --skip-fetch-latest-git-deps",
-                            git_rev,
-                            dep_name
-                        )
-                    })?;
-                if !status.success() {
-                    return Err(anyhow::anyhow!(
-                            "Failed to reset to latest Git state '{}' for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
-                            git_rev,
-                            dep_name,
-                        status
-                        ));
-                }
+                git::fetch_origin(git_path, dep_name)?;
+                git::reset_hard(git_path, git_rev, dep_name)?;
             }
         }
         if let Some(node_info) = &dep.node_info {
@@ -958,24 +884,5 @@ impl ResolvedPackage {
         } else {
             self.source_package.dependencies.keys().copied().collect()
         }
-    }
-}
-
-fn confirm_git_available() -> Result<()> {
-    match Command::new("git").arg("--version").output() {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            if let std::io::ErrorKind::NotFound = e.kind() {
-                bail!(
-                    "git was not found, confirm you have git installed and it is on your PATH. \
-                    Alternatively, skip with --skip-fetch-latest-git-deps"
-                );
-            } else {
-                bail!(
-                    "Unexpected error occurred when checking for presence of `git`: {:#}",
-                    e
-                );
-            }
-        },
     }
 }
