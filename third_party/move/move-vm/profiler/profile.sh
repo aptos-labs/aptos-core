@@ -5,7 +5,7 @@ set -euo pipefail
 # CONFIG
 #############################################
 
-BIN_PATH="../../target/debug/aptos-move-e2e-benchmark"
+BIN_PATH=$1
 TRACE_SCRIPT="trace.d"
 FOLD_SCRIPT="fold.awk"
 
@@ -35,7 +35,6 @@ require() {
     fi
 }
 
-require cargo
 require awk
 require flamegraph.pl
 
@@ -62,9 +61,6 @@ trap cleanup EXIT
 #############################################
 # MAIN WORKFLOW
 #############################################
-
-log "Building benchmark…"
-cargo build --bin aptos-move-e2e-benchmark --features profiling
 
 log "Starting benchmark with tracing…"
 sudo dtrace -q -s "$TRACE_SCRIPT" -c "$BIN_PATH" > "$OUT_RAW"
