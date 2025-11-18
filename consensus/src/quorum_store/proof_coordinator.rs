@@ -37,7 +37,7 @@ use tokio::{
 
 #[derive(Debug)]
 pub(crate) enum ProofCoordinatorCommand {
-    AppendSignature(PeerId, SignedBatchInfoMsg),
+    AppendSignature(PeerId, SignedBatchInfoMsg<BatchInfo>),
     CommitNotification(Vec<BatchInfo>),
     Shutdown(TokioOneshot::Sender<()>),
 }
@@ -76,7 +76,7 @@ impl IncrementalProofState {
 
     fn add_signature(
         &mut self,
-        signed_batch_info: &SignedBatchInfo,
+        signed_batch_info: &SignedBatchInfo<BatchInfo>,
         validator_verifier: &ValidatorVerifier,
     ) -> Result<(), SignedBatchInfoError> {
         if signed_batch_info.batch_info() != self.signature_aggregator.data() {
@@ -138,7 +138,7 @@ impl IncrementalProofState {
     pub fn aggregate_and_verify(
         &mut self,
         validator_verifier: &ValidatorVerifier,
-    ) -> Result<ProofOfStore, SignedBatchInfoError> {
+    ) -> Result<ProofOfStore<BatchInfo>, SignedBatchInfoError> {
         if self.completed {
             panic!("Cannot call take twice, unexpected issue occurred");
         }
@@ -168,7 +168,7 @@ pub(crate) struct ProofCoordinator {
     timeouts: Timeouts<BatchInfo>,
     batch_reader: Arc<dyn BatchReader>,
     batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
-    proof_cache: ProofCache,
+    proof_cache: ProofCache<BatchInfo>,
     broadcast_proofs: bool,
     batch_expiry_gap_when_init_usecs: u64,
 }
@@ -180,7 +180,7 @@ impl ProofCoordinator {
         peer_id: PeerId,
         batch_reader: Arc<dyn BatchReader>,
         batch_generator_cmd_tx: tokio::sync::mpsc::Sender<BatchGeneratorCommand>,
-        proof_cache: ProofCache,
+        proof_cache: ProofCache<BatchInfo>,
         broadcast_proofs: bool,
         batch_expiry_gap_when_init_usecs: u64,
     ) -> Self {
@@ -200,7 +200,7 @@ impl ProofCoordinator {
 
     fn init_proof(
         &mut self,
-        signed_batch_info: &SignedBatchInfo,
+        signed_batch_info: &SignedBatchInfo<BatchInfo>,
     ) -> Result<(), SignedBatchInfoError> {
         // Check if the signed digest corresponding to our batch
         if signed_batch_info.author() != self.peer_id {
@@ -235,9 +235,9 @@ impl ProofCoordinator {
 
     fn add_signature(
         &mut self,
-        signed_batch_info: SignedBatchInfo,
+        signed_batch_info: SignedBatchInfo<BatchInfo>,
         validator_verifier: &ValidatorVerifier,
-    ) -> Result<Option<ProofOfStore>, SignedBatchInfoError> {
+    ) -> Result<Option<ProofOfStore<BatchInfo>>, SignedBatchInfoError> {
         if !self
             .batch_info_to_proof
             .contains_key(signed_batch_info.batch_info())

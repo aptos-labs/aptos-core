@@ -745,34 +745,35 @@ public fun m::scalar_zero(): 0x42::m::Scalar {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.m {
-struct Scalar has copy, drop, store {
-	data: vector<u8>
-}
+// Bytecode version v9
+module 0x42::m
+struct Scalar has copy + drop + store
+  data: vector<u8>
 
-public new_scalar_from_u8(byte: u8): Scalar /* def_idx: 0 */ {
-L1:	s: Scalar
-L2:	byte_zero: &mut u8
-B0:
-	0: Call scalar_zero(): Scalar
-	1: StLoc[1](s: Scalar)
-	2: MutBorrowLoc[1](s: Scalar)
-	3: MutBorrowField[0](Scalar.data: vector<u8>)
-	4: LdU64(0)
-	5: VecMutBorrow(0)
-	6: StLoc[2](byte_zero: &mut u8)
-	7: MoveLoc[0](byte: u8)
-	8: MoveLoc[2](byte_zero: &mut u8)
-	9: WriteRef
-	10: MoveLoc[1](s: Scalar)
-	11: Ret
-}
-public scalar_zero(): Scalar /* def_idx: 1 */ {
-B0:
-	0: LdConst[0](Vector(U8): [1, 0])
-	1: Pack[0](Scalar)
-	2: Ret
-}
-}
+// Function definition at index 0
+#[persistent] public fun new_scalar_from_u8(l0: u8): Scalar
+    local l1: Scalar
+    local l2: &mut u8
+    call scalar_zero
+    st_loc l1
+    mut_borrow_loc l1
+    mut_borrow_field Scalar, data
+    ld_u64 0
+    // @5
+    vec_mut_borrow <u8>
+    st_loc l2
+    move_loc l0
+    move_loc l2
+    write_ref
+    // @10
+    move_loc l1
+    ret
+
+// Function definition at index 1
+#[persistent] public fun scalar_zero(): Scalar
+    ld_const<vector<u8>> [0]
+    pack Scalar
+    ret
+
+
 ============ bytecode verification succeeded ========

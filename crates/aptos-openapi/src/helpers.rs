@@ -171,12 +171,14 @@ macro_rules! impl_poem_parameter {
     };
 }
 
+#[cfg(test)]
 mod test {
     #[allow(unused_imports)]
     use poem_openapi::types::ParseFromParameter;
     use serde::{Deserialize, Serialize};
     use std::str::FromStr;
 
+    #[allow(dead_code)]
     #[derive(Debug, Deserialize, Serialize)]
     struct This {
         value: String,

@@ -174,7 +174,8 @@ module aptos_experimental::single_order_types {
     public(friend) fun destroy_order_from_state<M: store + copy + drop>(
         self: OrderWithState<M>
     ): (SingleOrder<M>, bool) {
-        (self.order, self.is_active)
+        let OrderWithState::V1 { order, is_active } = self;
+        (order, is_active)
     }
 
     public fun destroy_single_order<M: store + copy + drop>(

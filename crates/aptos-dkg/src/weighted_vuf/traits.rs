@@ -6,7 +6,7 @@
 //!
 //! As a result, we only define weighted VUF traits here.
 
-use crate::pvss::{Player, WeightedConfig};
+use crate::pvss::{Player, WeightedConfigBlstrs};
 use rayon::ThreadPool;
 use serde::Serialize;
 use std::fmt::Debug;
@@ -56,7 +56,7 @@ pub trait WeightedVUF {
     ) -> anyhow::Result<()>;
 
     fn aggregate_shares(
-        wc: &WeightedConfig,
+        wc: &WeightedConfigBlstrs,
         apks_and_proofs: &[(Player, Self::AugmentedPubKeyShare, Self::ProofShare)],
     ) -> Self::Proof;
 
@@ -64,7 +64,7 @@ pub trait WeightedVUF {
     fn eval(sk: &Self::SecretKey, msg: &[u8]) -> Self::Evaluation;
 
     fn derive_eval(
-        wc: &WeightedConfig,
+        wc: &WeightedConfigBlstrs,
         pp: &Self::PublicParameters,
         msg: &[u8],
         apks: &[Option<Self::AugmentedPubKeyShare>],

@@ -13,13 +13,7 @@ use aptos_types::{
     vm_status::StatusCode,
 };
 use move_core_types::gas_algebra::{InternalGas, NumBytes};
-use serde::{Deserialize, Serialize};
-
-/// Mimics `0xcafe::test::ModuleData`
-#[derive(Serialize, Deserialize)]
-struct ModuleData {
-    state: Vec<u8>,
-}
+use serde::Serialize;
 
 #[test]
 fn execution_limit_reached() {

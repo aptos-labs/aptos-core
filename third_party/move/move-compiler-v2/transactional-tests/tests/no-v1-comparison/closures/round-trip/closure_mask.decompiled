@@ -3,9 +3,8 @@
 //# publish
 module 0x42::test {
     fun if_then(p0: bool, p1: u64, p2: u64): u64 {
-        let _v0;
-        if (p0) _v0 = p1 else _v0 = p2;
-        _v0
+        if (p0) return p1;
+        p2
     }
     public fun run(): bool {
         let _v0 = |arg0,arg1| if_then(true, arg0, arg1);

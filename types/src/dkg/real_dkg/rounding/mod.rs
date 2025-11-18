@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use anyhow::{bail, ensure};
-use aptos_dkg::pvss::WeightedConfig;
+use aptos_dkg::pvss::WeightedConfigBlstrs;
 use fixed::types::U64F64;
 use once_cell::sync::Lazy;
 use std::{
@@ -52,8 +52,8 @@ pub struct DKGRounding {
     /// Currently either "binary_search" or "infallible".
     pub rounding_method: String,
     pub profile: DKGRoundingProfile,
-    pub wconfig: WeightedConfig,
-    pub fast_wconfig: Option<WeightedConfig>,
+    pub wconfig: WeightedConfigBlstrs,
+    pub fast_wconfig: Option<WeightedConfigBlstrs>,
     pub rounding_error: Option<String>,
 }
 
@@ -95,7 +95,7 @@ impl DKGRounding {
                 (profile, Some(format!("{e}")), "infallible".to_string())
             },
         };
-        let wconfig = WeightedConfig::new(
+        let wconfig = WeightedConfigBlstrs::new(
             profile.reconstruct_threshold_in_weights as usize,
             profile
                 .validator_weights
@@ -107,7 +107,7 @@ impl DKGRounding {
 
         let fast_wconfig = profile.fast_reconstruct_threshold_in_weights.map(
             |fast_reconstruct_threshold_in_weights| {
-                WeightedConfig::new(
+                WeightedConfigBlstrs::new(
                     fast_reconstruct_threshold_in_weights as usize,
                     profile
                         .validator_weights

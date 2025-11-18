@@ -35,9 +35,8 @@ module 0x1::ascii {
         true
     }
     public fun is_printable_char(byte: u8): bool {
-        let _v0;
-        if (byte >= 32u8) _v0 = byte <= 126u8 else _v0 = false;
-        _v0
+        if (byte >= 32u8) return byte <= 126u8;
+        false
     }
     public fun try_string(bytes: vector<u8>): option::Option<String> {
         let _v0 = 0x1::vector::length<u8>(&bytes);

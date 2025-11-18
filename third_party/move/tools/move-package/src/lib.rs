@@ -120,6 +120,10 @@ pub struct CompilerConfig {
     /// Experiments for v2 compiler to set to true
     #[clap(long, global = true)]
     pub experiments: Vec<String>,
+
+    /// Whether to print errors to stderr as they are reported.
+    #[clap(long, default_value = "true")]
+    pub print_errors: bool,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd)]

@@ -23,13 +23,13 @@ im = { workspace = true }
 itertools = { workspace = true }
 legacy-move-compiler = { workspace = true }
 log = { workspace = true, features = ["serde"] }
+move-asm = { workspace = true }
 move-binary-format = { workspace = true }
 move-borrow-graph = { workspace = true }
 move-bytecode-source-map = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-command-line-common = { workspace = true }
 move-core-types = { workspace = true }
-move-disassembler = { workspace = true }
 move-ir-types = { workspace = true }
 move-model = { workspace = true }
 move-stackless-bytecode = { workspace = true }

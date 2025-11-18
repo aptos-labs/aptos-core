@@ -59,7 +59,7 @@ impl PFNPerformance {
     /// to all validators, VFNs and PFNs in the swarm.
     async fn create_cpu_chaos(
         &self,
-        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> SwarmCpuStress {
         // Gather and shuffle all peers IDs (so that we get random CPU chaos)
         let shuffled_peer_ids = self.gather_and_shuffle_peer_ids(swarm).await;
@@ -72,7 +72,7 @@ impl PFNPerformance {
     /// is added to all validators, VFNs and PFNs in the swarm.
     async fn create_network_emulation_chaos(
         &self,
-        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> SwarmNetEm {
         // Gather and shuffle all peers IDs (so that we get random network emulation)
         let shuffled_peer_ids = self
@@ -86,7 +86,7 @@ impl PFNPerformance {
     /// Gathers and shuffles all peer IDs in the swarm
     async fn gather_and_shuffle_peer_ids(
         &self,
-        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> Vec<AccountAddress> {
         // Identify the validators and fullnodes in the swarm
         let (validator_peer_ids, fullnode_peer_ids) = {
@@ -110,7 +110,7 @@ impl PFNPerformance {
     /// Gathers and shuffles all peer IDs in the swarm, colocating VFNs with their validator
     async fn gather_and_shuffle_peer_ids_with_colocation(
         &self,
-        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> Vec<Vec<AccountAddress>> {
         // Identify the validators and fullnodes in the swarm
         let (validator_peer_ids, fullnode_peer_ids) = {

@@ -67,42 +67,42 @@ public fun m::test() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+fun consume_1(l0: u64)
+    ret
+
+// Function definition at index 1
+fun consume_5(l0: u64, l1: u64, l2: u64, l3: u64, l4: u64)
+    ret
+
+// Function definition at index 2
+fun one(): u64
+    ld_u64 1
+    ret
+
+// Function definition at index 3
+#[persistent] public fun test()
+    local l0: u64
+    local l1: u64
+    local l2: u64
+    local l3: u64
+    local l4: u64
+    local l5: u64
+    call one
+    call one
+    st_loc l0
+    call one
+    call one
+    // @5
+    call one
+    call one
+    call consume_5
+    move_loc l0
+    call consume_1
+    // @10
+    ret
 
 
-consume_1(_a: u64) /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-consume_5(_a: u64, _b: u64, _c: u64, _d: u64, _e: u64) /* def_idx: 1 */ {
-B0:
-	0: Ret
-}
-one(): u64 /* def_idx: 2 */ {
-B0:
-	0: LdU64(1)
-	1: Ret
-}
-public test() /* def_idx: 3 */ {
-L0:	b: u64
-L1:	f: u64
-L2:	e: u64
-L3:	d: u64
-L4:	c: u64
-L5:	a: u64
-B0:
-	0: Call one(): u64
-	1: Call one(): u64
-	2: StLoc[0](b: u64)
-	3: Call one(): u64
-	4: Call one(): u64
-	5: Call one(): u64
-	6: Call one(): u64
-	7: Call consume_5(u64, u64, u64, u64, u64)
-	8: MoveLoc[0](b: u64)
-	9: Call consume_1(u64)
-	10: Ret
-}
-}
 ============ bytecode verification succeeded ========

@@ -6,7 +6,7 @@ use crate::{
     pvss,
     pvss::{
         dealt_pub_key_share::g2::DealtPubKeyShare, traits::HasEncryptionPublicParams, Player,
-        WeightedConfig,
+        WeightedConfigBlstrs,
     },
     utils::{g1_multi_exp, g2_multi_exp, parallel_multi_pairing, random::random_nonzero_scalar},
     weighted_vuf::traits::WeightedVUF,
@@ -170,7 +170,7 @@ impl WeightedVUF for PinkasWUF {
     }
 
     fn aggregate_shares(
-        _wc: &WeightedConfig,
+        _wc: &WeightedConfigBlstrs,
         apks_and_proofs: &[(Player, Self::AugmentedPubKeyShare, Self::ProofShare)],
     ) -> Self::Proof {
         let mut players_and_shares = Vec::with_capacity(apks_and_proofs.len());
@@ -190,7 +190,7 @@ impl WeightedVUF for PinkasWUF {
 
     // NOTE: This VUF has the same evaluation as its proof.
     fn derive_eval(
-        wc: &WeightedConfig,
+        wc: &WeightedConfigBlstrs,
         _pp: &Self::PublicParameters,
         _msg: &[u8],
         apks: &[Option<Self::AugmentedPubKeyShare>],
@@ -271,7 +271,7 @@ impl PinkasWUF {
     }
 
     pub fn collect_lagrange_coeffs_shares_and_rks<'a>(
-        wc: &WeightedConfig,
+        wc: &WeightedConfigBlstrs,
         apks: &'a [Option<(RandomizedPKs, Vec<DealtPubKeyShare>)>],
         proof: &'a Vec<(Player, <Self as WeightedVUF>::ProofShare)>,
     ) -> anyhow::Result<(

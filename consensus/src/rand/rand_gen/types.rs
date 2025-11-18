@@ -6,7 +6,7 @@ use aptos_consensus_types::common::{Author, Round};
 use aptos_crypto::bls12381::Signature;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use aptos_dkg::{
-    pvss::{Player, WeightedConfig},
+    pvss::{Player, WeightedConfigBlstrs},
     weighted_vuf::traits::WeightedVUF,
 };
 use aptos_experimental_runtimes::thread_manager::THREAD_MANAGER;
@@ -587,7 +587,7 @@ pub struct RandConfig {
     // key shares for weighted VUF
     keys: Arc<RandKeys>,
     // weighted config for weighted VUF
-    wconfig: WeightedConfig,
+    wconfig: WeightedConfigBlstrs,
 }
 
 impl Debug for RandConfig {
@@ -607,7 +607,7 @@ impl RandConfig {
         validator: Arc<ValidatorVerifier>,
         vuf_pp: WvufPP,
         keys: RandKeys,
-        wconfig: WeightedConfig,
+        wconfig: WeightedConfigBlstrs,
     ) -> Self {
         Self {
             author,

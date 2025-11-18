@@ -5,27 +5,9 @@ use crate::harness::MoveHarness;
 use aptos_cached_packages::aptos_stdlib;
 use aptos_language_e2e_tests::account::Account;
 use aptos_types::{
-    account_address::AccountAddress, move_utils::MemberId, state_store::table::TableHandle,
-    transaction::TransactionStatus,
+    account_address::AccountAddress, move_utils::MemberId, transaction::TransactionStatus,
 };
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-
-#[derive(Deserialize, Serialize)]
-struct PartialVotingProposals {
-    pub proposals: TableHandle,
-}
-
-#[derive(Deserialize, Serialize)]
-struct RecordKey {
-    pub stake_pool: AccountAddress,
-    pub proposal_id: u64,
-}
-
-#[derive(Deserialize, Serialize)]
-struct VotingRecordsV2 {
-    pub votes: TableHandle,
-}
 
 pub fn create_proposal_v2(
     harness: &mut MoveHarness,

@@ -11,7 +11,7 @@ use crate::{
 };
 use aptos_consensus_types::{
     common::Author,
-    proof_of_store::{ProofOfStore, SignedBatchInfo},
+    proof_of_store::{BatchInfo, ProofOfStore, SignedBatchInfo},
 };
 use aptos_crypto::HashValue;
 use aptos_infallible::Mutex;
@@ -56,7 +56,7 @@ impl QuorumStoreSender for MockBatchRequester {
 
     async fn send_signed_batch_info_msg(
         &self,
-        _signed_batch_infos: Vec<SignedBatchInfo>,
+        _signed_batch_infos: Vec<SignedBatchInfo<BatchInfo>>,
         _recipients: Vec<Author>,
     ) {
         unimplemented!()
@@ -66,11 +66,17 @@ impl QuorumStoreSender for MockBatchRequester {
         unimplemented!()
     }
 
-    async fn broadcast_proof_of_store_msg(&mut self, _proof_of_stores: Vec<ProofOfStore>) {
+    async fn broadcast_proof_of_store_msg(
+        &mut self,
+        _proof_of_stores: Vec<ProofOfStore<BatchInfo>>,
+    ) {
         unimplemented!()
     }
 
-    async fn send_proof_of_store_msg_to_self(&mut self, _proof_of_stores: Vec<ProofOfStore>) {
+    async fn send_proof_of_store_msg_to_self(
+        &mut self,
+        _proof_of_stores: Vec<ProofOfStore<BatchInfo>>,
+    ) {
         unimplemented!()
     }
 }

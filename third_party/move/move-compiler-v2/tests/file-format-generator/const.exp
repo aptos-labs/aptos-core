@@ -68,51 +68,55 @@ warning: This assignment/binding to the left-hand-side variable `s` is unused. C
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.constant {
+// Bytecode version v9
+module 0x42::constant
+// Function definition at index 0
+fun test_constans()
+    ld_true
+    call u<bool>
+    ld_false
+    call u<bool>
+    ld_u8 1
+    // @5
+    call u<u8>
+    ld_u16 7086
+    call u<u16>
+    ld_u32 14593408
+    call u<u32>
+    // @10
+    ld_u64 51966
+    call u<u64>
+    ld_u128 3735928559
+    call u<u128>
+    ld_u256 301490978409967
+    // @15
+    call u<u256>
+    ld_const<address> 66
+    call u<address>
+    ld_const<vector<u64>> [1, 2, 3]
+    call u<vector<u64>>
+    // @20
+    ld_const<vector<u8>> [72, 101, 108, 108, 111, 33, 10]
+    call u<vector<u8>>
+    pop
+    pop
+    pop
+    // @25
+    pop
+    pop
+    pop
+    pop
+    pop
+    // @30
+    pop
+    pop
+    pop
+    ret
+
+// Function definition at index 1
+fun u<T0>(l0: T0): T0
+    move_loc l0
+    ret
 
 
-test_constans() /* def_idx: 0 */ {
-B0:
-	0: LdTrue
-	1: Call u<bool>(bool): bool
-	2: LdFalse
-	3: Call u<bool>(bool): bool
-	4: LdU8(1)
-	5: Call u<u8>(u8): u8
-	6: LdU16(7086)
-	7: Call u<u16>(u16): u16
-	8: LdU32(14593408)
-	9: Call u<u32>(u32): u32
-	10: LdU64(51966)
-	11: Call u<u64>(u64): u64
-	12: LdU128(3735928559)
-	13: Call u<u128>(u128): u128
-	14: LdU256(301490978409967)
-	15: Call u<u256>(u256): u256
-	16: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 66])
-	17: Call u<address>(address): address
-	18: LdConst[1](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
-	19: Call u<vector<u64>>(vector<u64>): vector<u64>
-	20: LdConst[2](Vector(U8): [7, 72, 101, 108, 108, 111, 33, 10])
-	21: Call u<vector<u8>>(vector<u8>): vector<u8>
-	22: Pop
-	23: Pop
-	24: Pop
-	25: Pop
-	26: Pop
-	27: Pop
-	28: Pop
-	29: Pop
-	30: Pop
-	31: Pop
-	32: Pop
-	33: Ret
-}
-u<T>(x: T): T /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[0](x: T)
-	1: Ret
-}
-}
 ============ bytecode verification succeeded ========

@@ -3168,394 +3168,429 @@ fun valid_vector::test9($t0: i64, $t1: i128): vector<0x42::valid_vector::E3<i64>
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.valid_vector {
-enum E1 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i64>
- }
-}
-enum E2 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i128>
- }
-}
-enum E3<T> has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<T>
- }
-}
-struct S1 has copy, drop {
-	x: u64,
-	y: i64,
-	z: i128
-}
-struct S2 has copy, drop {
-	x: S1,
-	y: i64,
-	z: i128
-}
-struct S3<T> has copy, drop {
-	x: T,
-	y: S1,
-	z: S2
-}
+// Bytecode version v9
+module 0x42::valid_vector
+enum E1 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i64>
 
-test1(a: i64): vector<i64> /* def_idx: 0 */ {
-L1:	v: vector<i64>
-B0:
-	0: VecPack(0, 0)
-	1: StLoc[1](v: vector<i64>)
-	2: MutBorrowLoc[1](v: vector<i64>)
-	3: CopyLoc[0](a: i64)
-	4: VecPushBack(0)
-	5: MutBorrowLoc[1](v: vector<i64>)
-	6: MoveLoc[0](a: i64)
-	7: VecPushBack(0)
-	8: MutBorrowLoc[1](v: vector<i64>)
-	9: LdI64(1)
-	10: VecPushBack(0)
-	11: MutBorrowLoc[1](v: vector<i64>)
-	12: LdI64(-1)
-	13: VecPushBack(0)
-	14: MoveLoc[1](v: vector<i64>)
-	15: Ret
-}
-test10(a: i64, b: i128): vector<E3<i128>> /* def_idx: 1 */ {
-L2:	s1: S1
-L3:	s2: S2
-L4:	e1: E3<i128>
-L5:	e2: E3<i128>
-L6:	e3: E3<i128>
-L7:	v: vector<E3<i128>>
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: CopyLoc[2](s1: S1)
-	6: MoveLoc[0](a: i64)
-	7: MoveLoc[1](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[3](s2: S2)
-	10: LdI128(-1)
-	11: CopyLoc[2](s1: S1)
-	12: CopyLoc[3](s2: S2)
-	13: PackGeneric[0](S3<i128>)
-	14: MoveLoc[2](s1: S1)
-	15: PackVariantGeneric[0](E3/V1<i128>)
-	16: StLoc[4](e1: E3<i128>)
-	17: MoveLoc[3](s2: S2)
-	18: PackVariantGeneric[1](E3/V2<i128>)
-	19: StLoc[5](e2: E3<i128>)
-	20: PackVariantGeneric[2](E3/V3<i128>)
-	21: StLoc[6](e3: E3<i128>)
-	22: VecPack(5, 0)
-	23: StLoc[7](v: vector<E3<i128>>)
-	24: MutBorrowLoc[7](v: vector<E3<i128>>)
-	25: MoveLoc[4](e1: E3<i128>)
-	26: VecPushBack(5)
-	27: MutBorrowLoc[7](v: vector<E3<i128>>)
-	28: MoveLoc[5](e2: E3<i128>)
-	29: VecPushBack(5)
-	30: MutBorrowLoc[7](v: vector<E3<i128>>)
-	31: MoveLoc[6](e3: E3<i128>)
-	32: VecPushBack(5)
-	33: MoveLoc[7](v: vector<E3<i128>>)
-	34: Ret
-}
-test2(a: i128): vector<i128> /* def_idx: 2 */ {
-L1:	v: vector<i128>
-B0:
-	0: VecPack(4, 0)
-	1: StLoc[1](v: vector<i128>)
-	2: MutBorrowLoc[1](v: vector<i128>)
-	3: CopyLoc[0](a: i128)
-	4: VecPushBack(4)
-	5: MutBorrowLoc[1](v: vector<i128>)
-	6: MoveLoc[0](a: i128)
-	7: VecPushBack(4)
-	8: MutBorrowLoc[1](v: vector<i128>)
-	9: LdI128(1)
-	10: VecPushBack(4)
-	11: MutBorrowLoc[1](v: vector<i128>)
-	12: LdI128(-1)
-	13: VecPushBack(4)
-	14: MoveLoc[1](v: vector<i128>)
-	15: Ret
-}
-test3(a: i64, b: i128): vector<S1> /* def_idx: 3 */ {
-L2:	s1: S1
-L3:	s11: S1
-L4:	v: vector<S1>
-B0:
-	0: LdU64(1)
-	1: MoveLoc[0](a: i64)
-	2: MoveLoc[1](b: i128)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: LdU64(1)
-	6: LdI64(-1)
-	7: LdI128(-2)
-	8: Pack[3](S1)
-	9: StLoc[3](s11: S1)
-	10: VecPack(9, 0)
-	11: StLoc[4](v: vector<S1>)
-	12: MutBorrowLoc[4](v: vector<S1>)
-	13: MoveLoc[2](s1: S1)
-	14: VecPushBack(9)
-	15: MutBorrowLoc[4](v: vector<S1>)
-	16: MoveLoc[3](s11: S1)
-	17: VecPushBack(9)
-	18: MoveLoc[4](v: vector<S1>)
-	19: Ret
-}
-test4(a: i64, b: i128): vector<S2> /* def_idx: 4 */ {
-L2:	s1: S1
-L3:	s2: S2
-L4:	s21: S2
-L5:	v: vector<S2>
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: CopyLoc[2](s1: S1)
-	6: MoveLoc[0](a: i64)
-	7: MoveLoc[1](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[3](s2: S2)
-	10: MoveLoc[2](s1: S1)
-	11: LdI64(-1)
-	12: LdI128(-2)
-	13: Pack[4](S2)
-	14: StLoc[4](s21: S2)
-	15: VecPack(12, 0)
-	16: StLoc[5](v: vector<S2>)
-	17: MutBorrowLoc[5](v: vector<S2>)
-	18: MoveLoc[3](s2: S2)
-	19: VecPushBack(12)
-	20: MutBorrowLoc[5](v: vector<S2>)
-	21: MoveLoc[4](s21: S2)
-	22: VecPushBack(12)
-	23: MoveLoc[5](v: vector<S2>)
-	24: Ret
-}
-test5(a: i64, b: i128): vector<S3<i64>> /* def_idx: 5 */ {
-L2:	s1: S1
-L3:	s2: S2
-L4:	s3: S3<i64>
-L5:	v: vector<S3<i64>>
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: CopyLoc[2](s1: S1)
-	6: CopyLoc[0](a: i64)
-	7: MoveLoc[1](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[3](s2: S2)
-	10: MoveLoc[0](a: i64)
-	11: MoveLoc[2](s1: S1)
-	12: MoveLoc[3](s2: S2)
-	13: PackGeneric[1](S3<i64>)
-	14: StLoc[4](s3: S3<i64>)
-	15: VecPack(15, 0)
-	16: StLoc[5](v: vector<S3<i64>>)
-	17: MutBorrowLoc[5](v: vector<S3<i64>>)
-	18: CopyLoc[4](s3: S3<i64>)
-	19: VecPushBack(15)
-	20: MutBorrowLoc[5](v: vector<S3<i64>>)
-	21: MoveLoc[4](s3: S3<i64>)
-	22: VecPushBack(15)
-	23: MoveLoc[5](v: vector<S3<i64>>)
-	24: Ret
-}
-test6(a: i64, b: i128): vector<S3<i128>> /* def_idx: 6 */ {
-L2:	s1: S1
-L3:	s2: S2
-L4:	s3: S3<i128>
-L5:	v: vector<S3<i128>>
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: CopyLoc[2](s1: S1)
-	6: MoveLoc[0](a: i64)
-	7: CopyLoc[1](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[3](s2: S2)
-	10: MoveLoc[1](b: i128)
-	11: MoveLoc[2](s1: S1)
-	12: MoveLoc[3](s2: S2)
-	13: PackGeneric[0](S3<i128>)
-	14: StLoc[4](s3: S3<i128>)
-	15: VecPack(18, 0)
-	16: StLoc[5](v: vector<S3<i128>>)
-	17: MutBorrowLoc[5](v: vector<S3<i128>>)
-	18: CopyLoc[4](s3: S3<i128>)
-	19: VecPushBack(18)
-	20: MutBorrowLoc[5](v: vector<S3<i128>>)
-	21: MoveLoc[4](s3: S3<i128>)
-	22: VecPushBack(18)
-	23: MoveLoc[5](v: vector<S3<i128>>)
-	24: Ret
-}
-test7(a: i64, b: i128): vector<E1> /* def_idx: 7 */ {
-L2:	s1: S1
-L3:	s2: S2
-L4:	e1: E1
-L5:	e2: E1
-L6:	e3: E1
-L7:	v: vector<E1>
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: CopyLoc[2](s1: S1)
-	6: MoveLoc[0](a: i64)
-	7: MoveLoc[1](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[3](s2: S2)
-	10: LdI64(-1)
-	11: CopyLoc[2](s1: S1)
-	12: CopyLoc[3](s2: S2)
-	13: PackGeneric[1](S3<i64>)
-	14: MoveLoc[2](s1: S1)
-	15: PackVariant[3](E1/V1)
-	16: StLoc[4](e1: E1)
-	17: MoveLoc[3](s2: S2)
-	18: PackVariant[4](E1/V2)
-	19: StLoc[5](e2: E1)
-	20: PackVariant[5](E1/V3)
-	21: StLoc[6](e3: E1)
-	22: VecPack(21, 0)
-	23: StLoc[7](v: vector<E1>)
-	24: MutBorrowLoc[7](v: vector<E1>)
-	25: MoveLoc[4](e1: E1)
-	26: VecPushBack(21)
-	27: MutBorrowLoc[7](v: vector<E1>)
-	28: MoveLoc[5](e2: E1)
-	29: VecPushBack(21)
-	30: MutBorrowLoc[7](v: vector<E1>)
-	31: MoveLoc[6](e3: E1)
-	32: VecPushBack(21)
-	33: MoveLoc[7](v: vector<E1>)
-	34: Ret
-}
-test8(a: i64, b: i128): vector<E2> /* def_idx: 8 */ {
-L2:	s1: S1
-L3:	s2: S2
-L4:	e1: E2
-L5:	e2: E2
-L6:	e3: E2
-L7:	v: vector<E2>
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: CopyLoc[2](s1: S1)
-	6: MoveLoc[0](a: i64)
-	7: MoveLoc[1](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[3](s2: S2)
-	10: LdI128(-1)
-	11: CopyLoc[2](s1: S1)
-	12: CopyLoc[3](s2: S2)
-	13: PackGeneric[0](S3<i128>)
-	14: MoveLoc[2](s1: S1)
-	15: PackVariant[6](E2/V1)
-	16: StLoc[4](e1: E2)
-	17: MoveLoc[3](s2: S2)
-	18: PackVariant[7](E2/V2)
-	19: StLoc[5](e2: E2)
-	20: PackVariant[8](E2/V3)
-	21: StLoc[6](e3: E2)
-	22: VecPack(24, 0)
-	23: StLoc[7](v: vector<E2>)
-	24: MutBorrowLoc[7](v: vector<E2>)
-	25: MoveLoc[4](e1: E2)
-	26: VecPushBack(24)
-	27: MutBorrowLoc[7](v: vector<E2>)
-	28: MoveLoc[5](e2: E2)
-	29: VecPushBack(24)
-	30: MutBorrowLoc[7](v: vector<E2>)
-	31: MoveLoc[6](e3: E2)
-	32: VecPushBack(24)
-	33: MoveLoc[7](v: vector<E2>)
-	34: Ret
-}
-test9(a: i64, b: i128): vector<E3<i64>> /* def_idx: 9 */ {
-L2:	s1: S1
-L3:	s2: S2
-L4:	e1: E3<i64>
-L5:	e2: E3<i64>
-L6:	e3: E3<i64>
-L7:	v: vector<E3<i64>>
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[2](s1: S1)
-	5: CopyLoc[2](s1: S1)
-	6: MoveLoc[0](a: i64)
-	7: MoveLoc[1](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[3](s2: S2)
-	10: LdI64(-1)
-	11: CopyLoc[2](s1: S1)
-	12: CopyLoc[3](s2: S2)
-	13: PackGeneric[1](S3<i64>)
-	14: MoveLoc[2](s1: S1)
-	15: PackVariantGeneric[3](E3/V1<i64>)
-	16: StLoc[4](e1: E3<i64>)
-	17: MoveLoc[3](s2: S2)
-	18: PackVariantGeneric[4](E3/V2<i64>)
-	19: StLoc[5](e2: E3<i64>)
-	20: PackVariantGeneric[5](E3/V3<i64>)
-	21: StLoc[6](e3: E3<i64>)
-	22: VecPack(27, 0)
-	23: StLoc[7](v: vector<E3<i64>>)
-	24: MutBorrowLoc[7](v: vector<E3<i64>>)
-	25: MoveLoc[4](e1: E3<i64>)
-	26: VecPushBack(27)
-	27: MutBorrowLoc[7](v: vector<E3<i64>>)
-	28: MoveLoc[5](e2: E3<i64>)
-	29: VecPushBack(27)
-	30: MutBorrowLoc[7](v: vector<E3<i64>>)
-	31: MoveLoc[6](e3: E3<i64>)
-	32: VecPushBack(27)
-	33: MoveLoc[7](v: vector<E3<i64>>)
-	34: Ret
-}
-}
+enum E2 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i128>
+
+enum E3<T0> has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<T0>
+
+struct S1 has copy + drop
+  x: u64
+  y: i64
+  z: i128
+
+struct S2 has copy + drop
+  x: S1
+  y: i64
+  z: i128
+
+struct S3<T0> has copy + drop
+  x: T0
+  y: S1
+  z: S2
+
+// Function definition at index 0
+fun test1(l0: i64): vector<i64>
+    local l1: vector<i64>
+    vec_pack <i64>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    copy_loc l0
+    vec_push_back <i64>
+    // @5
+    mut_borrow_loc l1
+    move_loc l0
+    vec_push_back <i64>
+    mut_borrow_loc l1
+    ld_i64 1
+    // @10
+    vec_push_back <i64>
+    mut_borrow_loc l1
+    ld_i64 -1
+    vec_push_back <i64>
+    move_loc l1
+    // @15
+    ret
+
+// Function definition at index 1
+fun test10(l0: i64, l1: i128): vector<E3<i128>>
+    local l2: S1
+    local l3: S2
+    local l4: E3<i128>
+    local l5: E3<i128>
+    local l6: E3<i128>
+    local l7: vector<E3<i128>>
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l2
+    // @5
+    copy_loc l2
+    move_loc l0
+    move_loc l1
+    pack S2
+    st_loc l3
+    // @10
+    ld_i128 -1
+    copy_loc l2
+    copy_loc l3
+    pack S3<i128>
+    move_loc l2
+    // @15
+    pack_variant E3<i128>, V1
+    st_loc l4
+    move_loc l3
+    pack_variant E3<i128>, V2
+    st_loc l5
+    // @20
+    pack_variant E3<i128>, V3
+    st_loc l6
+    vec_pack <E3<i128>>, 0
+    st_loc l7
+    mut_borrow_loc l7
+    // @25
+    move_loc l4
+    vec_push_back <E3<i128>>
+    mut_borrow_loc l7
+    move_loc l5
+    vec_push_back <E3<i128>>
+    // @30
+    mut_borrow_loc l7
+    move_loc l6
+    vec_push_back <E3<i128>>
+    move_loc l7
+    ret
+
+// Function definition at index 2
+fun test2(l0: i128): vector<i128>
+    local l1: vector<i128>
+    vec_pack <i128>, 0
+    st_loc l1
+    mut_borrow_loc l1
+    copy_loc l0
+    vec_push_back <i128>
+    // @5
+    mut_borrow_loc l1
+    move_loc l0
+    vec_push_back <i128>
+    mut_borrow_loc l1
+    ld_i128 1
+    // @10
+    vec_push_back <i128>
+    mut_borrow_loc l1
+    ld_i128 -1
+    vec_push_back <i128>
+    move_loc l1
+    // @15
+    ret
+
+// Function definition at index 3
+fun test3(l0: i64, l1: i128): vector<S1>
+    local l2: S1
+    local l3: S1
+    local l4: vector<S1>
+    ld_u64 1
+    move_loc l0
+    move_loc l1
+    pack S1
+    st_loc l2
+    // @5
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l3
+    // @10
+    vec_pack <S1>, 0
+    st_loc l4
+    mut_borrow_loc l4
+    move_loc l2
+    vec_push_back <S1>
+    // @15
+    mut_borrow_loc l4
+    move_loc l3
+    vec_push_back <S1>
+    move_loc l4
+    ret
+
+// Function definition at index 4
+fun test4(l0: i64, l1: i128): vector<S2>
+    local l2: S1
+    local l3: S2
+    local l4: S2
+    local l5: vector<S2>
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l2
+    // @5
+    copy_loc l2
+    move_loc l0
+    move_loc l1
+    pack S2
+    st_loc l3
+    // @10
+    move_loc l2
+    ld_i64 -1
+    ld_i128 -2
+    pack S2
+    st_loc l4
+    // @15
+    vec_pack <S2>, 0
+    st_loc l5
+    mut_borrow_loc l5
+    move_loc l3
+    vec_push_back <S2>
+    // @20
+    mut_borrow_loc l5
+    move_loc l4
+    vec_push_back <S2>
+    move_loc l5
+    ret
+
+// Function definition at index 5
+fun test5(l0: i64, l1: i128): vector<S3<i64>>
+    local l2: S1
+    local l3: S2
+    local l4: S3<i64>
+    local l5: vector<S3<i64>>
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l2
+    // @5
+    copy_loc l2
+    copy_loc l0
+    move_loc l1
+    pack S2
+    st_loc l3
+    // @10
+    move_loc l0
+    move_loc l2
+    move_loc l3
+    pack S3<i64>
+    st_loc l4
+    // @15
+    vec_pack <S3<i64>>, 0
+    st_loc l5
+    mut_borrow_loc l5
+    copy_loc l4
+    vec_push_back <S3<i64>>
+    // @20
+    mut_borrow_loc l5
+    move_loc l4
+    vec_push_back <S3<i64>>
+    move_loc l5
+    ret
+
+// Function definition at index 6
+fun test6(l0: i64, l1: i128): vector<S3<i128>>
+    local l2: S1
+    local l3: S2
+    local l4: S3<i128>
+    local l5: vector<S3<i128>>
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l2
+    // @5
+    copy_loc l2
+    move_loc l0
+    copy_loc l1
+    pack S2
+    st_loc l3
+    // @10
+    move_loc l1
+    move_loc l2
+    move_loc l3
+    pack S3<i128>
+    st_loc l4
+    // @15
+    vec_pack <S3<i128>>, 0
+    st_loc l5
+    mut_borrow_loc l5
+    copy_loc l4
+    vec_push_back <S3<i128>>
+    // @20
+    mut_borrow_loc l5
+    move_loc l4
+    vec_push_back <S3<i128>>
+    move_loc l5
+    ret
+
+// Function definition at index 7
+fun test7(l0: i64, l1: i128): vector<E1>
+    local l2: S1
+    local l3: S2
+    local l4: E1
+    local l5: E1
+    local l6: E1
+    local l7: vector<E1>
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l2
+    // @5
+    copy_loc l2
+    move_loc l0
+    move_loc l1
+    pack S2
+    st_loc l3
+    // @10
+    ld_i64 -1
+    copy_loc l2
+    copy_loc l3
+    pack S3<i64>
+    move_loc l2
+    // @15
+    pack_variant E1, V1
+    st_loc l4
+    move_loc l3
+    pack_variant E1, V2
+    st_loc l5
+    // @20
+    pack_variant E1, V3
+    st_loc l6
+    vec_pack <E1>, 0
+    st_loc l7
+    mut_borrow_loc l7
+    // @25
+    move_loc l4
+    vec_push_back <E1>
+    mut_borrow_loc l7
+    move_loc l5
+    vec_push_back <E1>
+    // @30
+    mut_borrow_loc l7
+    move_loc l6
+    vec_push_back <E1>
+    move_loc l7
+    ret
+
+// Function definition at index 8
+fun test8(l0: i64, l1: i128): vector<E2>
+    local l2: S1
+    local l3: S2
+    local l4: E2
+    local l5: E2
+    local l6: E2
+    local l7: vector<E2>
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l2
+    // @5
+    copy_loc l2
+    move_loc l0
+    move_loc l1
+    pack S2
+    st_loc l3
+    // @10
+    ld_i128 -1
+    copy_loc l2
+    copy_loc l3
+    pack S3<i128>
+    move_loc l2
+    // @15
+    pack_variant E2, V1
+    st_loc l4
+    move_loc l3
+    pack_variant E2, V2
+    st_loc l5
+    // @20
+    pack_variant E2, V3
+    st_loc l6
+    vec_pack <E2>, 0
+    st_loc l7
+    mut_borrow_loc l7
+    // @25
+    move_loc l4
+    vec_push_back <E2>
+    mut_borrow_loc l7
+    move_loc l5
+    vec_push_back <E2>
+    // @30
+    mut_borrow_loc l7
+    move_loc l6
+    vec_push_back <E2>
+    move_loc l7
+    ret
+
+// Function definition at index 9
+fun test9(l0: i64, l1: i128): vector<E3<i64>>
+    local l2: S1
+    local l3: S2
+    local l4: E3<i64>
+    local l5: E3<i64>
+    local l6: E3<i64>
+    local l7: vector<E3<i64>>
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l2
+    // @5
+    copy_loc l2
+    move_loc l0
+    move_loc l1
+    pack S2
+    st_loc l3
+    // @10
+    ld_i64 -1
+    copy_loc l2
+    copy_loc l3
+    pack S3<i64>
+    move_loc l2
+    // @15
+    pack_variant E3<i64>, V1
+    st_loc l4
+    move_loc l3
+    pack_variant E3<i64>, V2
+    st_loc l5
+    // @20
+    pack_variant E3<i64>, V3
+    st_loc l6
+    vec_pack <E3<i64>>, 0
+    st_loc l7
+    mut_borrow_loc l7
+    // @25
+    move_loc l4
+    vec_push_back <E3<i64>>
+    mut_borrow_loc l7
+    move_loc l5
+    vec_push_back <E3<i64>>
+    // @30
+    mut_borrow_loc l7
+    move_loc l6
+    vec_push_back <E3<i64>>
+    move_loc l7
+    ret
+
+
 ============ bytecode verification succeeded ========

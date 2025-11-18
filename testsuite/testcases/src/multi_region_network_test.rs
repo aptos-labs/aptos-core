@@ -281,7 +281,7 @@ impl MultiRegionNetworkEmulationTest {
     /// the fullnodes).
     async fn create_netem_chaos(
         &self,
-        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> SwarmNetEm {
         let (all_validators, all_vfns) = {
             let swarm = swarm.read().await;

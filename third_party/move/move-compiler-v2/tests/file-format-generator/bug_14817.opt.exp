@@ -1,27 +1,28 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module cafe.Module0 {
-struct S {
-	x: bool
-}
+// Bytecode version v9
+module 0xcafe::Module0
+struct S
+  x: bool
 
-public f(): S /* def_idx: 0 */ {
-L0:	s: S
-L1:	$t5: bool
-B0:
-	0: LdFalse
-	1: Pack[0](S)
-	2: StLoc[0](s: S)
-	3: LdTrue
-	4: ImmBorrowLoc[0](s: S)
-	5: ImmBorrowField[0](S.x: bool)
-	6: ReadRef
-	7: StLoc[1]($t5: bool)
-	8: MutBorrowLoc[1]($t5: bool)
-	9: WriteRef
-	10: MoveLoc[0](s: S)
-	11: Ret
-}
-}
+// Function definition at index 0
+#[persistent] public fun f(): S
+    local l0: S
+    local l1: bool
+    ld_false
+    pack S
+    st_loc l0
+    ld_true
+    borrow_loc l0
+    // @5
+    borrow_field S, x
+    read_ref
+    st_loc l1
+    mut_borrow_loc l1
+    write_ref
+    // @10
+    move_loc l0
+    ret
+
+
 ============ bytecode verification succeeded ========

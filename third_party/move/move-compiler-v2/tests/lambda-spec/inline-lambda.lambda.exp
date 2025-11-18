@@ -1168,102 +1168,106 @@ fun Test::__lambda__1_inline_1_393__test_apply($t0: u64, $t1: u64, $t2: u64): bo
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.Test {
+// Bytecode version v9
+module 0x42::Test
+// Function definition at index 0
+fun call_inline(l0: u64)
+    local l1: u64
+    local l2: u64
+    local l3: bool
+    local l4: bool
+    local l5: bool
+    ld_u64 3
+    copy_loc l0
+    add
+    st_loc l1
+    move_loc l0
+    // @5
+    st_loc l2
+    copy_loc l2
+    call __lambda__1_inline_1_905__call_inline
+    st_loc l3
+    copy_loc l1
+    // @10
+    copy_loc l2
+    call __lambda__1_inline_2_916__call_inline
+    st_loc l4
+    copy_loc l1
+    copy_loc l2
+    // @15
+    call __lambda__1_inline_3_927__call_inline
+    st_loc l5
+    nop
+    ret
+
+// Function definition at index 1
+#[persistent] public fun test_apply(l0: u64, l1: u64)
+    local l2: bool
+    local l3: bool
+    nop
+    ld_u64 0
+    call __lambda__1_inline_1_267__test_apply
+    st_loc l2
+    nop
+    // @5
+    nop
+    move_loc l0
+    move_loc l1
+    ld_u64 0
+    call __lambda__1_inline_1_393__test_apply
+    // @10
+    st_loc l3
+    nop
+    ret
+
+// Function definition at index 2
+fun __lambda__1_inline_1_905__call_inline(l0: u64): bool
+    move_loc l0
+    ld_u64 2
+    gt
+    ret
+
+// Function definition at index 3
+fun __lambda__1_inline_2_916__call_inline(l0: u64, l1: u64): bool
+    move_loc l1
+    move_loc l0
+    gt
+    ret
+
+// Function definition at index 4
+fun __lambda__1_inline_3_927__call_inline(l0: u64, l1: u64): bool
+l1: copy_loc l0
+    ld_u64 0
+    gt
+    br_false l0
+    copy_loc l1
+    // @5
+    ld_u64 1
+    add
+    pop
+    branch l1
+l0: move_loc l1
+    // @10
+    ld_u64 5
+    gt
+    ret
+
+// Function definition at index 5
+fun __lambda__1_inline_1_267__test_apply(l0: u64): bool
+    move_loc l0
+    ld_u64 0
+    ge
+    ret
+
+// Function definition at index 6
+fun __lambda__1_inline_1_393__test_apply(l0: u64, l1: u64, l2: u64): bool
+    move_loc l2
+    move_loc l0
+    move_loc l1
+    add
+    neq
+    // @5
+    ret
 
 
-call_inline(y: u64) /* def_idx: 0 */ {
-L1:	z: u64
-L2:	x: u64
-L3:	y: bool
-L4:	z': bool
-L5:	w: bool
-B0:
-	0: LdU64(3)
-	1: CopyLoc[0](y: u64)
-	2: Add
-	3: StLoc[1](z: u64)
-	4: MoveLoc[0](y: u64)
-	5: StLoc[2](x: u64)
-	6: CopyLoc[2](x: u64)
-	7: Call __lambda__1_inline_1_905__call_inline(u64): bool
-	8: StLoc[3](y: bool)
-	9: CopyLoc[1](z: u64)
-	10: CopyLoc[2](x: u64)
-	11: Call __lambda__1_inline_2_916__call_inline(u64, u64): bool
-	12: StLoc[4](z': bool)
-	13: CopyLoc[1](z: u64)
-	14: CopyLoc[2](x: u64)
-	15: Call __lambda__1_inline_3_927__call_inline(u64, u64): bool
-	16: StLoc[5](w: bool)
-	17: Nop
-	18: Ret
-}
-public test_apply(a1: u64, a2: u64) /* def_idx: 1 */ {
-L2:	r1: bool
-L3:	r2: bool
-B0:
-	0: Nop
-	1: LdU64(0)
-	2: Call __lambda__1_inline_1_267__test_apply(u64): bool
-	3: StLoc[2](r1: bool)
-	4: Nop
-	5: Nop
-	6: MoveLoc[0](a1: u64)
-	7: MoveLoc[1](a2: u64)
-	8: LdU64(0)
-	9: Call __lambda__1_inline_1_393__test_apply(u64, u64, u64): bool
-	10: StLoc[3](r2: bool)
-	11: Nop
-	12: Ret
-}
-__lambda__1_inline_1_905__call_inline(x: u64): bool /* def_idx: 2 */ {
-B0:
-	0: MoveLoc[0](x: u64)
-	1: LdU64(2)
-	2: Gt
-	3: Ret
-}
-__lambda__1_inline_2_916__call_inline(z: u64, x: u64): bool /* def_idx: 3 */ {
-B0:
-	0: MoveLoc[1](x: u64)
-	1: MoveLoc[0](z: u64)
-	2: Gt
-	3: Ret
-}
-__lambda__1_inline_3_927__call_inline(z: u64, x: u64): bool /* def_idx: 4 */ {
-B0:
-	0: CopyLoc[0](z: u64)
-	1: LdU64(0)
-	2: Gt
-	3: BrFalse(9)
-B1:
-	4: CopyLoc[1](x: u64)
-	5: LdU64(1)
-	6: Add
-	7: Pop
-	8: Branch(0)
-B2:
-	9: MoveLoc[1](x: u64)
-	10: LdU64(5)
-	11: Gt
-	12: Ret
-}
-__lambda__1_inline_1_267__test_apply(v: u64): bool /* def_idx: 5 */ {
-B0:
-	0: MoveLoc[0](v: u64)
-	1: LdU64(0)
-	2: Ge
-	3: Ret
-}
-__lambda__1_inline_1_393__test_apply(a1: u64, a2: u64, v: u64): bool /* def_idx: 6 */ {
-B0:
-	0: MoveLoc[2](v: u64)
-	1: MoveLoc[0](a1: u64)
-	2: MoveLoc[1](a2: u64)
-	3: Add
-	4: Neq
-	5: Ret
-}
-}
 ============ bytecode verification succeeded ========

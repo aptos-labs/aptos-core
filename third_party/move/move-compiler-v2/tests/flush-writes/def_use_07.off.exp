@@ -1,26 +1,24 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+fun foo(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 1
+fun one(): u64
+    ld_u64 1
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test(): u64
+    call one
+    call foo
+    ret
 
 
-foo(x: u64): u64 /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](x: u64)
-	1: LdU64(1)
-	2: Add
-	3: Ret
-}
-one(): u64 /* def_idx: 1 */ {
-B0:
-	0: LdU64(1)
-	1: Ret
-}
-public test(): u64 /* def_idx: 2 */ {
-B0:
-	0: Call one(): u64
-	1: Call foo(u64): u64
-	2: Ret
-}
-}
 ============ bytecode verification succeeded ========

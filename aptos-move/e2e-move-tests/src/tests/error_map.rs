@@ -10,13 +10,6 @@ use aptos_types::{
     transaction::{ExecutionStatus, TransactionStatus},
 };
 use move_core_types::value::MoveValue;
-use serde::{Deserialize, Serialize};
-
-/// Mimics `0xcafe::test::ModuleData`
-#[derive(Serialize, Deserialize)]
-struct ModuleData {
-    state: Vec<u8>,
-}
 
 #[test]
 fn error_map() {

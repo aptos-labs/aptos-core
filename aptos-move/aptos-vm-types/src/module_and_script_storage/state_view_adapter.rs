@@ -21,7 +21,6 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    metadata::Metadata,
 };
 use move_vm_runtime::{
     ambassador_impl_ModuleStorage, ambassador_impl_WithRuntimeEnvironment, AsUnsyncCodeStorage,

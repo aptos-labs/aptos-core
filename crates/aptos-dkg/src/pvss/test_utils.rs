@@ -1,17 +1,18 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    pvss::{
-        traits::{
-            transcript::Transcript, Convert, HasEncryptionPublicParams, Reconstructable,
-            SecretSharingConfig,
-        },
-        Player, ThresholdConfigBlstrs, WeightedConfig,
+use crate::pvss::{
+    traits::{
+        transcript::{Transcript, WithMaxNumShares},
+        Convert, HasEncryptionPublicParams,
     },
-    traits::ThresholdConfig,
+    Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
-use aptos_crypto::{hash::CryptoHash, SigningKey, Uniform};
+use aptos_crypto::{
+    arkworks::shamir::Reconstructable,
+    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
+    SigningKey, Uniform,
+};
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
 use serde::Serialize;
@@ -54,7 +55,7 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
         sc
     );
 
-    let pp = T::PublicParameters::default();
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_players());
 
     let ssks = (0..sc.get_total_num_players())
         .map(|_| T::SigningSecretKey::generate(&mut rng))
@@ -128,7 +129,7 @@ macro_rules! vec_to_str {
 #[allow(unused)]
 pub(crate) use vec_to_str;
 
-pub fn get_threshold_configs_for_testing<T: ThresholdConfig>() -> Vec<T> {
+pub fn get_threshold_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<T> {
     let mut tcs = vec![];
 
     for t in 1..8 {
@@ -141,37 +142,39 @@ pub fn get_threshold_configs_for_testing<T: ThresholdConfig>() -> Vec<T> {
     tcs
 }
 
-pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
+pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
 
     // 1-out-of-1 weighted
-    wcs.push(WeightedConfig::new(1, vec![1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![1]).unwrap());
 
     // 1-out-of-2, weights 2 0
-    wcs.push(WeightedConfig::new(1, vec![2]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![2]).unwrap());
     // 1-out-of-2, weights 1 1
-    wcs.push(WeightedConfig::new(1, vec![1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![1, 1]).unwrap());
     // 2-out-of-2, weights 1 1
-    wcs.push(WeightedConfig::new(2, vec![1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(2, vec![1, 1]).unwrap());
 
     // 1-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfig::new(1, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![1, 1, 1]).unwrap());
     // 2-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfig::new(2, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(2, vec![1, 1, 1]).unwrap());
     // 3-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfig::new(3, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(3, vec![1, 1, 1]).unwrap());
 
     // 3-out-of-5, weights 2 1 2
-    wcs.push(WeightedConfig::new(3, vec![2, 1, 2]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(3, vec![2, 1, 2]).unwrap());
 
     // 3-out-of-7, weights 2 3 2
-    wcs.push(WeightedConfig::new(3, vec![2, 3, 2]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(3, vec![2, 3, 2]).unwrap());
 
     // 50-out-of-100, weights [11, 13, 9, 10, 12, 8, 7, 14, 10, 6]
-    wcs.push(WeightedConfig::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
 
     // 7-out-of-15, weights [0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]
-    wcs.push(WeightedConfig::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap());
+    wcs.push(
+        WeightedConfigBlstrs::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap(),
+    );
 
     wcs
 }
@@ -189,7 +192,7 @@ pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfigBlstrs> {
     ]
 }
 
-pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
+pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
 
     let weights = vec![
@@ -201,7 +204,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     let weights = vec![
         3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
@@ -212,7 +215,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     let weights = vec![
         5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
@@ -223,16 +226,17 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     wcs
 }
 
-pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript + CryptoHash>(
+pub fn reconstruct_dealt_secret_key_randomly<R, T: Transcript>(
     sc: &<T as Transcript>::SecretSharingConfig,
     rng: &mut R,
     dks: &Vec<<T as Transcript>::DecryptPrivKey>,
     trx: T,
+    pp: &T::PublicParameters,
 ) -> <T as Transcript>::DealtSecretKey
 where
     R: rand_core::RngCore,
@@ -242,7 +246,7 @@ where
         .get_random_eligible_subset_of_players(rng)
         .into_iter()
         .map(|p| {
-            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()]);
+            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()], pp);
 
             assert_eq!(pk, trx.get_public_key_share(sc, &p));
 
@@ -250,5 +254,5 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    T::DealtSecretKey::reconstruct(sc, &players_and_shares)
+    T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

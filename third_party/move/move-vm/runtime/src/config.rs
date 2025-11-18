@@ -73,11 +73,11 @@ impl Default for VMConfig {
             enable_depth_checks: true,
             optimize_trusted_code: false,
             paranoid_ref_checks: false,
-            enable_capture_option: false,
+            enable_capture_option: true,
             enable_enum_option: true,
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
-            enable_framework_for_option: false,
+            enable_framework_for_option: true,
         }
     }
 }

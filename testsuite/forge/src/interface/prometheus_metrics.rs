@@ -161,7 +161,7 @@ impl LatencyBreakdown {
 }
 
 pub async fn fetch_latency_breakdown(
-    swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     start_time: u64,
     end_time: u64,
 ) -> anyhow::Result<LatencyBreakdown> {

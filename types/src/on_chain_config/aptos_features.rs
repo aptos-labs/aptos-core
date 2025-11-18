@@ -258,6 +258,7 @@ impl FeatureFlag {
             FeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VM_BINARY_FORMAT_V9,
+            FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
         ]
     }
 }

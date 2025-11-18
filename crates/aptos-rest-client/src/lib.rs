@@ -22,11 +22,10 @@ pub use aptos_api_types::{
     self, IndexResponseBcs, MoveModuleBytecode, PendingTransaction, Transaction,
 };
 use aptos_api_types::{
-    deserialize_from_string,
     mime_types::{BCS, BCS_SIGNED_TRANSACTION, BCS_VIEW_FUNCTION, JSON},
-    AptosError, AptosErrorCode, BcsBlock, Block, GasEstimation, HexEncodedBytes, IndexResponse,
-    MoveModuleId, TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult,
-    UserTransaction, VersionedEvent, ViewFunction, ViewRequest,
+    AptosError, AptosErrorCode, BcsBlock, Block, GasEstimation, IndexResponse, MoveModuleId,
+    TransactionData, TransactionOnChainData, TransactionsBatchSubmissionResult, UserTransaction,
+    VersionedEvent, ViewFunction, ViewRequest,
 };
 use aptos_crypto::HashValue;
 use aptos_logger::{debug, info, sample, sample::SampleRate};
@@ -1430,23 +1429,6 @@ impl Client {
         start: Option<u64>,
         limit: Option<u16>,
     ) -> Result<Response<Vec<VersionedNewBlockEvent>>> {
-        #[derive(Clone, Debug, Serialize, Deserialize)]
-        pub struct NewBlockEventResponse {
-            hash: String,
-            #[serde(deserialize_with = "deserialize_from_string")]
-            epoch: u64,
-            #[serde(deserialize_with = "deserialize_from_string")]
-            round: u64,
-            #[serde(deserialize_with = "deserialize_from_string")]
-            height: u64,
-            #[serde(deserialize_with = "deserialize_from_prefixed_hex_string")]
-            previous_block_votes_bitvec: HexEncodedBytes,
-            proposer: String,
-            failed_proposer_indices: Vec<String>,
-            #[serde(deserialize_with = "deserialize_from_string")]
-            time_microseconds: u64,
-        }
-
         let response = self
             .get_account_events_bcs(
                 CORE_CODE_ADDRESS,

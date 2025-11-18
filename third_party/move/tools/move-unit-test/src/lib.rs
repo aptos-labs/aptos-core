@@ -97,6 +97,10 @@ pub struct UnitTestingConfig {
     /// Verbose mode
     #[clap(short = 'v', long = "verbose")]
     pub verbose: bool,
+
+    /// Fail Fast mode: stop at the first test failure
+    #[clap(long = "fail-fast")]
+    pub fail_fast: bool,
 }
 
 fn format_module_id(module_id: &ModuleId) -> String {
@@ -121,6 +125,7 @@ impl Default for UnitTestingConfig {
             verbose: false,
             list: false,
             named_address_values: vec![],
+            fail_fast: false,
         }
     }
 }
@@ -187,6 +192,7 @@ impl UnitTestingConfig {
         writer: W,
         factory: F,
         enable_enum_option: bool,
+        fail_fast: bool,
     ) -> Result<(W, bool)> {
         let shared_writer = Mutex::new(writer);
         let shared_options = Mutex::new(factory);
@@ -215,6 +221,7 @@ impl UnitTestingConfig {
             genesis_state,
             self.verbose,
             enable_enum_option,
+            fail_fast,
         )
         .unwrap();
 

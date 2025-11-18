@@ -678,10 +678,10 @@ impl AptosVM {
             }
 
             let info = module_storage
-                .unmetered_get_module_metadata(module_id.address(), module_id.name())
+                .unmetered_get_deserialized_module(module_id.address(), module_id.name())
                 .ok()
                 .flatten()
-                .and_then(|metadata| get_metadata(&metadata))
+                .and_then(|module| get_metadata(&module.metadata))
                 .and_then(|m| m.extract_abort_info(code));
 
             ExecutionStatus::MoveAbort {
@@ -3198,6 +3198,10 @@ impl VMValidator for AptosVM {
             }
         }
 
+        if transaction.payload().is_encrypted_variant() {
+            return VMValidatorResult::error(StatusCode::FEATURE_UNDER_GATING);
+        }
+
         let txn = match transaction.check_signature() {
             Ok(t) => t,
             _ => {
@@ -3434,14 +3438,16 @@ pub(crate) fn should_create_account_resource(
         //   Account lives at a special address, so we should not be charging for it and unmetered
         //   access is safe. There are tests that ensure that address is always special.
         assert!(account_tag.address.is_special());
-        let metadata = module_storage
-            .unmetered_get_existing_module_metadata(&account_tag.address, &account_tag.module)?;
+        let module = module_storage.unmetered_get_existing_deserialized_module(
+            &account_tag.address,
+            &account_tag.module,
+        )?;
 
         let (maybe_bytes, _) = resolver
             .get_resource_bytes_with_metadata_and_layout(
                 &txn_data.sender(),
                 &account_tag,
-                &metadata,
+                &module.metadata,
                 None,
             )
             .map_err(|e| e.finish(Location::Undefined))?;

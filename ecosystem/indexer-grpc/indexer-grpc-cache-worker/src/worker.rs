@@ -418,7 +418,7 @@ async fn process_streaming_response(
                     let result = join_all(tasks_to_run).await;
                     if result
                         .iter()
-                        .any(|r| (r.is_err() || r.as_ref().unwrap().is_err()))
+                        .any(|r| r.is_err() || r.as_ref().unwrap().is_err())
                     {
                         error!(
                             start_version = start_version,

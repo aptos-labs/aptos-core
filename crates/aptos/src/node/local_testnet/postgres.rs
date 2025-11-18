@@ -4,7 +4,7 @@
 use super::{
     docker::{
         create_network, create_volume, delete_container, delete_volume, get_docker,
-        pull_docker_image, setup_docker_logging, StopContainerShutdownStep, CONTAINER_NETWORK_NAME,
+        pull_docker_image, setup_docker_logging, StopContainerShutdownStep,
     },
     health_checker::HealthChecker,
     traits::{ServiceManager, ShutdownStep},
@@ -121,6 +121,8 @@ pub struct PostgresManager {
     args: PostgresArgs,
     test_dir: PathBuf,
     force_restart: bool,
+    docker_network: String,
+    docker_network_already_exists: bool,
 }
 
 impl PostgresManager {
@@ -130,10 +132,13 @@ impl PostgresManager {
         {
             bail!("The postgres database cannot be named postgres if --use-host-postgres is set");
         }
+        let (docker_network, docker_network_already_exists) = args.get_docker_network();
         Ok(Self {
             args: args.postgres_args.clone(),
             test_dir,
             force_restart: args.force_restart,
+            docker_network: docker_network.to_string(),
+            docker_network_already_exists,
         })
     }
 
@@ -192,8 +197,11 @@ impl ServiceManager for PostgresManager {
             // `run_service`.
             pull_docker_image(POSTGRES_IMAGE).await?;
 
-            // Create a network for the containers to talk to each other.
-            create_network(CONTAINER_NETWORK_NAME).await?;
+            // Create a network for the containers to talk to each other if a
+            // pre-existing network was not specified.
+            if !self.docker_network_already_exists {
+                create_network(&self.docker_network).await?;
+            }
         }
 
         Ok(())
@@ -243,7 +251,7 @@ impl ServiceManager for PostgresManager {
             // Bind the container to the network we created in the pre_run. This does
             // not prevent the binary in the container from exposing itself to the host
             // on 127.0.0.1. See more here: https://stackoverflow.com/a/77432636/3846032.
-            network_mode: Some(CONTAINER_NETWORK_NAME.to_string()),
+            network_mode: Some(self.docker_network.clone()),
             port_bindings: Some(hashmap! {
                 POSTGRES_DEFAULT_PORT.to_string() => Some(vec![PortBinding {
                     host_ip: Some("127.0.0.1".to_string()),

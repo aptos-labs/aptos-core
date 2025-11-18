@@ -723,6 +723,21 @@ impl BlockRetriever {
 
             loop {
                 tokio::select! {
+                    biased;
+                    Some((peer, response)) = futures.next() => {
+                        match response {
+                            Ok(result) => return Ok(result),
+                            e => {
+                                warn!(
+                                    remote_peer = peer,
+                                    block_id = block_id,
+                                    "{:?}, Failed to fetch block",
+                                    e,
+                                );
+                                failed_attempt += 1;
+                            },
+                        }
+                    },
                     _ = interval.tick() => {
                         // send batch request to a set of peers of size request_num_peers (or 1 for the first time)
                         let next_peers = if cur_retry < num_retries {
@@ -759,20 +774,6 @@ impl BlockRetriever {
                             futures.push(async move { (remote_peer, future.await) }.boxed());
                         }
                     }
-                    Some((peer, response)) = futures.next() => {
-                        match response {
-                            Ok(result) => return Ok(result),
-                            e => {
-                                warn!(
-                                    remote_peer = peer,
-                                    block_id = block_id,
-                                    "{:?}, Failed to fetch block",
-                                    e,
-                                );
-                                failed_attempt += 1;
-                            },
-                        }
-                    },
                 }
             }
         })

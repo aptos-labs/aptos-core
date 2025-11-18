@@ -3665,7 +3665,7 @@ fun valid_logic::test_cmp1($t0: i64): bool {
      # live vars: $t0, $t7
   1: $t6 := ==($t7, $t0)
      # live vars: $t0, $t6
-  2: if ($t6) goto 3 else goto 41
+  2: if ($t6) goto 3 else goto 40
      # live vars: $t0
   3: label L0
      # live vars: $t0
@@ -3675,7 +3675,7 @@ fun valid_logic::test_cmp1($t0: i64): bool {
      # live vars: $t0, $t6
   6: label L2
      # live vars: $t0, $t6
-  7: if ($t6) goto 8 else goto 38
+  7: if ($t6) goto 8 else goto 37
      # live vars: $t0
   8: label L3
      # live vars: $t0
@@ -3685,7 +3685,7 @@ fun valid_logic::test_cmp1($t0: i64): bool {
      # live vars: $t0, $t4
  11: label L5
      # live vars: $t0, $t4
- 12: if ($t4) goto 13 else goto 35
+ 12: if ($t4) goto 13 else goto 34
      # live vars: $t0
  13: label L6
      # live vars: $t0
@@ -3695,7 +3695,7 @@ fun valid_logic::test_cmp1($t0: i64): bool {
      # live vars: $t0, $t3
  16: label L8
      # live vars: $t0, $t3
- 17: if ($t3) goto 18 else goto 32
+ 17: if ($t3) goto 18 else goto 31
      # live vars: $t0
  18: label L9
      # live vars: $t0
@@ -3705,7 +3705,7 @@ fun valid_logic::test_cmp1($t0: i64): bool {
      # live vars: $t0, $t2
  21: label L11
      # live vars: $t0, $t2
- 22: if ($t2) goto 23 else goto 29
+ 22: if ($t2) goto 23 else goto 28
      # live vars: $t0
  23: label L12
      # live vars: $t0
@@ -3715,39 +3715,37 @@ fun valid_logic::test_cmp1($t0: i64): bool {
      # live vars: $t12, $t13
  26: $t1 := ==($t12, $t13)
      # live vars: $t1
- 27: label L14
-     # live vars: $t1
- 28: return $t1
+ 27: return $t1
      # live vars: $t0
- 29: label L13
+ 28: label L13
      # live vars:
- 30: $t1 := false
+ 29: $t1 := false
      # live vars: $t1
- 31: goto 27
+ 30: return $t1
      # live vars: $t0
- 32: label L10
+ 31: label L10
      # live vars: $t0
- 33: $t2 := false
+ 32: $t2 := false
      # live vars: $t0, $t2
- 34: goto 21
+ 33: goto 21
      # live vars: $t0
- 35: label L7
+ 34: label L7
      # live vars: $t0
- 36: $t3 := false
+ 35: $t3 := false
      # live vars: $t0, $t3
- 37: goto 16
+ 36: goto 16
      # live vars: $t0
- 38: label L4
+ 37: label L4
      # live vars: $t0
- 39: $t4 := false
+ 38: $t4 := false
      # live vars: $t0, $t4
- 40: goto 11
+ 39: goto 11
      # live vars: $t0
- 41: label L1
+ 40: label L1
      # live vars: $t0
- 42: $t6 := false
+ 41: $t6 := false
      # live vars: $t0, $t6
- 43: goto 6
+ 42: goto 6
 }
 
 
@@ -3771,7 +3769,7 @@ fun valid_logic::test_cmp2($t0: i128): bool {
      # live vars: $t0, $t7
   1: $t6 := ==($t7, $t0)
      # live vars: $t0, $t6
-  2: if ($t6) goto 3 else goto 41
+  2: if ($t6) goto 3 else goto 40
      # live vars: $t0
   3: label L0
      # live vars: $t0
@@ -3781,7 +3779,7 @@ fun valid_logic::test_cmp2($t0: i128): bool {
      # live vars: $t0, $t6
   6: label L2
      # live vars: $t0, $t6
-  7: if ($t6) goto 8 else goto 38
+  7: if ($t6) goto 8 else goto 37
      # live vars: $t0
   8: label L3
      # live vars: $t0
@@ -3791,7 +3789,7 @@ fun valid_logic::test_cmp2($t0: i128): bool {
      # live vars: $t0, $t4
  11: label L5
      # live vars: $t0, $t4
- 12: if ($t4) goto 13 else goto 35
+ 12: if ($t4) goto 13 else goto 34
      # live vars: $t0
  13: label L6
      # live vars: $t0
@@ -3801,7 +3799,7 @@ fun valid_logic::test_cmp2($t0: i128): bool {
      # live vars: $t0, $t3
  16: label L8
      # live vars: $t0, $t3
- 17: if ($t3) goto 18 else goto 32
+ 17: if ($t3) goto 18 else goto 31
      # live vars: $t0
  18: label L9
      # live vars: $t0
@@ -3811,7 +3809,7 @@ fun valid_logic::test_cmp2($t0: i128): bool {
      # live vars: $t0, $t2
  21: label L11
      # live vars: $t0, $t2
- 22: if ($t2) goto 23 else goto 29
+ 22: if ($t2) goto 23 else goto 28
      # live vars: $t0
  23: label L12
      # live vars: $t0
@@ -3821,39 +3819,37 @@ fun valid_logic::test_cmp2($t0: i128): bool {
      # live vars: $t12, $t13
  26: $t1 := ==($t12, $t13)
      # live vars: $t1
- 27: label L14
-     # live vars: $t1
- 28: return $t1
+ 27: return $t1
      # live vars: $t0
- 29: label L13
+ 28: label L13
      # live vars:
- 30: $t1 := false
+ 29: $t1 := false
      # live vars: $t1
- 31: goto 27
+ 30: return $t1
      # live vars: $t0
- 32: label L10
+ 31: label L10
      # live vars: $t0
- 33: $t2 := false
+ 32: $t2 := false
      # live vars: $t0, $t2
- 34: goto 21
+ 33: goto 21
      # live vars: $t0
- 35: label L7
+ 34: label L7
      # live vars: $t0
- 36: $t3 := false
+ 35: $t3 := false
      # live vars: $t0, $t3
- 37: goto 16
+ 36: goto 16
      # live vars: $t0
- 38: label L4
+ 37: label L4
      # live vars: $t0
- 39: $t4 := false
+ 38: $t4 := false
      # live vars: $t0, $t4
- 40: goto 11
+ 39: goto 11
      # live vars: $t0
- 41: label L1
+ 40: label L1
      # live vars: $t0
- 42: $t6 := false
+ 41: $t6 := false
      # live vars: $t0, $t6
- 43: goto 6
+ 42: goto 6
 }
 
 
@@ -3919,7 +3915,7 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t10, $t13
   6: $t9 := ==($t10, $t13)
      # live vars: $t0, $t1, $t2, $t9
-  7: if ($t9) goto 8 else goto 79
+  7: if ($t9) goto 8 else goto 78
      # live vars: $t0, $t1, $t2
   8: label L0
      # live vars: $t0, $t1, $t2
@@ -3939,7 +3935,7 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t9
  16: label L2
      # live vars: $t0, $t1, $t2, $t9
- 17: if ($t9) goto 18 else goto 76
+ 17: if ($t9) goto 18 else goto 75
      # live vars: $t0, $t1, $t2
  18: label L3
      # live vars: $t0, $t1, $t2
@@ -3959,7 +3955,7 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t7
  26: label L5
      # live vars: $t0, $t1, $t2, $t7
- 27: if ($t7) goto 28 else goto 73
+ 27: if ($t7) goto 28 else goto 72
      # live vars: $t0, $t1, $t2
  28: label L6
      # live vars: $t0, $t1, $t2
@@ -3979,7 +3975,7 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t6
  36: label L8
      # live vars: $t0, $t1, $t2, $t6
- 37: if ($t6) goto 38 else goto 70
+ 37: if ($t6) goto 38 else goto 69
      # live vars: $t0, $t1, $t2
  38: label L9
      # live vars: $t0, $t1, $t2
@@ -3999,7 +3995,7 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t5
  46: label L11
      # live vars: $t0, $t1, $t5
- 47: if ($t5) goto 48 else goto 67
+ 47: if ($t5) goto 48 else goto 66
      # live vars: $t0, $t1
  48: label L12
      # live vars: $t0, $t1
@@ -4015,7 +4011,7 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t4
  54: label L14
      # live vars: $t0, $t1, $t4
- 55: if ($t4) goto 56 else goto 64
+ 55: if ($t4) goto 56 else goto 63
      # live vars: $t0, $t1
  56: label L15
      # live vars: $t0, $t1
@@ -4029,45 +4025,43 @@ fun valid_logic::test_cmp3($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t12, $t42
  61: $t3 := ==($t12, $t42)
      # live vars: $t3
- 62: label L17
-     # live vars: $t3
- 63: return $t3
+ 62: return $t3
      # live vars: $t0, $t1
- 64: label L16
+ 63: label L16
      # live vars:
- 65: $t3 := false
+ 64: $t3 := false
      # live vars: $t3
- 66: goto 62
+ 65: return $t3
      # live vars: $t0, $t1
- 67: label L13
+ 66: label L13
      # live vars: $t0, $t1
- 68: $t4 := false
+ 67: $t4 := false
      # live vars: $t0, $t1, $t4
- 69: goto 54
+ 68: goto 54
      # live vars: $t0, $t1, $t2
- 70: label L10
+ 69: label L10
      # live vars: $t0, $t1
- 71: $t5 := false
+ 70: $t5 := false
      # live vars: $t0, $t1, $t5
- 72: goto 46
+ 71: goto 46
      # live vars: $t0, $t1, $t2
- 73: label L7
+ 72: label L7
      # live vars: $t0, $t1, $t2
- 74: $t6 := false
+ 73: $t6 := false
      # live vars: $t0, $t1, $t2, $t6
- 75: goto 36
+ 74: goto 36
      # live vars: $t0, $t1, $t2
- 76: label L4
+ 75: label L4
      # live vars: $t0, $t1, $t2
- 77: $t7 := false
+ 76: $t7 := false
      # live vars: $t0, $t1, $t2, $t7
- 78: goto 26
+ 77: goto 26
      # live vars: $t0, $t1, $t2
- 79: label L1
+ 78: label L1
      # live vars: $t0, $t1, $t2
- 80: $t9 := false
+ 79: $t9 := false
      # live vars: $t0, $t1, $t2, $t9
- 81: goto 16
+ 80: goto 16
 }
 
 
@@ -4133,7 +4127,7 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t10, $t13
   6: $t9 := ==($t10, $t13)
      # live vars: $t0, $t1, $t2, $t9
-  7: if ($t9) goto 8 else goto 79
+  7: if ($t9) goto 8 else goto 78
      # live vars: $t0, $t1, $t2
   8: label L0
      # live vars: $t0, $t1, $t2
@@ -4153,7 +4147,7 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t9
  16: label L2
      # live vars: $t0, $t1, $t2, $t9
- 17: if ($t9) goto 18 else goto 76
+ 17: if ($t9) goto 18 else goto 75
      # live vars: $t0, $t1, $t2
  18: label L3
      # live vars: $t0, $t1, $t2
@@ -4173,7 +4167,7 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t7
  26: label L5
      # live vars: $t0, $t1, $t2, $t7
- 27: if ($t7) goto 28 else goto 73
+ 27: if ($t7) goto 28 else goto 72
      # live vars: $t0, $t1, $t2
  28: label L6
      # live vars: $t0, $t1, $t2
@@ -4193,7 +4187,7 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t2, $t6
  36: label L8
      # live vars: $t0, $t1, $t2, $t6
- 37: if ($t6) goto 38 else goto 70
+ 37: if ($t6) goto 38 else goto 69
      # live vars: $t0, $t1, $t2
  38: label L9
      # live vars: $t0, $t1, $t2
@@ -4213,7 +4207,7 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t5
  46: label L11
      # live vars: $t0, $t1, $t5
- 47: if ($t5) goto 48 else goto 67
+ 47: if ($t5) goto 48 else goto 66
      # live vars: $t0, $t1
  48: label L12
      # live vars: $t0, $t1
@@ -4229,7 +4223,7 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t0, $t1, $t4
  54: label L14
      # live vars: $t0, $t1, $t4
- 55: if ($t4) goto 56 else goto 64
+ 55: if ($t4) goto 56 else goto 63
      # live vars: $t0, $t1
  56: label L15
      # live vars: $t0, $t1
@@ -4243,45 +4237,43 @@ fun valid_logic::test_cmp4($t0: 0x42::valid_logic::S1, $t1: 0x42::valid_logic::S
      # live vars: $t12, $t42
  61: $t3 := ==($t12, $t42)
      # live vars: $t3
- 62: label L17
-     # live vars: $t3
- 63: return $t3
+ 62: return $t3
      # live vars: $t0, $t1
- 64: label L16
+ 63: label L16
      # live vars:
- 65: $t3 := false
+ 64: $t3 := false
      # live vars: $t3
- 66: goto 62
+ 65: return $t3
      # live vars: $t0, $t1
- 67: label L13
+ 66: label L13
      # live vars: $t0, $t1
- 68: $t4 := false
+ 67: $t4 := false
      # live vars: $t0, $t1, $t4
- 69: goto 54
+ 68: goto 54
      # live vars: $t0, $t1, $t2
- 70: label L10
+ 69: label L10
      # live vars: $t0, $t1
- 71: $t5 := false
+ 70: $t5 := false
      # live vars: $t0, $t1, $t5
- 72: goto 46
+ 71: goto 46
      # live vars: $t0, $t1, $t2
- 73: label L7
+ 72: label L7
      # live vars: $t0, $t1, $t2
- 74: $t6 := false
+ 73: $t6 := false
      # live vars: $t0, $t1, $t2, $t6
- 75: goto 36
+ 74: goto 36
      # live vars: $t0, $t1, $t2
- 76: label L4
+ 75: label L4
      # live vars: $t0, $t1, $t2
- 77: $t7 := false
+ 76: $t7 := false
      # live vars: $t0, $t1, $t2, $t7
- 78: goto 26
+ 77: goto 26
      # live vars: $t0, $t1, $t2
- 79: label L1
+ 78: label L1
      # live vars: $t0, $t1, $t2
- 80: $t9 := false
+ 79: $t9 := false
      # live vars: $t0, $t1, $t2, $t9
- 81: goto 16
+ 80: goto 16
 }
 
 
@@ -4566,548 +4558,519 @@ fun valid_logic::test_mix9($t0: i64, $t1: i64): bool {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.valid_logic {
-enum E1 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i64>
- }
-}
-enum E2 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i128>
- }
-}
-enum E3<T> has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<T>
- }
-}
-struct S1 has copy, drop {
-	x: u64,
-	y: i64,
-	z: i128
-}
-struct S2 has copy, drop {
-	x: S1,
-	y: i64,
-	z: i128
-}
-struct S3<T> has copy, drop {
-	x: T,
-	y: S1,
-	z: S2
-}
+// Bytecode version v9
+module 0x42::valid_logic
+enum E1 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i64>
 
-test_cmp1(x: i64): bool /* def_idx: 0 */ {
-L1:	$t6: bool
-L2:	$t4: bool
-L3:	$t3: bool
-L4:	$t2: bool
-L5:	return: bool
-B0:
-	0: CopyLoc[0](x: i64)
-	1: CopyLoc[0](x: i64)
-	2: Eq
-	3: BrFalse(46)
-B1:
-	4: CopyLoc[0](x: i64)
-	5: CopyLoc[0](x: i64)
-	6: Ge
-	7: StLoc[1]($t6: bool)
-B2:
-	8: MoveLoc[1]($t6: bool)
-	9: BrFalse(43)
-B3:
-	10: CopyLoc[0](x: i64)
-	11: CopyLoc[0](x: i64)
-	12: Le
-	13: StLoc[2]($t4: bool)
-B4:
-	14: MoveLoc[2]($t4: bool)
-	15: BrFalse(40)
-B5:
-	16: CopyLoc[0](x: i64)
-	17: CopyLoc[0](x: i64)
-	18: Gt
-	19: StLoc[3]($t3: bool)
-B6:
-	20: MoveLoc[3]($t3: bool)
-	21: BrFalse(37)
-B7:
-	22: CopyLoc[0](x: i64)
-	23: CopyLoc[0](x: i64)
-	24: Lt
-	25: StLoc[4]($t2: bool)
-B8:
-	26: MoveLoc[4]($t2: bool)
-	27: BrFalse(34)
-B9:
-	28: ImmBorrowLoc[0](x: i64)
-	29: ImmBorrowLoc[0](x: i64)
-	30: Eq
-	31: StLoc[5](return: bool)
-B10:
-	32: MoveLoc[5](return: bool)
-	33: Ret
-B11:
-	34: LdFalse
-	35: StLoc[5](return: bool)
-	36: Branch(32)
-B12:
-	37: LdFalse
-	38: StLoc[4]($t2: bool)
-	39: Branch(26)
-B13:
-	40: LdFalse
-	41: StLoc[3]($t3: bool)
-	42: Branch(20)
-B14:
-	43: LdFalse
-	44: StLoc[2]($t4: bool)
-	45: Branch(14)
-B15:
-	46: LdFalse
-	47: StLoc[1]($t6: bool)
-	48: Branch(8)
-}
-test_cmp2(x: i128): bool /* def_idx: 1 */ {
-L1:	$t6: bool
-L2:	$t4: bool
-L3:	$t3: bool
-L4:	$t2: bool
-L5:	return: bool
-B0:
-	0: CopyLoc[0](x: i128)
-	1: CopyLoc[0](x: i128)
-	2: Eq
-	3: BrFalse(46)
-B1:
-	4: CopyLoc[0](x: i128)
-	5: CopyLoc[0](x: i128)
-	6: Ge
-	7: StLoc[1]($t6: bool)
-B2:
-	8: MoveLoc[1]($t6: bool)
-	9: BrFalse(43)
-B3:
-	10: CopyLoc[0](x: i128)
-	11: CopyLoc[0](x: i128)
-	12: Le
-	13: StLoc[2]($t4: bool)
-B4:
-	14: MoveLoc[2]($t4: bool)
-	15: BrFalse(40)
-B5:
-	16: CopyLoc[0](x: i128)
-	17: CopyLoc[0](x: i128)
-	18: Gt
-	19: StLoc[3]($t3: bool)
-B6:
-	20: MoveLoc[3]($t3: bool)
-	21: BrFalse(37)
-B7:
-	22: CopyLoc[0](x: i128)
-	23: CopyLoc[0](x: i128)
-	24: Lt
-	25: StLoc[4]($t2: bool)
-B8:
-	26: MoveLoc[4]($t2: bool)
-	27: BrFalse(34)
-B9:
-	28: ImmBorrowLoc[0](x: i128)
-	29: ImmBorrowLoc[0](x: i128)
-	30: Eq
-	31: StLoc[5](return: bool)
-B10:
-	32: MoveLoc[5](return: bool)
-	33: Ret
-B11:
-	34: LdFalse
-	35: StLoc[5](return: bool)
-	36: Branch(32)
-B12:
-	37: LdFalse
-	38: StLoc[4]($t2: bool)
-	39: Branch(26)
-B13:
-	40: LdFalse
-	41: StLoc[3]($t3: bool)
-	42: Branch(20)
-B14:
-	43: LdFalse
-	44: StLoc[2]($t4: bool)
-	45: Branch(14)
-B15:
-	46: LdFalse
-	47: StLoc[1]($t6: bool)
-	48: Branch(8)
-}
-test_cmp3(s1: S1, s2: S2, s3: S3<i64>): bool /* def_idx: 2 */ {
-L3:	$t9: bool
-L4:	$t7: bool
-L5:	$t6: bool
-L6:	$t5: bool
-L7:	$t4: bool
-L8:	return: bool
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[0](S1.y: i64)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[1](S2.y: i64)
-	5: ReadRef
-	6: Eq
-	7: BrFalse(79)
-B1:
-	8: ImmBorrowLoc[0](s1: S1)
-	9: ImmBorrowField[0](S1.y: i64)
-	10: ReadRef
-	11: ImmBorrowLoc[2](s3: S3<i64>)
-	12: ImmBorrowFieldGeneric[0](S3.x: T)
-	13: ReadRef
-	14: Le
-	15: StLoc[3]($t9: bool)
-B2:
-	16: MoveLoc[3]($t9: bool)
-	17: BrFalse(76)
-B3:
-	18: ImmBorrowLoc[1](s2: S2)
-	19: ImmBorrowField[1](S2.y: i64)
-	20: ReadRef
-	21: ImmBorrowLoc[2](s3: S3<i64>)
-	22: ImmBorrowFieldGeneric[0](S3.x: T)
-	23: ReadRef
-	24: Ge
-	25: StLoc[4]($t7: bool)
-B4:
-	26: MoveLoc[4]($t7: bool)
-	27: BrFalse(73)
-B5:
-	28: ImmBorrowLoc[2](s3: S3<i64>)
-	29: ImmBorrowFieldGeneric[0](S3.x: T)
-	30: ReadRef
-	31: ImmBorrowLoc[0](s1: S1)
-	32: ImmBorrowField[0](S1.y: i64)
-	33: ReadRef
-	34: Gt
-	35: StLoc[5]($t6: bool)
-B6:
-	36: MoveLoc[5]($t6: bool)
-	37: BrFalse(70)
-B7:
-	38: ImmBorrowLoc[2](s3: S3<i64>)
-	39: ImmBorrowFieldGeneric[0](S3.x: T)
-	40: ReadRef
-	41: ImmBorrowLoc[1](s2: S2)
-	42: ImmBorrowField[1](S2.y: i64)
-	43: ReadRef
-	44: Lt
-	45: StLoc[6]($t5: bool)
-B8:
-	46: MoveLoc[6]($t5: bool)
-	47: BrFalse(67)
-B9:
-	48: ImmBorrowLoc[0](s1: S1)
-	49: ImmBorrowField[0](S1.y: i64)
-	50: ImmBorrowLoc[1](s2: S2)
-	51: ImmBorrowField[1](S2.y: i64)
-	52: Eq
-	53: StLoc[7]($t4: bool)
-B10:
-	54: MoveLoc[7]($t4: bool)
-	55: BrFalse(64)
-B11:
-	56: ImmBorrowLoc[0](s1: S1)
-	57: ImmBorrowField[0](S1.y: i64)
-	58: ImmBorrowLoc[1](s2: S2)
-	59: ImmBorrowField[1](S2.y: i64)
-	60: Eq
-	61: StLoc[8](return: bool)
-B12:
-	62: MoveLoc[8](return: bool)
-	63: Ret
-B13:
-	64: LdFalse
-	65: StLoc[8](return: bool)
-	66: Branch(62)
-B14:
-	67: LdFalse
-	68: StLoc[7]($t4: bool)
-	69: Branch(54)
-B15:
-	70: LdFalse
-	71: StLoc[6]($t5: bool)
-	72: Branch(46)
-B16:
-	73: LdFalse
-	74: StLoc[5]($t6: bool)
-	75: Branch(36)
-B17:
-	76: LdFalse
-	77: StLoc[4]($t7: bool)
-	78: Branch(26)
-B18:
-	79: LdFalse
-	80: StLoc[3]($t9: bool)
-	81: Branch(16)
-}
-test_cmp4(s1: S1, s2: S2, s3: S3<i128>): bool /* def_idx: 3 */ {
-L3:	$t9: bool
-L4:	$t7: bool
-L5:	$t6: bool
-L6:	$t5: bool
-L7:	$t4: bool
-L8:	return: bool
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[3](S1.z: i128)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[4](S2.z: i128)
-	5: ReadRef
-	6: Eq
-	7: BrFalse(79)
-B1:
-	8: ImmBorrowLoc[0](s1: S1)
-	9: ImmBorrowField[3](S1.z: i128)
-	10: ReadRef
-	11: ImmBorrowLoc[2](s3: S3<i128>)
-	12: ImmBorrowFieldGeneric[1](S3.x: T)
-	13: ReadRef
-	14: Le
-	15: StLoc[3]($t9: bool)
-B2:
-	16: MoveLoc[3]($t9: bool)
-	17: BrFalse(76)
-B3:
-	18: ImmBorrowLoc[1](s2: S2)
-	19: ImmBorrowField[4](S2.z: i128)
-	20: ReadRef
-	21: ImmBorrowLoc[2](s3: S3<i128>)
-	22: ImmBorrowFieldGeneric[1](S3.x: T)
-	23: ReadRef
-	24: Ge
-	25: StLoc[4]($t7: bool)
-B4:
-	26: MoveLoc[4]($t7: bool)
-	27: BrFalse(73)
-B5:
-	28: ImmBorrowLoc[2](s3: S3<i128>)
-	29: ImmBorrowFieldGeneric[1](S3.x: T)
-	30: ReadRef
-	31: ImmBorrowLoc[0](s1: S1)
-	32: ImmBorrowField[3](S1.z: i128)
-	33: ReadRef
-	34: Gt
-	35: StLoc[5]($t6: bool)
-B6:
-	36: MoveLoc[5]($t6: bool)
-	37: BrFalse(70)
-B7:
-	38: ImmBorrowLoc[2](s3: S3<i128>)
-	39: ImmBorrowFieldGeneric[1](S3.x: T)
-	40: ReadRef
-	41: ImmBorrowLoc[1](s2: S2)
-	42: ImmBorrowField[4](S2.z: i128)
-	43: ReadRef
-	44: Lt
-	45: StLoc[6]($t5: bool)
-B8:
-	46: MoveLoc[6]($t5: bool)
-	47: BrFalse(67)
-B9:
-	48: ImmBorrowLoc[0](s1: S1)
-	49: ImmBorrowField[3](S1.z: i128)
-	50: ImmBorrowLoc[1](s2: S2)
-	51: ImmBorrowField[4](S2.z: i128)
-	52: Eq
-	53: StLoc[7]($t4: bool)
-B10:
-	54: MoveLoc[7]($t4: bool)
-	55: BrFalse(64)
-B11:
-	56: ImmBorrowLoc[0](s1: S1)
-	57: ImmBorrowField[3](S1.z: i128)
-	58: ImmBorrowLoc[1](s2: S2)
-	59: ImmBorrowField[4](S2.z: i128)
-	60: Eq
-	61: StLoc[8](return: bool)
-B12:
-	62: MoveLoc[8](return: bool)
-	63: Ret
-B13:
-	64: LdFalse
-	65: StLoc[8](return: bool)
-	66: Branch(62)
-B14:
-	67: LdFalse
-	68: StLoc[7]($t4: bool)
-	69: Branch(54)
-B15:
-	70: LdFalse
-	71: StLoc[6]($t5: bool)
-	72: Branch(46)
-B16:
-	73: LdFalse
-	74: StLoc[5]($t6: bool)
-	75: Branch(36)
-B17:
-	76: LdFalse
-	77: StLoc[4]($t7: bool)
-	78: Branch(26)
-B18:
-	79: LdFalse
-	80: StLoc[3]($t9: bool)
-	81: Branch(16)
-}
-test_mix1(x: i64, y: i64): bool /* def_idx: 4 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: CopyLoc[1](y: i64)
-	2: Add
-	3: MoveLoc[1](y: i64)
-	4: MoveLoc[0](x: i64)
-	5: Add
-	6: Eq
-	7: Ret
-}
-test_mix10(x: i128, y: i128): bool /* def_idx: 5 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: LdI128(2)
-	2: Mod
-	3: CopyLoc[1](y: i128)
-	4: Mul
-	5: MoveLoc[0](x: i128)
-	6: LdI128(3)
-	7: Mod
-	8: MoveLoc[1](y: i128)
-	9: Mul
-	10: Gt
-	11: Ret
-}
-test_mix2(x: i128, y: i128): bool /* def_idx: 6 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: LdI128(2)
-	2: CopyLoc[1](y: i128)
-	3: Mul
-	4: Add
-	5: MoveLoc[0](x: i128)
-	6: LdI128(3)
-	7: MoveLoc[1](y: i128)
-	8: Mul
-	9: Add
-	10: Le
-	11: Ret
-}
-test_mix3(x: i64, y: i64): bool /* def_idx: 7 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: CopyLoc[1](y: i64)
-	2: Sub
-	3: MoveLoc[1](y: i64)
-	4: MoveLoc[0](x: i64)
-	5: Sub
-	6: Eq
-	7: Ret
-}
-test_mix4(x: i128, y: i128): bool /* def_idx: 8 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: LdI128(2)
-	2: CopyLoc[1](y: i128)
-	3: Mul
-	4: Sub
-	5: MoveLoc[0](x: i128)
-	6: LdI128(3)
-	7: MoveLoc[1](y: i128)
-	8: Mul
-	9: Sub
-	10: Gt
-	11: Ret
-}
-test_mix5(x: i64, y: i64): bool /* def_idx: 9 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: CopyLoc[1](y: i64)
-	2: Mul
-	3: MoveLoc[1](y: i64)
-	4: MoveLoc[0](x: i64)
-	5: Mul
-	6: Eq
-	7: Ret
-}
-test_mix6(x: i128, y: i128): bool /* def_idx: 10 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: LdI128(2)
-	2: Mul
-	3: CopyLoc[1](y: i128)
-	4: Mul
-	5: MoveLoc[0](x: i128)
-	6: LdI128(3)
-	7: Mul
-	8: MoveLoc[1](y: i128)
-	9: Mul
-	10: Gt
-	11: Ret
-}
-test_mix7(x: i64, y: i64): bool /* def_idx: 11 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: CopyLoc[1](y: i64)
-	2: Div
-	3: MoveLoc[1](y: i64)
-	4: MoveLoc[0](x: i64)
-	5: Div
-	6: Eq
-	7: Ret
-}
-test_mix8(x: i128, y: i128): bool /* def_idx: 12 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: LdI128(2)
-	2: Div
-	3: CopyLoc[1](y: i128)
-	4: Mul
-	5: MoveLoc[0](x: i128)
-	6: LdI128(3)
-	7: Div
-	8: MoveLoc[1](y: i128)
-	9: Mul
-	10: Gt
-	11: Ret
-}
-test_mix9(x: i64, y: i64): bool /* def_idx: 13 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: CopyLoc[1](y: i64)
-	2: Mod
-	3: MoveLoc[1](y: i64)
-	4: MoveLoc[0](x: i64)
-	5: Mod
-	6: Eq
-	7: Ret
-}
-}
+enum E2 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i128>
+
+enum E3<T0> has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<T0>
+
+struct S1 has copy + drop
+  x: u64
+  y: i64
+  z: i128
+
+struct S2 has copy + drop
+  x: S1
+  y: i64
+  z: i128
+
+struct S3<T0> has copy + drop
+  x: T0
+  y: S1
+  z: S2
+
+// Function definition at index 0
+fun test_cmp1(l0: i64): bool
+    local l1: bool
+    local l2: bool
+    local l3: bool
+    local l4: bool
+    copy_loc l0
+    copy_loc l0
+    eq
+    br_false l0
+    copy_loc l0
+    // @5
+    copy_loc l0
+    ge
+    st_loc l1
+l8: move_loc l1
+    br_false l1
+    // @10
+    copy_loc l0
+    copy_loc l0
+    le
+    st_loc l2
+l7: move_loc l2
+    // @15
+    br_false l2
+    copy_loc l0
+    copy_loc l0
+    gt
+    st_loc l3
+    // @20
+l6: move_loc l3
+    br_false l3
+    copy_loc l0
+    copy_loc l0
+    lt
+    // @25
+    st_loc l4
+l5: move_loc l4
+    br_false l4
+    borrow_loc l0
+    borrow_loc l0
+    // @30
+    eq
+    ret
+l4: ld_false
+    ret
+l3: ld_false
+    // @35
+    st_loc l4
+    branch l5
+l2: ld_false
+    st_loc l3
+    branch l6
+    // @40
+l1: ld_false
+    st_loc l2
+    branch l7
+l0: ld_false
+    st_loc l1
+    // @45
+    branch l8
+
+// Function definition at index 1
+fun test_cmp2(l0: i128): bool
+    local l1: bool
+    local l2: bool
+    local l3: bool
+    local l4: bool
+    copy_loc l0
+    copy_loc l0
+    eq
+    br_false l0
+    copy_loc l0
+    // @5
+    copy_loc l0
+    ge
+    st_loc l1
+l8: move_loc l1
+    br_false l1
+    // @10
+    copy_loc l0
+    copy_loc l0
+    le
+    st_loc l2
+l7: move_loc l2
+    // @15
+    br_false l2
+    copy_loc l0
+    copy_loc l0
+    gt
+    st_loc l3
+    // @20
+l6: move_loc l3
+    br_false l3
+    copy_loc l0
+    copy_loc l0
+    lt
+    // @25
+    st_loc l4
+l5: move_loc l4
+    br_false l4
+    borrow_loc l0
+    borrow_loc l0
+    // @30
+    eq
+    ret
+l4: ld_false
+    ret
+l3: ld_false
+    // @35
+    st_loc l4
+    branch l5
+l2: ld_false
+    st_loc l3
+    branch l6
+    // @40
+l1: ld_false
+    st_loc l2
+    branch l7
+l0: ld_false
+    st_loc l1
+    // @45
+    branch l8
+
+// Function definition at index 2
+fun test_cmp3(l0: S1, l1: S2, l2: S3<i64>): bool
+    local l3: bool
+    local l4: bool
+    local l5: bool
+    local l6: bool
+    local l7: bool
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    // @5
+    read_ref
+    eq
+    br_false l0
+    borrow_loc l0
+    borrow_field S1, y
+    // @10
+    read_ref
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    le
+    // @15
+    st_loc l3
+l10: move_loc l3
+    br_false l1
+    borrow_loc l1
+    borrow_field S2, y
+    // @20
+    read_ref
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    ge
+    // @25
+    st_loc l4
+l9: move_loc l4
+    br_false l2
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    // @30
+    read_ref
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    gt
+    // @35
+    st_loc l5
+l8: move_loc l5
+    br_false l3
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    // @40
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    read_ref
+    lt
+    // @45
+    st_loc l6
+l7: move_loc l6
+    br_false l4
+    borrow_loc l0
+    borrow_field S1, y
+    // @50
+    borrow_loc l1
+    borrow_field S2, y
+    eq
+    st_loc l7
+l6: move_loc l7
+    // @55
+    br_false l5
+    borrow_loc l0
+    borrow_field S1, y
+    borrow_loc l1
+    borrow_field S2, y
+    // @60
+    eq
+    ret
+l5: ld_false
+    ret
+l4: ld_false
+    // @65
+    st_loc l7
+    branch l6
+l3: ld_false
+    st_loc l6
+    branch l7
+    // @70
+l2: ld_false
+    st_loc l5
+    branch l8
+l1: ld_false
+    st_loc l4
+    // @75
+    branch l9
+l0: ld_false
+    st_loc l3
+    branch l10
+
+// Function definition at index 3
+fun test_cmp4(l0: S1, l1: S2, l2: S3<i128>): bool
+    local l3: bool
+    local l4: bool
+    local l5: bool
+    local l6: bool
+    local l7: bool
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    // @5
+    read_ref
+    eq
+    br_false l0
+    borrow_loc l0
+    borrow_field S1, z
+    // @10
+    read_ref
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    le
+    // @15
+    st_loc l3
+l10: move_loc l3
+    br_false l1
+    borrow_loc l1
+    borrow_field S2, z
+    // @20
+    read_ref
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    ge
+    // @25
+    st_loc l4
+l9: move_loc l4
+    br_false l2
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    // @30
+    read_ref
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    gt
+    // @35
+    st_loc l5
+l8: move_loc l5
+    br_false l3
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    // @40
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    read_ref
+    lt
+    // @45
+    st_loc l6
+l7: move_loc l6
+    br_false l4
+    borrow_loc l0
+    borrow_field S1, z
+    // @50
+    borrow_loc l1
+    borrow_field S2, z
+    eq
+    st_loc l7
+l6: move_loc l7
+    // @55
+    br_false l5
+    borrow_loc l0
+    borrow_field S1, z
+    borrow_loc l1
+    borrow_field S2, z
+    // @60
+    eq
+    ret
+l5: ld_false
+    ret
+l4: ld_false
+    // @65
+    st_loc l7
+    branch l6
+l3: ld_false
+    st_loc l6
+    branch l7
+    // @70
+l2: ld_false
+    st_loc l5
+    branch l8
+l1: ld_false
+    st_loc l4
+    // @75
+    branch l9
+l0: ld_false
+    st_loc l3
+    branch l10
+
+// Function definition at index 4
+fun test_mix1(l0: i64, l1: i64): bool
+    copy_loc l0
+    copy_loc l1
+    add
+    move_loc l1
+    move_loc l0
+    // @5
+    add
+    eq
+    ret
+
+// Function definition at index 5
+fun test_mix10(l0: i128, l1: i128): bool
+    copy_loc l0
+    ld_i128 2
+    mod
+    copy_loc l1
+    mul
+    // @5
+    move_loc l0
+    ld_i128 3
+    mod
+    move_loc l1
+    mul
+    // @10
+    gt
+    ret
+
+// Function definition at index 6
+fun test_mix2(l0: i128, l1: i128): bool
+    copy_loc l0
+    ld_i128 2
+    copy_loc l1
+    mul
+    add
+    // @5
+    move_loc l0
+    ld_i128 3
+    move_loc l1
+    mul
+    add
+    // @10
+    le
+    ret
+
+// Function definition at index 7
+fun test_mix3(l0: i64, l1: i64): bool
+    copy_loc l0
+    copy_loc l1
+    sub
+    move_loc l1
+    move_loc l0
+    // @5
+    sub
+    eq
+    ret
+
+// Function definition at index 8
+fun test_mix4(l0: i128, l1: i128): bool
+    copy_loc l0
+    ld_i128 2
+    copy_loc l1
+    mul
+    sub
+    // @5
+    move_loc l0
+    ld_i128 3
+    move_loc l1
+    mul
+    sub
+    // @10
+    gt
+    ret
+
+// Function definition at index 9
+fun test_mix5(l0: i64, l1: i64): bool
+    copy_loc l0
+    copy_loc l1
+    mul
+    move_loc l1
+    move_loc l0
+    // @5
+    mul
+    eq
+    ret
+
+// Function definition at index 10
+fun test_mix6(l0: i128, l1: i128): bool
+    copy_loc l0
+    ld_i128 2
+    mul
+    copy_loc l1
+    mul
+    // @5
+    move_loc l0
+    ld_i128 3
+    mul
+    move_loc l1
+    mul
+    // @10
+    gt
+    ret
+
+// Function definition at index 11
+fun test_mix7(l0: i64, l1: i64): bool
+    copy_loc l0
+    copy_loc l1
+    div
+    move_loc l1
+    move_loc l0
+    // @5
+    div
+    eq
+    ret
+
+// Function definition at index 12
+fun test_mix8(l0: i128, l1: i128): bool
+    copy_loc l0
+    ld_i128 2
+    div
+    copy_loc l1
+    mul
+    // @5
+    move_loc l0
+    ld_i128 3
+    div
+    move_loc l1
+    mul
+    // @10
+    gt
+    ret
+
+// Function definition at index 13
+fun test_mix9(l0: i64, l1: i64): bool
+    copy_loc l0
+    copy_loc l1
+    mod
+    move_loc l1
+    move_loc l0
+    // @5
+    mod
+    eq
+    ret
+
+
 ============ bytecode verification succeeded ========

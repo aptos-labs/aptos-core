@@ -79,18 +79,20 @@ impl RuntimeEnvironment {
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     ) -> Self {
-        Self::new_for_move_third_party_tests(natives, true)
+        Self::new_for_move_third_party_tests(natives, true, true)
     }
 
     /// API to control the enum option feature flag depending on whether the caller is from aptos or not
     pub fn new_for_move_third_party_tests(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         enable_enum_option: bool,
+        enable_framework_for_option: bool,
     ) -> Self {
         let vm_config = VMConfig {
             // Keep the paranoid mode on as we most likely want this for tests.
             paranoid_type_checks: true,
             enable_enum_option,
+            enable_framework_for_option,
             ..VMConfig::default()
         };
         Self::new_with_config(natives, vm_config)

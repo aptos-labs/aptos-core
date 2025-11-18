@@ -1412,147 +1412,161 @@ fun test::xor_vec_wrapped_coin_new($t0: vector<0x42::test::Wrapper<0x42::test::C
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.test {
-struct Coin has drop, key {
-	_0: u256
-}
-struct Wrapper<T> has drop, key {
-	_0: T
-}
+// Bytecode version v9
+module 0x42::test
+struct Coin has drop + key
+  _0: u256
 
-bitand_vec_coin_new(x: vector<Coin>, index: u64) /* def_idx: 0 */ {
-L2:	$t1: &mut u256
-B0:
-	0: MutBorrowLoc[0](x: vector<Coin>)
-	1: MoveLoc[1](index: u64)
-	2: VecMutBorrow(2)
-	3: MutBorrowField[0](Coin._0: u256)
-	4: StLoc[2]($t1: &mut u256)
-	5: CopyLoc[2]($t1: &mut u256)
-	6: ReadRef
-	7: LdU256(42)
-	8: BitAnd
-	9: MoveLoc[2]($t1: &mut u256)
-	10: WriteRef
-	11: Ret
-}
-bitor_vec_new(x: &mut vector<u256>, index: u64) /* def_idx: 1 */ {
-L2:	$t1: &mut u256
-B0:
-	0: MoveLoc[0](x: &mut vector<u256>)
-	1: MoveLoc[1](index: u64)
-	2: VecMutBorrow(5)
-	3: StLoc[2]($t1: &mut u256)
-	4: CopyLoc[2]($t1: &mut u256)
-	5: ReadRef
-	6: LdU256(42)
-	7: BitOr
-	8: MoveLoc[2]($t1: &mut u256)
-	9: WriteRef
-	10: Ret
-}
-coin_double(self: &mut Coin) /* def_idx: 2 */ {
-L1:	$t1: &mut u256
-B0:
-	0: MoveLoc[0](self: &mut Coin)
-	1: MutBorrowField[0](Coin._0: u256)
-	2: StLoc[1]($t1: &mut u256)
-	3: CopyLoc[1]($t1: &mut u256)
-	4: ReadRef
-	5: LdU256(2)
-	6: Mul
-	7: MoveLoc[1]($t1: &mut u256)
-	8: WriteRef
-	9: Ret
-}
-coin_mod_2(self: &mut Coin) /* def_idx: 3 */ {
-L1:	$t1: &mut u256
-B0:
-	0: MoveLoc[0](self: &mut Coin)
-	1: MutBorrowField[0](Coin._0: u256)
-	2: StLoc[1]($t1: &mut u256)
-	3: CopyLoc[1]($t1: &mut u256)
-	4: ReadRef
-	5: LdU256(2)
-	6: Mod
-	7: MoveLoc[1]($t1: &mut u256)
-	8: WriteRef
-	9: Ret
-}
-half_wrapped_coin_new(x: &mut Wrapper<Coin>) /* def_idx: 4 */ {
-L1:	$t1: &mut u256
-B0:
-	0: MoveLoc[0](x: &mut Wrapper<Coin>)
-	1: MutBorrowFieldGeneric[0](Wrapper._0: T)
-	2: MutBorrowField[0](Coin._0: u256)
-	3: StLoc[1]($t1: &mut u256)
-	4: CopyLoc[1]($t1: &mut u256)
-	5: ReadRef
-	6: LdU256(2)
-	7: Div
-	8: MoveLoc[1]($t1: &mut u256)
-	9: WriteRef
-	10: Ret
-}
-shl_vec_wrapped_coin_old(x: vector<Wrapper<Coin>>, index: u64) /* def_idx: 5 */ {
-L2:	$t1: &mut u256
-B0:
-	0: MutBorrowLoc[0](x: vector<Wrapper<Coin>>)
-	1: MoveLoc[1](index: u64)
-	2: VecMutBorrow(9)
-	3: MutBorrowFieldGeneric[0](Wrapper._0: T)
-	4: MutBorrowField[0](Coin._0: u256)
-	5: StLoc[2]($t1: &mut u256)
-	6: CopyLoc[2]($t1: &mut u256)
-	7: ReadRef
-	8: LdU8(1)
-	9: Shl
-	10: MoveLoc[2]($t1: &mut u256)
-	11: WriteRef
-	12: Ret
-}
-shr_coin_at(addr: address) /* def_idx: 6 */ {
-L1:	$t1: &mut u256
-B0:
-	0: MoveLoc[0](addr: address)
-	1: MutBorrowGlobal[0](Coin)
-	2: MutBorrowField[0](Coin._0: u256)
-	3: StLoc[1]($t1: &mut u256)
-	4: CopyLoc[1]($t1: &mut u256)
-	5: ReadRef
-	6: LdU8(1)
-	7: Shr
-	8: MoveLoc[1]($t1: &mut u256)
-	9: WriteRef
-	10: Ret
-}
-sub1(x: &mut u256) /* def_idx: 7 */ {
-B0:
-	0: CopyLoc[0](x: &mut u256)
-	1: ReadRef
-	2: LdU256(1)
-	3: Sub
-	4: MoveLoc[0](x: &mut u256)
-	5: WriteRef
-	6: Ret
-}
-xor_vec_wrapped_coin_new(x: vector<Wrapper<Coin>>, index: u64) /* def_idx: 8 */ {
-L2:	$t1: &mut u256
-B0:
-	0: MutBorrowLoc[0](x: vector<Wrapper<Coin>>)
-	1: MoveLoc[1](index: u64)
-	2: VecMutBorrow(9)
-	3: MutBorrowFieldGeneric[0](Wrapper._0: T)
-	4: MutBorrowField[0](Coin._0: u256)
-	5: StLoc[2]($t1: &mut u256)
-	6: CopyLoc[2]($t1: &mut u256)
-	7: ReadRef
-	8: LdU256(1)
-	9: Xor
-	10: MoveLoc[2]($t1: &mut u256)
-	11: WriteRef
-	12: Ret
-}
-}
+struct Wrapper<T0> has drop + key
+  _0: T0
+
+// Function definition at index 0
+fun bitand_vec_coin_new(l0: vector<Coin>, l1: u64)
+    local l2: &mut u256
+    mut_borrow_loc l0
+    move_loc l1
+    vec_mut_borrow <Coin>
+    mut_borrow_field Coin, _0
+    st_loc l2
+    // @5
+    copy_loc l2
+    read_ref
+    ld_u256 42
+    bit_and
+    move_loc l2
+    // @10
+    write_ref
+    ret
+
+// Function definition at index 1
+fun bitor_vec_new(l0: &mut vector<u256>, l1: u64)
+    local l2: &mut u256
+    move_loc l0
+    move_loc l1
+    vec_mut_borrow <u256>
+    st_loc l2
+    copy_loc l2
+    // @5
+    read_ref
+    ld_u256 42
+    bit_or
+    move_loc l2
+    write_ref
+    // @10
+    ret
+
+// Function definition at index 2
+fun coin_double(l0: &mut Coin)
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @5
+    ld_u256 2
+    mul
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 3
+fun coin_mod_2(l0: &mut Coin)
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    read_ref
+    // @5
+    ld_u256 2
+    mod
+    move_loc l1
+    write_ref
+    ret
+
+// Function definition at index 4
+fun half_wrapped_coin_new(l0: &mut Wrapper<Coin>)
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_field Wrapper<Coin>, _0
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    // @5
+    read_ref
+    ld_u256 2
+    div
+    move_loc l1
+    write_ref
+    // @10
+    ret
+
+// Function definition at index 5
+fun shl_vec_wrapped_coin_old(l0: vector<Wrapper<Coin>>, l1: u64)
+    local l2: &mut u256
+    mut_borrow_loc l0
+    move_loc l1
+    vec_mut_borrow <Wrapper<Coin>>
+    mut_borrow_field Wrapper<Coin>, _0
+    mut_borrow_field Coin, _0
+    // @5
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u8 1
+    shl
+    // @10
+    move_loc l2
+    write_ref
+    ret
+
+// Function definition at index 6
+fun shr_coin_at(l0: address) acquires Coin
+    local l1: &mut u256
+    move_loc l0
+    mut_borrow_global Coin
+    mut_borrow_field Coin, _0
+    st_loc l1
+    copy_loc l1
+    // @5
+    read_ref
+    ld_u8 1
+    shr
+    move_loc l1
+    write_ref
+    // @10
+    ret
+
+// Function definition at index 7
+fun sub1(l0: &mut u256)
+    copy_loc l0
+    read_ref
+    ld_u256 1
+    sub
+    move_loc l0
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 8
+fun xor_vec_wrapped_coin_new(l0: vector<Wrapper<Coin>>, l1: u64)
+    local l2: &mut u256
+    mut_borrow_loc l0
+    move_loc l1
+    vec_mut_borrow <Wrapper<Coin>>
+    mut_borrow_field Wrapper<Coin>, _0
+    mut_borrow_field Coin, _0
+    // @5
+    st_loc l2
+    copy_loc l2
+    read_ref
+    ld_u256 1
+    xor
+    // @10
+    move_loc l2
+    write_ref
+    ret
+
+
 ============ bytecode verification succeeded ========

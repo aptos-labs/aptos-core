@@ -18,14 +18,12 @@ use aptos_types::{
     contract_event::ContractEvent,
     event::EventKey,
     on_chain_config,
-    on_chain_config::OnChainConfig,
     transaction::{Transaction, Version, WriteSetPayload},
 };
 use aptos_vm::aptos_vm::AptosVMBlockExecutor;
 use claims::{assert_lt, assert_matches, assert_ok};
 use futures::{FutureExt, StreamExt};
 use move_core_types::language_storage::TypeTag;
-use serde::{Deserialize, Serialize};
 use std::{convert::TryInto, str::FromStr, sync::Arc};
 
 #[test]
@@ -415,17 +413,6 @@ fn test_event_v2_subscription_by_tag() {
     // Listener 2 should receive 1 event.
     verify_event_notification_received(vec![&mut listener_2], version, vec![event_1]);
     verify_no_event_notifications(vec![&mut listener_2]);
-}
-
-/// Defines a new on-chain config for test purposes.
-#[derive(Clone, Debug, Deserialize, PartialEq, Eq, PartialOrd, Ord, Serialize)]
-pub struct TestOnChainConfig {
-    pub some_value: u64,
-}
-
-impl OnChainConfig for TestOnChainConfig {
-    const MODULE_IDENTIFIER: &'static str = "test_on_chain_config";
-    const TYPE_IDENTIFIER: &'static str = "TestOnChainConfig";
 }
 
 // Counts the number of event notifications received by the listener. Also ensures that

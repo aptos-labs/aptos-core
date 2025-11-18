@@ -17,7 +17,7 @@ use move_binary_format::{
 };
 use move_core_types::{
     account_address::AccountAddress, function::FUNCTION_DATA_SERIALIZATION_FORMAT_V1,
-    identifier::IdentStr, language_storage::ModuleId, metadata::Metadata, vm_status::StatusCode,
+    identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode,
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
@@ -73,29 +73,6 @@ pub trait ModuleStorage: WithRuntimeEnvironment + LayoutCache {
         module_name: &IdentStr,
     ) -> VMResult<usize> {
         self.unmetered_get_module_size(address, module_name)?
-            .ok_or_else(|| module_linker_error!(address, module_name))
-    }
-
-    /// Returns the metadata in the module, or [None] otherwise. An error is returned if there is
-    /// a storage error or the module fails deserialization.
-    ///
-    /// Note: this API is not metered!
-    fn unmetered_get_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>>;
-
-    /// Returns the metadata in the module. An error is returned if there is a storage error,
-    /// module fails deserialization, or does not exist.
-    ///
-    /// Note: this API is not metered!
-    fn unmetered_get_existing_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Vec<Metadata>> {
-        self.unmetered_get_module_metadata(address, module_name)?
             .ok_or_else(|| module_linker_error!(address, module_name))
     }
 
@@ -240,17 +217,6 @@ where
         Ok(self
             .get_module_or_build_with(&id, self)?
             .map(|(module, _)| module.extension().bytes().len()))
-    }
-
-    fn unmetered_get_module_metadata(
-        &self,
-        address: &AccountAddress,
-        module_name: &IdentStr,
-    ) -> VMResult<Option<Vec<Metadata>>> {
-        let id = ModuleId::new(*address, module_name.to_owned());
-        Ok(self
-            .get_module_or_build_with(&id, self)?
-            .map(|(module, _)| module.code().deserialized().metadata.clone()))
     }
 
     fn unmetered_get_deserialized_module(

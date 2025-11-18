@@ -23,6 +23,10 @@ use aptos_protos::{
 use futures::Stream;
 use std::{
     pin::Pin,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tokio::sync::mpsc;
@@ -31,6 +35,13 @@ use tonic::{Request, Response, Status};
 
 pub struct FullnodeDataService {
     pub service_context: ServiceContext,
+    pub abort_handle: Arc<AtomicBool>,
+}
+
+impl Drop for FullnodeDataService {
+    fn drop(&mut self) {
+        println!("**** Dropping FullnodeDataService. ****");
+    }
 }
 
 type FullnodeResponseStream =
@@ -83,6 +94,7 @@ impl FullnodeData for FullnodeDataService {
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
 
+        let abort_handle = self.abort_handle.clone();
         // This is the main thread handling pushing to the stream
         tokio::spawn(async move {
             // Initialize the coordinator that tracks starting version and processes transactions
@@ -94,6 +106,7 @@ impl FullnodeData for FullnodeDataService {
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
+                Some(abort_handle.clone()),
             );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake
             let init_status = get_status(StatusType::Init, starting_version, None, ledger_chain_id);
@@ -116,6 +129,10 @@ impl FullnodeData for FullnodeDataService {
                 let start_time = std::time::Instant::now();
                 // Processes and sends batch of transactions to client
                 let results = coordinator.process_next_batch().await;
+                if abort_handle.load(Ordering::SeqCst) {
+                    info!("FullnodeDataService is aborted.");
+                    break;
+                }
                 if results.is_empty() {
                     info!(
                         start_version = starting_version,

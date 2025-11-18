@@ -66,20 +66,16 @@ impl DB {
         column_families: Vec<ColumnFamilyName>,
         db_opts: &Options,
     ) -> DbResult<Self> {
-        let db = DB::open_cf(
-            db_opts,
-            path,
-            name,
-            column_families
-                .iter()
-                .map(|cf_name| {
-                    let mut cf_opts = Options::default();
-                    cf_opts.set_compression_type(DBCompressionType::Lz4);
-                    ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts)
-                })
-                .collect(),
-        )?;
-        Ok(db)
+        Self::open_impl(path, name, column_families, db_opts, OpenMode::ReadWrite)
+    }
+
+    pub fn open_readonly(
+        path: impl AsRef<Path>,
+        name: &str,
+        column_families: Vec<ColumnFamilyName>,
+        db_opts: &Options,
+    ) -> DbResult<Self> {
+        Self::open_impl(path, name, column_families, db_opts, OpenMode::ReadOnly)
     }
 
     pub fn open_cf(
@@ -117,6 +113,30 @@ impl DB {
             cfds,
             OpenMode::Secondary(secondary_path.as_ref()),
         )
+    }
+
+    fn open_impl(
+        path: impl AsRef<Path>,
+        name: &str,
+        column_families: Vec<ColumnFamilyName>,
+        db_opts: &Options,
+        open_mode: OpenMode,
+    ) -> DbResult<Self> {
+        let db = DB::open_cf_impl(
+            db_opts,
+            path,
+            name,
+            column_families
+                .iter()
+                .map(|cf_name| {
+                    let mut cf_opts = Options::default();
+                    cf_opts.set_compression_type(DBCompressionType::Lz4);
+                    ColumnFamilyDescriptor::new((*cf_name).to_string(), cf_opts)
+                })
+                .collect(),
+            open_mode,
+        )?;
+        Ok(db)
     }
 
     fn open_cf_impl(

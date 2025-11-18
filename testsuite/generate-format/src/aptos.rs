@@ -100,6 +100,7 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<transaction::TransactionArgument>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayload>(&samples)?;
     tracer.trace_type::<transaction::TransactionPayloadInner>(&samples)?;
+    tracer.trace_type::<transaction::encrypted_payload::EncryptedPayload>(&samples)?;
     tracer.trace_type::<transaction::TransactionExecutable>(&samples)?;
     tracer.trace_type::<transaction::TransactionExtraConfig>(&samples)?;
     tracer.trace_type::<transaction::WriteSetPayload>(&samples)?;

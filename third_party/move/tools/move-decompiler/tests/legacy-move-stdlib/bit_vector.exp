@@ -42,41 +42,46 @@ module 0x1::bit_vector {
         *_v1 = true;
     }
     public fun shift_left(self: &mut BitVector, amount: u64) {
-        let _v0;
-        let _v1 = *&self.length;
-        if (amount >= _v1) {
-            let _v2 = &mut self.bit_field;
-            _v0 = 0;
-            let _v3 = 0x1::vector::length<bool>(freeze(_v2));
-            while (_v0 < _v3) {
-                let _v4 = 0x1::vector::borrow_mut<bool>(_v2, _v0);
-                *_v4 = false;
-                _v0 = _v0 + 1;
-                continue
-            }
-        } else {
-            _v0 = amount;
-            loop {
-                let _v5 = *&self.length;
-                if (!(_v0 < _v5)) break;
-                if (is_index_set(freeze(self), _v0)) {
-                    let _v6 = _v0 - amount;
-                    set(self, _v6)
-                } else {
-                    let _v7 = _v0 - amount;
-                    unset(self, _v7)
+        let _v0 = *&self.length;
+        'l1: loop {
+            'l0: loop {
+                let _v1;
+                if (amount >= _v0) {
+                    let _v2 = &mut self.bit_field;
+                    _v1 = 0;
+                    let _v3 = 0x1::vector::length<bool>(freeze(_v2));
+                    loop {
+                        if (!(_v1 < _v3)) break 'l0;
+                        let _v4 = 0x1::vector::borrow_mut<bool>(_v2, _v1);
+                        *_v4 = false;
+                        _v1 = _v1 + 1;
+                        continue
+                    }
+                } else _v1 = amount;
+                loop {
+                    let _v5 = *&self.length;
+                    if (!(_v1 < _v5)) break;
+                    if (is_index_set(freeze(self), _v1)) {
+                        let _v6 = _v1 - amount;
+                        set(self, _v6)
+                    } else {
+                        let _v7 = _v1 - amount;
+                        unset(self, _v7)
+                    };
+                    _v1 = _v1 + 1;
+                    continue
                 };
-                _v0 = _v0 + 1;
-                continue
+                _v1 = *&self.length - amount;
+                loop {
+                    let _v8 = *&self.length;
+                    if (!(_v1 < _v8)) break 'l1;
+                    unset(self, _v1);
+                    _v1 = _v1 + 1;
+                    continue
+                };
+                break
             };
-            _v0 = *&self.length - amount;
-            loop {
-                let _v8 = *&self.length;
-                if (!(_v0 < _v8)) break;
-                unset(self, _v0);
-                _v0 = _v0 + 1;
-                continue
-            }
+            return ()
         };
     }
     public fun unset(self: &mut BitVector, bit_index: u64) {

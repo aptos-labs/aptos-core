@@ -3,19 +3,18 @@
 
 use crate::{
     algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},
-    pvss,
     pvss::{
+        self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das,
-        das::fiat_shamir,
-        encryption_dlog, schnorr, traits,
-        traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
+        das, encryption_dlog, schnorr,
+        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
             insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_g2_point,
+            random_scalars,
         },
     },
 };
@@ -23,11 +22,13 @@ use anyhow::bail;
 use aptos_crypto::{
     bls12381,
     blstrs::{multi_pairing, random_scalar},
+    traits::SecretSharingConfig as _,
     CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Neg, Sub};
 
@@ -173,10 +174,9 @@ impl traits::Transcript for Transcript {
             );
         }
 
-        // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        // TODO: benchmark this
-        let (f, extra) =
-            fiat_shamir::derive_challenge_scalars(self, sc, pp, spks, eks, auxs, &Self::dst(), 2);
+        // Deriving challenges by flipping coins: less complex to implement & less likely to get wrong. Creates bad RNG risks but we deem that acceptable.
+        let mut rng = thread_rng();
+        let extra = random_scalars(2, &mut rng);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();
@@ -190,7 +190,13 @@ impl traits::Transcript for Transcript {
         )?;
 
         // Verify the committed polynomial is of the right degree
-        let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
+        let ldt = LowDegreeTest::random(
+            &mut rng,
+            sc.t,
+            sc.n + 1,
+            true,
+            sc.get_batch_evaluation_domain(),
+        );
         ldt.low_degree_test_on_g2(&self.V)?;
 
         //
@@ -278,6 +284,7 @@ impl traits::Transcript for Transcript {
         _sc: &Self::SecretSharingConfig,
         player: &Player,
         dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
         let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
@@ -291,7 +298,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {

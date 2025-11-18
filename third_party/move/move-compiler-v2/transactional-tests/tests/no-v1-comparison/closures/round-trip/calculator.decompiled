@@ -33,32 +33,39 @@ module 0x66::calculator {
         let _v2 = move_from<State>(_v1);
         let _v3 = &_v2;
         let _v4 = &p1;
-        if ((_v3 is Empty) && (_v4 is Number)) {
-            let State::Empty{} = _v2;
-            let Input::Number{_0: _v5} = p1;
-            _v0 = State::Value{_0: _v5};
-            move_to<State>(p0, _v0)
-        } else if ((_v3 is Value) && (_v4 is Number)) {
-            let State::Value{_0: _v6} = _v2;
-            let Input::Number{_0: _v7} = p1;
-            let _v8 = State::Value{_0: _v7};
-            move_to<State>(p0, _v8)
-        } else if ((_v3 is Value) && (_v4 is Add)) {
-            let State::Value{_0: _v9} = _v2;
-            let Input::Add{} = p1;
-            let _v10 = State::Continuation{_0: |arg0| storable_add(_v9, arg0)};
-            move_to<State>(p0, _v10)
-        } else if ((_v3 is Value) && (_v4 is Sub)) {
+        if (!((_v3 is Empty) && (_v4 is Number))) {
+            if (!((_v3 is Value) && (_v4 is Number))) {
+                if (!((_v3 is Value) && (_v4 is Add))) {
+                    if (!((_v3 is Value) && (_v4 is Sub))) {
+                        assert!((_v3 is Continuation) && (_v4 is Number), 1);
+                        let State::Continuation{_0: _v5} = _v2;
+                        let Input::Number{_0: _v6} = p1;
+                        _v0 = State::Value{_0: _v5(_v6)};
+                        move_to<State>(p0, _v0);
+                        return ()
+                    };
+                    let State::Value{_0: _v7} = _v2;
+                    let Input::Sub{} = p1;
+                    let _v8 = State::Continuation{_0: |arg0| storable_sub(_v7, arg0)};
+                    move_to<State>(p0, _v8);
+                    return ()
+                };
+                let State::Value{_0: _v9} = _v2;
+                let Input::Add{} = p1;
+                let _v10 = State::Continuation{_0: |arg0| storable_add(_v9, arg0)};
+                move_to<State>(p0, _v10);
+                return ()
+            };
             let State::Value{_0: _v11} = _v2;
-            let Input::Sub{} = p1;
-            let _v12 = State::Continuation{_0: |arg0| storable_sub(_v11, arg0)};
-            move_to<State>(p0, _v12)
-        } else if ((_v3 is Continuation) && (_v4 is Number)) {
-            let State::Continuation{_0: _v13} = _v2;
-            let Input::Number{_0: _v14} = p1;
-            _v0 = State::Value{_0: _v13(_v14)};
-            move_to<State>(p0, _v0)
-        } else abort 1;
+            let Input::Number{_0: _v12} = p1;
+            let _v13 = State::Value{_0: _v12};
+            move_to<State>(p0, _v13);
+            return ()
+        };
+        let State::Empty{} = _v2;
+        let Input::Number{_0: _v14} = p1;
+        _v0 = State::Value{_0: _v14};
+        move_to<State>(p0, _v0);
     }
     fun init_module(p0: &signer) {
         let _v0 = State::Empty{};

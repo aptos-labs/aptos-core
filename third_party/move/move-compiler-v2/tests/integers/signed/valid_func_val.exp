@@ -2167,254 +2167,263 @@ fun valid_fv::__lambda__1__test2($t0: i128): i128 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.valid_fv {
-enum E1 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i64>
- }
-}
-enum E2 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i128>
- }
-}
-enum E3<T> has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<T>
- }
-}
-struct S1 has copy, drop {
-	x: u64,
-	y: i64,
-	z: i128
-}
-struct S2 has copy, drop {
-	x: S1,
-	y: i64,
-	z: i128
-}
-struct S3<T> has copy, drop {
-	x: T,
-	y: S1,
-	z: S2
-}
+// Bytecode version v9
+module 0x42::valid_fv
+enum E1 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i64>
 
-test1(fv1: |i64|i64 has copy + drop, x: i64): i64 /* def_idx: 0 */ {
-B0:
-	0: PackClosure#0 __lambda__1__test1(i64): i64
-	1: Pop
-	2: MoveLoc[1](x: i64)
-	3: MoveLoc[0](fv1: |i64|i64 has copy + drop)
-	4: CallClosure(|i64|i64 has copy + drop)
-	5: Ret
-}
-test10(fv: |E2|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 1 */ {
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: LdI64(-1)
-	5: LdI128(-2)
-	6: Pack[4](S2)
-	7: PackVariant[0](E2/V2)
-	8: MoveLoc[0](fv: |E2|i64 has copy + drop)
-	9: CallClosure(|E2|i64 has copy + drop)
-	10: Ret
-}
-test11(fv: |E3<i64>|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 2 */ {
-L3:	s1: S1
-L4:	s2: S2
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[3](s1: S1)
-	5: CopyLoc[3](s1: S1)
-	6: LdI64(-1)
-	7: LdI128(-2)
-	8: Pack[4](S2)
-	9: StLoc[4](s2: S2)
-	10: LdI64(-1)
-	11: MoveLoc[3](s1: S1)
-	12: MoveLoc[4](s2: S2)
-	13: PackGeneric[0](S3<i64>)
-	14: PackVariantGeneric[0](E3/V3<i64>)
-	15: MoveLoc[0](fv: |E3<i64>|i64 has copy + drop)
-	16: CallClosure(|E3<i64>|i64 has copy + drop)
-	17: Ret
-}
-test12(fv: |E3<i128>|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 3 */ {
-L3:	s1: S1
-L4:	s2: S2
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: StLoc[3](s1: S1)
-	5: CopyLoc[3](s1: S1)
-	6: LdI64(-1)
-	7: LdI128(-2)
-	8: Pack[4](S2)
-	9: StLoc[4](s2: S2)
-	10: LdI128(-1)
-	11: MoveLoc[3](s1: S1)
-	12: MoveLoc[4](s2: S2)
-	13: PackGeneric[1](S3<i128>)
-	14: PackVariantGeneric[1](E3/V3<i128>)
-	15: MoveLoc[0](fv: |E3<i128>|i64 has copy + drop)
-	16: CallClosure(|E3<i128>|i64 has copy + drop)
-	17: Ret
-}
-test2(fv1: |i128|i128 has copy + drop, x: i128): i128 /* def_idx: 4 */ {
-B0:
-	0: PackClosure#0 __lambda__1__test2(i128): i128
-	1: Pop
-	2: MoveLoc[1](x: i128)
-	3: MoveLoc[0](fv1: |i128|i128 has copy + drop)
-	4: CallClosure(|i128|i128 has copy + drop)
-	5: Ret
-}
-test3(fv1: ||i64|i64|i64 has copy + drop, x: i64): i64 /* def_idx: 5 */ {
-B0:
-	0: PackClosure#0 test_64(i64): i64
-	1: MoveLoc[0](fv1: ||i64|i64|i64 has copy + drop)
-	2: CallClosure(||i64|i64|i64 has copy + drop)
-	3: Ret
-}
-test4(fv1: ||i128|i128|i128 has copy + drop, x: i128): i128 /* def_idx: 6 */ {
-B0:
-	0: PackClosure#0 test_128(i128): i128
-	1: MoveLoc[0](fv1: ||i128|i128|i128 has copy + drop)
-	2: CallClosure(||i128|i128|i128 has copy + drop)
-	3: Ret
-}
-test5(fv: |S1|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 7 */ {
-B0:
-	0: LdU64(1)
-	1: MoveLoc[1](a: i64)
-	2: MoveLoc[2](b: i128)
-	3: Pack[3](S1)
-	4: MoveLoc[0](fv: |S1|i64 has copy + drop)
-	5: CallClosure(|S1|i64 has copy + drop)
-	6: Ret
-}
-test6(fv: |S2|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 8 */ {
-B0:
-	0: LdU64(1)
-	1: CopyLoc[1](a: i64)
-	2: CopyLoc[2](b: i128)
-	3: Pack[3](S1)
-	4: MoveLoc[1](a: i64)
-	5: MoveLoc[2](b: i128)
-	6: Pack[4](S2)
-	7: MoveLoc[0](fv: |S2|i64 has copy + drop)
-	8: CallClosure(|S2|i64 has copy + drop)
-	9: Ret
-}
-test7(fv: |S3<i64>|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 9 */ {
-L3:	s1: S1
-L4:	s2: S2
-B0:
-	0: LdU64(1)
-	1: CopyLoc[1](a: i64)
-	2: CopyLoc[2](b: i128)
-	3: Pack[3](S1)
-	4: StLoc[3](s1: S1)
-	5: CopyLoc[3](s1: S1)
-	6: CopyLoc[1](a: i64)
-	7: MoveLoc[2](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[4](s2: S2)
-	10: MoveLoc[1](a: i64)
-	11: MoveLoc[3](s1: S1)
-	12: MoveLoc[4](s2: S2)
-	13: PackGeneric[0](S3<i64>)
-	14: MoveLoc[0](fv: |S3<i64>|i64 has copy + drop)
-	15: CallClosure(|S3<i64>|i64 has copy + drop)
-	16: Ret
-}
-test8(fv: |S3<i128>|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 10 */ {
-L3:	s1: S1
-L4:	s2: S2
-B0:
-	0: LdU64(1)
-	1: CopyLoc[1](a: i64)
-	2: CopyLoc[2](b: i128)
-	3: Pack[3](S1)
-	4: StLoc[3](s1: S1)
-	5: CopyLoc[3](s1: S1)
-	6: MoveLoc[1](a: i64)
-	7: CopyLoc[2](b: i128)
-	8: Pack[4](S2)
-	9: StLoc[4](s2: S2)
-	10: MoveLoc[2](b: i128)
-	11: MoveLoc[3](s1: S1)
-	12: MoveLoc[4](s2: S2)
-	13: PackGeneric[1](S3<i128>)
-	14: MoveLoc[0](fv: |S3<i128>|i64 has copy + drop)
-	15: CallClosure(|S3<i128>|i64 has copy + drop)
-	16: Ret
-}
-test9(fv: |E1|i64 has copy + drop, a: i64, b: i128): i64 /* def_idx: 11 */ {
-B0:
-	0: LdU64(1)
-	1: LdI64(-1)
-	2: LdI128(-2)
-	3: Pack[3](S1)
-	4: PackVariant[2](E1/V1)
-	5: MoveLoc[0](fv: |E1|i64 has copy + drop)
-	6: CallClosure(|E1|i64 has copy + drop)
-	7: Ret
-}
-test_128(x: i128): i128 /* def_idx: 12 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: MoveLoc[0](x: i128)
-	2: Add
-	3: Ret
-}
-test_64(x: i64): i64 /* def_idx: 13 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: MoveLoc[0](x: i64)
-	2: Add
-	3: Ret
-}
-__lambda__1__test1(x: i64): i64 /* def_idx: 14 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: MoveLoc[0](x: i64)
-	2: Mul
-	3: Ret
-}
-__lambda__1__test2(x: i128): i128 /* def_idx: 15 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: MoveLoc[0](x: i128)
-	2: Mul
-	3: Ret
-}
-}
+enum E2 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i128>
+
+enum E3<T0> has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<T0>
+
+struct S1 has copy + drop
+  x: u64
+  y: i64
+  z: i128
+
+struct S2 has copy + drop
+  x: S1
+  y: i64
+  z: i128
+
+struct S3<T0> has copy + drop
+  x: T0
+  y: S1
+  z: S2
+
+// Function definition at index 0
+fun test1(l0: |i64|i64 has copy + drop, l1: i64): i64
+    pack_closure __lambda__1__test1, 0
+    pop
+    move_loc l1
+    move_loc l0
+    call_closure <|i64|i64 has copy + drop>
+    // @5
+    ret
+
+// Function definition at index 1
+fun test10(l0: |E2|i64 has copy + drop, l1: i64, l2: i128): i64
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    ld_i64 -1
+    // @5
+    ld_i128 -2
+    pack S2
+    pack_variant E2, V2
+    move_loc l0
+    call_closure <|E2|i64 has copy + drop>
+    // @10
+    ret
+
+// Function definition at index 2
+fun test11(l0: |E3<i64>|i64 has copy + drop, l1: i64, l2: i128): i64
+    local l3: S1
+    local l4: S2
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l3
+    // @5
+    copy_loc l3
+    ld_i64 -1
+    ld_i128 -2
+    pack S2
+    st_loc l4
+    // @10
+    ld_i64 -1
+    move_loc l3
+    move_loc l4
+    pack S3<i64>
+    pack_variant E3<i64>, V3
+    // @15
+    move_loc l0
+    call_closure <|E3<i64>|i64 has copy + drop>
+    ret
+
+// Function definition at index 3
+fun test12(l0: |E3<i128>|i64 has copy + drop, l1: i64, l2: i128): i64
+    local l3: S1
+    local l4: S2
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    st_loc l3
+    // @5
+    copy_loc l3
+    ld_i64 -1
+    ld_i128 -2
+    pack S2
+    st_loc l4
+    // @10
+    ld_i128 -1
+    move_loc l3
+    move_loc l4
+    pack S3<i128>
+    pack_variant E3<i128>, V3
+    // @15
+    move_loc l0
+    call_closure <|E3<i128>|i64 has copy + drop>
+    ret
+
+// Function definition at index 4
+fun test2(l0: |i128|i128 has copy + drop, l1: i128): i128
+    pack_closure __lambda__1__test2, 0
+    pop
+    move_loc l1
+    move_loc l0
+    call_closure <|i128|i128 has copy + drop>
+    // @5
+    ret
+
+// Function definition at index 5
+fun test3(l0: |(|i64|i64)|i64 has copy + drop, l1: i64): i64
+    pack_closure test_64, 0
+    move_loc l0
+    call_closure <|(|i64|i64)|i64 has copy + drop>
+    ret
+
+// Function definition at index 6
+fun test4(l0: |(|i128|i128)|i128 has copy + drop, l1: i128): i128
+    pack_closure test_128, 0
+    move_loc l0
+    call_closure <|(|i128|i128)|i128 has copy + drop>
+    ret
+
+// Function definition at index 7
+fun test5(l0: |S1|i64 has copy + drop, l1: i64, l2: i128): i64
+    ld_u64 1
+    move_loc l1
+    move_loc l2
+    pack S1
+    move_loc l0
+    // @5
+    call_closure <|S1|i64 has copy + drop>
+    ret
+
+// Function definition at index 8
+fun test6(l0: |S2|i64 has copy + drop, l1: i64, l2: i128): i64
+    ld_u64 1
+    copy_loc l1
+    copy_loc l2
+    pack S1
+    move_loc l1
+    // @5
+    move_loc l2
+    pack S2
+    move_loc l0
+    call_closure <|S2|i64 has copy + drop>
+    ret
+
+// Function definition at index 9
+fun test7(l0: |S3<i64>|i64 has copy + drop, l1: i64, l2: i128): i64
+    local l3: S1
+    local l4: S2
+    ld_u64 1
+    copy_loc l1
+    copy_loc l2
+    pack S1
+    st_loc l3
+    // @5
+    copy_loc l3
+    copy_loc l1
+    move_loc l2
+    pack S2
+    st_loc l4
+    // @10
+    move_loc l1
+    move_loc l3
+    move_loc l4
+    pack S3<i64>
+    move_loc l0
+    // @15
+    call_closure <|S3<i64>|i64 has copy + drop>
+    ret
+
+// Function definition at index 10
+fun test8(l0: |S3<i128>|i64 has copy + drop, l1: i64, l2: i128): i64
+    local l3: S1
+    local l4: S2
+    ld_u64 1
+    copy_loc l1
+    copy_loc l2
+    pack S1
+    st_loc l3
+    // @5
+    copy_loc l3
+    move_loc l1
+    copy_loc l2
+    pack S2
+    st_loc l4
+    // @10
+    move_loc l2
+    move_loc l3
+    move_loc l4
+    pack S3<i128>
+    move_loc l0
+    // @15
+    call_closure <|S3<i128>|i64 has copy + drop>
+    ret
+
+// Function definition at index 11
+fun test9(l0: |E1|i64 has copy + drop, l1: i64, l2: i128): i64
+    ld_u64 1
+    ld_i64 -1
+    ld_i128 -2
+    pack S1
+    pack_variant E1, V1
+    // @5
+    move_loc l0
+    call_closure <|E1|i64 has copy + drop>
+    ret
+
+// Function definition at index 12
+fun test_128(l0: i128): i128
+    copy_loc l0
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 13
+fun test_64(l0: i64): i64
+    copy_loc l0
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 14
+fun __lambda__1__test1(l0: i64): i64
+    copy_loc l0
+    move_loc l0
+    mul
+    ret
+
+// Function definition at index 15
+fun __lambda__1__test2(l0: i128): i128
+    copy_loc l0
+    move_loc l0
+    mul
+    ret
+
+
 ============ bytecode verification succeeded ========

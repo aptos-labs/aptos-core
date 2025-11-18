@@ -246,6 +246,37 @@ Ed25519PublicKey:
   NEWTYPESTRUCT: BYTES
 Ed25519Signature:
   NEWTYPESTRUCT: BYTES
+EncryptedPayload:
+  ENUM:
+    0:
+      Encrypted:
+        STRUCT:
+          - ciphertext: BYTES
+          - extra_config:
+              TYPENAME: TransactionExtraConfig
+          - payload_hash:
+              TYPENAME: HashValue
+    1:
+      FailedDecryption:
+        STRUCT:
+          - ciphertext: BYTES
+          - extra_config:
+              TYPENAME: TransactionExtraConfig
+          - payload_hash:
+              TYPENAME: HashValue
+          - eval_proof: BYTES
+    2:
+      Decrypted:
+        STRUCT:
+          - ciphertext: BYTES
+          - extra_config:
+              TYPENAME: TransactionExtraConfig
+          - payload_hash:
+              TYPENAME: HashValue
+          - eval_proof: BYTES
+          - executable:
+              TYPENAME: TransactionExecutable
+          - decryption_nonce: U64
 EntryFunction:
   STRUCT:
     - module:
@@ -740,6 +771,10 @@ TransactionPayload:
       Payload:
         NEWTYPE:
           TYPENAME: TransactionPayloadInner
+    5:
+      EncryptedPayload:
+        NEWTYPE:
+          TYPENAME: EncryptedPayload
 TransactionPayloadInner:
   ENUM:
     0:

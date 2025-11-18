@@ -529,6 +529,11 @@ module aptos_framework::fungible_asset {
         BurnRef { metadata }
     }
 
+    /// Creates a burn copy ref that can be used to burn fungible assets from the given burn ref.
+    public(friend) fun generate_burn_copy_ref(burn_ref: &BurnRef): BurnRef {
+        BurnRef { metadata: burn_ref.metadata }
+    }
+
     /// Creates a transfer ref that can be used to freeze/unfreeze/transfer fungible assets from the given fungible
     /// object's constructor ref.
     /// This can only be called at object creation time as constructor_ref is only available then.

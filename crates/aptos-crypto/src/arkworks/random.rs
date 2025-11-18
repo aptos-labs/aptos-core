@@ -7,8 +7,35 @@
 //! `rand` crate, which may differ from the version used by `arkworks` and thus
 //! would not be accepted directly.
 
+use ark_ec::CurveGroup;
 use ark_ff::PrimeField;
 use rand::Rng;
+
+/// A version of `ark_ff`'s UniformRand but for our older RNGs
+pub trait UniformRand {
+    /// Securely generate a random instance of self
+    fn rand<R: Rng>(rng: &mut R) -> Self;
+}
+
+/// NOTE: This function is "unsafe" in the sense that the caller learns the discrete log of the
+/// random point w.r.t. the generator. In many applications, this is not acceptable.
+pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    let r: C::ScalarField = sample_field_element(rng);
+
+    C::generator().mul(r)
+}
+
+/// Samples `n` uniformly random elements from the group, but is unsafe in the sense
+/// that the caller learns the discrete log of the random point.
+pub fn unsafe_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    (0..n).map(|_| unsafe_random_point::<C, R>(rng)).collect()
+}
 
 /// Samples `n` uniformly random elements from the prime field `F`.
 pub fn sample_field_elements<F: PrimeField, R: Rng>(n: usize, rng: &mut R) -> Vec<F> {

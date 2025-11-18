@@ -2,10 +2,10 @@
 // Parts of the project are originally copyright © Meta Platforms, Inc.
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{add_accounts_impl, PipelineConfig};
+use crate::{add_accounts_impl, PipelineConfig, StorageTestConfig};
 use aptos_config::{
     config::{
-        PrunerConfig, RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
+        RocksdbConfigs, StorageDirPaths, BUFFERED_STATE_TARGET_ITEMS,
         DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD, NO_OP_STORAGE_PRUNER_CONFIG,
     },
     utils::get_genesis_txn,
@@ -30,9 +30,8 @@ pub fn create_db_with_accounts<V>(
     init_account_balance: u64,
     block_size: usize,
     db_dir: impl AsRef<Path>,
-    storage_pruner_config: PrunerConfig,
+    storage_test_config: StorageTestConfig,
     verify_sequence_numbers: bool,
-    enable_storage_sharding: bool,
     pipeline_config: PipelineConfig,
     init_features: Features,
     is_keyless: bool,
@@ -51,7 +50,11 @@ pub fn create_db_with_accounts<V>(
     // create if not exists
     fs::create_dir_all(db_dir.as_ref()).unwrap();
 
-    bootstrap_with_genesis(&db_dir, enable_storage_sharding, init_features.clone());
+    bootstrap_with_genesis(
+        &db_dir,
+        storage_test_config.enable_storage_sharding,
+        init_features.clone(),
+    );
 
     println!(
         "Finished empty DB creation, DB dir: {}. Creating accounts now...",
@@ -64,9 +67,8 @@ pub fn create_db_with_accounts<V>(
         block_size,
         &db_dir,
         &db_dir,
-        storage_pruner_config,
+        storage_test_config,
         verify_sequence_numbers,
-        enable_storage_sharding,
         pipeline_config,
         init_features,
         is_keyless,

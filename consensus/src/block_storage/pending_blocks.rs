@@ -5,9 +5,10 @@ use crate::{
     block_storage::block_store::sync_manager::TargetBlockRetrieval,
     counters::BLOCK_RETRIEVAL_LOCAL_FULFILL_COUNT,
 };
-use aptos_consensus_types::{block::Block, common::Round};
+use aptos_consensus_types::{block::Block, common::Round, opt_block_data::OptBlockData};
 use aptos_crypto::HashValue;
-use aptos_logger::info;
+use aptos_logger::{info, warn};
+use aptos_short_hex_str::AsShortHexStr;
 use futures_channel::oneshot;
 use std::collections::{BTreeMap, HashMap};
 
@@ -16,6 +17,7 @@ use std::collections::{BTreeMap, HashMap};
 pub struct PendingBlocks {
     blocks_by_hash: HashMap<HashValue, Block>,
     blocks_by_round: BTreeMap<Round, Block>,
+    opt_blocks_by_round: BTreeMap<Round, OptBlockData>,
     pending_request: Option<(TargetBlockRetrieval, oneshot::Sender<Block>)>,
 }
 
@@ -24,6 +26,7 @@ impl PendingBlocks {
         Self {
             blocks_by_hash: HashMap::new(),
             blocks_by_round: BTreeMap::new(),
+            opt_blocks_by_round: BTreeMap::new(),
             pending_request: None,
         }
     }
@@ -50,6 +53,34 @@ impl PendingBlocks {
             } else {
                 self.pending_request = Some((target_block_retrieval_payload, tx));
             }
+        }
+    }
+
+    pub fn insert_opt_block(&mut self, opt_block_data: OptBlockData) {
+        info!(
+            "Pending opt block inserted: ({}, {})",
+            opt_block_data.author().short_str(),
+            opt_block_data.round()
+        );
+        self.opt_blocks_by_round
+            .insert(opt_block_data.round(), opt_block_data.clone());
+
+        let Some(parent_opt_block) = self
+            .opt_blocks_by_round
+            .remove(&opt_block_data.parent().round())
+        else {
+            return;
+        };
+
+        if parent_opt_block.parent_id() == opt_block_data.grandparent_qc().certified_block().id() {
+            let block =
+                Block::new_from_opt(parent_opt_block, opt_block_data.grandparent_qc().clone());
+            self.insert_block(block);
+        } else {
+            warn!(
+                "Pending Opt Block entry in cache doesn't match QC: {} != {}",
+                parent_opt_block, opt_block_data
+            );
         }
     }
 
@@ -94,6 +125,7 @@ impl PendingBlocks {
             to_remove.push(*r);
         }
         for r in to_remove {
+            self.opt_blocks_by_round.remove(&r);
             if let Some(block) = self.blocks_by_round.remove(&r) {
                 self.blocks_by_hash.remove(&block.id());
             }

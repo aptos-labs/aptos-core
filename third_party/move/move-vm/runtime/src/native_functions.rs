@@ -30,7 +30,6 @@ use move_core_types::{
     gas_algebra::{InternalGas, NumBytes},
     identifier::{IdentStr, Identifier},
     language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };

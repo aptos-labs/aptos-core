@@ -34,13 +34,23 @@ pub const OPTION_NONE_TAG: u16 = 0;
 pub const OPTION_SOME_TAG: u16 = 1;
 // field "vec" of the old representation of option
 pub const LEGACY_OPTION_VEC: &str = "vec";
+pub const OPTION_MODULE_NAME_STR: &str = "option";
+pub const OPTION_STRUCT_NAME_STR: &str = "Option";
 
-pub static OPTION_MODULE_ID: Lazy<ModuleId> =
-    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("option"))));
+pub static OPTION_MODULE_ID: Lazy<ModuleId> = Lazy::new(|| {
+    ModuleId::new(
+        AccountAddress::ONE,
+        Identifier::from(ident_str!(OPTION_MODULE_NAME_STR)),
+    )
+});
 pub static OPTION_STRUCT_NAME: Lazy<Identifier> =
-    Lazy::new(|| Identifier::from(ident_str!("Option")));
+    Lazy::new(|| Identifier::from(ident_str!(OPTION_STRUCT_NAME_STR)));
 pub static MEM_MODULE_ID: Lazy<ModuleId> =
     Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("mem"))));
+pub static TABLE_MODULE_ID: Lazy<ModuleId> =
+    Lazy::new(|| ModuleId::new(AccountAddress::ONE, Identifier::from(ident_str!("table"))));
+pub static TABLE_STRUCT_NAME: Lazy<Identifier> =
+    Lazy::new(|| Identifier::from(ident_str!("Table")));
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Hash, Eq, Clone, PartialOrd, Ord)]
 #[cfg_attr(
@@ -239,8 +249,8 @@ impl StructTag {
     /// standard library at address `move_std_addr`.
     pub fn is_std_option(&self, move_std_addr: &AccountAddress) -> bool {
         self.address == *move_std_addr
-            && self.module.as_str().eq("option")
-            && self.name.as_str().eq("Option")
+            && self.module.as_str().eq(OPTION_MODULE_NAME_STR)
+            && self.name.as_str().eq(OPTION_STRUCT_NAME_STR)
     }
 
     pub fn module_id(&self) -> ModuleId {

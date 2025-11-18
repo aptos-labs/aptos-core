@@ -13,9 +13,15 @@ use aptos_indexer_grpc_fullnode::stream_coordinator::{
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
-use aptos_types::write_set::WriteSet;
 use itertools::Itertools;
-use std::{cmp::Ordering, sync::Arc, time::Duration};
+use std::{
+    cmp::Ordering as CmpOrdering,
+    sync::{
+        atomic::{AtomicBool, AtomicU64, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 
 type EndVersion = u64;
 const LEDGER_VERSION_RETRY_TIME_MILLIS: u64 = 10;
@@ -25,7 +31,6 @@ const SERVICE_TYPE: &str = "table_info_service";
 /// TableInfoService is responsible for parsing table info from transactions and writing them to rocksdb.
 /// Not thread safe.
 pub struct TableInfoService {
-    pub current_version: u64,
     pub parser_task_count: u16,
     pub parser_batch_size: u16,
     pub context: Arc<ApiContext>,
@@ -33,6 +38,15 @@ pub struct TableInfoService {
 
     // Backup and restore service. If not enabled, this will be None.
     pub backup_restore_operator: Option<Arc<GcsBackupRestoreOperator>>,
+
+    current_version: AtomicU64,
+    aborted: AtomicBool,
+}
+
+impl Drop for TableInfoService {
+    fn drop(&mut self) {
+        println!("**** Dropping TableInfoService ****");
+    }
 }
 
 impl TableInfoService {
@@ -45,13 +59,18 @@ impl TableInfoService {
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Self {
         Self {
-            current_version: request_start_version,
+            current_version: AtomicU64::new(request_start_version),
             parser_task_count,
             parser_batch_size,
             context,
             backup_restore_operator,
             indexer_async_v2,
+            aborted: AtomicBool::new(false),
         }
+    }
+
+    pub fn abort(&self) {
+        self.aborted.store(true, Ordering::SeqCst);
     }
 
     /// Start table info service and backup service is optional.
@@ -59,7 +78,7 @@ impl TableInfoService {
     /// 1. Table info parsing loop: fetching raw txns from db, processing, and writing to rocksdb.
     ///        If backup service is enabled, it will also snapshot the rocksdb at the end of each epoch.
     /// 2. Optional backup service loop: it monitors if new snapshots are available to backup and uploads them to GCS.
-    pub async fn run(&mut self) {
+    pub async fn run(&self) {
         // TODO: fix the restore logic.
         let backup_is_enabled = match self.backup_restore_operator.clone() {
             Some(backup_restore_operator) => {
@@ -87,6 +106,10 @@ impl TableInfoService {
         loop {
             let start_time = std::time::Instant::now();
             let ledger_version = self.get_highest_known_version().await.unwrap_or_default();
+            if self.aborted.load(Ordering::SeqCst) {
+                info!("table info service aborted");
+                break;
+            }
             let batches = self.get_batches(ledger_version).await;
             let transactions = self.fetch_batches(batches, ledger_version).await.unwrap();
             let num_transactions = transactions.len();
@@ -149,7 +172,7 @@ impl TableInfoService {
             .await;
 
             let versions_processed = num_transactions as i64;
-            let start_version = self.current_version;
+            let start_version = self.current_version.load(Ordering::SeqCst);
             log_grpc_step(
                 SERVICE_TYPE,
                 IndexerGrpcStep::TableInfoProcessed,
@@ -163,9 +186,14 @@ impl TableInfoService {
                 None,
             );
 
-            self.current_version = last_version + 1;
+            self.current_version
+                .store(last_version + 1, Ordering::SeqCst);
             current_epoch = Some(epoch);
         }
+    }
+
+    pub fn next_version(&self) -> u64 {
+        self.current_version.load(Ordering::SeqCst)
     }
 
     async fn fetch_batches(
@@ -226,18 +254,22 @@ impl TableInfoService {
             .map(|txn| txn.version)
             .unwrap_or_default();
 
-        // We copy the transactions here in case we need to retry the parsing.
-        let batches: Vec<Vec<TransactionOnChainData>> = transactions
+        let transactions = Arc::new(transactions);
+        for (chunk_idx, batch_size) in transactions
             .chunks(self.parser_batch_size as usize)
-            .map(|chunk| chunk.to_vec())
-            .collect();
+            .enumerate()
+            .map(|(idx, chunk)| (idx, chunk.len()))
+        {
+            let start = chunk_idx * self.parser_batch_size as usize;
+            let end = start + batch_size;
 
-        for batch in batches {
-            let task = tokio::spawn(Self::process_transactions(
-                context.clone(),
-                indexer_async_v2.clone(),
-                batch,
-            ));
+            let transactions = transactions.clone();
+            let context = context.clone();
+            let indexer_async_v2 = indexer_async_v2.clone();
+            let task = tokio::spawn(async move {
+                Self::process_transactions(context, indexer_async_v2, &transactions[start..end])
+                    .await
+            });
             tasks.push(task);
         }
 
@@ -256,7 +288,7 @@ impl TableInfoService {
                     Self::process_transactions(
                         context.clone(),
                         indexer_async_v2.clone(),
-                        transactions,
+                        &transactions,
                     )
                     .await;
                 }
@@ -287,7 +319,7 @@ impl TableInfoService {
     async fn process_transactions(
         context: Arc<ApiContext>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
-        raw_txns: Vec<TransactionOnChainData>,
+        raw_txns: &[TransactionOnChainData],
     ) -> EndVersion {
         let start_time = std::time::Instant::now();
         let start_version = raw_txns[0].version;
@@ -297,11 +329,7 @@ impl TableInfoService {
         loop {
             // NOTE: The retry is unlikely to be helpful. Put a loop here just to avoid panic and
             // allow the rest of FN functionality continue to work.
-            match Self::parse_table_info(
-                context.clone(),
-                raw_txns.clone(),
-                indexer_async_v2.clone(),
-            ) {
+            match Self::parse_table_info(context.clone(), raw_txns, indexer_async_v2.clone()) {
                 Ok(_) => break,
                 Err(e) => {
                     error!(error = ?e, "Error during parse_table_info.");
@@ -329,16 +357,16 @@ impl TableInfoService {
     /// Retrieves transaction batches based on the provided ledger version.
     /// The function prepares to fetch transactions by determining the start version,
     /// the number of fetches, and the size of each batch.
-    async fn get_batches(&mut self, ledger_version: u64) -> Vec<TransactionBatchInfo> {
+    async fn get_batches(&self, ledger_version: u64) -> Vec<TransactionBatchInfo> {
+        let mut start_version = self.current_version.load(Ordering::SeqCst);
         info!(
-            current_version = self.current_version,
+            current_version = start_version,
             highest_known_version = ledger_version,
             parser_batch_size = self.parser_batch_size,
             parser_task_count = self.parser_task_count,
             "[Table Info] Preparing to fetch transactions"
         );
 
-        let mut start_version = self.current_version;
         let mut num_fetches = 0;
         let mut batches = vec![];
 
@@ -364,7 +392,7 @@ impl TableInfoService {
     /// Parse table info from write sets,
     fn parse_table_info(
         context: Arc<ApiContext>,
-        raw_txns: Vec<TransactionOnChainData>,
+        raw_txns: &[TransactionOnChainData],
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Result<(), Error> {
         if raw_txns.is_empty() {
@@ -373,10 +401,9 @@ impl TableInfoService {
 
         let start_time = std::time::Instant::now();
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
-        let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
-        let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
+        let write_sets = raw_txns.iter().map(|txn| &txn.changes).collect::<Vec<_>>();
         indexer_async_v2
-            .index_table_info(context.db.clone(), first_version, &write_sets_slice)
+            .index_table_info(context.db.clone(), first_version, &write_sets)
             .map_err(|err| anyhow!("[Table Info] Failed to process write sets and index to the table info rocksdb: {}", err))?;
 
         info!(
@@ -469,7 +496,10 @@ impl TableInfoService {
         let mut ledger_version = info.unwrap().ledger_version.0;
         let mut empty_loops = 0;
 
-        while ledger_version == 0 || self.current_version > ledger_version {
+        while ledger_version == 0 || self.current_version.load(Ordering::SeqCst) > ledger_version {
+            if self.aborted.load(Ordering::SeqCst) {
+                break;
+            }
             if empty_loops > 0 {
                 tokio::time::sleep(Duration::from_millis(LEDGER_VERSION_RETRY_TIME_MILLIS)).await;
             }
@@ -613,12 +643,12 @@ fn transactions_in_epochs(
     let current_epoch = current_epoch.unwrap();
 
     let split_off_index = match current_epoch.cmp(&block_epoch.epoch()) {
-        Ordering::Equal => {
+        CmpOrdering::Equal => {
             // All transactions are in the this epoch.
             // Previous epoch is empty, i.e., [0, 0), and this epoch is [first_version, last_version].
             0
         },
-        Ordering::Less => {
+        CmpOrdering::Less => {
             // Try the best to split the transactions into two epochs.
             epoch_first_version - first_version
         },

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    move_workloads::{LoopType, PreBuiltPackagesImpl},
+    move_workloads::{FibonacciFunctionType, LoopType, PreBuiltPackagesImpl},
     token_workflow::TokenWorkflowKind,
     EntryPoints, MonotonicCounterType, OrderBookState,
 };
@@ -106,6 +106,11 @@ pub enum TransactionTypeArg {
     MonotonicCounterMultiple10,
     MonotonicCounterMultiple100,
     MonotonicCounterMultiple1000,
+
+    // Fibonacci tests
+    FibonacciRecursive20,
+    FibonacciTailRecursive20,
+    FibonacciIterative20,
 }
 
 impl TransactionTypeArg {
@@ -485,6 +490,24 @@ impl TransactionTypeArg {
             TransactionTypeArg::MonotonicCounterMultiple1000 => {
                 call_custom_module(EntryPoints::MonotonicCounter {
                     counter_type: MonotonicCounterType::Multiple { count: 1000 },
+                })
+            },
+            TransactionTypeArg::FibonacciRecursive20 => {
+                call_custom_module(EntryPoints::Fibonacci {
+                    n: 20,
+                    function_type: FibonacciFunctionType::Recursive,
+                })
+            },
+            TransactionTypeArg::FibonacciTailRecursive20 => {
+                call_custom_module(EntryPoints::Fibonacci {
+                    n: 20,
+                    function_type: FibonacciFunctionType::TailRecursive,
+                })
+            },
+            TransactionTypeArg::FibonacciIterative20 => {
+                call_custom_module(EntryPoints::Fibonacci {
+                    n: 20,
+                    function_type: FibonacciFunctionType::Iterative,
                 })
             },
         }

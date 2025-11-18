@@ -11,6 +11,7 @@ use aptos_types::{
 };
 use serde::{Deserialize, Serialize};
 
+#[allow(dead_code)] // TODO: remove.
 mod error;
 pub mod local_executor_helper;
 mod metrics;

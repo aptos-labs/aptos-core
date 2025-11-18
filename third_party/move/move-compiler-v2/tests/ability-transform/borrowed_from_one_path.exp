@@ -1086,36 +1086,35 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.m {
-struct R has key {
-	data: vector<u64>
-}
+// Bytecode version v9
+module 0x42::m
+struct R has key
+  data: vector<u64>
 
-f(k: u8, d: &vector<u64>): u64 /* def_idx: 0 */ {
-L2:	v: &vector<u64>
-B0:
-	0: MoveLoc[0](k: u8)
-	1: LdU8(0)
-	2: Eq
-	3: BrFalse(15)
-B1:
-	4: MoveLoc[1](d: &vector<u64>)
-	5: Pop
-	6: LdConst[0](Address: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1])
-	7: ImmBorrowGlobal[0](R)
-	8: ImmBorrowField[0](R.data: vector<u64>)
-	9: StLoc[2](v: &vector<u64>)
-B2:
-	10: MoveLoc[2](v: &vector<u64>)
-	11: LdU64(0)
-	12: VecImmBorrow(1)
-	13: ReadRef
-	14: Ret
-B3:
-	15: MoveLoc[1](d: &vector<u64>)
-	16: StLoc[2](v: &vector<u64>)
-	17: Branch(10)
-}
-}
+// Function definition at index 0
+fun f(l0: u8, l1: &vector<u64>): u64 acquires R
+    local l2: &vector<u64>
+    move_loc l0
+    ld_u8 0
+    eq
+    br_false l0
+    move_loc l1
+    // @5
+    pop
+    ld_const<address> 1
+    borrow_global R
+    borrow_field R, data
+    st_loc l2
+    // @10
+l1: move_loc l2
+    ld_u64 0
+    vec_borrow <u64>
+    read_ref
+    ret
+    // @15
+l0: move_loc l1
+    st_loc l2
+    branch l1
+
+
 ============ bytecode verification succeeded ========

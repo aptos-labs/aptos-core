@@ -6,11 +6,13 @@ use crate::{
     LoadedFunction, LoadedFunctionOwner, Module, ModuleStorage, Script, StructKey,
     WithRuntimeEnvironment,
 };
-use move_binary_format::errors::{Location, PartialVMResult, VMResult};
+use move_binary_format::{
+    errors::{Location, PartialVMResult, VMResult},
+    CompiledModule,
+};
 use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
     vm_status::{sub_status::type_resolution_failure::EUSER_TYPE_LOADING_FAILURE, StatusCode},
 };
 use move_vm_types::{
@@ -88,14 +90,15 @@ pub trait NativeModuleLoader {
 
 /// Provides access to module metadata.
 pub trait ModuleMetadataLoader {
-    /// Loads the module metadata, ensuring the module access gets charged. Returns an error if
+    /// Loads the compiled module, ensuring the module access gets charged. Returns an error if
     /// out-of-gas, module does not exist, or if there is some miscellaneous storage error.
-    fn load_module_metadata(
+    /// The metadata can be accessed from the module to avoid cloning.
+    fn load_module_for_metadata(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
-    ) -> PartialVMResult<Vec<Metadata>>;
+    ) -> PartialVMResult<Arc<CompiledModule>>;
 }
 
 /// Configuration used by legacy eager loader only. Used to allow single implementation for both

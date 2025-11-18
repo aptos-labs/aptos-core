@@ -420,17 +420,18 @@ impl<O: OutputLogger> MoveHarnessImpl<O> {
         payload: TransactionPayload,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let txn = self.create_transaction_payload(account, payload);
-        self.evaluate_gas_with_profiler_signed(txn)
+        self.evaluate_gas_with_profiler_signed(txn, &AuxiliaryInfo::default())
     }
 
     /// Runs a transaction with the gas profiler.
     pub fn evaluate_gas_with_profiler_signed(
         &mut self,
         txn: SignedTransaction,
+        auxiliary_info: &AuxiliaryInfo,
     ) -> (TransactionGasLog, u64, Option<FeeStatement>) {
         let (output, gas_log) = self
             .executor
-            .execute_transaction_with_gas_profiler(txn, &AuxiliaryInfo::default())
+            .execute_transaction_with_gas_profiler(txn, auxiliary_info)
             .unwrap();
         if matches!(output.status(), TransactionStatus::Keep(_)) {
             self.executor.apply_write_set(output.write_set());

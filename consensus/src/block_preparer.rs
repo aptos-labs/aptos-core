@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    counters::{self, MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXN_SHUFFLE_SECONDS},
+    counters::{self, MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXNS_IN_BLOCK, TXN_SHUFFLE_SECONDS},
     payload_manager::TPayloadManager,
     transaction_deduper::TransactionDeduper,
     transaction_shuffler::TransactionShuffler,
@@ -62,6 +62,9 @@ impl BlockPreparer {
                    result
                 }
         }?;
+        TXNS_IN_BLOCK
+            .with_label_values(&["before_filter"])
+            .observe(txns.len() as f64);
 
         let txn_filter_config = self.txn_filter_config.clone();
         let txn_deduper = self.txn_deduper.clone();
@@ -92,6 +95,9 @@ impl BlockPreparer {
             if let Some(max_txns_from_block_to_execute) = max_txns_from_block_to_execute {
                 shuffled_txns.truncate(max_txns_from_block_to_execute as usize);
             }
+            TXNS_IN_BLOCK
+                .with_label_values(&["after_filter"])
+                .observe(shuffled_txns.len() as f64);
             MAX_TXNS_FROM_BLOCK_TO_EXECUTE.observe(shuffled_txns.len() as f64);
             Ok(shuffled_txns)
         })

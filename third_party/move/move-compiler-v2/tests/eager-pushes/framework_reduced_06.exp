@@ -520,69 +520,71 @@ public fun m::test($t0: &mut 0xc0ffee::m::S, $t1: 0xc0ffee::m::S) {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
-struct S {
-	x: u64
-}
+// Bytecode version v9
+module 0xc0ffee::m
+struct S
+  x: u64
 
-bar(r: &mut S, i: u64): u64 /* def_idx: 0 */ {
-L2:	$t3: &mut u64
-B0:
-	0: MoveLoc[0](r: &mut S)
-	1: MutBorrowField[0](S.x: u64)
-	2: StLoc[2]($t3: &mut u64)
-	3: CopyLoc[1](i: u64)
-	4: MoveLoc[2]($t3: &mut u64)
-	5: WriteRef
-	6: MoveLoc[1](i: u64)
-	7: Ret
-}
-destroy(s: S) /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[0](s: S)
-	1: Unpack[0](S)
-	2: Pop
-	3: Ret
-}
-foo(l: &mut S, i: u64) /* def_idx: 2 */ {
-L2:	$t2: &mut u64
-B0:
-	0: MoveLoc[0](l: &mut S)
-	1: MutBorrowField[0](S.x: u64)
-	2: StLoc[2]($t2: &mut u64)
-	3: MoveLoc[1](i: u64)
-	4: MoveLoc[2]($t2: &mut u64)
-	5: WriteRef
-	6: Ret
-}
-public test(l: &mut S, r: S) /* def_idx: 3 */ {
-L2:	i: u64
-B0:
-	0: LdU64(0)
-	1: StLoc[2](i: u64)
-B1:
-	2: CopyLoc[2](i: u64)
-	3: LdU64(42)
-	4: Lt
-	5: BrFalse(16)
-B2:
-	6: CopyLoc[0](l: &mut S)
-	7: MutBorrowLoc[1](r: S)
-	8: CopyLoc[2](i: u64)
-	9: Call bar(&mut S, u64): u64
-	10: Call foo(&mut S, u64)
-	11: MoveLoc[2](i: u64)
-	12: LdU64(1)
-	13: Add
-	14: StLoc[2](i: u64)
-	15: Branch(2)
-B3:
-	16: MoveLoc[0](l: &mut S)
-	17: Pop
-	18: MoveLoc[1](r: S)
-	19: Call destroy(S)
-	20: Ret
-}
-}
+// Function definition at index 0
+fun bar(l0: &mut S, l1: u64): u64
+    local l2: &mut u64
+    move_loc l0
+    mut_borrow_field S, x
+    st_loc l2
+    copy_loc l1
+    move_loc l2
+    // @5
+    write_ref
+    move_loc l1
+    ret
+
+// Function definition at index 1
+fun destroy(l0: S)
+    move_loc l0
+    unpack S
+    pop
+    ret
+
+// Function definition at index 2
+fun foo(l0: &mut S, l1: u64)
+    local l2: &mut u64
+    move_loc l0
+    mut_borrow_field S, x
+    st_loc l2
+    move_loc l1
+    move_loc l2
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 3
+#[persistent] public fun test(l0: &mut S, l1: S)
+    local l2: u64
+    ld_u64 0
+    st_loc l2
+l1: copy_loc l2
+    ld_u64 42
+    lt
+    // @5
+    br_false l0
+    copy_loc l0
+    mut_borrow_loc l1
+    copy_loc l2
+    call bar
+    // @10
+    call foo
+    move_loc l2
+    ld_u64 1
+    add
+    st_loc l2
+    // @15
+    branch l1
+l0: move_loc l0
+    pop
+    move_loc l1
+    call destroy
+    // @20
+    ret
+
+
 ============ bytecode verification succeeded ========

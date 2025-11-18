@@ -26,15 +26,13 @@ module 0xc0ffee::m {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+#[persistent] public fun infinite()
+    call infinite
+    call infinite
+    ret
 
 
-public infinite() /* def_idx: 0 */ {
-B0:
-	0: Call infinite()
-	1: Call infinite()
-	2: Ret
-}
-}
 ============ bytecode verification succeeded ========

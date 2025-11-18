@@ -17,7 +17,6 @@ use bytes::Bytes;
 use move_binary_format::{errors::VMResult, CompiledModule};
 use move_core_types::{
     account_address::AccountAddress, identifier::IdentStr, language_storage::ModuleId,
-    metadata::Metadata,
 };
 use move_vm_types::{
     code::{

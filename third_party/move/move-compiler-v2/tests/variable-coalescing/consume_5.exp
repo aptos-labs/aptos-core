@@ -139,22 +139,21 @@ public fun m::test($t0: bool, $t1: u32) {
      var $t2: u32
      var $t3: bool
   0: $t2 := copy($t1)
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
   2: label L0
   3: m::consume($t2)
   4: label L2
   5: $t3 := !($t0)
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
   7: label L3
   8: m::consume($t1)
-  9: label L5
- 10: return ()
- 11: label L4
- 12: m::consume($t2)
- 13: goto 9
- 14: label L1
- 15: m::consume($t1)
- 16: goto 4
+  9: return ()
+ 10: label L4
+ 11: m::consume($t2)
+ 12: return ()
+ 13: label L1
+ 14: m::consume($t1)
+ 15: goto 4
 }
 
 
@@ -163,22 +162,21 @@ public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
      var $t2: 0xc0ffee::m::W
      var $t3: bool
   0: $t2 := copy($t1)
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
   2: label L0
   3: m::consume_($t2)
   4: label L2
   5: $t3 := !($t0)
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
   7: label L3
   8: m::consume_($t1)
-  9: label L5
- 10: return ()
- 11: label L4
- 12: m::consume_($t2)
- 13: goto 9
- 14: label L1
- 15: m::consume_($t1)
- 16: goto 4
+  9: return ()
+ 10: label L4
+ 11: m::consume_($t2)
+ 12: return ()
+ 13: label L1
+ 14: m::consume_($t1)
+ 15: goto 4
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -207,7 +205,7 @@ public fun m::test($t0: bool, $t1: u32) {
      # events: b:$t0, b:$t1, b:$t2
   0: $t2 := copy($t1)
      # live vars: $t0, $t1, $t2
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
      # live vars: $t0, $t1, $t2
   2: label L0
      # live vars: $t0, $t1, $t2
@@ -219,28 +217,26 @@ public fun m::test($t0: bool, $t1: u32) {
   5: $t3 := !($t0)
      # live vars: $t1, $t2, $t3
      # events: e:$t3
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
      # live vars: $t1, $t2
   7: label L3
      # live vars: $t1
   8: m::consume($t1)
      # live vars:
-  9: label L5
-     # live vars:
- 10: return ()
+  9: return ()
      # live vars: $t1, $t2
- 11: label L4
+ 10: label L4
      # live vars: $t2
- 12: m::consume($t2)
+ 11: m::consume($t2)
      # live vars:
- 13: goto 9
+ 12: return ()
      # live vars: $t0, $t1, $t2
- 14: label L1
+ 13: label L1
      # live vars: $t0, $t1, $t2
- 15: m::consume($t1)
+ 14: m::consume($t1)
      # live vars: $t0, $t1, $t2
      # events: e:$t0, e:$t1, e:$t2
- 16: goto 4
+ 15: goto 4
 }
 
 
@@ -252,7 +248,7 @@ public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
      # events: b:$t0, b:$t1, b:$t2
   0: $t2 := copy($t1)
      # live vars: $t0, $t1, $t2
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
      # live vars: $t0, $t1, $t2
   2: label L0
      # live vars: $t0, $t1, $t2
@@ -264,28 +260,26 @@ public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
   5: $t3 := !($t0)
      # live vars: $t1, $t2, $t3
      # events: e:$t3
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
      # live vars: $t1, $t2
   7: label L3
      # live vars: $t1
   8: m::consume_($t1)
      # live vars:
-  9: label L5
-     # live vars:
- 10: return ()
+  9: return ()
      # live vars: $t1, $t2
- 11: label L4
+ 10: label L4
      # live vars: $t2
- 12: m::consume_($t2)
+ 11: m::consume_($t2)
      # live vars:
- 13: goto 9
+ 12: return ()
      # live vars: $t0, $t1, $t2
- 14: label L1
+ 13: label L1
      # live vars: $t0, $t1, $t2
- 15: m::consume_($t1)
+ 14: m::consume_($t1)
      # live vars: $t0, $t1, $t2
      # events: e:$t0, e:$t1, e:$t2
- 16: goto 4
+ 15: goto 4
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -307,22 +301,21 @@ public fun m::test($t0: bool, $t1: u32) {
      var $t2: u32
      var $t3: bool
   0: $t2 := copy($t1)
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
   2: label L0
   3: m::consume($t2)
   4: label L2
   5: $t3 := !($t0)
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
   7: label L3
   8: m::consume($t1)
-  9: label L5
- 10: return ()
- 11: label L4
- 12: m::consume($t2)
- 13: goto 9
- 14: label L1
- 15: m::consume($t1)
- 16: goto 4
+  9: return ()
+ 10: label L4
+ 11: m::consume($t2)
+ 12: return ()
+ 13: label L1
+ 14: m::consume($t1)
+ 15: goto 4
 }
 
 
@@ -331,22 +324,21 @@ public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
      var $t2: 0xc0ffee::m::W
      var $t3: bool
   0: $t2 := copy($t1)
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
   2: label L0
   3: m::consume_($t2)
   4: label L2
   5: $t3 := !($t0)
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
   7: label L3
   8: m::consume_($t1)
-  9: label L5
- 10: return ()
- 11: label L4
- 12: m::consume_($t2)
- 13: goto 9
- 14: label L1
- 15: m::consume_($t1)
- 16: goto 4
+  9: return ()
+ 10: label L4
+ 11: m::consume_($t2)
+ 12: return ()
+ 13: label L1
+ 14: m::consume_($t1)
+ 15: goto 4
 }
 
 ============ after DeadStoreElimination: ================
@@ -368,22 +360,21 @@ public fun m::test($t0: bool, $t1: u32) {
      var $t2: u32
      var $t3: bool
   0: $t2 := copy($t1)
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
   2: label L0
   3: m::consume($t2)
   4: label L2
   5: $t3 := !($t0)
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
   7: label L3
   8: m::consume($t1)
-  9: label L5
- 10: return ()
- 11: label L4
- 12: m::consume($t2)
- 13: goto 9
- 14: label L1
- 15: m::consume($t1)
- 16: goto 4
+  9: return ()
+ 10: label L4
+ 11: m::consume($t2)
+ 12: return ()
+ 13: label L1
+ 14: m::consume($t1)
+ 15: goto 4
 }
 
 
@@ -392,93 +383,85 @@ public fun m::test_struct($t0: bool, $t1: 0xc0ffee::m::W) {
      var $t2: 0xc0ffee::m::W
      var $t3: bool
   0: $t2 := copy($t1)
-  1: if ($t0) goto 2 else goto 14
+  1: if ($t0) goto 2 else goto 13
   2: label L0
   3: m::consume_($t2)
   4: label L2
   5: $t3 := !($t0)
-  6: if ($t3) goto 7 else goto 11
+  6: if ($t3) goto 7 else goto 10
   7: label L3
   8: m::consume_($t1)
-  9: label L5
- 10: return ()
- 11: label L4
- 12: m::consume_($t2)
- 13: goto 9
- 14: label L1
- 15: m::consume_($t1)
- 16: goto 4
+  9: return ()
+ 10: label L4
+ 11: m::consume_($t2)
+ 12: return ()
+ 13: label L1
+ 14: m::consume_($t1)
+ 15: goto 4
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
-struct W has copy, drop {
-	x: u32
-}
+// Bytecode version v9
+module 0xc0ffee::m
+struct W has copy + drop
+  x: u32
 
-consume(_x: u32) /* def_idx: 0 */ {
-B0:
-	0: Ret
-}
-consume_(_x: W) /* def_idx: 1 */ {
-B0:
-	0: Ret
-}
-public test(p: bool, a: u32) /* def_idx: 2 */ {
-L2:	b: u32
-B0:
-	0: CopyLoc[1](a: u32)
-	1: StLoc[2](b: u32)
-	2: CopyLoc[0](p: bool)
-	3: BrFalse(14)
-B1:
-	4: CopyLoc[2](b: u32)
-	5: Call consume(u32)
-B2:
-	6: MoveLoc[0](p: bool)
-	7: BrTrue(11)
-B3:
-	8: MoveLoc[1](a: u32)
-	9: Call consume(u32)
-B4:
-	10: Ret
-B5:
-	11: MoveLoc[2](b: u32)
-	12: Call consume(u32)
-	13: Branch(10)
-B6:
-	14: CopyLoc[1](a: u32)
-	15: Call consume(u32)
-	16: Branch(6)
-}
-public test_struct(p: bool, a: W) /* def_idx: 3 */ {
-L2:	b: W
-B0:
-	0: CopyLoc[1](a: W)
-	1: StLoc[2](b: W)
-	2: CopyLoc[0](p: bool)
-	3: BrFalse(14)
-B1:
-	4: CopyLoc[2](b: W)
-	5: Call consume_(W)
-B2:
-	6: MoveLoc[0](p: bool)
-	7: BrTrue(11)
-B3:
-	8: MoveLoc[1](a: W)
-	9: Call consume_(W)
-B4:
-	10: Ret
-B5:
-	11: MoveLoc[2](b: W)
-	12: Call consume_(W)
-	13: Branch(10)
-B6:
-	14: CopyLoc[1](a: W)
-	15: Call consume_(W)
-	16: Branch(6)
-}
-}
+// Function definition at index 0
+fun consume(l0: u32)
+    ret
+
+// Function definition at index 1
+fun consume_(l0: W)
+    ret
+
+// Function definition at index 2
+#[persistent] public fun test(l0: bool, l1: u32)
+    local l2: u32
+    copy_loc l1
+    st_loc l2
+    copy_loc l0
+    br_false l0
+    copy_loc l2
+    // @5
+    call consume
+l2: move_loc l0
+    br_true l1
+    move_loc l1
+    call consume
+    // @10
+    ret
+l1: move_loc l2
+    call consume
+    ret
+l0: copy_loc l1
+    // @15
+    call consume
+    branch l2
+
+// Function definition at index 3
+#[persistent] public fun test_struct(l0: bool, l1: W)
+    local l2: W
+    copy_loc l1
+    st_loc l2
+    copy_loc l0
+    br_false l0
+    copy_loc l2
+    // @5
+    call consume_
+l2: move_loc l0
+    br_true l1
+    move_loc l1
+    call consume_
+    // @10
+    ret
+l1: move_loc l2
+    call consume_
+    ret
+l0: copy_loc l1
+    // @15
+    call consume_
+    branch l2
+
+
 ============ bytecode verification succeeded ========

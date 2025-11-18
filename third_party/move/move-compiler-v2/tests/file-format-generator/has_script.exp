@@ -1,20 +1,16 @@
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-script {
+// Bytecode version v9
+script
+// Function definition at index 0
+entry public fun main()
+    ld_true
+    br_false l0
+    branch l1
+l0: ld_u64 1
+    abort
+    // @5
+l1: ret
 
 
-main() /* def_idx: 0 */ {
-B0:
-	0: LdTrue
-	1: BrFalse(3)
-B1:
-	2: Branch(5)
-B2:
-	3: LdU64(1)
-	4: Abort
-B3:
-	5: Ret
-}
-}
 ============ bytecode verification succeeded ========

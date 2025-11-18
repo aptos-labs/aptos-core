@@ -127,11 +127,11 @@ pub struct RejectedTransactionSummary {
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProofWithData {
-    pub proofs: Vec<ProofOfStore>,
+    pub proofs: Vec<ProofOfStore<BatchInfo>>,
 }
 
 impl ProofWithData {
-    pub fn new(proofs: Vec<ProofOfStore>) -> Self {
+    pub fn new(proofs: Vec<ProofOfStore<BatchInfo>>) -> Self {
         Self { proofs }
     }
 
@@ -516,9 +516,9 @@ impl Payload {
     }
 
     fn verify_with_cache(
-        proofs: &[ProofOfStore],
+        proofs: &[ProofOfStore<BatchInfo>],
         validator: &ValidatorVerifier,
-        proof_cache: &ProofCache,
+        proof_cache: &ProofCache<BatchInfo>,
     ) -> anyhow::Result<()> {
         let unverified: Vec<_> = proofs
             .iter()
@@ -571,7 +571,7 @@ impl Payload {
     pub fn verify(
         &self,
         verifier: &ValidatorVerifier,
-        proof_cache: &ProofCache,
+        proof_cache: &ProofCache<BatchInfo>,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {

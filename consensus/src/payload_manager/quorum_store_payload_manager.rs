@@ -499,6 +499,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     all_txns,
                     opt_qs_payload.proof_with_data().deref().clone(),
                     opt_qs_payload.max_txns_to_execute(),
+                    opt_qs_payload.block_gas_limit(),
                     [
                         opt_qs_payload.opt_batches().deref().clone(),
                         opt_qs_payload.inline_batches().batch_infos(),

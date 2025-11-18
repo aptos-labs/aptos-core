@@ -605,7 +605,7 @@ where
 
 fn random_value(delete_value: bool) -> ValueType {
     ValueType::from_value(
-        (0..32).map(|_| (random::<u8>())).collect::<Vec<u8>>(),
+        (0..32).map(|_| random::<u8>()).collect::<Vec<u8>>(),
         !delete_value,
     )
 }

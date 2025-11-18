@@ -136,32 +136,33 @@ fun M::t0_u128() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 8675309.M {
-struct R<T: key> {
-	r: T
-}
-struct X<T> has drop, key {
-	r: T
-}
+// Bytecode version v9
+module 0x8675309::M
+struct R<T0: key>
+  r: T0
 
-t0() /* def_idx: 0 */ {
-B0:
-	0: LdU64(0)
-	1: PackGeneric[0](X<u64>)
-	2: PackGeneric[1](R<X<u64>>)
-	3: UnpackGeneric[1](R<X<u64>>)
-	4: Pop
-	5: Ret
-}
-t0_u128() /* def_idx: 1 */ {
-B0:
-	0: LdU128(18446744073709551616)
-	1: PackGeneric[2](X<u128>)
-	2: PackGeneric[3](R<X<u128>>)
-	3: UnpackGeneric[3](R<X<u128>>)
-	4: Pop
-	5: Ret
-}
-}
+struct X<T0> has drop + key
+  r: T0
+
+// Function definition at index 0
+fun t0()
+    ld_u64 0
+    pack X<u64>
+    pack R<X<u64>>
+    unpack R<X<u64>>
+    pop
+    // @5
+    ret
+
+// Function definition at index 1
+fun t0_u128()
+    ld_u128 18446744073709551616
+    pack X<u128>
+    pack R<X<u128>>
+    unpack R<X<u128>>
+    pop
+    // @5
+    ret
+
+
 ============ bytecode verification succeeded ========

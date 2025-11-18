@@ -125,17 +125,15 @@ fun m::test($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+fun test(l0: u64): u64
+    local l1: &u64
+    borrow_loc l0
+    pop
+    move_loc l0
+    ret
 
 
-test(p: u64): u64 /* def_idx: 0 */ {
-L1:	a: &u64
-B0:
-	0: ImmBorrowLoc[0](p: u64)
-	1: Pop
-	2: MoveLoc[0](p: u64)
-	3: Ret
-}
-}
 ============ bytecode verification succeeded ========

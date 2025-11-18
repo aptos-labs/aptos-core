@@ -278,7 +278,7 @@ impl TransactionDataCache {
         )?;
 
         let (data, bytes_loaded) = {
-            let metadata = metadata_loader.load_module_metadata(
+            let module = metadata_loader.load_module_for_metadata(
                 gas_meter,
                 traversal_context,
                 &struct_tag.module_id(),
@@ -289,7 +289,7 @@ impl TransactionDataCache {
             resource_resolver.get_resource_bytes_with_metadata_and_layout(
                 addr,
                 &struct_tag,
-                &metadata,
+                &module.metadata,
                 layout_with_delayed_fields.layout_when_contains_delayed_fields(),
             )?
         };

@@ -315,61 +315,60 @@ fun pack_unpack::pack6($t0: u8, $t1: u8, $t2: u8): 0x42::pack_unpack::S {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.pack_unpack {
-struct S {
-	f1: u8,
-	f2: u8,
-	f3: u8
-}
+// Bytecode version v9
+module 0x42::pack_unpack
+struct S
+  f1: u8
+  f2: u8
+  f3: u8
 
-pack1(x: u8, y: u8, z: u8): S /* def_idx: 0 */ {
-B0:
-	0: MoveLoc[0](x: u8)
-	1: MoveLoc[1](y: u8)
-	2: MoveLoc[2](z: u8)
-	3: Pack[0](S)
-	4: Ret
-}
-pack2(x: u8, y: u8, z: u8): S /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[0](x: u8)
-	1: MoveLoc[2](z: u8)
-	2: MoveLoc[1](y: u8)
-	3: Pack[0](S)
-	4: Ret
-}
-pack3(x: u8, y: u8, z: u8): S /* def_idx: 2 */ {
-B0:
-	0: MoveLoc[1](y: u8)
-	1: MoveLoc[0](x: u8)
-	2: MoveLoc[2](z: u8)
-	3: Pack[0](S)
-	4: Ret
-}
-pack4(x: u8, y: u8, z: u8): S /* def_idx: 3 */ {
-B0:
-	0: MoveLoc[2](z: u8)
-	1: MoveLoc[0](x: u8)
-	2: MoveLoc[1](y: u8)
-	3: Pack[0](S)
-	4: Ret
-}
-pack5(x: u8, y: u8, z: u8): S /* def_idx: 4 */ {
-B0:
-	0: MoveLoc[1](y: u8)
-	1: MoveLoc[2](z: u8)
-	2: MoveLoc[0](x: u8)
-	3: Pack[0](S)
-	4: Ret
-}
-pack6(x: u8, y: u8, z: u8): S /* def_idx: 5 */ {
-B0:
-	0: MoveLoc[2](z: u8)
-	1: MoveLoc[1](y: u8)
-	2: MoveLoc[0](x: u8)
-	3: Pack[0](S)
-	4: Ret
-}
-}
+// Function definition at index 0
+fun pack1(l0: u8, l1: u8, l2: u8): S
+    move_loc l0
+    move_loc l1
+    move_loc l2
+    pack S
+    ret
+
+// Function definition at index 1
+fun pack2(l0: u8, l1: u8, l2: u8): S
+    move_loc l0
+    move_loc l2
+    move_loc l1
+    pack S
+    ret
+
+// Function definition at index 2
+fun pack3(l0: u8, l1: u8, l2: u8): S
+    move_loc l1
+    move_loc l0
+    move_loc l2
+    pack S
+    ret
+
+// Function definition at index 3
+fun pack4(l0: u8, l1: u8, l2: u8): S
+    move_loc l2
+    move_loc l0
+    move_loc l1
+    pack S
+    ret
+
+// Function definition at index 4
+fun pack5(l0: u8, l1: u8, l2: u8): S
+    move_loc l1
+    move_loc l2
+    move_loc l0
+    pack S
+    ret
+
+// Function definition at index 5
+fun pack6(l0: u8, l1: u8, l2: u8): S
+    move_loc l2
+    move_loc l1
+    move_loc l0
+    pack S
+    ret
+
+
 ============ bytecode verification succeeded ========

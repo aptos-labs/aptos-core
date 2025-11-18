@@ -20,7 +20,7 @@ use aptos_protos::{
 use aptos_storage_interface::DbReader;
 use aptos_types::{chain_id::ChainId, indexer::indexer_db_reader::IndexerReader};
 use futures::channel::oneshot;
-use std::sync::Arc;
+use std::sync::{atomic::AtomicBool, Arc};
 use tokio::{net::TcpListener, runtime::Runtime};
 use tonic::{
     codec::CompressionEncoding,
@@ -72,6 +72,7 @@ pub fn bootstrap(
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
             service_context: service_context.clone(),
+            abort_handle: Arc::new(AtomicBool::new(false)),
         };
         let localnet_data_server = LocalnetDataService { service_context };
 

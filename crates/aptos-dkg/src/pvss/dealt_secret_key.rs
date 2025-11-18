@@ -13,8 +13,8 @@ macro_rules! dealt_secret_key_impl {
         use crate::{
             algebra::lagrange::lagrange_coefficients,
             pvss::{
-                dealt_secret_key_share::$gt::DealtSecretKeyShare, Player,
-                threshold_config::ThresholdConfigBlstrs, traits, traits::SecretSharingConfig,
+                dealt_secret_key_share::$gt::DealtSecretKeyShare,
+                threshold_config::ThresholdConfigBlstrs,
             },
             utils::{$gt_multi_exp},
         };
@@ -23,7 +23,10 @@ macro_rules! dealt_secret_key_impl {
         use blstrs::{$GTProjective, Scalar};
         use ff::Field;
         use more_asserts::{assert_ge, assert_le};
-        use crate::pvss::traits::ThresholdConfig;
+        use aptos_crypto::traits::{SecretSharingConfig as _};
+        use aptos_crypto::traits::{ThresholdConfig as _};
+        use aptos_crypto::arkworks::shamir::Reconstructable;
+        use aptos_crypto::arkworks::shamir::ShamirShare;
 
         /// The size of a serialized *dealt secret key*.
         pub(crate) const DEALT_SK_NUM_BYTES: usize = $GT_PROJ_NUM_BYTES;
@@ -80,12 +83,12 @@ macro_rules! dealt_secret_key_impl {
             }
         }
 
-        impl traits::Reconstructable<ThresholdConfigBlstrs> for DealtSecretKey {
-            type Share = DealtSecretKeyShare;
+        impl Reconstructable<ThresholdConfigBlstrs> for DealtSecretKey {
+            type ShareValue = DealtSecretKeyShare;
 
             /// Reconstructs the `DealtSecretKey` given a sufficiently-large subset of shares from players.
             /// Mainly used for testing the PVSS transcript dealing and decryption.
-            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &Vec<(Player, Self::Share)>) -> Self {
+            fn reconstruct(sc: &ThresholdConfigBlstrs, shares: &[ShamirShare<Self::ShareValue>]) -> anyhow::Result<Self> {
                 assert_ge!(shares.len(), sc.get_threshold());
                 assert_le!(shares.len(), sc.get_total_num_players());
 
@@ -113,9 +116,9 @@ macro_rules! dealt_secret_key_impl {
 
                 assert_eq!(lagr.len(), bases.len());
 
-                DealtSecretKey {
+                Ok(DealtSecretKey {
                     h_hat: $gt_multi_exp(bases.as_slice(), lagr.as_slice()),
-                }
+                })
             }
         }
     };

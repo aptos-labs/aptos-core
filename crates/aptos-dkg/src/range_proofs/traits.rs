@@ -1,19 +1,18 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::GroupGenerators;
+use aptos_crypto::arkworks::{random::UniformRand, GroupGenerators};
 use ark_ec::pairing::Pairing;
-use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 
 pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalDeserialize {
     type PublicStatement: CanonicalSerialize;
     type ProverKey;
-    type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this is often appended to a Fiat-Shamir transcript
-    type Input: From<u64>; // TODO: slightly hacky
+    type VerificationKey: Clone + CanonicalSerialize; // Serialization is needed because this key is often appended to a Fiat-Shamir transcript
+    type Input: From<u64>; // TODO: slightly hacky. It's used in `range_proof_random_instance()` to generate (chunks of) inputs that have a certain bit size
     type Commitment;
-    type CommitmentRandomness: Clone + ark_ff::UniformRand;
+    type CommitmentRandomness: Clone + UniformRand;
     type CommitmentKey;
 
     const DST: &[u8];
@@ -23,7 +22,7 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
     /// Setup generates the prover and verifier keys used in the batched range proof.
     fn setup<R: RngCore + CryptoRng>(
         max_n: usize,
-        max_ell: usize,
+        max_ell: usize, // TODO: change this to u8?
         group_generators: GroupGenerators<E>,
         rng: &mut R,
     ) -> (Self::ProverKey, Self::VerificationKey);
@@ -44,10 +43,10 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         r: &Self::CommitmentRandomness,
     ) -> Self::Commitment;
 
-    fn prove<R: RngCore + CryptoRng>(
+    fn prove<R: rand_core::RngCore + rand_core::CryptoRng>(
         pk: &Self::ProverKey,
         values: &[Self::Input],
-        ell: usize,
+        ell: usize, // TODO: change this to u8?
         comm: &Self::Commitment,
         r: &Self::CommitmentRandomness,
         fs_transcript: &mut merlin::Transcript,

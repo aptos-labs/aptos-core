@@ -1,0 +1,55 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x815::m
+enum Color
+  RGB
+    red: u64
+    green: u64
+    blue: u64
+  Red
+  Blue
+
+// Function definition at index 0
+fun test_red(l0: &Color): bool
+    move_loc l0
+    test_variant Color, Red
+    ret
+
+// Function definition at index 1
+fun test_rgb_reduces_to_is_cascade_with_opt(l0: &Color): bool
+    local l1: bool
+    copy_loc l0
+    test_variant Color, Red
+    br_false l0
+    move_loc l0
+    pop
+    // @5
+    ld_false
+    st_loc l1
+    branch l1
+l0: copy_loc l0
+    test_variant Color, Blue
+    // @10
+    br_false l2
+    move_loc l0
+    pop
+    ld_false
+    st_loc l1
+    // @15
+    branch l1
+l2: move_loc l0
+    test_variant Color, RGB
+    br_false l3
+    ld_true
+    // @20
+    st_loc l1
+    branch l1
+l3: ld_u64 14566554180833181697
+    abort
+l1: move_loc l1
+    // @25
+    ret
+
+
+============ bytecode verification succeeded ========

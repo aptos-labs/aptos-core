@@ -240,9 +240,10 @@ impl<'a> LowDegreeTest<'a> {
 mod test {
     use crate::{
         algebra::{evaluation_domain::BatchEvaluationDomain, fft::fft_assign},
-        pvss::{test_utils, traits::ThresholdConfig, LowDegreeTest, ThresholdConfigBlstrs},
+        pvss::{test_utils, LowDegreeTest, ThresholdConfigBlstrs},
         utils::random::random_scalars,
     };
+    use aptos_crypto::traits::ThresholdConfig as _;
     use blstrs::Scalar;
     use rand::{prelude::ThreadRng, thread_rng};
 

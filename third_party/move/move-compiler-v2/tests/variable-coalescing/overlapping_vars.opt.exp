@@ -68,14 +68,12 @@ fun m::test(): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+fun test(): u64
+    ld_u64 6
+    ret
 
 
-test(): u64 /* def_idx: 0 */ {
-B0:
-	0: LdU64(6)
-	1: Ret
-}
-}
 ============ bytecode verification succeeded ========

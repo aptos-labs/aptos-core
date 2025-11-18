@@ -13,7 +13,7 @@ use std::{
 
 pub type OptBatches = BatchPointer<BatchInfo>;
 
-pub type ProofBatches = BatchPointer<ProofOfStore>;
+pub type ProofBatches = BatchPointer<ProofOfStore<BatchInfo>>;
 
 pub trait TDataInfo {
     fn num_txns(&self) -> u64;
@@ -310,6 +310,10 @@ impl OptQuorumStorePayloadV1 {
         self.execution_limits.max_txns_to_execute()
     }
 
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        self.execution_limits.block_gas_limit()
+    }
+
     pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {
         ensure!(
             self.inline_batches
@@ -382,7 +386,7 @@ impl OptQuorumStorePayload {
         &self.inline_batches
     }
 
-    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore> {
+    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore<BatchInfo>> {
         &self.proofs
     }
 

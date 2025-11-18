@@ -531,6 +531,10 @@ pub struct TestPackage {
     /// Dump storage state on failure.
     #[clap(long = "dump")]
     pub dump_state: bool,
+
+    /// Fail-fast mode: stop running tests after the first failure.
+    #[clap(long = "fail-fast")]
+    pub fail_fast: bool,
 }
 
 pub(crate) fn fix_bytecode_version(
@@ -579,6 +583,7 @@ impl CliCommand<&'static str> for TestPackage {
                     .language_version
                     .or_else(|| Some(LanguageVersion::latest_stable())),
                 experiments: self.move_options.compute_experiments(),
+                print_errors: true,
             },
             ..Default::default()
         };
@@ -602,6 +607,7 @@ impl CliCommand<&'static str> for TestPackage {
                         )
                     })
                     .collect(),
+                fail_fast: self.fail_fast,
                 ..UnitTestingConfig::default()
             },
             // TODO(Gas): we may want to switch to non-zero costs in the future

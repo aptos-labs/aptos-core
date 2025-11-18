@@ -44,6 +44,7 @@ metadata object can be any object that equipped with <code><a href="fungible_ass
 -  [Function `register_dispatch_function_sanity_check`](#0x1_fungible_asset_register_dispatch_function_sanity_check)
 -  [Function `generate_mint_ref`](#0x1_fungible_asset_generate_mint_ref)
 -  [Function `generate_burn_ref`](#0x1_fungible_asset_generate_burn_ref)
+-  [Function `generate_burn_copy_ref`](#0x1_fungible_asset_generate_burn_copy_ref)
 -  [Function `generate_transfer_ref`](#0x1_fungible_asset_generate_transfer_ref)
 -  [Function `generate_raw_balance_ref`](#0x1_fungible_asset_generate_raw_balance_ref)
 -  [Function `generate_raw_supply_ref`](#0x1_fungible_asset_generate_raw_supply_ref)
@@ -1914,6 +1915,31 @@ This can only be called at object creation time as constructor_ref is only avail
 <pre><code><b>public</b> <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_ref">generate_burn_ref</a>(constructor_ref: &ConstructorRef): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> {
     <b>let</b> metadata = <a href="object.md#0x1_object_object_from_constructor_ref">object::object_from_constructor_ref</a>&lt;<a href="fungible_asset.md#0x1_fungible_asset_Metadata">Metadata</a>&gt;(constructor_ref);
     <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> { metadata }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_fungible_asset_generate_burn_copy_ref"></a>
+
+## Function `generate_burn_copy_ref`
+
+Creates a burn copy ref that can be used to burn fungible assets from the given burn ref.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_copy_ref">generate_burn_copy_ref</a>(burn_ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_copy_ref">generate_burn_copy_ref</a>(burn_ref: &<a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a>): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> {
+    <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">BurnRef</a> { metadata: burn_ref.metadata }
 }
 </code></pre>
 

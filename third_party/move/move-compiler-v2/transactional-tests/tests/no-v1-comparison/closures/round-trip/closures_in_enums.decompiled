@@ -18,19 +18,22 @@ module 0xc0ffee::m {
         &p0._0
     }
     fun get_func_recursive(p0: Function): ||(u64) {
-        let _v0;
-        let _v1 = &p0;
-        if (_v1 is NoParam) {
-            let Function::NoParam{_0: _v2} = p0;
-            _v0 = _v2
-        } else if (_v1 is OneParam) {
-            let Function::OneParam{_0: _v3} = p0;
-            _v0 = get_func_recursive(Function::NoParam{_0: || lambda__1__get_func_recursive(_v3)})
-        } else if (_v1 is TwoParam) {
-            let Function::TwoParam{_0: _v4} = p0;
-            _v0 = get_func_recursive(Function::OneParam{_0: |arg0| lambda__2__get_func_recursive(_v4, arg0)})
-        } else abort 14566554180833181697;
-        _v0
+        let _v0 = &p0;
+        'l0: loop {
+            loop {
+                if (!(_v0 is NoParam)) {
+                    if (_v0 is OneParam) break;
+                    if (_v0 is TwoParam) break 'l0;
+                    abort 14566554180833181697
+                };
+                let Function::NoParam{_0: _v1} = p0;
+                return _v1
+            };
+            let Function::OneParam{_0: _v2} = p0;
+            return get_func_recursive(Function::NoParam{_0: || lambda__1__get_func_recursive(_v2)})
+        };
+        let Function::TwoParam{_0: _v3} = p0;
+        get_func_recursive(Function::OneParam{_0: |arg0| lambda__2__get_func_recursive(_v3, arg0)})
     }
     fun lambda__1__get_func_recursive(p0: |u64|(u64) has copy + drop): u64 {
         p0(0)
@@ -39,19 +42,22 @@ module 0xc0ffee::m {
         p0(0, p1)
     }
     fun runner_1(p0: Function): u64 {
-        let _v0;
-        let _v1 = &p0;
-        if (_v1 is NoParam) {
-            let Function::NoParam{_0: _v2} = p0;
-            _v0 = _v2()
-        } else if (_v1 is OneParam) {
-            let Function::OneParam{_0: _v3} = p0;
-            _v0 = _v3(0)
-        } else if (_v1 is TwoParam) {
-            let Function::TwoParam{_0: _v4} = p0;
-            _v0 = _v4(0, 0)
-        } else abort 14566554180833181697;
-        _v0
+        let _v0 = &p0;
+        'l0: loop {
+            loop {
+                if (!(_v0 is NoParam)) {
+                    if (_v0 is OneParam) break;
+                    if (_v0 is TwoParam) break 'l0;
+                    abort 14566554180833181697
+                };
+                let Function::NoParam{_0: _v1} = p0;
+                return _v1()
+            };
+            let Function::OneParam{_0: _v2} = p0;
+            return _v2(0)
+        };
+        let Function::TwoParam{_0: _v3} = p0;
+        _v3(0, 0)
     }
     fun runner_2(p0: Function): u64 {
         let _v0;

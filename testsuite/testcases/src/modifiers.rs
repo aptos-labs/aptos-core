@@ -13,7 +13,7 @@ use rand::Rng;
 use std::sync::Arc;
 
 async fn add_execution_delay(
-    swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     config: &ExecutionDelayConfig,
 ) -> anyhow::Result<()> {
     let validators = { swarm.read().await.get_validator_clients_with_names() };
@@ -52,7 +52,7 @@ async fn add_execution_delay(
 }
 
 async fn remove_execution_delay(
-    swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+    swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
 ) -> anyhow::Result<()> {
     let validators = { swarm.read().await.get_validator_clients_with_names() };
 
@@ -229,7 +229,7 @@ impl CpuChaosTest {
     /// not the fullnodes).
     async fn create_cpu_chaos(
         &self,
-        swarm: Arc<tokio::sync::RwLock<Box<(dyn Swarm)>>>,
+        swarm: Arc<tokio::sync::RwLock<Box<dyn Swarm>>>,
     ) -> SwarmCpuStress {
         let all_validators = swarm
             .read()

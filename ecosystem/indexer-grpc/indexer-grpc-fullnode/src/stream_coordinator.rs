@@ -25,7 +25,13 @@ use aptos_protos::{
 };
 use itertools::Itertools;
 use serde::Serialize;
-use std::{sync::Arc, time::Duration};
+use std::{
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
 use tokio::sync::mpsc;
 use tonic::Status;
 
@@ -44,6 +50,7 @@ pub struct IndexerStreamCoordinator {
     pub highest_known_version: u64,
     pub context: Arc<Context>,
     pub transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
+    abort_handle: Option<Arc<AtomicBool>>,
 }
 
 // Single batch of transactions to fetch, convert, and stream
@@ -64,6 +71,7 @@ impl IndexerStreamCoordinator {
         processor_batch_size: u16,
         output_batch_size: u16,
         transactions_sender: mpsc::Sender<Result<TransactionsFromNodeResponse, tonic::Status>>,
+        abort_handle: Option<Arc<AtomicBool>>,
     ) -> Self {
         Self {
             current_version: request_start_version,
@@ -74,6 +82,7 @@ impl IndexerStreamCoordinator {
             highest_known_version: 0,
             context,
             transactions_sender,
+            abort_handle,
         }
     }
 
@@ -90,6 +99,9 @@ impl IndexerStreamCoordinator {
         // Stage 1: fetch transactions from storage.
         let sorted_transactions_from_storage_with_size =
             self.fetch_transactions_from_storage().await;
+        if sorted_transactions_from_storage_with_size.is_empty() {
+            return vec![];
+        }
         let first_version = sorted_transactions_from_storage_with_size
             .first()
             .map(|(txn, _)| txn.version)
@@ -264,7 +276,9 @@ impl IndexerStreamCoordinator {
 
     /// This will create batches based on the configuration of the request
     async fn get_batches(&mut self) -> Vec<TransactionBatchInfo> {
-        self.ensure_highest_known_version().await;
+        if !self.ensure_highest_known_version().await {
+            return vec![];
+        }
 
         let mut starting_version = self.current_version;
         let mut num_fetches = 0;
@@ -518,9 +532,14 @@ impl IndexerStreamCoordinator {
 
     /// Will keep looping and checking the latest ledger info to see if there are new transactions
     /// If there are, it will set the highest known version
-    async fn ensure_highest_known_version(&mut self) {
+    async fn ensure_highest_known_version(&mut self) -> bool {
         let mut empty_loops = 0;
         while self.highest_known_version == 0 || self.current_version > self.highest_known_version {
+            if let Some(abort_handle) = self.abort_handle.as_ref() {
+                if abort_handle.load(Ordering::SeqCst) {
+                    return false;
+                }
+            }
             if empty_loops > 0 {
                 tokio::time::sleep(Duration::from_millis(RETRY_TIME_MILLIS)).await;
             }
@@ -541,5 +560,6 @@ impl IndexerStreamCoordinator {
                 );
             }
         }
+        true
     }
 }

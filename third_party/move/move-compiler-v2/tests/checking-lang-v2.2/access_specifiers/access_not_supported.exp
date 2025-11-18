@@ -1,12 +1,12 @@
 
 Diagnostics:
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:11:20
    │
 11 │     fun f2() reads S {
    │                    ^^
 
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:14:21
    │
 14 │     fun f3() writes S {
@@ -18,25 +18,25 @@ error: only simple resource names can be used with `acquires`
 17 │     fun f4() acquires S(*) {
    │                       ^^^^
 
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:20:39
    │
 20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
    │                                       ^^
 
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:20:48
    │
 20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
    │                                                ^
 
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:20:51
    │
 20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
    │                                                   ^^
 
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:20:59
    │
 20 │     fun f_multiple() acquires R reads R writes T, S reads G<u64> {
@@ -66,13 +66,13 @@ error: only simple resource names can be used with `acquires`
 38 │     fun f10(x: u64) acquires *(make_up_address(x)) {
    │                              ^^^^^^^^^^^^^^^^^^^^^
 
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:45:22
    │
 45 │     fun f11() !reads *(0x42), *(0x43) {
    │                      ^^^^^^^
 
-error: not supported before language version `2.3-unstable`: read/write access specifiers.
+error: not supported before language version `2.5-unstable`: read/write access specifiers.
    ┌─ tests/checking-lang-v2.2/access_specifiers/access_not_supported.move:45:31
    │
 45 │     fun f11() !reads *(0x42), *(0x43) {

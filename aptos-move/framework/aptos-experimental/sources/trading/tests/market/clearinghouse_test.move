@@ -38,7 +38,7 @@ module aptos_experimental::clearinghouse_test {
     }
 
     public fun get_order_metadata_bytes(
-        _order_metadata: TestOrderMetadata
+        _order_metadata: &TestOrderMetadata
     ): vector<u8> {
         vector::empty<u8>()
     }

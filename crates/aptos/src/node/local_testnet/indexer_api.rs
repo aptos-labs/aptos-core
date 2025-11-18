@@ -4,7 +4,7 @@
 use super::{
     docker::{
         delete_container, get_docker, pull_docker_image, setup_docker_logging,
-        StopContainerShutdownStep, CONTAINER_NETWORK_NAME,
+        StopContainerShutdownStep,
     },
     health_checker::HealthChecker,
     traits::{PostHealthyStep, ServiceManager, ShutdownStep},
@@ -70,6 +70,7 @@ pub struct IndexerApiManager {
     prerequisite_health_checkers: HashSet<HealthChecker>,
     test_dir: PathBuf,
     postgres_connection_string: String,
+    docker_network: String,
 }
 
 impl IndexerApiManager {
@@ -79,6 +80,7 @@ impl IndexerApiManager {
         test_dir: PathBuf,
         postgres_connection_string: String,
     ) -> Result<Self> {
+        let (docker_network, _) = args.get_docker_network();
         Ok(Self {
             indexer_api_port: args.indexer_api_args.indexer_api_port,
             existing_hasura_url: args.indexer_api_args.existing_hasura_url.clone(),
@@ -86,6 +88,7 @@ impl IndexerApiManager {
             prerequisite_health_checkers,
             test_dir,
             postgres_connection_string,
+            docker_network: docker_network.to_string(),
         })
     }
 
@@ -188,7 +191,7 @@ impl ServiceManager for IndexerApiManager {
                 // in the Postgres pre_run steps.
                 (
                     self.postgres_connection_string,
-                    Some(CONTAINER_NETWORK_NAME.to_string()),
+                    Some(self.docker_network.clone()),
                 )
             };
 

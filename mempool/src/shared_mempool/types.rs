@@ -286,24 +286,6 @@ impl PeerSyncState {
     }
 }
 
-/// Identifier for a broadcasted batch of txns.
-/// For BatchId(`start_id`, `end_id`), (`start_id`, `end_id`) is the range of timeline IDs read from
-/// the core mempool timeline index that produced the txns in this batch.
-#[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
-struct BatchId(pub u64, pub u64);
-
-impl PartialOrd for BatchId {
-    fn partial_cmp(&self, other: &BatchId) -> Option<std::cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
-
-impl Ord for BatchId {
-    fn cmp(&self, other: &BatchId) -> std::cmp::Ordering {
-        (other.0, other.1).cmp(&(self.0, self.1))
-    }
-}
-
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct MultiBucketTimelineIndexIds {
     pub id_per_bucket: Vec<TimelineId>,
