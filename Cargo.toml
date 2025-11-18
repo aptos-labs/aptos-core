@@ -911,6 +911,7 @@ move-vm-types = { path = "third_party/move/move-vm/types" }
 [profile.release]
 debug = true
 overflow-checks = true
+lto = "thin"
 
 # For [build-dependencies], cargo sets `opt-level=0` independent of the actual profile used.
 # In `aptos-cached-packages` crate, we have `aptos-framework` as a build dependency. Which in a `--release` mode,
@@ -947,6 +948,7 @@ debug-assertions = true
 
 [profile.bench]
 debug = true
+lto = "thin"
 
 [patch.crates-io]
 # version 0.6 at commit 444eb13579c733089453806743b19f1ea2dce1c0 did not expose 'run_bench_with_bencher' as a public function, which we need
