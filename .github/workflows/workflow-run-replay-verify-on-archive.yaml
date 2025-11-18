@@ -56,6 +56,7 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
+      PROFILE: performance
       DRY_RUN: ${{ inputs.DRY_RUN }}
 
   run-replay-verify:
@@ -70,7 +71,7 @@ jobs:
           # get the last 10 commits to find images that have been built
           # we can optionally use the IMAGE_TAG to find the exact commit to checkout
           fetch-depth: 10
-      
+
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main
         id: docker-setup
         with:
@@ -106,7 +107,7 @@ jobs:
       - name: "Setup GCloud project"
         shell: bash
         run: gcloud config set project aptos-devinfra-0
-      
+
       - uses: ./.github/actions/python-setup
         with:
           pyproject_directory: testsuite/replay-verify
@@ -128,6 +129,7 @@ jobs:
           if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
             CMD="$CMD --image_tag ${{ inputs.IMAGE_TAG }}"  
           fi
+          CMD="$CMD --image_profile performance"
 
           eval $CMD
         timeout-minutes: 420 # 7 hours
