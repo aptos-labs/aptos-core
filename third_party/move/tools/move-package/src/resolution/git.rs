@@ -43,6 +43,29 @@ pub(crate) fn clone(url: &str, target_path: &str, dep_name: PackageName) -> anyh
     Ok(())
 }
 
+pub(crate) fn shallow_clone(
+    url: &str,
+    target_path: &str,
+    dep_name: PackageName,
+) -> anyhow::Result<()> {
+    let status = Command::new("git")
+        .args(["clone", url, "--depth", "1", target_path])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|_| {
+            anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name)
+        })?;
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "Failed to clone Git repository for package '{}' | Exit status: {}",
+            dep_name,
+            status
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn checkout(repo_path: &str, rev: &str, dep_name: PackageName) -> anyhow::Result<()> {
     let status = Command::new("git")
         .args(["-C", repo_path, "checkout", rev])
@@ -94,6 +117,40 @@ pub(crate) fn fetch_origin(repo_path: &str, dep_name: PackageName) -> anyhow::Re
     Ok(())
 }
 
+pub(crate) fn shallow_fetch_origin(
+    repo_path: &str,
+    rev: &str,
+    dep_name: PackageName,
+) -> anyhow::Result<()> {
+    let status = Command::new("git")
+        .args([
+            "-C",
+            repo_path,
+            "fetch",
+            "--depth",
+            "1",
+            "origin",
+            rev,
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "Failed to fetch latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps",
+                dep_name
+            )
+        })?;
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "Failed to fetch to latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
+            dep_name,
+            status
+        ));
+    }
+    Ok(())
+}
+
 pub(crate) fn reset_hard(repo_path: &str, rev: &str, dep_name: PackageName) -> anyhow::Result<()> {
     let status = Command::new("git")
         .args([
@@ -117,6 +174,34 @@ pub(crate) fn reset_hard(repo_path: &str, rev: &str, dep_name: PackageName) -> a
         return Err(anyhow::anyhow!(
             "Failed to reset to latest Git state '{}' for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
             rev,
+            dep_name,
+            status
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn switch_to_fetched_rev(repo_path: &str, dep_name: PackageName) -> anyhow::Result<()> {
+    let status = Command::new("git")
+        .args([
+            "-C",
+            repo_path,
+            "reset",
+            "--hard",
+            "FETCH_HEAD",
+        ])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .map_err(|_| {
+            anyhow::anyhow!(
+                "Failed to reset to FETCH_HEAD for package '{}', to skip set --skip-fetch-latest-git-deps",
+                dep_name
+            )
+        })?;
+    if !status.success() {
+        return Err(anyhow::anyhow!(
+            "Failed to reset to FETCH_HEAD for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
             dep_name,
             status
         ));
