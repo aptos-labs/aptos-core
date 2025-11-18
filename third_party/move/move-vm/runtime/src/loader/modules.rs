@@ -126,6 +126,7 @@ pub(crate) struct StructVariantInfo {
     pub(crate) variant: VariantIndex,
     pub(crate) definition_struct_type: Arc<StructType>,
     pub(crate) instantiation: Vec<Type>,
+    pub(crate) is_fully_instantiated: bool,
 }
 
 // A field handle. The offset is the only used information when operating on a field
@@ -248,17 +249,20 @@ impl Module {
                 variant,
                 definition_struct_type,
                 instantiation: vec![],
+                is_fully_instantiated: false,
             })
         }
 
         for struct_variant_inst in module.struct_variant_instantiations() {
             let variant = &struct_variant_infos[struct_variant_inst.handle.0 as usize];
+            let sig_idx = struct_variant_inst.type_parameters.0 as usize;
             struct_variant_instantiation_infos.push(StructVariantInfo {
                 field_count: variant.field_count,
                 variant: variant.variant,
                 definition_struct_type: variant.definition_struct_type.clone(),
                 instantiation: signature_table[struct_variant_inst.type_parameters.0 as usize]
                     .clone(),
+                is_fully_instantiated: is_fully_instantiated_signature[sig_idx],
             })
         }
 

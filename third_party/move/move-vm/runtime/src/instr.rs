@@ -210,7 +210,9 @@ pub(crate) struct BytecodeTransformer<'a> {
     // Caches for expensive type instantiation operations
     field_ty_cache: RefCell<HashMap<FieldInstantiationIndex, (Type, bool)>>,
     variant_field_ty_cache: RefCell<HashMap<VariantFieldInstantiationIndex, (Type, bool)>>,
+
     pack_field_tys_cache: RefCell<HashMap<StructDefInstantiationIndex, Vec<Type>>>,
+    pack_variant_field_tys_cache: RefCell<HashMap<StructVariantInstantiationIndex, Vec<Type>>>,
 }
 
 impl<'a> BytecodeTransformer<'a> {
@@ -238,6 +240,7 @@ impl<'a> BytecodeTransformer<'a> {
             field_ty_cache: RefCell::new(HashMap::new()),
             variant_field_ty_cache: RefCell::new(HashMap::new()),
             pack_field_tys_cache: RefCell::new(HashMap::new()),
+            pack_variant_field_tys_cache: RefCell::new(HashMap::new()),
         }
     }
 
@@ -361,12 +364,8 @@ impl<'a> BytecodeTransformer<'a> {
                 LdConst(_) => {
                     return Ok(false);
                 },
-                // Disallow unpack, variant pack/unpack (not supported yet -- needs new instruction)
-                PackVariantGeneric(_)
-                | Unpack(_)
-                | UnpackGeneric(_)
-                | UnpackVariant(_)
-                | UnpackVariantGeneric(_) => {
+                // Disallow unpack (not supported yet -- needs new instruction)
+                Unpack(_) | UnpackGeneric(_) | UnpackVariant(_) | UnpackVariantGeneric(_) => {
                     return Ok(false);
                 },
                 // Disallow vector operations other than VecLen (not supported yet -- needs new instruction)
@@ -406,6 +405,15 @@ impl<'a> BytecodeTransformer<'a> {
                 PackGeneric(idx) => {
                     let struct_inst = &self.struct_instantiations[idx.0 as usize];
                     if !struct_inst.is_fully_instantiated {
+                        return Ok(false);
+                    }
+                    // TODO: check depth
+                },
+                // - PackVariantGeneric: requires concrete instantiation for V2
+                PackVariantGeneric(idx) => {
+                    let struct_variant_inst =
+                        &self.struct_variant_instantiation_infos[idx.0 as usize];
+                    if !struct_variant_inst.is_fully_instantiated {
                         return Ok(false);
                     }
                     // TODO: check depth
@@ -688,8 +696,6 @@ impl<'a> BytecodeTransformer<'a> {
         )))
     }
 
-    // TODO: transform_borrow_variant_field_generic
-
     fn transform_pack_variant(
         &self,
         idx: StructVariantHandleIndex,
@@ -722,6 +728,66 @@ impl<'a> BytecodeTransformer<'a> {
         })
     }
 
+    fn transform_pack_variant_generic(
+        &self,
+        idx: StructVariantInstantiationIndex,
+        inline: bool,
+    ) -> PartialVMResult<Instruction> {
+        // TODO: double check correctness -- seems like right now there isn't a workflow that triggers this.
+
+        let fallback = || Ok(Instruction::PackVariantGeneric(idx));
+
+        if !(self.use_v2_instructions || inline) {
+            return fallback();
+        }
+
+        let info = &self.struct_variant_instantiation_infos[idx.0 as usize];
+
+        if !info.is_fully_instantiated {
+            // TODO: invariant violation if inline is true
+            return fallback();
+        }
+
+        let field_tys = {
+            let mut cache = self.pack_variant_field_tys_cache.borrow_mut();
+            match cache.entry(idx) {
+                Entry::Occupied(entry) => entry.get().clone(),
+                Entry::Vacant(entry) => {
+                    let mut tys = vec![];
+                    for (_, ty) in info.definition_struct_type.fields(Some(info.variant))? {
+                        tys.push(
+                            self.ty_builder
+                                .create_ty_with_subst(ty, &info.instantiation)
+                                .map_err(|e| {
+                                    PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                                        .with_message(format!("Failed to create field type: {}", e))
+                                })?,
+                        );
+                    }
+                    entry.insert(tys.clone()).clone()
+                },
+            }
+        };
+
+        // TODO: check depth
+        let struct_ty = Type::StructInstantiation {
+            idx: info.definition_struct_type.idx,
+            ty_args: triomphe::Arc::new(info.instantiation.clone()),
+            ability: AbilityInfo::generic_struct(
+                info.definition_struct_type.abilities,
+                info.definition_struct_type.phantom_ty_params_mask.clone(),
+            ),
+        };
+
+        Ok(Instruction::PackVariantV2(Box::new(PackVariantV2 {
+            is_generic: true,
+            variant_idx: info.variant,
+            field_count: info.field_count,
+            struct_ty,
+            field_tys,
+        })))
+    }
+
     // TODO: transform_pack_variant_generic
 
     pub fn transform(&self, bytecode: Bytecode, inline: bool) -> PartialVMResult<Instruction> {
@@ -751,7 +817,7 @@ impl<'a> BytecodeTransformer<'a> {
             B::Pack(idx) => self.transform_pack(idx, inline)?,
             B::PackGeneric(idx) => self.transform_pack_generic(idx, inline)?,
             B::PackVariant(idx) => self.transform_pack_variant(idx, inline)?,
-            B::PackVariantGeneric(idx) => I::PackVariantGeneric(idx),
+            B::PackVariantGeneric(idx) => self.transform_pack_variant_generic(idx, inline)?,
             B::Unpack(idx) => I::Unpack(idx),
             B::UnpackGeneric(idx) => I::UnpackGeneric(idx),
             B::UnpackVariant(idx) => I::UnpackVariant(idx),
