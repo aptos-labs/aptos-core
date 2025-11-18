@@ -194,23 +194,19 @@ impl Drop for NumOutstandingTransactionsResetter {
 /// This function is responsible for updating our local record of the sequence
 /// numbers of the funder and receiver accounts.
 ///
-/// The queue format is unified as Vec<(String, AccountAddress, u64)> where the String
-/// is the asset name. For single-asset funders (like TransferFunder), pass
-/// DEFAULT_ASSET_NAME. For multi-asset funders (like MintFunder), pass the specific
-/// asset name. When asset_name is provided, the queue is filtered by that asset to
-/// ensure requests for different assets don't interfere with each other.
-///
-/// If asset_name is None, the function treats all queue entries as belonging to the
-/// same asset (backward compatibility mode, though this should not be used in practice).
+/// Each asset has its own independent queue: HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>.
+/// This ensures requests for different assets don't interfere with each other while maintaining
+/// FIFO ordering within each asset. For single-asset funders (like TransferFunder), use
+/// DEFAULT_ASSET_NAME. For multi-asset funders (like MintFunder), pass the specific asset name.
 pub async fn update_sequence_numbers(
     client: &Client,
     funder_account: &RwLock<LocalAccount>,
-    // The value here is (asset_name, requester address, amount requested).
-    outstanding_requests: &RwLock<Vec<(String, AccountAddress, u64)>>,
+    // Each asset has its own queue: HashMap<asset_name, RwLock<Vec<(AccountAddress, u64)>>>
+    outstanding_requests: &RwLock<HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>>,
     receiver_address: AccountAddress,
     amount: u64,
     wait_for_outstanding_txns_secs: u64,
-    asset_name: Option<&str>,
+    asset_name: &str,
 ) -> Result<(u64, Option<u64>), AptosTapError> {
     let (mut funder_seq, mut receiver_seq) =
         get_sequence_numbers(client, funder_account, receiver_address).await?;
@@ -228,9 +224,7 @@ pub async fn update_sequence_numbers(
     let _resetter = NumOutstandingTransactionsResetter;
 
     let mut set_outstanding = false;
-    // Use the provided asset_name or empty string as a sentinel for "no filtering"
-    let asset_name_str = asset_name.unwrap_or("");
-    let request_key = (asset_name_str.to_string(), receiver_address, amount);
+    let request_key = (receiver_address, amount);
 
     // We shouldn't have too many outstanding txns
     for _ in 0..(wait_for_outstanding_txns_secs * 2) {
@@ -238,48 +232,35 @@ pub async fn update_sequence_numbers(
             // Enforce a stronger ordering of priorities based upon the MintParams that arrived
             // first. Then put the other folks to sleep to try again until the queue fills up.
             if !set_outstanding {
-                let mut requests = outstanding_requests.write().await;
-                requests.push(request_key.clone());
+                let mut requests_map = outstanding_requests.write().await;
+                let queue = requests_map
+                    .entry(asset_name.to_string())
+                    .or_insert_with(|| RwLock::new(Vec::new()));
+                let mut queue_guard = queue.write().await;
+                queue_guard.push(request_key);
                 set_outstanding = true;
             }
 
-            // Check if this request is at the front of the queue
-            // If asset_name is provided, filter to only consider requests for that asset
-            let requests = outstanding_requests.read().await;
-            let is_at_front = if let Some(asset) = asset_name {
-                // Filter the queue to only consider requests for this asset when checking position
-                let asset_requests: Vec<_> =
-                    requests.iter().filter(|(a, _, _)| a == asset).collect();
-                asset_requests.first() == Some(&&request_key)
+            // Check if this request is at the front of the queue for this asset
+            let requests_map = outstanding_requests.read().await;
+            let is_at_front = if let Some(queue) = requests_map.get(asset_name) {
+                let queue_guard = queue.read().await;
+                queue_guard.first() == Some(&request_key)
             } else {
-                // No filtering - check if this request is at the front of the entire queue
-                requests.first() == Some(&request_key)
+                false
             };
 
             if is_at_front {
                 // There might have been two requests with the same parameters, so we ensure that
                 // we only pop off one of them. We do a read lock first since that is cheap,
                 // followed by a write lock.
-                drop(requests);
-                let mut requests = outstanding_requests.write().await;
-
-                // Try to find and remove the request. If it's not found, it means another
-                // thread already removed it. In either case, we should break from the loop
-                // since the request has been processed (either by us or by another thread).
-                if let Some(asset) = asset_name {
-                    // Find and remove the first matching request for this asset
-                    if let Some(pos) = requests.iter().position(|(a, addr, amt)| {
-                        a == asset && *addr == receiver_address && *amt == amount
-                    }) {
-                        requests.remove(pos);
+                drop(requests_map);
+                let mut requests_map = outstanding_requests.write().await;
+                if let Some(queue) = requests_map.get_mut(asset_name) {
+                    let mut queue_guard = queue.write().await;
+                    if queue_guard.first() == Some(&request_key) {
+                        queue_guard.remove(0);
                     }
-                    // If not found, another thread already removed it - break either way
-                } else {
-                    // Remove the first matching request (no asset filtering)
-                    if requests.first() == Some(&request_key) {
-                        requests.remove(0);
-                    }
-                    // If not found, another thread already removed it - break either way
                 }
                 break;
             }

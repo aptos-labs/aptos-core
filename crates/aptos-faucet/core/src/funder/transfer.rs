@@ -116,9 +116,9 @@ pub struct TransferFunder {
     gas_unit_price_override: Option<u64>,
 
     /// When recovering from being overloaded, this struct ensures we handle
-    /// requests in the order they came in. The tuple is (asset_name, receiver_address, amount).
-    /// TransferFunder uses DEFAULT_ASSET_NAME for all requests since it only handles a single asset.
-    outstanding_requests: RwLock<Vec<(String, AccountAddress, u64)>>,
+    /// requests in the order they came in. TransferFunder uses DEFAULT_ASSET_NAME for all requests
+    /// since it only handles a single asset. The queue format is Vec<(AccountAddress, u64)>.
+    outstanding_requests: RwLock<HashMap<String, RwLock<Vec<(AccountAddress, u64)>>>>,
 
     /// Amount of time we'll wait for the seqnum to catch up before resetting it.
     wait_for_outstanding_txns_secs: u64,
@@ -158,7 +158,7 @@ impl TransferFunder {
             amount_to_fund,
             gas_unit_price_manager,
             gas_unit_price_override,
-            outstanding_requests: RwLock::new(vec![]),
+            outstanding_requests: RwLock::new(HashMap::new()),
             wait_for_outstanding_txns_secs,
             wait_for_transactions,
         }
@@ -288,7 +288,7 @@ impl FunderTrait for TransferFunder {
             receiver_address,
             amount,
             self.wait_for_outstanding_txns_secs,
-            Some(DEFAULT_ASSET_NAME),
+            DEFAULT_ASSET_NAME,
         )
         .await?;
 
