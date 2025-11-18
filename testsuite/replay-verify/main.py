@@ -718,12 +718,13 @@ def parse_args() -> argparse.Namespace:
         "--namespace", required=False, type=str, default="replay-verify"
     )
     parser.add_argument("--image_tag", required=False, type=str)
+    parser.add_argument("--image_profile", required=False, type=str, default="performance")
     parser.add_argument("--cleanup", required=False, action="store_true", default=False)
     args = parser.parse_args()
     return args
 
 
-def get_image(image_tag: str | None = None) -> str:
+def get_image(profile: str, image_tag: str | None = None) -> str:
     shell = forge.LocalShell()
     git = forge.Git(shell)
     image_name = "tools"
@@ -737,7 +738,8 @@ def get_image(image_tag: str | None = None) -> str:
         if image_tag is None
         else image_tag
     )
-    full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{default_latest_image}"
+    tag_prefix = "" if profile == "release" else f"{profile}_"
+    full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{tag_prefix}{default_latest_image}"
     return full_image
 
 
@@ -758,7 +760,7 @@ if __name__ == "__main__":
     args = parse_args()
     get_kubectl_credentials("aptos-devinfra-0", "us-central1", "devinfra-usce1-0")
     (start, end, skip_ranges) = read_skip_ranges(args.network)
-    image = get_image(args.image_tag) if args.image_tag is not None else get_image()
+    image = get_image(profile=args.image_profile, image_tag=args.image_tag)
     run_id = f"{datetime.datetime.now().strftime('%Y%m%d-%H%M%S')}-{image[-5:]}"
     network = Network.from_string(args.network)
     config = ReplayConfig(network)
