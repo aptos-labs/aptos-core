@@ -878,7 +878,11 @@ where
         let num_locals = function.local_tys().len();
         let num_param_tys = function.param_tys().len();
         if num_param_tys > num_locals {
-            return Err(Locals::local_index_out_of_bounds(num_param_tys, num_locals));
+            let first_oob_index = num_param_tys - 1;
+            return Err(Locals::local_index_out_of_bounds(
+                first_oob_index,
+                num_locals,
+            ));
         }
         let mut local_values = Locals::init_values(num_locals);
         // Whether the function making this frame performs checks.

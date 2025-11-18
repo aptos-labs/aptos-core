@@ -2156,7 +2156,7 @@ impl Locals {
         iter::repeat_with(|| Value::Invalid).take(n).collect()
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[cfg(test)]
     pub fn new(n: usize) -> Self {
         Self(Rc::new(RefCell::new(
             iter::repeat_with(|| Value::Invalid).take(n).collect(),
@@ -2170,11 +2170,9 @@ impl Locals {
         let num_invalid_locals = match num_expected_locals.checked_sub(values.len()) {
             Some(n) => n,
             None => {
-                let first_out_of_bounds_index = num_expected_locals;
-                let out_of_bounds_error = Locals::local_index_out_of_bounds(
-                    first_out_of_bounds_index,
-                    num_expected_locals,
-                );
+                let first_oob_index = values.len();
+                let out_of_bounds_error =
+                    Locals::local_index_out_of_bounds(first_oob_index, num_expected_locals);
                 return Err(out_of_bounds_error);
             },
         };
