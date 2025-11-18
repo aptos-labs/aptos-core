@@ -30,8 +30,8 @@ use aptos_crypto::{
     arkworks::{
         self,
         random::{
-            sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
-            UniformRand,
+            sample_field_element, sample_field_elements, unsafe_random_point,
+            unsafe_random_points_hash, UniformRand,
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
@@ -427,7 +427,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     // TODO: Make the method return a Result (rather than mutating Self)? And return None here?
-    fn aggregate_with(&mut self, _sc: &Self::SecretSharingConfig, _other: &Transcript<E>) -> anyhow::Result<()> {
+    fn aggregate_with(
+        &mut self,
+        _sc: &Self::SecretSharingConfig,
+        _other: &Transcript<E>,
+    ) -> anyhow::Result<()> {
         Err(anyhow::anyhow!("PVSS aggregation not supported"))
     }
 
@@ -436,7 +440,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.utrs.Vs[player.id].into_affine()))
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(
+            self.utrs.Vs[player.id].into_affine(),
+        ))
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
@@ -503,11 +509,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
         let utrs = UnsignedTranscript {
             dealer: sc.get_player(0),
-            Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
+            Vs: unsafe_random_points_hash::<E::G2, _>(sc.n + 1, rng),
             Cs: (0..sc.n)
-                .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                .map(|_| unsafe_random_points_hash(num_chunks_per_share, rng))
                 .collect::<Vec<_>>(),
-            Rs: unsafe_random_points(num_chunks_per_share, rng),
+            Rs: unsafe_random_points_hash(num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),
@@ -637,7 +643,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Malleab
     fn maul_signature<A: Serialize + Clone>(
         &mut self,
         _ssk: &Self::SigningSecretKey,
-        _aux: &A, 
+        _aux: &A,
         _player: &Player,
     ) {
         // TODO: We're not using this but it probably fails if we don't; but that would probably mean recomputing almost the entire transcript... but then that would require eks and pp

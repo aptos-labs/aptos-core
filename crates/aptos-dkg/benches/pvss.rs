@@ -4,17 +4,14 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::{
-    traits::{SecretSharingConfig as _},
-    Uniform,
-};
+use aptos_crypto::{traits::SecretSharingConfig as _, Uniform};
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
     pvss::{
         self,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
-            DealingArgs, NoAux,
+            DealingArgs, NoAux, BENCHMARK_CONFIGS,
         },
         traits::transcript::{MalleableTranscript, Transcript, WithMaxNumShares},
         LowDegreeTest, WeightedConfigBlstrs,
@@ -27,7 +24,6 @@ use criterion::{
 };
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use aptos_dkg::pvss::test_utils::BENCHMARK_CONFIGS;
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted PVSS

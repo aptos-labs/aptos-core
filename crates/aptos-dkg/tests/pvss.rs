@@ -46,20 +46,20 @@ fn test_pvss_all_unweighted() {
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
     }
 
-    // // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
-    // // TODO: maybe reduce the number of tcs to make it a bit faster?
-    // let tcs = test_utils::get_threshold_configs_for_testing();
-    // for tc in tcs {
-    //     println!("\nTesting {tc} PVSS");
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
+    let tcs = test_utils::get_threshold_configs_for_testing();
+    for tc in tcs.iter().take(20) {
+        // Reduce the number of tcs to make it a bit faster?
+        println!("\nTesting {tc} PVSS");
 
-    //     let seed = random_scalar(&mut rng);
+        let seed = random_scalar(&mut rng);
 
-    //     // Chunky
-    //     pvss_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
-    //         &tc,
-    //         seed.to_bytes_le(),
-    //     );
-    // }
+        // Chunky
+        pvss_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
+            &tc,
+            seed.to_bytes_le(),
+        );
+    }
 }
 
 #[test]
@@ -107,8 +107,8 @@ fn test_pvss_transcript_size() {
 
     // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254
     // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
-    // Should iterate over a vec of (t, n), not the actual threshold configs because they may be slow to initialise
-    for sc in get_threshold_configs_for_benchmarking() {
+    // Ideally should iterate over a vec of (t, n), not the actual threshold configs... but won't be a bottleneck
+    for sc in get_threshold_configs_for_benchmarking().iter().take(3) {
         println!();
         let actual_size = actual_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(&sc);
         print_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(
@@ -116,12 +116,10 @@ fn test_pvss_transcript_size() {
             &sc,
             actual_size,
         );
-
-        //break; // exit after first iteration, setup is too slow
     }
 
     // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
-    for sc in get_threshold_configs_for_benchmarking() {
+    for sc in get_threshold_configs_for_benchmarking().iter().take(3) {
         println!();
 
         let actual_size =
@@ -131,8 +129,6 @@ fn test_pvss_transcript_size() {
             &sc,
             actual_size,
         );
-
-        //break; // exit after first iteration, setup is too slow
     }
 
     for wc in get_weighted_configs_for_benchmarking() {

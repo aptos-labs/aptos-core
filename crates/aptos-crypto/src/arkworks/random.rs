@@ -19,6 +19,7 @@ pub trait UniformRand {
 
 /// NOTE: This function is "unsafe" in the sense that the caller learns the discrete log of the
 /// random point w.r.t. the generator. In many applications, this is not acceptable.
+/// It also seems rather slow, so it's not exactly ideal for testing either
 pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
@@ -35,6 +36,31 @@ where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
     (0..n).map(|_| unsafe_random_point::<C, R>(rng)).collect()
+}
+
+/// Faster "unsafe" random point by hashing some random bytes to the curve
+/// But still not very fast // TODO: make proper benchmarks
+pub fn unsafe_random_point_hash<C: CurveGroup, R>(rng: &mut R) -> C
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    // Generate some random bytes
+    let mut buf = [0u8; 32]; // 32 bytes for a 256-bit curve... so not ideal etc
+    rng.fill_bytes(&mut buf);
+
+    // Hash to curve (unsafe_hash_to_affine)
+    let p: C::Affine = crate::arkworks::hashing::unsafe_hash_to_affine(&buf, b"unsafe_random_point");
+
+    // Convert to curve point
+    p.into()
+}
+
+/// Batch version
+pub fn unsafe_random_points_hash<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    (0..n).map(|_| unsafe_random_point_hash::<C, R>(rng)).collect()
 }
 
 /// Samples `n` uniformly random elements from the prime field `F`.

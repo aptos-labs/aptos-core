@@ -191,7 +191,7 @@ impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
         Self::new(n, DEFAULT_ELL_FOR_TESTING, &mut rng)
     }
 
-    // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible. TODO: still seems slow, should investigate?
+    // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
     fn with_max_num_shares_for_generate(_n: usize) -> Self {
         let mut rng = thread_rng();
         Self::new(1, DEFAULT_ELL_FOR_TESTING, &mut rng)

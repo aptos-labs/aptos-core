@@ -290,7 +290,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) -> anyhow::Result<()> {
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
         let W = sc.get_total_weight();
 
         debug_assert!(self.check_sizes(sc).is_ok());

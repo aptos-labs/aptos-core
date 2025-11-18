@@ -157,7 +157,11 @@ impl traits::Transcript for Transcript {
         self.dealers.clone()
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) -> anyhow::Result<()> {
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
         debug_assert_eq!(self.C.len(), sc.n);
         debug_assert_eq!(self.V.len(), sc.n + 1);
 
