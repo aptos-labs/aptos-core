@@ -49,7 +49,8 @@ where
     rng.fill_bytes(&mut buf);
 
     // Hash to curve (unsafe_hash_to_affine)
-    let p: C::Affine = crate::arkworks::hashing::unsafe_hash_to_affine(&buf, b"unsafe_random_point");
+    let p: C::Affine =
+        crate::arkworks::hashing::unsafe_hash_to_affine(&buf, b"unsafe_random_point");
 
     // Convert to curve point
     p.into()
@@ -60,7 +61,9 @@ pub fn unsafe_random_points_hash<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
-    (0..n).map(|_| unsafe_random_point_hash::<C, R>(rng)).collect()
+    (0..n)
+        .map(|_| unsafe_random_point_hash::<C, R>(rng))
+        .collect()
 }
 
 /// Samples `n` uniformly random elements from the prime field `F`.
