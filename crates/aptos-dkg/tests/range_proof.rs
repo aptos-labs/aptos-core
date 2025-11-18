@@ -1,8 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
-    algebra::GroupGenerators,
     range_proofs::{
         dekart_univariate::Proof as UnivariateDeKART,
         dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,

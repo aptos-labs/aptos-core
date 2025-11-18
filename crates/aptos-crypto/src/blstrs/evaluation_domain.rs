@@ -1,7 +1,9 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::CryptoMaterialError;
+//! Evaluation domains and batched evaluation domains for radix-2 FFTs over the BLS12-381 scalar field.
+
+use crate::CryptoMaterialError;
 use blstrs::Scalar;
 use ff::{Field, PrimeField};
 use more_asserts::{assert_gt, assert_le};
@@ -150,6 +152,7 @@ impl BatchEvaluationDomain {
         }
     }
 
+    /// Returns the size `N` of the batch evaluation domain.
     #[allow(non_snake_case)]
     pub fn N(&self) -> usize {
         self.omegas.len()
@@ -205,7 +208,7 @@ impl BatchEvaluationDomain {
     #[allow(non_snake_case)]
     fn is_order(omega: &Scalar, K: usize) -> bool {
         assert_gt!(K, 0);
-        let mut acc = omega.clone();
+        let mut acc = *omega;
 
         // First, check that \omega^1, \omega^2, \omega^{K-1} are NOT the identity.
         for _ in 1..=K - 1 {
@@ -223,6 +226,6 @@ impl BatchEvaluationDomain {
         }
         // println!();
 
-        return true;
+        true
     }
 }

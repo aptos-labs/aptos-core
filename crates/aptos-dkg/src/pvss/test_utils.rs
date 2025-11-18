@@ -4,11 +4,12 @@
 use crate::pvss::{
     traits::{
         transcript::{Transcript, WithMaxNumShares},
-        Convert, HasEncryptionPublicParams, Reconstructable,
+        Convert, HasEncryptionPublicParams,
     },
-    Player, ThresholdConfigBlstrs, WeightedConfig,
+    Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
 use aptos_crypto::{
+    arkworks::shamir::Reconstructable,
     traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
     SigningKey, Uniform,
 };
@@ -141,37 +142,39 @@ pub fn get_threshold_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<T>
     tcs
 }
 
-pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfig> {
+pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
 
     // 1-out-of-1 weighted
-    wcs.push(WeightedConfig::new(1, vec![1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![1]).unwrap());
 
     // 1-out-of-2, weights 2 0
-    wcs.push(WeightedConfig::new(1, vec![2]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![2]).unwrap());
     // 1-out-of-2, weights 1 1
-    wcs.push(WeightedConfig::new(1, vec![1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![1, 1]).unwrap());
     // 2-out-of-2, weights 1 1
-    wcs.push(WeightedConfig::new(2, vec![1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(2, vec![1, 1]).unwrap());
 
     // 1-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfig::new(1, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(1, vec![1, 1, 1]).unwrap());
     // 2-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfig::new(2, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(2, vec![1, 1, 1]).unwrap());
     // 3-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfig::new(3, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(3, vec![1, 1, 1]).unwrap());
 
     // 3-out-of-5, weights 2 1 2
-    wcs.push(WeightedConfig::new(3, vec![2, 1, 2]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(3, vec![2, 1, 2]).unwrap());
 
     // 3-out-of-7, weights 2 3 2
-    wcs.push(WeightedConfig::new(3, vec![2, 3, 2]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(3, vec![2, 3, 2]).unwrap());
 
     // 50-out-of-100, weights [11, 13, 9, 10, 12, 8, 7, 14, 10, 6]
-    wcs.push(WeightedConfig::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
 
     // 7-out-of-15, weights [0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]
-    wcs.push(WeightedConfig::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap());
+    wcs.push(
+        WeightedConfigBlstrs::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap(),
+    );
 
     wcs
 }
@@ -189,7 +192,7 @@ pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfigBlstrs> {
     ]
 }
 
-pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
+pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
 
     let weights = vec![
@@ -201,7 +204,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     let weights = vec![
         3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
@@ -212,7 +215,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     let weights = vec![
         5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5,
@@ -223,7 +226,7 @@ pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfig> {
     ];
     let total_weight: usize = weights.iter().sum();
     let threshold = total_weight * 2 / 3 + 1;
-    wcs.push(WeightedConfig::new(threshold, weights).unwrap());
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     wcs
 }
@@ -251,5 +254,5 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-    T::DealtSecretKey::reconstruct(sc, &players_and_shares)
+    T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

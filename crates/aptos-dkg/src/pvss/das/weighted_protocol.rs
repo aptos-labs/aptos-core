@@ -8,7 +8,7 @@ use crate::{
         contribution::{batch_verify_soks, Contribution, SoK},
         das, encryption_dlog, schnorr,
         traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
-        LowDegreeTest, Player, WeightedConfig,
+        LowDegreeTest, Player, WeightedConfigBlstrs,
     },
     utils::{
         g1_multi_exp, g2_multi_exp,
@@ -93,7 +93,7 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = WeightedConfig;
+    type SecretSharingConfig = WeightedConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
@@ -394,7 +394,7 @@ impl traits::Transcript for Transcript {
 
 impl Transcript {
     #[allow(non_snake_case)]
-    fn check_sizes(&self, sc: &WeightedConfig) -> anyhow::Result<()> {
+    fn check_sizes(&self, sc: &WeightedConfigBlstrs) -> anyhow::Result<()> {
         let W = sc.get_total_weight();
 
         if self.V.len() != W + 1 {
@@ -440,7 +440,7 @@ impl Transcript {
     #[allow(non_snake_case, unused)]
     fn slow_verify(
         &self,
-        sc: &WeightedConfig,
+        sc: &WeightedConfigBlstrs,
         pp: &das::PublicParameters,
         eks: &Vec<encryption_dlog::g1::EncryptPubKey>,
     ) -> anyhow::Result<()> {

@@ -6,8 +6,8 @@
 /// WARNING: This will **NOT** necessarily be secure for any PVSS scheme, since it will reuse encryption
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
-    traits::{transcript::MalleableTranscript, Reconstructable, Transcript},
-    Player, ThresholdConfigBlstrs, WeightedConfig,
+    traits::{transcript::MalleableTranscript, Transcript},
+    Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
 use aptos_crypto::{traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -20,37 +20,6 @@ use serde::{Deserialize, Serialize};
 /// by the same `Transcript` trait.
 pub struct GenericWeighting<T> {
     trx: T,
-}
-
-/// Implements weighted reconstruction of a secret `SK` through the existing unweighted reconstruction
-/// implementation of `SK`.
-impl<SK: Reconstructable<ThresholdConfigBlstrs>> Reconstructable<WeightedConfig> for SK {
-    type Share = Vec<SK::Share>;
-
-    fn reconstruct(sc: &WeightedConfig, shares: &Vec<(Player, Self::Share)>) -> Self {
-        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
-
-        // println!();
-        for (player, sub_shares) in shares {
-            // println!(
-            //     "Flattening {} share(s) for player {player}",
-            //     sub_shares.len()
-            // );
-            for (pos, share) in sub_shares.iter().enumerate() {
-                let virtual_player = sc.get_virtual_player(player, pos);
-
-                // println!(
-                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
-                //     share
-                // );
-                // TODO(Performance): Avoiding the cloning here might be nice
-                let tuple = (virtual_player, share.clone());
-                flattened_shares.push(tuple);
-            }
-        }
-
-        SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
-    }
 }
 
 impl<T: Transcript> ValidCryptoMaterial for GenericWeighting<T> {
@@ -71,7 +40,7 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericWeighting<T> {
 
 impl<T: Transcript> GenericWeighting<T> {
     fn to_weighted_encryption_keys(
-        sc: &WeightedConfig,
+        sc: &WeightedConfigBlstrs,
         eks: &Vec<T::EncryptPubKey>,
     ) -> Vec<T::EncryptPubKey> {
         // Re-organize the encryption key vector so that we deal multiple shares to each player,
@@ -103,7 +72,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     type EncryptPubKey = T::EncryptPubKey;
     type InputSecret = T::InputSecret;
     type PublicParameters = T::PublicParameters;
-    type SecretSharingConfig = WeightedConfig;
+    type SecretSharingConfig = WeightedConfigBlstrs;
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 

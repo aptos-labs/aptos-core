@@ -1,7 +1,15 @@
-// Copyright (c) Aptos Foundation
+// Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-//! Helper functions and constants for blstrs code.
+//! Utilities and helpers for working with BLS12-381 primitives used in Aptos.
+
+pub mod evaluation_domain;
+pub mod fft;
+pub mod lagrange;
+pub mod polynomials;
+pub mod random;
+pub mod scalar_secret_key;
+pub mod threshold_config;
 
 use crate::CryptoMaterialError;
 use blstrs::{Bls12, G1Affine, G1Projective, G2Prepared, G2Projective, Gt, Scalar};

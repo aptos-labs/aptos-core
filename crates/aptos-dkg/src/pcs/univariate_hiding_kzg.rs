@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{polynomials, GroupGenerators},
+    algebra::polynomials,
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
@@ -14,7 +14,10 @@ use anyhow::ensure;
 #[allow(unused_imports)] // This is used but due to some bug it is not noticed by the compiler
 use aptos_crypto::arkworks::random::UniformRand;
 use aptos_crypto::{
-    arkworks::random::{sample_field_element, unsafe_random_point},
+    arkworks::{
+        random::{sample_field_element, unsafe_random_point},
+        GroupGenerators,
+    },
     utils,
 };
 use aptos_crypto_derive::SigmaProtocolWitness;

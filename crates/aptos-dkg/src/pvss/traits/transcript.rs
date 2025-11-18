@@ -48,11 +48,14 @@
 //! does not hold.
 
 use crate::pvss::{
-    traits::{Convert, HasEncryptionPublicParams, Reconstructable},
+    traits::{Convert, HasEncryptionPublicParams},
     Player,
 };
 use anyhow::bail;
-use aptos_crypto::{SecretSharingConfig, SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
+use aptos_crypto::{
+    arkworks::shamir::Reconstructable, SecretSharingConfig, SigningKey, Uniform,
+    ValidCryptoMaterial, VerifyingKey,
+};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
@@ -87,7 +90,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKey: PartialEq
-        + Reconstructable<Self::SecretSharingConfig, Share = Self::DealtSecretKeyShare>;
+        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
     type DealtPubKey;
 
     type InputSecret: Uniform
