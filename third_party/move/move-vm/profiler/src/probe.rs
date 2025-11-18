@@ -6,21 +6,21 @@ use std::time::Instant;
 
 #[usdt::provider]
 mod vm_profiler {
-    fn function_entry(function_name: &str) {}
-    fn function_exit(function_name: &str, nanos: u64) {}
+    fn function_entry(function_name: String) {}
+    fn function_exit(nanos: u64) {}
 
-    fn instruction_entry(instruction_name: &str) {}
-    fn instruction_exit(instruction_name: &str, nanos: u64) {}
+    fn instruction_entry(instruction_name: String) {}
+    fn instruction_exit(nanos: u64) {}
 }
 
 /// A profiler that emits USDT (Userland Statically Defined Tracing) probes.
 /// See [usdt](https://crates.io/crates/usdt) for more details.
 ///
 /// It emits the following probes for function and instruction entry/exit:
-/// - `function_entry(function_name: &str)`
-/// - `function_exit(function_name: &str, nanos: u64)`
-/// - `instruction_entry(instruction_name: &str)`
-/// - `instruction_exit(instruction_name: &str, nanos: u64)`
+/// - `function_entry(function_name: String)`
+/// - `function_exit(nanos: u64)`
+/// - `instruction_entry(instruction_name: String)`
+/// - `instruction_exit(nanos: u64)`
 /// Note that the exit probes include the elapsed time in nanoseconds.
 pub struct ProbeProfiler;
 
@@ -53,7 +53,6 @@ impl Profiler for ProbeProfiler {
 }
 
 pub struct ProbeFnGuard {
-    function_name: String,
     start: Instant,
 }
 
@@ -63,12 +62,9 @@ impl ProbeFnGuard {
     where
         F: ProfilerFunction,
     {
-        let function_name = function.name();
-
-        vm_profiler::function_entry!(|| &function_name);
+        vm_profiler::function_entry!(|| function.name());
 
         Self {
-            function_name,
             start: Instant::now(),
         }
     }
@@ -78,14 +74,12 @@ impl Drop for ProbeFnGuard {
     fn drop(&mut self) {
         vm_profiler::function_exit!(|| {
             let dt = self.start.elapsed();
-            let nanos = dt.as_nanos() as u64;
-            (&self.function_name, nanos)
+            dt.as_nanos() as u64
         });
     }
 }
 
 pub struct ProbeInstrGuard {
-    instruction_name: String,
     start: Instant,
 }
 
@@ -95,12 +89,9 @@ impl ProbeInstrGuard {
     where
         I: ProfilerInstruction,
     {
-        let instruction_name = instruction.name();
-
-        vm_profiler::instruction_entry!(|| &instruction_name);
+        vm_profiler::instruction_entry!(|| instruction.name());
 
         Self {
-            instruction_name,
             start: Instant::now(),
         }
     }
@@ -110,8 +101,7 @@ impl Drop for ProbeInstrGuard {
     fn drop(&mut self) {
         vm_profiler::instruction_exit!(|| {
             let dt = self.start.elapsed();
-            let nanos = dt.as_nanos() as u64;
-            (&self.instruction_name, nanos)
+            dt.as_nanos() as u64
         });
     }
 }

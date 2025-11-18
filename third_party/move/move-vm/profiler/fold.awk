@@ -13,7 +13,7 @@ $1 == "END" {
     for (i = 1; i < depth; i++) {
         out = out ";" stack[i]
     }
-    print out, $3
+    print out, $2
 
     # pop
     depth--

@@ -9,5 +9,5 @@ vm_profiler*:::function_entry
 
 vm_profiler*:::function_exit
 {
-  printf("END %s %llu\n", copyinstr(arg0), (unsigned long long)arg1);
+  printf("END %llu\n", (unsigned long long)arg0);
 }
