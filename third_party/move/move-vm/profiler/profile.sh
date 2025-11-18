@@ -5,9 +5,11 @@ set -euo pipefail
 # CONFIG
 #############################################
 
+SCRIPT_DIR="$(dirname $0)"
+
 BIN_PATH=$1
-TRACE_SCRIPT="trace.d"
-FOLD_SCRIPT="fold.awk"
+TRACE_SCRIPT="$SCRIPT_DIR/trace.d"
+FOLD_SCRIPT="$SCRIPT_DIR/fold.awk"
 
 OUT_RAW=$(mktemp /tmp/dtrace-raw.XXXXXX)
 OUT_FOLDED=$(mktemp /tmp/dtrace-folded.XXXXXX)
