@@ -60,7 +60,7 @@ async fn test_dkg_state_transition() {
     let agg_node_producer = DummyAggTranscriptProducer {};
     let mut dkg_manager: DKGManager<DummyDKG> = DKGManager::new(
         private_keys[0].clone(),
-        public_keys[0].clone(),
+        Arc::new(public_keys[0].clone()),
         0,
         addrs[0],
         Arc::new(epoch_state),

@@ -54,7 +54,7 @@ pub const DST: &[u8; 32] = b"APTOS_CHUNK_EG_FIELD_PVSS_FS_DST";
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)] // Removed CryptoHasher - not compatible with <E: Pairing> and doesn't seem to be used?
 pub struct Transcript<E: Pairing> {
-    dealers: Vec<Player>,
+    dealer: Player,
     /// Public key shares from 0 to n-1: V[i] = s_i * G_2; public key is in V[n]
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub V: Vec<E::G2>,
@@ -147,7 +147,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Initialize the PVSS Fiat-Shamir transcript
         let mut fs_transcript =
-            fiat_shamir::initialize_pvss_transcript::<E, Self>(sc, pp, eks, DST);
+            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(sc, spk, aux, dealer.id, DST);
 
         // Generate the Shamir secret sharing polynomial
         let mut f = vec![*s.get_secret_a()]; // constant term of polynomial
@@ -178,7 +178,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Return the transcript struct with all computed values
         Transcript {
-            dealers: vec![*dealer],
+            dealer: *dealer,
             V,
             C,
             R,
@@ -191,9 +191,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        _spks: &Vec<Self::SigningPubKey>,
+        spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
-        _aux: &Vec<A>,
+        aux: &Vec<A>,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
@@ -213,7 +213,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             );
         }
 
-        let mut fs_t = fiat_shamir::initialize_pvss_transcript::<E, Self>(sc, pp, eks, DST);
+        let mut fs_t =
+            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(sc, &spks[self.dealer.id], aux, self.dealer.id, DST);
 
         if let Some(proof) = &self.sharing_proof {
             // Verify the PoK
@@ -299,32 +300,33 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     fn get_dealers(&self) -> Vec<Player> {
-        self.dealers.clone()
+        vec![self.dealer]
     }
 
     // TODO: Make the method return a Result (rather than mutating Self)? And return None here?
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript<E>) {
-        debug_assert_eq!(self.C.len(), sc.n);
-        debug_assert_eq!(self.V.len(), sc.n + 1);
-        debug_assert_eq!(self.C.len(), other.C.len());
-        debug_assert_eq!(self.R.len(), other.R.len());
-        debug_assert_eq!(self.V.len(), other.V.len());
+    fn aggregate_with(&mut self, _sc: &Self::SecretSharingConfig, _other: &Transcript<E>) {
+        panic!("This PVSS doesn't aggregate");
+        // debug_assert_eq!(self.C.len(), sc.n);
+        // debug_assert_eq!(self.V.len(), sc.n + 1);
+        // debug_assert_eq!(self.C.len(), other.C.len());
+        // debug_assert_eq!(self.R.len(), other.R.len());
+        // debug_assert_eq!(self.V.len(), other.V.len());
 
-        for i in 0..sc.n {
-            self.V[i] += other.V[i];
-            for j in 0..self.C[i].len() {
-                self.C[i][j] += other.C[i][j];
-            }
-        }
-        self.V[sc.n] += other.V[sc.n];
+        // for i in 0..sc.n {
+        //     self.V[i] += other.V[i];
+        //     for j in 0..self.C[i].len() {
+        //         self.C[i][j] += other.C[i][j];
+        //     }
+        // }
+        // self.V[sc.n] += other.V[sc.n];
 
-        for (r_self, r_other) in self.R.iter_mut().zip(&other.R) {
-            *r_self += r_other;
-        }
+        // for (r_self, r_other) in self.R.iter_mut().zip(&other.R) {
+        //     *r_self += r_other;
+        // }
 
-        self.dealers.extend_from_slice(other.dealers.as_slice());
+        // self.dealers.extend_from_slice(other.dealers.as_slice());
 
-        self.sharing_proof = None; // the proofs don't aggregate
+        // self.sharing_proof = None; // the proofs don't aggregate
     }
 
     fn get_public_key_share(
@@ -392,7 +394,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     {
         let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
         Transcript {
-            dealers: vec![sc.get_player(0)],
+            dealer: sc.get_player(0),
             V: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
             C: (0..sc.n)
                 .map(|_| unsafe_random_points(num_chunks_per_share, rng))
@@ -508,6 +510,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Malleab
         _aux: &A,
         player: &Player,
     ) {
-        self.dealers = vec![*player]; // TODO!!!!!!!!!!!!!!!!!! NEXT PR
+        self.dealer = *player; // TODO!!!!!!!!!!!!!!!!!! NEXT PR
     }
 }
