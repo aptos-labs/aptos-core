@@ -50,6 +50,7 @@ This module provides the foundation for typesafe Coins.
 -  [Function `get_paired_transfer_ref`](#0x1_coin_get_paired_transfer_ref)
 -  [Function `return_paired_transfer_ref`](#0x1_coin_return_paired_transfer_ref)
 -  [Function `paired_burn_ref_exists`](#0x1_coin_paired_burn_ref_exists)
+-  [Function `get_paired_burn_copy_ref`](#0x1_coin_get_paired_burn_copy_ref)
 -  [Function `get_paired_burn_ref`](#0x1_coin_get_paired_burn_ref)
 -  [Function `convert_and_take_paired_burn_ref`](#0x1_coin_convert_and_take_paired_burn_ref)
 -  [Function `return_paired_burn_ref`](#0x1_coin_return_paired_burn_ref)
@@ -1935,6 +1936,33 @@ Check whether <code>BurnRef</code> has not been taken.
     <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(
         &<b>borrow_global</b>&lt;<a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a>&gt;(metadata_addr).burn_ref_opt
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_coin_get_paired_burn_copy_ref"></a>
+
+## Function `get_paired_burn_copy_ref`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_get_paired_burn_copy_ref">get_paired_burn_copy_ref</a>&lt;CoinType&gt;(burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">coin::BurnCapability</a>&lt;CoinType&gt;): <a href="fungible_asset.md#0x1_fungible_asset_BurnRef">fungible_asset::BurnRef</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="coin.md#0x1_coin_get_paired_burn_copy_ref">get_paired_burn_copy_ref</a>&lt;CoinType&gt;(
+    burn_cap: &<a href="coin.md#0x1_coin_BurnCapability">BurnCapability</a>&lt;CoinType&gt;
+): BurnRef <b>acquires</b> <a href="coin.md#0x1_coin_CoinConversionMap">CoinConversionMap</a>, <a href="coin.md#0x1_coin_PairedFungibleAssetRefs">PairedFungibleAssetRefs</a> {
+    <b>let</b> burn_ref = <a href="coin.md#0x1_coin_borrow_paired_burn_ref">borrow_paired_burn_ref</a>(burn_cap);
+    <a href="fungible_asset.md#0x1_fungible_asset_generate_burn_copy_ref">fungible_asset::generate_burn_copy_ref</a>(burn_ref)
 }
 </code></pre>
 

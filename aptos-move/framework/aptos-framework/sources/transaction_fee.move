@@ -8,7 +8,6 @@ module aptos_framework::transaction_fee {
     use std::error;
     use std::features;
     use std::option::{Self, Option};
-    use std::signer;
     use aptos_framework::event;
 
     friend aptos_framework::block;
@@ -30,17 +29,17 @@ module aptos_framework::transaction_fee {
 
     /// Stores burn capability to burn the gas fees.
     struct AptosCoinCapabilities has key {
-        burn_cap: BurnCapability<AptosCoin>,
+        burn_cap: BurnCapability<AptosCoin>
     }
 
     /// Stores burn capability to burn the gas fees.
     struct AptosFABurnCapabilities has key {
-        burn_ref: BurnRef,
+        burn_ref: BurnRef
     }
 
     /// Stores mint capability to mint the refunds.
     struct AptosCoinMintCapability has key {
-        mint_cap: MintCapability<AptosCoin>,
+        mint_cap: MintCapability<AptosCoin>
     }
 
     #[event]
@@ -73,39 +72,43 @@ module aptos_framework::transaction_fee {
         /// Storage fee charge.
         storage_fee_octas: u64,
         /// Storage fee refund.
-        storage_fee_refund_octas: u64,
+        storage_fee_refund_octas: u64
     }
 
     /// Burn transaction fees in epilogue.
-    public(friend) fun burn_fee(account: address, fee: u64) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
+    public(friend) fun burn_fee(
+        account: address, fee: u64
+    ) acquires AptosFABurnCapabilities, AptosCoinCapabilities {
         if (exists<AptosFABurnCapabilities>(@aptos_framework)) {
-            let burn_ref = &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
+            let burn_ref =
+                &borrow_global<AptosFABurnCapabilities>(@aptos_framework).burn_ref;
             aptos_account::burn_from_fungible_store_for_gas(burn_ref, account, fee);
         } else {
-            let burn_cap = &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
+            let burn_cap =
+                &borrow_global<AptosCoinCapabilities>(@aptos_framework).burn_cap;
             if (features::operations_default_to_fa_apt_store_enabled()) {
                 let (burn_ref, burn_receipt) = coin::get_paired_burn_ref(burn_cap);
                 aptos_account::burn_from_fungible_store_for_gas(&burn_ref, account, fee);
                 coin::return_paired_burn_ref(burn_ref, burn_receipt);
             } else {
-                coin::burn_from_for_gas<AptosCoin>(
-                    account,
-                    fee,
-                    burn_cap,
-                );
+                coin::burn_from_for_gas<AptosCoin>(account, fee, burn_cap);
             };
         };
     }
 
     /// Mint refund in epilogue.
-    public(friend) fun mint_and_refund(account: address, refund: u64) acquires AptosCoinMintCapability {
+    public(friend) fun mint_and_refund(
+        account: address, refund: u64
+    ) acquires AptosCoinMintCapability {
         let mint_cap = &borrow_global<AptosCoinMintCapability>(@aptos_framework).mint_cap;
         let refund_coin = coin::mint(refund, mint_cap);
         coin::deposit_for_gas_fee(account, refund_coin);
     }
 
     /// Only called during genesis.
-    public(friend) fun store_aptos_coin_burn_cap(aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>) {
+    public(friend) fun store_aptos_coin_burn_cap(
+        aptos_framework: &signer, burn_cap: BurnCapability<AptosCoin>
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
 
         if (features::operations_default_to_fa_apt_store_enabled()) {
@@ -116,18 +119,23 @@ module aptos_framework::transaction_fee {
         }
     }
 
-    public entry fun convert_to_aptos_fa_burn_ref(aptos_framework: &signer) acquires AptosCoinCapabilities {
-        assert!(features::operations_default_to_fa_apt_store_enabled(), EFA_GAS_CHARGING_NOT_ENABLED);
+    public entry fun convert_to_aptos_fa_burn_ref(
+        aptos_framework: &signer
+    ) acquires AptosCoinCapabilities {
+        assert!(
+            features::operations_default_to_fa_apt_store_enabled(),
+            EFA_GAS_CHARGING_NOT_ENABLED
+        );
         system_addresses::assert_aptos_framework(aptos_framework);
-        let AptosCoinCapabilities {
-            burn_cap,
-        } = move_from<AptosCoinCapabilities>(signer::address_of(aptos_framework));
-        let burn_ref = coin::convert_and_take_paired_burn_ref(burn_cap);
+        let burn_cap = &AptosCoinCapabilities[@aptos_framework].burn_cap;
+        let burn_ref = coin::get_paired_burn_copy_ref(burn_cap);
         move_to(aptos_framework, AptosFABurnCapabilities { burn_ref });
     }
 
     /// Only called during genesis.
-    public(friend) fun store_aptos_coin_mint_cap(aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>) {
+    public(friend) fun store_aptos_coin_mint_cap(
+        aptos_framework: &signer, mint_cap: MintCapability<AptosCoin>
+    ) {
         system_addresses::assert_aptos_framework(aptos_framework);
         move_to(aptos_framework, AptosCoinMintCapability { mint_cap })
     }
@@ -145,20 +153,21 @@ module aptos_framework::transaction_fee {
     struct CollectedFeesPerBlock has key {
         amount: AggregatableCoin<AptosCoin>,
         proposer: Option<address>,
-        burn_percentage: u8,
+        burn_percentage: u8
     }
 
     #[deprecated]
     /// DEPRECATED
-    public fun initialize_fee_collection_and_distribution(_aptos_framework: &signer, _burn_percentage: u8) {
+    public fun initialize_fee_collection_and_distribution(
+        _aptos_framework: &signer, _burn_percentage: u8
+    ) {
         abort error::not_implemented(ENO_LONGER_SUPPORTED)
     }
 
     #[deprecated]
     /// DEPRECATED
     public fun upgrade_burn_percentage(
-        _aptos_framework: &signer,
-        _new_burn_percentage: u8
+        _aptos_framework: &signer, _new_burn_percentage: u8
     ) {
         abort error::not_implemented(ENO_LONGER_SUPPORTED)
     }

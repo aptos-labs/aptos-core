@@ -547,6 +547,13 @@ module aptos_framework::coin {
         )
     }
 
+    public(friend) fun get_paired_burn_copy_ref<CoinType>(
+        burn_cap: &BurnCapability<CoinType>
+    ): BurnRef acquires CoinConversionMap, PairedFungibleAssetRefs {
+        let burn_ref = borrow_paired_burn_ref(burn_cap);
+        fungible_asset::generate_burn_copy_ref(burn_ref)
+    }
+
     /// Get the `BurnRef` of paired fungible asset of a coin type from `BurnCapability`.
     public fun get_paired_burn_ref<CoinType>(
         _: &BurnCapability<CoinType>
