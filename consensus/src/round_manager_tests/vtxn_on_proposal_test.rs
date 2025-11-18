@@ -165,6 +165,7 @@ fn test_dkg_result_handling<F>(
         &<RealDKG as DKGTrait>::PublicParams,
         u64,
         &<RealDKG as DKGTrait>::DealerPrivateKey,
+        &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript,
 {
     let mut rng = thread_rng();
@@ -193,6 +194,7 @@ fn test_dkg_result_handling<F>(
         &public_params,
         dealer_idx as u64,
         signers[dealer_idx].private_key(),
+        &signers[dealer_idx].public_key(),
     );
     let trx_bytes = bcs::to_bytes(&trx).unwrap();
     let vtxns = vec![ValidatorTransaction::DKGResult(DKGTranscript::new(
