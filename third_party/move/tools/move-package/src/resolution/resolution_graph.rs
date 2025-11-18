@@ -2,6 +2,7 @@
 // Copyright (c) The Move Contributors
 // SPDX-License-Identifier: Apache-2.0
 
+use crate::source_package::parsed_manifest::GitInfo;
 use crate::{
     package_hooks,
     resolution::{digest::compute_digest, git},
@@ -28,7 +29,7 @@ use petgraph::{algo, graphmap::DiGraphMap};
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
-    fs,
+    env, fs,
     io::Write,
     path::{Path, PathBuf},
     rc::Rc,
@@ -576,62 +577,72 @@ impl ResolvingGraph {
         writer: &mut W,
     ) -> Result<()> {
         if let Some(git_info) = &dep.git_info {
-            let git_url = git_info.git_url.as_str();
-            let git_rev = git_info.git_rev.as_str();
-            let git_path = &git_info.download_to.display().to_string();
-
-            // If there is no cached dependency, download it
-            if !git_info.download_to.exists() {
-                writeln!(
-                    writer,
-                    "{} {}",
-                    "FETCHING GIT DEPENDENCY".bold().green(),
-                    git_url,
-                )?;
-
-                // Confirm git is available.
-                git::confirm_git_available()?;
-
-                // If the cached folder does not exist, download and clone accordingly
-                git::clone(git_url, git_path, dep_name)?;
-                git::checkout(git_path, git_rev, dep_name)?;
-            } else if !skip_fetch_latest_git_deps {
-                // Confirm git is available.
-                git::confirm_git_available()?;
-
-                // Update the git dependency
-                // Check first that it isn't a git rev (if it doesn't work, just continue with the fetch)
-                if let Ok(parsed_rev) = git::find_rev(git_path, git_rev) {
-                    // If it's exactly the same, then it's a git rev
-                    if parsed_rev.trim().starts_with(git_rev) {
-                        return Ok(());
-                    }
-                }
-
-                if let Ok(tag) = git::find_tag(git_path, git_rev) {
-                    // If it's exactly the same, then it's a git tag, for now tags won't be updated
-                    // Tags don't easily update locally and you can't use reset --hard to cleanup
-                    // any extra files
-                    if tag.trim().starts_with(git_rev) {
-                        return Ok(());
-                    }
-                }
-
-                writeln!(
-                    writer,
-                    "{} {}",
-                    "UPDATING GIT DEPENDENCY".bold().green(),
-                    git_url,
-                )?;
-                // If the current folder exists, do a fetch and reset to ensure that the branch
-                // is up to date
-                // NOTE: this means that you must run the package system with a working network connection
-                git::fetch_origin(git_path, dep_name)?;
-                git::reset_hard(git_path, git_rev, dep_name)?;
-            }
+            Self::fetch_or_update_from_git(dep_name, git_info, skip_fetch_latest_git_deps, writer)?;
         }
         if let Some(node_info) = &dep.node_info {
             package_hooks::resolve_custom_dependency(dep_name, node_info)?
+        }
+        Ok(())
+    }
+
+    fn fetch_or_update_from_git<W: Write>(
+        dep_name: PackageName,
+        git_info: &GitInfo,
+        skip_fetch_latest_git_deps: bool,
+        writer: &mut W,
+    ) -> Result<()> {
+        let git_url = git_info.git_url.as_str();
+        let git_rev = git_info.git_rev.as_str();
+        let git_path = &git_info.download_to.display().to_string();
+
+        // If there is no cached dependency, download it
+        if !git_info.download_to.exists() {
+            writeln!(
+                writer,
+                "{} {}",
+                "FETCHING GIT DEPENDENCY".bold().green(),
+                git_url,
+            )?;
+
+            // Confirm git is available.
+            git::confirm_git_available()?;
+
+            // If the cached folder does not exist, download and clone accordingly
+            git::clone(git_url, git_path, dep_name)?;
+            git::checkout(git_path, git_rev, dep_name)?;
+        } else if !skip_fetch_latest_git_deps {
+            // Confirm git is available.
+            git::confirm_git_available()?;
+
+            // Update the git dependency
+            // Check first that it isn't a git rev (if it doesn't work, just continue with the fetch)
+            if let Ok(parsed_rev) = git::find_rev(git_path, git_rev) {
+                // If it's exactly the same, then it's a git rev
+                if parsed_rev.trim().starts_with(git_rev) {
+                    return Ok(());
+                }
+            }
+
+            if let Ok(tag) = git::find_tag(git_path, git_rev) {
+                // If it's exactly the same, then it's a git tag, for now tags won't be updated
+                // Tags don't easily update locally and you can't use reset --hard to cleanup
+                // any extra files
+                if tag.trim().starts_with(git_rev) {
+                    return Ok(());
+                }
+            }
+
+            writeln!(
+                writer,
+                "{} {}",
+                "UPDATING GIT DEPENDENCY".bold().green(),
+                git_url,
+            )?;
+            // If the current folder exists, do a fetch and reset to ensure that the branch
+            // is up to date
+            // NOTE: this means that you must run the package system with a working network connection
+            git::fetch_origin(git_path, dep_name)?;
+            git::reset_hard(git_path, git_rev, dep_name)?;
         }
         Ok(())
     }
