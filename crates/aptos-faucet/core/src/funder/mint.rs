@@ -8,13 +8,15 @@ use anyhow::{Context, Result};
 use aptos_logger::info;
 use aptos_sdk::{
     crypto::ed25519::{Ed25519PrivateKey, Ed25519PublicKey},
+    move_types::{identifier::Identifier, language_storage::ModuleId},
     rest_client::{AptosBaseUrl, Client},
     transaction_builder::{aptos_stdlib, TransactionFactory},
     types::{
         account_address::AccountAddress,
         chain_id::ChainId,
         transaction::{
-            authenticator::AuthenticationKey, Script, SignedTransaction, TransactionArgument,
+            authenticator::AuthenticationKey, EntryFunction, Script, SignedTransaction,
+            TransactionArgument, TransactionPayload,
         },
         LocalAccount,
     },
@@ -48,6 +50,26 @@ pub struct MintAssetConfig {
     /// Just use the account given in funder args, don't make a new one and
     /// delegate the mint capability to it.
     pub do_not_delegate: bool,
+
+    /// Transaction method: "script" (default) or "entry_function"
+    #[serde(default = "default_transaction_method")]
+    pub transaction_method: String,
+
+    /// Module address for entry function (required if transaction_method == "entry_function")
+    /// Example: "0x1234567890abcdef..."
+    pub module_address: Option<AccountAddress>,
+
+    /// Module name for entry function (required if transaction_method == "entry_function")
+    /// Example: "my_coin"
+    pub module_name: Option<String>,
+
+    /// Function name for entry function (required if transaction_method == "entry_function")
+    /// Example: "mint"
+    pub function_name: Option<String>,
+}
+
+fn default_transaction_method() -> String {
+    "script".to_string()
 }
 
 impl MintAssetConfig {
@@ -60,6 +82,10 @@ impl MintAssetConfig {
             default,
             mint_account_address,
             do_not_delegate,
+            transaction_method: default_transaction_method(),
+            module_address: None,
+            module_name: None,
+            function_name: None,
         }
     }
 
@@ -392,17 +418,96 @@ impl MintFunder {
             return Ok(vec![]);
         }
 
-        let txn =
-            {
-                let faucet_account = self.get_asset_account(asset_name)?.write().await;
-                let transaction_factory = self.get_transaction_factory().await?;
-                faucet_account.sign_with_transaction_builder(transaction_factory.script(
-                    Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![
+        let asset_config = self.get_asset_config(asset_name)?;
+        let transaction_factory = self.get_transaction_factory().await?;
+
+        let txn = {
+            let faucet_account = self.get_asset_account(asset_name)?.write().await;
+
+            let payload = match asset_config.transaction_method.as_str() {
+                "entry_function" => {
+                    // Validate entry function fields
+                    let module_address = asset_config.module_address.ok_or_else(|| {
+                        AptosTapError::new(
+                            format!(
+                                "Asset '{}' uses entry_function but module_address is not set",
+                                asset_name
+                            ),
+                            AptosTapErrorCode::InvalidRequest,
+                        )
+                    })?;
+                    let module_name = asset_config.module_name.as_ref().ok_or_else(|| {
+                        AptosTapError::new(
+                            format!(
+                                "Asset '{}' uses entry_function but module_name is not set",
+                                asset_name
+                            ),
+                            AptosTapErrorCode::InvalidRequest,
+                        )
+                    })?;
+                    let function_name = asset_config.function_name.as_ref().ok_or_else(|| {
+                        AptosTapError::new(
+                            format!(
+                                "Asset '{}' uses entry_function but function_name is not set",
+                                asset_name
+                            ),
+                            AptosTapErrorCode::InvalidRequest,
+                        )
+                    })?;
+
+                    // Create ModuleId
+                    let module_id = ModuleId::new(
+                        module_address,
+                        Identifier::new(module_name.as_str()).map_err(|e| {
+                            AptosTapError::new(
+                                format!("Invalid module_name '{}': {}", module_name, e),
+                                AptosTapErrorCode::InvalidRequest,
+                            )
+                        })?,
+                    );
+
+                    // Create function identifier
+                    let function_identifier =
+                        Identifier::new(function_name.as_str()).map_err(|e| {
+                            AptosTapError::new(
+                                format!("Invalid function_name '{}': {}", function_name, e),
+                                AptosTapErrorCode::InvalidRequest,
+                            )
+                        })?;
+
+                    // Serialize arguments (receiver_address and amount)
+                    use aptos_sdk::bcs;
+                    let args = vec![
+                        bcs::to_bytes(&receiver_address).map_err(|e| {
+                            AptosTapError::new(
+                                format!("Failed to serialize receiver_address: {}", e),
+                                AptosTapErrorCode::InvalidRequest,
+                            )
+                        })?,
+                        bcs::to_bytes(&amount).map_err(|e| {
+                            AptosTapError::new(
+                                format!("Failed to serialize amount: {}", e),
+                                AptosTapErrorCode::InvalidRequest,
+                            )
+                        })?,
+                    ];
+
+                    let entry_function =
+                        EntryFunction::new(module_id, function_identifier, vec![], args);
+
+                    TransactionPayload::EntryFunction(entry_function)
+                },
+                _ => {
+                    // Default script-based approach
+                    TransactionPayload::Script(Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![
                         TransactionArgument::Address(receiver_address),
                         TransactionArgument::U64(amount),
-                    ]),
-                ))
+                    ]))
+                },
             };
+
+            faucet_account.sign_with_transaction_builder(transaction_factory.payload(payload))
+        };
 
         Ok(vec![
             submit_transaction(
