@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-PROFILE=cli
+PROFILE=${PROFILE:-cli}
 
 echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"

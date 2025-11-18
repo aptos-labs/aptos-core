@@ -723,7 +723,7 @@ def parse_args() -> argparse.Namespace:
     return args
 
 
-def get_image(image_tag: str | None = None) -> str:
+def get_image(image_tag: str | None = None, use_performance_image: bool = True) -> str:
     shell = forge.LocalShell()
     git = forge.Git(shell)
     image_name = "tools"
@@ -737,7 +737,8 @@ def get_image(image_tag: str | None = None) -> str:
         if image_tag is None
         else image_tag
     )
-    full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{default_latest_image}"
+    tag_prefix = "performance_" if use_performance_image else ""
+    full_image = f"{forge.GAR_REPO_NAME}/{image_name}:{tag_prefix}{default_latest_image}"
     return full_image
 
 
