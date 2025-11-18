@@ -11,7 +11,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ark_ec::CurveGroup;
-use ark_ff::{batch_inversion, FftField, Field, PrimeField};
+use ark_ff::{batch_inversion, FftField, Field};
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::fmt;
 use rand::{seq::IteratorRandom, Rng};
@@ -27,7 +27,6 @@ pub type ShamirShare<F: WeightedSum> = (Player, F);
 pub type ShamirGroupShare<G: CurveGroup> = ShamirShare<G>;
 
 /// All dealt secret keys should be reconstructable from a subset of \[dealt secret key\] shares.
-/// TODO: Should we keep Vec<(Player, Self::Share)> ? Vec<ShamirShare> looks simpler / more descriptive
 pub trait Reconstructable<SSC: traits::SecretSharingConfig>: Sized {
     /// The "share" type. Minor nit: this is a slight misnomer; you can't actually reconstruct
     /// using just a vec of shares, you need a vec of pairs (Player, Self::Share). So the pair
@@ -53,7 +52,7 @@ pub struct ShamirThresholdConfig<F: FftField> {
     pub domain: Radix2EvaluationDomain<F>,
 }
 
-impl<F: PrimeField> traits::SecretSharingConfig for ShamirThresholdConfig<F> {
+impl<F: FftField> traits::SecretSharingConfig for ShamirThresholdConfig<F> {
     /// For testing only.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where
@@ -85,7 +84,7 @@ impl<F: PrimeField> traits::SecretSharingConfig for ShamirThresholdConfig<F> {
     }
 }
 
-impl<F: PrimeField> traits::ThresholdConfig for ShamirThresholdConfig<F> {
+impl<F: FftField> traits::ThresholdConfig for ShamirThresholdConfig<F> {
     fn new(t: usize, n: usize) -> Result<Self> {
         let domain = Radix2EvaluationDomain::new(n) // Note that `new(n)` internally does `n.next_power_of_two()`
             .expect("Invalid domain size: {}");
@@ -97,13 +96,13 @@ impl<F: PrimeField> traits::ThresholdConfig for ShamirThresholdConfig<F> {
     }
 }
 
-impl<F: PrimeField> fmt::Display for ShamirThresholdConfig<F> {
+impl<F: FftField> fmt::Display for ShamirThresholdConfig<F> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "ThresholdConfig {{ n: {}, t: {} }}", self.n, self.t)
     }
 }
 
-impl<'de, F: PrimeField> Deserialize<'de> for ShamirThresholdConfig<F> {
+impl<'de, F: FftField> Deserialize<'de> for ShamirThresholdConfig<F> {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -218,7 +217,7 @@ pub fn all_lagrange_denominators<F: FftField>(
     denoms
 }
 
-impl<F: PrimeField> ShamirThresholdConfig<F> {
+impl<F: FftField> ShamirThresholdConfig<F> {
     /// This initializes a `(t, n)` threshold scheme configuration.
     /// The `domain` is automatically computed as a radix-2 evaluation domain
     /// of size `n.next_power_of_two()` for use in FFT-based polynomial operations.

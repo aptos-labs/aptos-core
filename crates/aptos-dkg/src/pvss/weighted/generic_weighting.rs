@@ -7,7 +7,7 @@
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
     traits::{transcript::MalleableTranscript, Transcript},
-    Player, ThresholdConfigBlstrs, WeightedConfig,
+    Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
 use aptos_crypto::{traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -40,7 +40,7 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericWeighting<T> {
 
 impl<T: Transcript> GenericWeighting<T> {
     fn to_weighted_encryption_keys(
-        sc: &WeightedConfig,
+        sc: &WeightedConfigBlstrs,
         eks: &Vec<T::EncryptPubKey>,
     ) -> Vec<T::EncryptPubKey> {
         // Re-organize the encryption key vector so that we deal multiple shares to each player,
@@ -72,7 +72,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     type EncryptPubKey = T::EncryptPubKey;
     type InputSecret = T::InputSecret;
     type PublicParameters = T::PublicParameters;
-    type SecretSharingConfig = WeightedConfig;
+    type SecretSharingConfig = WeightedConfigBlstrs;
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 

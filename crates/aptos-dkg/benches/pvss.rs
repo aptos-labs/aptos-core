@@ -18,7 +18,7 @@ use aptos_dkg::{
             DealingArgs, NoAux,
         },
         traits::transcript::{MalleableTranscript, Transcript, WithMaxNumShares},
-        LowDegreeTest, WeightedConfig,
+        LowDegreeTest, WeightedConfigBlstrs,
     },
 };
 use criterion::{
@@ -95,7 +95,7 @@ pub fn pvss_group<T: MalleableTranscript>(
     d
 }
 
-pub fn weighted_pvss_group<T: MalleableTranscript<SecretSharingConfig = WeightedConfig>>(
+pub fn weighted_pvss_group<T: MalleableTranscript<SecretSharingConfig = WeightedConfigBlstrs>>(
     sc: &T::SecretSharingConfig,
     d: DealingArgs<T>,
     c: &mut Criterion,
