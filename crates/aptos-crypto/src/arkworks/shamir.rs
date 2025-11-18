@@ -27,7 +27,6 @@ pub type ShamirShare<F: WeightedSum> = (Player, F);
 pub type ShamirGroupShare<G: CurveGroup> = ShamirShare<G>;
 
 /// All dealt secret keys should be reconstructable from a subset of \[dealt secret key\] shares.
-/// TODO: Should we keep Vec<(Player, Self::Share)> ? Vec<ShamirShare> looks simpler / more descriptive
 pub trait Reconstructable<SSC: traits::SecretSharingConfig>: Sized {
     /// The "share" type. Minor nit: this is a slight misnomer; you can't actually reconstruct
     /// using just a vec of shares, you need a vec of pairs (Player, Self::Share). So the pair
