@@ -339,6 +339,7 @@ impl Module {
             &field_handles,
             &field_instantiations,
             &variant_field_infos,
+            &variant_field_instantiation_infos,
         );
 
         for (idx, _) in module.function_defs().iter().enumerate() {

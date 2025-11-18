@@ -205,9 +205,11 @@ pub(crate) struct BytecodeTransformer<'a> {
     pub(crate) field_instantiations: &'a [FieldInstantiation],
 
     pub(crate) variant_field_infos: &'a [VariantFieldInfo],
+    pub(crate) variant_field_instantiation_infos: &'a [VariantFieldInfo],
 
     // Caches for expensive type instantiation operations
     field_ty_cache: RefCell<HashMap<FieldInstantiationIndex, (Type, bool)>>,
+    variant_field_ty_cache: RefCell<HashMap<VariantFieldInstantiationIndex, (Type, bool)>>,
     pack_field_tys_cache: RefCell<HashMap<StructDefInstantiationIndex, Vec<Type>>>,
 }
 
@@ -220,6 +222,7 @@ impl<'a> BytecodeTransformer<'a> {
         field_handles: &'a [FieldHandle],
         field_instantiations: &'a [FieldInstantiation],
         variant_field_infos: &'a [VariantFieldInfo],
+        variant_field_instantiation_infos: &'a [VariantFieldInfo],
     ) -> Self {
         Self {
             use_v2_instructions: true, // TODO: get this from config/feature flag
@@ -231,7 +234,9 @@ impl<'a> BytecodeTransformer<'a> {
             field_handles,
             field_instantiations,
             variant_field_infos,
+            variant_field_instantiation_infos,
             field_ty_cache: RefCell::new(HashMap::new()),
+            variant_field_ty_cache: RefCell::new(HashMap::new()),
             pack_field_tys_cache: RefCell::new(HashMap::new()),
         }
     }
@@ -245,6 +250,7 @@ impl<'a> BytecodeTransformer<'a> {
             Entry::Occupied(entry) => Ok(entry.get().clone()),
             Entry::Vacant(entry) => {
                 let field_inst = &self.field_instantiations[idx.0 as usize];
+                // TODO: check if error code is correct
                 let ty = self
                     .ty_builder
                     .create_ty_with_subst_allow_ty_params(
@@ -254,6 +260,32 @@ impl<'a> BytecodeTransformer<'a> {
                     .map_err(|e| {
                         PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
                             .with_message(format!("Failed to create field type: {}", e))
+                    })?;
+                let is_fully_instantiated = ty.is_concrete();
+                Ok(entry.insert((ty.clone(), is_fully_instantiated)).clone())
+            },
+        }
+    }
+
+    fn get_variant_field_instantiation_ty(
+        &self,
+        idx: VariantFieldInstantiationIndex,
+    ) -> PartialVMResult<(Type, bool)> {
+        let mut cache = self.variant_field_ty_cache.borrow_mut();
+        match cache.entry(idx) {
+            Entry::Occupied(entry) => Ok(entry.get().clone()),
+            Entry::Vacant(entry) => {
+                let variant_field_inst = &self.variant_field_instantiation_infos[idx.0 as usize];
+                // TODO: check if error code is correct
+                let ty = self
+                    .ty_builder
+                    .create_ty_with_subst_allow_ty_params(
+                        &variant_field_inst.uninstantiated_field_ty,
+                        &variant_field_inst.instantiation,
+                    )
+                    .map_err(|e| {
+                        PartialVMError::new(StatusCode::TYPE_RESOLUTION_FAILURE)
+                            .with_message(format!("Failed to create variant field type: {}", e))
                     })?;
                 let is_fully_instantiated = ty.is_concrete();
                 Ok(entry.insert((ty.clone(), is_fully_instantiated)).clone())
@@ -337,10 +369,6 @@ impl<'a> BytecodeTransformer<'a> {
                 | UnpackVariantGeneric(_) => {
                     return Ok(false);
                 },
-                // Disallow variant field borrowing (not supported yet -- needs new instruction)
-                MutBorrowVariantFieldGeneric(_) | ImmBorrowVariantFieldGeneric(_) => {
-                    return Ok(false);
-                },
                 // Disallow vector operations other than VecLen (not supported yet -- needs new instruction)
                 VecPack(_, _)
                 | VecImmBorrow(_)
@@ -384,7 +412,7 @@ impl<'a> BytecodeTransformer<'a> {
                 },
                 // - Field borrowing (stack-only, operates on references)
                 MutBorrowField(_) | ImmBorrowField(_) => {},
-                // - MutBorrowFieldGeneric/ImmBorrowFieldGeneric: require concrete instantiation for V2
+                // - Generic field borrowing: require concrete instantiation for V2
                 MutBorrowFieldGeneric(idx) | ImmBorrowFieldGeneric(idx) => {
                     let (_, is_fully_instantiated) = self.get_field_instantiation_ty(*idx)?;
 
@@ -394,6 +422,15 @@ impl<'a> BytecodeTransformer<'a> {
                 },
                 // - Variant field borrowing (stack-only, operates on references)
                 MutBorrowVariantField(_) | ImmBorrowVariantField(_) => {},
+                // - Generic variant field borrowing: require concrete instantiation for V2
+                MutBorrowVariantFieldGeneric(idx) | ImmBorrowVariantFieldGeneric(idx) => {
+                    let (_, is_fully_instantiated) =
+                        self.get_variant_field_instantiation_ty(*idx)?;
+
+                    if !is_fully_instantiated {
+                        return Ok(false);
+                    }
+                },
                 // - Vector operations (only VecLen is supported, for now)
                 VecLen(_) => {},
             }
@@ -614,6 +651,43 @@ impl<'a> BytecodeTransformer<'a> {
         })
     }
 
+    fn transform_borrow_variant_field_generic(
+        &self,
+        is_mut: bool,
+        idx: VariantFieldInstantiationIndex,
+        inline: bool,
+    ) -> PartialVMResult<Instruction> {
+        let fallback = || {
+            Ok(if is_mut {
+                Instruction::MutBorrowVariantFieldGeneric(idx)
+            } else {
+                Instruction::ImmBorrowVariantFieldGeneric(idx)
+            })
+        };
+
+        if !(self.use_v2_instructions || inline) {
+            return fallback();
+        }
+
+        let info = &self.variant_field_instantiation_infos[idx.0 as usize];
+        let (field_ty, is_fully_instantiated) = self.get_variant_field_instantiation_ty(idx)?;
+
+        if !is_fully_instantiated {
+            // TODO: invariant violation if inline is true
+            return fallback();
+        }
+
+        Ok(Instruction::BorrowVariantFieldV2(Box::new(
+            BorrowVariantFieldV2 {
+                is_mut,
+                def_struct_ty: info.definition_struct_type.clone(),
+                variants: info.variants.clone(),
+                field_offset: info.offset,
+                field_ty,
+            },
+        )))
+    }
+
     // TODO: transform_borrow_variant_field_generic
 
     fn transform_pack_variant(
@@ -696,7 +770,9 @@ impl<'a> BytecodeTransformer<'a> {
             B::MutBorrowFieldGeneric(idx) => {
                 self.transform_borrow_field_generic(true, idx, inline)?
             },
-            B::MutBorrowVariantFieldGeneric(idx) => I::MutBorrowVariantFieldGeneric(idx),
+            B::MutBorrowVariantFieldGeneric(idx) => {
+                self.transform_borrow_variant_field_generic(true, idx, inline)?
+            },
             B::ImmBorrowField(idx) => self.transform_borrow_field(false, idx, inline)?,
             B::ImmBorrowVariantField(idx) => {
                 self.transform_borrow_variant_field(false, idx, inline)?
@@ -704,7 +780,9 @@ impl<'a> BytecodeTransformer<'a> {
             B::ImmBorrowFieldGeneric(idx) => {
                 self.transform_borrow_field_generic(false, idx, inline)?
             },
-            B::ImmBorrowVariantFieldGeneric(idx) => I::ImmBorrowVariantFieldGeneric(idx),
+            B::ImmBorrowVariantFieldGeneric(idx) => {
+                self.transform_borrow_variant_field_generic(false, idx, inline)?
+            },
             B::MutBorrowGlobal(idx) => I::MutBorrowGlobal(idx),
             B::MutBorrowGlobalGeneric(idx) => I::MutBorrowGlobalGeneric(idx),
             B::ImmBorrowGlobal(idx) => I::ImmBorrowGlobal(idx),
