@@ -57,6 +57,9 @@ pub(crate) struct Frame {
     pub(crate) ty_builder: TypeBuilder,
     // Currently being executed function.
     pub(crate) function: Rc<LoadedFunction>,
+    // Guard used to profile the execution of this function.
+    // Note that this is only stored to keep it alive for the lifetime of the frame.
+    // It is an option so we can pass `None` during the runtime type checks.
     pub(crate) _guard: Option<FnGuard>,
     // How this frame was established.
     pub(crate) call_type: CallType,
