@@ -18,14 +18,12 @@ module aptos_experimental::single_order_book {
     use std::option::{Self, Option};
     use std::string::String;
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_framework::transaction_context;
     use aptos_experimental::order_book_types::{
         OrderIdType,
         AccountClientOrderId,
-        new_unique_idx_type,
         new_account_client_order_id,
         new_default_big_ordered_map, OrderMatch, new_order_match, new_single_order_match_details, OrderMatchDetails,
-        UniqueIdxType, single_order_type
+        UniqueIdxType, single_order_type, next_unique_idx_type
     };
     use aptos_experimental::single_order_types::{
         OrderWithState,
@@ -251,8 +249,7 @@ module aptos_experimental::single_order_book {
     public(friend) fun place_maker_or_pending_order<M: store + copy + drop>(
         self: &mut SingleOrderBook<M>, price_time_idx: &mut PriceTimeIndex, order_req: SingleOrderRequest<M>
     ) {
-        let ascending_idx =
-            new_unique_idx_type(transaction_context::monotonically_increasing_counter());
+        let ascending_idx = next_unique_idx_type();
         if (order_req.trigger_condition.is_some()) {
             return self.place_pending_order_internal(order_req);
         };
@@ -335,8 +332,7 @@ module aptos_experimental::single_order_book {
         self: &mut SingleOrderBook<M>, order_req: SingleOrderRequest<M>
     ) {
         let order_id = order_req.order_id;
-        let ascending_idx =
-            new_unique_idx_type(transaction_context::monotonically_increasing_counter());
+        let ascending_idx = next_unique_idx_type();
         let order =
             new_single_order(
                 order_id,

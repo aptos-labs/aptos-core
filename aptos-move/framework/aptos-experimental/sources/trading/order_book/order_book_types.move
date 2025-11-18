@@ -72,23 +72,33 @@ module aptos_experimental::order_book_types {
         )
     }
 
-    public fun next_order_id(): OrderIdType {
-        // reverse bits to make order ids random, so indices on top of them are shuffled.
-        OrderIdType { order_id: reverse_bits(transaction_context::monotonically_increasing_counter()) }
-    }
-
-    public fun new_order_id_type(order_id: u128): OrderIdType {
-        OrderIdType { order_id }
-    }
-
     public fun new_account_client_order_id(
         account: address, client_order_id: String
     ): AccountClientOrderId {
         AccountClientOrderId { account, client_order_id }
     }
 
-    public(friend) fun new_unique_idx_type(idx: u128): UniqueIdxType {
-        UniqueIdxType { idx }
+    public fun new_order_id_type(order_id: u128): OrderIdType {
+        OrderIdType { order_id }
+    }
+
+    public fun next_order_id(): OrderIdType {
+        // reverse bits to make order ids random, so indices on top of them are shuffled.
+        OrderIdType { order_id: reverse_bits(transaction_context::monotonically_increasing_counter()) }
+    }
+
+    public(friend) fun next_unique_idx_type(): UniqueIdxType {
+        UniqueIdxType { idx: transaction_context::monotonically_increasing_counter() }
+    }
+
+    public(friend) fun next_order_id_and_unique_idx_type(): (OrderIdType, UniqueIdxType) {
+        let monotonic = transaction_context::monotonically_increasing_counter();
+        // It is OK to have order_id and unique_idx be the same value,
+        // their uniqueness is important only within their respective categories.
+        (
+            OrderIdType { order_id: reverse_bits(monotonic) },
+            UniqueIdxType { idx: monotonic }
+        )
     }
 
     public(friend) fun descending_idx(self: &UniqueIdxType): UniqueIdxType {

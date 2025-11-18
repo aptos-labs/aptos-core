@@ -47,7 +47,6 @@ module aptos_experimental::bulk_order_book {
     #[test_only] friend aptos_experimental::bulk_order_book_tests;
 
     use aptos_framework::big_ordered_map::BigOrderedMap;
-    use aptos_framework::transaction_context;
     use aptos_experimental::order_book_types::ActiveMatchedOrder;
     use aptos_experimental::order_book_types;
     use aptos_experimental::bulk_order_book_types::{
@@ -59,7 +58,8 @@ module aptos_experimental::bulk_order_book {
     use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_type};
     use aptos_experimental::order_book_types::{
         OrderIdType,
-        next_order_id, new_unique_idx_type
+        next_order_id_and_unique_idx_type,
+        next_unique_idx_type,
     };
 
     // Error codes for various failure scenarios
@@ -346,20 +346,20 @@ module aptos_experimental::bulk_order_book {
         let account = get_account_from_order_request(&order_req);
         let new_sequence_number = get_sequence_number_from_order_request(&order_req);
         let order_option = self.orders.remove_or_none(&account);
-        let (order_id, previous_seq_num) = if (order_option.is_some()) {
+        let (order_id, unique_idx, previous_seq_num) = if (order_option.is_some()) {
             let old_order = order_option.destroy_some();
             let existing_sequence_number = get_sequence_number_from_bulk_order(&old_order);
             assert!(new_sequence_number > existing_sequence_number, E_INVALID_SEQUENCE_NUMBER);
             cancel_active_orders(price_time_idx, &old_order);
-            (old_order.get_order_id(), std::option::some(existing_sequence_number))
+            (old_order.get_order_id(), next_unique_idx_type(), std::option::some(existing_sequence_number))
         } else {
-            let order_id = next_order_id();
+            let (order_id, unique_idx) = next_order_id_and_unique_idx_type();
             self.order_id_to_address.add(order_id, account);
-            (order_id, std::option::none())
+            (order_id, unique_idx, std::option::none())
         };
         let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes) = new_bulk_order(
             order_id,
-            new_unique_idx_type(transaction_context::monotonically_increasing_counter()),
+            unique_idx,
             order_req,
             price_time_idx.best_bid_price(),
             price_time_idx.best_ask_price(),
