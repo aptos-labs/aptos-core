@@ -103,8 +103,35 @@ fn test_pvss_transcript_size() {
 
         print_transcript_size::<das::Transcript>("Expected", &sc, expected_size);
         print_transcript_size::<das::Transcript>("Actual", &sc, actual_size);
+    }
 
-        // TODO: add `chunky` here?
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254 instead
+    // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
+    for sc in get_threshold_configs_for_benchmarking() {
+        println!();
+        let actual_size = actual_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(&sc);
+        print_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(
+            "Actual for BN254",
+            &sc,
+            actual_size,
+        );
+
+        break; // exit after first iteration, setup is too slow
+    }
+
+    // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
+    for sc in get_threshold_configs_for_benchmarking() {
+        println!();
+
+        let actual_size =
+            actual_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(&sc);
+        print_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(
+            "Actual for BLS12_381",
+            &sc,
+            actual_size,
+        );
+
+        break; // exit after first iteration, setup is too slow
     }
 
     for wc in get_weighted_configs_for_benchmarking() {

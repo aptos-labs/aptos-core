@@ -179,17 +179,23 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
     wcs
 }
 
-pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfigBlstrs> {
+pub fn get_threshold_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Vec<T> {
+    // Define the specific (t, n) pairs for benchmarking
     // [XDL+24] The Latency Price of Threshold Cryptosystem in Blockchains; by Zhuolun Xiang et al; 2024
-    vec![
-        ThresholdConfigBlstrs::new(143, 254).unwrap(), // from XDL+24
-        ThresholdConfigBlstrs::new(184, 254).unwrap(), // from XDL+24
-        ThresholdConfigBlstrs::new(548, 821).unwrap(), // from initial deployment
-        ThresholdConfigBlstrs::new(333, 1_000).unwrap(),
-        ThresholdConfigBlstrs::new(666, 1_000).unwrap(),
-        ThresholdConfigBlstrs::new(3_333, 10_000).unwrap(),
-        ThresholdConfigBlstrs::new(6_666, 10_000).unwrap(),
-    ]
+    let configs = vec![
+        (143, 254), // from XDL+24
+        (184, 254), // from XDL+24
+        (548, 821), // from initial deployment
+        (333, 1_000),
+        (666, 1_000),
+        (3_333, 10_000),
+        (6_666, 10_000),
+    ];
+
+    configs
+        .into_iter()
+        .map(|(t, n)| T::new(t, n).unwrap())
+        .collect()
 }
 
 pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {

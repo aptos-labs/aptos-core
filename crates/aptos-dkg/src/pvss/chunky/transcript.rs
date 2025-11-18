@@ -534,7 +534,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                     unsafe_random_point(rng),
                 ),
                 PoK: hkzg_chunked_elgamal::Proof::generate(
-                    pp.pk_range_proof.max_n,
+                    (sc.n - 1).next_power_of_two() - 1,
                     num_chunks_per_share,
                     rng,
                 ),

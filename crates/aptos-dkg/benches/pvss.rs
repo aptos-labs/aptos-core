@@ -10,15 +10,14 @@ use aptos_crypto::{
 };
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
-    pvss,
     pvss::{
-        test_utils,
+        self,
         test_utils::{
-            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+            self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
             DealingArgs, NoAux,
         },
         traits::transcript::{MalleableTranscript, Transcript, WithMaxNumShares},
-        LowDegreeTest, WeightedConfigBlstrs,
+        LowDegreeTest, ThresholdConfigBlstrs, WeightedConfigBlstrs,
     },
 };
 use criterion::{
@@ -52,7 +51,7 @@ pub fn all_groups(c: &mut Criterion) {
 pub fn ldt_group(c: &mut Criterion) {
     let mut rng = thread_rng();
 
-    for sc in get_threshold_configs_for_benchmarking() {
+    for sc in get_threshold_configs_for_benchmarking::<ThresholdConfigBlstrs>() {
         let mut group = c.benchmark_group("ldt");
 
         group.bench_function(format!("dual_code_word/{}", sc), move |b| {
