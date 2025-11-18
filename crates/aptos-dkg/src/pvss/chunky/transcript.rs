@@ -70,20 +70,20 @@ pub struct UnsignedTranscript<E: Pairing> {
     dealer: Player,
     /// Public key shares from 0 to n-1: V[i] = s_i * G_2; public key is in V[n]
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub V: Vec<E::G2>,
+    pub Vs: Vec<E::G2>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub C: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway
+    pub Cs: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway
     /// Second chunked ElGamal component: R[j] = r_j * H
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub R: Vec<E::G1>,
+    pub Rs: Vec<E::G1>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<E>,
 }
 
 // ================================================================
-//                    UNSIGNED TRANSCRIPT HASHER
+//            IMPLEMENTATION OF UNSIGNED TRANSCRIPT HASHER
 // ================================================================
 
 /// Cryptographic hasher for an BCS-serializable UnsignedTranscript
@@ -139,11 +139,11 @@ impl std::io::Write for UnsignedTranscriptHasher {
 }
 
 // ================================================================
-//                END UNSIGNED TRANSCRIPT HASHER
+//         END IMPLEMENTATION OF UNSIGNED TRANSCRIPT HASHER
 // ================================================================
 
 // ================================================================
-//                  UNSIGNED TRANSCRIPT BCS HASH
+//          IMPLEMENTATION OF UNSIGNED TRANSCRIPT BCS HASH
 // ================================================================
 
 use aptos_crypto::hash::{CryptoHash, HashValue};
@@ -167,7 +167,7 @@ where
 }
 
 // ================================================================
-//               END UNSIGNED TRANSCRIPT BCS HASH
+//        END IMPLEMENTATION OF UNSIGNED TRANSCRIPT BCS HASH
 // ================================================================
 
 #[allow(non_snake_case)]
@@ -200,6 +200,7 @@ impl<E: Pairing> TryFrom<&[u8]> for Transcript<E> {
     }
 }
 
+// Temporary hack, will deal with this at some point
 #[allow(type_alias_bounds)]
 type FiatShamirContext<'a, A: Serialize + Clone, E: Pairing> = (
     ShamirThresholdConfig<E::ScalarField>,
@@ -229,7 +230,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     fn dst() -> Vec<u8> {
-        b"APTOS_CHUNK_EG_FIELD_PVSS_FS_DST".to_vec()
+        DST.to_vec()
     }
 
     #[allow(non_snake_case)]
@@ -251,22 +252,22 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         );
 
         // Initialize the PVSS Fiat-Shamir transcript
-        let fs_ctxt = (*sc, spk.clone(), aux, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here
+        let fs_ctxt = (*sc, spk.clone(), aux, dealer.id, DST.to_vec()); // This is a bit hacky; also get rid of DST here and use self.dst?
 
         // Generate the Shamir secret sharing polynomial
         let mut f = vec![*s.get_secret_a()]; // constant term of polynomial
         f.extend(sample_field_elements::<E::ScalarField, _>(
             sc.get_threshold() - 1,
             rng,
-        )); // remaining coefficients; total degree is `t - 1`
+        )); // these are the remaining coefficients; total degree is `t - 1`
 
-        // Generate its `n` evaluations (shares)
+        // Generate its `n` evaluations (shares) by doing an FFT over the whole domain, then truncating
         let mut f_evals = sc.domain.fft(&f);
         f_evals.truncate(sc.n);
         debug_assert_eq!(f_evals.len(), sc.n);
 
         // Encrypt the chunked shares and generate the sharing proof
-        let (C, R, sharing_proof) =
+        let (Cs, Rs, sharing_proof) =
             Self::encrypt_chunked_shares(&f_evals, eks, sc, pp, fs_ctxt, rng);
 
         // Add constant term for the `\mathbb{G}_2` commitment (we're doing this
@@ -277,21 +278,22 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Commit to polynomial evaluations + constant term
         let G_2 = pp.get_commitment_base();
-        let V = arkworks::commit_to_scalars(&G_2, &f_evals);
-        debug_assert_eq!(V.len(), sc.n + 1);
+        let Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
+        debug_assert_eq!(Vs.len(), sc.n + 1);
 
         // Construct the **unsigned** transcript struct with all computed values
         let utrs = UnsignedTranscript {
             dealer: *dealer,
-            V,
-            C,
-            R,
+            Vs,
+            Cs,
+            Rs,
             sharing_proof,
         };
 
+        // Now sign this transcript
         let sgn = ssk
             .sign(&utrs)
-            .expect("signing of `chunky` PVSS transcript should have succeeded");
+            .expect("signing of `chunky` PVSS transcript failed");
 
         Transcript { utrs, sgn }
     }
@@ -303,23 +305,23 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         pp: &Self::PublicParameters,
         spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>, // TODO: is this intentional? if so, rename it auxs
+        auxs: &Vec<A>,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
         }
-        if self.utrs.C.len() != sc.n {
+        if self.utrs.Cs.len() != sc.n {
             bail!(
                 "Expected {} arrays of chunked ciphertexts, but got {}",
                 sc.n,
-                self.utrs.C.len()
+                self.utrs.Cs.len()
             );
         }
-        if self.utrs.V.len() != sc.n + 1 {
+        if self.utrs.Vs.len() != sc.n + 1 {
             bail!(
                 "Expected {} commitment elements, but got {}",
                 sc.n + 1,
-                self.utrs.V.len()
+                self.utrs.Vs.len()
             );
         }
 
@@ -337,7 +339,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             let mut fs_t = fiat_shamir::initialize_pvss_transcript::<_, E, Self>(
                 sc,
                 &spks[self.utrs.dealer.id],
-                &aux[self.utrs.dealer.id],
+                &auxs[self.utrs.dealer.id],
                 self.utrs.dealer.id,
                 DST,
             );
@@ -345,8 +347,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 &TupleCodomainShape(
                     self.utrs.sharing_proof.range_proof_commitment.clone(),
                     chunked_elgamal::CodomainShape {
-                        chunks: self.utrs.C.clone(),
-                        randomness: self.utrs.R.clone(),
+                        chunks: self.utrs.Cs.clone(),
+                        randomness: self.utrs.Rs.clone(),
                     },
                 ),
                 &self.utrs.sharing_proof.PoK,
@@ -359,7 +361,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             let mut fs_t = fiat_shamir::initialize_pvss_transcript::<_, E, Self>(
                 sc,
                 &spks[self.utrs.dealer.id],
-                &aux[self.utrs.dealer.id],
+                &auxs[self.utrs.dealer.id],
                 self.utrs.dealer.id,
                 DST,
             );
@@ -378,18 +380,18 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Do the SCRAPE LDT
         let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        ldt.low_degree_test_group(&self.utrs.V)?;
+        ldt.low_degree_test_group(&self.utrs.Vs)?;
 
         // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO?
         let mut base_vec = Vec::new();
         let mut exp_vec = Vec::new();
 
         let beta = sample_field_element(&mut rng);
-        let powers_of_beta = utils::powers(beta, self.utrs.C.len() + 1);
+        let powers_of_beta = utils::powers(beta, self.utrs.Cs.len() + 1);
 
-        for i in 0..self.utrs.C.len() {
-            for j in 0..self.utrs.C[i].len() {
-                let base = self.utrs.C[i][j];
+        for i in 0..self.utrs.Cs.len() {
+            for j in 0..self.utrs.Cs[i].len() {
+                let base = self.utrs.Cs[i][j];
                 let exp = pp.powers_of_radix[j] * powers_of_beta[i];
                 base_vec.push(base);
                 exp_vec.push(exp);
@@ -400,8 +402,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .expect("Failed to compute MSM of Cs in chunky");
 
         let weighted_Vs = E::G2::msm(
-            &E::G2::normalize_batch(&self.utrs.V[..self.utrs.C.len()]),
-            &powers_of_beta[..self.utrs.C.len()],
+            &E::G2::normalize_batch(&self.utrs.Vs[..self.utrs.Cs.len()]),
+            &powers_of_beta[..self.utrs.Cs.len()],
         )
         .expect("Failed to compute MSM of Vs in chunky");
 
@@ -434,13 +436,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.utrs.V[player.id].into_affine()))
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.utrs.Vs[player.id].into_affine()))
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
         Self::DealtPubKey::new(
             self.utrs
-                .V
+                .Vs
                 .last()
                 .expect("V is empty somehow")
                 .into_affine(),
@@ -455,9 +457,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let C_i = &self.utrs.C[player.id]; // where i = player.id
+        let C_i = &self.utrs.Cs[player.id]; // where i = player.id
 
-        let ephemeral_keys: Vec<_> = self.utrs.R.iter().map(|Ri| Ri.mul(dk.dk)).collect();
+        let ephemeral_keys: Vec<_> = self.utrs.Rs.iter().map(|Ri| Ri.mul(dk.dk)).collect();
         assert_eq!(
             ephemeral_keys.len(),
             C_i.len(),
@@ -485,7 +487,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let dealt_secret_key_share =
             chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
 
-        let dealt_pub_key_share = self.utrs.V[player.id].into_affine(); // G_2^{f(\omega^i})
+        let dealt_pub_key_share = self.utrs.Vs[player.id].into_affine(); // G_2^{f(\omega^i})
 
         (
             Scalar(dealt_secret_key_share),
@@ -501,11 +503,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
         let utrs = UnsignedTranscript {
             dealer: sc.get_player(0),
-            V: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
-            C: (0..sc.n)
+            Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
+            Cs: (0..sc.n)
                 .map(|_| unsafe_random_points(num_chunks_per_share, rng))
                 .collect::<Vec<_>>(),
-            R: unsafe_random_points(num_chunks_per_share, rng),
+            Rs: unsafe_random_points(num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),
@@ -530,7 +532,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 }
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcript<E> {
-    // why are N and P needed?
+    // why are N and P needed? TODO: maybe integrate into deal()
     #[allow(non_snake_case)]
     pub fn encrypt_chunked_shares<
         'a,
@@ -635,9 +637,16 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Malleab
     fn maul_signature<A: Serialize + Clone>(
         &mut self,
         _ssk: &Self::SigningSecretKey,
-        _aux: &A,
-        player: &Player,
+        _aux: &A, 
+        _player: &Player,
     ) {
-        self.utrs.dealer = *player; // TODO!!!!!!!!!!!!!!!!!! NEXT PR
+        // TODO: We're not using this but it probably fails if we don't; but that would probably mean recomputing almost the entire transcript... but then that would require eks and pp
+        panic!("Doesn't work for this PVSS, at least for now");
+        // self.utrs.dealer = *player;
+
+        // let sgn = ssk
+        //     .sign(&self.utrs)
+        //     .expect("signing of `chunky` PVSS transcript failed");
+        // self.sgn = sgn;
     }
 }

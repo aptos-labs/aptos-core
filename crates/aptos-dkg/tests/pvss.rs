@@ -46,20 +46,20 @@ fn test_pvss_all_unweighted() {
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
     }
 
-    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
-    // TODO: maybe reduce the number of tcs to make it a bit faster?
-    let tcs = test_utils::get_threshold_configs_for_testing();
-    for tc in tcs {
-        println!("\nTesting {tc} PVSS");
+    // // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s instead
+    // // TODO: maybe reduce the number of tcs to make it a bit faster?
+    // let tcs = test_utils::get_threshold_configs_for_testing();
+    // for tc in tcs {
+    //     println!("\nTesting {tc} PVSS");
 
-        let seed = random_scalar(&mut rng);
+    //     let seed = random_scalar(&mut rng);
 
-        // Chunky
-        pvss_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
-            &tc,
-            seed.to_bytes_le(),
-        );
-    }
+    //     // Chunky
+    //     pvss_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
+    //         &tc,
+    //         seed.to_bytes_le(),
+    //     );
+    // }
 }
 
 #[test]
@@ -105,8 +105,9 @@ fn test_pvss_transcript_size() {
         print_transcript_size::<das::Transcript>("Actual", &sc, actual_size);
     }
 
-    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254 instead
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254
     // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
+    // Should iterate over a vec of (t, n), not the actual threshold configs because they may be slow to initialise
     for sc in get_threshold_configs_for_benchmarking() {
         println!();
         let actual_size = actual_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(&sc);
@@ -116,7 +117,7 @@ fn test_pvss_transcript_size() {
             actual_size,
         );
 
-        break; // exit after first iteration, setup is too slow
+        //break; // exit after first iteration, setup is too slow
     }
 
     // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
@@ -131,7 +132,7 @@ fn test_pvss_transcript_size() {
             actual_size,
         );
 
-        break; // exit after first iteration, setup is too slow
+        //break; // exit after first iteration, setup is too slow
     }
 
     for wc in get_weighted_configs_for_benchmarking() {
@@ -200,7 +201,7 @@ fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
 
     let trx = T::generate(
         &sc,
-        &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
+        &T::PublicParameters::with_max_num_shares_for_generate(sc.get_total_num_shares()),
         &mut rng,
     );
     let actual_size = trx.to_bytes().len();

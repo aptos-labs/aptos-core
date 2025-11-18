@@ -97,6 +97,11 @@ impl WithMaxNumShares for PublicParameters {
     fn with_max_num_shares(_n: usize) -> Self {
         Self::default()
     }
+
+    // Setup is fast enough
+    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+        Self::default()
+    }
 }
 
 impl Default for PublicParameters {

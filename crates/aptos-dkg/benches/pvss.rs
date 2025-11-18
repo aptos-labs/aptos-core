@@ -170,7 +170,7 @@ fn pvss_aggregate<T: Transcript, M: Measurement>(
                 (trx.clone(), trx)
             },
             |(mut first, second)| {
-                first.aggregate_with(&sc, &second);
+                first.aggregate_with(&sc, &second).unwrap();
             },
         )
     });
