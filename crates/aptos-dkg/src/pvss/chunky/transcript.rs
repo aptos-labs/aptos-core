@@ -130,10 +130,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
-        _spk: &Self::SigningPubKey,
+        spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
-        _aux: &A,
+        aux: &A,
         dealer: &Player,
         rng: &mut R,
     ) -> Self {
@@ -143,7 +143,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             "Number of encryption keys must equal number of players"
         );
 
-        // let ctext = ()
+        //let ctext = (sc.t, sc.n, spk, aux, dealer.id);
 
         // Initialize the PVSS Fiat-Shamir transcript
         let mut fs_transcript =
