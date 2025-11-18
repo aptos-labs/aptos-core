@@ -142,7 +142,7 @@ pub fn get_threshold_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<T>
     tcs
 }
 
-// When set up is slow, we reduce the number of test cases to keep the tests fast
+// When setup is slow, we reduce the number of test cases to keep the tests fast
 pub fn get_threshold_configs_for_testing_smaller<T: traits::ThresholdConfig>() -> Vec<T> {
     let mut tcs = vec![];
 

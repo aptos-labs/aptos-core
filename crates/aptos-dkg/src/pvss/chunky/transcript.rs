@@ -73,7 +73,7 @@ pub struct UnsignedTranscript<E: Pairing> {
     pub Vs: Vec<E::G2>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway
+    pub Cs: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
     /// Second chunked ElGamal component: R[j] = r_j * H
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Rs: Vec<E::G1>,

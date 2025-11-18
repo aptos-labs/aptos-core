@@ -45,14 +45,13 @@ where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
     // Generate some random bytes
-    let mut buf = [0u8; 32]; // 32 bytes for a 256-bit curve... so not ideal etc
+    let mut buf = [0u8; 32];
     rng.fill_bytes(&mut buf);
 
-    // Hash to curve (unsafe_hash_to_affine)
+    // Hash to curve (using unsafe_hash_to_affine)
     let p: C::Affine =
         crate::arkworks::hashing::unsafe_hash_to_affine(&buf, b"unsafe_random_point");
 
-    // Convert to curve point
     p.into()
 }
 
