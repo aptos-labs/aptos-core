@@ -908,8 +908,11 @@ move-vm-test-utils = { path = "third_party/move/move-vm/test-utils", features = 
 ] }
 move-vm-types = { path = "third_party/move/move-vm/types" }
 
+[profile.dev]
+debug = "line-tables-only"
+
 [profile.release]
-debug = true
+debug = "line-tables-only"
 overflow-checks = true
 
 # For [build-dependencies], cargo sets `opt-level=0` independent of the actual profile used.
