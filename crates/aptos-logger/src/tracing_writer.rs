@@ -76,8 +76,7 @@ impl Write for SizeRollingFileAppender {
         if self.current_log_size + buf.len() as u64 > self.max_log_file_size {
             self.rotate();
         }
-        let mut bytes_written = self.current_log_file.write(buf)?;
-        bytes_written += self.current_log_file.write(b"\n")?;
+        let bytes_written = self.current_log_file.write(buf)?;
         self.current_log_size += bytes_written as u64;
         Ok(bytes_written)
     }
@@ -111,7 +110,8 @@ impl TracingWriter {
 
 impl Writer for TracingWriter {
     /// Write to file
-    fn write(&self, log: String) {
+    fn write(&self, mut log: String) {
+        log.push('\n');
         let (writer_mutex, _guard) = &*self.writer_guard;
         if let Ok(mut writer) = writer_mutex.lock() {
             if let Err(err) = writer.write_all(log.as_bytes()) {
