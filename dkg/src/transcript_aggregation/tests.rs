@@ -56,8 +56,13 @@ fn test_transcript_aggregation_state() {
         epoch_state,
     ));
 
-    let good_trx_0 =
-        RealDKG::sample_secret_and_generate_transcript(&mut rng, &pub_params, 0, &private_keys[0], &public_keys[0]);
+    let good_trx_0 = RealDKG::sample_secret_and_generate_transcript(
+        &mut rng,
+        &pub_params,
+        0,
+        &private_keys[0],
+        &public_keys[0],
+    );
     let good_trx_0_bytes = bcs::to_bytes(&good_trx_0).unwrap();
 
     // Node with incorrect epoch should be rejected.
@@ -130,8 +135,13 @@ fn test_transcript_aggregation_state() {
     assert!(result.is_err());
 
     // Good node should be accepted.
-    let good_trx_3 =
-        RealDKG::sample_secret_and_generate_transcript(&mut rng, &pub_params, 3, &private_keys[3], &public_keys[3]);
+    let good_trx_3 = RealDKG::sample_secret_and_generate_transcript(
+        &mut rng,
+        &pub_params,
+        3,
+        &private_keys[3],
+        &public_keys[3],
+    );
     let result = trx_agg_state.add(addrs[3], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
@@ -143,8 +153,13 @@ fn test_transcript_aggregation_state() {
     assert!(matches!(result, Ok(None)));
 
     // Repeated contribution should be ignored.
-    let good_trx_3_another =
-        RealDKG::sample_secret_and_generate_transcript(&mut rng, &pub_params, 3, &private_keys[3], &public_keys[3]);
+    let good_trx_3_another = RealDKG::sample_secret_and_generate_transcript(
+        &mut rng,
+        &pub_params,
+        3,
+        &private_keys[3],
+        &public_keys[3],
+    );
     let result = trx_agg_state.add(addrs[3], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,
@@ -155,8 +170,13 @@ fn test_transcript_aggregation_state() {
     assert!(matches!(result, Ok(None)));
 
     // Aggregated trx should be returned if after adding a node, the threshold is exceeded.
-    let good_trx_4 =
-        RealDKG::sample_secret_and_generate_transcript(&mut rng, &pub_params, 4, &private_keys[4], &public_keys[4]);
+    let good_trx_4 = RealDKG::sample_secret_and_generate_transcript(
+        &mut rng,
+        &pub_params,
+        4,
+        &private_keys[4],
+        &public_keys[4],
+    );
     let result = trx_agg_state.add(addrs[4], DKGTranscript {
         metadata: DKGTranscriptMetadata {
             epoch: 999,

@@ -235,9 +235,12 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 .verifier
                 .get_public_key(&self.my_addr)
                 .ok_or_else(|| anyhow!("my pk not found in validator set"))?;
-            let dealer_sk = self.key_storage.consensus_sk_by_pk(my_pk.clone()).map_err(|e| {
-                anyhow!("dkg new epoch handling failed with consensus sk lookup err: {e}")
-            })?;
+            let dealer_sk = self
+                .key_storage
+                .consensus_sk_by_pk(my_pk.clone())
+                .map_err(|e| {
+                    anyhow!("dkg new epoch handling failed with consensus sk lookup err: {e}")
+                })?;
             let dkg_manager = DKGManager::<DefaultDKG>::new(
                 Arc::new(dealer_sk),
                 Arc::new(my_pk),

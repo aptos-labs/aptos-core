@@ -88,7 +88,9 @@ pub fn pvss_group<T: MalleableTranscript>(
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_aggregate::<T, WallTime>(sc, &mut group);
     pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_decrypt_own_share::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group);
+    pvss_decrypt_own_share::<T, WallTime>(
+        sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
+    );
 
     group.finish();
 
