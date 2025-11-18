@@ -8,10 +8,15 @@ on:
   # Allow triggering manually
   workflow_dispatch:
     inputs:
-      IMAGE_TAG:
+      GIT_SHA:
         required: false
         type: string
-        description: The image tag of the feature branch to test, if not specified, it will use the latest commit on current branch.
+        description: The git commit to use.
+      IMAGE_PROFILE:
+        required: false
+        type: string
+        default: performance
+        description: Build the image with this `--profile` option. Use `performance` if not specified.
       START_VERSION:
         required: false
         type: string
@@ -40,7 +45,7 @@ permissions:
 # cancel redundant builds
 concurrency:
   # cancel redundant builds on PRs (only on PR, not on branches)
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}-${{ inputs.IMAGE_TAG || 'latest' }}
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.ref) || github.sha }}-${{ inputs.GIT_SHA || 'latest' }}
   cancel-in-progress: true
 
 jobs:
@@ -50,7 +55,8 @@ jobs:
     secrets: inherit
     with:
       NETWORK: "testnet"
-      IMAGE_TAG: ${{ inputs.IMAGE_TAG }}
+      GIT_SHA: ${{ inputs.GIT_SHA }}
+      IMAGE_PROFILE: ${{ inputs.IMAGE_PROFILE }}
       START_VERSION: ${{ inputs.START_VERSION }}
       END_VERSION: ${{ inputs.END_VERSION }}
       DRY_RUN: ${{ inputs.DRY_RUN || false }}
