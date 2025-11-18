@@ -30,8 +30,8 @@ use aptos_crypto::{
     arkworks::{
         self,
         random::{
-            sample_field_element, sample_field_elements, unsafe_random_point,
-            unsafe_random_points_hash, UniformRand,
+            sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+            UniformRand,
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
@@ -508,11 +508,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
         let utrs = UnsignedTranscript {
             dealer: sc.get_player(0),
-            Vs: unsafe_random_points_hash::<E::G2, _>(sc.n + 1, rng),
+            Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
             Cs: (0..sc.n)
-                .map(|_| unsafe_random_points_hash(num_chunks_per_share, rng))
-                .collect::<Vec<_>>(),
-            Rs: unsafe_random_points_hash(num_chunks_per_share, rng),
+                .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                .collect::<Vec<_>>(), // TODO: would this become faster if generated in one batch and flattened?
+            Rs: unsafe_random_points(num_chunks_per_share, rng),
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),
