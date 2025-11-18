@@ -2,26 +2,13 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    dlog::bsgs,
-    fiat_shamir,
-    pcs::univariate_hiding_kzg,
-    pvss::{
-        chunky::{
-            chunked_elgamal, chunked_elgamal::num_chunks_per_scalar, chunks, hkzg_chunked_elgamal,
-            hkzg_chunked_elgamal::HkzgElgamalWitness, input_secret::InputSecret, keys,
+    Scalar, dlog::bsgs, fiat_shamir, pcs::univariate_hiding_kzg, pvss::{
+        Player, chunky::{
+            chunked_elgamal::{self, num_chunks_per_scalar}, chunks, hkzg_chunked_elgamal::{self, HkzgElgamalWitness},
+            input_secret::InputSecret, keys,
             public_parameters::PublicParameters,
-        },
-        traits,
-        traits::{transcript::MalleableTranscript, HasEncryptionPublicParams},
-        Player,
-    },
-    range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
-    sigma_protocol,
-    sigma_protocol::{
-        homomorphism::{tuple::TupleCodomainShape, Trait as _},
-        traits::Trait as _,
-    },
-    Scalar,
+        }, traits::{self, HasEncryptionPublicParams, transcript::MalleableTranscript}
+    }, range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof}, sigma_protocol::{self, homomorphism::{Trait as _, tuple::TupleCodomainShape}, traits::Trait as _}
 };
 use anyhow::bail;
 use aptos_crypto::{
@@ -50,10 +37,29 @@ use std::ops::{Mul, Sub};
 /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
 pub const DST: &[u8; 32] = b"APTOS_CHUNK_EG_FIELD_PVSS_FS_DST";
 
-// TODO: Should SoKs be added here?
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)] // Removed CryptoHasher - not compatible with <E: Pairing> and doesn't seem to be used?
 pub struct Transcript<E: Pairing> {
+    dealer: Player,
+    /// Public key shares from 0 to n-1: V[i] = s_i * G_2; public key is in V[n]
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub V: Vec<E::G2>,
+    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub C: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway
+    /// Second chunked ElGamal component: R[j] = r_j * H
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub R: Vec<E::G1>,
+    /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub sharing_proof: Option<SharingProof<E>>, // Option because these proofs don't aggregate
+}
+
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+
+#[allow(non_snake_case)]
+#[derive(BCSCryptoHash, CryptoHasher, Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+pub struct UnsignedTranscript<E: Pairing> {
     dealer: Player,
     /// Public key shares from 0 to n-1: V[i] = s_i * G_2; public key is in V[n]
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
@@ -143,11 +149,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             "Number of encryption keys must equal number of players"
         );
 
-        //let ctext = (sc.t, sc.n, spk, aux, dealer.id);
-
         // Initialize the PVSS Fiat-Shamir transcript
-        let mut fs_transcript =
-            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(sc, spk, aux, dealer.id, DST);
+        let mut fs_t =
+            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(sc, spk, &aux, dealer.id, DST);
 
         // Generate the Shamir secret sharing polynomial
         let mut f = vec![*s.get_secret_a()]; // constant term of polynomial
@@ -163,7 +167,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Encrypt the chunked shares and generate the sharing proof
         let (C, R, sharing_proof) =
-            encrypt_chunked_shares(&f_evals, eks, sc, pp, &mut fs_transcript, rng);
+            encrypt_chunked_shares(&f_evals, eks, sc, pp, &mut fs_t, rng);
 
         // Add constant term for the `\mathbb{G}_2` commitment (we're doing this
         // **after** the previous step because we're now mutating `f_evals` by enlarging it; this is a silly
@@ -175,6 +179,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let G_2 = pp.get_commitment_base();
         let V = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(V.len(), sc.n + 1);
+
+        //let sig = Transcript::sign_contribution(ssk, dealer, aux, &V[sc.n]);
 
         // Return the transcript struct with all computed values
         Transcript {
@@ -193,7 +199,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         pp: &Self::PublicParameters,
         spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>,
+        aux: &Vec<A>, // TODO: is this intentional? if so, rename it auxs
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
@@ -214,7 +220,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
 
         let mut fs_t =
-            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(sc, &spks[self.dealer.id], aux, self.dealer.id, DST);
+            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(sc, &spks[self.dealer.id], &aux[self.dealer.id], self.dealer.id, DST);
 
         if let Some(proof) = &self.sharing_proof {
             // Verify the PoK
@@ -421,7 +427,7 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
     eks: &[keys::EncryptPubKey<E>],
     sc: &ShamirThresholdConfig<E::ScalarField>,
     pp: &PublicParameters<E>,
-    fs_transcript: &mut merlin::Transcript,
+    fs_t: &mut merlin::Transcript,
     rng: &mut R,
 ) -> (Vec<Vec<E::G1>>, Vec<E::G1>, SharingProof<E>) {
     // Generate the required randomness
@@ -462,7 +468,7 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
     let statement = hom.apply(&witness);
     //   (2c) Prove knowledge of its inverse
     let PoK = hom
-        .prove(&witness, &statement, fs_transcript, rng)
+        .prove(&witness, &statement, fs_t, rng)
         .change_lifetime(); // Make sure the lifetime of the proof is not coupled to `hom` which has references
 
     // Destructure the "public statement" of the above sigma protocol
@@ -487,7 +493,7 @@ pub fn encrypt_chunked_shares<E: Pairing, R: rand_core::RngCore + rand_core::Cry
         pp.ell as usize,
         &range_proof_commitment,
         &hkzg_randomness,
-        fs_transcript,
+        fs_t,
         rng,
     );
 
