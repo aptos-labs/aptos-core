@@ -36,6 +36,28 @@ use super::common::{
     GasUnitPriceManager, TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
 };
 
+/// Entry function identifier containing module and function information.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+pub struct EntryFunctionId {
+    /// Module address for the entry function
+    pub module_address: AccountAddress,
+    /// Module name for the entry function
+    pub module_name: String,
+    /// Function name for the entry function
+    pub function_name: String,
+}
+
+/// Transaction method for minting coins.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq, Default)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TransactionMethod {
+    /// Use a script-based transaction (default)
+    #[default]
+    Script,
+    /// Use an entry function transaction
+    EntryFunction(EntryFunctionId),
+}
+
 /// Asset configuration specific to minting, extends the base AssetConfig with mint-specific fields.
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct MintAssetConfig {
@@ -51,25 +73,9 @@ pub struct MintAssetConfig {
     /// delegate the mint capability to it.
     pub do_not_delegate: bool,
 
-    /// Transaction method: "script" (default) or "entry_function"
-    #[serde(default = "default_transaction_method")]
-    pub transaction_method: String,
-
-    /// Module address for entry function (required if transaction_method == "entry_function")
-    /// Example: "0x1234567890abcdef..."
-    pub module_address: Option<AccountAddress>,
-
-    /// Module name for entry function (required if transaction_method == "entry_function")
-    /// Example: "my_coin"
-    pub module_name: Option<String>,
-
-    /// Function name for entry function (required if transaction_method == "entry_function")
-    /// Example: "mint"
-    pub function_name: Option<String>,
-}
-
-fn default_transaction_method() -> String {
-    "script".to_string()
+    /// Transaction method: script (default) or entry_function
+    #[serde(default)]
+    pub transaction_method: TransactionMethod,
 }
 
 impl MintAssetConfig {
@@ -82,10 +88,7 @@ impl MintAssetConfig {
             default,
             mint_account_address,
             do_not_delegate,
-            transaction_method: default_transaction_method(),
-            module_address: None,
-            module_name: None,
-            function_name: None,
+            transaction_method: TransactionMethod::default(),
         }
     }
 
@@ -128,29 +131,6 @@ impl MintFunderConfig {
                 self.default_asset
             )
         })?;
-
-        for (asset_name, asset_config) in &self.assets {
-            if asset_config.transaction_method == "entry_function" {
-                if asset_config.module_address.is_none() {
-                    return Err(anyhow::anyhow!(
-                        "Asset '{}' uses entry_function but module_address is not set",
-                        asset_name
-                    ));
-                }
-                if asset_config.module_name.is_none() {
-                    return Err(anyhow::anyhow!(
-                        "Asset '{}' uses entry_function but module_name is not set",
-                        asset_name
-                    ));
-                }
-                if asset_config.function_name.is_none() {
-                    return Err(anyhow::anyhow!(
-                        "Asset '{}' uses entry_function but function_name is not set",
-                        asset_name
-                    ));
-                }
-            }
-        }
 
         let mut assets_with_accounts = HashMap::new();
 
@@ -447,19 +427,17 @@ impl MintFunder {
         let txn = {
             let faucet_account = self.get_asset_account(asset_name)?.write().await;
 
-            let payload = match asset_config.transaction_method.as_str() {
-                "entry_function" => {
-                    // These are guaranteed to be Some due to validation in build_funder
-                    let module_address = asset_config.module_address.unwrap();
-                    let module_name = asset_config.module_name.as_ref().unwrap();
-                    let function_name = asset_config.function_name.as_ref().unwrap();
-
+            let payload = match &asset_config.transaction_method {
+                TransactionMethod::EntryFunction(entry_function_id) => {
                     // Create ModuleId from module_address and module_name
                     let module_id = ModuleId::new(
-                        module_address,
-                        Identifier::new(module_name.as_str()).map_err(|e| {
+                        entry_function_id.module_address,
+                        Identifier::new(entry_function_id.module_name.as_str()).map_err(|e| {
                             AptosTapError::new(
-                                format!("Invalid module_name '{}': {}", module_name, e),
+                                format!(
+                                    "Invalid module_name '{}': {}",
+                                    entry_function_id.module_name, e
+                                ),
                                 AptosTapErrorCode::InvalidRequest,
                             )
                         })?,
@@ -467,9 +445,12 @@ impl MintFunder {
 
                     // Create function identifier
                     let function_identifier =
-                        Identifier::new(function_name.as_str()).map_err(|e| {
+                        Identifier::new(entry_function_id.function_name.as_str()).map_err(|e| {
                             AptosTapError::new(
-                                format!("Invalid function_name '{}': {}", function_name, e),
+                                format!(
+                                    "Invalid function_name '{}': {}",
+                                    entry_function_id.function_name, e
+                                ),
                                 AptosTapErrorCode::InvalidRequest,
                             )
                         })?;
@@ -496,7 +477,7 @@ impl MintFunder {
 
                     TransactionPayload::EntryFunction(entry_function)
                 },
-                _ => {
+                TransactionMethod::Script => {
                     // Default script-based approach
                     TransactionPayload::Script(Script::new(MINTER_SCRIPT.to_vec(), vec![], vec![
                         TransactionArgument::Address(receiver_address),

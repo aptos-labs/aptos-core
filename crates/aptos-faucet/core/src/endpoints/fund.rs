@@ -321,7 +321,7 @@ impl FundApiComponents {
             jwt_sub = jwt_sub(checker_data.headers.clone()).ok(),
             address = checker_data.receiver,
             requested_amount = fund_request.amount,
-            asset = asset_for_logging.as_deref().unwrap_or("default"),
+            asset = asset_for_logging,
             txn_hashes = txn_hashes,
             success = fund_result.is_ok(),
         );

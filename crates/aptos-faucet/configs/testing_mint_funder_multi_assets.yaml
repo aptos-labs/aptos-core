@@ -18,11 +18,12 @@ funder_config:
     shelbyusd:
       do_not_delegate: true
       key_file_path: "./shelbyusd.key"
-      mint_account_address: "0x123"
-      transaction_method: "entry_function"
-      module_address: "0x456"
-      module_name: "shelby_usd"
-      function_name: "mint"
+      mint_account_address: "7619a5c079936ada2b357a276d7a3feb5ce67c8cbe9969db2a4510738a93657e"
+      transaction_method:
+        type: "entry_function"
+        module_address: "0xe7e04d43ed9badf01ade482175f22d75b7c9f2c31a820d5623b6281fe694783d"
+        module_name: "shelby_usd"
+        function_name: "mint"
       
 handler_config:
   use_helpful_errors: true
