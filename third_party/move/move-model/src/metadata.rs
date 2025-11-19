@@ -3,7 +3,9 @@
 
 use anyhow::bail;
 use legacy_move_compiler::shared::LanguageVersion as CompilerLanguageVersion;
-use move_binary_format::file_format_common::{VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_4};
+use move_binary_format::file_format_common::{
+    VERSION_DEFAULT, VERSION_DEFAULT_LANG_V2_4, VERSION_DEFAULT_LANG_V2_5,
+};
 use move_command_line_common::env;
 use serde::{Deserialize, Serialize};
 use std::{
@@ -321,7 +323,8 @@ impl LanguageVersion {
             | LanguageVersion::V2_1
             | LanguageVersion::V2_2
             | LanguageVersion::V2_3 => VERSION_DEFAULT,
-            LanguageVersion::V2_4 | LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_4,
+            LanguageVersion::V2_4 => VERSION_DEFAULT_LANG_V2_4,
+            LanguageVersion::V2_5 => VERSION_DEFAULT_LANG_V2_5,
         })
     }
 

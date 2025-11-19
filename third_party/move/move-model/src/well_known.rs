@@ -97,3 +97,8 @@ pub const INCOMPLETE_MATCH_ABORT_CODE: u64 = make_abort_code(1);
 // Well known attributes
 pub const PERSISTENT_ATTRIBUTE: &str = "persistent";
 pub const MODULE_LOCK_ATTRIBUTE: &str = "module_lock";
+pub const PACK_ATTRIBUTE: &str = "pack";
+pub const UNPACK_ATTRIBUTE: &str = "unpack";
+pub const TEST_VARIANT_ATTRIBUTE: &str = "test_variant";
+pub const BORROW_FIELD_IMMUTABLE_ATTRIBUTE: &str = "borrow";
+pub const BORROW_FIELD_MUTABLE_ATTRIBUTE: &str = "borrow_mut";
