@@ -49,6 +49,9 @@ order-book-balanced-matches25-pct50-markets	1	VM	4	0.972	1.033	3759.4
 order-book-balanced-matches80-pct50-markets	1	VM	4	0.997	1.006	3996.1
 order-book-balanced-size-skewed80-pct50-markets	1	VM	4	0.997	1.039	3838.0
 monotonic-counter-single	1	VM	4	0.987	1.009	45350.3
+fibonacci-recursive20	1	VM	4	0.987	1.009	45350.3
+fibonacci-tail-recursive20	1	VM	4	0.987	1.009	45350.3
+fibonacci-iterative20	1	VM	4	0.987	1.009	45350.3
 no_commit_apt-fa-transfer	1	VM	4	0.995	1.011	35616.6
 no_commit_apt-fa-transfer	1	NativeVM	4	0.994	1.030	60946.4
 no_commit_apt-fa-transfer	1	AptosVMSpeculative	4	0.998	1.021	10321.9

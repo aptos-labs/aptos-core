@@ -60,8 +60,9 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
                 // Note: for functions values the difference between generated files are stack
                 // traces only (attached for in-place checks, set to None for async checks).
                 "/function_values_safety/",
-                "/trusted_code/",
                 "/paranoid-tests/",
+                "/stack_size/",
+                "/trusted_code/",
             ],
             exclude: &[],
             tracing: true,
@@ -77,8 +78,9 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             ),
             include: &[
                 "/function_values_safety/",
-                "/trusted_code/",
                 "/paranoid-tests/",
+                "/stack_size/",
+                "/trusted_code/",
             ],
             exclude: &[],
             tracing: false,
@@ -96,12 +98,13 @@ static TEST_CONFIGS: Lazy<Vec<TestConfig>> = Lazy::new(|| {
             },
             include: &[],
             exclude: &[
+                "/function_values_safety/",
                 "/lazy_loading/",
                 "/paranoid-tests/",
-                "/function_values_safety/",
-                "/trusted_code/",
-                "/tracing/",
                 "/runtime_ref_checks/",
+                "/stack_size/",
+                "/tracing/",
+                "/trusted_code/",
             ],
             tracing: false,
         },
@@ -154,8 +157,9 @@ const SEPARATE_BASELINE: &[&str] = &[
     "/function_values_safety/",
     "/module_publishing/",
     "/re_entrancy/",
-    "/trusted_code/",
     "/runtime_ref_checks/",
+    "/stack_size/",
+    "/trusted_code/",
 ];
 
 fn get_config_by_name(name: &str) -> TestConfig {
