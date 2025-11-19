@@ -82,6 +82,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         _aux: &A,
@@ -156,7 +157,11 @@ impl traits::Transcript for Transcript {
         self.dealers.clone()
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) {
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
         debug_assert_eq!(self.C.len(), sc.n);
         debug_assert_eq!(self.V.len(), sc.n + 1);
 
@@ -169,6 +174,8 @@ impl traits::Transcript for Transcript {
 
         debug_assert_eq!(self.C.len(), other.C.len());
         debug_assert_eq!(self.V.len(), other.V.len());
+
+        Ok(())
     }
 
     fn get_public_key_share(

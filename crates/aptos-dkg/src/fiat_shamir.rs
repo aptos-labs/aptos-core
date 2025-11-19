@@ -73,20 +73,23 @@ pub trait PVSS<E: Pairing, T: Transcript>: ScalarProtocol<E> {
     fn pvss_domain_sep(&mut self, sc: &T::SecretSharingConfig);
 
     /// Append the public parameters `pp`.
+    #[allow(dead_code)] // TODO: Can remove this
     fn append_public_parameters(&mut self, pp: &T::PublicParameters);
 
-    /// Append the signing pub keys.
-    #[allow(dead_code)] // Not a secure alternative to session identifiers? So remove?
-    fn append_signing_pub_keys(&mut self, spks: &[T::SigningPubKey]);
+    /// Append the signing pub key.
+    fn append_signing_pub_key(&mut self, spks: &T::SigningPubKey);
 
     /// Append the encryption keys `eks`.
+    #[allow(dead_code)] // TODO: Can remove this
     fn append_encryption_keys(&mut self, eks: &[T::EncryptPubKey]);
 
-    /// Append the aux data.
-    #[allow(dead_code)] // Will put session identifiers here?
+    /// Append the aux data. TODO: Will put session identifiers here?
+    #[allow(dead_code)] // TODO: Can remove this
     fn append_auxs<A: Serialize>(&mut self, aux: &[A]);
-    #[allow(dead_code)]
     fn append_aux<A: Serialize>(&mut self, aux: &A);
+
+    /// Append the dealer's id.
+    fn append_dealer_id(&mut self, dealer_id: usize);
 
     /// Appends the transcript
     #[allow(dead_code)] // TODO: Remove?
@@ -159,12 +162,8 @@ impl<E: Pairing, T: Transcript> PVSS<E, T> for merlin::Transcript {
         self.append_message(b"pp", pp.to_bytes().as_slice());
     }
 
-    fn append_signing_pub_keys(&mut self, spks: &[T::SigningPubKey]) {
-        self.append_u64(b"signing-pub-keys", spks.len() as u64);
-
-        for spk in spks {
-            self.append_message(b"spk", spk.to_bytes().as_slice())
-        }
+    fn append_signing_pub_key(&mut self, spk: &T::SigningPubKey) {
+        self.append_message(b"spk", spk.to_bytes().as_slice())
     }
 
     fn append_encryption_keys(&mut self, eks: &[T::EncryptPubKey]) {
@@ -185,6 +184,10 @@ impl<E: Pairing, T: Transcript> PVSS<E, T> for merlin::Transcript {
     fn append_aux<A: Serialize>(&mut self, aux: &A) {
         let aux_bytes = bcs::to_bytes(aux).expect("aux data serialization should succeed");
         self.append_message(b"aux", aux_bytes.as_slice());
+    }
+
+    fn append_dealer_id(&mut self, dealer_id: usize) {
+        self.append_message(b"dealer_id", dealer_id.to_le_bytes().as_slice());
     }
 
     fn append_transcript(&mut self, trx: &T) {
@@ -209,17 +212,19 @@ impl<E: Pairing, T: Transcript> PVSS<E, T> for merlin::Transcript {
     }
 }
 
-pub(crate) fn initialize_pvss_transcript<E: Pairing, T: Transcript>(
+pub(crate) fn initialize_pvss_transcript<A: Serialize, E: Pairing, T: Transcript>(
     sc: &T::SecretSharingConfig,
-    pp: &T::PublicParameters,
-    eks: &[T::EncryptPubKey],
+    spk: &T::SigningPubKey,
+    aux: &A,
+    dealer_id: usize,
     dst: &[u8],
 ) -> merlin::Transcript {
     let mut fs_t = merlin::Transcript::new(dst);
 
     <merlin::Transcript as PVSS<E, T>>::pvss_domain_sep(&mut fs_t, sc);
-    <merlin::Transcript as PVSS<E, T>>::append_public_parameters(&mut fs_t, pp);
-    <merlin::Transcript as PVSS<E, T>>::append_encryption_keys(&mut fs_t, eks);
+    <merlin::Transcript as PVSS<E, T>>::append_signing_pub_key(&mut fs_t, spk);
+    <merlin::Transcript as PVSS<E, T>>::append_aux(&mut fs_t, aux);
+    <merlin::Transcript as PVSS<E, T>>::append_dealer_id(&mut fs_t, dealer_id);
 
     fs_t
 }

@@ -63,6 +63,7 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>>(
         &wc,
         &d.pp,
         &d.ssks[0],
+        &d.spks[0],
         &d.eks,
         &d.s,
         &NoAux,

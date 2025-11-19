@@ -19,7 +19,8 @@ pub trait UniformRand {
 
 /// NOTE: This function is "unsafe" in the sense that the caller learns the discrete log of the
 /// random point w.r.t. the generator. In many applications, this is not acceptable.
-pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C
+/// Benches suggest that when generating a single point, it's roughly as fast as `unsafe_random_point()` - about 30µs
+pub fn unsafe_random_point_slow<C: CurveGroup, R>(rng: &mut R) -> C
 where
     R: rand_core::RngCore + rand_core::CryptoRng,
 {
@@ -30,6 +31,36 @@ where
 
 /// Samples `n` uniformly random elements from the group, but is unsafe in the sense
 /// that the caller learns the discrete log of the random point.
+/// Benches show it's about 3.5x slower than `unsafe_random_points`. I guess the expensive parts
+/// of hashing get reused? // TODO: Remove in the future
+pub fn unsafe_random_points_slow<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    (0..n)
+        .map(|_| unsafe_random_point_slow::<C, R>(rng))
+        .collect()
+}
+
+/// Faster "unsafe" random point by hashing some random bytes to the curve
+/// But still not very fast // TODO: make proper benchmarks, then probably remove the other version
+pub fn unsafe_random_point<C: CurveGroup, R>(rng: &mut R) -> C
+where
+    R: rand_core::RngCore + rand_core::CryptoRng,
+{
+    // Generate some random bytes
+    let mut buf = [0u8; 32];
+    rng.fill_bytes(&mut buf);
+
+    // Hash to curve (using unsafe_hash_to_affine)
+    let p: C::Affine =
+        crate::arkworks::hashing::unsafe_hash_to_affine(&buf, b"unsafe_random_point");
+
+    p.into() // TODO: change signature to output affine
+}
+
+/// Samples `n` uniformly random elements from the group, but is somewhat unsafe
+/// because it involves a hashing function which is sensitive to timing attacks
 pub fn unsafe_random_points<C: CurveGroup, R>(n: usize, rng: &mut R) -> Vec<C>
 where
     R: rand_core::RngCore + rand_core::CryptoRng,

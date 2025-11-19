@@ -52,6 +52,7 @@ impl Default for InnerState {
 
 pub struct DKGManager<DKG: DKGTrait> {
     dealer_sk: Arc<DKG::DealerPrivateKey>,
+    dealer_pk: Arc<DKG::DealerPublicKey>,
     my_index: usize,
     my_addr: AccountAddress,
     epoch_state: Arc<EpochState>,
@@ -91,6 +92,7 @@ impl InnerState {
 impl<DKG: DKGTrait> DKGManager<DKG> {
     pub fn new(
         dealer_sk: Arc<DKG::DealerPrivateKey>,
+        dealer_pk: Arc<DKG::DealerPublicKey>,
         my_index: usize,
         my_addr: AccountAddress,
         epoch_state: Arc<EpochState>,
@@ -101,6 +103,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             aptos_channel::new(QueueStyle::KLAST, 1, None);
         Self {
             dealer_sk,
+            dealer_pk,
             my_addr,
             my_index,
             epoch_state,
@@ -332,6 +335,7 @@ impl<DKG: DKGTrait> DKGManager<DKG> {
             &input_secret,
             self.my_index as u64,
             &self.dealer_sk,
+            &self.dealer_pk,
         );
 
         let my_transcript = DKGTranscript::new(
