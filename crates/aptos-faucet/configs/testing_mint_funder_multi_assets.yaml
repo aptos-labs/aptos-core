@@ -8,7 +8,6 @@ funder_config:
   type: "MintFunder"
   node_url: "http://127.0.0.1:8080"
   chain_id: 4
-  amount_to_fund: 100000000 
   assets:
     apt:
       do_not_delegate: false

@@ -44,6 +44,9 @@ const DEFAULT_KEY_FILE_PATH: &str = "/opt/aptos/etc/mint.key";
 /// Default asset name used when no asset is specified in requests.
 pub const DEFAULT_ASSET_NAME: &str = "apt";
 
+/// Default amount of coins to fund in OCTA.
+pub const DEFAULT_AMOUNT_TO_FUND: u64 = 100_000_000_000;
+
 /// This defines configuration for any Funder that needs to interact with a real
 /// blockchain API. This includes the MintFunder and the TransferFunder currently.
 ///

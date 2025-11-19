@@ -33,7 +33,7 @@ static MINTER_SCRIPT: &[u8] = include_bytes!(
 
 use super::common::{
     submit_transaction, update_sequence_numbers, ApiConnectionConfig, AssetConfig,
-    GasUnitPriceManager, TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
+    GasUnitPriceManager, TransactionSubmissionConfig, DEFAULT_AMOUNT_TO_FUND, DEFAULT_ASSET_NAME,
 };
 
 /// Entry function identifier containing module and function information.
@@ -114,6 +114,9 @@ pub struct MintFunderConfig {
     #[serde(default = "MintFunderConfig::get_default_asset_name")]
     pub default_asset: String,
 
+    /// Default amount of coins to fund.
+    /// If not provided, defaults to 100_000_000_000.
+    #[serde(default = "MintFunderConfig::get_default_amount_to_fund")]
     pub amount_to_fund: u64,
 }
 
@@ -190,6 +193,10 @@ impl MintFunderConfig {
 
     pub fn get_default_asset_name() -> String {
         DEFAULT_ASSET_NAME.to_string()
+    }
+
+    fn get_default_amount_to_fund() -> u64 {
+        DEFAULT_AMOUNT_TO_FUND
     }
 }
 
