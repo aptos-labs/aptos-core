@@ -295,7 +295,7 @@ impl RunConfig {
                 assets: HashMap::from([(
                     DEFAULT_ASSET_NAME.to_string(),
                     MintAssetConfig::new(
-                        AssetConfig::new(None, key_file_path),
+                        AssetConfig::new(_key, key_file_path),
                         Some(aptos_test_root_address()),
                         do_not_delegate,
                     ),
