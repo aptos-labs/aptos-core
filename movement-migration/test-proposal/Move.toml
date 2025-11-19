@@ -1,0 +1,11 @@
+[package]
+name = "test-proposal"
+version = "0.0.0"
+
+[addresses]
+admin = "0x1"
+
+[dependencies.AptosFramework]
+git = "https://github.com/movementlabsxyz/aptos-core.git"
+rev = "l1-migration"
+subdir = "aptos-move/framework/aptos-framework"

@@ -10,6 +10,7 @@ script {
         //let core_address: address = signer::address_of(core_resources);
 
         let enabled_blob: vector<u64> = vector[
+            17, //PartialGovernanceVoting,
             58, // RejectUnstableBytecode
             67, // ConcurrentFungibleBalance
             40, // VMBinaryFormat7
