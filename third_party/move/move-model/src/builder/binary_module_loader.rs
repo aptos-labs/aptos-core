@@ -8,8 +8,8 @@
 use crate::{
     ast::{
         AccessSpecifier as ASTAccessSpecifier, AccessSpecifierKind as ASTAccessSpecifierKind,
-        Address, AddressSpecifier as ASTAddressSpecifier, Attribute, ModuleName,
-        ResourceSpecifier as ASTResourceSpecifier,
+        Address, AddressSpecifier as ASTAddressSpecifier, Attribute, AttributeValue, ModuleName,
+        ResourceSpecifier as ASTResourceSpecifier, Value,
     },
     model::{
         FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, ModuleData,
@@ -38,6 +38,7 @@ use move_binary_format::{
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress, language_storage};
+use num::BigInt;
 use std::collections::BTreeMap;
 
 /// Macro to abort the execution if `with_dep_closure` is specified while dependencies are missing.
@@ -485,35 +486,45 @@ impl<'a> BinaryModuleLoader<'a> {
                     let sym = self.env.symbol_pool().make(well_known::PACK);
                     attributes.push(Attribute::Apply(node_id, sym, vec![]));
                 },
-                FunctionAttribute::PackVariant(_) => {
+                FunctionAttribute::PackVariant(variant_index) => {
                     let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
                     let sym = self.env.symbol_pool().make(well_known::PACK_VARIANT);
-                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    let attribute_value =
+                        AttributeValue::Value(node_id, Value::Number(BigInt::from(*variant_index)));
+                    attributes.push(Attribute::Assign(node_id, sym, attribute_value));
                 },
                 FunctionAttribute::Unpack => {
                     let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
                     let sym = self.env.symbol_pool().make(well_known::UNPACK);
                     attributes.push(Attribute::Apply(node_id, sym, vec![]));
                 },
-                FunctionAttribute::UnpackVariant(_) => {
+                FunctionAttribute::UnpackVariant(variant_index) => {
                     let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
                     let sym = self.env.symbol_pool().make(well_known::UNPACK_VARIANT);
-                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    let attribute_value =
+                        AttributeValue::Value(node_id, Value::Number(BigInt::from(*variant_index)));
+                    attributes.push(Attribute::Assign(node_id, sym, attribute_value));
                 },
-                FunctionAttribute::TestVariant(_) => {
+                FunctionAttribute::TestVariant(variant_index) => {
                     let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
                     let sym = self.env.symbol_pool().make(well_known::TEST_VARIANT);
-                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    let attribute_value =
+                        AttributeValue::Value(node_id, Value::Number(BigInt::from(*variant_index)));
+                    attributes.push(Attribute::Assign(node_id, sym, attribute_value));
                 },
-                FunctionAttribute::BorrowFieldImmutable(_) => {
+                FunctionAttribute::BorrowFieldImmutable(offset) => {
                     let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
                     let sym = self.env.symbol_pool().make(well_known::BORROW_NAME);
-                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    let attribute_value =
+                        AttributeValue::Value(node_id, Value::Number(BigInt::from(*offset)));
+                    attributes.push(Attribute::Assign(node_id, sym, attribute_value));
                 },
-                FunctionAttribute::BorrowFieldMutable(_) => {
+                FunctionAttribute::BorrowFieldMutable(offset) => {
                     let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
                     let sym = self.env.symbol_pool().make(well_known::BORROW_MUT_NAME);
-                    attributes.push(Attribute::Apply(node_id, sym, vec![]));
+                    let attribute_value =
+                        AttributeValue::Value(node_id, Value::Number(BigInt::from(*offset)));
+                    attributes.push(Attribute::Assign(node_id, sym, attribute_value));
                 },
             }
         }

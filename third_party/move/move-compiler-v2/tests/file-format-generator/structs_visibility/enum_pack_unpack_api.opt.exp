@@ -22,84 +22,84 @@ enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
     _0: T1
 
 // Function definition at index 0
-#[test_variant] public fun test_variant$E$A(l0: &E): bool
+#[test_variant=0] public fun test_variant$E$A(l0: &E): bool
     local l1: &E
     move_loc l0
     test_variant E, A
     ret
 
 // Function definition at index 1
-#[test_variant] public fun test_variant$E$B(l0: &E): bool
+#[test_variant=1] public fun test_variant$E$B(l0: &E): bool
     local l1: &E
     move_loc l0
     test_variant E, B
     ret
 
 // Function definition at index 2
-#[pack_variant] public fun pack$E$A(l0: u64): E
+#[pack_variant=0] public fun pack$E$A(l0: u64): E
     local l1: u64
     move_loc l0
     pack_variant E, A
     ret
 
 // Function definition at index 3
-#[pack_variant] public fun pack$E$B(l0: u64): E
+#[pack_variant=1] public fun pack$E$B(l0: u64): E
     local l1: u64
     move_loc l0
     pack_variant E, B
     ret
 
 // Function definition at index 4
-#[unpack_variant] public fun unpack$E$A(l0: E): u64
+#[unpack_variant=0] public fun unpack$E$A(l0: E): u64
     local l1: E
     move_loc l0
     unpack_variant E, A
     ret
 
 // Function definition at index 5
-#[unpack_variant] public fun unpack$E$B(l0: E): u64
+#[unpack_variant=1] public fun unpack$E$B(l0: E): u64
     local l1: E
     move_loc l0
     unpack_variant E, B
     ret
 
 // Function definition at index 6
-#[borrow] public fun borrow$E$0$0(l0: &E): &u64
+#[borrow=0] public fun borrow$E$0$0(l0: &E): &u64
     local l1: &E
     move_loc l0
     borrow_variant_field E, A::x, B::x
     ret
 
 // Function definition at index 7
-#[borrow_mut] public fun borrow_mut$E$0$0(l0: &mut E): &mut u64
+#[borrow_mut=0] public fun borrow_mut$E$0$0(l0: &mut E): &mut u64
     local l1: &mut E
     move_loc l0
     mut_borrow_variant_field E, A::x, B::x
     ret
 
 // Function definition at index 8
-#[test_variant] public fun test_variant$Inner$Inner1(l0: &Inner): bool
+#[test_variant=0] public fun test_variant$Inner$Inner1(l0: &Inner): bool
     local l1: &Inner
     move_loc l0
     test_variant Inner, Inner1
     ret
 
 // Function definition at index 9
-#[test_variant] public fun test_variant$Inner$Inner2(l0: &Inner): bool
+#[test_variant=1] public fun test_variant$Inner$Inner2(l0: &Inner): bool
     local l1: &Inner
     move_loc l0
     test_variant Inner, Inner2
     ret
 
 // Function definition at index 10
-#[pack_variant] public fun pack$Inner$Inner1(l0: u64): Inner
+#[pack_variant=0] public fun pack$Inner$Inner1(l0: u64): Inner
     local l1: u64
     move_loc l0
     pack_variant Inner, Inner1
     ret
 
 // Function definition at index 11
-#[pack_variant] public fun pack$Inner$Inner2(l0: u64, l1: u64): Inner
+#[pack_variant=1] public fun pack$Inner$Inner2(l0: u64, l1: u64): Inner
     local l2: u64
     local l3: u64
     move_loc l0
@@ -108,112 +108,112 @@ enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
     ret
 
 // Function definition at index 12
-#[unpack_variant] public fun unpack$Inner$Inner1(l0: Inner): u64
+#[unpack_variant=0] public fun unpack$Inner$Inner1(l0: Inner): u64
     local l1: Inner
     move_loc l0
     unpack_variant Inner, Inner1
     ret
 
 // Function definition at index 13
-#[unpack_variant] public fun unpack$Inner$Inner2(l0: Inner): (u64, u64)
+#[unpack_variant=1] public fun unpack$Inner$Inner2(l0: Inner): (u64, u64)
     local l1: Inner
     move_loc l0
     unpack_variant Inner, Inner2
     ret
 
 // Function definition at index 14
-#[borrow] public fun borrow$Inner$0$0(l0: &Inner): &u64
+#[borrow=0] public fun borrow$Inner$0$0(l0: &Inner): &u64
     local l1: &Inner
     move_loc l0
     borrow_variant_field Inner, Inner1::x, Inner2::x
     ret
 
 // Function definition at index 15
-#[borrow] public fun borrow$Inner$1$1(l0: &Inner): &u64
+#[borrow=1] public fun borrow$Inner$1$1(l0: &Inner): &u64
     local l1: &Inner
     move_loc l0
     borrow_variant_field Inner, Inner2::y
     ret
 
 // Function definition at index 16
-#[borrow_mut] public fun borrow_mut$Inner$0$0(l0: &mut Inner): &mut u64
+#[borrow_mut=0] public fun borrow_mut$Inner$0$0(l0: &mut Inner): &mut u64
     local l1: &mut Inner
     move_loc l0
     mut_borrow_variant_field Inner, Inner1::x, Inner2::x
     ret
 
 // Function definition at index 17
-#[borrow_mut] public fun borrow_mut$Inner$1$1(l0: &mut Inner): &mut u64
+#[borrow_mut=1] public fun borrow_mut$Inner$1$1(l0: &mut Inner): &mut u64
     local l1: &mut Inner
     move_loc l0
     mut_borrow_variant_field Inner, Inner2::y
     ret
 
 // Function definition at index 18
-#[test_variant] public fun test_variant$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+#[test_variant=0] public fun test_variant$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
     local l1: &Result<T0, T1>
     move_loc l0
     test_variant Result<T0, T1>, Ok
     ret
 
 // Function definition at index 19
-#[test_variant] public fun test_variant$Result$Err<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
+#[test_variant=1] public fun test_variant$Result$Err<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): bool
     local l1: &Result<T0, T1>
     move_loc l0
     test_variant Result<T0, T1>, Err
     ret
 
 // Function definition at index 20
-#[pack_variant] public fun pack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: T0): Result<T0, T1>
+#[pack_variant=0] public fun pack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: T0): Result<T0, T1>
     local l1: T0
     move_loc l0
     pack_variant Result<T0, T1>, Ok
     ret
 
 // Function definition at index 21
-#[pack_variant] public fun pack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: T1): Result<T0, T1>
+#[pack_variant=1] public fun pack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: T1): Result<T0, T1>
     local l1: T1
     move_loc l0
     pack_variant Result<T0, T1>, Err
     ret
 
 // Function definition at index 22
-#[unpack_variant] public fun unpack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T0
+#[unpack_variant=0] public fun unpack$Result$Ok<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T0
     local l1: Result<T0, T1>
     move_loc l0
     unpack_variant Result<T0, T1>, Ok
     ret
 
 // Function definition at index 23
-#[unpack_variant] public fun unpack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T1
+#[unpack_variant=1] public fun unpack$Result$Err<T0: copy + drop, T1: copy + drop>(l0: Result<T0, T1>): T1
     local l1: Result<T0, T1>
     move_loc l0
     unpack_variant Result<T0, T1>, Err
     ret
 
 // Function definition at index 24
-#[borrow] public fun borrow$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
+#[borrow=0] public fun borrow$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
     local l1: &Result<T0, T1>
     move_loc l0
     borrow_variant_field Result<T0, T1>, Ok::_0
     ret
 
 // Function definition at index 25
-#[borrow] public fun borrow$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
+#[borrow=0] public fun borrow$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
     local l1: &Result<T0, T1>
     move_loc l0
     borrow_variant_field Result<T0, T1>, Err::_0
     ret
 
 // Function definition at index 26
-#[borrow_mut] public fun borrow_mut$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
+#[borrow_mut=0] public fun borrow_mut$Result$0$0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
     local l1: &mut Result<T0, T1>
     move_loc l0
     mut_borrow_variant_field Result<T0, T1>, Ok::_0
     ret
 
 // Function definition at index 27
-#[borrow_mut] public fun borrow_mut$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
+#[borrow_mut=0] public fun borrow_mut$Result$0$1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
     local l1: &mut Result<T0, T1>
     move_loc l0
     mut_borrow_variant_field Result<T0, T1>, Err::_0

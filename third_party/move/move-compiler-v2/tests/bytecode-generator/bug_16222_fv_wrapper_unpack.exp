@@ -245,14 +245,14 @@ struct Lazy has drop
     ret
 
 // Function definition at index 2
-#[borrow] friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
+#[borrow=0] friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
     local l1: &Lazy
     move_loc l0
     borrow_field Lazy, _0
     ret
 
 // Function definition at index 3
-#[borrow_mut] friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
+#[borrow_mut=0] friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
     local l1: &mut Lazy
     move_loc l0
     mut_borrow_field Lazy, _0
@@ -289,14 +289,14 @@ struct Lazy has drop
     ret
 
 // Function definition at index 2
-#[borrow] friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
+#[borrow=0] friend fun borrow$Lazy$0(l0: &Lazy): &|| has drop
     local l1: &Lazy
     move_loc l0
     borrow_field Lazy, _0
     ret
 
 // Function definition at index 3
-#[borrow_mut] friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
+#[borrow_mut=0] friend fun borrow_mut$Lazy$0(l0: &mut Lazy): &mut || has drop
     local l1: &mut Lazy
     move_loc l0
     mut_borrow_field Lazy, _0
