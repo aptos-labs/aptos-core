@@ -741,14 +741,14 @@ enum Wrapper has drop
     ret
 
 // Function definition at index 4
-#[borrow] friend fun borrow$S$0(l0: &S): &u64
+#[borrow=0] friend fun borrow$S$0(l0: &S): &u64
     local l1: &S
     move_loc l0
     borrow_field S, x
     ret
 
 // Function definition at index 5
-#[borrow_mut] friend fun borrow_mut$S$0(l0: &mut S): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$S$0(l0: &mut S): &mut u64
     local l1: &mut S
     move_loc l0
     mut_borrow_field S, x
@@ -771,84 +771,84 @@ enum Wrapper has drop
     ret
 
 // Function definition at index 8
-#[borrow] friend fun borrow$S2$0(l0: &S2): &u64
+#[borrow=0] friend fun borrow$S2$0(l0: &S2): &u64
     local l1: &S2
     move_loc l0
     borrow_field S2, x
     ret
 
 // Function definition at index 9
-#[borrow] friend fun borrow$S2$1(l0: &S2): &S
+#[borrow=1] friend fun borrow$S2$1(l0: &S2): &S
     local l1: &S2
     move_loc l0
     borrow_field S2, s
     ret
 
 // Function definition at index 10
-#[borrow_mut] friend fun borrow_mut$S2$0(l0: &mut S2): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$S2$0(l0: &mut S2): &mut u64
     local l1: &mut S2
     move_loc l0
     mut_borrow_field S2, x
     ret
 
 // Function definition at index 11
-#[borrow_mut] friend fun borrow_mut$S2$1(l0: &mut S2): &mut S
+#[borrow_mut=1] friend fun borrow_mut$S2$1(l0: &mut S2): &mut S
     local l1: &mut S2
     move_loc l0
     mut_borrow_field S2, s
     ret
 
 // Function definition at index 12
-#[test_variant] friend fun test_variant$Wrapper$V1(l0: &Wrapper): bool
+#[test_variant=0] friend fun test_variant$Wrapper$V1(l0: &Wrapper): bool
     local l1: &Wrapper
     move_loc l0
     test_variant Wrapper, V1
     ret
 
 // Function definition at index 13
-#[test_variant] friend fun test_variant$Wrapper$V2(l0: &Wrapper): bool
+#[test_variant=1] friend fun test_variant$Wrapper$V2(l0: &Wrapper): bool
     local l1: &Wrapper
     move_loc l0
     test_variant Wrapper, V2
     ret
 
 // Function definition at index 14
-#[pack_variant] friend fun pack$Wrapper$V1(l0: u64): Wrapper
+#[pack_variant=0] friend fun pack$Wrapper$V1(l0: u64): Wrapper
     local l1: u64
     move_loc l0
     pack_variant Wrapper, V1
     ret
 
 // Function definition at index 15
-#[pack_variant] friend fun pack$Wrapper$V2(l0: u64): Wrapper
+#[pack_variant=1] friend fun pack$Wrapper$V2(l0: u64): Wrapper
     local l1: u64
     move_loc l0
     pack_variant Wrapper, V2
     ret
 
 // Function definition at index 16
-#[unpack_variant] friend fun unpack$Wrapper$V1(l0: Wrapper): u64
+#[unpack_variant=0] friend fun unpack$Wrapper$V1(l0: Wrapper): u64
     local l1: Wrapper
     move_loc l0
     unpack_variant Wrapper, V1
     ret
 
 // Function definition at index 17
-#[unpack_variant] friend fun unpack$Wrapper$V2(l0: Wrapper): u64
+#[unpack_variant=1] friend fun unpack$Wrapper$V2(l0: Wrapper): u64
     local l1: Wrapper
     move_loc l0
     unpack_variant Wrapper, V2
     ret
 
 // Function definition at index 18
-#[borrow] friend fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
+#[borrow=0] friend fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
     local l1: &Wrapper
     move_loc l0
     borrow_variant_field Wrapper, V1::_0, V2::_0
     ret
 
 // Function definition at index 19
-#[borrow_mut] friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
     local l1: &mut Wrapper
     move_loc l0
     mut_borrow_variant_field Wrapper, V1::_0, V2::_0
@@ -881,14 +881,14 @@ struct T
     ret
 
 // Function definition at index 2
-#[borrow] friend fun borrow$T$0(l0: &T): &u64
+#[borrow=0] friend fun borrow$T$0(l0: &T): &u64
     local l1: &T
     move_loc l0
     borrow_field T, x
     ret
 
 // Function definition at index 3
-#[borrow_mut] friend fun borrow_mut$T$0(l0: &mut T): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$T$0(l0: &mut T): &mut u64
     local l1: &mut T
     move_loc l0
     mut_borrow_field T, x

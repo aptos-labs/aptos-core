@@ -2001,7 +2001,7 @@ impl GlobalEnv {
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
-            is_empty_struct: Some(false),
+            is_empty_struct: IsEmptyStruct::no(),
         }
     }
 
@@ -3797,6 +3797,48 @@ impl<'env> ModuleEnv<'env> {
 
 // =================================================================================================
 /// # Struct Environment
+#[derive(Debug, Copy, Clone)]
+pub enum IsEmptyStruct {
+    Yes,
+    No,
+    Unknown,
+}
+
+impl IsEmptyStruct {
+    pub fn yes() -> Self {
+        IsEmptyStruct::Yes
+    }
+
+    pub fn no() -> Self {
+        IsEmptyStruct::No
+    }
+
+    pub fn unknown() -> Self {
+        IsEmptyStruct::Unknown
+    }
+
+    pub fn is_yes(&self) -> bool {
+        matches!(self, IsEmptyStruct::Yes)
+    }
+
+    pub fn is_no(&self) -> bool {
+        matches!(self, IsEmptyStruct::No)
+    }
+
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, IsEmptyStruct::Unknown)
+    }
+}
+
+impl From<bool> for IsEmptyStruct {
+    fn from(value: bool) -> Self {
+        if value {
+            IsEmptyStruct::Yes
+        } else {
+            IsEmptyStruct::No
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct StructData {
@@ -3843,9 +3885,9 @@ pub struct StructData {
     /// Invariant: when true, visibility is always friend.
     pub(crate) has_package_visibility: bool,
 
-    /// Whether this struct is originally empty
+    /// Whether this struct is empty when defined by the user
     /// None if the data is constructed from compiled module
-    pub is_empty_struct: Option<bool>,
+    pub is_empty_struct: IsEmptyStruct,
 }
 
 impl StructData {
@@ -3864,7 +3906,7 @@ impl StructData {
             is_native: false,
             visibility: Visibility::Private,
             has_package_visibility: false,
-            is_empty_struct: Some(false),
+            is_empty_struct: IsEmptyStruct::unknown(),
         }
     }
 }
@@ -3891,8 +3933,8 @@ impl<'env> StructEnv<'env> {
         self.module_env.env
     }
 
-    /// Returns true if struct is empty when defined by the user
-    pub fn is_empty_struct(&self) -> Option<bool> {
+    /// Returns whether the struct is empty when defined by the user
+    pub fn is_empty_struct(&self) -> IsEmptyStruct {
         self.data.is_empty_struct
     }
 

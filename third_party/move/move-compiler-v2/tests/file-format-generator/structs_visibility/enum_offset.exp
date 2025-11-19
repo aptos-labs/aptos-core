@@ -14,42 +14,42 @@ enum E has copy + drop
     o2: u8
 
 // Function definition at index 0
-#[test_variant] public fun test_variant$E$V1(l0: &E): bool
+#[test_variant=0] public fun test_variant$E$V1(l0: &E): bool
     local l1: &E
     move_loc l0
     test_variant E, V1
     ret
 
 // Function definition at index 1
-#[test_variant] public fun test_variant$E$V2(l0: &E): bool
+#[test_variant=1] public fun test_variant$E$V2(l0: &E): bool
     local l1: &E
     move_loc l0
     test_variant E, V2
     ret
 
 // Function definition at index 2
-#[test_variant] public fun test_variant$E$V3(l0: &E): bool
+#[test_variant=2] public fun test_variant$E$V3(l0: &E): bool
     local l1: &E
     move_loc l0
     test_variant E, V3
     ret
 
 // Function definition at index 3
-#[test_variant] public fun test_variant$E$V4(l0: &E): bool
+#[test_variant=3] public fun test_variant$E$V4(l0: &E): bool
     local l1: &E
     move_loc l0
     test_variant E, V4
     ret
 
 // Function definition at index 4
-#[pack_variant] public fun pack$E$V1(l0: u8): E
+#[pack_variant=0] public fun pack$E$V1(l0: u8): E
     local l1: u8
     move_loc l0
     pack_variant E, V1
     ret
 
 // Function definition at index 5
-#[pack_variant] public fun pack$E$V2(l0: u8, l1: u16): E
+#[pack_variant=1] public fun pack$E$V2(l0: u8, l1: u16): E
     local l2: u8
     local l3: u16
     move_loc l0
@@ -58,70 +58,70 @@ enum E has copy + drop
     ret
 
 // Function definition at index 6
-#[pack_variant] public fun pack$E$V3(l0: u8): E
+#[pack_variant=2] public fun pack$E$V3(l0: u8): E
     local l1: u8
     move_loc l0
     pack_variant E, V3
     ret
 
 // Function definition at index 7
-#[pack_variant] public fun pack$E$V4(l0: u8): E
+#[pack_variant=3] public fun pack$E$V4(l0: u8): E
     local l1: u8
     move_loc l0
     pack_variant E, V4
     ret
 
 // Function definition at index 8
-#[unpack_variant] public fun unpack$E$V1(l0: E): u8
+#[unpack_variant=0] public fun unpack$E$V1(l0: E): u8
     local l1: E
     move_loc l0
     unpack_variant E, V1
     ret
 
 // Function definition at index 9
-#[unpack_variant] public fun unpack$E$V2(l0: E): (u8, u16)
+#[unpack_variant=1] public fun unpack$E$V2(l0: E): (u8, u16)
     local l1: E
     move_loc l0
     unpack_variant E, V2
     ret
 
 // Function definition at index 10
-#[unpack_variant] public fun unpack$E$V3(l0: E): u8
+#[unpack_variant=2] public fun unpack$E$V3(l0: E): u8
     local l1: E
     move_loc l0
     unpack_variant E, V3
     ret
 
 // Function definition at index 11
-#[unpack_variant] public fun unpack$E$V4(l0: E): u8
+#[unpack_variant=3] public fun unpack$E$V4(l0: E): u8
     local l1: E
     move_loc l0
     unpack_variant E, V4
     ret
 
 // Function definition at index 12
-#[borrow] public fun borrow$E$0$0(l0: &E): &u8
+#[borrow=0] public fun borrow$E$0$0(l0: &E): &u8
     local l1: &E
     move_loc l0
     borrow_variant_field E, V1::o1, V2::o1, V3::o2, V4::o2
     ret
 
 // Function definition at index 13
-#[borrow] public fun borrow$E$1$1(l0: &E): &u16
+#[borrow=1] public fun borrow$E$1$1(l0: &E): &u16
     local l1: &E
     move_loc l0
     borrow_variant_field E, V2::o3
     ret
 
 // Function definition at index 14
-#[borrow_mut] public fun borrow_mut$E$0$0(l0: &mut E): &mut u8
+#[borrow_mut=0] public fun borrow_mut$E$0$0(l0: &mut E): &mut u8
     local l1: &mut E
     move_loc l0
     mut_borrow_variant_field E, V1::o1, V2::o1, V3::o2, V4::o2
     ret
 
 // Function definition at index 15
-#[borrow_mut] public fun borrow_mut$E$1$1(l0: &mut E): &mut u16
+#[borrow_mut=1] public fun borrow_mut$E$1$1(l0: &mut E): &mut u16
     local l1: &mut E
     move_loc l0
     mut_borrow_variant_field E, V2::o3

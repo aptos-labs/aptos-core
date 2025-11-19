@@ -117,6 +117,36 @@ fn clos_pack(
     Ok(())
 }
 
+fn check_borrow_field_mut(
+    verifier: &mut ReferenceSafetyAnalysis,
+    function_handle: &FunctionHandle,
+    state: &mut AbstractState,
+    offset: u16,
+    meter: &mut impl Meter,
+) -> Result<(), PartialVMError> {
+    let mut is_borrow_field_mutable = false;
+    for attr in function_handle.attributes.iter() {
+        // When calling a borrow field mut api, we assume
+        // 1) there is only one struct-API related attribute, which is `borrow_mut`,
+        // 2) the implementation of the function matches the attribute, which
+        // only borrows the field at field_offset thus call borrow_field
+        // we need this special case because of reference semantics of mutable references
+        // passing to a function, which is not necessary for immutable references.
+        // same for call generic below.
+        if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
+            let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+            let value = state.borrow_field(offset, true, id, *field_offset)?;
+            verifier.stack.push(value);
+            is_borrow_field_mutable = true;
+            break;
+        }
+    }
+    if !is_borrow_field_mutable {
+        call(verifier, state, offset, function_handle, meter)?;
+    }
+    Ok(())
+}
+
 fn call_closure(
     verifier: &mut ReferenceSafetyAnalysis,
     state: &mut AbstractState,
@@ -465,16 +495,12 @@ fn execute_inner(
 
         Bytecode::Call(idx) => {
             let function_handle = verifier.resolver.function_handle_at(*idx);
-            if !handle_borrow_field_mutable(verifier, state, offset, function_handle)? {
-                call(verifier, state, offset, function_handle, meter)?
-            }
+            check_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
         },
         Bytecode::CallGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
-            if !handle_borrow_field_mutable(verifier, state, offset, function_handle)? {
-                call(verifier, state, offset, function_handle, meter)?
-            }
+            check_borrow_field_mut(verifier, function_handle, state, offset, meter)?;
         },
 
         Bytecode::Ret => {
