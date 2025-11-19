@@ -41,6 +41,12 @@ const MAX_NUM_OUTSTANDING_TRANSACTIONS: u64 = 15;
 
 const DEFAULT_KEY_FILE_PATH: &str = "/opt/aptos/etc/mint.key";
 
+/// Default asset name used when no asset is specified in requests.
+pub const DEFAULT_ASSET_NAME: &str = "apt";
+
+/// Default amount of coins to fund in OCTA.
+pub const DEFAULT_AMOUNT_TO_FUND: u64 = 100_000_000_000;
+
 /// This defines configuration for any Funder that needs to interact with a real
 /// blockchain API. This includes the MintFunder and the TransferFunder currently.
 ///
@@ -62,20 +68,6 @@ pub struct ApiConnectionConfig {
     #[clap(skip)]
     pub additional_headers: Option<HashMap<String, String>>,
 
-    /// Path to the private key for creating test account and minting coins in
-    /// the MintFunder case, or for transferring coins in the TransferFunder case.
-    /// To keep Testnet simple, we used one private key for aptos root account
-    /// To manually generate a keypair, use generate-key:
-    /// `cargo run -p generate-keypair -- -o <output_file_path>`
-    #[serde(default = "ApiConnectionConfig::default_mint_key_file_path")]
-    #[clap(long, default_value = DEFAULT_KEY_FILE_PATH, value_parser)]
-    key_file_path: PathBuf,
-
-    /// Hex string of an Ed25519PrivateKey for minting / transferring coins.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string)]
-    key: Option<ConfigKey<Ed25519PrivateKey>>,
-
     /// Chain ID of the network this client is connecting to. For example, for mainnet:
     /// "MAINNET" or 1, testnet: "TESTNET" or 2. If there is no predefined string
     /// alias (e.g. "MAINNET"), just use the number. Note: Chain ID of 0 is not allowed.
@@ -88,48 +80,14 @@ impl ApiConnectionConfig {
         node_url: Url,
         api_key: Option<String>,
         additional_headers: Option<HashMap<String, String>>,
-        key_file_path: PathBuf,
-        key: Option<ConfigKey<Ed25519PrivateKey>>,
         chain_id: ChainId,
     ) -> Self {
         Self {
             node_url,
             api_key,
             additional_headers,
-            key_file_path,
-            key,
             chain_id,
         }
-    }
-
-    fn default_mint_key_file_path() -> PathBuf {
-        PathBuf::from_str(DEFAULT_KEY_FILE_PATH).unwrap()
-    }
-
-    pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
-        if let Some(ref key) = self.key {
-            return Ok(key.private_key());
-        }
-        let key_bytes = std::fs::read(self.key_file_path.as_path()).with_context(|| {
-            format!(
-                "Failed to read key file: {}",
-                self.key_file_path.to_string_lossy()
-            )
-        })?;
-        // decode as bcs first, fall back to a file of hex
-        let result = aptos_sdk::bcs::from_bytes(&key_bytes); //.with_context(|| "bad bcs");
-        if let Ok(x) = result {
-            return Ok(x);
-        }
-        let keystr = String::from_utf8(key_bytes).map_err(|e| anyhow!(e))?;
-        Ok(ConfigKey::from_encoded_string(keystr.as_str())
-            .with_context(|| {
-                format!(
-                    "{}: key file failed as both bcs and hex",
-                    self.key_file_path.to_string_lossy()
-                )
-            })?
-            .private_key())
     }
 }
 
@@ -238,14 +196,20 @@ impl Drop for NumOutstandingTransactionsResetter {
 
 /// This function is responsible for updating our local record of the sequence
 /// numbers of the funder and receiver accounts.
+///
+/// Each asset has its own independent queue: HashMap<String, Vec<(AccountAddress, u64)>>.
+/// This ensures requests for different assets don't interfere with each other while maintaining
+/// FIFO ordering within each asset. For single-asset funders (like TransferFunder), use
+/// DEFAULT_ASSET_NAME. For multi-asset funders (like MintFunder), pass the specific asset name.
 pub async fn update_sequence_numbers(
     client: &Client,
     funder_account: &RwLock<LocalAccount>,
-    // The value here is the requester address and amount requested.
-    outstanding_requests: &RwLock<Vec<(AccountAddress, u64)>>,
+    // Each asset has its own queue: HashMap<asset_name, Vec<(AccountAddress, u64)>>
+    outstanding_requests: &RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
     receiver_address: AccountAddress,
     amount: u64,
     wait_for_outstanding_txns_secs: u64,
+    asset_name: &str,
 ) -> Result<(u64, Option<u64>), AptosTapError> {
     let (mut funder_seq, mut receiver_seq) =
         get_sequence_numbers(client, funder_account, receiver_address).await?;
@@ -263,26 +227,42 @@ pub async fn update_sequence_numbers(
     let _resetter = NumOutstandingTransactionsResetter;
 
     let mut set_outstanding = false;
+    let request_key = (receiver_address, amount);
+
     // We shouldn't have too many outstanding txns
     for _ in 0..(wait_for_outstanding_txns_secs * 2) {
         if our_funder_seq < funder_seq + MAX_NUM_OUTSTANDING_TRANSACTIONS {
             // Enforce a stronger ordering of priorities based upon the MintParams that arrived
             // first. Then put the other folks to sleep to try again until the queue fills up.
             if !set_outstanding {
-                let mut requests = outstanding_requests.write().await;
-                requests.push((receiver_address, amount));
+                let mut requests_map = outstanding_requests.write().await;
+                let queue = requests_map
+                    .entry(asset_name.to_string())
+                    .or_insert_with(Vec::new);
+                queue.push(request_key);
                 set_outstanding = true;
             }
 
-            if outstanding_requests.read().await.first() == Some(&(receiver_address, amount)) {
+            // Check if this request is at the front of the queue for this asset
+            let requests_map = outstanding_requests.read().await;
+            let is_at_front = if let Some(queue) = requests_map.get(asset_name) {
+                queue.first() == Some(&request_key)
+            } else {
+                false
+            };
+
+            if is_at_front {
                 // There might have been two requests with the same parameters, so we ensure that
                 // we only pop off one of them. We do a read lock first since that is cheap,
                 // followed by a write lock.
-                let mut requests = outstanding_requests.write().await;
-                if requests.first() == Some(&(receiver_address, amount)) {
-                    requests.remove(0);
-                    break;
+                drop(requests_map);
+                let mut requests_map = outstanding_requests.write().await;
+                if let Some(queue) = requests_map.get_mut(asset_name) {
+                    if queue.first() == Some(&request_key) {
+                        queue.remove(0);
+                    }
                 }
+                break;
             }
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
             continue;
@@ -465,5 +445,58 @@ impl GasUnitPriceManager {
             .await?
             .into_inner()
             .gas_estimate)
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, Parser)]
+pub struct AssetConfig {
+    /// Path to the private key for creating test account and minting coins in
+    /// the MintFunder case, or for transferring coins in the TransferFunder case.
+    /// To keep Testnet simple, we used one private key for aptos root account
+    /// To manually generate a keypair, use generate-key:
+    /// `cargo run -p generate-keypair -- -o <output_file_path>`
+    #[serde(default = "AssetConfig::default_key_file_path")]
+    #[clap(long, default_value = DEFAULT_KEY_FILE_PATH, value_parser)]
+    pub key_file_path: PathBuf,
+
+    /// Hex string of an Ed25519PrivateKey for minting / transferring coins.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[clap(long, value_parser = ConfigKey::<Ed25519PrivateKey>::from_encoded_string)]
+    pub key: Option<ConfigKey<Ed25519PrivateKey>>,
+}
+
+impl AssetConfig {
+    pub fn new(key: Option<ConfigKey<Ed25519PrivateKey>>, key_file_path: PathBuf) -> Self {
+        Self { key, key_file_path }
+    }
+
+    fn default_key_file_path() -> PathBuf {
+        PathBuf::from_str(DEFAULT_KEY_FILE_PATH).unwrap()
+    }
+
+    pub fn get_key(&self) -> Result<Ed25519PrivateKey> {
+        if let Some(ref key) = self.key {
+            return Ok(key.private_key());
+        }
+        let key_bytes = std::fs::read(self.key_file_path.as_path()).with_context(|| {
+            format!(
+                "Failed to read key file: {}",
+                self.key_file_path.to_string_lossy()
+            )
+        })?;
+        // decode as bcs first, fall back to a file of hex
+        let result = aptos_sdk::bcs::from_bytes(&key_bytes);
+        if let Ok(x) = result {
+            return Ok(x);
+        }
+        let keystr = String::from_utf8(key_bytes).map_err(|e| anyhow!(e))?;
+        Ok(ConfigKey::from_encoded_string(keystr.as_str())
+            .with_context(|| {
+                format!(
+                    "{}: key file failed as both bcs and hex",
+                    self.key_file_path.to_string_lossy()
+                )
+            })?
+            .private_key())
     }
 }

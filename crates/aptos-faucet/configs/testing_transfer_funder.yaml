@@ -9,10 +9,12 @@ funder_config:
   type: "TransferFunder"
   node_url: "https://fullnode.devnet.aptoslabs.com"
   chain_id: 36
-  key_file_path: "/tmp/transfer_funder_devnet.key"
   minimum_funds: 10000000
   amount_to_fund: 2000
   max_gas_amount: 50000
+  assets:
+    apt:
+      key_file_path: "/tmp/transfer_funder_devnet.key"
 handler_config:
   use_helpful_errors: true
   return_rejections_early: false

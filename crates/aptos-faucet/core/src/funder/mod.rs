@@ -7,8 +7,8 @@ mod mint;
 mod transfer;
 
 pub use self::{
-    common::{ApiConnectionConfig, TransactionSubmissionConfig},
-    mint::MintFunderConfig,
+    common::{ApiConnectionConfig, AssetConfig, TransactionSubmissionConfig, DEFAULT_ASSET_NAME},
+    mint::{MintAssetConfig, MintFunderConfig},
 };
 use self::{fake::FakeFunderConfig, transfer::TransferFunderConfig};
 use crate::endpoints::AptosTapError;
@@ -37,6 +37,7 @@ pub trait FunderTrait: Sync + Send + 'static {
         &self,
         amount: Option<u64>,
         receiver_address: AccountAddress,
+        asset: Option<String>,
         check_only: bool,
         // True if a Bypasser let this request bypass the Checkers.
         did_bypass_checkers: bool,
