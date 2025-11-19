@@ -8,13 +8,13 @@
 use crate::{
     ast::{
         AccessSpecifier as ASTAccessSpecifier, AccessSpecifierKind as ASTAccessSpecifierKind,
-        Address, AddressSpecifier as ASTAddressSpecifier, Attribute, ModuleName,
-        ResourceSpecifier as ASTResourceSpecifier,
+        Address, AddressSpecifier as ASTAddressSpecifier, Attribute, AttributeValue, ModuleName,
+        ResourceSpecifier as ASTResourceSpecifier, Value,
     },
     model::{
-        FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, Loc, ModuleData,
-        ModuleId, MoveIrLoc, Parameter, StructData, StructId, StructVariant, TypeParameter,
-        TypeParameterKind,
+        FieldData, FieldId, FunId, FunctionData, FunctionKind, GlobalEnv, IsEmptyStruct, Loc,
+        ModuleData, ModuleId, MoveIrLoc, Parameter, StructData, StructId, StructVariant,
+        TypeParameter, TypeParameterKind,
     },
     symbol::{Symbol, SymbolPool},
     ty::{PrimitiveType, ReferenceKind, Type},
@@ -38,6 +38,7 @@ use move_binary_format::{
 };
 use move_bytecode_source_map::source_map::{SourceMap, SourceName};
 use move_core_types::{ability::AbilitySet, account_address::AccountAddress, language_storage};
+use num::BigInt;
 use std::collections::BTreeMap;
 
 /// Macro to abort the execution if `with_dep_closure` is specified while dependencies are missing.
@@ -318,7 +319,7 @@ impl<'a> BinaryModuleLoader<'a> {
                 new = true;
                 StructData {
                     abilities: handle_view.abilities(),
-                    is_empty_struct: None,
+                    is_empty_struct: IsEmptyStruct::unknown(),
                     ..StructData::new(struct_id.symbol(), loc.clone())
                 }
             });
@@ -460,41 +461,48 @@ impl<'a> BinaryModuleLoader<'a> {
 
         // add attributes to the function
         let mut attributes = vec![];
-        let mut add_attribute = |well_known_name: &str| {
+        // Helper closure to add an attribute, optionally with a u16 value parameter
+        let mut add_attribute = |well_known_name: &str, value: Option<u16>| {
             let node_id = self.env.new_node(Loc::default(), Type::Tuple(vec![]));
             let sym = self.env.symbol_pool().make(well_known_name);
-            attributes.push(Attribute::Apply(node_id, sym, vec![]));
+            if let Some(v) = value {
+                let attribute_value =
+                    AttributeValue::Value(node_id, Value::Number(BigInt::from(v)));
+                attributes.push(Attribute::Assign(node_id, sym, attribute_value));
+            } else {
+                attributes.push(Attribute::Apply(node_id, sym, vec![]));
+            }
         };
         for attr in handle_view.attributes() {
             match attr {
                 FunctionAttribute::Persistent => {
                     if !visibility.is_public() {
-                        add_attribute(well_known::PERSISTENT_ATTRIBUTE);
+                        add_attribute(well_known::PERSISTENT_ATTRIBUTE, None);
                     }
                 },
                 FunctionAttribute::ModuleLock => {
-                    add_attribute(well_known::MODULE_LOCK_ATTRIBUTE);
+                    add_attribute(well_known::MODULE_LOCK_ATTRIBUTE, None);
                 },
                 FunctionAttribute::Pack => {
-                    add_attribute(well_known::PACK);
+                    add_attribute(well_known::PACK, None);
                 },
-                FunctionAttribute::PackVariant(_) => {
-                    add_attribute(well_known::PACK_VARIANT);
+                FunctionAttribute::PackVariant(variant_index) => {
+                    add_attribute(well_known::PACK_VARIANT, Some(*variant_index));
                 },
                 FunctionAttribute::Unpack => {
-                    add_attribute(well_known::UNPACK);
+                    add_attribute(well_known::UNPACK, None);
                 },
-                FunctionAttribute::UnpackVariant(_) => {
-                    add_attribute(well_known::UNPACK_VARIANT);
+                FunctionAttribute::UnpackVariant(variant_index) => {
+                    add_attribute(well_known::UNPACK_VARIANT, Some(*variant_index));
                 },
-                FunctionAttribute::TestVariant(_) => {
-                    add_attribute(well_known::TEST_VARIANT);
+                FunctionAttribute::TestVariant(variant_index) => {
+                    add_attribute(well_known::TEST_VARIANT, Some(*variant_index));
                 },
-                FunctionAttribute::BorrowFieldImmutable(_) => {
-                    add_attribute(well_known::BORROW_NAME);
+                FunctionAttribute::BorrowFieldImmutable(offset) => {
+                    add_attribute(well_known::BORROW_NAME, Some(*offset));
                 },
-                FunctionAttribute::BorrowFieldMutable(_) => {
-                    add_attribute(well_known::BORROW_MUT_NAME);
+                FunctionAttribute::BorrowFieldMutable(offset) => {
+                    add_attribute(well_known::BORROW_MUT_NAME, Some(*offset));
                 },
             }
         }

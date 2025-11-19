@@ -20,14 +20,14 @@ struct Scalar has copy + drop + store
     ret
 
 // Function definition at index 2
-#[borrow] public fun borrow$Scalar$0(l0: &Scalar): &vector<u8>
+#[borrow=0] public fun borrow$Scalar$0(l0: &Scalar): &vector<u8>
     local l1: &Scalar
     move_loc l0
     borrow_field Scalar, data
     ret
 
 // Function definition at index 3
-#[borrow_mut] public fun borrow_mut$Scalar$0(l0: &mut Scalar): &mut vector<u8>
+#[borrow_mut=0] public fun borrow_mut$Scalar$0(l0: &mut Scalar): &mut vector<u8>
     local l1: &mut Scalar
     move_loc l0
     mut_borrow_field Scalar, data

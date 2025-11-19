@@ -33,28 +33,28 @@ struct Wrapper<T0: drop> has drop
     ret
 
 // Function definition at index 2
-#[borrow] public fun borrow$NestedPair$0<T0: drop>(l0: &NestedPair<T0>): &Pair
+#[borrow=0] public fun borrow$NestedPair$0<T0: drop>(l0: &NestedPair<T0>): &Pair
     local l1: &NestedPair<T0>
     move_loc l0
     borrow_field NestedPair<T0>, _0
     ret
 
 // Function definition at index 3
-#[borrow] public fun borrow$NestedPair$1<T0: drop>(l0: &NestedPair<T0>): &Wrapper<T0>
+#[borrow=1] public fun borrow$NestedPair$1<T0: drop>(l0: &NestedPair<T0>): &Wrapper<T0>
     local l1: &NestedPair<T0>
     move_loc l0
     borrow_field NestedPair<T0>, _1
     ret
 
 // Function definition at index 4
-#[borrow_mut] public fun borrow_mut$NestedPair$0<T0: drop>(l0: &mut NestedPair<T0>): &mut Pair
+#[borrow_mut=0] public fun borrow_mut$NestedPair$0<T0: drop>(l0: &mut NestedPair<T0>): &mut Pair
     local l1: &mut NestedPair<T0>
     move_loc l0
     mut_borrow_field NestedPair<T0>, _0
     ret
 
 // Function definition at index 5
-#[borrow_mut] public fun borrow_mut$NestedPair$1<T0: drop>(l0: &mut NestedPair<T0>): &mut Wrapper<T0>
+#[borrow_mut=1] public fun borrow_mut$NestedPair$1<T0: drop>(l0: &mut NestedPair<T0>): &mut Wrapper<T0>
     local l1: &mut NestedPair<T0>
     move_loc l0
     mut_borrow_field NestedPair<T0>, _1
@@ -77,28 +77,28 @@ struct Wrapper<T0: drop> has drop
     ret
 
 // Function definition at index 8
-#[borrow] public fun borrow$Pair$0(l0: &Pair): &u64
+#[borrow=0] public fun borrow$Pair$0(l0: &Pair): &u64
     local l1: &Pair
     move_loc l0
     borrow_field Pair, _0
     ret
 
 // Function definition at index 9
-#[borrow] public fun borrow$Pair$1(l0: &Pair): &bool
+#[borrow=1] public fun borrow$Pair$1(l0: &Pair): &bool
     local l1: &Pair
     move_loc l0
     borrow_field Pair, _1
     ret
 
 // Function definition at index 10
-#[borrow_mut] public fun borrow_mut$Pair$0(l0: &mut Pair): &mut u64
+#[borrow_mut=0] public fun borrow_mut$Pair$0(l0: &mut Pair): &mut u64
     local l1: &mut Pair
     move_loc l0
     mut_borrow_field Pair, _0
     ret
 
 // Function definition at index 11
-#[borrow_mut] public fun borrow_mut$Pair$1(l0: &mut Pair): &mut bool
+#[borrow_mut=1] public fun borrow_mut$Pair$1(l0: &mut Pair): &mut bool
     local l1: &mut Pair
     move_loc l0
     mut_borrow_field Pair, _1
@@ -119,14 +119,14 @@ struct Wrapper<T0: drop> has drop
     ret
 
 // Function definition at index 14
-#[borrow] public fun borrow$VecWrap$0<T0: drop>(l0: &VecWrap<T0>): &vector<T0>
+#[borrow=0] public fun borrow$VecWrap$0<T0: drop>(l0: &VecWrap<T0>): &vector<T0>
     local l1: &VecWrap<T0>
     move_loc l0
     borrow_field VecWrap<T0>, _0
     ret
 
 // Function definition at index 15
-#[borrow_mut] public fun borrow_mut$VecWrap$0<T0: drop>(l0: &mut VecWrap<T0>): &mut vector<T0>
+#[borrow_mut=0] public fun borrow_mut$VecWrap$0<T0: drop>(l0: &mut VecWrap<T0>): &mut vector<T0>
     local l1: &mut VecWrap<T0>
     move_loc l0
     mut_borrow_field VecWrap<T0>, _0
@@ -147,14 +147,14 @@ struct Wrapper<T0: drop> has drop
     ret
 
 // Function definition at index 18
-#[borrow] public fun borrow$Wrapper$0<T0: drop>(l0: &Wrapper<T0>): &T0
+#[borrow=0] public fun borrow$Wrapper$0<T0: drop>(l0: &Wrapper<T0>): &T0
     local l1: &Wrapper<T0>
     move_loc l0
     borrow_field Wrapper<T0>, _0
     ret
 
 // Function definition at index 19
-#[borrow_mut] public fun borrow_mut$Wrapper$0<T0: drop>(l0: &mut Wrapper<T0>): &mut T0
+#[borrow_mut=0] public fun borrow_mut$Wrapper$0<T0: drop>(l0: &mut Wrapper<T0>): &mut T0
     local l1: &mut Wrapper<T0>
     move_loc l0
     mut_borrow_field Wrapper<T0>, _0
