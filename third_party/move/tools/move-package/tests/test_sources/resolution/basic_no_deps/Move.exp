@@ -81,9 +81,9 @@ ResolutionGraph {
                 dev_dependencies: {},
             },
             package_path: "ELIDED_FOR_TEST",
-            renaming: {},
             resolution_table: {},
             source_digest: "ELIDED_FOR_TEST",
         },
     },
+    global_named_address_pool: {},
 }
