@@ -20,8 +20,8 @@ use move_binary_format::{
     control_flow_graph::ControlFlowGraph,
     errors::{Location, PartialVMError, PartialVMResult, VMResult},
     file_format::{
-        CompiledModule, CompiledScript, FunctionDefinition, FunctionDefinitionIndex,
-        IdentifierIndex, TableIndex,
+        Bytecode, CodeUnit, CompiledModule, CompiledScript, FunctionAttribute, FunctionDefinition,
+        FunctionDefinitionIndex, IdentifierIndex, TableIndex,
     },
     IndexKind,
 };
@@ -41,6 +41,189 @@ impl<'a> CodeUnitVerifier<'a> {
     ) -> VMResult<()> {
         Self::verify_module_impl(verifier_config, module)
             .map_err(|e| e.finish(Location::Module(module.self_id())))
+    }
+
+    fn pattern_check_for_pack(code_opt: Option<&CodeUnit>) -> PartialVMResult<()> {
+        if code_opt.is_none() {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+        let code = code_opt.unwrap();
+
+        if code.code.len() < 2 {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+
+        match (
+            &code.code[code.code.len() - 1],
+            &code.code[code.code.len() - 2],
+        ) {
+            (
+                &Bytecode::Ret,
+                &Bytecode::Pack(_)
+                | &Bytecode::PackGeneric(_)
+                | &Bytecode::PackVariant(_)
+                | &Bytecode::PackVariantGeneric(_),
+            ) => {},
+            _ => {
+                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+            },
+        }
+
+        for i in 0..code.code.len() - 2 {
+            if !matches!(code.code[i], Bytecode::MoveLoc(_)) {
+                return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+            }
+        }
+
+        Ok(())
+    }
+
+    fn pattern_check_for_unpack(code_opt: Option<&CodeUnit>) -> PartialVMResult<()> {
+        if code_opt.is_none() {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+        let code = code_opt.unwrap();
+
+        if code.code.len() == 3 {
+            println!("code:{:?}", code.code);
+            match (&code.code[0], &code.code[1], &code.code[2]) {
+                (
+                    Bytecode::MoveLoc(_),
+                    Bytecode::Unpack(_)
+                    | Bytecode::UnpackVariant(_)
+                    | Bytecode::UnpackGeneric(_)
+                    | Bytecode::UnpackVariantGeneric(_),
+                    Bytecode::Ret,
+                ) => Ok(()),
+                _ => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)),
+            }
+        } else {
+            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+        }
+    }
+
+    fn pattern_check_for_test_variant(code_opt: Option<&CodeUnit>) -> PartialVMResult<()> {
+        if code_opt.is_none() {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+        let code = code_opt.unwrap();
+
+        if code.code.len() == 3 {
+            match (&code.code[0], &code.code[1], &code.code[2]) {
+                (
+                    Bytecode::MoveLoc(_),
+                    Bytecode::TestVariant(_) | Bytecode::TestVariantGeneric(_),
+                    Bytecode::Ret,
+                ) => Ok(()),
+                _ => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)),
+            }
+        } else {
+            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+        }
+    }
+
+    fn pattern_check_for_imm_borrow_field(code_opt: Option<&CodeUnit>) -> PartialVMResult<()> {
+        if code_opt.is_none() {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+        let code = code_opt.unwrap();
+
+        if code.code.len() == 3 {
+            match (&code.code[0], &code.code[1], &code.code[2]) {
+                (
+                    Bytecode::MoveLoc(_),
+                    Bytecode::ImmBorrowField(_)
+                    | Bytecode::ImmBorrowFieldGeneric(_)
+                    | Bytecode::ImmBorrowVariantField(_)
+                    | Bytecode::ImmBorrowVariantFieldGeneric(_),
+                    Bytecode::Ret,
+                ) => Ok(()),
+                _ => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)),
+            }
+        } else {
+            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+        }
+    }
+
+    fn pattern_check_for_mut_borrow_field(code_opt: Option<&CodeUnit>) -> PartialVMResult<()> {
+        if code_opt.is_none() {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+        let code = code_opt.unwrap();
+
+        if code.code.len() == 3 {
+            match (&code.code[0], &code.code[1], &code.code[2]) {
+                (
+                    Bytecode::MoveLoc(_),
+                    Bytecode::MutBorrowField(_)
+                    | Bytecode::MutBorrowFieldGeneric(_)
+                    | Bytecode::MutBorrowVariantField(_)
+                    | Bytecode::MutBorrowVariantFieldGeneric(_),
+                    Bytecode::Ret,
+                ) => Ok(()),
+                _ => Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE)),
+            }
+        } else {
+            Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE))
+        }
+    }
+
+    pub fn has_at_most_one_struct_api_attr(attrs: &[FunctionAttribute]) -> bool {
+        use FunctionAttribute::*;
+        let mut count = 0;
+        for attr in attrs {
+            let is_exclusive = matches!(
+                attr,
+                Pack | PackVariant
+                    | Unpack
+                    | UnpackVariant
+                    | TestVariant
+                    | BorrowFieldImmutable(_)
+                    | BorrowFieldMutable(_)
+            );
+            if is_exclusive {
+                count += 1;
+                if count > 1 {
+                    return false;
+                }
+            }
+        }
+        true
+    }
+
+    fn check_struct_api_impl(
+        module: &CompiledModule,
+        function_definition: &FunctionDefinition,
+    ) -> PartialVMResult<()> {
+        let handle = module.function_handle_at(function_definition.function);
+        if !Self::has_at_most_one_struct_api_attr(&handle.attributes) {
+            return Err(PartialVMError::new(StatusCode::INVALID_STRUCT_API_CODE));
+        }
+        for attr in handle.attributes.iter() {
+            match attr {
+                FunctionAttribute::Pack | FunctionAttribute::PackVariant => {
+                    return Self::pattern_check_for_pack(function_definition.code.as_ref());
+                },
+                FunctionAttribute::Unpack | FunctionAttribute::UnpackVariant => {
+                    return Self::pattern_check_for_unpack(function_definition.code.as_ref());
+                },
+                FunctionAttribute::TestVariant => {
+                    return Self::pattern_check_for_test_variant(function_definition.code.as_ref());
+                },
+                FunctionAttribute::BorrowFieldImmutable(_) => {
+                    return Self::pattern_check_for_imm_borrow_field(
+                        function_definition.code.as_ref(),
+                    );
+                },
+                FunctionAttribute::BorrowFieldMutable(_) => {
+                    return Self::pattern_check_for_mut_borrow_field(
+                        function_definition.code.as_ref(),
+                    );
+                },
+                _ => {},
+            }
+        }
+        Ok(())
     }
 
     fn verify_module_impl(
@@ -66,6 +249,9 @@ impl<'a> CodeUnitVerifier<'a> {
             )
             .map_err(|err| err.at_index(IndexKind::FunctionDefinition, index.0))?;
             total_back_edges += num_back_edges;
+            if verifier_config.check_struct_api_attributes {
+                Self::check_struct_api_impl(module, function_definition)?;
+            }
         }
         if let Some(limit) = verifier_config.max_back_edges_per_module {
             if total_back_edges > limit {
