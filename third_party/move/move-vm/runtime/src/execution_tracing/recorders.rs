@@ -5,12 +5,12 @@
 
 use crate::{
     execution_tracing::{trace::DynamicCall, Trace},
-    instr::Instruction,
     LoadedFunction,
 };
 use bitvec::vec::BitVec;
 use fxhash::FxHasher64;
 use move_core_types::function::ClosureMask;
+use move_vm_types::instr::Instruction;
 use std::hash::{Hash, Hasher};
 
 /// Interface for recording the trace at runtime. It is sufficient to record branch decisions as

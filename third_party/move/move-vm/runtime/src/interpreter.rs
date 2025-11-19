@@ -9,7 +9,6 @@ use crate::{
     execution_tracing::TraceRecorder,
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
-    instr::Instruction,
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
     module_traversal::TraversalContext,
@@ -43,9 +42,11 @@ use move_core_types::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
 };
+use move_vm_profiler::{FnGuard, Profiler, VM_PROFILER};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
+    instr::Instruction,
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
@@ -343,6 +344,8 @@ where
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
+        let fn_guard = VM_PROFILER.function_start(function.as_ref());
+
         let num_locals = function.local_tys().len();
         let mut locals = Locals::new(num_locals);
         for (i, value) in args.into_iter().enumerate() {
@@ -368,6 +371,7 @@ where
             CallType::Regular,
             self.vm_config,
             function,
+            Some(fn_guard),
             locals,
             frame_cache,
         )
@@ -467,6 +471,8 @@ where
                         (function, frame_cache)
                     };
 
+                    let fn_guard = VM_PROFILER.function_start(function.as_ref());
+
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
                         &function,
@@ -509,6 +515,7 @@ where
                         &mut current_frame,
                         gas_meter,
                         function,
+                        fn_guard,
                         CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
@@ -561,6 +568,8 @@ where
                         (function, frame_cache)
                     };
 
+                    let fn_guard = VM_PROFILER.function_start(function.as_ref());
+
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
                         &function,
@@ -611,6 +620,7 @@ where
                         &mut current_frame,
                         gas_meter,
                         function,
+                        fn_guard,
                         CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
@@ -625,6 +635,7 @@ where
                         .pop_as::<Closure>()
                         .map_err(|e| set_err_info!(current_frame, e))?
                         .unpack();
+
                     let lazy_function = LazyLoadedFunction::expect_this_impl(fun.as_ref())
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     let mask = lazy_function.closure_mask();
@@ -650,6 +661,8 @@ where
                     let callee = lazy_function
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    let fn_guard = VM_PROFILER.function_start(callee.as_ref());
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
@@ -711,6 +724,7 @@ where
                             &mut current_frame,
                             gas_meter,
                             callee,
+                            fn_guard,
                             CallType::ClosureDynamicDispatch,
                             // Make sure the frame cache is empty for the new call.
                             frame_cache,
@@ -822,6 +836,7 @@ where
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
         function: Rc<LoadedFunction>,
+        fn_guard: FnGuard,
         call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
@@ -840,6 +855,7 @@ where
                 current_frame,
                 gas_meter,
                 function,
+                fn_guard,
                 call_type,
                 frame_cache,
                 mask,
@@ -875,6 +891,7 @@ where
         current_frame: &Frame,
         gas_meter: &mut impl GasMeter,
         function: Rc<LoadedFunction>,
+        fn_guard: FnGuard,
         call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
@@ -922,6 +939,7 @@ where
             call_type,
             self.vm_config,
             function,
+            Some(fn_guard),
             locals,
             frame_cache,
         )
@@ -1117,6 +1135,9 @@ where
                     ty_args_id,
                 )?;
 
+                // Note: the profiler begins measuring at this point, so it captures only execution time, not loading time.
+                let fn_guard = VM_PROFILER.function_start(&target_func);
+
                 RTTCheck::check_call_visibility(
                     function,
                     &target_func,
@@ -1157,6 +1178,7 @@ where
                     current_frame,
                     gas_meter,
                     Rc::new(target_func),
+                    fn_guard,
                     CallType::NativeDynamicDispatch,
                     frame_cache,
                     ClosureMask::empty(),
@@ -1948,6 +1970,8 @@ impl Frame {
                         ),
                     )
                 });
+
+                let _guard = VM_PROFILER.instruction_start(instruction);
 
                 // Paranoid Mode: Perform the type stack transition check to make sure all type safety requirements has been met.
                 //

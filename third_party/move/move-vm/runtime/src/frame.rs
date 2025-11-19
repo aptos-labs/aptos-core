@@ -26,6 +26,7 @@ use move_core_types::{
     ability::Ability, account_address::AccountAddress, gas_algebra::NumTypeNodes,
     identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode,
 };
+use move_vm_profiler::FnGuard;
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::{
@@ -56,6 +57,10 @@ pub(crate) struct Frame {
     pub(crate) ty_builder: TypeBuilder,
     // Currently being executed function.
     pub(crate) function: Rc<LoadedFunction>,
+    // Guard used to profile the execution of this function.
+    // Note that this is only stored to keep it alive for the lifetime of the frame.
+    // It is an option so we can pass `None` during the runtime type checks.
+    pub(crate) _guard: Option<FnGuard>,
     // How this frame was established.
     pub(crate) call_type: CallType,
     // Locals for this execution context and their instantiated types.
@@ -154,6 +159,7 @@ impl Frame {
         call_type: CallType,
         vm_config: &VMConfig,
         function: Rc<LoadedFunction>,
+        guard: Option<FnGuard>,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> PartialVMResult<Frame> {
@@ -213,6 +219,7 @@ impl Frame {
             ty_builder,
             locals,
             function,
+            _guard: guard,
             call_type,
             local_tys,
             frame_cache,
