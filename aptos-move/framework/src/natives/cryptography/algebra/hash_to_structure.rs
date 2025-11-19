@@ -80,7 +80,7 @@ macro_rules! hash_to_bls12381gx_cost {
 
 pub fn hash_to_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());

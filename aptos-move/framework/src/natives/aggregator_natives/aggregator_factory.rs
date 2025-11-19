@@ -28,7 +28,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 fn native_new_aggregator(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);

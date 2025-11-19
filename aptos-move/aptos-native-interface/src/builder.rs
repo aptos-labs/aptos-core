@@ -81,9 +81,9 @@ impl SafeNativeBuilder {
     /// allowing the client to use [`SafeNativeContext`] instead of Move VM's [`NativeContext`].
     pub fn make_native<F>(&self, native: F) -> NativeFunction
     where
-        F: Fn(
+        F: for<'a> Fn(
                 &mut SafeNativeContext,
-                Vec<Type>,
+                &'a [Type],
                 VecDeque<Value>,
             ) -> SafeNativeResult<SmallVec<[Value; 1]>>
             + Send
@@ -95,7 +95,7 @@ impl SafeNativeBuilder {
 
         let enable_incremental_gas_charging = self.enable_incremental_gas_charging;
 
-        let closure = move |context: &mut NativeContext, ty_args, args| {
+        let closure = move |context: &mut NativeContext, ty_args: &[Type], args| {
             use SafeNativeError::*;
 
             let mut context = SafeNativeContext {
@@ -175,9 +175,9 @@ impl SafeNativeBuilder {
     ) -> impl Iterator<Item = (String, NativeFunction)> + 'a
     where
         'b: 'a,
-        F: Fn(
+        F: for<'c> Fn(
                 &mut SafeNativeContext,
-                Vec<Type>,
+                &'c [Type],
                 VecDeque<Value>,
             ) -> SafeNativeResult<SmallVec<[Value; 1]>>
             + Send

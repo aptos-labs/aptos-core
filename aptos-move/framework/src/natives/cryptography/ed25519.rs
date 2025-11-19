@@ -38,10 +38,10 @@ pub mod abort_codes {
  **************************************************************************************************/
 fn native_public_key_validate(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(arguments.len() == 1);
 
     let key_bytes = safely_pop_arg!(arguments, Vec<u8>);
@@ -95,7 +95,7 @@ fn native_public_key_validate(
  **************************************************************************************************/
 fn native_signature_verify_strict(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -182,7 +182,7 @@ pub fn make_all(
 #[cfg(feature = "testing")]
 fn native_test_only_generate_keys_internal(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let key_pair = KeyPair::<Ed25519PrivateKey, Ed25519PublicKey>::generate(&mut OsRng);
@@ -195,7 +195,7 @@ fn native_test_only_generate_keys_internal(
 #[cfg(feature = "testing")]
 fn native_test_only_sign_internal(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let msg_bytes = safely_pop_arg!(args, Vec<u8>);

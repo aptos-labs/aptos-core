@@ -355,7 +355,7 @@ pub struct NewTableHandleGasParameters {
 fn native_new_table_handle(
     gas_params: &NewTableHandleGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 2);
@@ -404,7 +404,7 @@ fn native_add_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &AddBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -458,7 +458,7 @@ fn native_borrow_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &BorrowBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -511,7 +511,7 @@ fn native_contains_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &ContainsBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -563,7 +563,7 @@ fn native_remove_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &RemoveGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -614,7 +614,7 @@ pub struct DestroyEmptyBoxGasParameters {
 fn native_destroy_empty_box(
     gas_params: &DestroyEmptyBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -649,7 +649,7 @@ pub struct DropUncheckedBoxGasParameters {
 fn native_drop_unchecked_box(
     gas_params: &DropUncheckedBoxGasParameters,
     _context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
