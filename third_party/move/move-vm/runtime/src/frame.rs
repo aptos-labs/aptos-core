@@ -4,6 +4,7 @@
 use crate::{
     config::VMConfig,
     frame_type_cache::FrameTypeCache,
+    interpreter::Stack,
     loader::{FunctionHandle, LoadedFunctionOwner, StructVariantInfo, VariantFieldInfo},
     module_traversal::TraversalContext,
     reentrancy_checker::CallType,
@@ -64,6 +65,10 @@ pub(crate) struct Frame {
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
+    // Saved value stack size of the caller that created this frame.
+    pub(crate) caller_value_stack_size: u32,
+    // Saved type stack size of the caller that created this frame.
+    pub(crate) caller_type_stack_size: u32,
 }
 
 impl AccessSpecifierEnv for Frame {
@@ -156,6 +161,7 @@ impl Frame {
         function: Rc<LoadedFunction>,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
+        stack: &Stack,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
 
@@ -216,6 +222,8 @@ impl Frame {
             call_type,
             local_tys,
             frame_cache,
+            caller_value_stack_size: stack.value.len() as u32,
+            caller_type_stack_size: stack.types.len() as u32,
         })
     }
 
