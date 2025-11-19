@@ -587,7 +587,9 @@ where
         let num_params = function.param_tys().len();
         let num_locals = function.local_tys().len();
 
-        let args = iter::repeat_with(dummy_local).take(num_params).collect();
+        let args = iter::repeat_with(dummy_local)
+            .take(num_params)
+            .collect::<Vec<_>>();
         let locals = Locals::new_from(args, num_locals)?;
         Frame::make_new_frame::<RTTCheck>(
             &mut UnmeteredGasMeter,
@@ -614,13 +616,20 @@ where
     {
         let num_params = callee.param_tys().len();
         let num_locals = callee.local_tys().len();
-        let mut locals = Locals::new(num_locals);
+        if num_params > num_locals {
+            let first_oob_index = num_locals;
+            return Err(Locals::local_index_out_of_bounds(
+                first_oob_index,
+                num_locals,
+            ));
+        }
 
         let ty_args = callee.ty_args();
         let should_check = RTTCheck::should_perform_checks(&current_frame.function.function);
 
+        let mut local_values = Locals::init_values(num_locals);
         for i in (0..num_params).rev() {
-            locals.store_loc(i, dummy_local())?;
+            local_values[i] = dummy_local();
 
             if should_check && !mask.is_captured(i) {
                 let ty = self.type_stack.pop_ty()?;
@@ -640,7 +649,7 @@ where
             call_type,
             self.vm_config,
             callee,
-            locals,
+            Locals::from_values(local_values),
             callee_frame_cache,
         )?;
         std::mem::swap(current_frame, &mut frame);
