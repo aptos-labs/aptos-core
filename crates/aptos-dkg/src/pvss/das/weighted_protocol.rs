@@ -110,6 +110,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         aux: &A,
@@ -289,7 +290,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) {
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
         let W = sc.get_total_weight();
 
         debug_assert!(self.check_sizes(sc).is_ok());
@@ -309,6 +314,8 @@ impl traits::Transcript for Transcript {
         for sok in &other.soks {
             self.soks.push(sok.clone());
         }
+
+        Ok(())
     }
 
     fn get_public_key_share(

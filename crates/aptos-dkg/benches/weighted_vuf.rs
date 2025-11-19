@@ -162,6 +162,7 @@ where
             &wc,
             &d.pp,
             &d.ssks[0],
+            &d.spks[0],
             &d.eks,
             &d.iss[0],
             &NoAux,
