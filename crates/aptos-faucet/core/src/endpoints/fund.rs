@@ -102,6 +102,7 @@ impl FundApi {
     async fn fund(
         &self,
         fund_request: Json<FundRequest>,
+        asset: poem_openapi::param::Query<Option<String>>,
         // This automagically uses FromRequest to get this data from the request.
         // It takes into things like X-Forwarded-IP and X-Real-IP.
         source_ip: RealIp,
@@ -110,7 +111,7 @@ impl FundApi {
     ) -> poem::Result<Json<FundResponse>, AptosTapErrorResponse> {
         let txns = self
             .components
-            .fund_inner(fund_request.0, source_ip, header_map, false)
+            .fund_inner(fund_request.0, source_ip, header_map, false, asset.0)
             .await?;
         Ok(Json(FundResponse {
             txn_hashes: get_hashes(&txns),
@@ -132,6 +133,7 @@ impl FundApi {
     async fn is_eligible(
         &self,
         fund_request: Json<FundRequest>,
+        asset: poem_openapi::param::Query<Option<String>>,
         // This automagically uses FromRequest to get this data from the request.
         // It takes into things like X-Forwarded-IP and X-Real-IP.
         source_ip: RealIp,
@@ -149,10 +151,16 @@ impl FundApi {
 
         // Call Funder.fund with `check_only` set, meaning it only does the
         // initial set of checks without actually submitting any transactions
-        // to fund the account.
+        // to fund the account. Pass asset directly, funder will use its configured default if None.
         self.components
             .funder
-            .fund(fund_request.amount, checker_data.receiver, true, bypass)
+            .fund(
+                fund_request.amount,
+                checker_data.receiver,
+                asset.0,
+                true,
+                bypass,
+            )
             .await?;
 
         Ok(())
@@ -281,15 +289,23 @@ impl FundApiComponents {
         // Same thing, this uses FromRequest.
         header_map: &HeaderMap,
         dry_run: bool,
+        asset: Option<String>,
     ) -> poem::Result<Vec<SignedTransaction>, AptosTapError> {
         let (checker_data, bypass, _semaphore_permit) = self
             .preprocess_request(&fund_request, source_ip, header_map, dry_run)
             .await?;
 
-        // Fund the account.
+        // Fund the account - pass asset directly, funder will use its configured default if None
+        let asset_for_logging = asset.clone();
         let fund_result = self
             .funder
-            .fund(fund_request.amount, checker_data.receiver, false, bypass)
+            .fund(
+                fund_request.amount,
+                checker_data.receiver,
+                asset,
+                false,
+                bypass,
+            )
             .await;
 
         // This might be empty if there is an error and we never got to the
@@ -305,6 +321,7 @@ impl FundApiComponents {
             jwt_sub = jwt_sub(checker_data.headers.clone()).ok(),
             address = checker_data.receiver,
             requested_amount = fund_request.amount,
+            asset = asset_for_logging,
             txn_hashes = txn_hashes,
             success = fund_result.is_ok(),
         );
@@ -387,7 +404,7 @@ pub async fn mint(
     };
     let txns = fund_api_components
         .0
-        .fund_inner(fund_request, source_ip, header_map, false)
+        .fund_inner(fund_request, source_ip, header_map, false, None)
         .await
         .map_err(|e| {
             poem::Error::from((e.status_and_retry_after().0, anyhow::anyhow!(e.message)))
