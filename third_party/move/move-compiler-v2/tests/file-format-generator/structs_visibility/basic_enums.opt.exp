@@ -58,14 +58,14 @@ enum Wrapper has drop
     ret
 
 // Function definition at index 6
-#[borrow] friend fun borrow$Wrapper$0$u64(l0: &Wrapper): &u64
+#[borrow=0] friend fun borrow$Wrapper$0$u64(l0: &Wrapper): &u64
     local l1: &Wrapper
     move_loc l0
     borrow_variant_field Wrapper, V1::_0, V2::_0
     ret
 
 // Function definition at index 7
-#[borrow_mut] friend fun borrow_mut$Wrapper$0$u64(l0: &mut Wrapper): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$Wrapper$0$u64(l0: &mut Wrapper): &mut u64
     local l1: &mut Wrapper
     move_loc l0
     mut_borrow_variant_field Wrapper, V1::_0, V2::_0

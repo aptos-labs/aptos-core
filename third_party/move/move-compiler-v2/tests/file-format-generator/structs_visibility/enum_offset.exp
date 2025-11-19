@@ -100,28 +100,28 @@ enum E has copy + drop
     ret
 
 // Function definition at index 12
-#[borrow] public fun borrow$E$0$u8(l0: &E): &u8
+#[borrow=0] public fun borrow$E$0$u8(l0: &E): &u8
     local l1: &E
     move_loc l0
     borrow_variant_field E, V1::o1, V2::o1, V3::o2, V4::o2
     ret
 
 // Function definition at index 13
-#[borrow] public fun borrow$E$1$u16(l0: &E): &u16
+#[borrow=1] public fun borrow$E$1$u16(l0: &E): &u16
     local l1: &E
     move_loc l0
     borrow_variant_field E, V2::o3
     ret
 
 // Function definition at index 14
-#[borrow_mut] public fun borrow_mut$E$0$u8(l0: &mut E): &mut u8
+#[borrow_mut=0] public fun borrow_mut$E$0$u8(l0: &mut E): &mut u8
     local l1: &mut E
     move_loc l0
     mut_borrow_variant_field E, V1::o1, V2::o1, V3::o2, V4::o2
     ret
 
 // Function definition at index 15
-#[borrow_mut] public fun borrow_mut$E$1$u16(l0: &mut E): &mut u16
+#[borrow_mut=1] public fun borrow_mut$E$1$u16(l0: &mut E): &mut u16
     local l1: &mut E
     move_loc l0
     mut_borrow_variant_field E, V2::o3

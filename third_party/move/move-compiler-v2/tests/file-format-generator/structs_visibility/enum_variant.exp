@@ -83,28 +83,28 @@ enum Data2 has drop
     ret
 
 // Function definition at index 9
-#[borrow] friend fun borrow$Data$0$u64(l0: &Data): &u64
+#[borrow=0] friend fun borrow$Data$0$u64(l0: &Data): &u64
     local l1: &Data
     move_loc l0
     borrow_variant_field Data, V1::x, V2::x
     ret
 
 // Function definition at index 10
-#[borrow] friend fun borrow$Data$1$bool(l0: &Data): &bool
+#[borrow=1] friend fun borrow$Data$1$bool(l0: &Data): &bool
     local l1: &Data
     move_loc l0
     borrow_variant_field Data, V2::y
     ret
 
 // Function definition at index 11
-#[borrow_mut] friend fun borrow_mut$Data$0$u64(l0: &mut Data): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$Data$0$u64(l0: &mut Data): &mut u64
     local l1: &mut Data
     move_loc l0
     mut_borrow_variant_field Data, V1::x, V2::x
     ret
 
 // Function definition at index 12
-#[borrow_mut] friend fun borrow_mut$Data$1$bool(l0: &mut Data): &mut bool
+#[borrow_mut=1] friend fun borrow_mut$Data$1$bool(l0: &mut Data): &mut bool
     local l1: &mut Data
     move_loc l0
     mut_borrow_variant_field Data, V2::y
@@ -174,28 +174,28 @@ enum Data2 has drop
     ret
 
 // Function definition at index 22
-#[borrow] friend fun borrow$Data2$0$u64(l0: &Data2): &u64
+#[borrow=0] friend fun borrow$Data2$0$u64(l0: &Data2): &u64
     local l1: &Data2
     move_loc l0
     borrow_variant_field Data2, V1::x, V2::y
     ret
 
 // Function definition at index 23
-#[borrow] friend fun borrow$Data2$1$u64(l0: &Data2): &u64
+#[borrow=1] friend fun borrow$Data2$1$u64(l0: &Data2): &u64
     local l1: &Data2
     move_loc l0
     borrow_variant_field Data2, V2::x
     ret
 
 // Function definition at index 24
-#[borrow_mut] friend fun borrow_mut$Data2$0$u64(l0: &mut Data2): &mut u64
+#[borrow_mut=0] friend fun borrow_mut$Data2$0$u64(l0: &mut Data2): &mut u64
     local l1: &mut Data2
     move_loc l0
     mut_borrow_variant_field Data2, V1::x, V2::y
     ret
 
 // Function definition at index 25
-#[borrow_mut] friend fun borrow_mut$Data2$1$u64(l0: &mut Data2): &mut u64
+#[borrow_mut=1] friend fun borrow_mut$Data2$1$u64(l0: &mut Data2): &mut u64
     local l1: &mut Data2
     move_loc l0
     mut_borrow_variant_field Data2, V2::x

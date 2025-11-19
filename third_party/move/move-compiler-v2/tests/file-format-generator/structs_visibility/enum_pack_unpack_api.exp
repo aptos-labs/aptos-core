@@ -64,14 +64,14 @@ enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
     ret
 
 // Function definition at index 6
-#[borrow] public fun borrow$E$0$u64(l0: &E): &u64
+#[borrow=0] public fun borrow$E$0$u64(l0: &E): &u64
     local l1: &E
     move_loc l0
     borrow_variant_field E, A::x, B::x
     ret
 
 // Function definition at index 7
-#[borrow_mut] public fun borrow_mut$E$0$u64(l0: &mut E): &mut u64
+#[borrow_mut=0] public fun borrow_mut$E$0$u64(l0: &mut E): &mut u64
     local l1: &mut E
     move_loc l0
     mut_borrow_variant_field E, A::x, B::x
@@ -122,28 +122,28 @@ enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
     ret
 
 // Function definition at index 14
-#[borrow] public fun borrow$Inner$0$u64(l0: &Inner): &u64
+#[borrow=0] public fun borrow$Inner$0$u64(l0: &Inner): &u64
     local l1: &Inner
     move_loc l0
     borrow_variant_field Inner, Inner1::x, Inner2::x
     ret
 
 // Function definition at index 15
-#[borrow] public fun borrow$Inner$1$u64(l0: &Inner): &u64
+#[borrow=1] public fun borrow$Inner$1$u64(l0: &Inner): &u64
     local l1: &Inner
     move_loc l0
     borrow_variant_field Inner, Inner2::y
     ret
 
 // Function definition at index 16
-#[borrow_mut] public fun borrow_mut$Inner$0$u64(l0: &mut Inner): &mut u64
+#[borrow_mut=0] public fun borrow_mut$Inner$0$u64(l0: &mut Inner): &mut u64
     local l1: &mut Inner
     move_loc l0
     mut_borrow_variant_field Inner, Inner1::x, Inner2::x
     ret
 
 // Function definition at index 17
-#[borrow_mut] public fun borrow_mut$Inner$1$u64(l0: &mut Inner): &mut u64
+#[borrow_mut=1] public fun borrow_mut$Inner$1$u64(l0: &mut Inner): &mut u64
     local l1: &mut Inner
     move_loc l0
     mut_borrow_variant_field Inner, Inner2::y
@@ -192,28 +192,28 @@ enum Result<T0: copy + drop, T1: copy + drop> has copy + drop
     ret
 
 // Function definition at index 24
-#[borrow] public fun borrow$Result$0$_0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
+#[borrow=0] public fun borrow$Result$0$_0<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T0
     local l1: &Result<T0, T1>
     move_loc l0
     borrow_variant_field Result<T0, T1>, Ok::_0
     ret
 
 // Function definition at index 25
-#[borrow] public fun borrow$Result$0$_1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
+#[borrow=0] public fun borrow$Result$0$_1<T0: copy + drop, T1: copy + drop>(l0: &Result<T0, T1>): &T1
     local l1: &Result<T0, T1>
     move_loc l0
     borrow_variant_field Result<T0, T1>, Err::_0
     ret
 
 // Function definition at index 26
-#[borrow_mut] public fun borrow_mut$Result$0$_0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
+#[borrow_mut=0] public fun borrow_mut$Result$0$_0<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T0
     local l1: &mut Result<T0, T1>
     move_loc l0
     mut_borrow_variant_field Result<T0, T1>, Ok::_0
     ret
 
 // Function definition at index 27
-#[borrow_mut] public fun borrow_mut$Result$0$_1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
+#[borrow_mut=0] public fun borrow_mut$Result$0$_1<T0: copy + drop, T1: copy + drop>(l0: &mut Result<T0, T1>): &mut T1
     local l1: &mut Result<T0, T1>
     move_loc l0
     mut_borrow_variant_field Result<T0, T1>, Err::_0

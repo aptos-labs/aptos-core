@@ -65,14 +65,14 @@ enum Version<T0, T1> has copy + drop + store
     ret
 
 // Function definition at index 6
-#[borrow] public fun borrow$Action$0$_u64_u64hasdrop(l0: &Action): &|u64|u64 has drop
+#[borrow=0] public fun borrow$Action$0$_u64_u64hasdrop(l0: &Action): &|u64|u64 has drop
     local l1: &Action
     move_loc l0
     borrow_variant_field Action, Call::_0
     ret
 
 // Function definition at index 7
-#[borrow_mut] public fun borrow_mut$Action$0$_u64_u64hasdrop(l0: &mut Action): &mut |u64|u64 has drop
+#[borrow_mut=0] public fun borrow_mut$Action$0$_u64_u64hasdrop(l0: &mut Action): &mut |u64|u64 has drop
     local l1: &mut Action
     move_loc l0
     mut_borrow_variant_field Action, Call::_0
@@ -123,42 +123,42 @@ enum Version<T0, T1> has copy + drop + store
     ret
 
 // Function definition at index 14
-#[borrow] public fun borrow$FunVec$0$u64<T0>(l0: &FunVec<T0>): &u64
+#[borrow=0] public fun borrow$FunVec$0$u64<T0>(l0: &FunVec<T0>): &u64
     local l1: &FunVec<T0>
     move_loc l0
     borrow_variant_field FunVec<T0>, V2::v0
     ret
 
 // Function definition at index 15
-#[borrow] public fun borrow$FunVec$0$vector___mut_0__0hascopy_drop_store_<T0>(l0: &FunVec<T0>): &vector<|&mut T0|T0 has copy + drop + store>
+#[borrow=0] public fun borrow$FunVec$0$vector___mut_0__0hascopy_drop_store_<T0>(l0: &FunVec<T0>): &vector<|&mut T0|T0 has copy + drop + store>
     local l1: &FunVec<T0>
     move_loc l0
     borrow_variant_field FunVec<T0>, V1::v1
     ret
 
 // Function definition at index 16
-#[borrow] public fun borrow$FunVec$1$vector___mut_0__0hascopy_drop_store_<T0>(l0: &FunVec<T0>): &vector<|&mut T0|T0 has copy + drop + store>
+#[borrow=1] public fun borrow$FunVec$1$vector___mut_0__0hascopy_drop_store_<T0>(l0: &FunVec<T0>): &vector<|&mut T0|T0 has copy + drop + store>
     local l1: &FunVec<T0>
     move_loc l0
     borrow_variant_field FunVec<T0>, V2::v1
     ret
 
 // Function definition at index 17
-#[borrow_mut] public fun borrow_mut$FunVec$0$u64<T0>(l0: &mut FunVec<T0>): &mut u64
+#[borrow_mut=0] public fun borrow_mut$FunVec$0$u64<T0>(l0: &mut FunVec<T0>): &mut u64
     local l1: &mut FunVec<T0>
     move_loc l0
     mut_borrow_variant_field FunVec<T0>, V2::v0
     ret
 
 // Function definition at index 18
-#[borrow_mut] public fun borrow_mut$FunVec$0$vector___mut_0__0hascopy_drop_store_<T0>(l0: &mut FunVec<T0>): &mut vector<|&mut T0|T0 has copy + drop + store>
+#[borrow_mut=0] public fun borrow_mut$FunVec$0$vector___mut_0__0hascopy_drop_store_<T0>(l0: &mut FunVec<T0>): &mut vector<|&mut T0|T0 has copy + drop + store>
     local l1: &mut FunVec<T0>
     move_loc l0
     mut_borrow_variant_field FunVec<T0>, V1::v1
     ret
 
 // Function definition at index 19
-#[borrow_mut] public fun borrow_mut$FunVec$1$vector___mut_0__0hascopy_drop_store_<T0>(l0: &mut FunVec<T0>): &mut vector<|&mut T0|T0 has copy + drop + store>
+#[borrow_mut=1] public fun borrow_mut$FunVec$1$vector___mut_0__0hascopy_drop_store_<T0>(l0: &mut FunVec<T0>): &mut vector<|&mut T0|T0 has copy + drop + store>
     local l1: &mut FunVec<T0>
     move_loc l0
     mut_borrow_variant_field FunVec<T0>, V2::v1
@@ -207,28 +207,28 @@ enum Version<T0, T1> has copy + drop + store
     ret
 
 // Function definition at index 26
-#[borrow] public fun borrow$Mapper$0$0x66__fv_enum_basic__Version__0__1_<T0, T1>(l0: &Mapper<T0, T1>): &Version<T0, T1>
+#[borrow=0] public fun borrow$Mapper$0$0x66__fv_enum_basic__Version__0__1_<T0, T1>(l0: &Mapper<T0, T1>): &Version<T0, T1>
     local l1: &Mapper<T0, T1>
     move_loc l0
     borrow_variant_field Mapper<T0, T1>, Twice::_0
     ret
 
 // Function definition at index 27
-#[borrow] public fun borrow$Mapper$0$__0__1hascopy_drop_store<T0, T1>(l0: &Mapper<T0, T1>): &|T0|T1 has copy + drop + store
+#[borrow=0] public fun borrow$Mapper$0$__0__1hascopy_drop_store<T0, T1>(l0: &Mapper<T0, T1>): &|T0|T1 has copy + drop + store
     local l1: &Mapper<T0, T1>
     move_loc l0
     borrow_variant_field Mapper<T0, T1>, Id::_0
     ret
 
 // Function definition at index 28
-#[borrow_mut] public fun borrow_mut$Mapper$0$0x66__fv_enum_basic__Version__0__1_<T0, T1>(l0: &mut Mapper<T0, T1>): &mut Version<T0, T1>
+#[borrow_mut=0] public fun borrow_mut$Mapper$0$0x66__fv_enum_basic__Version__0__1_<T0, T1>(l0: &mut Mapper<T0, T1>): &mut Version<T0, T1>
     local l1: &mut Mapper<T0, T1>
     move_loc l0
     mut_borrow_variant_field Mapper<T0, T1>, Twice::_0
     ret
 
 // Function definition at index 29
-#[borrow_mut] public fun borrow_mut$Mapper$0$__0__1hascopy_drop_store<T0, T1>(l0: &mut Mapper<T0, T1>): &mut |T0|T1 has copy + drop + store
+#[borrow_mut=0] public fun borrow_mut$Mapper$0$__0__1hascopy_drop_store<T0, T1>(l0: &mut Mapper<T0, T1>): &mut |T0|T1 has copy + drop + store
     local l1: &mut Mapper<T0, T1>
     move_loc l0
     mut_borrow_variant_field Mapper<T0, T1>, Id::_0
@@ -256,14 +256,14 @@ enum Version<T0, T1> has copy + drop + store
     ret
 
 // Function definition at index 33
-#[borrow] public fun borrow$Version$0$__0__1hascopy_drop_store<T0, T1>(l0: &Version<T0, T1>): &|T0|T1 has copy + drop + store
+#[borrow=0] public fun borrow$Version$0$__0__1hascopy_drop_store<T0, T1>(l0: &Version<T0, T1>): &|T0|T1 has copy + drop + store
     local l1: &Version<T0, T1>
     move_loc l0
     borrow_variant_field Version<T0, T1>, V1::v1
     ret
 
 // Function definition at index 34
-#[borrow_mut] public fun borrow_mut$Version$0$__0__1hascopy_drop_store<T0, T1>(l0: &mut Version<T0, T1>): &mut |T0|T1 has copy + drop + store
+#[borrow_mut=0] public fun borrow_mut$Version$0$__0__1hascopy_drop_store<T0, T1>(l0: &mut Version<T0, T1>): &mut |T0|T1 has copy + drop + store
     local l1: &mut Version<T0, T1>
     move_loc l0
     mut_borrow_variant_field Version<T0, T1>, V1::v1
