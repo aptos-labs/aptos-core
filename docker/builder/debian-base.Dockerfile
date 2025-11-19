@@ -13,8 +13,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         curl \
         iproute2 \
         libpq-dev \
-        libssl1.1 \
-        netcat \
+        libssl3 \
         net-tools \
         tcpdump
 
