@@ -7,12 +7,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     install \
     wget \
     curl \
-    perl-base=5.32.1-4+deb11u4 \
-    libtinfo6=6.2+20201114-2+deb11u2 \
+    perl-base \
+    libtinfo6 \
     git \
-            socat \
-    python3-botocore/bullseye \
-    awscli/bullseye \
+    socat \
+    python3-botocore/trixie \
+    awscli/trixie \
     gnupg2 \
     pigz
 
