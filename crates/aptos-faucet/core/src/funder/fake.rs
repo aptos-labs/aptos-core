@@ -18,6 +18,7 @@ impl FunderTrait for FakeFunder {
         &self,
         _amount: Option<u64>,
         _receiver_address: AccountAddress,
+        _asset: Option<String>,
         _check_only: bool,
         _did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
