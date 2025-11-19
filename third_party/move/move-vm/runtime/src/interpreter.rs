@@ -11,7 +11,7 @@ use crate::{
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
     instr::Instruction,
     interpreter_caches::InterpreterFunctionCaches,
-    loader::LazyLoadedFunction,
+    loader::{FunctionHandle, LazyLoadedFunction},
     module_traversal::TraversalContext,
     native_extensions::NativeContextExtensions,
     native_functions::NativeContext,
@@ -25,7 +25,7 @@ use crate::{
         loader::traits::Loader, ty_depth_checker::TypeDepthChecker,
         ty_layout_converter::LayoutConverter,
     },
-    trace, LoadedFunction, RuntimeEnvironment,
+    trace, LoadedFunction, LoadedFunctionOwner, RuntimeEnvironment,
 };
 use fail::fail_point;
 use itertools::Itertools;
@@ -115,6 +115,11 @@ macro_rules! set_err_info {
             .finish($frame.location())
     }};
 }
+
+// TODO(fastcall):
+// - Fix async paranoid mode
+// - Fix tracing
+// - Check error location of inlined code
 
 /// `Interpreter` instances can execute Move functions.
 ///
@@ -287,19 +292,72 @@ where
         current_frame: &Frame,
         idx: FunctionInstantiationIndex,
     ) -> VMResult<LoadedFunction> {
-        let (ty_args, ty_args_id) = current_frame
-            .instantiate_generic_function(self.ty_pool, Some(gas_meter), idx)
-            .map_err(|e| set_err_info!(current_frame, e))?;
-        let function = current_frame
-            .build_loaded_function_from_instantiation_and_ty_args(
-                self.loader,
-                gas_meter,
-                traversal_context,
-                idx,
-                ty_args,
-                ty_args_id,
-            )
-            .map_err(|e| self.set_location(e))?;
+        macro_rules! make_ty_args_and_id {
+            ($function:ident) => {
+                if $function.is_inlineable {
+                    (vec![], self.ty_pool.intern_ty_args(&[]))
+                } else {
+                    current_frame
+                        .instantiate_generic_function(self.ty_pool, Some(gas_meter), idx)
+                        .map_err(|e| set_err_info!(current_frame, e))?
+                }
+            };
+        }
+
+        macro_rules! build_loaded_function_from_name {
+            ($module:ident, $name:ident) => {{
+                let (module, function) = self.loader.load_function_definition(
+                    gas_meter,
+                    traversal_context,
+                    $module,
+                    $name,
+                )?;
+
+                let (ty_args, ty_args_id) = make_ty_args_and_id!(function);
+
+                Ok(LoadedFunction {
+                    owner: LoadedFunctionOwner::Module(module),
+                    ty_args,
+                    ty_args_id,
+                    function,
+                })
+            }};
+        }
+
+        let res = match current_frame.function.owner() {
+            LoadedFunctionOwner::Module(module) => {
+                let handle = module.function_instantiation_handle_at(idx.0);
+                match handle {
+                    FunctionHandle::Local(function) => {
+                        let (ty_args, ty_args_id) = make_ty_args_and_id!(function);
+
+                        Ok(LoadedFunction {
+                            owner: LoadedFunctionOwner::Module(module.clone()),
+                            ty_args,
+                            ty_args_id,
+                            function: function.clone(),
+                        })
+                    },
+                    FunctionHandle::Remote { module, name } => {
+                        build_loaded_function_from_name!(module, name)
+                    },
+                }
+            },
+            LoadedFunctionOwner::Script(script) => {
+                let handle = script.function_instantiation_handle_at(idx.0);
+                match handle {
+                    FunctionHandle::Local(_) => Err(PartialVMError::new(
+                        StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                    )
+                    .with_message("Scripts never have local functions".to_string())),
+                    FunctionHandle::Remote { module, name } => {
+                        build_loaded_function_from_name!(module, name)
+                    },
+                }
+            },
+        };
+
+        let function = res.map_err(|e| self.set_location(e))?;
         Ok(function)
     }
 
@@ -474,6 +532,37 @@ where
                     )
                     .map_err(|err| set_err_info!(current_frame, err))?;
 
+                    if function.function.is_inlineable {
+                        println!(
+                            ">>> fast call! -- {}::{}",
+                            function.owner_as_module()?.self_id(),
+                            function.function.name(),
+                        );
+                        trace_recorder.record_successful_instruction(&Instruction::Call(fh_idx));
+
+                        let code = &function.function.code[function.function.param_tys.len()..];
+
+                        let exit_code = current_frame
+                            .execute_inline_code::<RTTCheck, RTRCheck>(
+                                &mut self,
+                                data_cache,
+                                gas_meter,
+                                traversal_context,
+                                trace_recorder,
+                                code,
+                            )
+                            .map_err(|err| {
+                                self.attach_state_if_invariant_violation(err, &current_frame)
+                            })?;
+                        current_frame.pc += 1;
+
+                        // TODO: record successful instruction?
+
+                        assert!(matches!(exit_code, ExitCode::Return));
+
+                        continue;
+                    }
+
                     // Charge gas
                     gas_meter
                         .charge_call(
@@ -504,6 +593,12 @@ where
                         }
                         continue;
                     }
+
+                    println!(
+                        ">>> regular call! -- {}::{}",
+                        function.owner_as_module()?.self_id(),
+                        function.function.name()
+                    );
 
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
@@ -568,6 +663,31 @@ where
                     )
                     .map_err(|err| set_err_info!(current_frame, err))?;
 
+                    if function.function.is_inlineable {
+                        println!(
+                            ">>> fast call! -- {}::{}",
+                            function.owner_as_module()?.self_id(),
+                            function.function.name(),
+                        );
+                        trace_recorder
+                            .record_successful_instruction(&Instruction::CallGeneric(idx));
+
+                        let code = &function.function.code[function.function.param_tys.len()..];
+
+                        let exit_code = current_frame.execute_inline_code::<RTTCheck, RTRCheck>(
+                            &mut self,
+                            data_cache,
+                            gas_meter,
+                            traversal_context,
+                            trace_recorder,
+                            code,
+                        )?;
+                        current_frame.pc += 1;
+
+                        assert!(matches!(exit_code, ExitCode::Return));
+                        continue;
+                    }
+
                     // Charge gas
                     gas_meter
                         .charge_call_generic(
@@ -606,6 +726,12 @@ where
                         }
                         continue;
                     }
+
+                    println!(
+                        ">>> regular call! -- {}::{}",
+                        function.owner_as_module()?.self_id(),
+                        function.function.name()
+                    );
 
                     self.set_new_call_frame::<RTTCheck, RTRCheck>(
                         &mut current_frame,
@@ -1897,8 +2023,51 @@ impl Frame {
             gas_meter,
             traversal_context,
             trace_recorder,
+            None,
         )
         .map_err(|e| {
+            let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
+                e.with_exec_state(interpreter.get_internal_state())
+            } else {
+                e
+            };
+            if is_tracing_for!(TraceCategory::VMError) {
+                let mut str = String::new();
+                if let Err(print_err) = interpreter
+                    .debug_print_stack_trace(&mut str, interpreter.loader.runtime_environment())
+                {
+                    str = format!("<while printing stack trace>: {}", print_err);
+                }
+                eprintln!("trace vm_error {}:\n{}", e, str)
+            }
+            set_err_info!(self, e)
+        })
+    }
+
+    fn execute_inline_code<RTTCheck: RuntimeTypeCheck, RTRCheck: RuntimeRefCheck>(
+        &mut self,
+        interpreter: &mut InterpreterImpl<impl Loader>,
+        data_cache: &mut impl MoveVmDataCache,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        trace_recorder: &mut impl TraceRecorder,
+        code: &[Instruction],
+    ) -> VMResult<ExitCode> {
+        let old_pc = self.pc;
+        self.pc = 0;
+
+        let res = self.execute_code_impl::<RTTCheck, RTRCheck>(
+            interpreter,
+            data_cache,
+            gas_meter,
+            traversal_context,
+            trace_recorder,
+            Some(code),
+        );
+
+        self.pc = old_pc;
+
+        res.map_err(|e| {
             let e = if cfg!(feature = "testing") || cfg!(feature = "stacktrace") {
                 e.with_exec_state(interpreter.get_internal_state())
             } else {
@@ -1924,14 +2093,16 @@ impl Frame {
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         trace_recorder: &mut impl TraceRecorder,
+        code: Option<&[Instruction]>,
     ) -> PartialVMResult<ExitCode> {
         use SimpleInstruction as S;
 
         let frame_cache = &mut *self.frame_cache.borrow_mut();
 
-        let code = self.function.code();
+        let code = code.unwrap_or_else(|| self.function.code());
         loop {
             for instruction in &code[self.pc as usize..] {
+                /*
                 trace!(
                     &self.function,
                     &self.locals,
@@ -1940,6 +2111,7 @@ impl Frame {
                     interpreter.loader.runtime_environment(),
                     interpreter
                 );
+                */
 
                 fail_point!("move_vm::interpreter_loop", |_| {
                     Err(
@@ -2904,6 +3076,78 @@ impl Frame {
                         gas_meter.charge_create_ty(ty_count)?;
                         gas_meter.charge_vec_swap()?;
                         vec_ref.swap(idx1, idx2)?;
+                    },
+
+                    Instruction::VecLenV2 => {
+                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        gas_meter.charge_vec_len()?;
+                        let value = vec_ref.len()?;
+                        interpreter.operand_stack.push(value)?;
+                    },
+                    Instruction::TestVariantV2(instr) => {
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        gas_meter.charge_simple_instr(S::TestVariant)?;
+                        interpreter
+                            .operand_stack
+                            .push(reference.test_variant(instr.variant_idx)?)?;
+                    },
+                    Instruction::BorrowFieldV2(instr) => {
+                        gas_meter.charge_simple_instr(
+                            if instr.is_mut {
+                                S::MutBorrowField
+                            } else {
+                                S::ImmBorrowField
+                            },
+                        )?;
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        interpreter
+                            .operand_stack
+                            .push(reference.borrow_field(instr.field_offset)?)?;
+                    },
+                    Instruction::PackV2(instr) => {
+                        gas_meter.charge_pack(
+                            instr.is_generic,
+                            interpreter
+                                .operand_stack
+                                .last_n(instr.field_count as usize)?,
+                        )?;
+                        let args = interpreter.operand_stack.popn(instr.field_count)?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::struct_(Struct::pack(args)))?;
+                    },
+                    Instruction::BorrowVariantFieldV2(instr) => {
+                        gas_meter.charge_simple_instr(
+                            if instr.is_mut {
+                                S::MutBorrowVariantField
+                            } else {
+                                S::ImmBorrowVariantField
+                            },
+                        )?;
+
+                        let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
+                        let field_ref = reference.borrow_variant_field(
+                            &instr.variants,
+                            instr.field_offset,
+                            &|v| instr.def_struct_ty.variant_name_for_message(v),
+                        )?;
+                        interpreter.operand_stack.push(field_ref)?;
+                    },
+                    Instruction::PackVariantV2(instr) => {
+                        gas_meter.charge_pack_variant(
+                            instr.is_generic,
+                            interpreter
+                                .operand_stack
+                                .last_n(instr.field_count as usize)?,
+                        )?;
+                        let args = interpreter.operand_stack.popn(instr.field_count)?;
+                        interpreter
+                            .operand_stack
+                            .push(Value::struct_(Struct::pack_variant(
+                                instr.variant_idx,
+                                args,
+                            )))?;
                     },
                 }
                 trace_recorder.record_successful_instruction(instruction);

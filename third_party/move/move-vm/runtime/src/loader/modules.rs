@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
+    instr::BytecodeTransformer,
     loader::{
         function::{Function, FunctionHandle, FunctionInstantiation},
         single_signature_loader::load_single_signatures_for_module,
@@ -116,6 +117,7 @@ pub(crate) struct StructInstantiation {
     pub(crate) field_count: u16,
     pub(crate) definition_struct_type: Arc<StructType>,
     pub(crate) instantiation: Vec<Type>,
+    pub(crate) is_fully_instantiated: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -124,6 +126,7 @@ pub(crate) struct StructVariantInfo {
     pub(crate) variant: VariantIndex,
     pub(crate) definition_struct_type: Arc<StructType>,
     pub(crate) instantiation: Vec<Type>,
+    pub(crate) is_fully_instantiated: bool,
 }
 
 // A field handle. The offset is the only used information when operating on a field
@@ -227,10 +230,12 @@ impl Module {
         for struct_inst in module.struct_instantiations() {
             let def = struct_inst.def.0 as usize;
             let struct_def = &structs[def];
+            let sig_idx = struct_inst.type_parameters.0 as usize;
             struct_instantiations.push(StructInstantiation {
                 field_count: struct_def.definition_struct_type.field_count(None),
-                instantiation: signature_table[struct_inst.type_parameters.0 as usize].clone(),
+                instantiation: signature_table[sig_idx].clone(),
                 definition_struct_type: struct_def.definition_struct_type.clone(),
+                is_fully_instantiated: is_fully_instantiated_signature[sig_idx],
             });
         }
 
@@ -244,19 +249,102 @@ impl Module {
                 variant,
                 definition_struct_type,
                 instantiation: vec![],
+                is_fully_instantiated: false,
             })
         }
 
         for struct_variant_inst in module.struct_variant_instantiations() {
             let variant = &struct_variant_infos[struct_variant_inst.handle.0 as usize];
+            let sig_idx = struct_variant_inst.type_parameters.0 as usize;
             struct_variant_instantiation_infos.push(StructVariantInfo {
                 field_count: variant.field_count,
                 variant: variant.variant,
                 definition_struct_type: variant.definition_struct_type.clone(),
                 instantiation: signature_table[struct_variant_inst.type_parameters.0 as usize]
                     .clone(),
+                is_fully_instantiated: is_fully_instantiated_signature[sig_idx],
             })
         }
+
+        for field_handle in module.field_handles() {
+            let def_idx = field_handle.owner;
+            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
+            let offset = field_handle.field as usize;
+            let ty = definition_struct_type.field_at(None, offset)?.1.clone();
+            field_handles.push(FieldHandle {
+                offset,
+                field_ty: ty,
+                definition_struct_type,
+            });
+        }
+
+        for field_inst in module.field_instantiations() {
+            let fh_idx = field_inst.handle;
+            let offset = field_handles[fh_idx.0 as usize].offset;
+            let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
+            let uninstantiated_ty = owner_struct_def
+                .definition_struct_type
+                .field_at(None, offset)?
+                .1
+                .clone();
+            let sig_idx = field_inst.type_parameters.0 as usize;
+            field_instantiations.push(FieldInstantiation {
+                offset,
+                uninstantiated_field_ty: uninstantiated_ty,
+                instantiation: signature_table[sig_idx].clone(),
+                definition_struct_type: owner_struct_def.definition_struct_type.clone(),
+            });
+        }
+
+        for variant_handle in module.variant_field_handles() {
+            let def_idx = variant_handle.struct_index;
+            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
+            let offset = variant_handle.field as usize;
+            let variants = variant_handle.variants.clone();
+            let ty = definition_struct_type
+                .field_at(Some(variants[0]), offset)?
+                .1
+                .clone();
+            variant_field_infos.push(VariantFieldInfo {
+                offset,
+                variants,
+                definition_struct_type,
+                uninstantiated_field_ty: ty,
+                instantiation: vec![],
+            });
+        }
+
+        for variant_inst in module.variant_field_instantiations() {
+            let variant_info = &variant_field_infos[variant_inst.handle.0 as usize];
+            let definition_struct_type = variant_info.definition_struct_type.clone();
+            let variants = variant_info.variants.clone();
+            let offset = variant_info.offset;
+            let instantiation = signature_table[variant_inst.type_parameters.0 as usize].clone();
+            // We can select one representative variant for finding the field type, all
+            // must have the same type as the verifier ensured.
+            let uninstantiated_ty = definition_struct_type
+                .field_at(Some(variants[0]), offset)?
+                .1
+                .clone();
+            variant_field_instantiation_infos.push(VariantFieldInfo {
+                offset,
+                uninstantiated_field_ty: uninstantiated_ty,
+                variants,
+                definition_struct_type,
+                instantiation,
+            });
+        }
+
+        let bytecode_transformer = BytecodeTransformer::new(
+            &structs,
+            &struct_instantiations,
+            &struct_variant_infos,
+            &struct_variant_instantiation_infos,
+            &field_handles,
+            &field_instantiations,
+            &variant_field_infos,
+            &variant_field_instantiation_infos,
+        );
 
         for (idx, _) in module.function_defs().iter().enumerate() {
             let findex = FunctionDefinitionIndex(idx as TableIndex);
@@ -266,6 +354,7 @@ impl Module {
                 &module,
                 signature_table.as_slice(),
                 &struct_names,
+                &bytecode_transformer,
             )?;
 
             function_map.insert(function.name.to_owned(), idx);
@@ -308,74 +397,6 @@ impl Module {
                 handle,
                 instantiation,
                 ty_args_id,
-            });
-        }
-
-        for field_handle in module.field_handles() {
-            let def_idx = field_handle.owner;
-            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
-            let offset = field_handle.field as usize;
-            let ty = definition_struct_type.field_at(None, offset)?.1.clone();
-            field_handles.push(FieldHandle {
-                offset,
-                field_ty: ty,
-                definition_struct_type,
-            });
-        }
-
-        for field_inst in module.field_instantiations() {
-            let fh_idx = field_inst.handle;
-            let offset = field_handles[fh_idx.0 as usize].offset;
-            let owner_struct_def = &structs[module.field_handle_at(fh_idx).owner.0 as usize];
-            let uninstantiated_ty = owner_struct_def
-                .definition_struct_type
-                .field_at(None, offset)?
-                .1
-                .clone();
-            field_instantiations.push(FieldInstantiation {
-                offset,
-                uninstantiated_field_ty: uninstantiated_ty,
-                instantiation: signature_table[field_inst.type_parameters.0 as usize].clone(),
-                definition_struct_type: owner_struct_def.definition_struct_type.clone(),
-            });
-        }
-
-        for variant_handle in module.variant_field_handles() {
-            let def_idx = variant_handle.struct_index;
-            let definition_struct_type = structs[def_idx.0 as usize].definition_struct_type.clone();
-            let offset = variant_handle.field as usize;
-            let variants = variant_handle.variants.clone();
-            let ty = definition_struct_type
-                .field_at(Some(variants[0]), offset)?
-                .1
-                .clone();
-            variant_field_infos.push(VariantFieldInfo {
-                offset,
-                variants,
-                definition_struct_type,
-                uninstantiated_field_ty: ty,
-                instantiation: vec![],
-            });
-        }
-
-        for variant_inst in module.variant_field_instantiations() {
-            let variant_info = &variant_field_infos[variant_inst.handle.0 as usize];
-            let definition_struct_type = variant_info.definition_struct_type.clone();
-            let variants = variant_info.variants.clone();
-            let offset = variant_info.offset;
-            let instantiation = signature_table[variant_inst.type_parameters.0 as usize].clone();
-            // We can select one representative variant for finding the field type, all
-            // must have the same type as the verifier ensured.
-            let uninstantiated_ty = definition_struct_type
-                .field_at(Some(variants[0]), offset)?
-                .1
-                .clone();
-            variant_field_instantiation_infos.push(VariantFieldInfo {
-                offset,
-                uninstantiated_field_ty: uninstantiated_ty,
-                variants,
-                definition_struct_type,
-                instantiation,
             });
         }
 

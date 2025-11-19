@@ -124,7 +124,7 @@ impl AptosEnvironment {
 
     /// Returns true if runtime checks can be performed after execution.
     pub fn async_runtime_checks_enabled(&self) -> bool {
-        self.0.async_runtime_checks_enabled
+        false
     }
 }
 

@@ -428,7 +428,13 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | MutBorrowVariantField(_)
             | MutBorrowVariantFieldGeneric(_)
             | ImmBorrowVariantField(_)
-            | ImmBorrowVariantFieldGeneric(_) => {
+            | ImmBorrowVariantFieldGeneric(_)
+            | VecLenV2
+            | TestVariantV2(_)
+            | BorrowFieldV2(_)
+            | PackV2(_)
+            | BorrowVariantFieldV2(_)
+            | PackVariantV2(_) => {
                 // handled in `post_execution_transition`
             },
         };
@@ -663,6 +669,36 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             PackClosureGeneric(_, mask) => {
                 let captured = mask.captured_count();
                 ref_state.pop_many_from_shadow_stack(captured.into())?;
+                ref_state.push_non_refs_to_shadow_stack(1);
+            },
+            VecLenV2 => {
+                ref_state.vec_len()?;
+            },
+            TestVariantV2(_) => {
+                ref_state.pop_ref_push_non_ref()?;
+            },
+            BorrowFieldV2(instr) => {
+                let label = instr.field_offset;
+                if instr.is_mut {
+                    ref_state.borrow_child_with_label::<true>(label)?;
+                } else {
+                    ref_state.borrow_child_with_label::<false>(label)?;
+                }
+            },
+            PackV2(instr) => {
+                ref_state.pop_many_from_shadow_stack(instr.field_count as usize)?;
+                ref_state.push_non_refs_to_shadow_stack(1);
+            },
+            BorrowVariantFieldV2(instr) => {
+                let label = instr.field_offset;
+                if instr.is_mut {
+                    ref_state.borrow_child_with_label::<true>(label)?;
+                } else {
+                    ref_state.borrow_child_with_label::<false>(label)?;
+                }
+            },
+            PackVariantV2(instr) => {
+                ref_state.pop_many_from_shadow_stack(instr.field_count as usize)?;
                 ref_state.push_non_refs_to_shadow_stack(1);
             },
         };

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    instr::Instruction,
+    instr::{BytecodeTransformer, Instruction},
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
@@ -87,6 +87,8 @@ pub struct Function {
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
     pub(crate) is_trusted: bool,
+    #[allow(unused)]
+    pub(crate) is_inlineable: bool,
 }
 
 /// For loaded function representation, specifies the owner: a script or a module.
@@ -607,6 +609,7 @@ impl Function {
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
         struct_names: &[StructIdentifier],
+        bytecode_transformer: &BytecodeTransformer,
     ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
@@ -629,10 +632,23 @@ impl Function {
         let is_dispatchable_native =
             is_native && native.is_some() && DISPATCHABLE_NATIVES.contains(name.as_str());
 
+        let param_tys = signature_table[handle.parameters.0 as usize].clone();
+
         // Native functions do not have a code unit
-        let code = match &def.code {
-            Some(code) => code.code.iter().map(|b| b.clone().into()).collect(),
-            None => vec![],
+        let (code, is_inlineable) = match &def.code {
+            Some(code) => {
+                let is_inlineable =
+                    bytecode_transformer.is_function_inlineable(param_tys.len(), &code.code)?;
+
+                let code = code
+                    .code
+                    .iter()
+                    .map(|b| bytecode_transformer.transform(b.clone(), is_inlineable))
+                    .collect::<PartialVMResult<Vec<_>>>()?;
+
+                (code, is_inlineable)
+            },
+            None => (vec![], false),
         };
         let ty_param_abilities = handle.type_parameters.clone();
 
@@ -644,7 +660,6 @@ impl Function {
         } else {
             vec![]
         };
-        let param_tys = signature_table[handle.parameters.0 as usize].clone();
 
         let access_specifier = load_access_specifier(
             BinaryIndexedView::Module(module),
@@ -671,6 +686,7 @@ impl Function {
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),
             is_trusted,
+            is_inlineable,
         })
     }
 
