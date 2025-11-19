@@ -501,28 +501,28 @@ enum Wrapper has drop
     ret
 
 // Function definition at index 6
-#[borrow] public fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
+#[borrow=0] public fun borrow$Wrapper$0$0(l0: &Wrapper): &u64
     local l1: &Wrapper
     move_loc l0
     borrow_variant_field Wrapper, V1::_0, V2::_0
     ret
 
 // Function definition at index 7
-#[borrow] public fun borrow$Wrapper$1$1(l0: &Wrapper): &u64
+#[borrow=1] public fun borrow$Wrapper$1$1(l0: &Wrapper): &u64
     local l1: &Wrapper
     move_loc l0
     borrow_variant_field Wrapper, V1::_1
     ret
 
 // Function definition at index 8
-#[borrow_mut] public fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
+#[borrow_mut=0] public fun borrow_mut$Wrapper$0$0(l0: &mut Wrapper): &mut u64
     local l1: &mut Wrapper
     move_loc l0
     mut_borrow_variant_field Wrapper, V1::_0, V2::_0
     ret
 
 // Function definition at index 9
-#[borrow_mut] public fun borrow_mut$Wrapper$1$1(l0: &mut Wrapper): &mut u64
+#[borrow_mut=1] public fun borrow_mut$Wrapper$1$1(l0: &mut Wrapper): &mut u64
     local l1: &mut Wrapper
     move_loc l0
     mut_borrow_variant_field Wrapper, V1::_1
