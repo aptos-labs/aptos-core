@@ -8,8 +8,7 @@ RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloa
 ARG CLANG_VERSION=20
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list \
-    && apt update \
+    apt update \
     && apt-get --no-install-recommends install -y \
         binutils \
         cmake \
@@ -20,10 +19,10 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libpq-dev \
         libssl-dev \
         libudev-dev \
+        liburing-dev \
         lld \
         lsb-release \
         pkg-config \
-        software-properties-common \
         wget \
     && bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh ${CLANG_VERSION} \
     && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${CLANG_VERSION} 100 \
