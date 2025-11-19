@@ -1191,25 +1191,35 @@ impl TypeBuilder {
         self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline]
     fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
         if *count >= self.max_ty_size {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Type size is larger than maximum {}",
-                    self.max_ty_size
-                )),
-            );
+            return self.too_many_nodes_error();
         }
         if depth > self.max_ty_depth {
-            return Err(
-                PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED).with_message(format!(
-                    "Type depth is larger than maximum {}",
-                    self.max_ty_depth
-                )),
-            );
+            return self.too_large_depth_error();
         }
         Ok(())
+    }
+
+    #[cold]
+    fn too_many_nodes_error(&self) -> PartialVMResult<()> {
+        Err(
+            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                "Type size is larger than maximum {}",
+                self.max_ty_size
+            )),
+        )
+    }
+
+    #[cold]
+    fn too_large_depth_error(&self) -> PartialVMResult<()> {
+        Err(
+            PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED).with_message(format!(
+                "Type depth is larger than maximum {}",
+                self.max_ty_depth
+            )),
+        )
     }
 
     fn create_constant_ty_impl(

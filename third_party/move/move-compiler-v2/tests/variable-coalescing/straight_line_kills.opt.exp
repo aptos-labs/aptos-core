@@ -152,23 +152,22 @@ fun m::copy_kill($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module c0ffee.m {
+// Bytecode version v9
+module 0xc0ffee::m
+// Function definition at index 0
+fun copy_kill(l0: u64): u64
+    local l1: u64
+    copy_loc l0
+    st_loc l1
+    copy_loc l1
+    move_loc l0
+    ld_u64 1
+    // @5
+    add
+    pop
+    move_loc l1
+    add
+    ret
 
 
-copy_kill(p: u64): u64 /* def_idx: 0 */ {
-L1:	a: u64
-B0:
-	0: CopyLoc[0](p: u64)
-	1: StLoc[1](a: u64)
-	2: CopyLoc[1](a: u64)
-	3: MoveLoc[0](p: u64)
-	4: LdU64(1)
-	5: Add
-	6: Pop
-	7: MoveLoc[1](a: u64)
-	8: Add
-	9: Ret
-}
-}
 ============ bytecode verification succeeded ========

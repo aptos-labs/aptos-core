@@ -47,6 +47,10 @@ fuzzing = []
 range_proof_timing = []
 
 [[bench]]
+name = "bsgs"
+harness = false
+
+[[bench]]
 name = "crypto"
 harness = false
 

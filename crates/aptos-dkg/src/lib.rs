@@ -18,15 +18,22 @@
 #![allow(clippy::borrow_interior_mutable_const)]
 
 use crate::pvss::{traits, Player};
-use aptos_crypto::arkworks::shamir::{ShamirShare, ThresholdConfig};
-pub use aptos_crypto::blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES};
+use aptos_crypto::arkworks::{
+    random::{sample_field_element, UniformRand},
+    shamir::{Reconstructable, ShamirThresholdConfig},
+};
+pub use aptos_crypto::{
+    blstrs as algebra,
+    blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
+};
 use ark_ec::pairing::Pairing;
+use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{rand::Rng, UniformRand};
 use more_asserts::{assert_ge, assert_le};
+use rand::Rng;
 pub use utils::random::DST_RAND_CORE_HELL;
 
-pub mod algebra;
+pub mod dlog;
 pub(crate) mod fiat_shamir;
 pub mod pcs;
 pub mod pvss;
@@ -34,6 +41,7 @@ pub mod range_proofs;
 pub mod sigma_protocol;
 pub mod utils;
 pub mod weighted_vuf;
+use aptos_crypto::arkworks::shamir::ShamirShare;
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
 ///
@@ -77,35 +85,41 @@ impl<E: Pairing> Scalar<E> {
     pub fn vecvec_from_inner(vv: Vec<Vec<E::ScalarField>>) -> Vec<Vec<Self>> {
         vv.into_iter().map(Self::vec_from_inner).collect()
     }
-}
 
-impl<E: Pairing> Scalar<E> {
-    pub fn rand<R: Rng + ?Sized>(rng: &mut R) -> Self {
-        Scalar(E::ScalarField::rand(rng))
+    /// Converts a `&[E::ScalarField]` into a `Vec<Scalar<E>>` safely.
+    pub fn vec_from_inner_slice(slice: &[E::ScalarField]) -> Vec<Self> {
+        slice.iter().copied().map(Self).collect()
     }
 }
 
-impl<E: Pairing> traits::Reconstructable<ThresholdConfig<E::ScalarField>> for Scalar<E> {
-    type Share = Scalar<E>;
+impl<E: Pairing> UniformRand for Scalar<E> {
+    fn rand<R: Rng>(rng: &mut R) -> Self {
+        Scalar(sample_field_element(rng))
+    }
+}
 
-    // TODO: converting between Vec<(Player, Self::Share)> and Vec<ShamirShare<E::ScalarField>> feels bulky,
-    // one of them needs to go
+// TODO: maybe move the Reconstructable trait to the SecretSharingConfig in the PVSS trait, with associated Scalar equal to InputSecret
+// then make the existing implementation of `fn reconstruct()` part of a trait... and then we can remove the trivial implementation below!
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+    Reconstructable<ShamirThresholdConfig<E::ScalarField>> for Scalar<E>
+{
+    type ShareValue = Scalar<E>;
+
     fn reconstruct(
-        sc: &ThresholdConfig<E::ScalarField>,
-        shares: &Vec<(Player, Self::Share)>,
-    ) -> Self {
+        sc: &ShamirThresholdConfig<E::ScalarField>,
+        shares: &[ShamirShare<Self::ShareValue>],
+    ) -> anyhow::Result<Self> {
         assert_ge!(shares.len(), sc.get_threshold());
         assert_le!(shares.len(), sc.get_total_num_players());
 
-        // Convert shares to a Vec of ShamirShare // TODO: get rid of this?
-        let shamir_shares: Vec<ShamirShare<E::ScalarField>> = shares
+        let shares_destructured: Vec<(Player, E::ScalarField)> = shares
             .iter()
-            .map(|(p, share)| ShamirShare {
-                x: E::ScalarField::from(p.id as u64),
-                y: share.0,
-            })
+            .map(|(player, scalar)| (*player, scalar.0))
             .collect();
 
-        Scalar(sc.reconstruct(&shamir_shares).unwrap())
+        Ok(Scalar(E::ScalarField::reconstruct(
+            &sc,
+            &shares_destructured,
+        )?))
     }
 }

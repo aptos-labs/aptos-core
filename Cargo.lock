@@ -304,7 +304,7 @@ dependencies = [
 
 [[package]]
 name = "aptos"
-version = "7.10.2"
+version = "7.11.0"
 dependencies = [
  "anyhow",
  "aptos-api-types",
@@ -959,6 +959,7 @@ dependencies = [
  "aptos-network",
  "aptos-peer-monitoring-service-types",
  "aptos-reliable-broadcast",
+ "aptos-resource-viewer",
  "aptos-runtimes",
  "aptos-safety-rules",
  "aptos-schemadb",
@@ -971,7 +972,6 @@ dependencies = [
  "aptos-types",
  "aptos-validator-transaction-pool",
  "aptos-vm",
- "aptos-vm-validator",
  "async-trait",
  "bcs 0.1.4",
  "byteorder",
@@ -1547,17 +1547,21 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aptos-aggregator",
+ "aptos-api",
  "aptos-block-executor",
  "aptos-block-partitioner",
  "aptos-config",
  "aptos-crypto",
  "aptos-db",
+ "aptos-db-indexer",
  "aptos-executor",
  "aptos-executor-service",
  "aptos-executor-types",
  "aptos-experimental-ptx-executor",
  "aptos-experimental-runtimes",
  "aptos-genesis",
+ "aptos-indexer-grpc-fullnode",
+ "aptos-indexer-grpc-table-info",
  "aptos-infallible",
  "aptos-jellyfish-merkle",
  "aptos-logger",
@@ -1565,6 +1569,7 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-node-resource-metrics",
  "aptos-profiler 0.1.0",
+ "aptos-protos 1.3.1",
  "aptos-push-metrics",
  "aptos-sdk",
  "aptos-storage-interface",
@@ -1583,6 +1588,7 @@ dependencies = [
  "clap 4.5.21",
  "dashmap 7.0.0-rc2",
  "derivative",
+ "futures",
  "indicatif 0.15.0",
  "itertools 0.13.0",
  "move-core-types",
@@ -1597,6 +1603,7 @@ dependencies = [
  "tikv-jemallocator",
  "tokio",
  "toml 0.7.8",
+ "tonic 0.12.3",
 ]
 
 [[package]]
@@ -3861,13 +3868,17 @@ name = "aptos-resource-viewer"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "aptos-logger",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-environment",
+ "aptos-vm-logging",
  "move-binary-format",
  "move-bytecode-utils",
  "move-core-types",
  "move-resource-viewer",
+ "move-vm-runtime",
+ "move-vm-types",
 ]
 
 [[package]]
@@ -5055,15 +5066,13 @@ dependencies = [
  "aptos-executor-test-helpers",
  "aptos-gas-schedule",
  "aptos-logger",
+ "aptos-resource-viewer",
  "aptos-storage-interface",
  "aptos-temppath",
  "aptos-types",
  "aptos-vm",
- "aptos-vm-environment",
  "aptos-vm-genesis",
- "aptos-vm-logging",
  "fail",
- "move-binary-format",
  "move-core-types",
  "move-vm-runtime",
  "move-vm-types",
@@ -5581,7 +5590,7 @@ dependencies = [
  "async-lock 3.2.0",
  "async-task",
  "concurrent-queue",
- "fastrand 2.0.1",
+ "fastrand 2.3.0",
  "futures-lite 2.2.0",
  "slab",
 ]
@@ -6363,7 +6372,7 @@ dependencies = [
  "async-channel 2.1.1",
  "async-lock 3.2.0",
  "async-task",
- "fastrand 2.0.1",
+ "fastrand 2.3.0",
  "futures-io",
  "futures-lite 2.2.0",
  "piper",
@@ -9123,9 +9132,9 @@ dependencies = [
 
 [[package]]
 name = "fastrand"
-version = "2.0.1"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25cbce373ec4653f1a01a31e8a5e5ec0c622dc27ff9c4e6606eefef5cbbed4a5"
+checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
 name = "fdeflate"
@@ -9510,7 +9519,7 @@ version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "445ba825b27408685aaecefd65178908c36c6e96aaf6d8599419d46e624192ba"
 dependencies = [
- "fastrand 2.0.1",
+ "fastrand 2.3.0",
  "futures-core",
  "futures-io",
  "parking",
@@ -12383,13 +12392,13 @@ dependencies = [
  "legacy-move-compiler",
  "libtest-mimic",
  "log",
+ "move-asm",
  "move-binary-format",
  "move-borrow-graph",
  "move-bytecode-source-map",
  "move-bytecode-verifier",
  "move-command-line-common",
  "move-core-types",
- "move-disassembler",
  "move-ir-types",
  "move-model",
  "move-prover-test-utils",
@@ -13021,6 +13030,7 @@ dependencies = [
  "rayon",
  "regex",
  "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -14452,7 +14462,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "668d31b1c4eba19242f2088b2bf3316b82ca31082a8335764db4e083db7485d4"
 dependencies = [
  "atomic-waker",
- "fastrand 2.0.1",
+ "fastrand 2.3.0",
  "futures-io",
 ]
 
@@ -14990,9 +15000,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.89"
+version = "1.0.103"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f139b0662de085916d1fb67d2b4169d1addddda1919e696f3252b740b629986e"
+checksum = "5ee95bc4ef87b8d5ba32e8b7714ccc834865276eab0aed5c9958d00ec45f49e8"
 dependencies = [
  "unicode-ident",
 ]
@@ -17856,7 +17866,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "01ce4141aa927a6d1bd34a041795abd0db1cccba5d5f24b009f694bdf3a1f3fa"
 dependencies = [
  "cfg-if",
- "fastrand 2.0.1",
+ "fastrand 2.3.0",
  "redox_syscall 0.4.1",
  "rustix 0.38.28",
  "windows-sys 0.52.0",

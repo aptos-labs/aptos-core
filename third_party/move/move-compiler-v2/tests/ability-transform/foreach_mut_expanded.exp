@@ -2005,57 +2005,56 @@ fun m::test_for_each_mut() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.m {
+// Bytecode version v9
+module 0x42::m
+// Function definition at index 0
+fun test_for_each_mut()
+    local l0: vector<u64>
+    local l1: u64
+    local l2: u64
+    local l3: &mut vector<u64>
+    local l4: u64
+    local l5: &mut u64
+    ld_const<vector<u64>> [1, 2, 3]
+    st_loc l0
+    ld_u64 0
+    st_loc l1
+    borrow_loc l0
+    // @5
+    vec_len <u64>
+    st_loc l2
+    mut_borrow_loc l0
+    st_loc l3
+l1: copy_loc l1
+    // @10
+    copy_loc l2
+    lt
+    br_false l0
+    copy_loc l3
+    copy_loc l1
+    // @15
+    vec_mut_borrow <u64>
+    st_loc l5
+    ld_u64 2
+    move_loc l5
+    write_ref
+    // @20
+    move_loc l1
+    ld_u64 1
+    add
+    st_loc l1
+    branch l1
+    // @25
+l0: move_loc l3
+    pop
+    move_loc l0
+    ld_const<vector<u64>> [2, 3, 4]
+    eq
+    // @30
+    br_false l2
+    ret
+l2: ld_u64 0
+    abort
 
 
-test_for_each_mut() /* def_idx: 0 */ {
-L0:	v: vector<u64>
-L1:	i: u64
-L2:	len: u64
-L3:	vr: &mut vector<u64>
-L4:	$t6: u64
-L5:	x: &mut u64
-B0:
-	0: LdConst[0](Vector(U64): [3, 1, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0])
-	1: StLoc[0](v: vector<u64>)
-	2: LdU64(0)
-	3: StLoc[1](i: u64)
-	4: ImmBorrowLoc[0](v: vector<u64>)
-	5: VecLen(1)
-	6: StLoc[2](len: u64)
-	7: MutBorrowLoc[0](v: vector<u64>)
-	8: StLoc[3](vr: &mut vector<u64>)
-B1:
-	9: CopyLoc[1](i: u64)
-	10: CopyLoc[2](len: u64)
-	11: Lt
-	12: BrFalse(25)
-B2:
-	13: CopyLoc[3](vr: &mut vector<u64>)
-	14: CopyLoc[1](i: u64)
-	15: VecMutBorrow(1)
-	16: StLoc[5](x: &mut u64)
-	17: LdU64(2)
-	18: MoveLoc[5](x: &mut u64)
-	19: WriteRef
-	20: MoveLoc[1](i: u64)
-	21: LdU64(1)
-	22: Add
-	23: StLoc[1](i: u64)
-	24: Branch(9)
-B3:
-	25: MoveLoc[3](vr: &mut vector<u64>)
-	26: Pop
-	27: MoveLoc[0](v: vector<u64>)
-	28: LdConst[1](Vector(U64): [3, 2, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0])
-	29: Eq
-	30: BrFalse(32)
-B4:
-	31: Ret
-B5:
-	32: LdU64(0)
-	33: Abort
-}
-}
 ============ bytecode verification succeeded ========

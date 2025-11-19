@@ -2,11 +2,9 @@
 /// Bulk orders allow users to place multiple bid and ask orders at different price levels
 /// in a single transaction, improving efficiency for market makers.
 module aptos_experimental::market_bulk_order {
-    use std::option;
     use std::signer;
     use aptos_experimental::bulk_order_book_types::{
-        new_bulk_order_request, destroy_bulk_order_request_response, is_bulk_order_success_response, destroy_bulk_order_place_success_response, destroy_bulk_order_place_reject_response,
-        get_validation_failed_rejection
+        new_bulk_order_request, destroy_bulk_order_place_response
     };
     use aptos_experimental::market_types::{
         MarketClearinghouseCallbacks,
@@ -15,6 +13,7 @@ module aptos_experimental::market_bulk_order {
     use aptos_experimental::order_book_types::OrderIdType;
 
     const E_SEQUENCE_NUMBER_MISMATCH: u64 = 0;
+    const E_CLEARINGHOUSE_VALIDATION_FAILED: u64 = 1;
 
     /// Places a bulk order with multiple bid and ask price levels.
     /// This allows market makers to place multiple orders at different price levels
@@ -41,30 +40,17 @@ module aptos_experimental::market_bulk_order {
         ask_sizes: vector<u64>,
         metadata: M,
         callbacks: &MarketClearinghouseCallbacks<M, R>
-    ): option::Option<OrderIdType> {
+    ): OrderIdType {
         let validation_result = callbacks.validate_bulk_order_placement(
             account,
-            bid_prices,
-            bid_sizes,
-            ask_prices,
-            ask_sizes,
-            metadata,
+            &bid_prices,
+            &bid_sizes,
+            &ask_prices,
+            &ask_sizes,
+            &metadata,
         );
-        if (!validation_result.is_validation_result_valid()) {
-            // If the bulk order is not valid, emit rejection event and return without placing the order.
-            market.emit_event_for_bulk_order_rejected(
-                sequence_number,
-                account,
-                bid_prices,
-                bid_sizes,
-                ask_prices,
-                ask_sizes,
-                get_validation_failed_rejection(),
-                validation_result.get_validation_failure_reason().destroy_some(),
-            );
-            return option::none();
-        };
-        let request_response = new_bulk_order_request(
+        assert!(validation_result.is_validation_result_valid(), E_CLEARINGHOUSE_VALIDATION_FAILED);
+        let request = new_bulk_order_request(
             account,
             sequence_number,
             bid_prices,
@@ -73,53 +59,28 @@ module aptos_experimental::market_bulk_order {
             ask_sizes,
             metadata,
         );
-        let (request_option, request_rejection_reason, rejection_details) = destroy_bulk_order_request_response(request_response);
-        if (request_option.is_none()) {
-            // Bulk order request creation failed - emit rejection event
-            let rejection_reason = request_rejection_reason.destroy_some();
-            market.emit_event_for_bulk_order_rejected(
-                sequence_number,
-                account,
-                bid_prices,
-                bid_sizes,
-                ask_prices,
-                ask_sizes,
-                rejection_reason,
-                rejection_details.destroy_some(),
-            );
-            return option::none();
-        };
-        let bulk_order_request = request_option.destroy_some();
-        let response = market.get_order_book_mut().place_bulk_order(bulk_order_request);
-        if (is_bulk_order_success_response(&response)) {
-            let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_success_response(response);
-            let (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
-            assert!(sequence_number == order_sequence_number, E_SEQUENCE_NUMBER_MISMATCH);
-            // Extract previous_seq_num from option, defaulting to 0 if none
-            let previous_seq_num = if (previous_seq_num_option.is_some()) {
-                previous_seq_num_option.destroy_some()
-            } else {
-                0
-            };
-            // Emit an event for the placed bulk order
-            market.emit_event_for_bulk_order_placed(order_id,
-                order_sequence_number, account, bid_prices, bid_sizes, ask_prices, ask_sizes, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num);
-            option::some(order_id)
-        } else {
-            // Handle rejection from order book - emit rejection event
-            let (rejection_reason, details) = destroy_bulk_order_place_reject_response(response);
-            market.emit_event_for_bulk_order_rejected(
-                sequence_number,
-                account,
-                bid_prices,
-                bid_sizes,
-                ask_prices,
-                ask_sizes,
-                rejection_reason,
-                details
-            );
-            option::none()
-        }
+        let response = market.get_order_book_mut().place_bulk_order(request);
+        let (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_response(response);
+        let (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need to keep the bulk order struct after placement
+        assert!(sequence_number == order_sequence_number, E_SEQUENCE_NUMBER_MISMATCH);
+        // Extract previous_seq_num from option, defaulting to 0 if none
+        let previous_seq_num = previous_seq_num_option.destroy_with_default(0);
+        // Emit an event for the placed bulk order
+        market.emit_event_for_bulk_order_placed(
+            order_id,
+            order_sequence_number,
+            account,
+            bid_prices,
+            bid_sizes,
+            ask_prices,
+            ask_sizes,
+            cancelled_bid_prices,
+            cancelled_bid_sizes,
+            cancelled_ask_prices,
+            cancelled_ask_sizes,
+            previous_seq_num
+        );
+        order_id
     }
 
     /// Cancels all bulk orders for a given user.

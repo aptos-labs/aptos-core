@@ -18,6 +18,7 @@ pub mod encoding_type;
 pub mod error;
 pub mod hash;
 pub mod hkdf;
+pub mod input_secret;
 pub mod multi_ed25519;
 pub mod noise;
 pub mod player;
@@ -25,7 +26,9 @@ pub mod secp256k1_ecdsa;
 pub mod secp256r1_ecdsa;
 pub mod test_utils;
 pub mod traits;
+pub mod utils;
 pub mod validatable;
+pub mod weighted_config;
 pub mod x25519;
 
 pub mod blstrs;

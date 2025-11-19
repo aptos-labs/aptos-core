@@ -257,33 +257,28 @@ fun m::main() {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 32.m {
+// Bytecode version v9
+module 0x32::m
+// Function definition at index 0
+fun main()
+    local l0: u64
+    ld_u64 0
+    st_loc l0
+    branch l0
+    branch l1
+l0: move_loc l0
+    // @5
+    ld_u64 1
+    add
+    st_loc l0
+l1: move_loc l0
+    ld_u64 1
+    // @10
+    eq
+    br_false l2
+    ret
+l2: ld_u64 42
+    abort
 
 
-main() /* def_idx: 0 */ {
-L0:	x: u64
-B0:
-	0: LdU64(0)
-	1: StLoc[0](x: u64)
-	2: Branch(4)
-B1:
-	3: Branch(8)
-B2:
-	4: MoveLoc[0](x: u64)
-	5: LdU64(1)
-	6: Add
-	7: StLoc[0](x: u64)
-B3:
-	8: MoveLoc[0](x: u64)
-	9: LdU64(1)
-	10: Eq
-	11: BrFalse(13)
-B4:
-	12: Ret
-B5:
-	13: LdU64(42)
-	14: Abort
-}
-}
 ============ bytecode verification succeeded ========

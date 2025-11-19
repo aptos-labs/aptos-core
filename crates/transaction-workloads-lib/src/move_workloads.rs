@@ -47,6 +47,13 @@ pub enum LoopType {
     BcsToBytes { len: u64 },
 }
 
+#[derive(Debug, Clone)]
+pub enum FibonacciFunctionType {
+    Recursive,
+    TailRecursive,
+    Iterative,
+}
+
 /// Monotonically increasing counter test variants
 #[derive(Debug, Copy, Clone)]
 pub enum MonotonicCounterType {
@@ -126,6 +133,11 @@ pub enum EntryPoints {
     Loop {
         loop_count: Option<u64>,
         loop_type: LoopType,
+    },
+    /// Compute the n-th fibonacci number using the given function type.
+    Fibonacci {
+        n: u64,
+        function_type: FibonacciFunctionType,
     },
     // next 2 functions, second arg must be existing account address with data
     // Sets `Resource` to the max from two addresses
@@ -314,6 +326,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::Double
             | EntryPoints::Half
             | EntryPoints::Loop { .. }
+            | EntryPoints::Fibonacci { .. }
             | EntryPoints::GetFromConst { .. }
             | EntryPoints::SetId
             | EntryPoints::SetName
@@ -384,6 +397,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::Double
             | EntryPoints::Half
             | EntryPoints::Loop { .. }
+            | EntryPoints::Fibonacci { .. }
             | EntryPoints::GetFromConst { .. }
             | EntryPoints::SetId
             | EntryPoints::SetName
@@ -500,6 +514,16 @@ impl EntryPointTrait for EntryPoints {
                     },
                 };
                 get_payload(module_id, ident_str!(method).to_owned(), args)
+            },
+            EntryPoints::Fibonacci { n, function_type } => {
+                let method = match function_type {
+                    FibonacciFunctionType::Recursive => "fibonacci_recursive",
+                    FibonacciFunctionType::TailRecursive => "fibonacci_tail_recursive",
+                    FibonacciFunctionType::Iterative => "fibonacci_iterative",
+                };
+                get_payload(module_id, ident_str!(method).to_owned(), vec![
+                    bcs::to_bytes(&n).unwrap(),
+                ])
             },
             EntryPoints::GetFromConst { const_idx } => get_from_random_const(
                 module_id,
@@ -995,6 +1019,7 @@ impl EntryPointTrait for EntryPoints {
             | EntryPoints::Double
             | EntryPoints::Half
             | EntryPoints::Loop { .. }
+            | EntryPoints::Fibonacci { .. }
             | EntryPoints::GetFromConst { .. }
             | EntryPoints::SetId
             | EntryPoints::SetName

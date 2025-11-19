@@ -5,11 +5,11 @@
 
 use crate::{
     execution_tracing::{trace::DynamicCall, Trace},
+    instr::Instruction,
     LoadedFunction,
 };
 use bitvec::vec::BitVec;
 use fxhash::FxHasher64;
-use move_binary_format::file_format::Bytecode;
 use move_core_types::function::ClosureMask;
 use std::hash::{Hash, Hasher};
 
@@ -24,7 +24,7 @@ pub trait TraceRecorder {
 
     /// Called after successful execution of a bytecode instruction. It is crucial that the trace
     /// records only successful instructions.
-    fn record_successful_instruction(&mut self, instr: &Bytecode);
+    fn record_successful_instruction(&mut self, instr: &Instruction);
 
     /// Called for every successfully executed conditional branch.
     fn record_branch_outcome(&mut self, taken: bool);
@@ -46,7 +46,7 @@ pub(crate) struct BytecodeFingerprintRecorder {
 }
 
 impl BytecodeFingerprintRecorder {
-    pub(crate) fn record(&mut self, instr: &Bytecode) {
+    pub(crate) fn record(&mut self, instr: &Instruction) {
         instr.hash(&mut self.hasher);
     }
 
@@ -97,7 +97,7 @@ impl TraceRecorder for FullTraceRecorder {
     }
 
     #[inline(always)]
-    fn record_successful_instruction(&mut self, instr: &Bytecode) {
+    fn record_successful_instruction(&mut self, instr: &Instruction) {
         self.ticks += 1;
         self.fingerprint_recorder.record(instr);
     }
@@ -133,7 +133,7 @@ impl TraceRecorder for NoOpTraceRecorder {
     }
 
     #[inline(always)]
-    fn record_successful_instruction(&mut self, _instr: &Bytecode) {}
+    fn record_successful_instruction(&mut self, _instr: &Instruction) {}
 
     #[inline(always)]
     fn record_branch_outcome(&mut self, _taken: bool) {}
@@ -165,11 +165,11 @@ mod testing {
         let mut recorder = FullTraceRecorder::new();
         assert_eq!(recorder.ticks, 0);
 
-        recorder.record_successful_instruction(&Bytecode::Nop);
+        recorder.record_successful_instruction(&Instruction::Nop);
         assert_eq!(recorder.ticks, 1);
 
         for _ in 0..10 {
-            recorder.record_successful_instruction(&Bytecode::Nop);
+            recorder.record_successful_instruction(&Instruction::Nop);
         }
         assert_eq!(recorder.ticks, 11);
     }

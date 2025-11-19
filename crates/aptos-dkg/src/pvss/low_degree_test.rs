@@ -243,6 +243,7 @@ mod test {
         pvss::{test_utils, LowDegreeTest, ThresholdConfigBlstrs},
         utils::random::random_scalars,
     };
+    use aptos_crypto::traits::ThresholdConfig as _;
     use blstrs::Scalar;
     use rand::{prelude::ThreadRng, thread_rng};
 

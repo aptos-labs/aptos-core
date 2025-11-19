@@ -1,13 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash};
+use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash, traits::SecretSharingConfig as _};
 use aptos_dkg::pvss::{
     das,
     das::unweighted_protocol,
     insecure_field, test_utils,
     test_utils::{reconstruct_dealt_secret_key_randomly, NoAux},
-    traits::{SecretSharingConfig, Transcript},
+    traits::Transcript,
     weighted::generic_weighting::GenericWeighting,
 };
 use rand::{rngs::StdRng, thread_rng};
@@ -52,6 +52,7 @@ fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, see
             sc,
             &d.pp,
             &d.ssks[i],
+            &d.spks[i],
             &d.eks,
             &d.iss[i],
             &NoAux,
@@ -75,7 +76,8 @@ fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, see
     )
     .expect("aggregated PVSS transcript failed verification");
 
-    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx) {
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
         panic!("Reconstructed SK did not match");
     }
 }

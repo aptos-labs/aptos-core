@@ -980,13 +980,8 @@ API to ensure that the order is a taker order before calling this API, otherwise
     };
 
     <b>let</b> (order, is_active) = order_with_state.destroy_order_from_state();
-    <b>if</b> (remaining_size == 0 && order.get_client_order_id().is_some()) {
-        self.client_order_ids.remove(
-            &new_account_client_order_id(
-                order.get_account(), order.get_client_order_id().destroy_some()
-            )
-        );
-    };
+    <b>assert</b>!(is_active, <a href="single_order_book.md#0x7_single_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>);
+
     <b>let</b> (
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_id,
@@ -996,11 +991,14 @@ API to ensure that the order is a taker order before calling this API, otherwise
         orig_size,
         size,
         is_bid,
-        _trigger_condition,
+        _,
         time_in_force,
         metadata
     ) = order.destroy_single_order();
-    <b>assert</b>!(is_active, <a href="single_order_book.md#0x7_single_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>);
+
+    <b>if</b> (remaining_size == 0 && client_order_id.is_some()) {
+        self.client_order_ids.remove(&new_account_client_order_id(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id.destroy_some()));
+    };
     new_order_match(new_single_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata), matched_size)
 }
 </code></pre>
@@ -1259,10 +1257,11 @@ Removes and returns the orders that are ready to be executed based on the curren
     order_ids.for_each(|order_id| {
         <b>let</b> order_with_state = self_orders.remove(&order_id);
         <b>let</b> (order, _) = order_with_state.destroy_order_from_state();
-        <b>if</b> (order.get_client_order_id().is_some()) {
+        <b>let</b> client_order_id = order.get_client_order_id();
+        <b>if</b> (client_order_id.is_some()) {
             self_client_order_ids.remove(
                 &new_account_client_order_id(
-                    order.get_account(), order.get_client_order_id().destroy_some()
+                    order.get_account(), client_order_id.destroy_some()
                 )
             );
         };

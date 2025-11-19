@@ -48,11 +48,14 @@
 //! does not hold.
 
 use crate::pvss::{
-    traits::{Convert, HasEncryptionPublicParams, Reconstructable, SecretSharingConfig},
+    traits::{Convert, HasEncryptionPublicParams},
     Player,
 };
 use anyhow::bail;
-use aptos_crypto::{SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
+use aptos_crypto::{
+    arkworks::shamir::Reconstructable, SecretSharingConfig, SigningKey, Uniform,
+    ValidCryptoMaterial, VerifyingKey,
+};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
@@ -72,6 +75,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Eq;
 
     type PublicParameters: HasEncryptionPublicParams
+        + WithMaxNumShares
         + Default
         + ValidCryptoMaterial
         + DeserializeOwned
@@ -86,7 +90,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKey: PartialEq
-        + Reconstructable<Self::SecretSharingConfig, Share = Self::DealtSecretKeyShare>;
+        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
     type DealtPubKey;
 
     type InputSecret: Uniform
@@ -125,6 +129,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
+        spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         aux: &A,
@@ -155,7 +160,11 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     fn get_dealers(&self) -> Vec<Player>;
 
     /// Aggregates two transcripts.
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self);
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Self,
+    ) -> anyhow::Result<()>;
 
     /// Helper function for aggregating a vector of transcripts
     fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
@@ -167,7 +176,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         let (first, last) = trxs.split_at_mut(1);
 
         for other in last {
-            first[0].aggregate_with(sc, other);
+            first[0].aggregate_with(sc, other)?;
         }
 
         trxs.truncate(1);
@@ -194,11 +203,16 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         sc: &Self::SecretSharingConfig,
         player: &Player,
         dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
 
     /// Generates a random looking transcript (but not a valid one).
     /// Useful for testing and benchmarking.
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng;
 }
@@ -214,4 +228,12 @@ pub trait MalleableTranscript: Transcript {
         aux: &A,
         dealer: &Player,
     );
+}
+
+/// This is needed instead of Default because `max_n` influences the public parameters of the DeKARTv2 range proof, and hence the public parameters of `chunky`
+pub trait WithMaxNumShares {
+    fn with_max_num_shares(n: usize) -> Self;
+
+    /// This is a modified function which might create public parameters that are fairly nonsensical, but which are sufficient for `generate()`
+    fn with_max_num_shares_for_generate(n: usize) -> Self;
 }

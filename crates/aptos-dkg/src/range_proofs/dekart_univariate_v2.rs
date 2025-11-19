@@ -4,24 +4,27 @@
 // This file implements the range proof described here: https://alinush.github.io/dekart
 
 use crate::{
-    algebra::{polynomials, GroupGenerators},
+    algebra::polynomials,
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
     sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
     utils, Scalar,
 };
-use aptos_crypto::arkworks;
+use aptos_crypto::arkworks::{
+    self,
+    random::{
+        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+    },
+    GroupGenerators,
+};
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
 use ark_ff::{AdditiveGroup, Field};
 use ark_poly::{self, EvaluationDomain, Polynomial};
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, Read, SerializationError, Valid, Validate,
 };
-use ark_std::{
-    rand::{CryptoRng, RngCore},
-    UniformRand,
-};
 use num_integer::Roots;
+use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, io::Write};
 
 #[allow(non_snake_case)]
@@ -29,16 +32,30 @@ use std::{fmt::Debug, io::Write};
 pub struct Proof<E: Pairing> {
     hatC: E::G1,
     pi_PoK: sigma_protocol::Proof<E, two_term_msm::Homomorphism<E>>,
-    Cs: Vec<E::G1>,
+    Cs: Vec<E::G1>, // has length ell
     D: E::G1,
     a: E::ScalarField,
     a_h: E::ScalarField,
-    a_js: Vec<E::ScalarField>,
+    a_js: Vec<E::ScalarField>, // has length ell
     pi_gamma: univariate_hiding_kzg::OpeningProof<E>,
 }
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(pub(crate) E::G1);
+impl<E: Pairing> Proof<E> {
+    /// Generates a random looking proof (but not a valid one).
+    /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
+    pub fn generate<R: rand::Rng + rand::CryptoRng>(ell: u8, rng: &mut R) -> Self {
+        Self {
+            hatC: unsafe_random_point(rng),
+            pi_PoK: two_term_msm::Proof::generate(rng),
+            Cs: unsafe_random_points(ell as usize, rng),
+            D: unsafe_random_point(rng),
+            a: sample_field_element(rng),
+            a_h: sample_field_element(rng),
+            a_js: sample_field_elements(ell as usize, rng),
+            pi_gamma: univariate_hiding_kzg::OpeningProof::generate(rng),
+        }
+    }
+}
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -53,7 +70,7 @@ pub struct ProverKey<E: Pairing> {
 pub struct PublicStatement<E: Pairing> {
     n: usize,
     ell: usize,
-    comm: Commitment<E>,
+    comm: univariate_hiding_kzg::Commitment<E>,
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -211,9 +228,9 @@ fn compute_h_denom_eval<E: Pairing>(
 }
 
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
-    type Commitment = Commitment<E>;
+    type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
-    type CommitmentRandomness = E::ScalarField;
+    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
@@ -277,18 +294,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ck_S: &Self::CommitmentKey,
         values: &[Self::Input],
         rho: &Self::CommitmentRandomness,
-    ) -> Commitment<E> {
+    ) -> Self::Commitment {
         let mut values_shifted = vec![E::ScalarField::ZERO]; // start with 0,
         values_shifted.extend(values); // then append all values from the original vector
 
-        let hiding_kzg_hom = univariate_hiding_kzg::CommitmentHomomorphism::<E> {
-            lagr_g1: &ck_S.lagr_g1,
-            xi_1: ck_S.xi_1,
-        };
-
-        let hiding_kzg_input = (*rho, values_shifted);
-
-        Commitment(hiding_kzg_hom.apply(&hiding_kzg_input).0)
+        univariate_hiding_kzg::commit_with_randomness(ck_S, &values_shifted, rho)
     }
 
     #[allow(non_snake_case)]
@@ -302,7 +312,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         rng: &mut R,
     ) -> Proof<E>
     where
-        R: RngCore + CryptoRng,
+        R: rand_core::RngCore + rand_core::CryptoRng,
     {
         // Step 1a
         let ProverKey {
@@ -321,7 +331,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             n,
             max_n
         );
-        // TODO: Use a subdomain to make the FFTs smaller
+        // TODO: Use a subdomain to make the FFTs smaller, when n is much smaller than max_n
         assert!(
             ell <= max_ell,
             "ell (got {}) must be ≤ max_ell (which is {})",
@@ -352,8 +362,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         });
 
         // Step 2a
-        let r = E::ScalarField::rand(rng);
-        let delta_rho = E::ScalarField::rand(rng);
+        let r = sample_field_element(rng);
+        let delta_rho = sample_field_element(rng);
         let hatC = *xi_1 * delta_rho + lagr_g1[0] * r + comm.0;
 
         // Step 2b
@@ -378,7 +388,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         fiat_shamir::append_sigma_proof(fs_t, &pi_PoK); // TODO: should be changed to "remainder of sigma proof" since the first message is already in there
 
         // Step 4a
-        let rs: Vec<E::ScalarField> = (0..ell).map(|_| E::ScalarField::rand(rng)).collect();
+        let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
 
         let f_js_evals: Vec<Vec<E::ScalarField>> = {
             let mut f_js_evals = vec![Vec::with_capacity(num_omegas); ell];
@@ -401,7 +411,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             f_js_evals
         };
 
-        let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| E::ScalarField::rand(rng))
+        let rhos: Vec<E::ScalarField> = std::iter::repeat_with(|| sample_field_element(rng))
             .take(ell)
             .collect();
 
@@ -412,8 +422,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let Cs: Vec<_> = f_js_evals
             .iter()
             .zip(rhos.iter())
-            .map(|(f_j, rho)| {
-                let hkzg_commit_input = (*rho, f_j.clone());
+            .map(|(f_j, &rho)| {
+                let hkzg_commit_input = univariate_hiding_kzg::Witness {
+                    hiding_randomness: Scalar(rho), // because univariate_hiding_kzg::CommitmentRandomness is an alias for Scalar... TODO: should maybe make a constructor method?
+                    values: Scalar::vec_from_inner_slice(f_j),
+                };
                 hkzg_commitment_hom.apply(&hkzg_commit_input).0
             })
             .collect();
@@ -517,9 +530,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             result
         };
 
-        let rho_h = E::ScalarField::rand(rng);
-        let D = hkzg_commitment_hom.apply(&(rho_h, h_evals.clone())).0;
-
+        let rho_h = sample_field_element(rng);
+        let D = hkzg_commitment_hom
+            .apply(&univariate_hiding_kzg::Witness {
+                hiding_randomness: Scalar(rho_h),
+                values: Scalar::vec_from_inner_slice(&h_evals),
+            })
+            .0;
         // Step 7b
         fiat_shamir::append_h_commitment::<E>(fs_t, &D);
 
@@ -565,9 +582,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 10
-        let s = E::ScalarField::rand(rng);
+        let s = sample_field_element(rng);
 
-        let rho_u = mu * (*rho + delta_rho)
+        let rho_u = mu * (rho.0 + delta_rho)
             + mu_h * rho_h
             + mus
                 .iter()
@@ -587,7 +604,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             rho_u,
             gamma,
             u_val,
-            &univariate_hiding_kzg::CommitmentRandomness(s),
+            &Scalar(s),
         );
 
         Proof {
@@ -701,9 +718,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 .map(|(&a_j, &mu_j)| a_j * mu_j)
                 .sum::<E::ScalarField>();
 
+        use sigma_protocol::homomorphism::TrivialShape as HkzgCommitment;
         univariate_hiding_kzg::CommitmentHomomorphism::verify(
             vk_hkzg.clone(),
-            univariate_hiding_kzg::Commitment(U),
+            HkzgCommitment(U), // TODO: Ugh univariate_hiding_kzg::Commitment(U) does not work because it's a tuple struct, see https://github.com/rust-lang/rust/issues/17422; So make it a struct with one named field?
             gamma,
             a_u,
             pi_gamma.clone(),
@@ -849,9 +867,27 @@ mod fiat_shamir {
 pub mod two_term_msm {
     // TODO: maybe fixed_base_msms should become a folder and put its code inside mod.rs? Then put this mod inside of that folder?
     use super::*;
-    use crate::sigma_protocol::homomorphism::fixed_base_msms;
+    use crate::sigma_protocol::{homomorphism::fixed_base_msms, traits::FirstProofItem};
+    use aptos_crypto::arkworks::random::UniformRand;
     use aptos_crypto_derive::SigmaProtocolWitness;
     pub use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
+    pub type Proof<E> = sigma_protocol::Proof<E, Homomorphism<E>>;
+
+    impl<E: Pairing> Proof<E> {
+        /// Generates a random looking proof (but not a valid one).
+        /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
+        pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
+            Self {
+                first_proof_item: FirstProofItem::Commitment(CodomainShape(unsafe_random_point(
+                    rng,
+                ))),
+                z: Witness {
+                    poly_randomness: Scalar::rand(rng),
+                    hiding_kzg_randomness: Scalar::rand(rng),
+                },
+            }
+        }
+    }
 
     /// Represents a homomorphism with two base points over an elliptic curve group.
     ///

@@ -4,20 +4,19 @@
 use ark_ff::{BigInteger, PrimeField};
 
 /// Converts a field element into little-endian chunks of `num_bits` bits.
-#[allow(dead_code)]
-pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: usize, scalar: &F) -> Vec<F> {
+pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: u8, scalar: &F) -> Vec<F> {
     assert!(
-        num_bits % 8 == 0 && num_bits > 0 && num_bits <= 64,
+        num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64,
         "Invalid chunk size"
     );
 
     let bytes = scalar.into_bigint().to_bytes_le();
     let num_bytes = num_bits / 8;
-    let num_chunks = bytes.len().div_ceil(num_bytes);
+    let num_chunks = bytes.len().div_ceil(num_bytes as usize);
 
     let mut chunks = Vec::with_capacity(num_chunks);
 
-    for bytes_chunk in bytes.chunks(num_bytes) {
+    for bytes_chunk in bytes.chunks(num_bytes as usize) {
         let mut padded = [0u8; 8]; // The last chunk might be shorter, so this guarantee a fixed 8-byte buffer
         padded[..bytes_chunk.len()].copy_from_slice(bytes_chunk);
 
@@ -30,10 +29,9 @@ pub(crate) fn scalar_to_le_chunks<F: PrimeField>(num_bits: usize, scalar: &F) ->
 }
 
 /// Reconstructs a field element from `num_bits`-bit chunks (little-endian order).
-#[allow(dead_code)]
-pub(crate) fn le_chunks_to_scalar<F: PrimeField>(num_bits: usize, chunks: &[F]) -> F {
+pub(crate) fn le_chunks_to_scalar<F: PrimeField>(num_bits: u8, chunks: &[F]) -> F {
     assert!(
-        num_bits % 8 == 0 && num_bits > 0 && num_bits <= 64,
+        num_bits.is_multiple_of(8) && num_bits > 0 && num_bits <= 64, // TODO: so make num_bits a u8?
         "Invalid chunk size"
     );
 

@@ -3,7 +3,7 @@
 
 use crate::range_proofs::traits::BatchedRangeProof;
 use ark_ec::pairing::Pairing;
-use ark_std::rand::{CryptoRng, RngCore};
+use rand::{CryptoRng, RngCore};
 
 /// Generate a **random instance** (values + commitment) given a fixed setup.
 pub fn range_proof_random_instance<E: Pairing, B: BatchedRangeProof<E>, R: RngCore + CryptoRng>(

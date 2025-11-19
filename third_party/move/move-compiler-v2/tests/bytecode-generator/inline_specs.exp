@@ -136,27 +136,26 @@ fun inline_specs::succ($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.inline_specs {
+// Bytecode version v9
+module 0x42::inline_specs
+// Function definition at index 0
+fun specs(): u64
+    local l0: u64
+    nop
+    ld_u64 0
+    call succ
+    st_loc l0
+    nop
+    // @5
+    move_loc l0
+    ret
+
+// Function definition at index 1
+fun succ(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
 
 
-specs(): u64 /* def_idx: 0 */ {
-L0:	x: u64
-B0:
-	0: Nop
-	1: LdU64(0)
-	2: Call succ(u64): u64
-	3: StLoc[0](x: u64)
-	4: Nop
-	5: MoveLoc[0](x: u64)
-	6: Ret
-}
-succ(x: u64): u64 /* def_idx: 1 */ {
-B0:
-	0: MoveLoc[0](x: u64)
-	1: LdU64(1)
-	2: Add
-	3: Ret
-}
-}
 ============ bytecode verification succeeded ========

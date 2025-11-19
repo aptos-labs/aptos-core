@@ -20,7 +20,7 @@ fn create_proof_manager() -> ProofManager {
     ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
 }
 
-fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore {
+fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore<BatchInfo> {
     create_proof_with_gas(author, expiration, batch_sequence, 0)
 }
 
@@ -29,7 +29,7 @@ fn create_proof_with_gas(
     expiration: u64,
     batch_sequence: u64,
     gas_bucket_start: u64,
-) -> ProofOfStore {
+) -> ProofOfStore<BatchInfo> {
     let digest = HashValue::random();
     let batch_id = BatchId::new_for_test(batch_sequence);
     ProofOfStore::new(
@@ -72,7 +72,7 @@ async fn get_proposal(
 
 fn assert_payload_response(
     payload: Payload,
-    expected: &[ProofOfStore],
+    expected: &[ProofOfStore<BatchInfo>],
     max_txns_from_block_to_execute: Option<u64>,
     expected_block_gas_limit: Option<u64>,
 ) {
@@ -116,7 +116,7 @@ async fn get_proposal_and_assert(
     proof_manager: &mut ProofManager,
     max_txns: u64,
     filter: &[BatchInfo],
-    expected: &[ProofOfStore],
+    expected: &[ProofOfStore<BatchInfo>],
 ) {
     assert_payload_response(
         get_proposal(proof_manager, max_txns, filter).await,

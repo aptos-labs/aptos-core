@@ -52,15 +52,14 @@ module aptos_experimental::bulk_order_book {
     use aptos_experimental::order_book_types;
     use aptos_experimental::bulk_order_book_types::{
         BulkOrder, BulkOrderPlaceResponse, BulkOrderRequest,
-        new_bulk_order_match, new_bulk_order, new_bulk_order_place_response_success,
-        new_bulk_order_place_response_rejection, get_account_from_order_request,
-        get_sequence_number_from_order_request, get_sequence_number_from_bulk_order,
-        get_sequence_number_out_of_order_rejection
+        new_bulk_order_match, new_bulk_order, new_bulk_order_place_response,
+        get_account_from_order_request,
+        get_sequence_number_from_order_request, get_sequence_number_from_bulk_order
     };
     use aptos_experimental::order_book_types::{OrderMatch, OrderMatchDetails, bulk_order_type};
     use aptos_experimental::order_book_types::{
         OrderIdType,
-        new_order_id_type, new_unique_idx_type
+        next_order_id, new_unique_idx_type
     };
 
     // Error codes for various failure scenarios
@@ -133,7 +132,7 @@ module aptos_experimental::bulk_order_book {
         let order_address = self.order_id_to_address.get(&order_id).destroy_some();
         let order = self.orders.remove(&order_address);
         let order_match = new_bulk_order_match<M>(
-            &mut order,
+            &order,
             !is_bid,
             matched_size,
         );
@@ -292,11 +291,9 @@ module aptos_experimental::bulk_order_book {
         self: &BulkOrderBook<M>,
         account: address
     ): BulkOrder<M> {
-        if (!self.orders.contains(&account)) {
-            abort EORDER_NOT_FOUND;
-        };
-
-        self.orders.get(&account).destroy_some()
+        let result = self.orders.get(&account);
+        assert!(result.is_some(), EORDER_NOT_FOUND);
+        result.destroy_some()
     }
 
     public(friend) fun get_remaining_size<M: store + copy + drop>(
@@ -352,18 +349,11 @@ module aptos_experimental::bulk_order_book {
         let (order_id, previous_seq_num) = if (order_option.is_some()) {
             let old_order = order_option.destroy_some();
             let existing_sequence_number = get_sequence_number_from_bulk_order(&old_order);
-            if (new_sequence_number <= existing_sequence_number) {
-                // Return rejection response for invalid sequence number
-                self.orders.add(account, old_order); // Re-add the old order back since we are rejecting the new one
-                return new_bulk_order_place_response_rejection(
-                    get_sequence_number_out_of_order_rejection(),
-                    std::string::utf8(b"Invalid sequence number")
-                );
-            };
+            assert!(new_sequence_number > existing_sequence_number, E_INVALID_SEQUENCE_NUMBER);
             cancel_active_orders(price_time_idx, &old_order);
             (old_order.get_order_id(), std::option::some(existing_sequence_number))
         } else {
-            let order_id = new_order_id_type(transaction_context::monotonically_increasing_counter());
+            let order_id = next_order_id();
             self.order_id_to_address.add(order_id, account);
             (order_id, std::option::none())
         };
@@ -377,7 +367,7 @@ module aptos_experimental::bulk_order_book {
         self.orders.add(account, bulk_order);
         // Activate the first price levels in the active order book
         activate_first_price_levels(price_time_idx, &bulk_order, order_id);
-        new_bulk_order_place_response_success(
+        new_bulk_order_place_response(
             bulk_order,
             cancelled_bid_prices,
             cancelled_bid_sizes,

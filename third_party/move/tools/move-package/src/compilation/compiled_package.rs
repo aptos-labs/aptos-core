@@ -4,7 +4,7 @@
 
 use crate::{
     compilation::{build_plan::CompilerDriverResult, package_layout::CompiledPackageLayout},
-    resolution::resolution_graph::{Renaming, ResolvedGraph, ResolvedPackage, ResolvedTable},
+    resolution::resolution_graph::{ResolvedGraph, ResolvedPackage, ResolvedTable},
     source_package::{
         layout::{SourcePackageLayout, REFERENCE_TEMPLATE_FILENAME},
         parsed_manifest::{FileName, PackageDigest, PackageName},
@@ -18,7 +18,7 @@ use legacy_move_compiler::{
     compiled_unit::{self, CompiledUnit, NamedCompiledModule, NamedCompiledScript},
     shared::{
         known_attributes::{AttributeKind, KnownAttribute},
-        Flags, NamedAddressMap, NumericalAddress, PackagePaths,
+        Flags, NumericalAddress, PackagePaths,
     },
 };
 use move_abigen::{Abigen, AbigenOptions};
@@ -39,7 +39,6 @@ use std::{
     path::{Path, PathBuf},
     sync::Arc,
 };
-use termcolor::{ColorChoice, StandardStream};
 
 #[derive(Debug, Clone)]
 pub enum CompilationCachingStatus {
@@ -605,16 +604,6 @@ impl CompiledPackage {
             .clone()
             .into_iter()
             .partition_map(|(p, b)| if b { Either::Left(p) } else { Either::Right(p) });
-        // If bytecode dependency is not empty, do not allow renaming
-        if !bytecode_deps.is_empty() {
-            if let Some(pkg_name) = resolution_graph.contains_renaming() {
-                bail!(
-                    "Found address renaming in package '{}' when \
-                    building with bytecode dependencies -- this is currently not supported",
-                    pkg_name
-                )
-            }
-        }
 
         // invoke the compiler
         let effective_compiler_version = config.compiler_version.unwrap_or_default();
@@ -675,6 +664,7 @@ impl CompiledPackage {
                         compile_test_code: flags.keep_testing_functions(),
                         experiments: config.experiments.clone(),
                         external_checks,
+                        print_errors: config.print_errors,
                         ..Default::default()
                     };
                     options = options.set_experiment(Experiment::ATTACH_COMPILED_MODULE, true);
@@ -1047,31 +1037,6 @@ pub(crate) fn named_address_mapping_for_compiler(
         .collect::<BTreeMap<_, _>>()
 }
 
-pub(crate) fn apply_named_address_renaming(
-    current_package_name: Symbol,
-    address_resolution: BTreeMap<Symbol, NumericalAddress>,
-    renaming: &Renaming,
-) -> NamedAddressMap {
-    let package_renamings = renaming
-        .iter()
-        .filter_map(|(rename_to, (package_name, from_name))| {
-            if package_name == &current_package_name {
-                Some((from_name, *rename_to))
-            } else {
-                None
-            }
-        })
-        .collect::<BTreeMap<_, _>>();
-
-    address_resolution
-        .into_iter()
-        .map(|(name, value)| {
-            let new_name = package_renamings.get(&name).copied();
-            (new_name.unwrap_or(name), value)
-        })
-        .collect()
-}
-
 /// Collects source and dependency files with their address mappings.
 pub fn make_source_and_deps_for_compiler(
     resolution_graph: &ResolvedGraph,
@@ -1105,11 +1070,7 @@ pub fn make_source_and_deps_for_compiler(
             ))
         })
         .collect::<Result<Vec<_>>>()?;
-    let root_named_addrs = apply_named_address_renaming(
-        root.source_package.package.name,
-        named_address_mapping_for_compiler(&root.resolution_table),
-        &root.renaming,
-    );
+    let root_named_addrs = named_address_mapping_for_compiler(&root.resolution_table);
     let sources = root.get_sources(&resolution_graph.build_options)?;
     let source_package_paths = PackagePaths {
         name: Some(root.source_package.package.name),
@@ -1126,8 +1087,8 @@ pub fn unimplemented_v2_driver(_options: move_compiler_v2::Options) -> CompilerD
 
 /// Runs the v2 compiler, exiting the process if any errors occurred.
 pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> CompilerDriverResult {
-    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    let mut emitter = options.error_emitter(&mut stderr);
+    let mut writer = options.error_writer();
+    let mut emitter = options.error_emitter(&mut writer);
     match move_compiler_v2::run_move_compiler(emitter.as_mut(), options) {
         Ok((env, units)) => Ok((move_compiler_v2::make_files_source_text(&env), units, env)),
         Err(_) => {
@@ -1141,8 +1102,8 @@ pub fn build_and_report_v2_driver(options: move_compiler_v2::Options) -> Compile
 pub fn build_and_report_no_exit_v2_driver(
     options: move_compiler_v2::Options,
 ) -> CompilerDriverResult {
-    let mut stderr = StandardStream::stderr(ColorChoice::Auto);
-    let mut emitter = options.error_emitter(&mut stderr);
+    let mut writer = options.error_writer();
+    let mut emitter = options.error_emitter(&mut writer);
     let (env, units) = move_compiler_v2::run_move_compiler(emitter.as_mut(), options)?;
     Ok((move_compiler_v2::make_files_source_text(&env), units, env))
 }

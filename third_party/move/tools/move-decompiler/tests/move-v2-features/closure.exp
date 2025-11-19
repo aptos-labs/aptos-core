@@ -24,9 +24,8 @@ module 0x99::basic_struct {
     }
     #[persistent]
     fun test(f: &||(u64)): u64 {
-        let _v0;
-        if (f == f) _v0 = 1 else _v0 = 2;
-        _v0
+        if (f == f) return 1;
+        2
     }
     public fun test_driver(acc: &signer) {
         let _v0: |&||(u64)|(u64) has copy + drop + store = |arg0| test(arg0);

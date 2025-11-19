@@ -784,7 +784,8 @@
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_types.md#0x7_single_order_types_destroy_order_from_state">destroy_order_from_state</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="single_order_types.md#0x7_single_order_types_OrderWithState">OrderWithState</a>&lt;M&gt;
 ): (<a href="single_order_types.md#0x7_single_order_types_SingleOrder">SingleOrder</a>&lt;M&gt;, bool) {
-    (self.order, self.is_active)
+    <b>let</b> OrderWithState::V1 { order, is_active } = self;
+    (order, is_active)
 }
 </code></pre>
 

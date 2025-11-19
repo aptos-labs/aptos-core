@@ -111,6 +111,7 @@ fn test_dummy_dkg_correctness() {
             &dealer_state.input_secret,
             idx as u64,
             &dealer_state.sk,
+            &dealer_state.pk,
         );
         assert!(DummyDKG::verify_transcript(&pub_params, &trx).is_ok());
         dealer_state.transcript = Some(trx);

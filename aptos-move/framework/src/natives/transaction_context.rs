@@ -27,6 +27,7 @@ use std::collections::VecDeque;
 pub mod abort_codes {
     pub const ETRANSACTION_CONTEXT_NOT_AVAILABLE: u64 = 1;
     pub const EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW: u64 = 2;
+    pub const ETRANSACTION_INDEX_NOT_AVAILABLE: u64 = 5;
 }
 
 use move_core_types::language_storage::{OPTION_NONE_TAG, OPTION_SOME_TAG};
@@ -176,11 +177,18 @@ fn native_monotonically_increasing_counter_internal(
         // monotonically_increasing_counter (128 bits) = `<reserved_byte (8 bits) = 0 for block/chunk execution, 1 for validation/simulation> || timestamp_us (64 bits) || transaction_index (32 bits) || session counter (8 bits) || local_counter (16 bits)`
         let timestamp_us = safely_pop_arg!(args, u64);
         let transaction_index = user_transaction_context.transaction_index();
-        let mut monotonically_increasing_counter: u128 = (timestamp_us as u128) << 56;
-        monotonically_increasing_counter |= (transaction_index.unwrap_or(1) as u128) << 24;
-        monotonically_increasing_counter |= session_counter << 16;
-        monotonically_increasing_counter |= local_counter;
-        Ok(smallvec![Value::u128(monotonically_increasing_counter)])
+
+        if let Some(transaction_index) = transaction_index {
+            let mut monotonically_increasing_counter: u128 = (timestamp_us as u128) << 56;
+            monotonically_increasing_counter |= (transaction_index as u128) << 24;
+            monotonically_increasing_counter |= session_counter << 16;
+            monotonically_increasing_counter |= local_counter;
+            Ok(smallvec![Value::u128(monotonically_increasing_counter)])
+        } else {
+            Err(SafeNativeError::Abort {
+                abort_code: error::invalid_state(abort_codes::ETRANSACTION_INDEX_NOT_AVAILABLE),
+            })
+        }
     } else {
         // When transaction context is not available, return an error
         Err(SafeNativeError::Abort {

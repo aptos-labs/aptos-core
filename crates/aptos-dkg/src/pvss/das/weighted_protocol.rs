@@ -6,12 +6,9 @@ use crate::{
     pvss::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das::{self, fiat_shamir},
-        encryption_dlog, schnorr,
-        traits::{
-            self, transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig,
-        },
-        LowDegreeTest, Player, WeightedConfig,
+        das, encryption_dlog, schnorr,
+        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
+        LowDegreeTest, Player, WeightedConfigBlstrs,
     },
     utils::{
         g1_multi_exp, g2_multi_exp,
@@ -25,6 +22,7 @@ use anyhow::bail;
 use aptos_crypto::{
     bls12381,
     blstrs::{multi_pairing, random_scalar},
+    traits::SecretSharingConfig as _,
     CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -95,7 +93,7 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = WeightedConfig;
+    type SecretSharingConfig = WeightedConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 
@@ -112,6 +110,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         aux: &A,
@@ -199,17 +198,9 @@ impl traits::Transcript for Transcript {
         }
         let W = sc.get_total_weight();
 
-        // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        let (f, extra) = fiat_shamir::derive_challenge_scalars(
-            self,
-            sc,
-            pp,
-            spks,
-            eks,
-            auxs,
-            &Self::dst(),
-            2 + W * 3, // 3W+1 for encryption check, 1 for SoK verification.
-        );
+        // Deriving challenges by flipping coins: less complex to implement & less likely to get wrong. Creates bad RNG risks but we deem that acceptable.
+        let mut rng = rand::thread_rng();
+        let extra = random_scalars(2 + W * 3, &mut rng);
 
         let sok_vrfy_challenge = &extra[W * 3 + 1];
         let g_2 = pp.get_commitment_base();
@@ -223,13 +214,13 @@ impl traits::Transcript for Transcript {
             sok_vrfy_challenge,
         )?;
 
-        let ldt = LowDegreeTest::new(
-            f,
+        let ldt = LowDegreeTest::random(
+            &mut rng,
             sc.get_threshold_weight(),
             W + 1,
             true,
             sc.get_batch_evaluation_domain(),
-        )?;
+        );
         ldt.low_degree_test_on_g1(&self.V)?;
 
         //
@@ -299,7 +290,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) {
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
         let W = sc.get_total_weight();
 
         debug_assert!(self.check_sizes(sc).is_ok());
@@ -319,6 +314,8 @@ impl traits::Transcript for Transcript {
         for sok in &other.soks {
             self.soks.push(sok.clone());
         }
+
+        Ok(())
     }
 
     fn get_public_key_share(
@@ -349,6 +346,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         player: &Player,
         dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         let weight = sc.get_player_weight(player);
         let mut sk_shares = Vec::with_capacity(weight);
@@ -370,7 +368,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
@@ -399,7 +401,7 @@ impl traits::Transcript for Transcript {
 
 impl Transcript {
     #[allow(non_snake_case)]
-    fn check_sizes(&self, sc: &WeightedConfig) -> anyhow::Result<()> {
+    fn check_sizes(&self, sc: &WeightedConfigBlstrs) -> anyhow::Result<()> {
         let W = sc.get_total_weight();
 
         if self.V.len() != W + 1 {
@@ -445,7 +447,7 @@ impl Transcript {
     #[allow(non_snake_case, unused)]
     fn slow_verify(
         &self,
-        sc: &WeightedConfig,
+        sc: &WeightedConfigBlstrs,
         pp: &das::PublicParameters,
         eks: &Vec<encryption_dlog::g1::EncryptPubKey>,
     ) -> anyhow::Result<()> {

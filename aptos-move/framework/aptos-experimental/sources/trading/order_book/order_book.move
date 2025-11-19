@@ -10,10 +10,8 @@ module aptos_experimental::order_book {
     use aptos_experimental::bulk_order_book_types::{BulkOrder, BulkOrderRequest, BulkOrderPlaceResponse};
     use aptos_experimental::bulk_order_book::{BulkOrderBook, new_bulk_order_book};
     use aptos_experimental::single_order_book::{SingleOrderBook, new_single_order_book, SingleOrderRequest};
-    use aptos_experimental::order_book_types::{OrderIdType,
-        OrderMatch, OrderMatchDetails, single_order_type
-    };
-    use aptos_experimental::single_order_types::{SingleOrder};
+    use aptos_experimental::order_book_types::{OrderIdType, OrderMatch, OrderMatchDetails};
+    use aptos_experimental::single_order_types::SingleOrder;
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book_types::TimeInForce;
     use aptos_experimental::price_time_index::{PriceTimeIndex, new_price_time_idx};
@@ -163,6 +161,10 @@ module aptos_experimental::order_book {
         self.price_time_idx.best_ask_price()
     }
 
+    public fun get_mid_price<M: store + copy + drop>(self: &OrderBook<M>): Option<u64> {
+        self.price_time_idx.get_mid_price()
+    }
+
     public fun get_slippage_price<M: store + copy + drop>(
         self: &OrderBook<M>, is_bid: bool, slippage_pct: u64
     ): Option<u64> {
@@ -197,8 +199,7 @@ module aptos_experimental::order_book {
         is_bid: bool
     ): OrderMatch<M> {
         let result = self.price_time_idx.get_single_match_result(price, size, is_bid);
-        let book_type = result.get_active_matched_book_type();
-        if (book_type == single_order_type()) {
+        if (result.is_active_matched_book_type_single_order()) {
             self.single_order_book.get_single_match_for_taker(result)
         } else {
             self.bulk_order_book.get_single_match_for_taker(&mut self.price_time_idx, result, is_bid)
@@ -210,9 +211,7 @@ module aptos_experimental::order_book {
         reinsert_order: OrderMatchDetails<M>,
         original_order: &OrderMatchDetails<M>,
     ) {
-        assert!(reinsert_order.get_book_type_from_match_details()
-            == original_order.get_book_type_from_match_details(), E_REINSERT_ORDER_MISMATCH);
-        if (reinsert_order.get_book_type_from_match_details() == single_order_type()) {
+        if (reinsert_order.is_single_order_from_match_details()) {
             self.single_order_book.reinsert_order(
                 &mut self.price_time_idx, reinsert_order, original_order
             )

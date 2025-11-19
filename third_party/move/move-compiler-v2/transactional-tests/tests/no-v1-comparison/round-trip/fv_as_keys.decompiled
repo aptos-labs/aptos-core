@@ -12,9 +12,8 @@ module 0x99::test_struct {
     }
     #[persistent]
     fun test(p0: ||(u64) has drop + store): u64 {
-        let _v0;
-        if (p0() == 1) _v0 = 1 else _v0 = 2;
-        _v0
+        if (p0() == 1) return 1;
+        2
     }
     #[persistent]
     fun test1(): u64 {
@@ -116,9 +115,8 @@ module 0x99::test_enum {
     }
     #[persistent]
     fun test(p0: ||(u64) has drop + store): u64 {
-        let _v0;
-        if (p0() == 1) _v0 = 1 else _v0 = 2;
-        _v0
+        if (p0() == 1) return 1;
+        2
     }
     public fun bad_init(p0: &signer) {
         let _v0 = Wrapper::V2<||(u64) has drop + store>{fv1: |arg0: ||(u64) has drop + store| test(arg0)};

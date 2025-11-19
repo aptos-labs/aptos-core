@@ -2,14 +2,25 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{polynomials, GroupGenerators},
+    algebra::polynomials,
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
         homomorphism::{fixed_base_msms, fixed_base_msms::Trait as FixedBaseMsmsTrait, Trait},
     },
+    Scalar,
 };
 use anyhow::ensure;
+#[allow(unused_imports)] // This is used but due to some bug it is not noticed by the compiler
+use aptos_crypto::arkworks::random::UniformRand;
+use aptos_crypto::{
+    arkworks::{
+        random::{sample_field_element, unsafe_random_point},
+        GroupGenerators,
+    },
+    utils,
+};
+use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     AdditiveGroup, CurveGroup, VariableBaseMSM,
@@ -17,23 +28,29 @@ use ark_ec::{
 use ark_ff::Field;
 use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{
-    rand::{CryptoRng, RngCore},
-    UniformRand,
-};
+use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq)]
-pub struct Commitment<E: Pairing>(pub E::G1);
+pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
-#[derive(CanonicalSerialize, CanonicalDeserialize, Debug, Clone)]
-pub struct CommitmentRandomness<E: Pairing>(pub E::ScalarField);
+pub type CommitmentRandomness<E> = Scalar<E>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
-    pi_1: Commitment<E>,
-    pi_2: E::G1,
+    pub(crate) pi_1: Commitment<E>,
+    pub(crate) pi_2: E::G1,
+}
+
+impl<E: Pairing> OpeningProof<E> {
+    /// Generates a random looking opening proof (but not a valid one).
+    /// Useful for testing and benchmarking. TODO: might be able to derive this through macros etc
+    pub fn generate<R: rand::Rng + rand::CryptoRng>(rng: &mut R) -> Self {
+        Self {
+            pi_1: sigma_protocol::homomorphism::TrivialShape(unsafe_random_point(rng)),
+            pi_2: unsafe_random_point(rng),
+        }
+    }
 }
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -64,8 +81,8 @@ pub struct Trapdoor<E: Pairing> {
 impl<E: Pairing> Trapdoor<E> {
     pub fn rand<R: RngCore + CryptoRng>(rng: &mut R) -> Self {
         Self {
-            xi: E::ScalarField::rand(rng),
-            tau: E::ScalarField::rand(rng),
+            xi: sample_field_element(rng),
+            tau: sample_field_element(rng),
         }
     }
 }
@@ -76,7 +93,7 @@ pub fn lagrange_basis<E: Pairing>(
     eval_dom: ark_poly::Radix2EvaluationDomain<E::ScalarField>,
     tau: E::ScalarField,
 ) -> Vec<E::G1Affine> {
-    let powers_of_tau = crate::utils::powers(tau, n);
+    let powers_of_tau = utils::powers(tau, n);
     let lagr_basis_scalars = eval_dom.ifft(&powers_of_tau);
     debug_assert!(lagr_basis_scalars.iter().sum::<E::ScalarField>() == E::ScalarField::ONE);
 
@@ -133,7 +150,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
     )
 }
 
-fn commit_with_randomness<E: Pairing>(
+pub fn commit_with_randomness<E: Pairing>(
     ck: &CommitmentKey<E>,
     values: &[E::ScalarField],
     r: &CommitmentRandomness<E>,
@@ -143,9 +160,12 @@ fn commit_with_randomness<E: Pairing>(
         xi_1: ck.xi_1,
     };
 
-    let input = (r.0, values.to_vec());
+    let input = Witness {
+        hiding_randomness: r.clone(),
+        values: Scalar::vec_from_inner_slice(values),
+    };
 
-    Commitment(commitment_hom.apply(&input).0)
+    commitment_hom.apply(&input)
 }
 
 impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
@@ -252,9 +272,17 @@ pub struct CommitmentHomomorphism<'a, E: Pairing> {
     pub xi_1: E::G1Affine,
 }
 
+#[derive(
+    SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
+)]
+pub struct Witness<E: Pairing> {
+    pub hiding_randomness: CommitmentRandomness<E>,
+    pub values: Vec<Scalar<E>>,
+}
+
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
-    type Domain = (E::ScalarField, Vec<E::ScalarField>);
+    type Domain = Witness<E>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
@@ -273,19 +301,19 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
 
     fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
         assert!(
-            self.lagr_g1.len() >= input.1.len(),
+            self.lagr_g1.len() >= input.values.len(),
             "Not enough Lagrange basis elements for univariate hiding KZG: required {}, got {}",
-            input.1.len(),
+            input.values.len(),
             self.lagr_g1.len()
         );
 
-        let mut scalars = Vec::with_capacity(input.1.len() + 1);
-        scalars.push(input.0);
-        scalars.extend_from_slice(&input.1);
+        let mut scalars = Vec::with_capacity(input.values.len() + 1);
+        scalars.push(input.hiding_randomness.0);
+        scalars.extend(input.values.iter().map(|s| s.0.clone()));
 
-        let mut bases = Vec::with_capacity(input.1.len() + 1);
+        let mut bases = Vec::with_capacity(input.values.len() + 1);
         bases.push(self.xi_1);
-        bases.extend(&self.lagr_g1[..input.1.len()]);
+        bases.extend(&self.lagr_g1[..input.values.len()]);
 
         CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
     }
@@ -295,26 +323,33 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
     }
 }
 
+impl<'a, E: Pairing> sigma_protocol::Trait<E> for CommitmentHomomorphism<'a, E> {
+    fn dst(&self) -> Vec<u8> {
+        b"APTOS_HIDING_KZG_SIGMA_PROTOCOL_DST".to_vec()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use aptos_crypto::arkworks::random::{sample_field_element, sample_field_elements};
     use ark_ec::pairing::Pairing;
     use ark_poly::{univariate::DensePolynomial, Polynomial};
-    use ark_std::{rand::thread_rng, UniformRand};
+    use rand::thread_rng;
 
     // TODO: Should set up a PCS trait, then make these tests generic?
     fn assert_kzg_opening_correctness<E: Pairing>() {
         let mut rng = thread_rng();
-        let group_data = GroupGenerators::sample(&mut rng);
+        let group_data = GroupGenerators::default();
 
         type Fr<E> = <E as Pairing>::ScalarField;
 
         let m = 64;
-        let xi = Fr::<E>::rand(&mut rng);
-        let tau = Fr::<E>::rand(&mut rng);
+        let xi = sample_field_element(&mut rng);
+        let tau = sample_field_element(&mut rng);
         let (vk, ck) = setup::<E, _>(m, group_data, Trapdoor { xi, tau }, &mut rng);
 
-        let f_coeffs: Vec<Fr<E>> = (0..m).map(|_| Fr::<E>::rand(&mut rng)).collect();
+        let f_coeffs: Vec<Fr<E>> = sample_field_elements(m, &mut rng);
         let poly = DensePolynomial::<Fr<E>> { coeffs: f_coeffs };
 
         // Polynomial values at the roots of unity
@@ -324,9 +359,9 @@ mod tests {
             .map(|&gamma| poly.evaluate(&gamma))
             .collect();
 
-        let rho = CommitmentRandomness::<E>(Fr::<E>::rand(&mut rng));
-        let s = CommitmentRandomness::<E>(Fr::<E>::rand(&mut rng));
-        let x = Fr::<E>::rand(&mut rng);
+        let rho = CommitmentRandomness::rand(&mut rng);
+        let s = CommitmentRandomness::rand(&mut rng);
+        let x = sample_field_element(&mut rng);
         let y =
             polynomials::barycentric_eval(&f_evals, &ck.roots_of_unity_in_eval_dom, x, ck.m_inv);
 

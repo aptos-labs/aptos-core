@@ -992,7 +992,7 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
      # live vars: $t0, $t1, $t5
   3: $t4 := ==($t5, $t0)
      # live vars: $t1, $t4
-  4: if ($t4) goto 5 else goto 11
+  4: if ($t4) goto 5 else goto 10
      # live vars: $t1
   5: label L0
      # live vars: $t1
@@ -1002,114 +1002,108 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
      # live vars: $t7, $t8
   8: $t4 := >($t7, $t8)
      # live vars: $t4
-  9: label L2
-     # live vars: $t4
- 10: return $t4
+  9: return $t4
      # live vars: $t1
- 11: label L1
+ 10: label L1
      # live vars:
- 12: $t4 := false
+ 11: $t4 := false
      # live vars: $t4
- 13: goto 9
+ 12: return $t4
 }
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.m {
-struct T has copy, drop, store {
-	issuer: vector<u8>,
-	version: u64
-}
-struct J has copy, drop, store {
-	variant: u64
-}
-struct S has copy, drop, store {
-	entries: vector<T>
-}
+// Bytecode version v9
+module 0x42::m
+struct T has copy + drop + store
+  issuer: vector<u8>
+  version: u64
 
-test(s: &mut S, issuer: vector<u8>) /* def_idx: 0 */ {
-L2:	x: u64
-L3:	v: &vector<T>
-L4:	find: bool
-L5:	found_index: u64
-L6:	i: u64
-L7:	x': u64
-L8:	len: u64
-B0:
-	0: CopyLoc[0](s: &mut S)
-	1: ImmBorrowField[0](S.entries: vector<T>)
-	2: VecLen(2)
-	3: StLoc[2](x: u64)
-	4: MoveLoc[0](s: &mut S)
-	5: ImmBorrowField[0](S.entries: vector<T>)
-	6: StLoc[3](v: &vector<T>)
-	7: LdFalse
-	8: StLoc[4](find: bool)
-	9: LdU64(0)
-	10: StLoc[5](found_index: u64)
-	11: LdU64(0)
-	12: StLoc[6](i: u64)
-	13: CopyLoc[3](v: &vector<T>)
-	14: VecLen(2)
-	15: StLoc[7](x': u64)
-	16: CopyLoc[3](v: &vector<T>)
-	17: VecLen(2)
-	18: StLoc[8](len: u64)
-B1:
-	19: CopyLoc[6](i: u64)
-	20: CopyLoc[8](len: u64)
-	21: Lt
-	22: BrTrue(24)
-B2:
-	23: Branch(35)
-B3:
-	24: CopyLoc[1](issuer: vector<u8>)
-	25: CopyLoc[2](x: u64)
-	26: CopyLoc[3](v: &vector<T>)
-	27: CopyLoc[6](i: u64)
-	28: VecImmBorrow(2)
-	29: Call __lambda__1_inline_1_956__test(vector<u8>, u64, &T): bool
-	30: BrFalse(39)
-B4:
-	31: LdTrue
-	32: StLoc[4](find: bool)
-	33: MoveLoc[6](i: u64)
-	34: StLoc[5](found_index: u64)
-B5:
-	35: Nop
-	36: MoveLoc[3](v: &vector<T>)
-	37: Pop
-	38: Ret
-B6:
-	39: MoveLoc[6](i: u64)
-	40: CopyLoc[7](x': u64)
-	41: Add
-	42: StLoc[6](i: u64)
-	43: Branch(19)
-}
-__lambda__1_inline_1_956__test(issuer: vector<u8>, x: u64, obj: &T): bool /* def_idx: 1 */ {
-L3:	$t4: bool
-B0:
-	0: Nop
-	1: MoveLoc[2](obj: &T)
-	2: ImmBorrowField[1](T.issuer: vector<u8>)
-	3: ReadRef
-	4: MoveLoc[0](issuer: vector<u8>)
-	5: Eq
-	6: BrFalse(13)
-B1:
-	7: MoveLoc[1](x: u64)
-	8: LdU64(0)
-	9: Gt
-	10: StLoc[3]($t4: bool)
-B2:
-	11: MoveLoc[3]($t4: bool)
-	12: Ret
-B3:
-	13: LdFalse
-	14: StLoc[3]($t4: bool)
-	15: Branch(11)
-}
-}
+struct J has copy + drop + store
+  variant: u64
+
+struct S has copy + drop + store
+  entries: vector<T>
+
+// Function definition at index 0
+fun test(l0: &mut S, l1: vector<u8>)
+    local l2: u64
+    local l3: &vector<T>
+    local l4: bool
+    local l5: u64
+    local l6: u64
+    local l7: u64
+    local l8: u64
+    copy_loc l0
+    borrow_field S, entries
+    vec_len <T>
+    st_loc l2
+    move_loc l0
+    // @5
+    borrow_field S, entries
+    st_loc l3
+    ld_false
+    st_loc l4
+    ld_u64 0
+    // @10
+    st_loc l5
+    ld_u64 0
+    st_loc l6
+    copy_loc l3
+    vec_len <T>
+    // @15
+    st_loc l7
+    copy_loc l3
+    vec_len <T>
+    st_loc l8
+l3: copy_loc l6
+    // @20
+    copy_loc l8
+    lt
+    br_true l0
+    branch l1
+l0: copy_loc l1
+    // @25
+    copy_loc l2
+    copy_loc l3
+    copy_loc l6
+    vec_borrow <T>
+    call __lambda__1_inline_1_956__test
+    // @30
+    br_false l2
+    ld_true
+    st_loc l4
+    move_loc l6
+    st_loc l5
+    // @35
+l1: nop
+    move_loc l3
+    pop
+    ret
+l2: move_loc l6
+    // @40
+    copy_loc l7
+    add
+    st_loc l6
+    branch l3
+
+// Function definition at index 1
+fun __lambda__1_inline_1_956__test(l0: vector<u8>, l1: u64, l2: &T): bool
+    nop
+    move_loc l2
+    borrow_field T, issuer
+    read_ref
+    move_loc l0
+    // @5
+    eq
+    br_false l0
+    move_loc l1
+    ld_u64 0
+    gt
+    // @10
+    ret
+l0: ld_false
+    ret
+
+
 ============ bytecode verification succeeded ========

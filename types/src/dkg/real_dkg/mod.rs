@@ -185,6 +185,7 @@ pub struct DealtSecretKeyShares {
 
 impl DKGTrait for RealDKG {
     type DealerPrivateKey = <WTrx as Transcript>::SigningSecretKey;
+    type DealerPublicKey = <WTrx as Transcript>::SigningPubKey;
     type DealtPubKeyShare = DealtPubKeyShares;
     type DealtSecret = <WTrx as Transcript>::DealtSecretKey;
     type DealtSecretShare = DealtSecretKeyShares;
@@ -241,6 +242,7 @@ impl DKGTrait for RealDKG {
         input_secret: &Self::InputSecret,
         my_index: u64,
         sk: &Self::DealerPrivateKey,
+        pk: &Self::DealerPublicKey,
     ) -> Self::Transcript {
         let my_index = my_index as usize;
         let my_addr = pub_params.session_metadata.dealer_validator_set[my_index].addr;
@@ -250,6 +252,7 @@ impl DKGTrait for RealDKG {
             &pub_params.pvss_config.wconfig,
             &pub_params.pvss_config.pp,
             sk,
+            pk,
             &pub_params.pvss_config.eks,
             input_secret,
             &aux,
@@ -266,6 +269,7 @@ impl DKGTrait for RealDKG {
                     fast_wconfig,
                     &pub_params.pvss_config.pp,
                     sk,
+                    pk,
                     &pub_params.pvss_config.eks,
                     input_secret,
                     &aux,
@@ -401,13 +405,15 @@ impl DKGTrait for RealDKG {
     ) {
         accumulator
             .main
-            .aggregate_with(&params.pvss_config.wconfig, &element.main);
+            .aggregate_with(&params.pvss_config.wconfig, &element.main)
+            .expect("Transcript aggregation failed");
         if let (Some(acc), Some(ele), Some(config)) = (
             accumulator.fast.as_mut(),
             element.fast.as_ref(),
             params.pvss_config.fast_wconfig.as_ref(),
         ) {
-            acc.aggregate_with(config, ele);
+            acc.aggregate_with(config, ele)
+                .expect("Transcript aggregation failed");
         }
     }
 
@@ -423,6 +429,7 @@ impl DKGTrait for RealDKG {
                 id: player_idx as usize,
             },
             dk,
+            &pub_params.pvss_config.pp,
         );
         assert_eq!(
             trx.fast.is_some(),
@@ -439,6 +446,7 @@ impl DKGTrait for RealDKG {
                         id: player_idx as usize,
                     },
                     dk,
+                    &pub_params.pvss_config.pp,
                 );
                 (Some(fast_sk), Some(fast_pk))
             },
@@ -461,7 +469,7 @@ impl DKGTrait for RealDKG {
         pub_params: &Self::PublicParams,
         input_player_share_pairs: Vec<(u64, Self::DealtSecretShare)>,
     ) -> anyhow::Result<Self::DealtSecret> {
-        let player_share_pairs = input_player_share_pairs
+        let player_share_pairs: Vec<_> = input_player_share_pairs
             .clone()
             .into_iter()
             .map(|(x, y)| (Player { id: x as usize }, y.main))
@@ -469,21 +477,23 @@ impl DKGTrait for RealDKG {
         let reconstructed_secret = <WTrx as Transcript>::DealtSecretKey::reconstruct(
             &pub_params.pvss_config.wconfig,
             &player_share_pairs,
-        );
+        )
+        .unwrap();
         if input_player_share_pairs
             .clone()
             .into_iter()
             .all(|(_, y)| y.fast.is_some())
             && pub_params.pvss_config.fast_wconfig.is_some()
         {
-            let fast_player_share_pairs = input_player_share_pairs
+            let fast_player_share_pairs: Vec<_> = input_player_share_pairs
                 .into_iter()
                 .map(|(x, y)| (Player { id: x as usize }, y.fast.unwrap()))
                 .collect();
             let fast_reconstructed_secret = <WTrx as Transcript>::DealtSecretKey::reconstruct(
                 pub_params.pvss_config.fast_wconfig.as_ref().unwrap(),
                 &fast_player_share_pairs,
-            );
+            )
+            .unwrap();
             ensure!(
                 reconstructed_secret == fast_reconstructed_secret,
                 "real_dkg::reconstruct_secret_from_shares failed with inconsistent dealt secrets."
@@ -509,9 +519,10 @@ impl RealDKG {
         pub_params: &<RealDKG as DKGTrait>::PublicParams,
         my_index: u64,
         sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+        pk: &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript {
         let secret = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        Self::generate_transcript(rng, pub_params, &secret, my_index, sk)
+        Self::generate_transcript(rng, pub_params, &secret, my_index, sk, pk)
     }
 
     /// The same dealer deals twice and aggregates the transcripts.
@@ -521,11 +532,12 @@ impl RealDKG {
         pub_params: &<RealDKG as DKGTrait>::PublicParams,
         my_index: u64,
         sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+        pk: &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript {
         let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        let mut trx_0 = Self::generate_transcript(rng, pub_params, &secret_0, my_index, sk);
+        let mut trx_0 = Self::generate_transcript(rng, pub_params, &secret_0, my_index, sk, pk);
         let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
-        let trx_1 = Self::generate_transcript(rng, pub_params, &secret_1, my_index, sk);
+        let trx_1 = Self::generate_transcript(rng, pub_params, &secret_1, my_index, sk, pk);
         Self::aggregate_transcripts(pub_params, &mut trx_0, trx_1);
         assert_eq!(2, trx_0.main.get_dealers().len());
         trx_0
@@ -537,6 +549,7 @@ impl RealDKG {
         pub_params: &<RealDKG as DKGTrait>::PublicParams,
         my_index: u64,
         sk: &<RealDKG as DKGTrait>::DealerPrivateKey,
+        pk: &<RealDKG as DKGTrait>::DealerPublicKey,
     ) -> <RealDKG as DKGTrait>::Transcript {
         let secret_0 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
         let secret_1 = <RealDKG as DKGTrait>::InputSecret::generate(rng);
@@ -548,6 +561,7 @@ impl RealDKG {
             &pub_params.pvss_config.wconfig,
             &pub_params.pvss_config.pp,
             sk,
+            pk,
             &pub_params.pvss_config.eks,
             &secret_0,
             &aux,
@@ -564,6 +578,7 @@ impl RealDKG {
                     fast_wconfig,
                     &pub_params.pvss_config.pp,
                     sk,
+                    pk,
                     &pub_params.pvss_config.eks,
                     &secret_1,
                     &aux,

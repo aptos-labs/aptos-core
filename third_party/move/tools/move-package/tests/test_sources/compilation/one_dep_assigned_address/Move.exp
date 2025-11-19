@@ -2,6 +2,7 @@ CompiledPackageInfo {
     package_name: "Root",
     address_alias_instantiation: {
         "A": 0000000000000000000000000000000000000000000000000000000000000002,
+        "B": 0000000000000000000000000000000000000000000000000000000000000002,
     },
     source_digest: Some(
         "ELIDED_FOR_TEST",
@@ -41,6 +42,7 @@ CompiledPackageInfo {
             ),
             language_version: None,
             experiments: [],
+            print_errors: false,
         },
     },
 }

@@ -232,6 +232,16 @@ Transaction context is only available in the user transaction prologue, executio
 
 
 
+<a id="0x1_transaction_context_ETRANSACTION_INDEX_NOT_AVAILABLE"></a>
+
+Transaction index is not avaulable in this execution context.
+
+
+<pre><code><b>const</b> <a href="transaction_context.md#0x1_transaction_context_ETRANSACTION_INDEX_NOT_AVAILABLE">ETRANSACTION_INDEX_NOT_AVAILABLE</a>: u64 = 5;
+</code></pre>
+
+
+
 <a id="0x1_transaction_context_get_txn_hash"></a>
 
 ## Function `get_txn_hash`

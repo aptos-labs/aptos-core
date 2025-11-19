@@ -466,6 +466,16 @@ impl AbstractState {
         mut_: bool,
     ) -> PartialVMResult<AbstractValue> {
         let vec_id = safe_unwrap!(vector.ref_id());
+
+        // For immutable borrow, check that the vector is readable
+        if !mut_ && !self.is_readable(vec_id, None) {
+            return Err(self.error(
+                StatusCode::VEC_BORROW_ELEMENT_EXISTS_MUTABLE_BORROW_ERROR,
+                offset,
+            ));
+        }
+
+        // For mutable borrow, check that the vector is writable
         if mut_ && !self.is_writable(vec_id) {
             return Err(self.error(
                 StatusCode::VEC_BORROW_ELEMENT_EXISTS_MUTABLE_BORROW_ERROR,

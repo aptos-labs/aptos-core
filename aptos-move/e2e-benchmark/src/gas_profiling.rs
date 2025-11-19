@@ -22,7 +22,7 @@ use aptos_types::{
     account_address::AccountAddress,
     chain_id::ChainId,
     fee_statement::FeeStatement,
-    transaction::{SignedTransaction, TransactionExecutableRef},
+    transaction::{AuxiliaryInfo, SignedTransaction, TransactionExecutableRef},
 };
 use e2e_move_tests::MoveHarnessSend;
 use std::{
@@ -133,7 +133,7 @@ impl CalibrationRunner {
             } else {
                 name.clone()
             };
-            let log = self.run_signed_with_tps(&cur_name, txn, tps);
+            let log = self.run_signed_with_tps(&cur_name, txn, tps, i as u32);
             if let Some(mut log) = log {
                 log.exec_io.call_graph = log.exec_io.call_graph.fold_unique_stack();
                 aggregate_gas_log = Some(
@@ -200,13 +200,19 @@ impl CalibrationRunner {
         function: &str,
         txn: SignedTransaction,
         tps: Option<f64>,
+        transaction_index: u32,
     ) -> Option<TransactionGasLog> {
         if !self.profile_gas {
             print_gas_cost(function, self.harness.evaluate_gas_signed(txn));
             None
         } else {
-            let (log, gas_used, fee_statement) =
-                self.harness.evaluate_gas_with_profiler_signed(txn);
+            let (log, gas_used, fee_statement) = self.harness.evaluate_gas_with_profiler_signed(
+                txn,
+                &AuxiliaryInfo::new(
+                    aptos_types::transaction::PersistedAuxiliaryInfo::V1 { transaction_index },
+                    None,
+                ),
+            );
             save_profiling_results(function, &log);
             print_gas_with_statement_summary_and_tps(
                 function,

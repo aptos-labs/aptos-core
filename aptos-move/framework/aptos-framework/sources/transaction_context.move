@@ -17,6 +17,9 @@ module aptos_framework::transaction_context {
     /// The monotonically increasing counter has overflowed (too many calls in a single session).
     const EMONOTONICALLY_INCREASING_COUNTER_OVERFLOW: u64 = 4;
 
+    /// Transaction index is not avaulable in this execution context.
+    const ETRANSACTION_INDEX_NOT_AVAILABLE: u64 = 5;
+
     /// A wrapper denoting aptos unique identifer (AUID)
     /// for storing an address
     struct AUID has drop, store {

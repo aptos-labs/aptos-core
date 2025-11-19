@@ -43,7 +43,6 @@ impl<E: Pairing> TryFrom<&[u8]> for EncryptPubKey<E> {
 }
 
 /// The *decryption (secret) key* used by each PVSS player to decrypt their share of the dealt secret.
-#[allow(dead_code)]
 #[derive(SilentDisplay, SilentDebug)]
 pub struct DecryptPrivKey<E: Pairing> {
     /// A scalar $dk \in F$.
@@ -56,7 +55,7 @@ impl<E: Pairing> Uniform for DecryptPrivKey<E> {
         R: rand_core::RngCore + rand::Rng + rand_core::CryptoRng + rand::CryptoRng,
     {
         DecryptPrivKey::<E> {
-            dk: arkworks::rand::sample_field_element(rng),
+            dk: arkworks::random::sample_field_element(rng),
         }
     }
 }
@@ -86,6 +85,11 @@ impl<E: Pairing> DealtPubKey<E> {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>);
+pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>); // TODO: Copied from `das`, but should review this at some point!!
+
+impl<E: Pairing> DealtPubKeyShare<E> {
+    pub fn new(dealt_pk: DealtPubKey<E>) -> Self {
+        DealtPubKeyShare(dealt_pk)
+    }
+}

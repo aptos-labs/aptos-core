@@ -7,19 +7,16 @@ use crate::{
         self,
         fixed_base_msms::{self, IsMsmInput},
     },
-    utils, Scalar,
+    Scalar,
 };
 use anyhow::ensure;
+use aptos_crypto::{arkworks::random::sample_field_element, utils};
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};
 use ark_ff::AdditiveGroup;
 use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid, Validate,
 };
-use ark_std::{
-    io::Read,
-    rand::{CryptoRng, RngCore},
-    UniformRand,
-};
+use ark_std::{io::Read, UniformRand};
 use std::{fmt::Debug, io::Write};
 
 pub trait Trait<E: Pairing>:
@@ -33,7 +30,7 @@ pub trait Trait<E: Pairing>:
 {
     fn dst(&self) -> Vec<u8>;
 
-    fn prove<R: RngCore + CryptoRng>(
+    fn prove<R: rand_core::RngCore + rand_core::CryptoRng>(
         &self,
         witness: &Self::Domain,
         statement: &Self::Codomain,
@@ -44,12 +41,15 @@ pub trait Trait<E: Pairing>:
     }
 
     #[allow(non_snake_case)]
-    fn verify(
+    fn verify<H>(
         &self,
         public_statement: &Self::Codomain,
-        proof: &Proof<E, Self>,
+        proof: &Proof<E, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
         transcript: &mut merlin::Transcript,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+    {
         verify_msm_hom::<E, Self>(
             self,
             public_statement,
@@ -74,7 +74,7 @@ pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone
     fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self;
 
     /// Samples a random element in the domain. The prover has a witness w and calls w.sample_randomness(rng) to get the prover's first nonce (of the same "size" as w, hence why this cannot be a static method), which it then uses to compute the prover's first message in the sigma protocol.
-    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self;
+    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self;
 }
 
 impl<E: Pairing> Witness<E> for Scalar<E> {
@@ -84,8 +84,8 @@ impl<E: Pairing> Witness<E> for Scalar<E> {
         Scalar(self.0 + (c) * other.0)
     }
 
-    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
-        Scalar(E::ScalarField::rand(rng))
+    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
+        Scalar(sample_field_element(rng))
     }
 }
 
@@ -99,7 +99,7 @@ impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
             .collect()
     }
 
-    fn rand<R: RngCore + CryptoRng>(&self, rng: &mut R) -> Self {
+    fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
         self.iter().map(|elem| elem.rand(rng)).collect()
     }
 }
@@ -232,6 +232,29 @@ where
     pub z: H::Domain,
 }
 
+impl<E: Pairing, H: homomorphism::Trait> Proof<E, H>
+where
+    H::Domain: Witness<E>,
+    H::Codomain: Statement,
+{
+    /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method should do nothing at runtime.
+    #[allow(non_snake_case)]
+    pub fn change_lifetime<H2>(self) -> Proof<E, H2>
+    where
+        H2: homomorphism::Trait<Domain = H::Domain, Codomain = H::Codomain>,
+    {
+        let first = match self.first_proof_item {
+            FirstProofItem::Commitment(A) => FirstProofItem::Commitment(A),
+            FirstProofItem::Challenge(c) => FirstProofItem::Challenge(c),
+        };
+
+        Proof {
+            first_proof_item: first,
+            z: self.z,
+        }
+    }
+}
+
 // Manual implementation of PartialEq and Eq is required here because deriving PartialEq/Eq would
 // automatically require `H` itself to implement PartialEq and Eq, which is undesirable.
 // Workaround would be to make `Proof` generic over `H::Domain` and `H::Codomain` instead of `H`
@@ -287,7 +310,7 @@ where
     // Append the Σ-protocol separator to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(fs_t, dst);
 
-    // Append the MSM bases to the transcript
+    // Append the MSM bases to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_msm_bases(
         fs_t, hom,
     );
@@ -321,7 +344,7 @@ pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait + CanonicalSerializ
 where
     H::Domain: Witness<E>,
     H::Codomain: Statement,
-    R: RngCore + CryptoRng,
+    R: rand_core::RngCore + rand_core::CryptoRng,
 {
     // Step 1: Sample randomness. Here the `witness` is used to make sure that `r` has the right dimension
     let r = witness.rand(rng);

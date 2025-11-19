@@ -75,6 +75,7 @@ pub fn create_move_prover_v2_model<W: WriteColor>(
         compile_test_code: false,
         compile_verify_code: true,
         external_checks: vec![],
+        print_errors: true,
     };
 
     move_compiler_v2::run_move_compiler_for_analysis(error_writer, compiler_options)

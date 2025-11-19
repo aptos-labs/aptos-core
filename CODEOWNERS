@@ -45,8 +45,8 @@
 /crates/aptos @gregnazario @banool
 
 # Owners for the `/crates/aptos-crypto*` directories.
-/crates/aptos-crypto-derive/ @alinush @zjma @rex1fernando
-/crates/aptos-crypto/ @alinush @zjma @rex1fernando
+/crates/aptos-crypto-derive/ @alinush @zjma @rex1fernando @waamm
+/crates/aptos-crypto/ @alinush @zjma @rex1fernando @waamm
 
 # Owners for the `/crates/aptos-faucet` directory and all its subdirectories. And other faucet, genesis, and OpenAPI-related crates.
 /crates/aptos-faucet @banool @gregnazario
@@ -107,7 +107,7 @@
 /terraform/ @aptos-labs/prod-eng
 
 # Owners for the `aptos-dkg` crate.
-/crates/aptos-dkg @alinush @rex1fernando
+/crates/aptos-dkg @alinush @rex1fernando @waamm
 
 /types/src/keyless/ @alinush
 /types/src/transaction/authenticator.rs @alinush

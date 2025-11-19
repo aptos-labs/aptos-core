@@ -1,6 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_crypto::arkworks::random::sample_field_element;
 use aptos_dkg::{
     sigma_protocol::{
         self, homomorphism,
@@ -11,9 +12,8 @@ use aptos_dkg::{
 use ark_bls12_381::Bls12_381;
 use ark_bn254::Bn254;
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
-use ark_ff::UniformRand;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::rand::thread_rng;
+use rand::thread_rng;
 use std::fmt::Debug;
 
 #[cfg(test)]
@@ -120,11 +120,11 @@ fn test_schnorr() {
     let mut rng = thread_rng();
 
     // ---- Bn254 ----
-    let witness_bn = Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng));
+    let witness_bn = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<Bn254, _>(Schnorr::default(), witness_bn);
 
     // ---- Bls12_381 ----
-    let witness_bls = Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
+    let witness_bls = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<Bls12_381, _>(Schnorr::default(), witness_bls);
 }
 
@@ -135,10 +135,10 @@ fn test_chaum_pedersen() {
     let mut rng = thread_rng();
 
     // ---- Bn254 ----
-    let witness_bn = Scalar(<Bn254 as Pairing>::ScalarField::rand(&mut rng));
+    let witness_bn = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<Bn254, _>(make_chaum_pedersen_instance(), witness_bn);
 
     // ---- Bls12_381 ----
-    let witness_bls = Scalar(<Bls12_381 as Pairing>::ScalarField::rand(&mut rng));
+    let witness_bls = Scalar(sample_field_element(&mut rng));
     test_sigma_protocol::<Bls12_381, _>(make_chaum_pedersen_instance(), witness_bls);
 }
