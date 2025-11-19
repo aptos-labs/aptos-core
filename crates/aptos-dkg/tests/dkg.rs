@@ -52,6 +52,7 @@ fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, see
             sc,
             &d.pp,
             &d.ssks[i],
+            &d.spks[i],
             &d.eks,
             &d.iss[i],
             &NoAux,

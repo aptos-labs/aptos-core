@@ -137,6 +137,10 @@ name = "noise"
 harness = false
 
 [[bench]]
+name = "random"
+harness = false
+
+[[bench]]
 name = "ristretto255"
 harness = false
 

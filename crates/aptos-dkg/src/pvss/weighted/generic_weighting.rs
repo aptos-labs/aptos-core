@@ -90,6 +90,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
+        spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         aux: &A,
@@ -104,6 +105,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
                 sc.get_threshold_config(),
                 pp,
                 ssk,
+                spk,
                 &duplicated_eks,
                 s,
                 aux,
@@ -137,8 +139,13 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         T::get_dealers(&self.trx)
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self) {
-        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Self,
+    ) -> anyhow::Result<()> {
+        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)?;
+        Ok(())
     }
 
     fn get_public_key_share(

@@ -142,6 +142,20 @@ pub fn get_threshold_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<T>
     tcs
 }
 
+// When setup is slow, we reduce the number of test cases to keep the tests fast
+pub fn get_threshold_configs_for_testing_smaller<T: traits::ThresholdConfig>() -> Vec<T> {
+    let mut tcs = vec![];
+
+    for t in 1..4 {
+        for n in t..5 {
+            let tc = T::new(t, n).unwrap();
+            tcs.push(tc)
+        }
+    }
+
+    tcs
+}
+
 pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
 
@@ -179,21 +193,38 @@ pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
     wcs
 }
 
-pub fn get_threshold_configs_for_benchmarking() -> Vec<ThresholdConfigBlstrs> {
-    // [XDL+24] The Latency Price of Threshold Cryptosystem in Blockchains; by Zhuolun Xiang et al; 2024
-    vec![
-        ThresholdConfigBlstrs::new(143, 254).unwrap(), // from XDL+24
-        ThresholdConfigBlstrs::new(184, 254).unwrap(), // from XDL+24
-        ThresholdConfigBlstrs::new(548, 821).unwrap(), // from initial deployment
-        ThresholdConfigBlstrs::new(333, 1_000).unwrap(),
-        ThresholdConfigBlstrs::new(666, 1_000).unwrap(),
-        ThresholdConfigBlstrs::new(3_333, 10_000).unwrap(),
-        ThresholdConfigBlstrs::new(6_666, 10_000).unwrap(),
-    ]
+pub const BENCHMARK_CONFIGS: &[(usize, usize)] = &[
+    (143, 254),
+    (184, 254),
+    (548, 821),
+    (333, 1_000),
+    (666, 1_000),
+    (3_333, 10_000),
+    (6_666, 10_000),
+];
+
+pub fn get_threshold_configs_for_benchmarking<T: traits::ThresholdConfig>() -> Vec<T> {
+    BENCHMARK_CONFIGS
+        .iter()
+        .map(|&(t, n)| T::new(t, n).unwrap())
+        .collect()
 }
 
 pub fn get_weighted_configs_for_benchmarking() -> Vec<WeightedConfigBlstrs> {
     let mut wcs = vec![];
+
+    // This one was produced mid-Nov 2025
+    let weights = vec![
+        0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2,
+        2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3,
+        3, 3, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 6, 7,
+    ];
+    let threshold = 129; // slow path
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights.clone()).unwrap());
+    let threshold = 166; // fast path
+    wcs.push(WeightedConfigBlstrs::new(threshold, weights).unwrap());
 
     let weights = vec![
         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
