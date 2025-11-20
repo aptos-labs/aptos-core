@@ -80,8 +80,6 @@ fn step_strategy() -> impl Strategy<Value = Step> {
     ]
 }
 
-// Removed older non-interleaved property test in favor of stronger interleaved tests below.
-
 fn variant_to_str(idx: u16) -> String {
     format!("variant {idx}")
 }
