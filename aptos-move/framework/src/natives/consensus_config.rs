@@ -16,8 +16,10 @@ pub fn validator_txn_enabled(
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let config_bytes = safely_pop_arg!(args, Vec<u8>);
-    let config = bcs::from_bytes::<OnChainConsensusConfig>(&config_bytes).unwrap_or_default();
-    Ok(smallvec![Value::bool(config.is_vtxn_enabled())])
+    let config = bcs::from_bytes::<OnChainConsensusConfig>(&config_bytes)
+        .unwrap_or_default()
+        .to_consensus_config_on_chain();
+    Ok(smallvec![Value::bool(config.vtxn_config.enabled())])
 }
 
 pub fn make_all(

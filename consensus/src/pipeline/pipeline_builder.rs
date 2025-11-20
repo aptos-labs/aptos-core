@@ -37,7 +37,7 @@ use aptos_types::{
     account_config::randomness_event::RANDOMNESS_GENERATED_EVENT_MOVE_TYPE_TAG,
     block_executor::config::BlockExecutorConfigFromOnchain,
     ledger_info::{LedgerInfo, LedgerInfoWithSignatures},
-    on_chain_config::OnChainConsensusConfig,
+    on_chain_config::ConsensusConfigFromOnchain,
     randomness::Randomness,
     state_store::StateViewId,
     transaction::{
@@ -257,7 +257,7 @@ impl PipelineBuilder {
         payload_manager: Arc<dyn TPayloadManager>,
         txn_notifier: Arc<dyn TxnNotifier>,
         enable_pre_commit: bool,
-        consensus_onchain_config: &OnChainConsensusConfig,
+        consensus_onchain_config: &ConsensusConfigFromOnchain,
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
     ) -> Self {
@@ -273,9 +273,9 @@ impl PipelineBuilder {
             payload_manager,
             txn_notifier,
             pre_commit_status: Arc::new(Mutex::new(PreCommitStatus::new(0, enable_pre_commit))),
-            order_vote_enabled: consensus_onchain_config.order_vote_enabled(),
+            order_vote_enabled: consensus_onchain_config.order_vote_enabled,
             persisted_auxiliary_info_version,
-            rand_check_enabled: consensus_onchain_config.rand_check_enabled(),
+            rand_check_enabled: consensus_onchain_config.rand_check_enabled,
             module_cache,
             network_sender,
         }

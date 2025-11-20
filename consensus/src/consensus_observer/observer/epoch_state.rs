@@ -18,8 +18,8 @@ use aptos_logger::{error, info, warn};
 use aptos_types::{
     epoch_state::EpochState,
     on_chain_config::{
-        OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig,
-        RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
+        ConsensusConfigFromOnchain, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainRandomnessConfig, RandomnessConfigMoveStruct, RandomnessConfigSeqNum, ValidatorSet,
     },
 };
 use futures::StreamExt;
@@ -88,7 +88,7 @@ impl ObserverEpochState {
         >,
     ) -> (
         Arc<dyn TPayloadManager>,
-        OnChainConsensusConfig,
+        ConsensusConfigFromOnchain,
         OnChainExecutionConfig,
         OnChainRandomnessConfig,
     ) {
@@ -98,8 +98,8 @@ impl ObserverEpochState {
 
         // Update the local epoch state and quorum store config
         self.epoch_state = Some(epoch_state.clone());
-        self.execution_pool_window_size = consensus_config.window_size();
-        self.quorum_store_enabled = consensus_config.quorum_store_enabled();
+        self.execution_pool_window_size = consensus_config.window_size;
+        self.quorum_store_enabled = consensus_config.quorum_store_enabled;
         info!(
             LogSchema::new(LogEntry::ConsensusObserver).message(&format!(
                 "New epoch started: {:?}. Execution pool window: {:?}. Quorum store enabled: {:?}",
@@ -133,7 +133,7 @@ async fn extract_on_chain_configs(
     reconfig_events: &mut ReconfigNotificationListener<DbBackedOnChainConfig>,
 ) -> (
     Arc<EpochState>,
-    OnChainConsensusConfig,
+    ConsensusConfigFromOnchain,
     OnChainExecutionConfig,
     OnChainRandomnessConfig,
 ) {
@@ -163,7 +163,9 @@ async fn extract_on_chain_configs(
             ))
         );
     }
-    let consensus_config = onchain_consensus_config.unwrap_or_default();
+    let consensus_config = onchain_consensus_config
+        .unwrap_or_default()
+        .to_consensus_config_on_chain();
 
     // Extract the execution config (or use the default if it's missing)
     let onchain_execution_config: anyhow::Result<OnChainExecutionConfig> = on_chain_configs.get();

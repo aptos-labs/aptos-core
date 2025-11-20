@@ -71,8 +71,8 @@ use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfo,
     on_chain_config::{
-        ConsensusAlgorithmConfig, OnChainConsensusConfig, OnChainJWKConsensusConfig,
-        OnChainRandomnessConfig,
+        ConsensusAlgorithmConfig, ConsensusConfigFromOnchain, OnChainConsensusConfig,
+        OnChainJWKConsensusConfig, OnChainRandomnessConfig,
     },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
@@ -184,7 +184,7 @@ pub struct NodeSetup {
     mock_execution_client: Arc<MockExecutionClient>,
     _state_sync_receiver: mpsc::UnboundedReceiver<Vec<SignedTransaction>>,
     id: usize,
-    onchain_consensus_config: OnChainConsensusConfig,
+    onchain_consensus_config: ConsensusConfigFromOnchain,
     block_txn_filter_config: BlockTransactionFilterConfig,
     local_consensus_config: ConsensusConfig,
     onchain_randomness_config: OnChainRandomnessConfig,
@@ -252,6 +252,7 @@ impl NodeSetup {
         use_quorum_store_payloads: bool,
     ) -> Vec<Self> {
         let mut onchain_consensus_config = onchain_consensus_config.unwrap_or_default();
+
         // With order votes feature, the validators additionally send order votes.
         // next_proposal and next_vote functions could potentially break because of it.
         if let OnChainConsensusConfig::V4 {
@@ -267,6 +268,7 @@ impl NodeSetup {
         {
             *order_vote_enabled = false;
         }
+        let onchain_consensus_config = onchain_consensus_config.to_consensus_config_on_chain();
         let onchain_randomness_config =
             onchain_randomness_config.unwrap_or_else(OnChainRandomnessConfig::default_if_missing);
         let onchain_jwk_consensus_config = onchain_jwk_consensus_config
@@ -341,7 +343,7 @@ impl NodeSetup {
         initial_data: RecoveryData,
         safety_rules_manager: SafetyRulesManager,
         id: usize,
-        onchain_consensus_config: OnChainConsensusConfig,
+        onchain_consensus_config: ConsensusConfigFromOnchain,
         block_txn_filter_config: BlockTransactionFilterConfig,
         local_consensus_config: ConsensusConfig,
         onchain_randomness_config: OnChainRandomnessConfig,
@@ -406,7 +408,7 @@ impl NodeSetup {
             Arc::new(DirectMempoolPayloadManager::new())
         };
 
-        let window_size = onchain_consensus_config.window_size();
+        let window_size = onchain_consensus_config.window_size;
         let block_store = Arc::new(BlockStore::new(
             storage.clone(),
             initial_data,
@@ -444,7 +446,7 @@ impl NodeSetup {
             PipelineBackpressureConfig::new_no_backoff(),
             ChainHealthBackoffConfig::new_no_backoff(),
             false,
-            onchain_consensus_config.effective_validator_txn_config(),
+            onchain_consensus_config.vtxn_config.clone(),
             true,
             Arc::new(MockOptQSPayloadProvider {}),
         );
@@ -515,8 +517,8 @@ impl NodeSetup {
         let recover_data = self
             .storage
             .try_start(
-                self.onchain_consensus_config.order_vote_enabled(),
-                self.onchain_consensus_config.window_size(),
+                self.onchain_consensus_config.order_vote_enabled,
+                self.onchain_consensus_config.window_size,
             )
             .unwrap_or_else(|e| panic!("fail to restart due to: {}", e));
         Self::new(
