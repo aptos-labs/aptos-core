@@ -34,6 +34,15 @@ else
   profile_prefix="${PROFILE}_"
 fi
 
+RUSTFLAGS=( \
+  "--cfg tokio_unstable" \
+  "-C link-arg=-fuse-ld=lld" \
+  "-C force-frame-pointers=yes" \
+  "-C force-unwind-tables=yes" \
+  "-C target-cpu=x86-64-v3" \
+)
+export RUSTFLAGS="${RUSTFLAGS[*]}"
+
 if [ -n "$CUSTOM_IMAGE_TAG_PREFIX" ]; then
   export IMAGE_TAG_PREFIX="${CUSTOM_IMAGE_TAG_PREFIX}_"
 else
