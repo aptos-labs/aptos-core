@@ -215,8 +215,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
-    type DealtSecretKey = Scalar<E>;
-    type DealtSecretKeyShare = Scalar<E>;
+    type DealtSecretKey = keys::DealtSecretKey<E>;
+    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type InputSecret = InputSecret<E::ScalarField>;
@@ -325,6 +325,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             );
         }
 
+        // Verify the transcript signature
         self.sgn.verify(&self.utrs, &spks[self.utrs.dealer.id])?;
 
         {
@@ -358,19 +359,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             }
 
             // Verify the range proof
-            let mut fs_t = fiat_shamir::initialize_pvss_transcript::<_, E, Self>(
-                sc,
-                &spks[self.utrs.dealer.id],
-                &auxs[self.utrs.dealer.id],
-                self.utrs.dealer.id,
-                DST,
-            );
             if let Err(err) = self.utrs.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
                 sc.n * num_chunks_per_scalar::<E>(pp.ell) as usize,
                 pp.ell as usize,
                 &self.utrs.sharing_proof.range_proof_commitment,
-                &mut fs_t,
             ) {
                 bail!("Range proof batch verification failed: {:?}", err);
             }
@@ -431,7 +424,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         _sc: &Self::SecretSharingConfig,
         _other: &Transcript<E>,
     ) -> anyhow::Result<()> {
-        Err(anyhow::anyhow!("PVSS aggregation not supported"))
+        Err(anyhow::anyhow!("PVSS aggregation not supported for chunky"))
     }
 
     fn get_public_key_share(
@@ -462,9 +455,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let C_i = &self.utrs.Cs[player.id]; // where i = player.id
+        let C_i = &self.utrs.Cs[player.id]; // where in notation `C_i`, `i` denotes `player.id`
 
-        let ephemeral_keys: Vec<_> = self.utrs.Rs.iter().map(|Ri| Ri.mul(dk.dk)).collect();
+        let ephemeral_keys: Vec<_> = self.utrs.Rs.iter().map(|R_i| R_i.mul(dk.dk)).collect();
         assert_eq!(
             ephemeral_keys.len(),
             C_i.len(),
@@ -613,15 +606,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         );
 
         // Generate the batch range proof, given the `range_proof_commitment` produced in the PoK
-        let mut fs_t =
-            fiat_shamir::initialize_pvss_transcript::<_, E, Self>(&sc, &spk, &aux, dealer_id, &dst);
         let range_proof = dekart_univariate_v2::Proof::prove(
             &pp.pk_range_proof,
             &f_evals_chunked_flat,
             pp.ell as usize,
             &range_proof_commitment,
             &hkzg_randomness,
-            &mut fs_t,
             rng,
         ); // TODO: don't do &mut fs_t but just pass it
 

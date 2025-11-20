@@ -12,6 +12,7 @@ use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
+use crate::Scalar;
 
 /// The *encryption (public)* key used to encrypt shares of the dealt secret for each PVSS player.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]
@@ -93,3 +94,9 @@ impl<E: Pairing> DealtPubKeyShare<E> {
         DealtPubKeyShare(dealt_pk)
     }
 }
+
+// TODO: maybe make these actual structs
+#[allow(type_alias_bounds)]
+pub type DealtSecretKey<E: Pairing> = Scalar<E>;
+#[allow(type_alias_bounds)]
+pub type DealtSecretKeyShare<E: Pairing> = Scalar<E>;

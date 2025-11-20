@@ -132,7 +132,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
-        aux: &A,
+        session_id: &A,
         dealer: &Player,
         rng: &mut R,
     ) -> Self;
@@ -150,7 +150,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         pp: &Self::PublicParameters,
         spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>,
+        session_ids: &Vec<A>,
     ) -> anyhow::Result<()>;
 
     /// Returns the set of player IDs who have contributed to this transcript.
@@ -225,7 +225,7 @@ pub trait MalleableTranscript: Transcript {
     fn maul_signature<A: Serialize + Clone>(
         &mut self,
         ssk: &Self::SigningSecretKey,
-        aux: &A,
+        session_id: &A,
         dealer: &Player,
     );
 }
