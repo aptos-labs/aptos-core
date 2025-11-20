@@ -56,7 +56,7 @@ jobs:
     with:
       GIT_SHA: ${{ inputs.IMAGE_TAG || github.event.pull_request.head.sha || github.sha }}
       TARGET_CACHE_ID: ${{ github.event.number && format('pr-{0}', github.event.number) || github.ref_name }}
-      PROFILE: performance
+      # PROFILE: performance
       DRY_RUN: ${{ inputs.DRY_RUN }}
 
   run-replay-verify:
@@ -129,7 +129,7 @@ jobs:
           if [ -n "${{ inputs.IMAGE_TAG }}" ]; then  
             CMD="$CMD --image_tag ${{ inputs.IMAGE_TAG }}"  
           fi
-          CMD="$CMD --image_profile performance"
+          CMD="$CMD --image_profile release"
 
           eval $CMD
         timeout-minutes: 420 # 7 hours
