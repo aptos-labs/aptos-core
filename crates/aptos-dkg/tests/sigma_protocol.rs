@@ -25,12 +25,11 @@ where
     let mut rng = thread_rng();
 
     let statement = hom.apply(&witness);
+    let ctxt = b"SIGMA-PROTOCOL-CONTEXT";
 
-    let mut prover_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    let proof = hom.prove(&witness, &statement, &mut prover_transcript, &mut rng);
+    let proof = hom.prove(&witness, &statement, ctxt, &mut rng);
 
-    let mut verifier_transcript = merlin::Transcript::new(b"sigma-protocol-test");
-    hom.verify(&statement, &proof, &mut verifier_transcript)
+    hom.verify(&statement, &proof, ctxt)
         .expect("Sigma protocol proof failed verification");
 }
 

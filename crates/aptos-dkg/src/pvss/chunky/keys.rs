@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pvss::chunky::chunked_elgamal, traits};
+use crate::{pvss::chunky::chunked_elgamal, traits, Scalar};
 use aptos_crypto::{
     arkworks,
     arkworks::serialization::{ark_de, ark_se},
@@ -12,7 +12,6 @@ use ark_ec::{pairing::Pairing, CurveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::Mul;
-use crate::Scalar;
 
 /// The *encryption (public)* key used to encrypt shares of the dealt secret for each PVSS player.
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Debug)]

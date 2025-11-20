@@ -27,7 +27,7 @@ pub const PVSS_DOM_SEP: &[u8; 26] = b"APTOS_PVSS_FIAT_SHAMIR_DST";
 ///
 /// ⚠️ This trait is intentionally private: functions like `challenge_scalars`
 /// should **only** be used internally to ensure properly
-/// labelled scalar generation across protocols.
+/// labelled scalar generation across Fiat-Shamir protocols.
 //
 // TODO: Again, seems that ideally Scalar<E> should become Scalar<F> instead
 trait ScalarProtocol<E: Pairing> {
@@ -130,6 +130,9 @@ pub trait RangeProof<E: Pairing, B: BatchedRangeProof<E>> {
 #[allow(private_bounds)]
 pub trait SigmaProtocol<E: Pairing, H: homomorphism::Trait>: ScalarProtocol<E> {
     fn append_sigma_protocol_sep(&mut self, dst: &[u8]);
+
+    /// Append the "context" of a sigma protocol, e.g. session identifiers
+    fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C);
 
     /// Append the MSM bases of a sigma protocol.
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H);
@@ -319,6 +322,11 @@ where
 {
     fn append_sigma_protocol_sep(&mut self, dst: &[u8]) {
         self.append_message(b"dom-sep", dst);
+    }
+
+    fn append_sigma_protocol_ctxt<C: Serialize>(&mut self, ctxt: &C) {
+        let ctxt_bytes = bcs::to_bytes(ctxt).expect("ctxt data serialization should succeed");
+        self.append_message(b"aux", ctxt_bytes.as_slice());
     }
 
     fn append_sigma_protocol_msm_bases(&mut self, hom: &H) {

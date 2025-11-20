@@ -381,12 +381,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
             &two_term_msm::CodomainShape(hatC - comm.0),
-            &mut fs_t,
+            b"DeKART_RANGE_PROOF", // TODO: make this a const or smth
             rng,
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK); // TODO: should be changed to "remainder of sigma proof" since the first message is already in there
+        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
 
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
@@ -557,7 +557,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 9
-        let gamma = fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &ck_S.roots_of_unity_in_eval_dom);
+        let gamma =
+            fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &ck_S.roots_of_unity_in_eval_dom);
 
         let a: E::ScalarField = {
             let poly = ark_poly::univariate::DensePolynomial {
@@ -671,7 +672,11 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             base_1: *lagr_0,
             base_2: *xi_1,
         }
-        .verify(&(two_term_msm::CodomainShape(*hatC - comm.0)), pi_PoK, &mut fs_t)?;
+        .verify(
+            &(two_term_msm::CodomainShape(*hatC - comm.0)),
+            pi_PoK,
+            b"DeKART_RANGE_PROOF",
+        )?;
 
         // Step 4a
         fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
