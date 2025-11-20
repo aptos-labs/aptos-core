@@ -240,7 +240,6 @@ pub(crate) struct ProofCoordinator {
     broadcast_proofs: bool,
     batch_expiry_gap_when_init_usecs: u64,
     use_batch_info_ext: bool,
-    enable_proof_v2_msg: bool,
 }
 
 //PoQS builder object - gather signed digest to form PoQS
@@ -254,7 +253,6 @@ impl ProofCoordinator {
         broadcast_proofs: bool,
         batch_expiry_gap_when_init_usecs: u64,
         use_batch_info_ext: bool,
-        enable_proof_v2_msg: bool,
     ) -> Self {
         Self {
             peer_id,
@@ -268,7 +266,6 @@ impl ProofCoordinator {
             broadcast_proofs,
             batch_expiry_gap_when_init_usecs,
             use_batch_info_ext,
-            enable_proof_v2_msg,
         }
     }
 
@@ -459,7 +456,7 @@ impl ProofCoordinator {
                                 .saturating_sub(self.batch_expiry_gap_when_init_usecs);
                             let self_peer_id = self.peer_id;
                             let enable_broadcast_proofs = self.broadcast_proofs;
-                            let enable_proof_v2_msg = self.enable_proof_v2_msg;
+                            let use_batch_info_ext = self.use_batch_info_ext;
 
                             let mut proofs_iter = signed_batch_infos.into_iter().filter_map(|signed_batch_info| {
                                 let peer_id = signed_batch_info.signer();
@@ -489,7 +486,7 @@ impl ProofCoordinator {
                             if proofs_iter.peek().is_some() {
                                 observe_batch(approx_created_ts_usecs, self_peer_id, BatchStage::POS_FORMED);
                                 if enable_broadcast_proofs {
-                                    if enable_proof_v2_msg {
+                                    if use_batch_info_ext {
                                         let proofs: Vec<_> = proofs_iter.collect();
                                         network_sender.broadcast_proof_of_store_msg_v2(proofs).await;
                                     } else {

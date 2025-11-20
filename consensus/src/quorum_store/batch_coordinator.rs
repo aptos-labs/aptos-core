@@ -44,7 +44,7 @@ pub struct BatchCoordinator {
     max_total_bytes: u64,
     batch_expiry_gap_when_init_usecs: u64,
     transaction_filter_config: BatchTransactionFilterConfig,
-    enable_proof_v2: bool,
+    batch_info_ext_enabled: bool,
 }
 
 impl BatchCoordinator {
@@ -60,7 +60,7 @@ impl BatchCoordinator {
         max_total_bytes: u64,
         batch_expiry_gap_when_init_usecs: u64,
         transaction_filter_config: BatchTransactionFilterConfig,
-        enable_proof_v2: bool,
+        batch_info_ext_enabled: bool,
     ) -> Self {
         Self {
             my_peer_id,
@@ -74,7 +74,7 @@ impl BatchCoordinator {
             max_total_bytes,
             batch_expiry_gap_when_init_usecs,
             transaction_filter_config,
-            enable_proof_v2,
+            batch_info_ext_enabled,
         }
     }
 
@@ -90,7 +90,7 @@ impl BatchCoordinator {
         let batch_store = self.batch_store.clone();
         let network_sender = self.network_sender.clone();
         let sender_to_proof_manager = self.sender_to_proof_manager.clone();
-        let enable_proof_v2 = self.enable_proof_v2;
+        let batch_info_ext_enabled = self.batch_info_ext_enabled;
         tokio::spawn(async move {
             let peer_id = persist_requests[0].author();
             let batches = persist_requests
@@ -103,7 +103,7 @@ impl BatchCoordinator {
                 })
                 .collect();
 
-            if enable_proof_v2 {
+            if batch_info_ext_enabled {
                 let signed_batch_infos = batch_store.persist_v2(persist_requests);
                 if !signed_batch_infos.is_empty() {
                     if approx_created_ts_usecs > 0 {

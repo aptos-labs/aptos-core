@@ -75,7 +75,7 @@ async fn test_proof_coordinator_basic() {
     let digest = batch.digest();
 
     for signer in &signers {
-        let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone().into(), signer)
+        let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer)
             .unwrap()
             .into();
         assert!(proof_coordinator_tx
