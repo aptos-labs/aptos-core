@@ -1,5 +1,5 @@
 ---
-remote_endpoint: https://fullnode.testnet.aptoslabs.com
+remote_endpoint: https://fullnode.mainnet.aptoslabs.com
 # replace with below for actual release, compat test needs concrete URL above:
 # remote_endpoint: ~
 name: "v1.37.0"
@@ -18,3 +18,5 @@ proposals:
       - Framework:
           bytecode_version: 8
           git_hash: ~
+      # convert FA burn ref after the framework upgrade
+      - RawScript: aptos-move/aptos-release-builder/data/enable_fa_burn_ref.move
