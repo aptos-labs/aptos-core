@@ -2,12 +2,16 @@
 # Copyright (c) Aptos
 # SPDX-License-Identifier: Apache-2.0
 set -e
+set -x
 
 PROFILE=${PROFILE:-release}
+if [[ "$PROFILE" == "performance" ]]; then
+  export RUSTFLAGS="$PERF_RUSTFLAGS"
+fi
 
 echo "Building indexer and related binaries"
 echo "PROFILE: $PROFILE"
-
+echo "RUSTFLAGS: $RUSTFLAGS"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
 # Build all the rust binaries
