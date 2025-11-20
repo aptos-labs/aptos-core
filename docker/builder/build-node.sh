@@ -5,9 +5,13 @@ set -e
 
 PROFILE=${PROFILE:-release}
 FEATURES=${FEATURES:-""}
+if [[ "$PROFILE" == "performance" ]]; then
+  export RUSTFLAGS="$PERF_RUSTFLAGS"
+fi
 
 echo "Building aptos-node"
 echo "PROFILE: $PROFILE"
+echo "RUSTFLAGS: $RUSTFLAGS"
 echo "FEATURES: $FEATURES"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
