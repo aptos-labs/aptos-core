@@ -8,8 +8,9 @@ use crate::{
         contribution::{batch_verify_soks, Contribution, SoK},
         das, encryption_dlog, schnorr,
         traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
-        LowDegreeTest, Player, WeightedConfigBlstrs,
+        LowDegreeTest, Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
     },
+    traits::transcript::Aggregatable,
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
@@ -23,6 +24,7 @@ use aptos_crypto::{
     bls12381,
     blstrs::{multi_pairing, random_scalar},
     traits::SecretSharingConfig as _,
+    weighted_config::WeightedConfig,
     CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
 };
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -289,35 +291,6 @@ impl traits::Transcript for Transcript {
             .collect::<Vec<Player>>()
     }
 
-    #[allow(non_snake_case)]
-    fn aggregate_with(
-        &mut self,
-        sc: &Self::SecretSharingConfig,
-        other: &Transcript,
-    ) -> anyhow::Result<()> {
-        let W = sc.get_total_weight();
-
-        debug_assert!(self.check_sizes(sc).is_ok());
-        debug_assert!(other.check_sizes(sc).is_ok());
-
-        for i in 0..self.V.len() {
-            self.V[i] += other.V[i];
-            self.V_hat[i] += other.V_hat[i];
-        }
-
-        for i in 0..W {
-            self.R[i] += other.R[i];
-            self.R_hat[i] += other.R_hat[i];
-            self.C[i] += other.C[i];
-        }
-
-        for sok in &other.soks {
-            self.soks.push(sok.clone());
-        }
-
-        Ok(())
-    }
-
     fn get_public_key_share(
         &self,
         sc: &Self::SecretSharingConfig,
@@ -396,6 +369,37 @@ impl traits::Transcript for Transcript {
             V_hat: insecure_random_g2_points(W + 1, rng),
             C: insecure_random_g1_points(W, rng),
         }
+    }
+}
+
+impl Aggregatable<WeightedConfig<ThresholdConfigBlstrs>> for Transcript {
+    #[allow(non_snake_case)]
+    fn aggregate_with(
+        &mut self,
+        sc: &WeightedConfig<ThresholdConfigBlstrs>,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
+        let W = sc.get_total_weight();
+
+        debug_assert!(self.check_sizes(sc).is_ok());
+        debug_assert!(other.check_sizes(sc).is_ok());
+
+        for i in 0..self.V.len() {
+            self.V[i] += other.V[i];
+            self.V_hat[i] += other.V_hat[i];
+        }
+
+        for i in 0..W {
+            self.R[i] += other.R[i];
+            self.R_hat[i] += other.R_hat[i];
+            self.C[i] += other.C[i];
+        }
+
+        for sok in &other.soks {
+            self.soks.push(sok.clone());
+        }
+
+        Ok(())
     }
 }
 

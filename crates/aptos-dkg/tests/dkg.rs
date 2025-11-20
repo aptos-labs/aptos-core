@@ -3,11 +3,10 @@
 
 use aptos_crypto::{blstrs::random_scalar, hash::CryptoHash, traits::SecretSharingConfig as _};
 use aptos_dkg::pvss::{
-    das,
-    das::unweighted_protocol,
-    insecure_field, test_utils,
-    test_utils::{reconstruct_dealt_secret_key_randomly, NoAux},
-    traits::Transcript,
+    das::{self, unweighted_protocol},
+    insecure_field,
+    test_utils::{self, reconstruct_dealt_secret_key_randomly, NoAux},
+    traits::transcript::AggregatableTranscript,
     weighted::generic_weighting::GenericWeighting,
 };
 use rand::{rngs::StdRng, thread_rng};
@@ -39,7 +38,10 @@ fn test_dkg_all_weighted() {
 
 /// Deals `n` times, aggregates all transcripts, and attempts to reconstruct the secret dealt in this
 /// aggregated transcript.
-fn aggregatable_dkg<T: Transcript + CryptoHash>(sc: &T::SecretSharingConfig, seed_bytes: [u8; 32]) {
+fn aggregatable_dkg<T: AggregatableTranscript + CryptoHash>(
+    sc: &T::SecretSharingConfig,
+    seed_bytes: [u8; 32],
+) {
     let mut rng = StdRng::from_seed(seed_bytes);
 
     let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
