@@ -159,32 +159,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     /// other transcripts, in which case the set will be of size `n`.
     fn get_dealers(&self) -> Vec<Player>;
 
-    /// Aggregates two transcripts.
-    fn aggregate_with(
-        &mut self,
-        sc: &Self::SecretSharingConfig,
-        other: &Self,
-    ) -> anyhow::Result<()>;
-
-    /// Helper function for aggregating a vector of transcripts
-    fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
-        if trxs.is_empty() {
-            bail!("Cannot aggregate empty vector of transcripts")
-        }
-
-        let n = trxs.len();
-        let (first, last) = trxs.split_at_mut(1);
-
-        for other in last {
-            first[0].aggregate_with(sc, other)?;
-        }
-
-        trxs.truncate(1);
-        let trx = trxs.pop().unwrap();
-        assert_eq!(trx.get_dealers().len(), n);
-        Ok(trx)
-    }
-
     /// Returns the dealt pubkey shore of `player`.
     fn get_public_key_share(
         &self,
@@ -215,6 +189,42 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng;
+}
+
+pub trait AggregatableTranscript: Transcript {
+    /// Aggregates two transcripts.
+    fn aggregate_with(
+        &mut self,
+        sc: &Self::SecretSharingConfig,
+        other: &Self,
+    ) -> anyhow::Result<()>;
+
+    /// Helper function for aggregating a vector of transcripts.
+    /// Is only used in benchmarks and tests at the moment
+    fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
+        if trxs.is_empty() {
+            bail!("Cannot aggregate empty vector of transcripts")
+        }
+
+        let n = trxs.len();
+        let (first, last) = trxs.split_at_mut(1);
+
+        for other in last {
+            first[0].aggregate_with(sc, other)?;
+        }
+
+        trxs.truncate(1);
+        let trx = trxs.pop().unwrap();
+        assert_eq!(trx.get_dealers().len(), n);
+        Ok(trx)
+    }
+}
+
+#[allow(dead_code)] // Will be used soon
+trait HasAggregatableSubtranscript {
+    type SubTranscript: AggregatableTranscript;
+
+    fn get_subtranscript(&self) -> Self::SubTranscript;
 }
 
 /// This traits defines testing-only and benchmarking-only interfaces.

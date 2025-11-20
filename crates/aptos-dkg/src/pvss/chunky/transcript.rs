@@ -3,7 +3,6 @@
 
 use crate::{
     dlog::bsgs,
-    fiat_shamir,
     pcs::univariate_hiding_kzg,
     pvss::{
         chunky::{
@@ -68,18 +67,21 @@ pub struct Transcript<E: Pairing> {
 )]
 pub struct UnsignedTranscript<E: Pairing> {
     dealer: Player,
-    /// Public key shares from 0 to n-1: V[i] = s_i * G_2; public key is in V[n]
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Vs: Vec<E::G2>,
-    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Cs: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
-    /// Second chunked ElGamal component: R[j] = r_j * H
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub Rs: Vec<E::G1>,
+    pub subtranscript: SubTranscript<E>,
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<E>,
+}
+
+#[allow(non_snake_case)]
+#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+pub struct SubTranscript<E: Pairing> {
+    pub Vs: Vec<E::G2>,
+    /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
+    pub Cs: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
+    /// Second chunked ElGamal component: R[j] = r_j * H
+    pub Rs: Vec<E::G1>,
 }
 
 // ================================================================
@@ -284,9 +286,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         // Construct the **unsigned** transcript struct with all computed values
         let utrs = UnsignedTranscript {
             dealer: *dealer,
-            Vs,
-            Cs,
-            Rs,
+            subtranscript: SubTranscript { Vs, Cs, Rs },
             sharing_proof,
         };
 
@@ -310,18 +310,18 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
         }
-        if self.utrs.Cs.len() != sc.n {
+        if self.utrs.subtranscript.Cs.len() != sc.n {
             bail!(
                 "Expected {} arrays of chunked ciphertexts, but got {}",
                 sc.n,
-                self.utrs.Cs.len()
+                self.utrs.subtranscript.Cs.len()
             );
         }
-        if self.utrs.Vs.len() != sc.n + 1 {
+        if self.utrs.subtranscript.Vs.len() != sc.n + 1 {
             bail!(
                 "Expected {} commitment elements, but got {}",
                 sc.n + 1,
-                self.utrs.Vs.len()
+                self.utrs.subtranscript.Vs.len()
             );
         }
 
@@ -350,8 +350,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                 &TupleCodomainShape(
                     self.utrs.sharing_proof.range_proof_commitment.clone(),
                     chunked_elgamal::CodomainShape {
-                        chunks: self.utrs.Cs.clone(),
-                        randomness: self.utrs.Rs.clone(),
+                        chunks: self.utrs.subtranscript.Cs.clone(),
+                        randomness: self.utrs.subtranscript.Rs.clone(),
                     },
                 ),
                 &self.utrs.sharing_proof.PoK,
@@ -375,18 +375,18 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 
         // Do the SCRAPE LDT
         let ldt = LowDegreeTest::random(&mut rng, sc.t, sc.n + 1, true, &sc.domain); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        ldt.low_degree_test_group(&self.utrs.Vs)?;
+        ldt.low_degree_test_group(&self.utrs.subtranscript.Vs)?;
 
         // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO?
         let mut base_vec = Vec::new();
         let mut exp_vec = Vec::new();
 
         let beta = sample_field_element(&mut rng);
-        let powers_of_beta = utils::powers(beta, self.utrs.Cs.len() + 1);
+        let powers_of_beta = utils::powers(beta, self.utrs.subtranscript.Cs.len() + 1);
 
-        for i in 0..self.utrs.Cs.len() {
-            for j in 0..self.utrs.Cs[i].len() {
-                let base = self.utrs.Cs[i][j];
+        for i in 0..self.utrs.subtranscript.Cs.len() {
+            for j in 0..self.utrs.subtranscript.Cs[i].len() {
+                let base = self.utrs.subtranscript.Cs[i][j];
                 let exp = pp.powers_of_radix[j] * powers_of_beta[i];
                 base_vec.push(base);
                 exp_vec.push(exp);
@@ -397,8 +397,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .expect("Failed to compute MSM of Cs in chunky");
 
         let weighted_Vs = E::G2::msm(
-            &E::G2::normalize_batch(&self.utrs.Vs[..self.utrs.Cs.len()]),
-            &powers_of_beta[..self.utrs.Cs.len()],
+            &E::G2::normalize_batch(
+                &self.utrs.subtranscript.Vs[..self.utrs.subtranscript.Cs.len()],
+            ),
+            &powers_of_beta[..self.utrs.subtranscript.Cs.len()],
         )
         .expect("Failed to compute MSM of Vs in chunky");
 
@@ -421,27 +423,20 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         vec![self.utrs.dealer]
     }
 
-    fn aggregate_with(
-        &mut self,
-        _sc: &Self::SecretSharingConfig,
-        _other: &Transcript<E>,
-    ) -> anyhow::Result<()> {
-        Err(anyhow::anyhow!("PVSS aggregation not supported for chunky"))
-    }
-
     fn get_public_key_share(
         &self,
         _sc: &Self::SecretSharingConfig,
         player: &Player,
     ) -> Self::DealtPubKeyShare {
         Self::DealtPubKeyShare::new(Self::DealtPubKey::new(
-            self.utrs.Vs[player.id].into_affine(),
+            self.utrs.subtranscript.Vs[player.id].into_affine(),
         ))
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
         Self::DealtPubKey::new(
             self.utrs
+                .subtranscript
                 .Vs
                 .last()
                 .expect("V is empty somehow")
@@ -457,9 +452,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let C_i = &self.utrs.Cs[player.id]; // where in notation `C_i`, `i` denotes `player.id`
+        let C_i = &self.utrs.subtranscript.Cs[player.id]; // where in notation `C_i`, `i` denotes `player.id`
 
-        let ephemeral_keys: Vec<_> = self.utrs.Rs.iter().map(|R_i| R_i.mul(dk.dk)).collect();
+        let ephemeral_keys: Vec<_> = self
+            .utrs
+            .subtranscript
+            .Rs
+            .iter()
+            .map(|R_i| R_i.mul(dk.dk))
+            .collect();
         assert_eq!(
             ephemeral_keys.len(),
             C_i.len(),
@@ -487,7 +488,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let dealt_secret_key_share =
             chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
 
-        let dealt_pub_key_share = self.utrs.Vs[player.id].into_affine(); // G_2^{f(\omega^i})
+        let dealt_pub_key_share = self.utrs.subtranscript.Vs[player.id].into_affine(); // G_2^{f(\omega^i})
 
         (
             Scalar(dealt_secret_key_share),
@@ -503,11 +504,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
         let utrs = UnsignedTranscript {
             dealer: sc.get_player(0),
-            Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
-            Cs: (0..sc.n)
-                .map(|_| unsafe_random_points(num_chunks_per_share, rng))
-                .collect::<Vec<_>>(), // TODO: would this become faster if generated in one batch and flattened?
-            Rs: unsafe_random_points(num_chunks_per_share, rng),
+            subtranscript: SubTranscript {
+                Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
+                Cs: (0..sc.n)
+                    .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                    .collect::<Vec<_>>(), // TODO: would this become faster if generated in one batch and flattened?
+                Rs: unsafe_random_points(num_chunks_per_share, rng),
+            },
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),

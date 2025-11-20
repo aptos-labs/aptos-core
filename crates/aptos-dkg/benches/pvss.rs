@@ -13,7 +13,9 @@ use aptos_dkg::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
             DealingArgs, NoAux, BENCHMARK_CONFIGS,
         },
-        traits::transcript::{MalleableTranscript, Transcript, WithMaxNumShares},
+        traits::transcript::{
+            AggregatableTranscript, MalleableTranscript, Transcript, WithMaxNumShares,
+        },
         LowDegreeTest, WeightedConfigBlstrs,
     },
 };
@@ -70,7 +72,7 @@ pub fn ldt_group(c: &mut Criterion) {
     }
 }
 
-pub fn pvss_group<T: MalleableTranscript>(
+pub fn pvss_group<T: AggregatableTranscript + MalleableTranscript>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
 ) -> DealingArgs<T> {
@@ -94,7 +96,9 @@ pub fn pvss_group<T: MalleableTranscript>(
     d
 }
 
-pub fn weighted_pvss_group<T: MalleableTranscript<SecretSharingConfig = WeightedConfigBlstrs>>(
+pub fn weighted_pvss_group<
+    T: AggregatableTranscript + MalleableTranscript<SecretSharingConfig = WeightedConfigBlstrs>,
+>(
     sc: &T::SecretSharingConfig,
     d: DealingArgs<T>,
     c: &mut Criterion,
@@ -153,7 +157,7 @@ fn pvss_deal<T: Transcript, M: Measurement>(
     });
 }
 
-fn pvss_aggregate<T: Transcript, M: Measurement>(
+fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     g: &mut BenchmarkGroup<M>,
 ) {
@@ -213,7 +217,7 @@ fn pvss_verify<T: Transcript, M: Measurement>(
     });
 }
 
-fn pvss_aggregate_verify<T: MalleableTranscript, M: Measurement>(
+fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
     ssks: &Vec<T::SigningSecretKey>,
