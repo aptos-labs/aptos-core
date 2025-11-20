@@ -38,8 +38,7 @@ impl ExecutorTask for AptosExecutorTask {
         state_view: &impl StateView,
         async_runtime_checks_enabled: bool,
     ) -> Self {
-        let vm =
-            AptosVM::new_for_block_executor(environment, state_view, async_runtime_checks_enabled);
+        let vm = AptosVM::new_for_block_executor(environment, async_runtime_checks_enabled);
         let id = state_view.id();
         Self { vm, id }
     }

@@ -113,8 +113,6 @@ use aptos_vm_types::{
     },
     storage::{change_set_configs::ChangeSetConfigs, StorageGasParameters},
 };
-use ark_bn254::Bn254;
-use ark_groth16::PreparedVerifyingKey;
 use claims::assert_err;
 use fail::fail_point;
 use move_binary_format::{
@@ -306,8 +304,6 @@ fn is_approved_gov_script(
 pub struct AptosVM {
     is_simulation: bool,
     move_vm: MoveVmExt,
-    /// For a new chain, or even mainnet, the VK might not necessarily be set.
-    pvk: Option<PreparedVerifyingKey<Bn254>>,
     /// If true, user payloads are allowed not to run extra checks and instead trace execution. If
     /// so, Block-STM replays the trace and performs these checks at post-commit time once. Note
     /// that checks might still be performed in-place based on a heuristic such as payload type.
@@ -318,21 +314,10 @@ impl AptosVM {
     /// Creates a new VM instance based on the runtime environment. The VM can then be used by
     /// block executor to create multiple tasks sharing the same execution configurations extracted
     /// from the environment.
-    // TODO: Passing `state_view` is not needed once we move keyless configs to the environment.
-    pub fn new(env: &AptosEnvironment, state_view: &impl StateView) -> Self {
-        let resolver = state_view.as_move_resolver();
-        let module_storage = state_view.as_aptos_code_storage(env);
-
-        // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
-        // via governance (although, currently, we do check for that in `keyless_account.move`).
-        let pvk = keyless_validation::get_groth16_vk_onchain(&resolver, &module_storage)
-            .ok()
-            .and_then(|vk| vk.try_into().ok());
-
+    pub fn new(env: &AptosEnvironment) -> Self {
         Self {
             is_simulation: false,
             move_vm: MoveVmExt::new(env),
-            pvk,
             // There is no tracing by default because it can only be done if there is access to
             // Block-STM.
             async_runtime_checks_enabled: false,
@@ -342,10 +327,9 @@ impl AptosVM {
     /// Creates the VM for Block-STM worker's to use.
     pub fn new_for_block_executor(
         env: &AptosEnvironment,
-        state_view: &impl StateView,
         async_runtime_checks_enabled: bool,
     ) -> Self {
-        let mut vm = Self::new(env, state_view);
+        let mut vm = Self::new(env);
         vm.async_runtime_checks_enabled = async_runtime_checks_enabled;
         vm
     }
@@ -1803,7 +1787,8 @@ impl AptosVM {
         // If there are keyless TXN authenticators, validate them all.
         if !keyless_authenticators.is_empty() && !self.is_simulation {
             keyless_validation::validate_authenticators(
-                &self.pvk,
+                self.environment().keyless_pvk(),
+                self.environment().keyless_configuration(),
                 &keyless_authenticators,
                 self.features(),
                 session.resolver,
@@ -2629,7 +2614,7 @@ impl AptosVM {
         max_gas_amount: u64,
     ) -> ViewFunctionOutput {
         let env = AptosEnvironment::new(state_view);
-        let vm = AptosVM::new(&env, state_view);
+        let vm = AptosVM::new(&env);
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
 
@@ -3328,7 +3313,7 @@ impl AptosSimulationVM {
         );
 
         let env = AptosEnvironment::new(state_view);
-        let mut vm = AptosVM::new(&env, state_view);
+        let mut vm = AptosVM::new(&env);
         vm.is_simulation = true;
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
