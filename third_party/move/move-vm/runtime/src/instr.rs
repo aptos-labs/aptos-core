@@ -76,6 +76,8 @@ pub struct PackVariantV2 {
 ///
 /// This provides path for incremental performance optimizations, while making it less painful to
 /// maintain backward compatibility.
+///
+/// Note: large variants are boxed to keep the size of [`Instruction`] small (16 bytes).
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Instruction {
     Pop,
@@ -191,6 +193,15 @@ pub enum Instruction {
     PackVariantV2(Box<PackVariantV2>),
 }
 
+/// Factory type that handles the conversion from Move bytecode (as defined in the binary format)
+/// to the internal VM instruction representation.
+///
+/// It has the ability to apply optimizations such as:
+/// - **V2 Instructions**: variants of existing instructions that provide direct access
+///   to certain runtime info required for execution and can be executed indepdent of the
+///   frame context.
+/// - **Inline Function Detection**: determines whether a function can be trivially inlined,
+///   in order to speed up execution.
 pub(crate) struct BytecodeTransformer<'a> {
     pub(crate) use_v2_instructions: bool,
 
@@ -217,6 +228,7 @@ pub(crate) struct BytecodeTransformer<'a> {
 }
 
 impl<'a> BytecodeTransformer<'a> {
+    /// Creates a new `BytecodeTransformer` instance.
     pub fn new(
         structs: &'a [StructDef],
         struct_instantiations: &'a [StructInstantiation],
@@ -245,6 +257,9 @@ impl<'a> BytecodeTransformer<'a> {
         }
     }
 
+    /// Retrieves the type of a field instantiation and whether it is fully instantiated.
+    ///
+    /// The result is cached internally to avoid repeated expensive computations.
     fn get_field_instantiation_ty(
         &self,
         idx: FieldInstantiationIndex,
@@ -271,6 +286,9 @@ impl<'a> BytecodeTransformer<'a> {
         }
     }
 
+    /// Retrieves the type of a variant field instantiation and whether it is fully instantiated.
+    ///
+    /// The result is cached internally to avoid repeated expensive computations.
     fn get_variant_field_instantiation_ty(
         &self,
         idx: VariantFieldInstantiationIndex,
@@ -297,6 +315,33 @@ impl<'a> BytecodeTransformer<'a> {
         }
     }
 
+    /// Determines whether a function can be trivially inlined during runtime.
+    ///
+    /// As of now, a function is considered inlineable if it is a "stack-only-no-branch" function,
+    /// i.e. it only manipulates stack values without branches, access to locals, calls, or
+    /// other complex operations.
+    ///
+    /// Optionally, it is allowed to have a series of `move_loc` instructions at the beginning, if
+    /// their sole effect is to get the args back on stack, in the original order.
+    ///
+    /// For generic instructions to be inlineable, their output types must be fully instantiated --
+    /// not depedent on type parameters from the current function context. Here is an example:
+    /// ```plaintext
+    /// struct Foo<T> {
+    ///     x: T,
+    ///     y: bool,
+    /// }
+    ///
+    /// // Not inlineable because we don't know that `T` is statically.
+    /// fun borrow_x<T>(foo: &Foo<T>): &T {
+    ///     &foo.x
+    /// }
+    ///
+    /// // Inlineable because the output type is always `bool`.
+    /// fun get_y<T>(foo: &Foo<T>): bool {
+    ///     foo.y
+    /// }
+    /// ```
     pub fn is_function_inlineable(
         &self,
         num_params: usize,
@@ -408,7 +453,7 @@ impl<'a> BytecodeTransformer<'a> {
                     if !struct_inst.is_fully_instantiated {
                         return Ok(false);
                     }
-                    // TODO: check depth
+                    // TODO: check depth?
                 },
                 // - PackVariantGeneric: requires concrete instantiation for V2
                 PackVariantGeneric(idx) => {
@@ -417,11 +462,11 @@ impl<'a> BytecodeTransformer<'a> {
                     if !struct_variant_inst.is_fully_instantiated {
                         return Ok(false);
                     }
-                    // TODO: check depth
+                    // TODO: check depth?
                 },
                 // - Field borrowing (stack-only, operates on references)
                 MutBorrowField(_) | ImmBorrowField(_) => {},
-                // - Generic field borrowing: require concrete instantiation for V2
+                // - Generic field borrowing: requires concrete instantiation for V2
                 MutBorrowFieldGeneric(idx) | ImmBorrowFieldGeneric(idx) => {
                     let (_, is_fully_instantiated) = self.get_field_instantiation_ty(*idx)?;
 
@@ -431,7 +476,7 @@ impl<'a> BytecodeTransformer<'a> {
                 },
                 // - Variant field borrowing (stack-only, operates on references)
                 MutBorrowVariantField(_) | ImmBorrowVariantField(_) => {},
-                // - Generic variant field borrowing: require concrete instantiation for V2
+                // - Generic variant field borrowing: requires concrete instantiation for V2
                 MutBorrowVariantFieldGeneric(idx) | ImmBorrowVariantFieldGeneric(idx) => {
                     let (_, is_fully_instantiated) =
                         self.get_variant_field_instantiation_ty(*idx)?;
@@ -629,7 +674,7 @@ impl<'a> BytecodeTransformer<'a> {
             }
         };
 
-        // TODO: check depth
+        // TODO: check depth?
         let struct_ty = Type::StructInstantiation {
             idx: struct_inst.definition_struct_type.idx,
             ty_args: triomphe::Arc::new(struct_inst.instantiation.clone()),
@@ -801,8 +846,15 @@ impl<'a> BytecodeTransformer<'a> {
         })))
     }
 
-    // TODO: transform_pack_variant_generic
-
+    /// Transforms a Move bytecode instruction into a VM `Instruction` type.
+    ///
+    /// If `self.use_v2_instructions` is set, the transformer will use the V2 instructions
+    /// if possible.
+    ///
+    /// If `inline` is set, the use of v2 instructions is forced, as as we rely on their
+    /// ability to be executed indepdent of the frame context.
+    /// It is expected that the caller has already checked that the function is inlineable via
+    /// [`Self::is_function_inlineable`].
     pub fn transform(&self, bytecode: Bytecode, inline: bool) -> PartialVMResult<Instruction> {
         use Bytecode as B;
         use Instruction as I;
