@@ -20,6 +20,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
         libpq-dev \
         libssl-dev \
         libudev-dev \
+        liburing-dev \
         lld \
         lsb-release \
         pkg-config \
