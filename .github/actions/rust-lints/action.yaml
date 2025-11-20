@@ -18,4 +18,5 @@ runs:
       shell: bash
       run: |
         cargo install cargo-sort --version 1.0.7  # Fix the version to avoid unexpected changes
+        sudo apt-get install liburing-dev
         scripts/rust_lint.sh --check
