@@ -10,11 +10,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     perl-base=5.32.1-4+deb11u4 \
     libtinfo6=6.2+20201114-2+deb11u2 \
     git \
-            socat \
+    socat \
     python3-botocore/bullseye \
     awscli/bullseye \
     gnupg2 \
-    pigz
+    pigz \
+    liburing1
 
 RUN echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" | tee -a /etc/apt/sources.list.d/google-cloud-sdk.list && \
     curl https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key --keyring /usr/share/keyrings/cloud.google.gpg add - && \
