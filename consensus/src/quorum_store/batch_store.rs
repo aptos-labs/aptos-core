@@ -12,7 +12,9 @@ use crate::{
     },
 };
 use anyhow::bail;
-use aptos_consensus_types::proof_of_store::{BatchInfo, SignedBatchInfo};
+use aptos_consensus_types::proof_of_store::{
+    BatchInfo, BatchInfoExt, BatchKind, ExtraBatchInfo, SignedBatchInfo, TBatchInfo,
+};
 use aptos_crypto::{CryptoMaterialError, HashValue};
 use aptos_executor_types::{ExecutorError, ExecutorResult};
 use aptos_infallible::Mutex;
@@ -378,10 +380,10 @@ impl BatchStore {
         ret
     }
 
-    fn generate_signed_batch_info(
+    fn generate_signed_batch_info<T: TBatchInfo>(
         &self,
-        batch_info: BatchInfo,
-    ) -> Result<SignedBatchInfo<BatchInfo>, CryptoMaterialError> {
+        batch_info: T,
+    ) -> Result<SignedBatchInfo<T>, CryptoMaterialError> {
         fail_point!("quorum_store::create_invalid_signed_batch_info", |_| {
             Ok(SignedBatchInfo::new_with_signature(
                 batch_info.clone(),
@@ -392,10 +394,17 @@ impl BatchStore {
         SignedBatchInfo::new(batch_info, &self.validator_signer)
     }
 
-    fn persist_inner(&self, persist_request: PersistedValue) -> Option<SignedBatchInfo<BatchInfo>> {
+    fn persist_inner<T: TBatchInfo>(
+        &self,
+        batch_info: T,
+        persist_request: PersistedValue,
+    ) -> Option<SignedBatchInfo<T>> {
+        assert!(
+            batch_info.as_batch_info() == persist_request.batch_info(),
+            "Provided batch info doesn't match persist request batch info"
+        );
         match self.save(&persist_request) {
             Ok(needs_db) => {
-                let batch_info = persist_request.batch_info().clone();
                 trace!("QS: sign digest {}", persist_request.digest());
                 if needs_db {
                     #[allow(clippy::unwrap_in_result)]
@@ -405,7 +414,6 @@ impl BatchStore {
                 }
                 self.generate_signed_batch_info(batch_info).ok()
             },
-
             Err(e) => {
                 debug!("QS: failed to store to cache {:?}", e);
                 None
@@ -486,7 +494,37 @@ impl BatchWriter for BatchStore {
     fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo<BatchInfo>> {
         let mut signed_infos = vec![];
         for persist_request in persist_requests.into_iter() {
-            if let Some(signed_info) = self.persist_inner(persist_request.clone()) {
+            let batch_info = persist_request.batch_info().clone();
+            if let Some(signed_info) = self.persist_inner(batch_info, persist_request.clone()) {
+                self.notify_subscribers(persist_request);
+                signed_infos.push(signed_info);
+            }
+        }
+        signed_infos
+    }
+
+    fn persist_v2(
+        &self,
+        persist_requests: Vec<PersistedValue>,
+    ) -> Vec<SignedBatchInfo<BatchInfoExt>> {
+        let mut signed_infos = vec![];
+        for persist_request in persist_requests.into_iter() {
+            let is_encrypted_batch = persist_request
+                .payload()
+                .as_ref()
+                .expect("Payload must be available for persistence")
+                .iter()
+                .any(|txn| txn.is_encrypted_txn());
+            let batch_kind = if is_encrypted_batch {
+                BatchKind::Encrypted
+            } else {
+                BatchKind::Normal
+            };
+            let batch_info = BatchInfoExt::V2 {
+                info: persist_request.batch_info().clone(),
+                extra: ExtraBatchInfo { batch_kind },
+            };
+            if let Some(signed_info) = self.persist_inner(batch_info, persist_request.clone()) {
                 self.notify_subscribers(persist_request);
                 signed_infos.push(signed_info);
             }
@@ -611,4 +649,9 @@ impl<T: QuorumStoreSender + Clone + Send + Sync + 'static> BatchReader for Batch
 
 pub trait BatchWriter: Send + Sync {
     fn persist(&self, persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo<BatchInfo>>;
+
+    fn persist_v2(
+        &self,
+        persist_requests: Vec<PersistedValue>,
+    ) -> Vec<SignedBatchInfo<BatchInfoExt>>;
 }
