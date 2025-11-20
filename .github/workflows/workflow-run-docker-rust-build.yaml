@@ -93,6 +93,9 @@ jobs:
         with:
           ref: ${{ env.GIT_SHA }}
 
+      - name: Check Memory
+        run: free -h
+
       - name: Setup Runs On Cache for Docker
         uses: runs-on/cache@v4
         with:
