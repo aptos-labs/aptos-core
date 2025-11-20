@@ -381,7 +381,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
             &two_term_msm::CodomainShape(hatC - comm.0),
-            b"DeKART_RANGE_PROOF", // TODO: make this a const or smth
+            &Self::DST,
             rng,
         );
 
@@ -675,7 +675,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         .verify(
             &(two_term_msm::CodomainShape(*hatC - comm.0)),
             pi_PoK,
-            b"DeKART_RANGE_PROOF",
+            &Self::DST,
         )?;
 
         // Step 4a

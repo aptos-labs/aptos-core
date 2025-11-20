@@ -13,7 +13,11 @@ use crate::{
             keys,
             public_parameters::PublicParameters,
         },
-        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
+        traits::{
+            self,
+            transcript::{Aggregatable, MalleableTranscript},
+            HasEncryptionPublicParams,
+        },
         Player,
     },
     range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
@@ -22,6 +26,7 @@ use crate::{
         homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::Trait as _,
     },
+    traits::transcript::HasAggregatableSubtranscript,
     Scalar,
 };
 use anyhow::bail;
@@ -37,7 +42,7 @@ use aptos_crypto::{
         shamir::ShamirThresholdConfig,
     },
     bls12381::{self, PrivateKey},
-    utils, CryptoMaterialError, SecretSharingConfig, Signature, SigningKey, Uniform,
+    utils, CryptoMaterialError, SecretSharingConfig as _, Signature, SigningKey, Uniform,
     ValidCryptoMaterial,
 };
 use ark_ec::{
@@ -82,6 +87,44 @@ pub struct SubTranscript<E: Pairing> {
     pub Cs: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
     /// Second chunked ElGamal component: R[j] = r_j * H
     pub Rs: Vec<E::G1>,
+}
+
+impl<E: Pairing> HasAggregatableSubtranscript<SecretSharingConfig<E::ScalarField>>
+    for Transcript<E>
+{
+    type SubTranscript = SubTranscript<E>;
+
+    fn get_subtranscript(&self) -> Self::SubTranscript {
+        self.utrs.subtranscript.clone()
+    }
+}
+
+impl<E: Pairing> Aggregatable<SecretSharingConfig<E::ScalarField>> for SubTranscript<E> {
+    fn aggregate_with(
+        &mut self,
+        sc: &SecretSharingConfig<E::ScalarField>,
+        other: &Self,
+    ) -> anyhow::Result<()> {
+        debug_assert_eq!(self.Cs.len(), sc.n);
+        debug_assert_eq!(self.Vs.len(), sc.n + 1);
+        debug_assert_eq!(self.Cs.len(), other.Cs.len());
+        debug_assert_eq!(self.Rs.len(), other.Rs.len());
+        debug_assert_eq!(self.Vs.len(), other.Vs.len());
+
+        for i in 0..sc.n {
+            self.Vs[i] += other.Vs[i];
+            for j in 0..self.Cs[i].len() {
+                self.Cs[i][j] += other.Cs[i][j];
+            }
+        }
+        self.Vs[sc.n] += other.Vs[sc.n];
+
+        for (r_self, r_other) in self.Rs.iter_mut().zip(&other.Rs) {
+            *r_self += r_other;
+        }
+
+        Ok(())
+    }
 }
 
 // ================================================================
@@ -212,6 +255,9 @@ type SokContext<'a, A: Serialize + Clone, E: Pairing> = (
     Vec<u8>,
 );
 
+// Not sure this alias is very useful
+type SecretSharingConfig<F> = ShamirThresholdConfig<F>;
+
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
@@ -223,7 +269,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type InputSecret = InputSecret<E::ScalarField>;
     type PublicParameters = PublicParameters<E>;
-    type SecretSharingConfig = ShamirThresholdConfig<E::ScalarField>;
+    type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
 

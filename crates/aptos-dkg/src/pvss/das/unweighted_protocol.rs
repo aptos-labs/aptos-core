@@ -7,13 +7,10 @@ use crate::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
         das, encryption_dlog, schnorr,
-        traits::{
-            self,
-            transcript::{AggregatableTranscript, MalleableTranscript},
-            HasEncryptionPublicParams,
-        },
+        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
+    traits::transcript::Aggregatable,
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
@@ -311,10 +308,10 @@ impl traits::Transcript for Transcript {
     }
 }
 
-impl AggregatableTranscript for Transcript {
+impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
     fn aggregate_with(
         &mut self,
-        sc: &Self::SecretSharingConfig,
+        sc: &ThresholdConfigBlstrs,
         other: &Transcript,
     ) -> anyhow::Result<()> {
         debug_assert_eq!(self.C.len(), sc.n);

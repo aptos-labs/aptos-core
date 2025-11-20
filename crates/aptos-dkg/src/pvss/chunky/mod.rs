@@ -8,6 +8,6 @@ mod input_secret;
 mod keys;
 mod public_parameters;
 mod transcript;
-// mod weighted_transcript;
+// mod weighted_transcript; TODO: to add soon
 
 pub use transcript::Transcript;

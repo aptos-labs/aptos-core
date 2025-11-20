@@ -12,7 +12,11 @@ use crate::pvss::{
     },
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
-use aptos_crypto::{traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial};
+use crate::traits::transcript::Aggregatable;
+use aptos_crypto::{
+    traits::SecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
+    ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -208,13 +212,13 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     }
 }
 
-impl<T> AggregatableTranscript for GenericWeighting<T>
+impl<T> Aggregatable<WeightedConfig<ThresholdConfigBlstrs>> for GenericWeighting<T>
 where
     T: AggregatableTranscript + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
 {
     fn aggregate_with(
         &mut self,
-        sc: &Self::SecretSharingConfig,
+        sc: &WeightedConfig<ThresholdConfigBlstrs>,
         other: &Self,
     ) -> anyhow::Result<()> {
         T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)?;

@@ -5,13 +5,10 @@ use crate::{
     algebra::polynomials::shamir_secret_share,
     pvss::{
         self, das, encryption_dlog,
-        traits::{
-            self,
-            transcript::{AggregatableTranscript, MalleableTranscript},
-            Convert,
-        },
+        traits::{self, transcript::MalleableTranscript, Convert},
         Player, ThresholdConfigBlstrs,
     },
+    traits::transcript::Aggregatable,
     utils::{
         random::{insecure_random_g2_points, random_scalars},
         HasMultiExp,
@@ -199,10 +196,10 @@ impl traits::Transcript for Transcript {
     }
 }
 
-impl AggregatableTranscript for Transcript {
+impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
     fn aggregate_with(
         &mut self,
-        sc: &Self::SecretSharingConfig,
+        sc: &ThresholdConfigBlstrs,
         other: &Transcript,
     ) -> anyhow::Result<()> {
         debug_assert_eq!(self.C.len(), sc.n);

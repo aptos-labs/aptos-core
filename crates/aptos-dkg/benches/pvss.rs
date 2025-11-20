@@ -14,7 +14,8 @@ use aptos_dkg::{
             DealingArgs, NoAux, BENCHMARK_CONFIGS,
         },
         traits::transcript::{
-            AggregatableTranscript, MalleableTranscript, Transcript, WithMaxNumShares,
+            Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript,
+            MalleableTranscript, Transcript, WithMaxNumShares,
         },
         LowDegreeTest, WeightedConfigBlstrs,
     },
@@ -28,19 +29,18 @@ use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
-    // Uncomment this to test the new PVSS, but turn off the aggregate bench below...
-    // for tc in get_threshold_configs_for_benchmarking() {
-    //     pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
-    // }
-
-    // unweighted PVSS
+    // unweighted aggregatable PVSS
     for tc in get_threshold_configs_for_benchmarking() {
-        pvss_group::<pvss::das::Transcript>(&tc, c);
+        aggregatable_pvss_group::<pvss::das::Transcript>(&tc, c);
+    }
+
+    for tc in get_threshold_configs_for_benchmarking() {
+        subaggregatable_pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
     }
 
     // weighted PVSS
     for wc in get_weighted_configs_for_benchmarking() {
-        let d = pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
+        let d = aggregatable_pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
         weighted_pvss_group(&wc, d, c);
 
         // Note: Insecure, so not interested in benchmarks.
@@ -72,7 +72,7 @@ pub fn ldt_group(c: &mut Criterion) {
     }
 }
 
-pub fn pvss_group<T: AggregatableTranscript + MalleableTranscript>(
+pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
 ) -> DealingArgs<T> {
@@ -86,6 +86,32 @@ pub fn pvss_group<T: AggregatableTranscript + MalleableTranscript>(
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_aggregate::<T, WallTime>(sc, &mut group);
+    pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_decrypt_own_share::<T, WallTime>(
+        sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
+    );
+
+    group.finish();
+
+    d
+}
+
+pub fn subaggregatable_pvss_group<
+    T: HasAggregatableSubtranscript<T::SecretSharingConfig> + MalleableTranscript,
+>(
+    sc: &T::SecretSharingConfig,
+    c: &mut Criterion,
+) -> DealingArgs<T> {
+    let name = T::scheme_name();
+    let mut group = c.benchmark_group(format!("pvss/{}", name));
+    let mut rng = thread_rng();
+
+    // TODO: use a lazy pattern to avoid this expensive step when no benchmarks are run
+    let d = test_utils::setup_dealing::<T, ThreadRng>(sc, &mut rng);
+
+    // pvss_transcript_random::<T, WallTime>(sc, &mut group);
+    pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_subaggregate::<T, WallTime>(sc, &mut group);
     pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
@@ -176,6 +202,36 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
             },
             |(mut first, second)| {
                 first.aggregate_with(&sc, &second).unwrap();
+            },
+        )
+    });
+}
+
+fn pvss_subaggregate<
+    T: Transcript + HasAggregatableSubtranscript<T::SecretSharingConfig>,
+    M: Measurement,
+>(
+    sc: &T::SecretSharingConfig,
+    g: &mut BenchmarkGroup<M>,
+) {
+    g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
+    let mut rng = thread_rng();
+
+    g.bench_function(format!("aggregate/{}", sc), move |b| {
+        b.iter_with_setup(
+            || {
+                let trx = T::generate(
+                    &sc,
+                    &T::PublicParameters::with_max_num_shares(sc.get_total_num_shares()),
+                    &mut rng,
+                );
+                (trx.clone(), trx)
+            },
+            |(first, second)| {
+                first
+                    .get_subtranscript()
+                    .aggregate_with(&sc, &second.get_subtranscript())
+                    .unwrap();
             },
         )
     });
