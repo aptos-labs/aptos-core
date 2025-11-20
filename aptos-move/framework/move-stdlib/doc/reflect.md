@@ -125,12 +125,12 @@ TODO: make this public once language version 2.4 is available
 ## Constants
 
 
-<a id="0x1_reflect_EFEATURE_NOT_ENABLED"></a>
+<a id="0x1_reflect_E_FEATURE_NOT_ENABLED"></a>
 
 This error indicates that the reflection feature is not enabled.
 
 
-<pre><code><b>const</b> <a href="reflect.md#0x1_reflect_EFEATURE_NOT_ENABLED">EFEATURE_NOT_ENABLED</a>: u64 = 0;
+<pre><code><b>const</b> <a href="reflect.md#0x1_reflect_E_FEATURE_NOT_ENABLED">E_FEATURE_NOT_ENABLED</a>: u64 = 0;
 </code></pre>
 
 
@@ -175,7 +175,7 @@ produced.
 ): Result&lt;FuncType, <a href="reflect.md#0x1_reflect_ReflectionError">ReflectionError</a>&gt; {
     <b>assert</b>!(
         <a href="features.md#0x1_features_is_function_reflection_enabled">features::is_function_reflection_enabled</a>(),
-        <a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reflect.md#0x1_reflect_EFEATURE_NOT_ENABLED">EFEATURE_NOT_ENABLED</a>)
+        <a href="error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="reflect.md#0x1_reflect_E_FEATURE_NOT_ENABLED">E_FEATURE_NOT_ENABLED</a>)
     );
     <a href="reflect.md#0x1_reflect_native_resolve">native_resolve</a>(addr, module_name, func_name)
 }

@@ -6,7 +6,7 @@ module std::reflect {
     use std::string::String;
 
     /// This error indicates that the reflection feature is not enabled.
-    const EFEATURE_NOT_ENABLED: u64 = 0;
+    const E_FEATURE_NOT_ENABLED: u64 = 0;
 
     /// Resolves a function specified by address and symbolic name, with expected type, into a typed function value.
     ///
@@ -33,7 +33,7 @@ module std::reflect {
     ): Result<FuncType, ReflectionError> {
         assert!(
             features::is_function_reflection_enabled(),
-            error::invalid_state(EFEATURE_NOT_ENABLED)
+            error::invalid_state(E_FEATURE_NOT_ENABLED)
         );
         native_resolve(addr, module_name, func_name)
     }
@@ -41,10 +41,17 @@ module std::reflect {
     /// Represents errors returned by the reflection API.
     /// TODO: make this public once language version 2.4 is available
     enum ReflectionError has copy, drop, store {
+        /// The passed module or function name is not a valid Move identifier
         InvalidIdentifier,
+        /// The module or function in the moduke cannot be find.
         FunctionNotFound,
+        /// The function in the moduke cannot be accessed. The function must be public.
         FunctionNotAccessible,
+        /// The function exists and is accessible, but doesn't the requested `FuncType`
+        /// type argument.
         FunctionIncompatibleType,
+        /// The function is generic but cannot be fully instantiated from the provided type, e.g. for `f<X,Y>: |X|`,
+        /// `Y` canot be inferred from a function type `|X| := |u64|`. `Y` is typically a phantom type.
         FunctionNotInstantiated
     }
 
