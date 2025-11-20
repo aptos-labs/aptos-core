@@ -17,8 +17,7 @@ Standard math utilities missing in the Move Language.
 -  [Function `pow_raw`](#0x1_math_fixed_pow_raw)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/fixed_point32.md#0x1_fixed_point32">0x1::fixed_point32</a>;
 <b>use</b> <a href="math128.md#0x1_math128">0x1::math128</a>;
 </code></pre>
 

@@ -14,8 +14,7 @@
 -  [Function `derivable_abstract_public_key`](#0x1_auth_data_derivable_abstract_public_key)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-</code></pre>
+<pre><code></code></pre>
 
 
 

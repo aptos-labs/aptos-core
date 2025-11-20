@@ -58,8 +58,7 @@ shares left.
     -  [Function `multiply_then_divide`](#@Specification_1_multiply_then_divide)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
+<pre><code><b>use</b> <a href="table_with_length.md#0x1_table_with_length">0x1::table_with_length</a>;
 </code></pre>
 
 

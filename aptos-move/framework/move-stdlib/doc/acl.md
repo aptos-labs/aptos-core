@@ -24,8 +24,7 @@ use a "set" instead when it's available in the language in the future.
     -  [Function `assert_contains`](#@Specification_1_assert_contains)
 
 
-<pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="vector.md#0x1_vector">0x1::vector</a>;
+<pre><code><b>use</b> <a href="vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 

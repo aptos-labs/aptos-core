@@ -20,12 +20,12 @@ It is used to represent public keys for the Ed25519, SECP256K1, WebAuthn, and Ke
 <pre><code><b>use</b> <a href="../../move-stdlib/doc/bcs.md#0x1_bcs">0x1::bcs</a>;
 <b>use</b> <a href="bcs_stream.md#0x1_bcs_stream">0x1::bcs_stream</a>;
 <b>use</b> <a href="ed25519.md#0x1_ed25519">0x1::ed25519</a>;
-<b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="federated_keyless.md#0x1_federated_keyless">0x1::federated_keyless</a>;
 <b>use</b> <a href="../../move-stdlib/doc/hash.md#0x1_hash">0x1::hash</a>;
 <b>use</b> <a href="keyless.md#0x1_keyless">0x1::keyless</a>;
 <b>use</b> <a href="secp256k1.md#0x1_secp256k1">0x1::secp256k1</a>;
 <b>use</b> <a href="secp256r1.md#0x1_secp256r1">0x1::secp256r1</a>;
+<b>use</b> <a href="../../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 </code></pre>
 
 

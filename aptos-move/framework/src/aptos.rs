@@ -126,6 +126,12 @@ impl ReleaseTarget {
                     output_format: None,
                 }),
                 skip_fetch_latest_git_deps: true,
+                experiments: vec![
+                    "inlining-optimization=on".to_string(),
+                    "optimize-extra=on".to_string(),
+                    "across-package-inlining=on".to_string(),
+                    "inlining-optimization-to-non-primary-targets=on".to_string(),
+                ],
                 ..BuildOptions::default()
             },
             packages: packages
