@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-PROFILE=${PROFILE:-release}
+PROFILE=release
 
 echo "Building indexer and related binaries"
 echo "PROFILE: $PROFILE"
