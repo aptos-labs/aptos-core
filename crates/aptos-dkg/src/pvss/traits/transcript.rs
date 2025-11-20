@@ -217,6 +217,7 @@ pub trait Aggregatable<C>: Sized {
     }
 }
 
+/// Workaround for the trait alias `AggregatableTranscript = Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>`
 pub trait AggregatableTranscript:
     Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>
 {
@@ -226,36 +227,6 @@ impl<T> AggregatableTranscript for T where
 {
 }
 
-// pub trait AggregatableTranscript: Transcript {
-//     /// Aggregates two transcripts.
-//     fn aggregate_with(
-//         &mut self,
-//         sc: &Self::SecretSharingConfig,
-//         other: &Self,
-//     ) -> anyhow::Result<()>;
-
-//     /// Helper function for aggregating a vector of transcripts.
-//     /// Is only used in benchmarks and tests at the moment
-//     fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
-//         if trxs.is_empty() {
-//             bail!("Cannot aggregate empty vector of transcripts")
-//         }
-
-//         let n = trxs.len();
-//         let (first, last) = trxs.split_at_mut(1);
-
-//         for other in last {
-//             first[0].aggregate_with(sc, other)?;
-//         }
-
-//         trxs.truncate(1);
-//         let trx = trxs.pop().unwrap();
-//         assert_eq!(trx.get_dealers().len(), n);
-//         Ok(trx)
-//     }
-// }
-
-#[allow(dead_code)] // Will be used soon
 pub trait HasAggregatableSubtranscript<C> {
     type SubTranscript: Aggregatable<C>;
 

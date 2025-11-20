@@ -80,7 +80,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     type InputSecret = T::InputSecret;
     type PublicParameters = T::PublicParameters;
     type SecretSharingConfig = WeightedConfigBlstrs;
-    // Can probably change this to T::SecretSharingConfig, after editing Reconstructable
+    // Can probably change this to T::SecretSharingConfig, after editing Reconstructable... but not worth the effort atm
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 

@@ -285,6 +285,7 @@ where
 /// the image under consideration are included in the transcript.
 ///
 /// # Arguments
+/// - `ctxt`: Extra "context" material that needs to be hashed for the challenge.
 /// - `hom`: The homomorphism structure carrying its public data (e.g., MSM bases).
 /// - `statement`: The public statement, i.e. the image of a witness under the homomorphism.
 /// - `prover_first_message`: the first message in the Σ-protocol (the prover's commitment)
@@ -308,6 +309,7 @@ where
     H::Domain: Witness<E>,
     H::Codomain: Statement,
 {
+    // Initialise the transcript
     let mut fs_t = merlin::Transcript::new(dst);
 
     // Append the "context" to the transcript

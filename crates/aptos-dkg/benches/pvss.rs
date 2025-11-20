@@ -29,13 +29,14 @@ use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
+    // unweighted BN254 PVSS with aggregatable subscript
+    for tc in get_threshold_configs_for_benchmarking() {
+        subaggregatable_pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
+    }
+
     // unweighted aggregatable PVSS
     for tc in get_threshold_configs_for_benchmarking() {
         aggregatable_pvss_group::<pvss::das::Transcript>(&tc, c);
-    }
-
-    for tc in get_threshold_configs_for_benchmarking() {
-        subaggregatable_pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
     }
 
     // weighted PVSS
@@ -52,6 +53,7 @@ pub fn all_groups(c: &mut Criterion) {
     ldt_group(c);
 }
 
+// TODO: benchmark both blstrs and arkworks LDT?
 pub fn ldt_group(c: &mut Criterion) {
     let mut rng = thread_rng();
     let mut group = c.benchmark_group("ldt");
@@ -96,6 +98,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
     d
 }
 
+// TODO: combine with function above, rather than copy-paste
 pub fn subaggregatable_pvss_group<
     T: HasAggregatableSubtranscript<T::SecretSharingConfig> + MalleableTranscript,
 >(
