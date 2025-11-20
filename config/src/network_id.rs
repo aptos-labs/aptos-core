@@ -180,7 +180,7 @@ impl NetworkId {
             ],
             NetworkId::Vfn => match role {
                 RoleType::Validator => &[],
-                RoleType::FullNode => &[PeerRole::Validator],
+                RoleType::FullNode => &[PeerRole::Validator, PeerRole::ValidatorFullNode],
             },
         }
     }
