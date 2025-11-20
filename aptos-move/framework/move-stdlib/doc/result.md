@@ -86,22 +86,22 @@ Represents the result of some computation, either a value <code>T</code> or an e
 ## Constants
 
 
-<a id="0x1_result_EUNWRAP_ERR"></a>
+<a id="0x1_result_E_UNWRAP_ERR"></a>
 
 Attempt to unwrap error but found value
 
 
-<pre><code><b>const</b> <a href="result.md#0x1_result_EUNWRAP_ERR">EUNWRAP_ERR</a>: u64 = 0;
+<pre><code><b>const</b> <a href="result.md#0x1_result_E_UNWRAP_ERR">E_UNWRAP_ERR</a>: u64 = 1;
 </code></pre>
 
 
 
-<a id="0x1_result_EUNWRAP_OK"></a>
+<a id="0x1_result_E_UNWRAP_OK"></a>
 
 Attempt to unwrap value but found error
 
 
-<pre><code><b>const</b> <a href="result.md#0x1_result_EUNWRAP_OK">EUNWRAP_OK</a>: u64 = 0;
+<pre><code><b>const</b> <a href="result.md#0x1_result_E_UNWRAP_OK">E_UNWRAP_OK</a>: u64 = 0;
 </code></pre>
 
 
@@ -175,7 +175,7 @@ Unpacks the <code>T</code> of Ok or aborts.
 <pre><code><b>public</b> <b>fun</b> <a href="result.md#0x1_result_unwrap">unwrap</a>&lt;T, E&gt;(self: <a href="result.md#0x1_result_Result">Result</a>&lt;T, E&gt;): T {
     match (self) {
         Ok(x) =&gt; x,
-        _ =&gt; <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="result.md#0x1_result_EUNWRAP_OK">EUNWRAP_OK</a>)
+        _ =&gt; <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="result.md#0x1_result_E_UNWRAP_OK">E_UNWRAP_OK</a>)
     }
 }
 </code></pre>
@@ -203,7 +203,7 @@ Unpacks the <code>E</code> of Err or aborts.
 <pre><code><b>public</b> <b>fun</b> <a href="result.md#0x1_result_unwrap_err">unwrap_err</a>&lt;T, E&gt;(self: <a href="result.md#0x1_result_Result">Result</a>&lt;T, E&gt;): E {
     match (self) {
         Err(x) =&gt; x,
-        _ =&gt; <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="result.md#0x1_result_EUNWRAP_ERR">EUNWRAP_ERR</a>)
+        _ =&gt; <b>abort</b> <a href="error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="result.md#0x1_result_E_UNWRAP_ERR">E_UNWRAP_ERR</a>)
     }
 }
 </code></pre>

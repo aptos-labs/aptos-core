@@ -6,8 +6,8 @@
 use crate::natives::result;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::REFLECT_RESOLVE_BASE;
 use aptos_native_interface::{
-    safely_pop_arg, safely_pop_type_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext,
-    SafeNativeError, SafeNativeResult,
+    safely_pop_arg, RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError,
+    SafeNativeResult,
 };
 use move_core_types::{
     account_address::AccountAddress, identifier::Identifier, language_storage::ModuleId,
@@ -15,6 +15,7 @@ use move_core_types::{
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
     loaded_data::runtime_types::Type,
+    natives::function::PartialVMError,
     values::{Struct, StructRef, Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -24,15 +25,23 @@ const INVALID_IDENTIFIER: u16 = 0;
 
 fn native_resolve(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: Vec<Type>,
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
+    // Prepare for future API without ownership
+    let ty_args = ty_args.as_slice();
+
     // Charge base cost before anything else.
     context.charge(REFLECT_RESOLVE_BASE)?;
 
     // Process arguments
     debug_assert!(ty_args.len() == 1);
-    let fun_ty = safely_pop_type_arg!(ty_args);
+    let Some(fun_ty) = ty_args.first() else {
+        return Err(SafeNativeError::InvariantViolation(
+            PartialVMError::new_invariant_violation("wrong number of type arguments"),
+        ));
+    };
+
     debug_assert!(args.len() == 3);
     let Some(fun_name) = identifier_from_string(safely_pop_arg!(args))? else {
         return Ok(smallvec![result::err_result(pack_err(INVALID_IDENTIFIER))]);
@@ -44,10 +53,10 @@ fn native_resolve(
     let mod_id = ModuleId::new(addr, mod_name);
 
     // Resolve function and return closure. Notice the loader context function
-    // takes car of gas metering and type checking.
+    // takes care of gas metering and type checking.
     match context
         .loader_context()
-        .resolve_function(&mod_id, &fun_name, &fun_ty)?
+        .resolve_function(&mod_id, &fun_name, fun_ty)?
     {
         Ok(fun) => {
             // Return as a closure with no captured arguments

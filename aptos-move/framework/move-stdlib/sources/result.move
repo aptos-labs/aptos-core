@@ -3,10 +3,10 @@ module std::result {
     use std::error;
 
     /// Attempt to unwrap value but found error
-    const EUNWRAP_OK: u64 = 0;
+    const E_UNWRAP_OK: u64 = 0;
 
     /// Attempt to unwrap error but found value
-    const EUNWRAP_ERR: u64 = 0;
+    const E_UNWRAP_ERR: u64 = 1;
 
     /// Represents the result of some computation, either a value `T` or an error `E`.
     enum Result<T, E> has copy, store {
@@ -28,7 +28,7 @@ module std::result {
     public fun unwrap<T, E>(self: Result<T, E>): T {
         match (self) {
             Ok(x) => x,
-            _ => abort error::invalid_argument(EUNWRAP_OK)
+            _ => abort error::invalid_argument(E_UNWRAP_OK)
         }
     }
 
@@ -36,7 +36,7 @@ module std::result {
     public fun unwrap_err<T, E>(self: Result<T, E>): E {
         match (self) {
             Err(x) => x,
-            _ => abort error::invalid_argument(EUNWRAP_ERR)
+            _ => abort error::invalid_argument(E_UNWRAP_ERR)
         }
     }
 

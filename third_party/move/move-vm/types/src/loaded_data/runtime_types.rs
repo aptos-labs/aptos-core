@@ -1668,15 +1668,16 @@ impl<'a> TypeParamMap<'a> {
         }
     }
 
+    /// Matches sequences of types using `match_ty`.
     pub fn match_tys(
         &mut self,
         actuals: impl ExactSizeIterator<Item = &'a Type>,
-        formals: impl ExactSizeIterator<Item = &'a Type>,
+        expected: impl ExactSizeIterator<Item = &'a Type>,
     ) -> bool {
-        if actuals.len() != formals.len() {
+        if actuals.len() != expected.len() {
             return false;
         }
-        for (actual, formal) in actuals.zip(formals) {
+        for (actual, formal) in actuals.zip(expected) {
             if !self.match_ty(actual, formal) {
                 return false;
             }
