@@ -331,7 +331,7 @@ impl InnerBuilder {
                 self.config.receiver_max_total_bytes as u64,
                 self.config.batch_expiry_gap_when_init_usecs,
                 self.transaction_filter_config.clone(),
-                self.config.enable_proof_v2,
+                self.batch_info_ext_enabled,
             );
             #[allow(unused_variables)]
             let name = format!("batch_coordinator-{}", i);
