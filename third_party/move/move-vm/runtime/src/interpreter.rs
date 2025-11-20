@@ -3061,6 +3061,13 @@ impl Frame {
                         let value = vec_ref.len()?;
                         interpreter.operand_stack.push(value)?;
                     },
+                    Instruction::VecSwapV2 => {
+                        let idx2 = interpreter.operand_stack.pop_as::<u64>()? as usize;
+                        let idx1 = interpreter.operand_stack.pop_as::<u64>()? as usize;
+                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        gas_meter.charge_vec_swap()?;
+                        vec_ref.swap(idx1, idx2)?;
+                    },
                     Instruction::TestVariantV2(instr) => {
                         let reference = interpreter.operand_stack.pop_as::<StructRef>()?;
                         gas_meter.charge_simple_instr(S::TestVariant)?;

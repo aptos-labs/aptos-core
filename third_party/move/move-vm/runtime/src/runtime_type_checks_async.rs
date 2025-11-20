@@ -410,6 +410,7 @@ where
                 | Instruction::CastU32
                 | Instruction::CastU256
                 | Instruction::VecLenV2
+                | Instruction::VecSwapV2
                 | Instruction::TestVariantV2(_)
                 | Instruction::BorrowFieldV2(_)
                 | Instruction::PackV2(_)

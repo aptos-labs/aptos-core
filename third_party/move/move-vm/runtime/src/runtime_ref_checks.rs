@@ -430,6 +430,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             | ImmBorrowVariantField(_)
             | ImmBorrowVariantFieldGeneric(_)
             | VecLenV2
+            | VecSwapV2
             | TestVariantV2(_)
             | BorrowFieldV2(_)
             | PackV2(_)
@@ -673,6 +674,9 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             VecLenV2 => {
                 ref_state.vec_len()?;
+            },
+            VecSwapV2 => {
+                ref_state.vec_swap()?;
             },
             TestVariantV2(_) => {
                 ref_state.pop_ref_push_non_ref()?;

@@ -183,6 +183,7 @@ pub enum Instruction {
     Negate,
 
     VecLenV2,
+    VecSwapV2,
     TestVariantV2(TestVariantV2),
     BorrowFieldV2(Box<BorrowFieldV2>),
     PackV2(Box<PackV2>),
@@ -452,6 +453,18 @@ impl<'a> BytecodeTransformer<'a> {
             Instruction::VecLenV2
         } else {
             Instruction::VecLen(idx)
+        })
+    }
+
+    fn transform_vec_swap(
+        &self,
+        idx: SignatureIndex,
+        inline: bool,
+    ) -> PartialVMResult<Instruction> {
+        Ok(if self.use_v2_instructions || inline {
+            Instruction::VecSwapV2
+        } else {
+            Instruction::VecSwap(idx)
         })
     }
 
@@ -887,7 +900,7 @@ impl<'a> BytecodeTransformer<'a> {
             B::VecPushBack(idx) => I::VecPushBack(idx),
             B::VecPopBack(idx) => I::VecPopBack(idx),
             B::VecUnpack(idx, n) => I::VecUnpack(idx, n),
-            B::VecSwap(idx) => I::VecSwap(idx),
+            B::VecSwap(idx) => self.transform_vec_swap(idx, inline)?,
             B::PackClosure(idx, mask) => I::PackClosure(idx, mask),
             B::PackClosureGeneric(idx, mask) => I::PackClosureGeneric(idx, mask),
             B::CallClosure(idx) => I::CallClosure(idx),

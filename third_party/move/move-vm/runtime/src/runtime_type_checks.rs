@@ -414,6 +414,7 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
             | Instruction::ImmBorrowVariantFieldGeneric(_) => (),
 
             Instruction::VecLenV2 => (),
+            Instruction::VecSwapV2 => (),
             Instruction::TestVariantV2(_) => (),
             Instruction::BorrowFieldV2(_) => (),
             Instruction::PackV2(_) => (),
@@ -957,6 +958,13 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
                     .paranoid_check_is_any_vec_ref_ty::<false>()?;
                 let u64_ty = ty_builder.create_u64_ty();
                 operand_stack.push_ty(u64_ty)?;
+            },
+            Instruction::VecSwapV2 => {
+                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                operand_stack.pop_ty()?.paranoid_check_is_u64_ty()?;
+                operand_stack
+                    .pop_ty()?
+                    .paranoid_check_is_any_vec_ref_ty::<false>()?;
             },
             Instruction::TestVariantV2(instr) => {
                 let struct_ref_ty = operand_stack.pop_ty()?;
