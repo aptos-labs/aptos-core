@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{pvss::chunky::chunked_elgamal, traits};
+use crate::{pvss::chunky::chunked_elgamal, traits, Scalar};
 use aptos_crypto::{
     arkworks,
     arkworks::serialization::{ark_de, ark_se},
@@ -93,3 +93,9 @@ impl<E: Pairing> DealtPubKeyShare<E> {
         DealtPubKeyShare(dealt_pk)
     }
 }
+
+// TODO: maybe make these actual structs
+#[allow(type_alias_bounds)]
+pub type DealtSecretKey<E: Pairing> = Scalar<E>;
+#[allow(type_alias_bounds)]
+pub type DealtSecretKeyShare<E: Pairing> = Scalar<E>;
