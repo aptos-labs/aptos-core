@@ -718,6 +718,7 @@ function install_libdw {
   # Right now, only install libdw for linux
   if [[ "$(uname)" == "Linux" ]]; then
     install_pkg libdw-dev "$PACKAGE_MANAGER"
+    install_pkg liburing-dev "$PACKAGE_MANAGER"
   fi
 }
 
