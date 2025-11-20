@@ -33,18 +33,8 @@ pub(crate) trait RuntimeTypeCheck {
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()>;
 
-    /// Paranoid check that operand and type stacks have the same size
-    fn check_operand_stack_balance(
-        for_fun: &Function,
-        operand_stack: &Stack,
-    ) -> PartialVMResult<()>;
-
     /// For any other checks are performed externally
     fn should_perform_checks(for_fun: &Function) -> bool;
-
-    /// Whether this is a partial checker, in which some parts of the code are checked and
-    /// others not. This is needed for certain info only valid in full checking.
-    fn is_partial_checker() -> bool;
 
     /// Performs a runtime check of the caller is allowed to call the callee for any type of call,
     /// including native dynamic dispatch or calling a closure.
@@ -249,20 +239,7 @@ impl RuntimeTypeCheck for NoRuntimeTypeCheck {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    fn check_operand_stack_balance(
-        _for_fun: &Function,
-        _operand_stack: &Stack,
-    ) -> PartialVMResult<()> {
-        Ok(())
-    }
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
     fn should_perform_checks(_for_fun: &Function) -> bool {
-        false
-    }
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    fn is_partial_checker() -> bool {
         false
     }
 
@@ -952,21 +929,8 @@ impl RuntimeTypeCheck for FullRuntimeTypeCheck {
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
-    fn check_operand_stack_balance(
-        _for_fun: &Function,
-        operand_stack: &Stack,
-    ) -> PartialVMResult<()> {
-        operand_stack.check_balance()
-    }
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
     fn should_perform_checks(_for_fun: &Function) -> bool {
         true
-    }
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    fn is_partial_checker() -> bool {
-        false
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
@@ -1048,23 +1012,8 @@ impl RuntimeTypeCheck for UntrustedOnlyRuntimeTypeCheck {
         }
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    fn check_operand_stack_balance(
-        _for_fun: &Function,
-        _operand_stack: &Stack,
-    ) -> PartialVMResult<()> {
-        // We cannot have a global stack balancing without traversing the frame stack,
-        // so skip in this mode.
-        Ok(())
-    }
-
     fn should_perform_checks(for_fun: &Function) -> bool {
         !for_fun.is_trusted
-    }
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    fn is_partial_checker() -> bool {
-        true
     }
 
     #[cfg_attr(feature = "force-inline", inline(always))]
