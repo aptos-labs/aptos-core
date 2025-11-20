@@ -597,6 +597,7 @@ where
             None,
             locals,
             frame_cache,
+            &self.type_stack,
         )
     }
 
@@ -644,6 +645,7 @@ where
             None,
             locals,
             callee_frame_cache,
+            &self.type_stack,
         )?;
         std::mem::swap(current_frame, &mut frame);
         self.call_stack.push(frame).map_err(|_| {

@@ -1,0 +1,59 @@
+//# publish
+module 0x33::untrusted
+
+fun return_20(): (u64, u64)
+    ld_u64 20
+    ret
+
+public fun sum_10_20(): u64
+    ld_u64 10
+    call return_20
+    add
+    add
+    ret
+
+public fun sum_10_20_closure(): u64
+    ld_u64 10
+    // stack size is 1
+    pack_closure return_20, 0
+    call_closure<||(u64, u64)>
+    // on return, stack size is 3
+    add
+    add
+    ret
+
+
+//# publish
+module 0x44::untrusted
+
+fun return_20_30_40(): (u64, u64)
+    ld_u64 20
+    ld_u64 30
+    ld_u64 40
+    ret
+
+public fun sum_10_20_30_40(): u64
+    ld_u64 10
+    call return_20_30_40
+    add
+    add
+    ret
+
+public fun sum_10_20_30_40_closure(): u64
+    ld_u64 10
+    // stack size is 1
+    pack_closure return_20_30_40, 0
+    call_closure<||(u64, u64)>
+    // on return, stack size is 3
+    add
+    add
+    ret
+
+
+//# run --verbose 0x33::untrusted::sum_10_20
+
+//# run --verbose 0x33::untrusted::sum_10_20_closure
+
+//# run --verbose 0x44::untrusted::sum_10_20_30_40
+
+//# run --verbose 0x44::untrusted::sum_10_20_30_40_closure
