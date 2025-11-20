@@ -4,10 +4,13 @@
 set -e
 
 PROFILE=${PROFILE:-release}
+if [[ "$PROFILE" == "performance" ]]; then
+  export RUSTFLAGS="$PERF_RUSTFLAGS"
+fi
 
 echo "Building indexer and related binaries"
 echo "PROFILE: $PROFILE"
-
+echo "RUSTFLAGS: $RUSTFLAGS"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
 # Build all the rust binaries
