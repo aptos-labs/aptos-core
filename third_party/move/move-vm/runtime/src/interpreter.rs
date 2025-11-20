@@ -374,6 +374,7 @@ where
             Some(fn_guard),
             locals,
             frame_cache,
+            &self.operand_stack,
         )
         .map_err(|err| self.set_location(err))?;
 
@@ -401,6 +402,15 @@ where
                     gas_meter
                         .charge_drop_frame(non_ref_vals.iter())
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    let actual_stack_size = self.operand_stack.value.len();
+                    let expected_stack_size = current_frame.function.return_tys().len()
+                        + current_frame.caller_value_stack_size as usize;
+                    if actual_stack_size != expected_stack_size {
+                        let err = current_frame
+                            .stack_size_mismatch_error(expected_stack_size, actual_stack_size);
+                        return Err(set_err_info!(current_frame, err));
+                    }
 
                     self.call_stack
                         .type_check_return::<RTTCheck>(&mut self.operand_stack, &mut current_frame)
@@ -760,16 +770,32 @@ impl CallStack {
         let callee_has_rt_checks =
             RTTCheck::should_perform_checks(&current_frame.function.function);
         if callee_has_rt_checks {
+            let num_return_tys = current_frame.function.return_tys().len();
+            let actual_type_stack_size = operand_stack.types.len();
+            let expected_type_stack_size =
+                num_return_tys + current_frame.caller_type_stack_size as usize;
+            if actual_type_stack_size != expected_type_stack_size {
+                return Err(current_frame
+                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+            }
             self.check_return_tys::<RTTCheck>(operand_stack, current_frame)?;
             if !caller_has_rt_checks {
                 // The callee has pushed return types, but they aren't used by
                 // the caller, so need to be removed.
-                operand_stack.remove_tys(current_frame.function.return_tys().len())?;
+                operand_stack.remove_tys(num_return_tys)?;
             }
         } else if caller_has_rt_checks {
-            // We are not runtime checking this function, but in the caller,
-            // so we must push the return types of the function onto the type stack,
-            // following the runtime type checking protocol.
+            // We are not runtime checking this function, but in the caller, so we must push the
+            // return types of the function onto the type stack, following the runtime type
+            // checking protocol. Also, we should check that the type stack is balanced: if callee
+            // has no runtime checks, type stack should be at the same state.
+            let actual_type_stack_size = operand_stack.types.len();
+            let expected_type_stack_size = current_frame.caller_type_stack_size as usize;
+            if actual_type_stack_size != expected_type_stack_size {
+                return Err(current_frame
+                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+            }
+
             let ty_args = current_frame.function.ty_args();
             if ty_args.is_empty() {
                 for ret_ty in current_frame.function.return_tys() {
@@ -795,17 +821,6 @@ impl CallStack {
         current_frame: &mut Frame,
     ) -> PartialVMResult<()> {
         let expected_ret_tys = current_frame.function.return_tys();
-        if !RTTCheck::is_partial_checker()
-            && self.0.is_empty()
-            && operand_stack.types.len() != expected_ret_tys.len()
-        {
-            // If we have full stack available and this is the outermost call on the stack, the
-            // type stack must contain exactly the expected number of returns.
-            return Err(PartialVMError::new_invariant_violation(
-                "unbalanced stack at end of execution",
-            )
-            .with_sub_status(EPARANOID_FAILURE));
-        }
         if expected_ret_tys.is_empty() {
             return Ok(());
         }
@@ -942,6 +957,7 @@ where
             Some(fn_guard),
             locals,
             frame_cache,
+            &self.operand_stack,
         )
     }
 
@@ -1708,7 +1724,7 @@ pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
-    value: Vec<Value>,
+    pub(crate) value: Vec<Value>,
     pub(crate) types: Vec<Type>,
 }
 
@@ -1848,18 +1864,6 @@ impl Stack {
         let len = self.types.len();
         Ok(&self.types[(len - n)..])
     }
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
-        if self.types.len() != self.value.len() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    "Paranoid Mode: Type and value stack need to be balanced".to_string(),
-                ),
-            );
-        }
-        Ok(())
-    }
 }
 
 /// A call stack.
@@ -1981,10 +1985,6 @@ impl Frame {
                 // The reason for this design is we charge gas during instruction execution and we want to perform checks only after
                 // proper gas has been charged for each instruction.
 
-                RTTCheck::check_operand_stack_balance(
-                    &self.function.function,
-                    &interpreter.operand_stack,
-                )?;
                 RTTCheck::pre_execution_type_stack_transition(
                     self,
                     &mut interpreter.operand_stack,
@@ -2938,10 +2938,6 @@ impl Frame {
                     instruction,
                     frame_cache,
                 )?;
-                RTTCheck::check_operand_stack_balance(
-                    &self.function.function,
-                    &interpreter.operand_stack,
-                )?;
                 RTRCheck::post_execution_transition(
                     self,
                     instruction,
@@ -2951,18 +2947,10 @@ impl Frame {
                 // invariant: advance to pc +1 is iff instruction at pc executed without aborting
                 self.pc += 1;
             }
-            // ok we are out, it's a branch, check the pc for good luck
-            // TODO: re-work the logic here. Tests should have a more
-            // natural way to plug in
+
+            // If out of the loop - it was a branch.
             if self.pc as usize >= code.len() {
-                if cfg!(test) {
-                    // In order to test the behavior of an instruction stream, hitting end of the
-                    // code should report no error so that we can check the
-                    // locals.
-                    return Ok(ExitCode::Return);
-                } else {
-                    return Err(PartialVMError::new(StatusCode::PC_OVERFLOW));
-                }
+                return Err(PartialVMError::new(StatusCode::PC_OVERFLOW));
             }
         }
     }
@@ -2972,5 +2960,16 @@ impl Frame {
             None => Location::Script,
             Some(id) => Location::Module(id.clone()),
         }
+    }
+
+    #[cold]
+    fn stack_size_mismatch_error(&self, expected: usize, actual: usize) -> PartialVMError {
+        let err = PartialVMError::new_invariant_violation(format!(
+            "Stack size mismatch when returning from {}: expected: {}, got: {}",
+            self.function.name_as_pretty_string(),
+            expected,
+            actual
+        ));
+        err.with_sub_status(EPARANOID_FAILURE)
     }
 }
