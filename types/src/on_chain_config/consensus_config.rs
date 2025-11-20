@@ -25,6 +25,13 @@ pub enum ConsensusAlgorithmConfig {
         quorum_store_enabled: bool,
         order_vote_enabled: bool,
     },
+    AptosV3 {
+        main: ConsensusConfigV1,
+        quorum_store_enabled: bool,
+        order_vote_enabled: bool,
+        // Use BatchInfoExt instead of BatchInfo in Quorum Store
+        use_batch_info_ext: bool,
+    },
 }
 
 impl ConsensusAlgorithmConfig {
@@ -61,6 +68,10 @@ impl ConsensusAlgorithmConfig {
             | ConsensusAlgorithmConfig::JolteonV2 {
                 quorum_store_enabled,
                 ..
+            }
+            | ConsensusAlgorithmConfig::AptosV3 {
+                quorum_store_enabled,
+                ..
             } => *quorum_store_enabled,
             ConsensusAlgorithmConfig::DAG(_) => true,
         }
@@ -70,41 +81,49 @@ impl ConsensusAlgorithmConfig {
         match self {
             ConsensusAlgorithmConfig::JolteonV2 {
                 order_vote_enabled, ..
+            }
+            | ConsensusAlgorithmConfig::AptosV3 {
+                order_vote_enabled, ..
             } => *order_vote_enabled,
+            _ => false,
+        }
+    }
+
+    pub fn use_batch_info_ext(&self) -> bool {
+        match self {
+            ConsensusAlgorithmConfig::AptosV3 {
+                use_batch_info_ext, ..
+            } => *use_batch_info_ext,
             _ => false,
         }
     }
 
     pub fn is_dag_enabled(&self) -> bool {
         match self {
-            ConsensusAlgorithmConfig::Jolteon { .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { .. } => false,
             ConsensusAlgorithmConfig::DAG(_) => true,
+            _ => false,
+        }
+    }
+
+    pub fn as_consensus_config_v1(&self) -> &ConsensusConfigV1 {
+        match self {
+            ConsensusAlgorithmConfig::Jolteon { main, .. }
+            | ConsensusAlgorithmConfig::JolteonV2 { main, .. }
+            | ConsensusAlgorithmConfig::AptosV3 { main, .. } => main,
+            _ => unimplemented!("method not supported"),
         }
     }
 
     pub fn leader_reputation_exclude_round(&self) -> u64 {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.exclude_round,
-            _ => unimplemented!("method not supported"),
-        }
+        self.as_consensus_config_v1().exclude_round
     }
 
     pub fn max_failed_authors_to_store(&self) -> usize {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. }
-            | ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main.max_failed_authors_to_store,
-            _ => unimplemented!("method not supported"),
-        }
+        self.as_consensus_config_v1().max_failed_authors_to_store
     }
 
     pub fn proposer_election_type(&self) -> &ProposerElectionType {
-        match self {
-            ConsensusAlgorithmConfig::Jolteon { main, .. } => &main.proposer_election_type,
-            ConsensusAlgorithmConfig::JolteonV2 { main, .. } => &main.proposer_election_type,
-            _ => unimplemented!("method not supported"),
-        }
+        &self.as_consensus_config_v1().proposer_election_type
     }
 
     pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
@@ -118,6 +137,7 @@ impl ConsensusAlgorithmConfig {
         match self {
             ConsensusAlgorithmConfig::Jolteon { main, .. } => main,
             ConsensusAlgorithmConfig::JolteonV2 { main, .. } => main,
+            ConsensusAlgorithmConfig::AptosV3 { main, .. } => main,
             _ => unreachable!("not a jolteon config"),
         }
     }
@@ -271,6 +291,16 @@ impl OnChainConsensusConfig {
                 rand_check_enabled, ..
             } => Some(rand_check_enabled),
             _ => None,
+        }
+    }
+
+    pub fn is_dag_enabled(&self) -> bool {
+        match self {
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => false,
+            _ => self
+                .alg()
+                .expect("V3+ variants always have alg")
+                .is_dag_enabled(),
         }
     }
 

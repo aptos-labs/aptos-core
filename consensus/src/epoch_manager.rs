@@ -66,7 +66,7 @@ use aptos_consensus_types::{
     block_retrieval::BlockRetrievalRequest,
     common::{Author, Round},
     epoch_retrieval::EpochRetrievalRequest,
-    proof_of_store::{BatchInfo, ProofCache},
+    proof_of_store::ProofCache,
     utils::PayloadTxnsSize,
 };
 use aptos_crypto::bls12381::PrivateKey;
@@ -172,7 +172,7 @@ pub struct EpochManager<P: OnChainConfigProvider> {
     dag_config: DagConsensusConfig,
     payload_manager: Arc<dyn TPayloadManager>,
     rand_storage: Arc<dyn RandStorage<AugmentedData>>,
-    proof_cache: ProofCache<BatchInfo>,
+    proof_cache: ProofCache,
     consensus_publisher: Option<Arc<ConsensusPublisher>>,
     pending_blocks: Arc<Mutex<PendingBlocks>>,
     key_storage: PersistentSafetyStorage,
@@ -746,6 +746,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.quorum_store_storage.clone(),
                 !consensus_config.is_dag_enabled,
                 consensus_key,
+                consensus_config.use_batch_info_ext(),
             ))
         } else {
             info!("Building DirectMempool");

@@ -19,7 +19,9 @@ use std::{
     ops::Deref,
 };
 
-pub trait TBatchInfo: Serialize + CryptoHash + Debug + Clone + Hash + Eq {
+pub trait TBatchInfo:
+    Serialize + CryptoHash + Debug + Clone + Hash + Eq + PartialEq + Into<BatchInfoExt>
+{
     fn epoch(&self) -> u64;
 
     fn expiration(&self) -> u64;
@@ -29,6 +31,16 @@ pub trait TBatchInfo: Serialize + CryptoHash + Debug + Clone + Hash + Eq {
     fn num_bytes(&self) -> u64;
 
     fn as_batch_info(&self) -> &BatchInfo;
+
+    fn batch_id(&self) -> BatchId;
+
+    fn author(&self) -> PeerId;
+
+    fn digest(&self) -> &HashValue;
+
+    fn gas_bucket_start(&self) -> u64;
+
+    fn size(&self) -> PayloadTxnsSize;
 }
 
 #[derive(
@@ -105,6 +117,12 @@ impl BatchInfo {
     }
 }
 
+impl From<BatchInfo> for BatchInfoExt {
+    fn from(info: BatchInfo) -> Self {
+        Self::V1 { info }
+    }
+}
+
 impl TBatchInfo for BatchInfo {
     fn epoch(&self) -> u64 {
         self.epoch
@@ -124,6 +142,26 @@ impl TBatchInfo for BatchInfo {
 
     fn as_batch_info(&self) -> &BatchInfo {
         self
+    }
+
+    fn batch_id(&self) -> BatchId {
+        self.batch_id
+    }
+
+    fn author(&self) -> PeerId {
+        self.author
+    }
+
+    fn digest(&self) -> &HashValue {
+        &self.digest
+    }
+
+    fn gas_bucket_start(&self) -> u64 {
+        self.gas_bucket_start
+    }
+
+    fn size(&self) -> PayloadTxnsSize {
+        PayloadTxnsSize::new(self.num_txns, self.num_bytes)
     }
 }
 
@@ -149,6 +187,85 @@ impl TDataInfo for BatchInfo {
     fn signers(&self, _ordered_authors: &[PeerId]) -> Vec<PeerId> {
         vec![self.author()]
     }
+}
+
+#[derive(
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+)]
+pub enum BatchInfoExt {
+    V1 {
+        info: BatchInfo,
+    },
+    V2 {
+        info: BatchInfo,
+        extra: ExtraBatchInfo,
+    },
+}
+
+impl BatchInfoExt {
+    pub fn info(&self) -> &BatchInfo {
+        match self {
+            BatchInfoExt::V1 { info } => info,
+            BatchInfoExt::V2 { info, .. } => info,
+        }
+    }
+}
+
+impl TBatchInfo for BatchInfoExt {
+    fn epoch(&self) -> u64 {
+        self.info().epoch()
+    }
+
+    fn expiration(&self) -> u64 {
+        self.info().expiration()
+    }
+
+    fn num_txns(&self) -> u64 {
+        self.info().num_txns()
+    }
+
+    fn num_bytes(&self) -> u64 {
+        self.info().num_bytes()
+    }
+
+    fn as_batch_info(&self) -> &BatchInfo {
+        self.info()
+    }
+
+    fn batch_id(&self) -> BatchId {
+        self.info().batch_id()
+    }
+
+    fn author(&self) -> PeerId {
+        self.info().author()
+    }
+
+    fn digest(&self) -> &HashValue {
+        self.info().digest()
+    }
+
+    fn gas_bucket_start(&self) -> u64 {
+        self.info().gas_bucket_start()
+    }
+
+    fn size(&self) -> PayloadTxnsSize {
+        PayloadTxnsSize::new(self.num_txns(), self.num_bytes())
+    }
+}
+
+#[derive(
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+)]
+pub struct ExtraBatchInfo {
+    pub batch_kind: BatchKind,
+}
+
+#[derive(
+    Clone, Debug, Deserialize, Serialize, CryptoHasher, BCSCryptoHash, PartialEq, Eq, Hash,
+)]
+pub enum BatchKind {
+    Normal,
+    Encrypted,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -200,6 +317,18 @@ where
 
     pub fn take(self) -> Vec<SignedBatchInfo<T>> {
         self.signed_infos
+    }
+}
+
+impl From<SignedBatchInfoMsg<BatchInfo>> for SignedBatchInfoMsg<BatchInfoExt> {
+    fn from(info: SignedBatchInfoMsg<BatchInfo>) -> Self {
+        Self {
+            signed_infos: info
+                .signed_infos
+                .into_iter()
+                .map(|signed_info| signed_info.into())
+                .collect(),
+        }
     }
 }
 
@@ -294,6 +423,21 @@ impl<T> Deref for SignedBatchInfo<T> {
     }
 }
 
+impl From<SignedBatchInfo<BatchInfo>> for SignedBatchInfo<BatchInfoExt> {
+    fn from(signed_batch_info: SignedBatchInfo<BatchInfo>) -> Self {
+        let SignedBatchInfo {
+            info,
+            signer,
+            signature,
+        } = signed_batch_info;
+        Self {
+            info: info.into(),
+            signer,
+            signature,
+        }
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum SignedBatchInfoError {
     WrongAuthor,
@@ -323,7 +467,7 @@ where
         &self,
         max_num_proofs: usize,
         validator: &ValidatorVerifier,
-        cache: &ProofCache<T>,
+        cache: &ProofCache,
     ) -> anyhow::Result<()> {
         ensure!(!self.proofs.is_empty(), "Empty message");
         ensure!(
@@ -357,7 +501,19 @@ where
     }
 }
 
-pub type ProofCache<T> = Cache<T, AggregateSignature>;
+impl From<ProofOfStoreMsg<BatchInfo>> for ProofOfStoreMsg<BatchInfoExt> {
+    fn from(proof_msg: ProofOfStoreMsg<BatchInfo>) -> Self {
+        Self {
+            proofs: proof_msg
+                .proofs
+                .into_iter()
+                .map(|proof| proof.into())
+                .collect(),
+        }
+    }
+}
+
+pub type ProofCache = Cache<BatchInfoExt, AggregateSignature>;
 
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct ProofOfStore<T> {
@@ -376,12 +532,9 @@ where
         }
     }
 
-    pub fn verify(
-        &self,
-        validator: &ValidatorVerifier,
-        cache: &ProofCache<T>,
-    ) -> anyhow::Result<()> {
-        if let Some(signature) = cache.get(&self.info) {
+    pub fn verify(&self, validator: &ValidatorVerifier, cache: &ProofCache) -> anyhow::Result<()> {
+        let batch_info_ext: BatchInfoExt = self.info.clone().into();
+        if let Some(signature) = cache.get(&batch_info_ext) {
             if signature == self.multi_signature {
                 return Ok(());
             }
@@ -393,7 +546,7 @@ where
                 self.info
             ));
         if result.is_ok() {
-            cache.insert(self.info.clone(), self.multi_signature.clone());
+            cache.insert(batch_info_ext, self.multi_signature.clone());
         }
         result
     }
@@ -410,6 +563,10 @@ where
 
     pub fn multi_signature(&self) -> &AggregateSignature {
         &self.multi_signature
+    }
+
+    pub fn unpack(self) -> (T, AggregateSignature) {
+        (self.info, self.multi_signature)
     }
 }
 
@@ -439,5 +596,15 @@ where
 
     fn signers(&self, ordered_authors: &[PeerId]) -> Vec<PeerId> {
         self.shuffled_signers(ordered_authors)
+    }
+}
+
+impl From<ProofOfStore<BatchInfo>> for ProofOfStore<BatchInfoExt> {
+    fn from(proof: ProofOfStore<BatchInfo>) -> Self {
+        let (info, sig) = proof.unpack();
+        Self {
+            info: info.into(),
+            multi_signature: sig,
+        }
     }
 }

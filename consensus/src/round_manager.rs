@@ -45,7 +45,7 @@ use aptos_consensus_types::{
     order_vote::OrderVote,
     order_vote_msg::OrderVoteMsg,
     pipelined_block::PipelinedBlock,
-    proof_of_store::{BatchInfo, ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
+    proof_of_store::{BatchInfo, BatchInfoExt, ProofCache, ProofOfStoreMsg, SignedBatchInfoMsg},
     proposal_msg::ProposalMsg,
     quorum_cert::QuorumCert,
     round_timeout::{RoundTimeout, RoundTimeoutMsg, RoundTimeoutReason},
@@ -107,7 +107,7 @@ impl UnverifiedEvent {
         self,
         peer_id: PeerId,
         validator: &ValidatorVerifier,
-        proof_cache: &ProofCache<BatchInfo>,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
         self_message: bool,
         max_num_batches: usize,
@@ -115,7 +115,6 @@ impl UnverifiedEvent {
     ) -> Result<VerifiedEvent, VerifyError> {
         let start_time = Instant::now();
         Ok(match self {
-            //TODO: no need to sign and verify the proposal
             UnverifiedEvent::ProposalMsg(p) => {
                 if !self_message {
                     p.verify(peer_id, validator, proof_cache, quorum_store_enabled)?;
@@ -161,7 +160,6 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::OrderVoteMsg(v)
             },
-            // sync info verification is on-demand (verified when it's used)
             UnverifiedEvent::SyncInfo(s) => VerifiedEvent::UnverifiedSyncInfo(s),
             UnverifiedEvent::BatchMsg(b) => {
                 if !self_message {
@@ -184,7 +182,7 @@ impl UnverifiedEvent {
                         .with_label_values(&["signed_batch"])
                         .observe(start_time.elapsed().as_secs_f64());
                 }
-                VerifiedEvent::SignedBatchInfo(sd)
+                VerifiedEvent::SignedBatchInfo(Box::new((*sd).into()))
             },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
@@ -193,7 +191,7 @@ impl UnverifiedEvent {
                         .with_label_values(&["proof_of_store"])
                         .observe(start_time.elapsed().as_secs_f64());
                 }
-                VerifiedEvent::ProofOfStoreMsg(p)
+                VerifiedEvent::ProofOfStoreMsg(Box::new((*p).into()))
             },
         })
     }
@@ -240,8 +238,8 @@ pub enum VerifiedEvent {
     OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
     BatchMsg(Box<BatchMsg>),
-    SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfo>>),
-    ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfo>>),
+    SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfoExt>>),
+    ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfoExt>>),
     // local messages
     LocalTimeout(Round),
     // Shutdown the NetworkListener

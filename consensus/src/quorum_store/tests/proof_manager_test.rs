@@ -6,7 +6,7 @@ use crate::quorum_store::{
 };
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter},
-    proof_of_store::{BatchInfo, ProofOfStore},
+    proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore},
     request_response::{GetPayloadCommand, GetPayloadRequest, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
@@ -20,7 +20,11 @@ fn create_proof_manager() -> ProofManager {
     ProofManager::new(PeerId::random(), 10, 10, batch_store, true, true, 1)
 }
 
-fn create_proof(author: PeerId, expiration: u64, batch_sequence: u64) -> ProofOfStore<BatchInfo> {
+fn create_proof(
+    author: PeerId,
+    expiration: u64,
+    batch_sequence: u64,
+) -> ProofOfStore<BatchInfoExt> {
     create_proof_with_gas(author, expiration, batch_sequence, 0)
 }
 
@@ -29,7 +33,7 @@ fn create_proof_with_gas(
     expiration: u64,
     batch_sequence: u64,
     gas_bucket_start: u64,
-) -> ProofOfStore<BatchInfo> {
+) -> ProofOfStore<BatchInfoExt> {
     let digest = HashValue::random();
     let batch_id = BatchId::new_for_test(batch_sequence);
     ProofOfStore::new(
@@ -42,7 +46,8 @@ fn create_proof_with_gas(
             1,
             1,
             gas_bucket_start,
-        ),
+        )
+        .into(),
         AggregateSignature::empty(),
     )
 }
@@ -50,7 +55,7 @@ fn create_proof_with_gas(
 async fn get_proposal(
     proof_manager: &mut ProofManager,
     max_txns: u64,
-    filter: &[BatchInfo],
+    filter: &[BatchInfoExt],
 ) -> Payload {
     let (callback_tx, callback_rx) = oneshot::channel();
     let filter_set = HashSet::from_iter(filter.iter().cloned());
@@ -72,7 +77,7 @@ async fn get_proposal(
 
 fn assert_payload_response(
     payload: Payload,
-    expected: &[ProofOfStore<BatchInfo>],
+    expected: &[ProofOfStore<BatchInfoExt>],
     max_txns_from_block_to_execute: Option<u64>,
     expected_block_gas_limit: Option<u64>,
 ) {
@@ -80,27 +85,27 @@ fn assert_payload_response(
         Payload::InQuorumStore(proofs) => {
             assert_eq!(proofs.proofs.len(), expected.len());
             for proof in proofs.proofs {
-                assert!(expected.contains(&proof));
+                assert!(expected.contains(&proof.into()));
             }
         },
         Payload::InQuorumStoreWithLimit(proofs) => {
             assert_eq!(proofs.proof_with_data.proofs.len(), expected.len());
             for proof in proofs.proof_with_data.proofs {
-                assert!(expected.contains(&proof));
+                assert!(expected.contains(&proof.into()));
             }
             assert_eq!(proofs.max_txns_to_execute, max_txns_from_block_to_execute);
         },
         Payload::QuorumStoreInlineHybrid(_inline_batches, proofs, max_txns_to_execute) => {
             assert_eq!(proofs.proofs.len(), expected.len());
             for proof in proofs.proofs {
-                assert!(expected.contains(&proof));
+                assert!(expected.contains(&proof.into()));
             }
             assert_eq!(max_txns_to_execute, max_txns_from_block_to_execute);
         },
         Payload::QuorumStoreInlineHybridV2(_inline_batches, proofs, execution_limits) => {
             assert_eq!(proofs.proofs.len(), expected.len());
             for proof in proofs.proofs {
-                assert!(expected.contains(&proof));
+                assert!(expected.contains(&proof.into()));
             }
             assert_eq!(
                 execution_limits.max_txns_to_execute(),
@@ -115,8 +120,8 @@ fn assert_payload_response(
 async fn get_proposal_and_assert(
     proof_manager: &mut ProofManager,
     max_txns: u64,
-    filter: &[BatchInfo],
-    expected: &[ProofOfStore<BatchInfo>],
+    filter: &[BatchInfoExt],
+    expected: &[ProofOfStore<BatchInfoExt>],
 ) {
     assert_payload_response(
         get_proposal(proof_manager, max_txns, filter).await,
@@ -263,9 +268,18 @@ async fn test_duplicate_batches_on_commit() {
     let digest = HashValue::random();
     let batch_id = BatchId::new_for_test(1);
     let batch = BatchInfo::new(author, batch_id, 0, 10, digest, 1, 1, 0);
-    let proof0 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
-    let proof1 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
-    let proof2 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
+    let proof0 = ProofOfStore::new(
+        BatchInfoExt::from(batch.clone()),
+        AggregateSignature::empty(),
+    );
+    let proof1 = ProofOfStore::new(
+        BatchInfoExt::from(batch.clone()),
+        AggregateSignature::empty(),
+    );
+    let proof2 = ProofOfStore::new(
+        BatchInfoExt::from(batch.clone()),
+        AggregateSignature::empty(),
+    );
 
     proof_manager.receive_proofs(vec![proof0.clone()]);
     proof_manager.receive_proofs(vec![proof1.clone()]);
@@ -274,7 +288,7 @@ async fn test_duplicate_batches_on_commit() {
     get_proposal_and_assert(&mut proof_manager, 10, &[], &vec![proof0.clone()]).await;
 
     // Nothing goes wrong on commits
-    proof_manager.handle_commit_notification(4, vec![batch.clone()]);
+    proof_manager.handle_commit_notification(4, vec![batch.clone().into()]);
     get_proposal_and_assert(&mut proof_manager, 10, &[], &[]).await;
 
     // Before expiration, still marked as committed
@@ -296,8 +310,14 @@ async fn test_duplicate_batches_on_expiration() {
     let digest = HashValue::random();
     let batch_id = BatchId::new_for_test(1);
     let batch = BatchInfo::new(author, batch_id, 0, 10, digest, 1, 1, 0);
-    let proof0 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
-    let proof1 = ProofOfStore::new(batch.clone(), AggregateSignature::empty());
+    let proof0 = ProofOfStore::new(
+        BatchInfoExt::from(batch.clone()),
+        AggregateSignature::empty(),
+    );
+    let proof1 = ProofOfStore::new(
+        BatchInfoExt::from(batch.clone()),
+        AggregateSignature::empty(),
+    );
 
     proof_manager.receive_proofs(vec![proof0.clone()]);
     proof_manager.receive_proofs(vec![proof1.clone()]);

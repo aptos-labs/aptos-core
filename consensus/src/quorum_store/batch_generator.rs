@@ -14,7 +14,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::BatchInfo,
+    proof_of_store::{BatchInfoExt, TBatchInfo},
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
@@ -31,7 +31,7 @@ use tokio::time::Interval;
 
 #[derive(Debug)]
 pub enum BatchGeneratorCommand {
-    CommitNotification(u64, Vec<BatchInfo>),
+    CommitNotification(u64, Vec<BatchInfoExt>),
     ProofExpiration(Vec<BatchId>),
     RemoteBatch(Batch),
     Shutdown(tokio::sync::oneshot::Sender<()>),
