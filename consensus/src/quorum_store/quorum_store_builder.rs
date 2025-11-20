@@ -152,6 +152,7 @@ pub struct InnerBuilder {
     batch_reader: Option<Arc<dyn BatchReader>>,
     broadcast_proofs: bool,
     consensus_key: Arc<PrivateKey>,
+    use_batch_info_ext: bool,
 }
 
 impl InnerBuilder {
@@ -172,6 +173,7 @@ impl InnerBuilder {
         quorum_store_storage: Arc<dyn QuorumStoreStorage>,
         broadcast_proofs: bool,
         consensus_key: Arc<PrivateKey>,
+        use_batch_info_ext: bool,
     ) -> Self {
         let (coordinator_tx, coordinator_rx) = futures_channel::mpsc::channel(config.channel_size);
         let (batch_generator_cmd_tx, batch_generator_cmd_rx) =
@@ -228,6 +230,7 @@ impl InnerBuilder {
             batch_reader: None,
             broadcast_proofs,
             consensus_key,
+            use_batch_info_ext,
         }
     }
 
@@ -349,6 +352,7 @@ impl InnerBuilder {
             self.proof_cache,
             self.broadcast_proofs,
             self.config.batch_expiry_gap_when_init_usecs,
+            self.use_batch_info_ext,
         );
         spawn_named!(
             "proof_coordinator",

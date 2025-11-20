@@ -746,6 +746,7 @@ impl<P: OnChainConfigProvider> EpochManager<P> {
                 self.quorum_store_storage.clone(),
                 !consensus_config.is_dag_enabled,
                 consensus_key,
+                consensus_config.use_batch_info_ext(),
             ))
         } else {
             info!("Building DirectMempool");
