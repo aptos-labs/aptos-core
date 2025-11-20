@@ -5,9 +5,7 @@ set -e
 
 # We usually just need to build with `cli` profile, but building `aptos-debugger`
 # with `performance` profile helps speed up replay-verify.
-if [[ "${PROFILE}" != "performance" ]]; then
-  PROFILE=cli
-fi
+PROFILE=cli
 
 echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
@@ -21,7 +19,6 @@ cargo build --locked --profile=$PROFILE \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p aptos-keyless-pepper-service \
-    -p aptos-debugger \
     -p aptos-transaction-emitter \
     -p aptos-release-builder \
     "$@"
@@ -33,7 +30,6 @@ BINS=(
     aptos-openapi-spec-generator
     aptos-telemetry-service
     aptos-keyless-pepper-service
-    aptos-debugger
     aptos-transaction-emitter
     aptos-release-builder
 )
@@ -44,6 +40,10 @@ for BIN in "${BINS[@]}"; do
     cp $CARGO_TARGET_DIR/$PROFILE/$BIN dist/$BIN
 done
 
+PROFILE=performance
+cargo build --locked --profile=$PROFILE -p aptos-debugger
+cp $CARGO_TARGET_DIR/$PROFILE/aptos-debugger dist/aptos-debugger
+
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
 echo "Building the Aptos Move framework..."
-(cd dist && cargo run --locked --profile=$PROFILE --package aptos-framework -- release)
+(cd dist && cargo run --locked --profile=cli --package aptos-framework -- release)
