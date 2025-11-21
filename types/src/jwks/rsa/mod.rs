@@ -8,6 +8,7 @@ use base64::URL_SAFE_NO_PAD;
 use jsonwebtoken::{Algorithm, DecodingKey, TokenData, Validation};
 use move_core_types::value::{MoveStruct, MoveValue};
 use once_cell::sync::Lazy;
+#[cfg(feature = "poem")]
 use poem_openapi_derive::Object;
 use ring::signature::RsaKeyPair;
 use rsa::{pkcs1::EncodeRsaPrivateKey, pkcs8::DecodePrivateKey};
@@ -15,7 +16,8 @@ use serde::{Deserialize, Serialize};
 /// Move type `0x1::jwks::RSA_JWK` in rust.
 /// See its doc in Move for more details.
 #[allow(non_camel_case_types)]
-#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "poem", derive(Object))]
 pub struct RSA_JWK {
     pub kid: String,
     pub kty: String,

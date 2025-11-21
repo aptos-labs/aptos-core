@@ -4,13 +4,15 @@
 use crate::{jwks::KID, move_any::AsMoveAny, move_utils::as_move_value::AsMoveValue};
 use aptos_crypto::HashValue;
 use move_core_types::value::{MoveStruct, MoveValue};
+#[cfg(feature = "poem")]
 use poem_openapi_derive::Object;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 
 /// Move type `0x1::jwks::UnsupportedJWK` in rust.
 /// See its doc in Move for more details.
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Object)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "poem", derive(Object))]
 pub struct UnsupportedJWK {
     pub id: Vec<u8>,
     pub payload: Vec<u8>,
