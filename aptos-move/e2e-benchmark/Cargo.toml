@@ -31,6 +31,9 @@ rand = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+jemallocator = { workspace = true }
+
 [features]
 default = []
 profiling = ["e2e-move-tests/profiling"]
