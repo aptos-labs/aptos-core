@@ -16,16 +16,20 @@ PACKAGES=(
     aptos-forge-cli
 )
 
+if [[ "$PROFILE" == "performance" ]]; then
+  EXTRA_CONFIG=("--config" "build.rustflags=[\"-C\", \"linker-plugin-lto\"]")
+fi
+
 # We have to do these separately because we need to avoid feature unification
 # between aptos-node and other binaries
 for PACKAGE in "${PACKAGES[@]}"; do
     # Build and overwrite the aptos-node binary with features if specified
     if [ -n "$FEATURES" ] && [ "$PACKAGE" = "aptos-node" ]; then
         echo "Building aptos-node with features ${FEATURES}"
-        cargo build --profile=$PROFILE --features=$FEATURES -p $PACKAGE "$@"
+        cargo build "${EXTRA_CONFIG[@]}" --profile=$PROFILE --features=$FEATURES -p $PACKAGE "$@"
     else 
         # Build aptos-node separately
-        cargo build --locked --profile=$PROFILE -p $PACKAGE "$@"
+        cargo build "${EXTRA_CONFIG[@]}" --locked --profile=$PROFILE -p $PACKAGE "$@"
     fi
 done
 
