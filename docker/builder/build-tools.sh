@@ -3,25 +3,19 @@
 # SPDX-License-Identifier: Apache-2.0
 set -e
 
-# We usually just need to build with `cli` profile, but building `aptos-debugger`
-# with `performance` profile helps speed up replay-verify.
-if [[ "${PROFILE}" != "performance" ]]; then
-  PROFILE=cli
-fi
-
 echo "Building tools and services docker images"
 echo "PROFILE: $PROFILE"
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
 # Build all the rust binaries
-cargo build --locked --profile=$PROFILE \
+CLI_PROFILE=cli
+cargo build --locked --profile=$CLI_PROFILE \
     -p aptos \
     -p aptos-backup-cli \
     -p aptos-faucet-service \
     -p aptos-openapi-spec-generator \
     -p aptos-telemetry-service \
     -p aptos-keyless-pepper-service \
-    -p aptos-debugger \
     -p aptos-transaction-emitter \
     -p aptos-release-builder \
     "$@"
@@ -33,7 +27,6 @@ BINS=(
     aptos-openapi-spec-generator
     aptos-telemetry-service
     aptos-keyless-pepper-service
-    aptos-debugger
     aptos-transaction-emitter
     aptos-release-builder
 )
@@ -41,9 +34,18 @@ BINS=(
 mkdir dist
 
 for BIN in "${BINS[@]}"; do
-    cp $CARGO_TARGET_DIR/$PROFILE/$BIN dist/$BIN
+    cp $CARGO_TARGET_DIR/$CLI_PROFILE/$BIN dist/$BIN
 done
 
 # Build the Aptos Move framework and place it in dist. It can be found afterwards in the current directory.
 echo "Building the Aptos Move framework..."
-(cd dist && cargo run --locked --profile=$PROFILE --package aptos-framework -- release)
+(cd dist && cargo run --locked --profile=$CLI_PROFILE --package aptos-framework -- release)
+
+# We build everything above with `cli` profile, but building `aptos-debugger`
+# with `performance` profile, if specified, helps speed up replay-verify, so we
+# do it here separately.
+if [[ "$PROFILE" == "performance" ]]; then
+  EXTRA_CONFIG=("--config" "build.rustflags=[\"-C\", \"linker-plugin-lto\"]")
+fi
+cargo build "${EXTRA_CONFIG[@]}" --locked --profile=$PROFILE -p aptos-debugger "$@"
+cp $CARGO_TARGET_DIR/$PROFILE/aptos-debugger dist/aptos-debugger

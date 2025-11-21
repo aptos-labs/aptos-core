@@ -23,6 +23,9 @@ proptest = { workspace = true, optional = true }
 rand = { workspace = true }
 rocksdb = { workspace = true }
 
+[target.'cfg(unix)'.dependencies]
+rocksdb = { workspace = true, features = ["jemalloc"] }
+
 [dev-dependencies]
 aptos-temppath = { workspace = true }
 byteorder = { workspace = true }
