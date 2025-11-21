@@ -22,7 +22,7 @@ module aptos_experimental::price_time_index {
     #[test_only]
     use std::vector;
     #[test_only]
-    use aptos_experimental::order_book_types::{new_order_id_type, new_unique_idx_type, single_order_type};
+    use aptos_experimental::order_book_types::{new_order_id_type, next_unique_idx_type, single_order_type};
 
     const EINVALID_MAKER_ORDER: u64 = 1;
     /// There is a code bug that breaks internal invariant
@@ -342,7 +342,6 @@ module aptos_experimental::price_time_index {
         order_id: OrderIdType,
         price: u64,
         size: u64,
-        unique_idx: UniqueIdxType,
         is_bid: bool
     }
 
@@ -354,7 +353,7 @@ module aptos_experimental::price_time_index {
         while (remaining_size > 0) {
             if (!self.is_taker_order(order.price, order.is_bid)) {
                 self.place_maker_order(
-                    order.order_id, single_order_type(), order.price, order.unique_idx, order.size, order.is_bid
+                    order.order_id, single_order_type(), order.price, next_unique_idx_type(), order.size, order.is_bid
                 );
                 return result;
             };
@@ -385,7 +384,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(0),
                     price: 200,
                     size: 1000,
-                    unique_idx: new_unique_idx_type(0),
                     is_bid: false
                 }
             );
@@ -401,7 +399,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(1),
                     price: 100,
                     size: 1000,
-                    unique_idx: new_unique_idx_type(1),
                     is_bid: true
                 }
             );
@@ -421,7 +418,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(2),
                     price: 150,
                     size: 100,
-                    unique_idx: new_unique_idx_type(2),
                     is_bid: false
                 }
             );
@@ -439,7 +435,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(3),
                     price: 175,
                     size: 100,
-                    unique_idx: new_unique_idx_type(3),
                     is_bid: false
                 }
             );
@@ -460,7 +455,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(4),
                     price: 160,
                     size: 50,
-                    unique_idx: new_unique_idx_type(4),
                     is_bid: true
                 }
             );
@@ -499,7 +493,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(0),
                     price: 200,
                     size: 1000,
-                    unique_idx: new_unique_idx_type(0),
                     is_bid: maker_is_bid
                 }
             );
@@ -513,7 +506,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(1),
                     price: 200,
                     size: 1000,
-                    unique_idx: new_unique_idx_type(1),
                     is_bid: maker_is_bid
                 }
             );
@@ -526,7 +518,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(2),
                     price: 200,
                     size: 1000,
-                    unique_idx: new_unique_idx_type(2),
                     is_bid: maker_is_bid
                 }
             );
@@ -539,7 +530,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(3),
                     price: 200,
                     size: 500,
-                    unique_idx: new_unique_idx_type(3),
                     is_bid: !maker_is_bid
                 }
             );
@@ -566,7 +556,6 @@ module aptos_experimental::price_time_index {
                     order_id: new_order_id_type(4),
                     price: 200,
                     size: 1000,
-                    unique_idx: new_unique_idx_type(4),
                     is_bid: !maker_is_bid
                 }
             );
@@ -617,7 +606,6 @@ module aptos_experimental::price_time_index {
                 order_id: new_order_id_type(1),
                 price: 101,
                 size: 50,
-                unique_idx: new_unique_idx_type(1),
                 is_bid: false
             }
         );
@@ -628,7 +616,6 @@ module aptos_experimental::price_time_index {
                 order_id: new_order_id_type(2),
                 price: 102,
                 size: 100,
-                unique_idx: new_unique_idx_type(2),
                 is_bid: false
             }
         );
@@ -639,7 +626,6 @@ module aptos_experimental::price_time_index {
                 order_id: new_order_id_type(3),
                 price: 103,
                 size: 150,
-                unique_idx: new_unique_idx_type(3),
                 is_bid: false
             }
         );
@@ -651,7 +637,6 @@ module aptos_experimental::price_time_index {
                 order_id: new_order_id_type(4),
                 price: 99,
                 size: 50,
-                unique_idx: new_unique_idx_type(4),
                 is_bid: true
             }
         );
@@ -662,7 +647,6 @@ module aptos_experimental::price_time_index {
                 order_id: new_order_id_type(5),
                 price: 98,
                 size: 100,
-                unique_idx: new_unique_idx_type(5),
                 is_bid: true
             }
         );

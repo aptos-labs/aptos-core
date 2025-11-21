@@ -23,10 +23,11 @@ Order book type definitions
 -  [Function `is_bulk_order_type`](#0x7_order_book_types_is_bulk_order_type)
 -  [Function `is_single_order_type`](#0x7_order_book_types_is_single_order_type)
 -  [Function `new_default_big_ordered_map`](#0x7_order_book_types_new_default_big_ordered_map)
--  [Function `next_order_id`](#0x7_order_book_types_next_order_id)
--  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
--  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
+-  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
+-  [Function `next_order_id`](#0x7_order_book_types_next_order_id)
+-  [Function `next_unique_idx_type`](#0x7_order_book_types_next_unique_idx_type)
+-  [Function `next_order_id_and_unique_idx_type`](#0x7_order_book_types_next_order_id_and_unique_idx_type)
 -  [Function `descending_idx`](#0x7_order_book_types_descending_idx)
 -  [Function `get_order_id_value`](#0x7_order_book_types_get_order_id_value)
 -  [Function `time_in_force_from_index`](#0x7_order_book_types_time_in_force_from_index)
@@ -807,13 +808,13 @@ particular match operation.
 
 </details>
 
-<a id="0x7_order_book_types_next_order_id"></a>
+<a id="0x7_order_book_types_new_account_client_order_id"></a>
 
-## Function `next_order_id`
+## Function `new_account_client_order_id`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>
 </code></pre>
 
 
@@ -822,9 +823,10 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> {
-    // reverse bits <b>to</b> make order ids random, so indices on top of them are shuffled.
-    <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> { order_id: <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()) }
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: String
+): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
+    <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
 }
 </code></pre>
 
@@ -856,13 +858,13 @@ particular match operation.
 
 </details>
 
-<a id="0x7_order_book_types_new_account_client_order_id"></a>
+<a id="0x7_order_book_types_next_order_id"></a>
 
-## Function `new_account_client_order_id`
+## Function `next_order_id`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">order_book_types::AccountClientOrderId</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
 </code></pre>
 
 
@@ -871,10 +873,9 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_account_client_order_id">new_account_client_order_id</a>(
-    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: String
-): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
-    <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> {
+    // reverse bits <b>to</b> make order ids random, so indices on top of them are shuffled.
+    <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> { order_id: <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()) }
 }
 </code></pre>
 
@@ -882,13 +883,13 @@ particular match operation.
 
 </details>
 
-<a id="0x7_order_book_types_new_unique_idx_type"></a>
+<a id="0x7_order_book_types_next_unique_idx_type"></a>
 
-## Function `new_unique_idx_type`
+## Function `next_unique_idx_type`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_unique_idx_type">next_unique_idx_type</a>(): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>
 </code></pre>
 
 
@@ -897,8 +898,38 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_unique_idx_type">new_unique_idx_type</a>(idx: u128): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
-    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx }
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_unique_idx_type">next_unique_idx_type</a>(): <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> {
+    <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx: <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>() }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_next_order_id_and_unique_idx_type"></a>
+
+## Function `next_order_id_and_unique_idx_type`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id_and_unique_idx_type">next_order_id_and_unique_idx_type</a>(): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id_and_unique_idx_type">next_order_id_and_unique_idx_type</a>(): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>) {
+    <b>let</b> monotonic = <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>();
+    // It is OK <b>to</b> have order_id and unique_idx be the same value,
+    // their uniqueness is important only within their respective categories.
+    (
+        <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> { order_id: <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(monotonic) },
+        <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a> { idx: monotonic }
+    )
 }
 </code></pre>
 
