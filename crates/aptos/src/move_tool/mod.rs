@@ -524,18 +524,6 @@ pub struct TestPackage {
     #[clap(flatten)]
     pub(crate) move_options: MovePackageOptions,
 
-    /// The maximum number of instructions that can be executed by a test
-    ///
-    /// If set, the number of instructions executed by one test will be bounded
-    // TODO: Remove short, it's against the style guidelines, and update the name here
-    #[clap(
-        name = "instructions",
-        default_value_t = 100000,
-        short = 'i',
-        long = "instructions"
-    )]
-    pub instruction_execution_bound: u64,
-
     /// Collect coverage information for later use with the various `aptos move coverage` subcommands
     #[clap(long = "coverage")]
     pub compute_coverage: bool,
