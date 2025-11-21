@@ -124,19 +124,19 @@ impl BlockExecutorConfigFromOnchain {
 
     pub const fn on_but_large_for_test() -> Self {
         Self {
-            block_gas_limit_type:
-                // present, so code is exercised, but large to not limit blocks
-                BlockGasLimitType::ComplexLimitV1 {
-                    effective_block_gas_limit: 1_000_000_000,
-                    execution_gas_effective_multiplier: 1,
-                    io_gas_effective_multiplier: 1,
-                    block_output_limit: Some(1_000_000_000_000),
-                    conflict_penalty_window: 8,
-                    use_module_publishing_block_conflict: true,
-                    include_user_txn_size_in_block_output: true,
-                    add_block_limit_outcome_onchain: true,
-                    use_granular_resource_group_conflicts: false,
-                },
+            block_gas_limit_type: BlockGasLimitType::Limit(1000000000),
+            // present, so code is exercised, but large to not limit blocks
+            // BlockGasLimitType::ComplexLimitV1 {
+            //     effective_block_gas_limit: 1_000_000_000,
+            //     execution_gas_effective_multiplier: 1,
+            //     io_gas_effective_multiplier: 1,
+            //     block_output_limit: Some(1_000_000_000_000),
+            //     conflict_penalty_window: 8,
+            //     use_module_publishing_block_conflict: true,
+            //     include_user_txn_size_in_block_output: true,
+            //     add_block_limit_outcome_onchain: true,
+            //     use_granular_resource_group_conflicts: false,
+            // },
             enable_per_block_gas_limit: false,
             per_block_gas_limit: None,
             gas_price_to_burn: None,
