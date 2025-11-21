@@ -17,7 +17,6 @@ account_identity is raw public_key.
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/auth_data.md#0x1_auth_data">0x1::auth_data</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/ed25519.md#0x1_ed25519">0x1::ed25519</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/doc/string_utils.md#0x1_string_utils">0x1::string_utils</a>;
 </code></pre>

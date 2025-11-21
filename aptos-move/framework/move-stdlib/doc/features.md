@@ -183,8 +183,7 @@ return true.
     -  [Function `apply_diff`](#@Specification_1_apply_diff)
 
 
-<pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="signer.md#0x1_signer">0x1::signer</a>;
+<pre><code><b>use</b> <a href="signer.md#0x1_signer">0x1::signer</a>;
 <b>use</b> <a href="vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 

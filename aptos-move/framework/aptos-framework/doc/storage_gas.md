@@ -255,8 +255,7 @@ The below index is automatically generated from source code:
     -  [Function `on_reconfig`](#@Specification_16_on_reconfig)
 
 
-<pre><code><b>use</b> <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
+<pre><code><b>use</b> <a href="state_storage.md#0x1_state_storage">0x1::state_storage</a>;
 <b>use</b> <a href="system_addresses.md#0x1_system_addresses">0x1::system_addresses</a>;
 </code></pre>
 

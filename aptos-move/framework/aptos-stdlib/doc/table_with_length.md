@@ -34,8 +34,7 @@ Extends Table and provides functions such as length and the ability to be destro
     -  [Function `contains`](#@Specification_1_contains)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="table.md#0x1_table">0x1::table</a>;
+<pre><code><b>use</b> <a href="table.md#0x1_table">0x1::table</a>;
 </code></pre>
 
 
