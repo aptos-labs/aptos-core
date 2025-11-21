@@ -1,0 +1,8 @@
+# Seeds for failure cases proptest has generated in the past. It is
+# automatically read and these particular cases re-run before any
+# novel cases are generated.
+#
+# It is recommended to check this file in to source control so that
+# everyone who runs the test benefits from these saved cases.
+cc b75ae68a2c77fc78a40fac6f84e479731de7821428bb931a13a3adc5261ddcb0 # shrinks to (mut items_per_update, ancestor, base, top) = ([[(HashCollide(18), 0), (HashCollide(64), 0), (HashCollide(18), 0), (HashCollide(18), 0), (HashCollide(18), 0)], [(HashCollide(0), 0)]], 0, 1, 2)
+cc 2a3b246d022edb1995a0a2ba220b4da4d79f1120c4e0917e6e7472b7106e7a06 # shrinks to (mut items_per_update, ancestor, base, top) = ([[(HashCollide(140), 0), (HashCollide(104), 0), (HashCollide(44), 0), (HashCollide(208), 0), (HashCollide(44), 0)], [(HashCollide(44), 0)]], 0, 1, 2)
