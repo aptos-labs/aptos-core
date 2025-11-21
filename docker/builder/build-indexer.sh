@@ -10,8 +10,12 @@ echo "PROFILE: $PROFILE"
 
 echo "CARGO_TARGET_DIR: $CARGO_TARGET_DIR"
 
+if [[ "$PROFILE" == "performance" ]]; then
+  EXTRA_CONFIG=("--config" "build.rustflags=[\"-C\", \"linker-plugin-lto\"]")
+fi
+
 # Build all the rust binaries
-cargo build --locked --profile=$PROFILE \
+cargo build "${EXTRA_CONFIG[@]}" --locked --profile=$PROFILE \
     -p aptos-indexer-grpc-cache-worker \
     -p aptos-indexer-grpc-file-store \
     -p aptos-indexer-grpc-data-service \
