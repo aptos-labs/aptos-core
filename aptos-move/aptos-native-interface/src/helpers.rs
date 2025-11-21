@@ -60,26 +60,6 @@ macro_rules! safely_assert_eq {
     }};
 }
 
-/// Pops a `Type` argument off the type argument stack inside a safe native. Returns a
-/// `SafeNativeError::InvariantViolation(UNKNOWN_INVARIANT_VIOLATION_ERROR)` in case there are not
-/// enough arguments on the stack.
-///
-/// NOTE: Expects as its argument an object that has a `fn pop(&self) -> Option<_>` method (e.g., a `Vec<_>`)
-#[macro_export]
-macro_rules! safely_pop_type_arg {
-    ($ty_args:ident) => {{
-        use $crate::reexports::move_vm_types::natives::function::{PartialVMError, StatusCode};
-        match $ty_args.pop() {
-            Some(ty) => ty,
-            None => {
-                return Err($crate::SafeNativeError::InvariantViolation(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR),
-                ))
-            },
-        }
-    }};
-}
-
 /// Like `pop_vec_arg` but for safe natives that return `SafeNativeResult<T>`.
 /// (Duplicates code from above, unfortunately.)
 #[macro_export]

@@ -19,7 +19,7 @@ use std::{collections::VecDeque, rc::Rc};
 
 pub fn sqr_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);

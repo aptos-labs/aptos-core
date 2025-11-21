@@ -71,7 +71,7 @@ impl RandomnessContext {
 
 pub fn fetch_and_increment_txn_counter(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if context.gas_feature_version() >= RELEASE_V1_23 {
@@ -92,7 +92,7 @@ pub fn fetch_and_increment_txn_counter(
 
 pub fn is_unbiasable(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // Because we need to run a special transaction prologue to pre-charge maximum

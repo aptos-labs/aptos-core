@@ -72,10 +72,10 @@ static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
 
 fn native_verify_range_proof(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let dst = safely_pop_arg!(args, Vec<u8>);
@@ -112,10 +112,10 @@ fn native_verify_range_proof(
 
 fn native_verify_batch_range_proof(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let dst = safely_pop_arg!(args, Vec<u8>);
@@ -162,10 +162,10 @@ fn native_verify_batch_range_proof(
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_prove_range(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let rand_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
@@ -228,10 +228,10 @@ fn native_test_only_prove_range(
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_batch_prove_range(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let rand_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;

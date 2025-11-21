@@ -45,7 +45,7 @@ use std::{
 };
 use triomphe::Arc as TriompheArc;
 
-pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
+pub type UnboxedNativeFunction = dyn for<'a> Fn(&mut NativeContext, &'a [Type], VecDeque<Value>) -> PartialVMResult<NativeResult>
     + Send
     + Sync
     + 'static;

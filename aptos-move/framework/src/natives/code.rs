@@ -263,7 +263,7 @@ fn unpack_allowed_dep(v: Value) -> PartialVMResult<(AccountAddress, String)> {
  **************************************************************************************************/
 fn native_request_publish(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(matches!(args.len(), 4 | 5));

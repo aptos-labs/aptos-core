@@ -12,7 +12,7 @@ use std::collections::VecDeque;
 
 pub fn validator_txn_enabled(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let config_bytes = safely_pop_arg!(args, Vec<u8>);
