@@ -58,6 +58,8 @@ pub struct ExecutionConfig {
     /// If enabled, runtime checks like paranoid type checks may be performed in parallel in post
     /// commit hook in Block-STM.
     pub async_runtime_checks: bool,
+    /// Enables pre-write optimization for parallel execution.
+    pub enable_pre_write: bool,
 }
 
 impl std::fmt::Debug for ExecutionConfig {
@@ -93,6 +95,7 @@ impl Default for ExecutionConfig {
             // TODO: consider setting to be true by default.
             layout_caches_enabled: false,
             async_runtime_checks: false,
+            enable_pre_write: true,
         }
     }
 }
