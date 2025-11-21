@@ -3,9 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod extensions;
+mod filter;
 pub mod test_reporter;
 pub mod test_runner;
 
+pub use crate::filter::FilterOptions;
 use crate::test_runner::TestRunner;
 use clap::*;
 use legacy_move_compiler::{
@@ -33,9 +35,8 @@ const DEFAULT_EXECUTION_BOUND: u64 = 1_000_000;
 #[derive(Debug, Parser, Clone)]
 #[clap(author, version, about)]
 pub struct UnitTestingConfig {
-    /// A filter string to determine which unit tests to run
-    #[clap(name = "filter", short = 'f', long = "filter")]
-    pub filter: Option<String>,
+    #[clap(flatten)]
+    pub filter_options: FilterOptions,
 
     /// List all tests
     #[clap(name = "list", short = 'l', long = "list")]
@@ -114,7 +115,7 @@ fn format_module_id(module_id: &ModuleId) -> String {
 impl Default for UnitTestingConfig {
     fn default() -> Self {
         Self {
-            filter: None,
+            filter_options: FilterOptions::default(),
             num_threads: 8,
             report_statistics: false,
             report_storage_on_error: false,
@@ -225,9 +226,7 @@ impl UnitTestingConfig {
         )
         .unwrap();
 
-        if let Some(filter_str) = &self.filter {
-            test_runner.filter(filter_str)
-        }
+        test_runner.filter(&self.filter_options);
 
         let test_results = test_runner.run(&shared_writer, &shared_options).unwrap();
         if self.report_statistics {
