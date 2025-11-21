@@ -742,7 +742,7 @@ module std::features {
     }
 
     /// Whether function reflection is enabled.
-    const FUNCTION_REFLECTION: u64 = 103;
+    const FUNCTION_REFLECTION: u64 = 105;
 
     public fun get_function_reflection_feature(): u64 { FUNCTION_REFLECTION }
 
