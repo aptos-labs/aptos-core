@@ -700,7 +700,7 @@ ouroboros = "0.15.6"
 owo-colors = "3.5.0"
 p256 = { version = "0.13.2" }
 prettydiff = "0.6.2"
-primitive-types = { version = "0.10" }
+primitive-types = { version = "0.12.2" }
 signature = "2.1.0"
 pairing = "0.23"
 parking_lot = "0.12.0"
