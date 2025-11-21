@@ -22,13 +22,17 @@ use std::{collections::HashMap, path::Path, sync::Arc};
 pub struct DBDebuggerInterface(Arc<dyn DbReader>);
 
 impl DBDebuggerInterface {
-    pub fn open<P: AsRef<Path> + Clone>(db_root_path: P) -> Result<Self> {
+    pub fn open<P: AsRef<Path> + Clone>(db_root_path: P, enable_sharding: bool) -> Result<Self> {
+        let mut default_config = RocksdbConfigs::default();
+        if enable_sharding {
+            default_config.enable_storage_sharding = true;
+        }
         Ok(Self(Arc::new(
             AptosDB::open(
                 StorageDirPaths::from_path(db_root_path),
                 true,
                 NO_OP_STORAGE_PRUNER_CONFIG,
-                RocksdbConfigs::default(),
+                default_config,
                 false, /* indexer */
                 BUFFERED_STATE_TARGET_ITEMS,
                 DEFAULT_MAX_NUM_NODES_PER_LRU_CACHE_SHARD,
