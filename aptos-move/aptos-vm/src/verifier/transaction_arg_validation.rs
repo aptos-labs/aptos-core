@@ -591,35 +591,30 @@ fn load_constructor_function(
         return Err(err);
     }
 
+    let module_loc = || Location::Module(module_id.clone());
+
     let (module, function) =
         loader.load_function_definition(gas_meter, traversal_context, module_id, function_name)?;
 
     if function.return_tys().len() != 1 {
         // For functions that are marked constructor this should not happen.
-        return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
+        return Err(PartialVMError::new(StatusCode::ABORTED).finish(module_loc()));
     }
 
     let mut map = TypeParamMap::default();
     if !map.match_ty(&function.return_tys()[0], expected_return_ty) {
         // For functions that are marked constructor this should not happen.
         return Err(
-            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .finish(Location::Undefined),
+            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(module_loc()),
         );
     }
 
     // Construct the type arguments from the match.
-    let num_ty_args = function.ty_param_abilities().len();
-    let mut ty_args = Vec::with_capacity(num_ty_args);
-    for i in 0..num_ty_args {
-        ty_args.push(map.get_ty_param(i as u16).ok_or_else(|| {
-            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .finish(Location::Undefined)
-        })?);
-    }
-
-    Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-        .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+    let Ok(ty_args) = map.verify_and_extract_type_args(function.ty_param_abilities()) else {
+        return Err(
+            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(module_loc()),
+        );
+    };
     let ty_args_id = loader
         .runtime_environment()
         .ty_pool()
