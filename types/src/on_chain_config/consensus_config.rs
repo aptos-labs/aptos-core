@@ -224,119 +224,82 @@ impl OnChainConsensusConfig {
         }
     }
 
-    /// The number of recent rounds that don't count into reputations.
-    pub fn leader_reputation_exclude_round(&self) -> u64 {
-        match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
-                config.exclude_round
-            },
-            OnChainConsensusConfig::V3 { alg, .. }
-            | OnChainConsensusConfig::V4 { alg, .. }
-            | OnChainConsensusConfig::V5 { alg, .. } => alg.leader_reputation_exclude_round(),
-        }
-    }
+    // Helper methods to extract common fields, reducing duplication in match expressions
 
-    /// Decouple execution from consensus or not.
-    pub fn decoupled_execution(&self) -> bool {
-        true
-    }
-
-    // Trim the list of failed authors from immediatelly preceeding rounds
-    // to this max size.
-    pub fn max_failed_authors_to_store(&self) -> usize {
-        match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
-                config.max_failed_authors_to_store
-            },
-            OnChainConsensusConfig::V3 { alg, .. }
-            | OnChainConsensusConfig::V4 { alg, .. }
-            | OnChainConsensusConfig::V5 { alg, .. } => alg.max_failed_authors_to_store(),
-        }
-    }
-
-    // Type and configuration used for proposer election.
-    pub fn proposer_election_type(&self) -> &ProposerElectionType {
-        match &self {
-            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => {
-                &config.proposer_election_type
-            },
-            OnChainConsensusConfig::V3 { alg, .. }
-            | OnChainConsensusConfig::V4 { alg, .. }
-            | OnChainConsensusConfig::V5 { alg, .. } => alg.proposer_election_type(),
-        }
-    }
-
-    pub fn quorum_store_enabled(&self) -> bool {
-        match &self {
-            OnChainConsensusConfig::V1(_config) => false,
-            OnChainConsensusConfig::V2(_) => true,
-            OnChainConsensusConfig::V3 { alg, .. }
-            | OnChainConsensusConfig::V4 { alg, .. }
-            | OnChainConsensusConfig::V5 { alg, .. } => alg.quorum_store_enabled(),
-        }
-    }
-
-    pub fn order_vote_enabled(&self) -> bool {
-        match &self {
-            OnChainConsensusConfig::V1(_config) => false,
-            OnChainConsensusConfig::V2(_) => false,
-            OnChainConsensusConfig::V3 { alg, .. }
-            | OnChainConsensusConfig::V4 { alg, .. }
-            | OnChainConsensusConfig::V5 { alg, .. } => alg.order_vote_enabled(),
-        }
-    }
-
-    pub fn is_dag_enabled(&self) -> bool {
+    /// Extract the algorithm config from newer versions (V3+), or None for older versions
+    fn alg(&self) -> Option<&ConsensusAlgorithmConfig> {
         match self {
-            OnChainConsensusConfig::V1(_) => false,
-            OnChainConsensusConfig::V2(_) => false,
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => None,
             OnChainConsensusConfig::V3 { alg, .. }
             | OnChainConsensusConfig::V4 { alg, .. }
-            | OnChainConsensusConfig::V5 { alg, .. } => alg.is_dag_enabled(),
+            | OnChainConsensusConfig::V5 { alg, .. } => Some(alg),
+        }
+    }
+
+    /// Extract the validator txn config from newer versions (V3+), or None for older versions
+    fn vtxn(&self) -> Option<&ValidatorTxnConfig> {
+        match self {
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => None,
+            OnChainConsensusConfig::V3 { vtxn, .. }
+            | OnChainConsensusConfig::V4 { vtxn, .. }
+            | OnChainConsensusConfig::V5 { vtxn, .. } => Some(vtxn),
+        }
+    }
+
+    /// Extract the consensus config from older versions (V1/V2), or None for newer versions
+    fn legacy_config(&self) -> Option<&ConsensusConfigV1> {
+        match self {
+            OnChainConsensusConfig::V1(config) | OnChainConsensusConfig::V2(config) => Some(config),
+            _ => None,
+        }
+    }
+
+    /// Extract mutable validator txn config from newer versions (V3+)
+    fn vtxn_mut(&mut self) -> Option<&mut ValidatorTxnConfig> {
+        match self {
+            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => None,
+            OnChainConsensusConfig::V3 { vtxn, .. }
+            | OnChainConsensusConfig::V4 { vtxn, .. }
+            | OnChainConsensusConfig::V5 { vtxn, .. } => Some(vtxn),
+        }
+    }
+
+    /// Extract mutable rand_check_enabled from versions that support it (V5+)
+    fn rand_check_enabled_mut(&mut self) -> Option<&mut bool> {
+        match self {
+            OnChainConsensusConfig::V5 {
+                rand_check_enabled, ..
+            } => Some(rand_check_enabled),
+            _ => None,
         }
     }
 
     pub fn unwrap_dag_config_v1(&self) -> &DagConsensusConfigV1 {
-        match &self {
+        // Can't delegate to to_consensus_config() since it returns owned value
+        // but we need to return a reference
+        match self {
             OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
                 unreachable!("not a dag config")
             },
-            OnChainConsensusConfig::V3 { alg, .. }
-            | OnChainConsensusConfig::V4 { alg, .. }
-            | OnChainConsensusConfig::V5 { alg, .. } => alg.unwrap_dag_config_v1(),
+            _ => self.alg().unwrap().unwrap_dag_config_v1(),
         }
-    }
-
-    pub fn effective_validator_txn_config(&self) -> ValidatorTxnConfig {
-        match self {
-            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
-                ValidatorTxnConfig::default_disabled()
-            },
-            OnChainConsensusConfig::V3 { vtxn, .. }
-            | OnChainConsensusConfig::V4 { vtxn, .. }
-            | OnChainConsensusConfig::V5 { vtxn, .. } => vtxn.clone(),
-        }
-    }
-
-    pub fn is_vtxn_enabled(&self) -> bool {
-        self.effective_validator_txn_config().enabled()
     }
 
     pub fn disable_validator_txns(&mut self) {
-        match self {
-            OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => {
-                // vtxn not supported. No-op.
-            },
-            OnChainConsensusConfig::V3 { vtxn, .. }
-            | OnChainConsensusConfig::V4 { vtxn, .. }
-            | OnChainConsensusConfig::V5 { vtxn, .. } => {
-                *vtxn = ValidatorTxnConfig::V0;
-            },
+        if let Some(vtxn) = self.vtxn_mut() {
+            *vtxn = ValidatorTxnConfig::V0;
         }
+        // For V1/V2, vtxn not supported. No-op.
     }
 
     pub fn enable_validator_txns(&mut self) {
+        // Early return if already enabled
+        if self.vtxn().is_some_and(|config| config.enabled()) {
+            return;
+        }
+
         let new_self = match std::mem::take(self) {
+            // Migrate legacy versions to V5 with enabled vtxn
             OnChainConsensusConfig::V1(config) => OnChainConsensusConfig::V5 {
                 alg: ConsensusAlgorithmConfig::JolteonV2 {
                     main: config,
@@ -357,19 +320,16 @@ impl OnChainConsensusConfig {
                 window_size: DEFAULT_WINDOW_SIZE,
                 rand_check_enabled: true,
             },
-            OnChainConsensusConfig::V3 {
-                vtxn: ValidatorTxnConfig::V0,
-                alg,
-            } => OnChainConsensusConfig::V5 {
+            // Migrate V3 to V5 with enabled vtxn
+            OnChainConsensusConfig::V3 { alg, .. } => OnChainConsensusConfig::V5 {
                 alg,
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size: DEFAULT_WINDOW_SIZE,
                 rand_check_enabled: true,
             },
+            // For V4/V5/V6, enable vtxn while preserving other fields
             OnChainConsensusConfig::V4 {
-                alg,
-                vtxn: ValidatorTxnConfig::V0,
-                window_size,
+                alg, window_size, ..
             } => OnChainConsensusConfig::V4 {
                 alg,
                 vtxn: ValidatorTxnConfig::default_enabled(),
@@ -377,64 +337,129 @@ impl OnChainConsensusConfig {
             },
             OnChainConsensusConfig::V5 {
                 alg,
-                vtxn: ValidatorTxnConfig::V0,
                 window_size,
-                rand_check_enabled: rand_check,
+                rand_check_enabled,
+                ..
             } => OnChainConsensusConfig::V5 {
                 alg,
                 vtxn: ValidatorTxnConfig::default_enabled(),
                 window_size,
-                rand_check_enabled: rand_check,
+                rand_check_enabled,
             },
-            item @ OnChainConsensusConfig::V3 {
-                vtxn: ValidatorTxnConfig::V1 { .. },
-                ..
-            } => item,
-            item @ OnChainConsensusConfig::V4 {
-                vtxn: ValidatorTxnConfig::V1 { .. },
-                ..
-            } => item,
-            item @ OnChainConsensusConfig::V5 {
-                vtxn: ValidatorTxnConfig::V1 { .. },
-                ..
-            } => item,
         };
         *self = new_self;
     }
 
-    pub fn window_size(&self) -> Option<u64> {
-        match self {
+    pub fn disable_rand_check(&mut self) {
+        if let Some(rand_check_enabled) = self.rand_check_enabled_mut() {
+            *rand_check_enabled = false;
+        }
+        // For older versions, rand_check not supported. No-op.
+    }
+
+    /// Convert this on-chain config into a flattened local config struct.
+    /// This handles all version migration logic in one place, making the rest of the codebase
+    /// simpler by not needing to deal with enum variants.
+    pub fn to_consensus_config_on_chain(&self) -> ConsensusConfigFromOnchain {
+        // Extract algorithm config, handling legacy versions
+        let alg = if let Some(alg) = self.alg() {
+            alg.clone()
+        } else if let Some(legacy_config) = self.legacy_config() {
+            // Convert V1/V2 to JolteonV2 format
+            match self {
+                OnChainConsensusConfig::V1(_) => ConsensusAlgorithmConfig::JolteonV2 {
+                    main: legacy_config.clone(),
+                    quorum_store_enabled: false,
+                    order_vote_enabled: false,
+                },
+                OnChainConsensusConfig::V2(_) => ConsensusAlgorithmConfig::JolteonV2 {
+                    main: legacy_config.clone(),
+                    quorum_store_enabled: true,
+                    order_vote_enabled: false,
+                },
+                _ => unreachable!("legacy_config() only returns Some for V1/V2"),
+            }
+        } else {
+            unreachable!("All variants should be covered")
+        };
+
+        // Extract window_size directly from enum to avoid circular call
+        let window_size = match self {
             OnChainConsensusConfig::V1(_)
             | OnChainConsensusConfig::V2(_)
             | OnChainConsensusConfig::V3 { .. } => None,
             OnChainConsensusConfig::V4 { window_size, .. }
             | OnChainConsensusConfig::V5 { window_size, .. } => *window_size,
-        }
-    }
+        };
 
-    pub fn rand_check_enabled(&self) -> bool {
-        match self {
-            OnChainConsensusConfig::V1(_)
-            | OnChainConsensusConfig::V2(_)
-            | OnChainConsensusConfig::V3 { .. }
-            | OnChainConsensusConfig::V4 { .. } => false,
-            OnChainConsensusConfig::V5 {
-                rand_check_enabled: rand_check,
-                ..
-            } => *rand_check,
-        }
-    }
-
-    pub fn disable_rand_check(&mut self) {
-        match self {
+        // Extract rand_check_enabled directly from enum to avoid circular call
+        let rand_check_enabled = match self {
             OnChainConsensusConfig::V5 {
                 rand_check_enabled, ..
-            } => {
-                *rand_check_enabled = false;
+            } => *rand_check_enabled,
+            _ => false,
+        };
+
+        // Extract vtxn directly from enum to avoid circular call
+        let vtxn = self
+            .vtxn()
+            .cloned()
+            .unwrap_or_else(ValidatorTxnConfig::default_disabled);
+
+        ConsensusConfigFromOnchain {
+            quorum_store_enabled: match self {
+                OnChainConsensusConfig::V1(_) => false,
+                OnChainConsensusConfig::V2(_) => true,
+                _ => alg.quorum_store_enabled(),
             },
-            _ => {
-                // rand_check not supported. No-op.
+            order_vote_enabled: match self {
+                OnChainConsensusConfig::V1(_) | OnChainConsensusConfig::V2(_) => false,
+                _ => alg.order_vote_enabled(),
             },
+            is_dag_enabled: alg.is_dag_enabled(),
+            algorithm: alg,
+            vtxn_config: vtxn,
+            window_size,
+            rand_check_enabled,
+        }
+    }
+}
+
+/// A flattened consensus configuration that represents the effective values
+/// regardless of which version of OnChainConsensusConfig it came from.
+/// This eliminates the need to match on enum variants throughout the codebase.
+#[derive(Clone, Debug)]
+pub struct ConsensusConfigFromOnchain {
+    pub quorum_store_enabled: bool,
+    pub order_vote_enabled: bool,
+    pub is_dag_enabled: bool,
+    algorithm: ConsensusAlgorithmConfig,
+    pub vtxn_config: ValidatorTxnConfig,
+    pub window_size: Option<u64>,
+    pub rand_check_enabled: bool,
+}
+
+impl ConsensusConfigFromOnchain {
+    /// Get a reference to the algorithm config for accessing algorithm-specific methods
+    pub fn alg(&self) -> &ConsensusAlgorithmConfig {
+        &self.algorithm
+    }
+
+    /// Get the DAG config if DAG is enabled
+    pub fn dag_config(&self) -> Option<&DagConsensusConfigV1> {
+        if self.is_dag_enabled {
+            Some(self.algorithm.unwrap_dag_config_v1())
+        } else {
+            None
+        }
+    }
+
+    /// Get the Jolteon config if Jolteon is enabled
+    pub fn jolteon_config(&self) -> Option<&ConsensusConfigV1> {
+        if !self.is_dag_enabled {
+            Some(self.algorithm.unwrap_jolteon_config_v1())
+        } else {
+            None
         }
     }
 }
@@ -642,8 +667,9 @@ mod test {
 
         let s = serde_yaml::to_string(&config).unwrap();
         let result = serde_yaml::from_str::<OnChainConsensusConfig>(&s).unwrap();
+        let result = result.to_consensus_config_on_chain();
         assert!(matches!(
-            result.proposer_election_type(),
+            result.alg().proposer_election_type(),
             ProposerElectionType::RoundProposer(_value)
         ));
     }
@@ -668,8 +694,9 @@ mod test {
         let payload = OnChainConfigPayload::new(1, InMemoryOnChainConfig::new(configs));
 
         let result: OnChainConsensusConfig = payload.get().unwrap();
+        let result: ConsensusConfigFromOnchain = result.to_consensus_config_on_chain();
         assert!(matches!(
-            result.proposer_election_type(),
+            result.alg().proposer_election_type(),
             ProposerElectionType::RoundProposer(_value)
         ));
     }

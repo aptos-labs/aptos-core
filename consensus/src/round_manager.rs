@@ -67,7 +67,7 @@ use aptos_types::{
     block_info::BlockInfo,
     epoch_state::EpochState,
     on_chain_config::{
-        OnChainConsensusConfig, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
+        ConsensusConfigFromOnchain, OnChainJWKConsensusConfig, OnChainRandomnessConfig,
         ValidatorTxnConfig,
     },
     randomness::RandMetadata,
@@ -271,7 +271,7 @@ pub struct RoundManager {
     safety_rules: Arc<Mutex<MetricsSafetyRules>>,
     network: Arc<NetworkSender>,
     storage: Arc<dyn PersistentLivenessStorage>,
-    onchain_config: OnChainConsensusConfig,
+    onchain_config: ConsensusConfigFromOnchain,
     vtxn_config: ValidatorTxnConfig,
     buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
     block_txn_filter_config: BlockTransactionFilterConfig,
@@ -304,7 +304,7 @@ impl RoundManager {
         safety_rules: Arc<Mutex<MetricsSafetyRules>>,
         network: Arc<NetworkSender>,
         storage: Arc<dyn PersistentLivenessStorage>,
-        onchain_config: OnChainConsensusConfig,
+        onchain_config: ConsensusConfigFromOnchain,
         buffered_proposal_tx: aptos_channel::Sender<Author, VerifiedEvent>,
         block_txn_filter_config: BlockTransactionFilterConfig,
         local_config: ConsensusConfig,
@@ -319,10 +319,7 @@ impl RoundManager {
         counters::OP_COUNTERS
             .gauge("sync_only")
             .set(local_config.sync_only as i64);
-        counters::OP_COUNTERS
-            .gauge("decoupled_execution")
-            .set(onchain_config.decoupled_execution() as i64);
-        let vtxn_config = onchain_config.effective_validator_txn_config();
+        let vtxn_config = onchain_config.vtxn_config.clone();
         debug!("vtxn_config={:?}", vtxn_config);
         Self {
             epoch_state,
@@ -362,7 +359,7 @@ impl RoundManager {
                 .get_ordered_account_addresses_iter()
                 .collect(),
             self.local_config
-                .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled()),
+                .max_blocks_per_sending_request(self.onchain_config.quorum_store_enabled),
             self.block_store.pending_blocks(),
         )
     }
@@ -1506,7 +1503,7 @@ impl RoundManager {
     }
 
     async fn process_order_vote_msg(&mut self, order_vote_msg: OrderVoteMsg) -> anyhow::Result<()> {
-        if self.onchain_config.order_vote_enabled() {
+        if self.onchain_config.order_vote_enabled {
             fail_point!("consensus::process_order_vote_msg", |_| {
                 Err(anyhow::anyhow!("Injected error in process_order_vote_msg"))
             });
@@ -1754,7 +1751,7 @@ impl RoundManager {
                         "[RoundManager] Unable to process the created QC {:?}",
                         qc
                     ))?;
-                if self.onchain_config.order_vote_enabled() {
+                if self.onchain_config.order_vote_enabled {
                     // This check is already done in safety rules. As printing the "failed to broadcast order vote"
                     // in humio logs could sometimes look scary, we are doing the same check again here.
                     if let Some(last_sent_vote) = self.round_state.vote_sent() {

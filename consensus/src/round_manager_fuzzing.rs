@@ -216,7 +216,7 @@ fn create_node_for_fuzzing() -> RoundManager {
         ))),
         network,
         storage,
-        OnChainConsensusConfig::default(),
+        OnChainConsensusConfig::default().to_consensus_config_on_chain(),
         round_manager_tx,
         BlockTransactionFilterConfig::default(),
         ConsensusConfig::default(),

@@ -18,7 +18,7 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     account_address::AccountAddress, block_executor::config::BlockExecutorConfigFromOnchain,
     epoch_state::EpochState, ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::OnChainConsensusConfig, validator_signer::ValidatorSigner,
+    on_chain_config::ConsensusConfigFromOnchain, validator_signer::ValidatorSigner,
 };
 use fail::fail_point;
 use std::{boxed::Box, sync::Arc, time::Duration};
@@ -44,7 +44,7 @@ struct MutableState {
     block_executor_onchain_config: BlockExecutorConfigFromOnchain,
     transaction_deduper: Arc<dyn TransactionDeduper>,
     is_randomness_enabled: bool,
-    consensus_onchain_config: OnChainConsensusConfig,
+    consensus_onchain_config: ConsensusConfigFromOnchain,
     persisted_auxiliary_info_version: u8,
     network_sender: Arc<NetworkSender>,
 }
@@ -236,7 +236,7 @@ impl StateComputer for ExecutionProxy {
         block_executor_onchain_config: BlockExecutorConfigFromOnchain,
         transaction_deduper: Arc<dyn TransactionDeduper>,
         randomness_enabled: bool,
-        consensus_onchain_config: OnChainConsensusConfig,
+        consensus_onchain_config: ConsensusConfigFromOnchain,
         persisted_auxiliary_info_version: u8,
         network_sender: Arc<NetworkSender>,
     ) {
