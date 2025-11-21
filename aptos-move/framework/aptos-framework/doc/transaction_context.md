@@ -1025,7 +1025,6 @@ When compiled for testing, this function bypasses feature checks and returns a s
     <b>if</b> (__COMPILE_FOR_TESTING__) {
         <a href="transaction_context.md#0x1_transaction_context_monotonically_increasing_counter_internal_for_test_only">monotonically_increasing_counter_internal_for_test_only</a>()
     } <b>else</b> {
-        <b>assert</b>!(<a href="../../aptos-stdlib/../move-stdlib/doc/features.md#0x1_features_is_monotonically_increasing_counter_enabled">features::is_monotonically_increasing_counter_enabled</a>(), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="transaction_context.md#0x1_transaction_context_EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED">EMONOTONICALLY_INCREASING_COUNTER_NOT_ENABLED</a>));
         <a href="transaction_context.md#0x1_transaction_context_monotonically_increasing_counter_internal">monotonically_increasing_counter_internal</a>(<a href="timestamp.md#0x1_timestamp_now_microseconds">timestamp::now_microseconds</a>())
     }
 }
