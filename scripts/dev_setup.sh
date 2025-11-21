@@ -120,6 +120,21 @@ function install_build_essentials {
   #fi
 }
 
+function install_clang {
+  PACKAGE_MANAGER=$1
+  VERSION=${2:-20}
+
+  if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
+    "${PRE_COMMAND[@]}" apt-get install gnupg lsb-release software-properties-common wget
+    "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
+    "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
+    "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
+  else
+    install_pkg clang "$PACKAGE_MANAGER"
+    install_pkg llvm "$PACKAGE_MANAGER"
+  fi
+}
+
 function install_protoc {
   INSTALL_PROTOC="true"
   echo "Installing protoc and plugins"
@@ -968,8 +983,7 @@ install_pkg wget "$PACKAGE_MANAGER"
 if [[ "$INSTALL_BUILD_TOOLS" == "true" ]]; then
   install_build_essentials "$PACKAGE_MANAGER"
   install_pkg cmake "$PACKAGE_MANAGER"
-  install_pkg clang "$PACKAGE_MANAGER"
-  install_pkg llvm "$PACKAGE_MANAGER"
+  install_clang "$PACKAGE_MANAGER"
 
   install_openssl_dev "$PACKAGE_MANAGER"
   install_pkg_config "$PACKAGE_MANAGER"
