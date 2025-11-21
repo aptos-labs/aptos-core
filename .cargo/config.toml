@@ -26,6 +26,10 @@ x = "run --package aptos-cargo-cli --bin aptos-cargo-cli --"
 rustflags = ["--cfg", "tokio_unstable", "-C", "force-frame-pointers=yes", "-C", "force-unwind-tables=yes"]
 
 [target.x86_64-unknown-linux-gnu]
+# We also need `-C linker-plugin-lto` for performance build to take full
+# advantage of LTO, but we cannot add it here because it would affect dev and
+# release builds as well, so we add it via `--config 'build.rustflags=...'` when
+# building docker images.
 rustflags = [
   "--cfg",
   "tokio_unstable",
