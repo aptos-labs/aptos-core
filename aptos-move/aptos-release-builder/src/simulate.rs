@@ -64,7 +64,10 @@ use move_core_types::{
     language_storage::ModuleId,
     value::MoveValue,
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    InterpreterFunctionCaches,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use once_cell::sync::Lazy;
 use std::{
@@ -73,7 +76,6 @@ use std::{
 };
 use url::Url;
 use walkdir::WalkDir;
-
 /***************************************************************************************************
  * Compiled Module Helpers
  *
@@ -349,6 +351,7 @@ fn force_end_epoch(state_view: &impl SimulationStateStore) -> Result<()> {
         &mut UnmeteredGasMeter,
         &mut TraversalContext::new(&traversal_storage),
         &module_storage,
+        &mut InterpreterFunctionCaches::new(),
     )?;
     let mut change_set = sess.finish(&change_set_configs, &module_storage)?;
 

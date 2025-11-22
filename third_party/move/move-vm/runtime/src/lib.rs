@@ -35,6 +35,7 @@ mod runtime_type_checks_async;
 pub use runtime_type_checks_async::TypeChecker;
 mod storage;
 
+pub use interpreter_caches::InterpreterFunctionCaches;
 pub use loader::{Function, LoadedFunction, LoadedFunctionOwner, Module, Script};
 pub use storage::{
     code_storage::CodeStorage,
