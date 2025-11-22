@@ -47,6 +47,9 @@ pub fn create_db_with_accounts<V>(
     if db_dir.as_ref().exists() {
         panic!("data-dir exists already.");
     }
+
+    println!("Creating directory at: {:?}", db_dir.as_ref());
+    println!("Canonical path: {:?}", std::fs::canonicalize(&db_dir).ok());
     // create if not exists
     fs::create_dir_all(db_dir.as_ref()).unwrap();
 

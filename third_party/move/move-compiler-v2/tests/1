@@ -1,0 +1,3 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.60s
+     Running unittests src/lib.rs (/Users/jun/Documents/aptos-core/target/debug/deps/move_compiler_v2-926ec20bd4fcfa1c)
+     Running tests/testsuite.rs (/Users/jun/Documents/aptos-core/target/debug/deps/testsuite-6980613c40660854)

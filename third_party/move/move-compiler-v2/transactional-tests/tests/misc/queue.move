@@ -30,4 +30,4 @@ module 0x42::queue {
     }
 }
 
-//# run 0x42::queue::test_queue_operations
+//# run 0x42::queue::test_queue_operations --verbose
