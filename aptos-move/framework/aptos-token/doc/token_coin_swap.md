@@ -457,7 +457,7 @@ Token owner lists their token for swapping
 
 ## Function `initialize_token_listing`
 
-Initalize the token listing for a token owner
+Initialize the token listing for a token owner
 
 
 <pre><code><b>fun</b> <a href="token_coin_swap.md#0x3_token_coin_swap_initialize_token_listing">initialize_token_listing</a>&lt;CoinType&gt;(_token_owner: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>)
