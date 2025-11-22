@@ -1,0 +1,66 @@
+processed 9 tasks
+task 0 lines 1-4:  publish [module 0x42::m2 {]
+task 1 lines 6-35:  publish [module 0x42::m {]
+task 2 lines 37-93:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ warning: This assignment/binding to the left-hand-side variable `ref_x` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_ref_x`), or renaming to `_`
+   ┌─ TEMPFILE2:76:17
+   │
+76 │     let ref_x = &mut_ref_d.x;
+   │                 ^^^^^^^^^^^^
+
+error: cannot perform borrow operation for field `x` for struct `0x42::m::Data4` since it has or may be instantiated with different types in variants
+   ┌─ TEMPFILE2:81:17
+   │
+81 │     let ref_x = &mut_ref_d.x;
+   │                 ^^^^^^^^^^^^
+
+
+task 3 lines 95-95:  run 0x42::m2::test_v1
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 97-97:  run 0x42::m2::test_v1_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 99-99:  run 0x42::m2::test_v2_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 101-101:  run 0x42::m2::test_data2_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 103-103:  run 0x42::m2::test_data3_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 8 lines 105-105:  run 0x42::m2::test_data4_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
