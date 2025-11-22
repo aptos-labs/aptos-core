@@ -68,6 +68,23 @@ subjects:
     name: vector
     namespace: {{ .Release.Namespace }}
 ---
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: vector-critical-pods
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: vector
+    app.kubernetes.io/instance: vector
+    app.kubernetes.io/component: Agent
+spec:
+  scopeSelector:
+    matchExpressions:
+      - scopeName: PriorityClass
+        operator: In
+        values:
+          - system-node-critical
+---
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
@@ -99,6 +116,7 @@ spec:
         prometheus.io/port: "9090"
     spec:
       serviceAccountName: vector
+      priorityClassName: system-node-critical
       dnsPolicy: ClusterFirst
       tolerations:
         - effect: NoExecute
@@ -153,6 +171,13 @@ spec:
             - name: prom-exporter
               containerPort: 9090
               protocol: TCP
+          resources:
+            requests:
+              memory: {{ .Values.resources.requests.memory }}
+              cpu: {{ .Values.resources.requests.cpu }}
+            limits:
+              memory: {{ .Values.resources.limits.memory }}
+              cpu: {{ .Values.resources.limits.cpu }}
           volumeMounts:
             - name: data
               mountPath: "/vector-data-dir"

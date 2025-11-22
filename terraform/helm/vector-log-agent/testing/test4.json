@@ -1,0 +1,20 @@
+{
+    "data.network_context.network_id": "Validator",
+    "data.network_context.peer_id": "0ab4a80ccc772691cb03e3ee8d22b5c13acc92472dd4a19987c1aade2691404a",
+    "data.network_context.role": "validator",
+    "data.remote_peer": "0x30952a7b88b02028e7c6c7209722cc047acaef85d3d303f375d8ea89fc6ba0c6",
+    "data.request_id": 319868,
+    "hostname": "mainnet-validator-euwe6-1-aptos-node-0-validator-0",
+    "level": "debug",
+    "namespace": "mainnet-validator-euwe6-1",
+    "source.file": "network/framework/src/protocols/rpc/mod.rs:707",
+    "source.package": "aptos_network",
+    "thread_name": "network-Val-17",
+    "timestamp": "2025-04-10T21:40:32.542651599Z",
+    "cluster": "mainnet-euwe6-0",
+    "pod_name": "mainnet-validator-euwe6-1-aptos-node-0-validator-0",
+    "workload": "mainnet-validator-euwe6-1-aptos-node-0-validator",
+    "format": "json",
+    "container_name": "validator",
+    "message": "[validator,Validator,0ab4a80c] Received response for expired request_id 319868 from 30952a7b. Discarding."
+  }
