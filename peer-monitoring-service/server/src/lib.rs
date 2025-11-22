@@ -11,8 +11,8 @@ use crate::{
 };
 use aptos_bounded_executor::BoundedExecutor;
 use aptos_config::{
-    config::{BaseConfig, NodeConfig},
-    network_id::NetworkId,
+    config::{BaseConfig, NodeConfig, PeerMonitoringServiceConfig},
+    network_id::PeerNetworkId,
 };
 use aptos_logger::prelude::*;
 use aptos_network::application::storage::PeersAndMetadata;
@@ -21,10 +21,12 @@ use aptos_peer_monitoring_service_types::{
     response::{
         ConnectionMetadata, LatencyPingResponse, NetworkInformationResponse,
         NodeInformationResponse, PeerMonitoringServiceResponse, ServerProtocolVersionResponse,
+        TransactionInformationResponse,
     },
     PeerMonitoringServiceError, Result, MAX_DISTANCE_FROM_VALIDATORS,
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use error::Error;
 use futures::stream::StreamExt;
 use std::{cmp::min, sync::Arc, time::Instant};
@@ -45,12 +47,14 @@ pub const PEER_MONITORING_SERVER_VERSION: u64 = 1;
 /// The server-side actor for the peer monitoring service
 pub struct PeerMonitoringServiceServer<T> {
     base_config: BaseConfig,
+    peer_monitoring_service_config: PeerMonitoringServiceConfig,
     bounded_executor: BoundedExecutor,
     network_requests: PeerMonitoringServiceNetworkEvents,
     peers_and_metadata: Arc<PeersAndMetadata>,
     start_time: Instant,
     storage: T,
     time_service: TimeService,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 }
 
 impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
@@ -61,8 +65,10 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
         peers_and_metadata: Arc<PeersAndMetadata>,
         storage: T,
         time_service: TimeService,
+        transaction_trace_collector: Arc<TransactionTraceCollector>,
     ) -> Self {
         let base_config = node_config.base;
+        let peer_monitoring_service_config = node_config.peer_monitoring_service;
         let bounded_executor = BoundedExecutor::new(
             node_config.peer_monitoring_service.max_concurrent_requests as usize,
             executor,
@@ -71,12 +77,14 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
 
         Self {
             base_config,
+            peer_monitoring_service_config,
             bounded_executor,
             network_requests,
             peers_and_metadata,
             start_time,
             storage,
             time_service,
+            transaction_trace_collector,
         }
     }
 
@@ -98,23 +106,24 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
             // All handler methods are currently CPU-bound so we want
             // to spawn on the blocking thread pool.
             let base_config = self.base_config.clone();
+            let peer_monitoring_service_config = self.peer_monitoring_service_config;
             let peers_and_metadata = self.peers_and_metadata.clone();
             let start_time = self.start_time;
             let storage = self.storage.clone();
             let time_service = self.time_service.clone();
+            let transaction_trace_collector = self.transaction_trace_collector.clone();
             self.bounded_executor
                 .spawn_blocking(move || {
                     let response = Handler::new(
                         base_config,
+                        peer_monitoring_service_config,
                         peers_and_metadata,
                         start_time,
                         storage,
                         time_service,
+                        transaction_trace_collector,
                     )
-                    .call(
-                        peer_network_id.network_id(),
-                        peer_monitoring_service_request,
-                    );
+                    .handle_request(peer_network_id, peer_monitoring_service_request);
                     log_monitoring_service_response(&response);
                     response_sender.send(response);
                 })
@@ -129,35 +138,42 @@ impl<T: StorageReaderInterface> PeerMonitoringServiceServer<T> {
 #[derive(Clone)]
 pub struct Handler<T> {
     base_config: BaseConfig,
+    peer_monitoring_service_config: PeerMonitoringServiceConfig,
     peers_and_metadata: Arc<PeersAndMetadata>,
     start_time: Instant,
     storage: T,
     time_service: TimeService,
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 }
 
 impl<T: StorageReaderInterface> Handler<T> {
     pub fn new(
         base_config: BaseConfig,
+        peer_monitoring_service_config: PeerMonitoringServiceConfig,
         peers_and_metadata: Arc<PeersAndMetadata>,
         start_time: Instant,
         storage: T,
         time_service: TimeService,
+        transaction_trace_collector: Arc<TransactionTraceCollector>,
     ) -> Self {
         Self {
             base_config,
+            peer_monitoring_service_config,
             peers_and_metadata,
             start_time,
             storage,
             time_service,
+            transaction_trace_collector,
         }
     }
 
-    pub fn call(
+    pub fn handle_request(
         &self,
-        network_id: NetworkId,
+        peer_network_id: PeerNetworkId,
         request: PeerMonitoringServiceRequest,
     ) -> Result<PeerMonitoringServiceResponse> {
         // Update the request count
+        let network_id = peer_network_id.network_id();
         increment_counter(
             &metrics::PEER_MONITORING_REQUESTS_RECEIVED,
             network_id,
@@ -179,6 +195,18 @@ impl<T: StorageReaderInterface> Handler<T> {
             },
             PeerMonitoringServiceRequest::GetNodeInformation => self.get_node_information(),
             PeerMonitoringServiceRequest::LatencyPing(request) => self.handle_latency_ping(request),
+            PeerMonitoringServiceRequest::GetTransactionInformation => {
+                // If transaction info monitoring is disabled, return an error
+                if !self
+                    .peer_monitoring_service_config
+                    .transaction_info_monitoring_enabled()
+                {
+                    return Err(PeerMonitoringServiceError::InvalidRequest(
+                        "Transaction information monitoring is disabled!".into(),
+                    ));
+                }
+                self.get_transaction_information(peer_network_id)
+            },
         };
 
         // Process the response and handle any errors
@@ -277,6 +305,28 @@ impl<T: StorageReaderInterface> Handler<T> {
         };
         Ok(PeerMonitoringServiceResponse::NodeInformation(
             node_information_response,
+        ))
+    }
+
+    fn get_transaction_information(
+        &self,
+        peer_network_id: PeerNetworkId,
+    ) -> Result<PeerMonitoringServiceResponse, Error> {
+        // Identify the transaction hashes for the transactions received from the peer
+        let transaction_hashes = self
+            .transaction_trace_collector
+            .get_transaction_hashes_received_from_peer(peer_network_id);
+
+        // Get the transaction traces for the hashes
+        let transaction_traces = self
+            .transaction_trace_collector
+            .get_traces_for_transaction_hashes(&transaction_hashes);
+
+        // Create and return the response
+        let transaction_information_response =
+            TransactionInformationResponse::new(transaction_traces);
+        Ok(PeerMonitoringServiceResponse::TransactionInformation(
+            transaction_information_response,
         ))
     }
 

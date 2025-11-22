@@ -17,6 +17,7 @@ use aptos_network::{
     protocols::wire::handshake::v1::ProtocolId::MempoolDirectSend,
 };
 use aptos_storage_interface::mock::MockDbReaderWriter;
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::transaction::SignedTransaction;
 use aptos_vm_validator::mocks::mock_vm_validator::MockVMValidator;
 use proptest::{
@@ -83,8 +84,9 @@ pub fn test_mempool_process_incoming_transactions_impl(
         PeersAndMetadata::new(&[NetworkId::Validator]),
     );
     let transaction_filter_config = config.transaction_filters.mempool_filter.clone();
+    let transaction_trace_collector = Arc::new(TransactionTraceCollector::new_empty());
     let smp: SharedMempool<NetworkClient<MempoolSyncMsg>, MockVMValidator> = SharedMempool::new(
-        Arc::new(Mutex::new(CoreMempool::new(&config))),
+        Arc::new(Mutex::new(CoreMempool::new_for_testing(&config))),
         config.mempool.clone(),
         transaction_filter_config,
         network_client,
@@ -92,9 +94,10 @@ pub fn test_mempool_process_incoming_transactions_impl(
         vm_validator,
         vec![],
         NodeType::extract_from_config(&config),
+        transaction_trace_collector,
     );
 
-    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, false);
+    let _ = tasks::process_incoming_transactions(&smp, txns, timeline_state, None);
 }
 
 proptest! {

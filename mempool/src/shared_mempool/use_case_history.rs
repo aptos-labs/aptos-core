@@ -1,6 +1,8 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+#[cfg(test)]
+use aptos_crypto::HashValue;
 use aptos_logger::info;
 use aptos_mempool_notifications::CommittedTransaction;
 use aptos_types::transaction::use_case::UseCaseKey;
@@ -122,6 +124,7 @@ fn test_use_case_history() {
     use aptos_types::{account_address::AccountAddress, transaction::ReplayProtector};
     let ct = |use_case: UseCaseKey| -> CommittedTransaction {
         CommittedTransaction {
+            committed_hash: HashValue::zero(),
             sender: AccountAddress::ONE,
             replay_protector: ReplayProtector::SequenceNumber(0),
             use_case,
