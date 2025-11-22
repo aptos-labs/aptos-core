@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    account::derive_resource_account::ResourceAccountSeed,
     common::{
+        compile_script_function::CompileScriptFunction,
         local_simulation,
+        resource_account_seed::ResourceAccountSeed,
         transactions::TxnOptions,
         types::{
             load_account_arg, ArgWithTypeJSON, ChunkedPublishOption, CliConfig, CliError,
@@ -18,7 +19,6 @@ use crate::{
             dispatch_transaction, prompt_yes_with_override, write_to_file,
         },
     },
-    governance::CompileScriptFunction,
     move_tool::{
         bytecode::{Decompile, Disassemble},
         coverage::SummaryCoverage,

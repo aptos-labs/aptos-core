@@ -12,8 +12,8 @@ use crate::{
             PoolAddressArgs, ProfileOptions, RestOptions, TransactionOptions, TransactionSummary,
         },
         utils::read_from_file,
+        yaml::from_yaml,
     },
-    genesis::git::from_yaml,
     node::analyze::{
         analyze_validators::{AnalyzeValidators, ValidatorStats},
         fetch_metadata::FetchMetadata,
