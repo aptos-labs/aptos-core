@@ -183,12 +183,13 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                         && old_module_ref.self_id().is_option()
                         && old_module_ref.self_id() == compiled_module.self_id()
                     {
-                        continue;
+                        // skip check for option module during publishing
+                    } else {
+                        let old_module = old_module_ref.as_ref();
+                        compatibility
+                            .check(old_module, &compiled_module)
+                            .map_err(|e| e.finish(Location::Undefined))?;
                     }
-                    let old_module = old_module_ref.as_ref();
-                    compatibility
-                        .check(old_module, &compiled_module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
                 }
             }
 
