@@ -26,6 +26,9 @@ const LOCAL_INDEXER_GRPC_URL: &str = "http://127.0.0.1:50051";
 const TRANSACTION_STREAM_TIMEOUT_IN_SECS: u64 = 60;
 const DEFAULT_FUND_AMOUNT_IN_OCTA: u64 = 100_000_000;
 
+const SCRIPT_NAME_MODERN: &str = "main.mv";
+const SCRIPT_NAME_LEGACY: &str = "main_0.mv";
+
 impl ScriptTransactions {
     /// Run the script transaction generator using a localnode.
     pub async fn run(
@@ -113,12 +116,28 @@ impl ScriptTransactions {
             .as_str()
             .context("Malformed package name.")?;
 
-        // Run the compiled script.
-        let compiled_build_path = script_current_dir
+        let output_path = script_current_dir
             .join("build")
             .join(package_name)
-            .join("bytecode_scripts")
-            .join("main_0.mv");
+            .join("bytecode_scripts");
+
+        if !output_path.exists() {
+            anyhow::bail!("Failed to find the output folder at {:?}", output_path);
+        }
+
+        let modern_build_path = output_path.join(SCRIPT_NAME_MODERN);
+        let legacy_build_path = output_path.join(SCRIPT_NAME_LEGACY);
+
+        let compiled_build_path = if modern_build_path.exists() {
+            modern_build_path
+        } else if legacy_build_path.exists() {
+            legacy_build_path
+        } else {
+            anyhow::bail!(
+                "Failed to find the compiled script. Expected one of: {:?}",
+                [SCRIPT_NAME_MODERN, SCRIPT_NAME_LEGACY]
+            );
+        };
 
         let cmd = create_run_script_cmd(compiled_build_path);
         let transaction_summary = cmd.execute().await.context(format!(
