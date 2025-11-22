@@ -1,0 +1,4 @@
+processed 3 tasks
+task 0 lines 3-27:  publish [module 0x42::phantoms {]
+task 1 lines 30-36:  publish [module 0x42::phantoms2 {]
+task 2 lines 39-39:  run 0x42::phantoms2::test_phantoms

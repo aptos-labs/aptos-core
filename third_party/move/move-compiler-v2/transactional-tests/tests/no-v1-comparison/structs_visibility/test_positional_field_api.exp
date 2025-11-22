@@ -1,78 +1,11 @@
 processed 10 tasks
 task 0 lines 1-10:  publish [module 0x42::m1 {]
 task 1 lines 12-93:  publish [module 0x42::m2 {]
-Error: compilation errors:
- bug: bytecode verification failed with unexpected status code `CALL_BORROWED_MUTABLE_REFERENCE_ERROR`:
-Error message: none
-   ┌─ TEMPFILE1:75:13
-   │
-75 │         let NestedPair(p, w) = &mut np;
-   │             ^^^^^^^^^^^^^^^^
-   │
-   = please consider reporting this issue (see https://aptos.dev/en/build/smart-contracts/compiler_v2#reporting-an-issue)
-
-
 task 2 lines 96-96:  run 0x42::m2::test_borrow_pair_fields
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 3 lines 98-98:  run 0x42::m2::test_borrow_wrapper_field
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 4 lines 100-100:  run 0x42::m2::test_borrow_nested_pair_fields
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 5 lines 102-102:  run 0x42::m2::test_borrow_vecwrap_element
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 6 lines 104-104:  run 0x42::m2::test_mut_borrow_pair
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 7 lines 106-106:  run 0x42::m2::test_mut_borrow_vecwrap_element
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 8 lines 108-108:  run 0x42::m2::test_mut_borrow_nestedpair
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}
 task 9 lines 110-110:  run 0x42::m2::test_mut_borrow_nestedpair_2
-Error: Function execution failed with VMError: {
-    major_status: LINKER_ERROR,
-    sub_status: None,
-    location: undefined,
-    indices: [],
-    offsets: [],
-}

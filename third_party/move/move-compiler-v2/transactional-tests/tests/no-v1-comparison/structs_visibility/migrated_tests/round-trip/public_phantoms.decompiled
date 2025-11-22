@@ -1,0 +1,39 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_phantoms.move`
+
+//# publish
+module 0x42::phantoms {
+    struct T {
+    }
+    struct S<phantom T0> has drop {
+        addr: address,
+    }
+    #[pack]
+    public fun pack_0x42_phantoms_S<T0>(p0: address): S<T0> {
+        S<T0>{addr: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_phantoms_S<T0>(p0: S<T0>): address {
+        let S<T0>{addr: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_phantoms_S_addr_0<T0>(p0: &S<T0>): &address {
+        &p0.addr
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_phantoms_S_addr_0<T0>(p0: &mut S<T0>): &mut address {
+        &mut p0.addr
+    }
+}
+
+
+//# publish
+module 0x42::phantoms2 {
+    use 0x42::phantoms;
+    fun test_phantoms() {
+        let _v0 = phantoms::pack_0x42_phantoms_S<phantoms::T>(@0x12);
+    }
+}
+
+
+//# run 0x42::phantoms2::test_phantoms

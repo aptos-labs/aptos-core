@@ -272,7 +272,7 @@ fun test::optimize_vector() {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::test
 struct X has copy + drop + key
   value: bool

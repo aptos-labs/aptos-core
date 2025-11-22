@@ -1,0 +1,171 @@
+processed 5 tasks
+task 0 lines 3-179:  publish [module 0x66::fv_enum_basic {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `Mapper<T0, T1>`
+    ┌─ TEMPFILE:144:10
+    │
+144 │         &p0._0
+    │          ^^
+    │
+    = field `_0` has type `Version<T0, T1>` in variant `Twice` and type `|T0|T1 has copy + drop + store` in variant `Id`
+
+error: cannot select field `_0` since it has different types in variants of enum `Mapper<T0, T1>`
+    ┌─ TEMPFILE:148:10
+    │
+148 │         &p0._0
+    │          ^^
+    │
+    = field `_0` has type `Version<T0, T1>` in variant `Twice` and type `|T0|T1 has copy + drop + store` in variant `Id`
+
+error: cannot select field `_0` since it has different types in variants of enum `Mapper<T0, T1>`
+    ┌─ TEMPFILE:152:14
+    │
+152 │         &mut p0._0
+    │              ^^
+    │
+    = field `_0` has type `Version<T0, T1>` in variant `Twice` and type `|T0|T1 has copy + drop + store` in variant `Id`
+
+error: cannot select field `_0` since it has different types in variants of enum `Mapper<T0, T1>`
+    ┌─ TEMPFILE:156:14
+    │
+156 │         &mut p0._0
+    │              ^^
+    │
+    = field `_0` has type `Version<T0, T1>` in variant `Twice` and type `|T0|T1 has copy + drop + store` in variant `Id`
+
+
+task 1 lines 182-255:  publish [module 0x66::fv_enum_basic_public {]
+Error: compilation errors:
+ error: unbound module
+    ┌─ TEMPFILE1:184:9
+    │
+184 │     use 0x66::fv_enum_basic;
+    │         ^^^^^^^^^^^^^^^^^^^ Invalid 'use'. Unbound module: '0x66::fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:196:19
+    │
+196 │         let _v1 = fv_enum_basic::pack_0x66_fv_enum_basic_Action_Call(|arg0| square(arg0));
+    │                   ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:197:13
+    │
+197 │         if (fv_enum_basic::test_variant_0x66_fv_enum_basic_Action_Call(&_v1)) {
+    │             ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:198:23
+    │
+198 │             let _v2 = fv_enum_basic::unpack_0x66_fv_enum_basic_Action_Call(_v1);
+    │                       ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:208:19
+    │
+208 │         let _v1 = fv_enum_basic::pack_0x66_fv_enum_basic_Mapper_Twice<u64,u64>(fv_enum_basic::pack_0x66_fv_enum_basic_Version_V1<u64,u64>(|arg0| add_k_persistent(arg0, 3)));
+    │                   ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:208:80
+    │
+208 │         let _v1 = fv_enum_basic::pack_0x66_fv_enum_basic_Mapper_Twice<u64,u64>(fv_enum_basic::pack_0x66_fv_enum_basic_Version_V1<u64,u64>(|arg0| add_k_persistent(arg0, 3)));
+    │                                                                                ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:210:13
+    │
+210 │         if (fv_enum_basic::test_variant_0x66_fv_enum_basic_Mapper_Twice<u64,u64>(freeze(_v2))) {
+    │             ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:211:23
+    │
+211 │             let _v3 = fv_enum_basic::borrow_mut_0x66_fv_enum_basic_Mapper_0_0_Twice<u64,u64>(_v2);
+    │                       ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:212:24
+    │
+212 │             let _v4 = *fv_enum_basic::borrow_0x66_fv_enum_basic_Version_v1_0<u64,u64>(freeze(_v3));
+    │                        ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:214:24
+    │
+214 │             let _v6 = *fv_enum_basic::borrow_0x66_fv_enum_basic_Version_v1_0<u64,u64>(freeze(_v3));
+    │                        ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:216:20
+    │
+216 │         } else if (fv_enum_basic::test_variant_0x66_fv_enum_basic_Mapper_Id<u64,u64>(freeze(_v2))) {
+    │                    ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:217:24
+    │
+217 │             let _v7 = *fv_enum_basic::borrow_mut_0x66_fv_enum_basic_Mapper_0_0_Id<u64,u64>(_v2);
+    │                        ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:228:19
+    │
+228 │         let _v3 = fv_enum_basic::pack_0x66_fv_enum_basic_FunVec_V1<u64>(_v1);
+    │                   ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:230:19
+    │
+230 │         let _v5 = fv_enum_basic::test_variant_0x66_fv_enum_basic_FunVec_V1<u64>(_v4);
+    │                   ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:235:27
+    │
+235 │                     _v6 = fv_enum_basic::unpack_0x66_fv_enum_basic_FunVec_V1<u64>(_v3);
+    │                           ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:244:25
+    │
+244 │                 assert!(fv_enum_basic::test_variant_0x66_fv_enum_basic_FunVec_V2<u64>(_v4), 14566554180833181697);
+    │                         ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:245:35
+    │
+245 │                 let (_v10,_v11) = fv_enum_basic::unpack_0x66_fv_enum_basic_FunVec_V2<u64>(_v3);
+    │                                   ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+error: unbound module
+    ┌─ TEMPFILE1:251:24
+    │
+251 │             let _v12 = fv_enum_basic::pack_0x66_fv_enum_basic_FunVec_V2<u64>(10, _v6);
+    │                        ^^^^^^^^^^^^^ Unbound module or type alias 'fv_enum_basic'
+
+
+task 2 lines 258-258:  run 0x66::fv_enum_basic_public::call_square --args 7
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 260-260:  run 0x66::fv_enum_basic_public::test_enum_in_another_enum
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 262-262:  run 0x66::fv_enum_basic_public::test_fun_vec
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

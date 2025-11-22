@@ -1,0 +1,113 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/test_fv_struct_api.move`
+
+//# publish
+module 0x42::m1 {
+    struct Holder<T0> has copy, drop {
+        _0: Predicate<T0>,
+    }
+    struct Predicate<T0> has copy, drop {
+        _0: |&T0|(bool) has copy + drop,
+    }
+    #[pack]
+    public fun pack_0x42_m1_Holder<T0>(p0: Predicate<T0>): Holder<T0> {
+        Holder<T0>{_0: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_Holder<T0>(p0: Holder<T0>): Predicate<T0> {
+        let Holder<T0>{_0: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_Holder_0_0<T0>(p0: &Holder<T0>): &Predicate<T0> {
+        &p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_Holder_0_0<T0>(p0: &mut Holder<T0>): &mut Predicate<T0> {
+        &mut p0._0
+    }
+    #[pack]
+    public fun pack_0x42_m1_Predicate<T0>(p0: |&T0|(bool) has copy + drop): Predicate<T0> {
+        Predicate<T0>{_0: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_Predicate<T0>(p0: Predicate<T0>): |&T0|(bool) has copy + drop {
+        let Predicate<T0>{_0: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_Predicate_0_0<T0>(p0: &Predicate<T0>): &|&T0|(bool) has copy + drop {
+        &p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_Predicate_0_0<T0>(p0: &mut Predicate<T0>): &mut |&T0|(bool) has copy + drop {
+        &mut p0._0
+    }
+}
+
+
+//# publish
+module 0x42::m2 {
+    use 0x42::m1;
+    fun apply_holder(p0: m1::Holder<u64>, p1: u64): bool {
+        let _v0 = m1::unpack_0x42_m1_Holder<u64>(p0);
+        let _v1 = &p1;
+        let _v2 = m1::unpack_0x42_m1_Predicate<u64>(_v0);
+        _v2(_v1)
+    }
+    fun apply_pred(p0: m1::Predicate<u64>, p1: u64): bool {
+        let _v0 = &p1;
+        let _v1 = m1::unpack_0x42_m1_Predicate<u64>(p0);
+        _v1(_v0)
+    }
+    fun try_direct_assignment_and_call() {
+        let _v0 = m1::pack_0x42_m1_Predicate<u64>(|arg0| lambda__1__try_direct_assignment_and_call(arg0));
+        let _v1 = 99;
+        let _v2 = &_v1;
+        let _v3 = m1::unpack_0x42_m1_Predicate<u64>(_v0);
+        assert!(_v3(_v2), 1);
+        let _v4 = 101;
+        let _v5 = &_v4;
+        let _v6 = m1::unpack_0x42_m1_Predicate<u64>(_v0);
+        if (_v6(_v5)) abort 2;
+    }
+    fun lambda__1__try_direct_assignment_and_call(p0: &u64): bool {
+        *p0 < 100
+    }
+    fun try_nested_wrapper() {
+        let _v0 = m1::pack_0x42_m1_Holder<u64>(m1::pack_0x42_m1_Predicate<u64>(|arg0| lambda__1__try_nested_wrapper(arg0)));
+        assert!(apply_holder(_v0, 42), 7);
+        if (apply_holder(_v0, 99)) abort 8;
+    }
+    fun lambda__1__try_nested_wrapper(p0: &u64): bool {
+        *p0 == 42
+    }
+    fun try_pass_to_apply() {
+        let _v0 = m1::pack_0x42_m1_Predicate<u64>(|arg0| lambda__1__try_pass_to_apply(arg0));
+        assert!(apply_pred(_v0, 4), 5);
+        if (apply_pred(_v0, 5)) abort 6;
+    }
+    fun lambda__1__try_pass_to_apply(p0: &u64): bool {
+        *p0 % 2 == 0
+    }
+    fun try_unpack_wrapper() {
+        let _v0 = m1::unpack_0x42_m1_Predicate<u64>(m1::pack_0x42_m1_Predicate<u64>(|arg0| lambda__1__try_unpack_wrapper(arg0)));
+        let _v1 = 1;
+        let _v2 = &_v1;
+        assert!(_v0(_v2), 9);
+        let _v3 = 0;
+        let _v4 = &_v3;
+        if (_v0(_v4)) abort 10;
+    }
+    fun lambda__1__try_unpack_wrapper(p0: &u64): bool {
+        *p0 != 0
+    }
+}
+
+
+//# run 0x42::m2::try_direct_assignment_and_call
+
+//# run 0x42::m2::try_pass_to_apply
+
+//# run 0x42::m2::try_nested_wrapper
+
+//# run 0x42::m2::try_unpack_wrapper

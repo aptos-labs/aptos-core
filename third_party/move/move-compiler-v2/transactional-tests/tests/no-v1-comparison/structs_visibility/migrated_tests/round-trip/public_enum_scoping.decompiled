@@ -1,0 +1,156 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_enum_scoping.move`
+
+//# publish
+module 0x42::m {
+    struct Box has drop {
+        x: u64,
+    }
+    enum Inner has drop {
+        Inner1 {
+            x: u64,
+        }
+        Inner2 {
+            x: u64,
+            y: u64,
+        }
+    }
+    enum Outer has drop {
+        None,
+        One {
+            i: Inner,
+        }
+        Two {
+            i: Inner,
+            b: Box,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Inner_Inner1(p0: &Inner): bool {
+        p0 is Inner1
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Inner_Inner2(p0: &Inner): bool {
+        p0 is Inner2
+    }
+    #[pack]
+    public fun pack_0x42_m_Inner_Inner1(p0: u64): Inner {
+        Inner::Inner1{x: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m_Inner_Inner2(p0: u64, p1: u64): Inner {
+        Inner::Inner2{x: p0, y: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Inner_Inner1(p0: Inner): u64 {
+        let Inner::Inner1{x: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Inner_Inner2(p0: Inner): (u64, u64) {
+        let Inner::Inner2{x: _v0, y: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Inner_x_0(p0: &Inner): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Inner_y_1(p0: &Inner): &u64 {
+        &p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Inner_x_0(p0: &mut Inner): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Inner_y_1(p0: &mut Inner): &mut u64 {
+        &mut p0.y
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Outer_None(p0: &Outer): bool {
+        p0 is None
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Outer_One(p0: &Outer): bool {
+        p0 is One
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Outer_Two(p0: &Outer): bool {
+        p0 is Two
+    }
+    #[pack]
+    public fun pack_0x42_m_Outer_None(): Outer {
+        Outer::None{}
+    }
+    #[pack]
+    public fun pack_0x42_m_Outer_One(p0: Inner): Outer {
+        Outer::One{i: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m_Outer_Two(p0: Inner, p1: Box): Outer {
+        Outer::Two{i: p0, b: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Outer_None(p0: Outer) {
+        let Outer::None{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Outer_One(p0: Outer): Inner {
+        let Outer::One{i: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Outer_Two(p0: Outer): (Inner, Box) {
+        let Outer::Two{i: _v0, b: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Outer_i_0(p0: &Outer): &Inner {
+        &p0.i
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Outer_b_1(p0: &Outer): &Box {
+        &p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Outer_i_0(p0: &mut Outer): &mut Inner {
+        &mut p0.i
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Outer_b_1(p0: &mut Outer): &mut Box {
+        &mut p0.b
+    }
+}
+
+
+//# publish
+module 0x42::test_m {
+    use 0x42::m;
+    public fun check_scoping(p0: &m::Inner): u64 {
+        let _v0 = m::test_variant_0x42_m_Inner_Inner1(p0);
+        3
+    }
+    fun t1_check_scoping(): u64 {
+        let _v0 = m::pack_0x42_m_Outer_One(m::pack_0x42_m_Inner_Inner1(43));
+        let _v1 = &_v0;
+        let _v2 = m::test_variant_0x42_m_Outer_None(_v1);
+        'l0: loop {
+            loop {
+                if (!_v2) {
+                    if (m::test_variant_0x42_m_Outer_One(_v1)) break;
+                    if (m::test_variant_0x42_m_Outer_Two(_v1)) break 'l0;
+                    abort 14566554180833181697
+                };
+                m::unpack_0x42_m_Outer_None(_v0);
+                return 0
+            };
+            let _v3 = m::unpack_0x42_m_Outer_One(_v0);
+            return check_scoping(&_v3)
+        };
+        let (_v4,_v5) = m::unpack_0x42_m_Outer_Two(_v0);
+        3
+    }
+}
+
+
+//# run 0x42::test_m::t1_check_scoping

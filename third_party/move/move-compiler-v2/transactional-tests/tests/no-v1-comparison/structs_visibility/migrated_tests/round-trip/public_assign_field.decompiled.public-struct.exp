@@ -1,0 +1,553 @@
+processed 9 tasks
+task 0 lines 3-180:  publish [module 0x42::test {]
+Error: compilation errors:
+ error: cannot select field `_0` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:62:10
+   │
+62 │         &p0._0
+   │          ^^
+   │
+   = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`
+
+error: cannot select field `_0` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:66:10
+   │
+66 │         &p0._0
+   │          ^^
+   │
+   = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`
+
+error: cannot select field `_0` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:74:14
+   │
+74 │         &mut p0._0
+   │              ^^
+   │
+   = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`
+
+error: cannot select field `_0` since it has different types in variants of enum `E`
+   ┌─ TEMPFILE:78:14
+   │
+78 │         &mut p0._0
+   │              ^^
+   │
+   = field `_0` has type `S3` in variant `V2` and type `u8` in variant `V1`
+
+
+task 1 lines 183-294:  publish [module 0x42::test_assign_field {]
+Error: compilation errors:
+ error: unbound module
+    ┌─ TEMPFILE1:185:9
+    │
+185 │     use 0x42::test;
+    │         ^^^^^^^^^^ Invalid 'use'. Unbound module: '0x42::test'
+
+error: unbound module
+    ┌─ TEMPFILE1:186:37
+    │
+186 │     fun assign0(p0: u64, p1: bool): test::S1 {
+    │                                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:187:19
+    │
+187 │         let _v0 = test::pack_0x42_test_S1(p0, p1);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:188:17
+    │
+188 │         while (*test::borrow_0x42_test_S1_1_1(&_v0)) {
+    │                 ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:189:24
+    │
+189 │             let _v1 = *test::borrow_0x42_test_S1_0_0(&_v0) - 1;
+    │                        ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:190:24
+    │
+190 │             let _v2 = *test::borrow_0x42_test_S1_0_0(&_v0);
+    │                        ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:191:19
+    │
+191 │             _v0 = test::pack_0x42_test_S1(_v1, _v2 >= 2);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:196:21
+    │
+196 │     fun assign1(p0: test::S1): u64 {
+    │                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:200:19
+    │
+200 │             if (!*test::borrow_0x42_test_S1_1_1(&p0)) break;
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:201:18
+    │
+201 │             if (*test::borrow_0x42_test_S1_0_0(&p0) > 0) _v1 = *test::borrow_0x42_test_S1_0_0(&p0) - 1 else _v1 = 0;
+    │                  ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:201:65
+    │
+201 │             if (*test::borrow_0x42_test_S1_0_0(&p0) > 0) _v1 = *test::borrow_0x42_test_S1_0_0(&p0) - 1 else _v1 = 0;
+    │                                                                 ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:202:18
+    │
+202 │             p0 = test::pack_0x42_test_S1(_v1, _v1 >= 1);
+    │                  ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:208:28
+    │
+208 │     fun assign_chained(p0: test::S3): test::S3 {
+    │                            ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:208:39
+    │
+208 │     fun assign_chained(p0: test::S3): test::S3 {
+    │                                       ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:209:20
+    │
+209 │         let _v0 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_0_0(&p0)));
+    │                    ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:209:50
+    │
+209 │         let _v0 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_0_0(&p0)));
+    │                                                  ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:209:80
+    │
+209 │         let _v0 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_0_0(&p0)));
+    │                                                                                ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:210:20
+    │
+210 │         let _v1 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S3_1_1(&p0));
+    │                    ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:210:50
+    │
+210 │         let _v1 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S3_1_1(&p0));
+    │                                                  ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:212:20
+    │
+212 │         let _v3 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_2_2(&p0)));
+    │                    ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:212:50
+    │
+212 │         let _v3 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_2_2(&p0)));
+    │                                                  ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:212:80
+    │
+212 │         let _v3 = *test::borrow_0x42_test_S0_x_0(test::borrow_0x42_test_S2_0_0(test::borrow_0x42_test_S3_2_2(&p0)));
+    │                                                                                ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:214:19
+    │
+214 │         let _v5 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(&mut p0)));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:214:53
+    │
+214 │         let _v5 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(&mut p0)));
+    │                                                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:214:87
+    │
+214 │         let _v5 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(&mut p0)));
+    │                                                                                       ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:216:19
+    │
+216 │         let _v6 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S3_1_1(&mut p0));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:216:53
+    │
+216 │         let _v6 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S3_1_1(&mut p0));
+    │                                                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:218:19
+    │
+218 │         let _v7 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(&mut p0)));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:218:53
+    │
+218 │         let _v7 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(&mut p0)));
+    │                                                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:218:87
+    │
+218 │         let _v7 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(&mut p0)));
+    │                                                                                       ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:222:30
+    │
+222 │     fun assign_enum(p0: &mut test::E) {
+    │                              ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:223:19
+    │
+223 │         let _v0 = test::test_variant_0x42_test_E_V1(freeze(p0));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:226:21
+    │
+226 │                 if (test::test_variant_0x42_test_E_V2(freeze(p0))) break;
+    │                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:229:23
+    │
+229 │             let _v1 = test::borrow_mut_0x42_test_E_0_0_V1(p0);
+    │                       ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:230:23
+    │
+230 │             let _v2 = test::borrow_mut_0x42_test_E_1_1(p0);
+    │                       ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:235:19
+    │
+235 │         let _v3 = test::borrow_mut_0x42_test_E_0_0_V2(p0);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:236:19
+    │
+236 │         let _v4 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(_v3)));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:236:53
+    │
+236 │         let _v4 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(_v3)));
+    │                                                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:236:87
+    │
+236 │         let _v4 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_0_0(_v3)));
+    │                                                                                       ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:238:19
+    │
+238 │         let _v5 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S3_1_1(_v3));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:238:53
+    │
+238 │         let _v5 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S3_1_1(_v3));
+    │                                                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:240:19
+    │
+240 │         let _v6 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(_v3)));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:240:53
+    │
+240 │         let _v6 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(_v3)));
+    │                                                     ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:240:87
+    │
+240 │         let _v6 = test::borrow_mut_0x42_test_S0_x_0(test::borrow_mut_0x42_test_S2_0_0(test::borrow_mut_0x42_test_S3_2_2(_v3)));
+    │                                                                                       ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:243:20
+    │
+243 │     fun simple(p0: test::S1): test::S1 {
+    │                    ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:243:31
+    │
+243 │     fun simple(p0: test::S1): test::S1 {
+    │                               ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:244:19
+    │
+244 │         let _v0 = test::borrow_mut_0x42_test_S1_0_0(&mut p0);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:246:19
+    │
+246 │         let _v1 = test::borrow_mut_0x42_test_S1_1_1(&mut p0);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:250:29
+    │
+250 │     fun simple_ref(p0: &mut test::S1) {
+    │                             ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:251:19
+    │
+251 │         let _v0 = test::borrow_mut_0x42_test_S1_0_0(p0);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:253:19
+    │
+253 │         let _v1 = test::borrow_mut_0x42_test_S1_1_1(p0);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:256:25
+    │
+256 │     fun test_assign0(): test::S1 {
+    │                         ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:260:17
+    │
+260 │         assign1(test::pack_0x42_test_S1(4, true))
+    │                 ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:262:32
+    │
+262 │     fun test_assign_chained(): test::S3 {
+    │                                ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:263:19
+    │
+263 │         let _v0 = test::pack_0x42_test_S0(42u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:264:19
+    │
+264 │         let _v1 = test::pack_0x42_test_S2(_v0, 42u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:265:24
+    │
+265 │         assign_chained(test::pack_0x42_test_S3(_v1, _v0, _v1))
+    │                        ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:268:19
+    │
+268 │         let _v0 = test::pack_0x42_test_S0(43u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:269:19
+    │
+269 │         let _v1 = test::pack_0x42_test_S2(_v0, 42u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:270:19
+    │
+270 │         let _v2 = test::pack_0x42_test_E_V2(test::pack_0x42_test_S3(_v1, _v0, _v1));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:270:45
+    │
+270 │         let _v2 = test::pack_0x42_test_E_V2(test::pack_0x42_test_S3(_v1, _v0, _v1));
+    │                                             ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:272:19
+    │
+272 │         let _v3 = test::pack_0x42_test_S0(0u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:273:19
+    │
+273 │         let _v4 = test::pack_0x42_test_S0(1u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:274:19
+    │
+274 │         let _v5 = test::pack_0x42_test_S0(2u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:275:19
+    │
+275 │         let _v6 = test::pack_0x42_test_S2(_v3, 42u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:276:19
+    │
+276 │         let _v7 = test::pack_0x42_test_S2(_v5, 42u8);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:277:19
+    │
+277 │         let _v8 = test::pack_0x42_test_E_V2(test::pack_0x42_test_S3(_v6, _v4, _v7));
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:277:45
+    │
+277 │         let _v8 = test::pack_0x42_test_E_V2(test::pack_0x42_test_S3(_v6, _v4, _v7));
+    │                                             ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:281:19
+    │
+281 │         let _v0 = test::pack_0x42_test_E_V1(0u8, false);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:283:19
+    │
+283 │         let _v1 = test::pack_0x42_test_E_V1(42u8, true);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:286:24
+    │
+286 │     fun test_simple(): test::S1 {
+    │                        ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:287:16
+    │
+287 │         simple(test::pack_0x42_test_S1(0, false))
+    │                ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:289:28
+    │
+289 │     fun test_simple_ref(): test::S1 {
+    │                            ^^^^ Unbound module or type alias 'test'
+
+error: unbound module
+    ┌─ TEMPFILE1:290:19
+    │
+290 │         let _v0 = test::pack_0x42_test_S1(0, false);
+    │                   ^^^^ Unbound module or type alias 'test'
+
+
+task 2 lines 297-297:  run --verbose -- 0x42::test_assign_field::test_simple
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 3 lines 299-299:  run --verbose -- 0x42::test_assign_field::test_simple_ref
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 4 lines 301-301:  run --verbose -- 0x42::test_assign_field::test_assign0
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 5 lines 303-303:  run --verbose -- 0x42::test_assign_field::test_assign1
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 6 lines 305-305:  run --verbose -- 0x42::test_assign_field::test_assign_chained
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 7 lines 307-307:  run --verbose -- 0x42::test_assign_field::test_assign_enum_1
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}
+task 8 lines 309-309:  run --verbose -- 0x42::test_assign_field::test_assign_enum_2
+Error: Function execution failed with VMError: {
+    message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000042::test_assign_field doesn't exist,
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+    exec_state: None,
+}

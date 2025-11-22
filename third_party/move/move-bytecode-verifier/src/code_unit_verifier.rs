@@ -189,6 +189,7 @@ impl<'a> CodeUnitVerifier<'a> {
             &self.function_view,
             self.name_def_map,
             meter,
+            verifier_config.check_struct_api_attributes,
         )
     }
 }

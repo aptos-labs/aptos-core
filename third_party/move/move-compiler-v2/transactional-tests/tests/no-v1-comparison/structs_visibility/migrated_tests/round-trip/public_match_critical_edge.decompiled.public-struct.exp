@@ -1,0 +1,17 @@
+processed 9 tasks
+task 0 lines 3-95:  publish [module 0x815::m {]
+task 1 lines 98-283:  publish [module 0x815::m_bug_14733_match_critical_edge {]
+task 2 lines 286-286:  run 0x815::m_bug_14733_match_critical_edge::test1
+return values: 22
+task 3 lines 288-288:  run 0x815::m_bug_14733_match_critical_edge::test2
+return values: 0
+task 4 lines 290-290:  run 0x815::m_bug_14733_match_critical_edge::test3
+return values: 10
+task 5 lines 292-292:  run 0x815::m_bug_14733_match_critical_edge::test4
+return values: 21
+task 6 lines 294-294:  run 0x815::m_bug_14733_match_critical_edge::test5
+return values: 43
+task 7 lines 296-296:  run 0x815::m_bug_14733_match_critical_edge::test6
+return values: 25
+task 8 lines 298-298:  run 0x815::m_bug_14733_match_critical_edge::test7
+return values: 15

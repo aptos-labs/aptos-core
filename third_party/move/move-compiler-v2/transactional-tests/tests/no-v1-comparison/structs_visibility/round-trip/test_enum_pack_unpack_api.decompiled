@@ -1,0 +1,196 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/test_enum_pack_unpack_api.move`
+
+//# publish
+module 0x42::m1 {
+    enum E has drop {
+        A {
+            x: u64,
+        }
+        B {
+            x: u64,
+        }
+    }
+    enum Inner {
+        Inner1 {
+            x: u64,
+        }
+        Inner2 {
+            x: u64,
+            y: u64,
+        }
+    }
+    enum Result<T0: copy + drop, T1: copy + drop> has copy, drop {
+        Ok {
+            _0: T0,
+        }
+        Err {
+            _0: T1,
+        }
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m1_E_A(p0: &E): bool {
+        p0 is A
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m1_E_B(p0: &E): bool {
+        p0 is B
+    }
+    #[pack]
+    public fun pack_0x42_m1_E_A(p0: u64): E {
+        E::A{x: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m1_E_B(p0: u64): E {
+        E::B{x: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_E_A(p0: E): u64 {
+        let E::A{x: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_E_B(p0: E): u64 {
+        let E::B{x: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_E_x_0(p0: &E): &u64 {
+        &p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_E_x_0(p0: &mut E): &mut u64 {
+        &mut p0.x
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m1_Inner_Inner1(p0: &Inner): bool {
+        p0 is Inner1
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m1_Inner_Inner2(p0: &Inner): bool {
+        p0 is Inner2
+    }
+    #[pack]
+    public fun pack_0x42_m1_Inner_Inner1(p0: u64): Inner {
+        Inner::Inner1{x: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m1_Inner_Inner2(p0: u64, p1: u64): Inner {
+        Inner::Inner2{x: p0, y: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_Inner_Inner1(p0: Inner): u64 {
+        let Inner::Inner1{x: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_Inner_Inner2(p0: Inner): (u64, u64) {
+        let Inner::Inner2{x: _v0, y: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_Inner_x_0(p0: &Inner): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_Inner_y_1(p0: &Inner): &u64 {
+        &p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_Inner_x_0(p0: &mut Inner): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_Inner_y_1(p0: &mut Inner): &mut u64 {
+        &mut p0.y
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m1_Result_Ok<T0: copy + drop, T1: copy + drop>(p0: &Result<T0, T1>): bool {
+        p0 is Ok
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m1_Result_Err<T0: copy + drop, T1: copy + drop>(p0: &Result<T0, T1>): bool {
+        p0 is Err
+    }
+    #[pack]
+    public fun pack_0x42_m1_Result_Ok<T0: copy + drop, T1: copy + drop>(p0: T0): Result<T0, T1> {
+        Result::Ok<T0,T1>{_0: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m1_Result_Err<T0: copy + drop, T1: copy + drop>(p0: T1): Result<T0, T1> {
+        Result::Err<T0,T1>{_0: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_Result_Ok<T0: copy + drop, T1: copy + drop>(p0: Result<T0, T1>): T0 {
+        let Result::Ok<T0,T1>{_0: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m1_Result_Err<T0: copy + drop, T1: copy + drop>(p0: Result<T0, T1>): T1 {
+        let Result::Err<T0,T1>{_0: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_Result_0_0_Ok<T0: copy + drop, T1: copy + drop>(p0: &Result<T0, T1>): &T0 {
+        &p0._0
+    }
+    #[borrow]
+    public fun borrow_0x42_m1_Result_0_0_Err<T0: copy + drop, T1: copy + drop>(p0: &Result<T0, T1>): &T1 {
+        &p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_Result_0_0_Ok<T0: copy + drop, T1: copy + drop>(p0: &mut Result<T0, T1>): &mut T0 {
+        &mut p0._0
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m1_Result_0_0_Err<T0: copy + drop, T1: copy + drop>(p0: &mut Result<T0, T1>): &mut T1 {
+        &mut p0._0
+    }
+}
+
+
+//# publish
+module 0x42::m2 {
+    use 0x42::m1;
+    public fun test_pack_unpack_result_err() {
+        assert!(m1::unpack_0x42_m1_Result_Err<u64,u8>(m1::pack_0x42_m1_Result_Err<u64,u8>(7u8)) == 7u8, 3);
+    }
+    public fun test_pack_unpack_result_ok() {
+        let _v0 = m1::pack_0x42_m1_Result_Ok<u64,u64>(42);
+        let _v1 = m1::pack_0x42_m1_Result_Ok<u64,u64>(42);
+        assert!(_v0 == _v1, 1);
+        assert!(m1::unpack_0x42_m1_Result_Ok<u64,u64>(_v0) == 42, 2);
+    }
+    public fun test_unpack_enum_e() {
+        let _v0 = m1::pack_0x42_m1_E_A(100);
+        let _v1 = m1::pack_0x42_m1_E_B(200);
+        assert!(m1::unpack_0x42_m1_E_A(_v0) == 100, 4);
+        assert!(m1::unpack_0x42_m1_E_B(_v1) == 200, 5);
+    }
+    public fun test_unpack_inner() {
+        let _v0;
+        let _v1;
+        let _v2 = m1::pack_0x42_m1_Inner_Inner1(10);
+        let _v3 = m1::pack_0x42_m1_Inner_Inner2(20, 30);
+        let _v4 = &_v2;
+        if (m1::test_variant_0x42_m1_Inner_Inner1(_v4)) _v1 = m1::unpack_0x42_m1_Inner_Inner1(_v2) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v4)) {
+            let (_v5,_v6) = m1::unpack_0x42_m1_Inner_Inner2(_v2);
+            _v1 = _v5 + _v6
+        } else abort 14566554180833181697;
+        let _v7 = &_v3;
+        if (m1::test_variant_0x42_m1_Inner_Inner1(_v7)) _v0 = m1::unpack_0x42_m1_Inner_Inner1(_v3) else if (m1::test_variant_0x42_m1_Inner_Inner2(_v7)) {
+            let (_v8,_v9) = m1::unpack_0x42_m1_Inner_Inner2(_v3);
+            _v0 = _v8 + _v9
+        } else abort 14566554180833181697;
+        assert!(_v1 == 10, 6);
+        assert!(_v0 == 50, 7);
+    }
+}
+
+
+//# run 0x42::m2::test_pack_unpack_result_ok
+
+//# run 0x42::m2::test_pack_unpack_result_err
+
+//# run 0x42::m2::test_unpack_enum_e
+
+//# run 0x42::m2::test_unpack_inner

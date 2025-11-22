@@ -3,7 +3,7 @@
 //# init --addresses A=42
 
 //# run --signers A
-// Bytecode version v9
+// Bytecode version v10
 script
 use 0x1::signer
 // Function definition at index 0
@@ -21,7 +21,7 @@ l0: ld_u64 1000
 
 
 //# publish
-// Bytecode version v9
+// Bytecode version v10
 module 0x2a::M
 struct Foo has key
   x: u64
@@ -37,7 +37,7 @@ struct Foo has key
 
 
 //# run --signers A
-// Bytecode version v9
+// Bytecode version v10
 script
 use 0x2a::M
 // Function definition at index 0

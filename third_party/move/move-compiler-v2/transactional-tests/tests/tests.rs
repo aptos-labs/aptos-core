@@ -148,7 +148,7 @@ const TEST_CONFIGS: &[TestConfig] = &[
         language_version: LanguageVersion::latest(),
         include: &["/structs_visibility/"],
         exclude: &[],
-        cross_compile: false,
+        cross_compile: true,
     },
     TestConfig {
         name: "testing-constant-true",

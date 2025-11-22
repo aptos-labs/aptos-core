@@ -1,0 +1,5 @@
+processed 3 tasks
+task 0 lines 3-123:  publish [module 0x42::m {]
+task 1 lines 126-153:  publish [module 0x42::test_m {]
+task 2 lines 156-156:  run 0x42::test_m::t1_check_scoping
+return values: 3

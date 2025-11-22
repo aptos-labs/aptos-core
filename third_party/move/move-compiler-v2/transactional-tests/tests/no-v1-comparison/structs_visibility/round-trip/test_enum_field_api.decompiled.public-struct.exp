@@ -1,0 +1,149 @@
+processed 8 tasks
+task 0 lines 3-5:  publish [module 0x42::m2 {]
+task 1 lines 8-294:  publish [module 0x42::m {]
+Error: compilation errors:
+ error: cannot select field `x` since it has different types in variants of enum `Data2<T0, T1>`
+    ┌─ TEMPFILE1:147:10
+    │
+147 │         &p0.x
+    │          ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+error: cannot select field `x` since it has different types in variants of enum `Data2<T0, T1>`
+    ┌─ TEMPFILE1:151:10
+    │
+151 │         &p0.x
+    │          ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+error: cannot select field `x` since it has different types in variants of enum `Data2<T0, T1>`
+    ┌─ TEMPFILE1:159:14
+    │
+159 │         &mut p0.x
+    │              ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+error: cannot select field `x` since it has different types in variants of enum `Data2<T0, T1>`
+    ┌─ TEMPFILE1:163:14
+    │
+163 │         &mut p0.x
+    │              ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+error: cannot select field `x` since it has different types in variants of enum `Data3<T0, T1>`
+    ┌─ TEMPFILE1:210:10
+    │
+210 │         &p0.x
+    │          ^^
+    │
+    = field `x` has type `T0` in variant `V3` and type `T1` in variant `V2`
+
+error: cannot select field `x` since it has different types in variants of enum `Data3<T0, T1>`
+    ┌─ TEMPFILE1:214:10
+    │
+214 │         &p0.x
+    │          ^^
+    │
+    = field `x` has type `T0` in variant `V3` and type `T1` in variant `V2`
+
+error: cannot select field `x` since it has different types in variants of enum `Data3<T0, T1>`
+    ┌─ TEMPFILE1:222:14
+    │
+222 │         &mut p0.x
+    │              ^^
+    │
+    = field `x` has type `T0` in variant `V3` and type `T1` in variant `V2`
+
+error: cannot select field `x` since it has different types in variants of enum `Data3<T0, T1>`
+    ┌─ TEMPFILE1:226:14
+    │
+226 │         &mut p0.x
+    │              ^^
+    │
+    = field `x` has type `T0` in variant `V3` and type `T1` in variant `V2`
+
+error: cannot select field `x` since it has different types in variants of enum `Data4<T0, T1>`
+    ┌─ TEMPFILE1:276:10
+    │
+276 │         &p0.x
+    │          ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+error: cannot select field `x` since it has different types in variants of enum `Data4<T0, T1>`
+    ┌─ TEMPFILE1:280:10
+    │
+280 │         &p0.x
+    │          ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+error: cannot select field `x` since it has different types in variants of enum `Data4<T0, T1>`
+    ┌─ TEMPFILE1:288:14
+    │
+288 │         &mut p0.x
+    │              ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+error: cannot select field `x` since it has different types in variants of enum `Data4<T0, T1>`
+    ┌─ TEMPFILE1:292:14
+    │
+292 │         &mut p0.x
+    │              ^^
+    │
+    = field `x` has type `T1` in variant `V2` and type `T0` in variant `V1`
+
+
+task 2 lines 297-297:  run 0x42::m2::test_v1
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 3 lines 299-299:  run 0x42::m2::test_v1_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 301-301:  run 0x42::m2::test_v2_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 303-303:  run 0x42::m2::test_data2_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 305-305:  run 0x42::m2::test_data3_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 307-307:  run 0x42::m2::test_data4_mut_borrow
+Error: Function execution failed with VMError: {
+    major_status: FUNCTION_RESOLUTION_FAILURE,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

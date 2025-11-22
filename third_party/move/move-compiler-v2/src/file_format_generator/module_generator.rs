@@ -63,6 +63,7 @@ pub struct ModuleGenerator {
     /// A mapping from structs to indices of pack apis.
     struct_to_api_pack_idx:
         BTreeMap<QualifiedId<StructId>, BTreeMap<Option<Symbol>, FF::FunctionHandleIndex>>,
+    struct_to_definition_idx: BTreeMap<QualifiedId<StructId>, FF::StructDefinitionIndex>,
     /// A mapping from structs to indices of unpack apis.
     struct_to_api_unpack_idx:
         BTreeMap<QualifiedId<StructId>, BTreeMap<Option<Symbol>, FF::FunctionHandleIndex>>,
@@ -191,6 +192,7 @@ impl ModuleGenerator {
             struct_to_api_imm_borrow_field_idx: Default::default(),
             struct_to_api_mut_borrow_field_idx: Default::default(),
             struct_to_idx: Default::default(),
+            struct_to_definition_idx: Default::default(),
             struct_def_inst_to_idx: Default::default(),
             field_to_idx: Default::default(),
             field_inst_to_idx: Default::default(),
@@ -274,6 +276,8 @@ impl ModuleGenerator {
             MAX_STRUCT_DEF_COUNT,
             "struct",
         ));
+        self.struct_to_definition_idx
+            .insert(struct_env.get_qualified_id(), def_idx);
         self.source_map
             .add_top_level_struct_mapping(def_idx, ctx.env.to_ir_loc(loc))
             .expect(SOURCE_MAP_OK);
@@ -682,6 +686,29 @@ impl ModuleGenerator {
             let name_sym = struct_env.env().symbol_pool().make(&name);
             let name_idx = self.name_index(ctx, loc, name_sym);
 
+            // Attach attributes according to the operation
+            let attributes = if op_prefix == well_known::PACK {
+                if variant_opt.is_some() {
+                    vec![FF::FunctionAttribute::PackVariant]
+                } else {
+                    vec![FF::FunctionAttribute::Pack]
+                }
+            } else if op_prefix == well_known::UNPACK {
+                if variant_opt.is_some() {
+                    vec![FF::FunctionAttribute::UnpackVariant]
+                } else {
+                    vec![FF::FunctionAttribute::Unpack]
+                }
+            } else if op_prefix == well_known::TEST_VARIANT {
+                assert!(
+                    variant_opt.is_some(),
+                    "test_variant must be a concrete variant"
+                );
+                vec![FF::FunctionAttribute::TestVariant]
+            } else {
+                vec![]
+            };
+
             let handle = FF::FunctionHandle {
                 module,
                 name: name_idx,
@@ -689,7 +716,7 @@ impl ModuleGenerator {
                 parameters: params_sig,
                 return_: return_sig,
                 access_specifiers: None,
-                attributes: vec![],
+                attributes,
             };
 
             self.module.function_handles.push(handle);
@@ -970,6 +997,13 @@ impl ModuleGenerator {
                 handle_elements.push((name, return_, vec![*variant].clone(), offset));
             }
             for (name, return_, variant_vec, offset) in handle_elements {
+                let attributes = vec![
+                    if is_imm {
+                        FF::FunctionAttribute::BorrowFieldImmutable(*offset as u8)
+                    } else {
+                        FF::FunctionAttribute::BorrowFieldMutable(*offset as u8)
+                    },
+                ];
                 let handle: FF::FunctionHandle = FF::FunctionHandle {
                     module,
                     name: self.name_index(ctx, loc, struct_env.env().symbol_pool().make(&name)),
@@ -977,7 +1011,7 @@ impl ModuleGenerator {
                     parameters,
                     return_,
                     access_specifiers: None,
-                    attributes: vec![],
+                    attributes,
                 };
                 let idx = FF::FunctionHandleIndex(ctx.checked_bound(
                     loc,
@@ -1007,6 +1041,13 @@ impl ModuleGenerator {
                     MAX_FUNCTION_COUNT,
                     "used function",
                 ));
+                let attributes = vec![
+                    if is_imm {
+                        FF::FunctionAttribute::BorrowFieldImmutable(offset as u8)
+                    } else {
+                        FF::FunctionAttribute::BorrowFieldMutable(offset as u8)
+                    },
+                ];
                 let handle: FF::FunctionHandle = FF::FunctionHandle {
                     module,
                     name: self.name_index(ctx, loc, struct_env.env().symbol_pool().make(&name)),
@@ -1014,7 +1055,7 @@ impl ModuleGenerator {
                     parameters,
                     return_,
                     access_specifiers: None,
-                    attributes: vec![],
+                    attributes,
                 };
                 self.module.function_handles.push(handle);
                 ret.push(((None, offset), idx));

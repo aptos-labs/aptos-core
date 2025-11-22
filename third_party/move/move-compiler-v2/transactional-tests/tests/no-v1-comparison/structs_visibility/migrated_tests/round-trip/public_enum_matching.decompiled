@@ -1,0 +1,505 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_enum_matching.move`
+
+//# publish
+module 0x42::m {
+    struct Box has drop {
+        x: u64,
+    }
+    enum CommonFields {
+        Foo {
+            x: u64,
+            y: u64,
+        }
+        Bar {
+            z: u64,
+            x: u64,
+        }
+    }
+    enum Inner has drop {
+        Inner1 {
+            x: u64,
+        }
+        Inner2 {
+            x: u64,
+            y: u64,
+        }
+    }
+    enum Option<T0> has drop {
+        None,
+        Some {
+            value: T0,
+        }
+    }
+    enum Outer has drop {
+        None,
+        One {
+            i: Inner,
+        }
+        Two {
+            i: Inner,
+            b: Box,
+        }
+    }
+    #[pack]
+    public fun pack_0x42_m_Box(p0: u64): Box {
+        Box{x: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Box(p0: Box): u64 {
+        let Box{x: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Box_x_0(p0: &Box): &u64 {
+        &p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Box_x_0(p0: &mut Box): &mut u64 {
+        &mut p0.x
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_CommonFields_Foo(p0: &CommonFields): bool {
+        p0 is Foo
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_CommonFields_Bar(p0: &CommonFields): bool {
+        p0 is Bar
+    }
+    #[pack]
+    public fun pack_0x42_m_CommonFields_Foo(p0: u64, p1: u64): CommonFields {
+        CommonFields::Foo{x: p0, y: p1}
+    }
+    #[pack]
+    public fun pack_0x42_m_CommonFields_Bar(p0: u64, p1: u64): CommonFields {
+        CommonFields::Bar{z: p0, x: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_CommonFields_Foo(p0: CommonFields): (u64, u64) {
+        let CommonFields::Foo{x: _v0, y: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[unpack]
+    public fun unpack_0x42_m_CommonFields_Bar(p0: CommonFields): (u64, u64) {
+        let CommonFields::Bar{z: _v0, x: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m_CommonFields_x_0(p0: &CommonFields): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_m_CommonFields_x_1(p0: &CommonFields): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_m_CommonFields_y_1(p0: &CommonFields): &u64 {
+        &p0.y
+    }
+    #[borrow]
+    public fun borrow_0x42_m_CommonFields_z_0(p0: &CommonFields): &u64 {
+        &p0.z
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_CommonFields_x_0(p0: &mut CommonFields): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_CommonFields_x_1(p0: &mut CommonFields): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_CommonFields_y_1(p0: &mut CommonFields): &mut u64 {
+        &mut p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_CommonFields_z_0(p0: &mut CommonFields): &mut u64 {
+        &mut p0.z
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Inner_Inner1(p0: &Inner): bool {
+        p0 is Inner1
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Inner_Inner2(p0: &Inner): bool {
+        p0 is Inner2
+    }
+    #[pack]
+    public fun pack_0x42_m_Inner_Inner1(p0: u64): Inner {
+        Inner::Inner1{x: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m_Inner_Inner2(p0: u64, p1: u64): Inner {
+        Inner::Inner2{x: p0, y: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Inner_Inner1(p0: Inner): u64 {
+        let Inner::Inner1{x: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Inner_Inner2(p0: Inner): (u64, u64) {
+        let Inner::Inner2{x: _v0, y: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Inner_x_0(p0: &Inner): &u64 {
+        &p0.x
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Inner_y_1(p0: &Inner): &u64 {
+        &p0.y
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Inner_x_0(p0: &mut Inner): &mut u64 {
+        &mut p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Inner_y_1(p0: &mut Inner): &mut u64 {
+        &mut p0.y
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Option_None<T0>(p0: &Option<T0>): bool {
+        p0 is None
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Option_Some<T0>(p0: &Option<T0>): bool {
+        p0 is Some
+    }
+    #[pack]
+    public fun pack_0x42_m_Option_None<T0>(): Option<T0> {
+        Option::None<T0>{}
+    }
+    #[pack]
+    public fun pack_0x42_m_Option_Some<T0>(p0: T0): Option<T0> {
+        Option::Some<T0>{value: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Option_None<T0>(p0: Option<T0>) {
+        let Option::None<T0>{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Option_Some<T0>(p0: Option<T0>): T0 {
+        let Option::Some<T0>{value: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Option_value_0<T0>(p0: &Option<T0>): &T0 {
+        &p0.value
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Option_value_0<T0>(p0: &mut Option<T0>): &mut T0 {
+        &mut p0.value
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Outer_None(p0: &Outer): bool {
+        p0 is None
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Outer_One(p0: &Outer): bool {
+        p0 is One
+    }
+    #[test_variant]
+    public fun test_variant_0x42_m_Outer_Two(p0: &Outer): bool {
+        p0 is Two
+    }
+    #[pack]
+    public fun pack_0x42_m_Outer_None(): Outer {
+        Outer::None{}
+    }
+    #[pack]
+    public fun pack_0x42_m_Outer_One(p0: Inner): Outer {
+        Outer::One{i: p0}
+    }
+    #[pack]
+    public fun pack_0x42_m_Outer_Two(p0: Inner, p1: Box): Outer {
+        Outer::Two{i: p0, b: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Outer_None(p0: Outer) {
+        let Outer::None{} = p0;
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Outer_One(p0: Outer): Inner {
+        let Outer::One{i: _v0} = p0;
+        _v0
+    }
+    #[unpack]
+    public fun unpack_0x42_m_Outer_Two(p0: Outer): (Inner, Box) {
+        let Outer::Two{i: _v0, b: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Outer_i_0(p0: &Outer): &Inner {
+        &p0.i
+    }
+    #[borrow]
+    public fun borrow_0x42_m_Outer_b_1(p0: &Outer): &Box {
+        &p0.b
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Outer_i_0(p0: &mut Outer): &mut Inner {
+        &mut p0.i
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_Outer_b_1(p0: &mut Outer): &mut Box {
+        &mut p0.b
+    }
+}
+
+
+//# publish
+module 0x42::test_m {
+    use 0x42::m;
+    public fun inner_value(p0: m::Inner): u64 {
+        let _v0 = &p0;
+        let _v1 = m::test_variant_0x42_m_Inner_Inner1(_v0);
+        loop {
+            if (!_v1) {
+                if (m::test_variant_0x42_m_Inner_Inner2(_v0)) break;
+                abort 14566554180833181697
+            };
+            return m::unpack_0x42_m_Inner_Inner1(p0)
+        };
+        let (_v2,_v3) = m::unpack_0x42_m_Inner_Inner2(p0);
+        _v2 + _v3
+    }
+    public fun is_inner1(p0: &m::Inner): bool {
+        m::test_variant_0x42_m_Inner_Inner1(p0)
+    }
+    public fun is_some<T0>(p0: &m::Option<T0>): bool {
+        let _v0 = m::test_variant_0x42_m_Option_None<T0>(p0);
+        loop {
+            if (!_v0) {
+                if (m::test_variant_0x42_m_Option_Some<T0>(p0)) break;
+                abort 14566554180833181697
+            };
+            return false
+        };
+        true
+    }
+    public fun is_some_dropped<T0: drop>(p0: m::Option<T0>): bool {
+        if (m::test_variant_0x42_m_Option_None<T0>(&p0)) {
+            m::unpack_0x42_m_Option_None<T0>(p0);
+            return false
+        };
+        true
+    }
+    public fun is_some_specialized(p0: &m::Option<m::Option<u64>>): bool {
+        let _v0 = m::test_variant_0x42_m_Option_None<m::Option<u64>>(p0);
+        'l0: loop {
+            loop {
+                if (!_v0) {
+                    if (m::test_variant_0x42_m_Option_Some<m::Option<u64>>(p0)) {
+                        if (m::test_variant_0x42_m_Option_None<u64>(m::borrow_0x42_m_Option_value_0<m::Option<u64>>(p0))) break 'l0};
+                    if (m::test_variant_0x42_m_Option_Some<m::Option<u64>>(p0)) {
+                        if (m::test_variant_0x42_m_Option_Some<u64>(m::borrow_0x42_m_Option_value_0<m::Option<u64>>(p0))) break};
+                    abort 14566554180833181697
+                };
+                return false
+            };
+            return true
+        };
+        false
+    }
+    public fun outer_value(p0: m::Outer): u64 {
+        let _v0 = &p0;
+        let _v1 = m::test_variant_0x42_m_Outer_None(_v0);
+        'l0: loop {
+            loop {
+                if (!_v1) {
+                    if (m::test_variant_0x42_m_Outer_One(_v0)) break;
+                    if (m::test_variant_0x42_m_Outer_Two(_v0)) break 'l0;
+                    abort 14566554180833181697
+                };
+                m::unpack_0x42_m_Outer_None(p0);
+                return 0
+            };
+            return inner_value(m::unpack_0x42_m_Outer_One(p0))
+        };
+        let (_v2,_v3) = m::unpack_0x42_m_Outer_Two(p0);
+        let _v4 = _v3;
+        let _v5 = inner_value(_v2);
+        let _v6 = *m::borrow_0x42_m_Box_x_0(&_v4);
+        _v5 + _v6
+    }
+    public fun outer_value_nested(p0: m::Outer): u64 {
+        let _v0 = &p0;
+        let _v1 = m::test_variant_0x42_m_Outer_None(_v0);
+        'l0: loop {
+            'l1: loop {
+                loop {
+                    if (!_v1) {
+                        if (m::test_variant_0x42_m_Outer_One(_v0)) {
+                            assert!(m::test_variant_0x42_m_Outer_One(_v0), 14566554180833181697);
+                            if (m::test_variant_0x42_m_Inner_Inner1(m::borrow_0x42_m_Outer_i_0(_v0))) break 'l0
+                        };
+                        if (m::test_variant_0x42_m_Outer_One(_v0)) break;
+                        if (m::test_variant_0x42_m_Outer_Two(_v0)) break 'l1;
+                        abort 14566554180833181697
+                    };
+                    m::unpack_0x42_m_Outer_None(p0);
+                    return 0
+                };
+                return inner_value(m::unpack_0x42_m_Outer_One(p0))
+            };
+            let (_v2,_v3) = m::unpack_0x42_m_Outer_Two(p0);
+            let _v4 = _v3;
+            let _v5 = inner_value(_v2);
+            let _v6 = *m::borrow_0x42_m_Box_x_0(&_v4);
+            return _v5 + _v6
+        };
+        m::unpack_0x42_m_Inner_Inner1(m::unpack_0x42_m_Outer_One(p0))
+    }
+    public fun outer_value_with_cond(p0: m::Outer): u64 {
+        let _v0 = &p0;
+        let _v1 = m::test_variant_0x42_m_Outer_None(_v0);
+        'l0: loop {
+            'l1: loop {
+                loop {
+                    if (!_v1) {
+                        if (m::test_variant_0x42_m_Outer_One(_v0)) {
+                            assert!(m::test_variant_0x42_m_Outer_One(_v0), 14566554180833181697);
+                            if (is_inner1(m::borrow_0x42_m_Outer_i_0(_v0))) break 'l0
+                        };
+                        if (m::test_variant_0x42_m_Outer_One(_v0)) break;
+                        if (m::test_variant_0x42_m_Outer_Two(_v0)) break 'l1;
+                        abort 14566554180833181697
+                    };
+                    m::unpack_0x42_m_Outer_None(p0);
+                    return 0
+                };
+                return inner_value(m::unpack_0x42_m_Outer_One(p0))
+            };
+            let (_v2,_v3) = m::unpack_0x42_m_Outer_Two(p0);
+            let _v4 = _v3;
+            let _v5 = inner_value(_v2);
+            let _v6 = *m::borrow_0x42_m_Box_x_0(&_v4);
+            return _v5 + _v6
+        };
+        inner_value(m::unpack_0x42_m_Outer_One(p0)) % 2
+    }
+    public fun outer_value_with_cond_ref(p0: &m::Outer): bool {
+        let _v0 = m::test_variant_0x42_m_Outer_None(p0);
+        'l0: loop {
+            'l1: loop {
+                loop {
+                    if (!_v0) {
+                        if (m::test_variant_0x42_m_Outer_One(p0)) {
+                            assert!(m::test_variant_0x42_m_Outer_One(p0), 14566554180833181697);
+                            if (is_inner1(m::borrow_0x42_m_Outer_i_0(p0))) break 'l0
+                        };
+                        if (m::test_variant_0x42_m_Outer_One(p0)) {
+                            if (m::test_variant_0x42_m_Outer_One(p0)) break;
+                            abort 14566554180833181697
+                        };
+                        assert!(m::test_variant_0x42_m_Outer_Two(p0), 14566554180833181697);
+                        if (m::test_variant_0x42_m_Outer_Two(p0)) break 'l1;
+                        abort 14566554180833181697
+                    };
+                    return false
+                };
+                return is_inner1(m::borrow_0x42_m_Outer_i_0(p0))
+            };
+            return is_inner1(m::borrow_0x42_m_Outer_i_0(p0))
+        };
+        true
+    }
+    fun select_common_fields(p0: m::CommonFields): u64 {
+        let _v0;
+        let _v1;
+        let _v2 = &p0;
+        if (m::test_variant_0x42_m_CommonFields_Bar(_v2)) _v0 = m::borrow_0x42_m_CommonFields_x_1(_v2) else _v0 = m::borrow_0x42_m_CommonFields_x_0(_v2);
+        let _v3 = *_v0;
+        let _v4 = &p0;
+        if (m::test_variant_0x42_m_CommonFields_Foo(_v4)) {
+            let (_v5,_v6) = m::unpack_0x42_m_CommonFields_Foo(p0);
+            _v1 = _v6
+        } else if (m::test_variant_0x42_m_CommonFields_Bar(_v4)) {
+            let (_v7,_v8) = m::unpack_0x42_m_CommonFields_Bar(p0);
+            _v1 = _v7
+        } else abort 14566554180833181697;
+        _v3 + _v1
+    }
+    fun t1_inner_value(): u64 {
+        inner_value(m::pack_0x42_m_Inner_Inner2(2, 5))
+    }
+    fun t1_is_inner1(): bool {
+        let _v0 = m::pack_0x42_m_Inner_Inner1(2);
+        is_inner1(&_v0)
+    }
+    fun t1_is_some(): bool {
+        let _v0 = m::pack_0x42_m_Option_None<u64>();
+        is_some<u64>(&_v0)
+    }
+    fun t1_is_some_specialized(): bool {
+        let _v0 = m::pack_0x42_m_Option_Some<m::Option<u64>>(m::pack_0x42_m_Option_None<u64>());
+        is_some_specialized(&_v0)
+    }
+    fun t1_outer_value(): u64 {
+        outer_value(m::pack_0x42_m_Outer_None())
+    }
+    fun t1_outer_value_nested(): u64 {
+        outer_value_nested(m::pack_0x42_m_Outer_One(m::pack_0x42_m_Inner_Inner1(27)))
+    }
+    fun t1_outer_value_with_cond(): u64 {
+        outer_value_with_cond(m::pack_0x42_m_Outer_One(m::pack_0x42_m_Inner_Inner1(43)))
+    }
+    fun t1_outer_value_with_cond_ref(): bool {
+        let _v0 = m::pack_0x42_m_Outer_One(m::pack_0x42_m_Inner_Inner1(43));
+        outer_value_with_cond_ref(&_v0)
+    }
+    fun t2_is_inner1(): bool {
+        let _v0 = m::pack_0x42_m_Inner_Inner2(2, 3);
+        is_inner1(&_v0)
+    }
+    fun t2_is_some(): bool {
+        let _v0 = m::pack_0x42_m_Option_Some<u64>(3);
+        is_some<u64>(&_v0)
+    }
+    fun t2_is_some_specialized(): bool {
+        let _v0 = m::pack_0x42_m_Option_Some<m::Option<u64>>(m::pack_0x42_m_Option_Some<u64>(1));
+        is_some_specialized(&_v0)
+    }
+    fun t2_outer_value(): u64 {
+        outer_value(m::pack_0x42_m_Outer_One(m::pack_0x42_m_Inner_Inner2(1, 2)))
+    }
+    fun t2_outer_value_nested(): u64 {
+        let _v0 = m::pack_0x42_m_Inner_Inner1(5);
+        let _v1 = m::pack_0x42_m_Box(7);
+        outer_value_nested(m::pack_0x42_m_Outer_Two(_v0, _v1))
+    }
+    fun t3_outer_value(): u64 {
+        let _v0 = m::pack_0x42_m_Inner_Inner1(1);
+        let _v1 = m::pack_0x42_m_Box(7);
+        outer_value(m::pack_0x42_m_Outer_Two(_v0, _v1))
+    }
+}
+
+
+//# run 0x42::test_m::t1_is_inner1
+
+//# run 0x42::test_m::t2_is_inner1
+
+//# run 0x42::test_m::t1_inner_value
+
+//# run 0x42::test_m::t1_outer_value
+
+//# run 0x42::test_m::t2_outer_value
+
+//# run 0x42::test_m::t3_outer_value
+
+//# run 0x42::test_m::t1_outer_value_nested
+
+//# run 0x42::test_m::t2_outer_value_nested
+
+//# run 0x42::test_m::t1_outer_value_with_cond
+
+//# run 0x42::test_m::t1_outer_value_with_cond_ref
+
+//# run 0x42::test_m::t1_is_some
+
+//# run 0x42::test_m::t2_is_some
+
+//# run 0x42::test_m::t1_is_some_specialized
+
+//# run 0x42::test_m::t2_is_some_specialized

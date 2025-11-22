@@ -1,0 +1,65 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_consume_1.move`
+
+//# publish
+module 0xc0ffee::m {
+    struct W has copy, drop {
+        x: u64,
+    }
+    #[pack]
+    public fun pack_0xc0ffee_m_W(p0: u64): W {
+        W{x: p0}
+    }
+    #[unpack]
+    public fun unpack_0xc0ffee_m_W(p0: W): u64 {
+        let W{x: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0xc0ffee_m_W_x_0(p0: &W): &u64 {
+        &p0.x
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0xc0ffee_m_W_x_0(p0: &mut W): &mut u64 {
+        &mut p0.x
+    }
+}
+
+
+//# publish
+module 0xc0ffee::test_m {
+    use 0xc0ffee::m;
+    fun consume(p0: u64) {
+        ()
+    }
+    fun consume_(p0: m::W) {
+        ()
+    }
+    public fun test1(p0: u64) {
+        consume(p0);
+        consume(p0);
+    }
+    public fun test2(p0: u64) {
+        consume(p0);
+        consume(p0);
+    }
+    public fun test3(p0: m::W) {
+        consume_(p0);
+        consume_(p0);
+    }
+    public fun test4(p0: m::W) {
+        consume_(p0);
+        consume_(p0);
+    }
+    public fun test5() {
+        let _v0 = m::pack_0xc0ffee_m_W(42);
+        test3(_v0);
+        test4(_v0);
+    }
+}
+
+
+//# run 0xc0ffee::test_m::test1 --args 42
+
+//# run 0xc0ffee::test_m::test2 --args 42
+
+//# run 0xc0ffee::test_m::test5

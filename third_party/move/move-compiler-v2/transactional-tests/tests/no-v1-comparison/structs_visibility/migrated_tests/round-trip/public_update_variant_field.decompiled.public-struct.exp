@@ -1,0 +1,9 @@
+processed 5 tasks
+task 0 lines 3-90:  publish [module 0x815::m {]
+task 1 lines 93-119:  publish [module 0x815::m_bug_14300_update_variant_field {]
+task 2 lines 122-122:  run 0x815::m_bug_14300_update_variant_field::update_common_field
+return values: 15
+task 3 lines 124-124:  run 0x815::m_bug_14300_update_variant_field::update_non_common_field
+return values: 15
+task 4 lines 126-126:  run 0x815::m_bug_14300_update_variant_field::update_common_field_different_offset
+return values: 15

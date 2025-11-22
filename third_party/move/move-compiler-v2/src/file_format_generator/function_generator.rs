@@ -482,7 +482,7 @@ impl<'a> FunctionGenerator<'a> {
         is_imm: bool,
     ) {
         assert!(struct_env.get_visibility().is_public_or_friend());
-        if struct_env.is_empty_struct() {
+        if struct_env.is_empty_struct().unwrap_or(false) {
             return;
         }
         let para_type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());
@@ -1118,7 +1118,7 @@ impl<'a> FunctionGenerator<'a> {
                         .language_version_for_public_struct()
                 {
                     let struct_env = &fun_ctx.module.env.get_struct(mid.qualified(*sid));
-                    if struct_env.is_empty_struct() {
+                    if struct_env.is_empty_struct().unwrap_or(false) {
                         fun_ctx.internal_error("cannot generate borrow field for empty struct");
                         return;
                     }

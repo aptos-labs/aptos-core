@@ -660,6 +660,7 @@ pub mod known_attributes {
         Deprecation(DeprecationAttribute),
         Lint(LintAttribute),
         Execution(ExecutionAttribute),
+        StructAPI(StructAPIAttribute),
     }
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -703,6 +704,18 @@ pub mod known_attributes {
         Persistent,
         /// Marks a function to establish a module reentrancy lock during execution
         ModuleLock,
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub enum StructAPIAttribute {
+        // Marks a struct as having API for packing and unpacking
+        Pack,
+        PackVariant,
+        Unpack,
+        UnpackVariant,
+        TestVariant,
+        BorrowFieldImmutable,
+        BorrowFieldMutable,
     }
 
     impl fmt::Display for AttributePosition {
@@ -762,6 +775,7 @@ pub mod known_attributes {
             DeprecationAttribute::add_attribute_names(table);
             LintAttribute::add_attribute_names(table);
             ExecutionAttribute::add_attribute_names(table);
+            StructAPIAttribute::add_attribute_names(table);
         }
 
         fn name(&self) -> &str {
@@ -772,6 +786,7 @@ pub mod known_attributes {
                 Self::Deprecation(a) => a.name(),
                 Self::Lint(a) => a.name(),
                 Self::Execution(a) => a.name(),
+                Self::StructAPI(a) => a.name(),
             }
         }
 
@@ -783,6 +798,7 @@ pub mod known_attributes {
                 Self::Deprecation(a) => a.expected_positions(),
                 Self::Lint(a) => a.expected_positions(),
                 Self::Execution(a) => a.expected_positions(),
+                Self::StructAPI(a) => a.expected_positions(),
             }
         }
     }
@@ -999,6 +1015,46 @@ pub mod known_attributes {
             match self {
                 Self::Persistent => Self::PERSISTENT,
                 Self::ModuleLock => Self::MODULE_LOCK,
+            }
+        }
+
+        fn expected_positions(&self) -> &'static BTreeSet<AttributePosition> {
+            static POSITIONS: Lazy<BTreeSet<AttributePosition>> =
+                Lazy::new(|| IntoIterator::into_iter([AttributePosition::Function]).collect());
+            &POSITIONS
+        }
+    }
+
+    impl StructAPIAttribute {
+        const ALL_ATTRIBUTE_NAMES: [&'static str; 5] = [
+            Self::PACK,
+            Self::UNPACK,
+            Self::TEST_VARIANT,
+            Self::BORROW_FIELD_IMMUTABLE,
+            Self::BORROW_FIELD_MUTABLE,
+        ];
+        pub const BORROW_FIELD_IMMUTABLE: &'static str = "borrow";
+        pub const BORROW_FIELD_MUTABLE: &'static str = "borrow_mut";
+        pub const PACK: &'static str = "pack";
+        pub const TEST_VARIANT: &'static str = "test_variant";
+        pub const UNPACK: &'static str = "unpack";
+    }
+    impl AttributeKind for StructAPIAttribute {
+        fn add_attribute_names(table: &mut BTreeSet<String>) {
+            for str in Self::ALL_ATTRIBUTE_NAMES {
+                table.insert(str.to_string());
+            }
+        }
+
+        fn name(&self) -> &str {
+            match self {
+                Self::Pack => Self::PACK,
+                Self::PackVariant => Self::PACK,
+                Self::Unpack => Self::UNPACK,
+                Self::UnpackVariant => Self::UNPACK,
+                Self::TestVariant => Self::TEST_VARIANT,
+                Self::BorrowFieldImmutable => Self::BORROW_FIELD_IMMUTABLE,
+                Self::BorrowFieldMutable => Self::BORROW_FIELD_MUTABLE,
             }
         }
 

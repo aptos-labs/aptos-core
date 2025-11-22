@@ -1,0 +1,462 @@
+processed 13 tasks
+task 0 lines 3-128:  publish [module 0x42::m1 {]
+Error: compilation errors:
+ error: undeclared `_v0`
+   ┌─ TEMPFILE:67:9
+   │
+67 │         _v0
+   │         ^^^
+
+
+task 1 lines 131-163:  publish [module 0x42::m3 {]
+Error: compilation errors:
+ error: unbound module
+    ┌─ TEMPFILE1:133:9
+    │
+133 │     use 0x42::m1;
+    │         ^^^^^^^^ Invalid 'use'. Unbound module: '0x42::m1'
+
+error: unbound module
+    ┌─ TEMPFILE1:136:12
+    │
+136 │         g: m1::T<T0>,
+    │            ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:139:62
+    │
+139 │     public fun pack_0x42_m3_S<T0: drop + store>(p0: u64, p1: m1::T<T0>): S<T0> {
+    │                                                              ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:143:69
+    │
+143 │     public fun unpack_0x42_m3_S<T0: drop + store>(p0: S<T0>): (u64, m1::T<T0>) {
+    │                                                                     ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:152:69
+    │
+152 │     public fun borrow_0x42_m3_S_g_1<T0: drop + store>(p0: &S<T0>): &m1::T<T0> {
+    │                                                                     ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE1:160:81
+    │
+160 │     public fun borrow_mut_0x42_m3_S_g_1<T0: drop + store>(p0: &mut S<T0>): &mut m1::T<T0> {
+    │                                                                                 ^^ Unbound module or type alias 'm1'
+
+
+task 2 lines 166-233:  publish [module 0x42::m2 {]
+Error: compilation errors:
+ error: unbound module
+    ┌─ TEMPFILE2:168:9
+    │
+168 │     use 0x42::m1;
+    │         ^^^^^^^^ Invalid 'use'. Unbound module: '0x42::m1'
+
+error: unbound module
+    ┌─ TEMPFILE2:169:9
+    │
+169 │     use 0x42::m3;
+    │         ^^^^^^^^ Invalid 'use'. Unbound module: '0x42::m3'
+
+error: unbound module
+    ┌─ TEMPFILE2:170:33
+    │
+170 │     public fun return_struct(): m1::S<u64> {
+    │                                 ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:171:19
+    │
+171 │         let _v0 = m1::pack_0x42_m1_T<u64>(88);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:172:9
+    │
+172 │         m1::pack_0x42_m1_S<u64>(77, _v0)
+    │         ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:174:32
+    │
+174 │     public fun take_struct(p0: m1::S<vector<u8>>) {
+    │                                ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:175:42
+    │
+175 │         assert!(*0x1::vector::borrow<u8>(m1::borrow_0x42_m1_T_h_0<vector<u8>>(m1::borrow_0x42_m1_S_g_1<vector<u8>>(&p0)), 0) == 255u8, 12);
+    │                                          ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:175:79
+    │
+175 │         assert!(*0x1::vector::borrow<u8>(m1::borrow_0x42_m1_T_h_0<vector<u8>>(m1::borrow_0x42_m1_S_g_1<vector<u8>>(&p0)), 0) == 255u8, 12);
+    │                                                                               ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:178:19
+    │
+178 │         let _v0 = m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[1, 2, 3])));
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:178:48
+    │
+178 │         let _v0 = m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[1, 2, 3])));
+    │                                                ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:178:67
+    │
+178 │         let _v0 = m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[1, 2, 3])));
+    │                                                                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:178:79
+    │
+178 │         let _v0 = m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[1, 2, 3])));
+    │                                                                               ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:179:43
+    │
+179 │         assert!(*0x1::vector::borrow<u64>(m1::borrow_0x42_m1_V_items_0<u64>(m1::borrow_0x42_m1_T_h_0<m1::V<u64>>(m1::borrow_0x42_m1_Nested_inner_0<u64>(&_v0))), 2) == 3, 7);
+    │                                           ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:179:77
+    │
+179 │         assert!(*0x1::vector::borrow<u64>(m1::borrow_0x42_m1_V_items_0<u64>(m1::borrow_0x42_m1_T_h_0<m1::V<u64>>(m1::borrow_0x42_m1_Nested_inner_0<u64>(&_v0))), 2) == 3, 7);
+    │                                                                             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:179:102
+    │
+179 │         assert!(*0x1::vector::borrow<u64>(m1::borrow_0x42_m1_V_items_0<u64>(m1::borrow_0x42_m1_T_h_0<m1::V<u64>>(m1::borrow_0x42_m1_Nested_inner_0<u64>(&_v0))), 2) == 3, 7);
+    │                                                                                                      ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:179:114
+    │
+179 │         assert!(*0x1::vector::borrow<u64>(m1::borrow_0x42_m1_V_items_0<u64>(m1::borrow_0x42_m1_T_h_0<m1::V<u64>>(m1::borrow_0x42_m1_Nested_inner_0<u64>(&_v0))), 2) == 3, 7);
+    │                                                                                                                  ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:182:19
+    │
+182 │         let _v0 = m1::pack_0x42_m1_T<u64>(42);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:183:18
+    │
+183 │         assert!(*m1::borrow_0x42_m1_T_h_0<u64>(&_v0) == 42, 1);
+    │                  ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:184:19
+    │
+184 │         let _v1 = m1::pack_0x42_m1_S<u64>(43, _v0);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:185:18
+    │
+185 │         assert!(*m1::borrow_0x42_m1_S_f_0<u64>(&_v1) == 43, 2);
+    │                  ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:188:19
+    │
+188 │         let _v0 = m1::pack_0x42_m1_T<u64>(42);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:189:18
+    │
+189 │         assert!(*m1::borrow_0x42_m1_T_h_0<u64>(&_v0) == 42, 1);
+    │                  ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:190:19
+    │
+190 │         let _v1 = m3::pack_0x42_m3_S<u64>(43, _v0);
+    │                   ^^ Unbound module or type alias 'm3'
+
+error: unbound module
+    ┌─ TEMPFILE2:191:18
+    │
+191 │         assert!(*m3::borrow_0x42_m3_S_f_0<u64>(&_v1) == 43, 13);
+    │                  ^^ Unbound module or type alias 'm3'
+
+error: unbound module
+    ┌─ TEMPFILE2:192:18
+    │
+192 │         assert!(*m1::borrow_0x42_m1_T_h_0<u64>(m3::borrow_0x42_m3_S_g_1<u64>(&_v1)) == 42, 14);
+    │                  ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:192:48
+    │
+192 │         assert!(*m1::borrow_0x42_m1_T_h_0<u64>(m3::borrow_0x42_m3_S_g_1<u64>(&_v1)) == 42, 14);
+    │                                                ^^ Unbound module or type alias 'm3'
+
+error: unbound module
+    ┌─ TEMPFILE2:195:19
+    │
+195 │         let _v0 = m1::unpack_0x42_m1_NoFields(m1::pack_0x42_m1_NoFields(false));
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:195:47
+    │
+195 │         let _v0 = m1::unpack_0x42_m1_NoFields(m1::pack_0x42_m1_NoFields(false));
+    │                                               ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:198:19
+    │
+198 │         let _v0 = m1::pack_0x42_m1_P<m1::Inner<u64>>(42);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:198:38
+    │
+198 │         let _v0 = m1::pack_0x42_m1_P<m1::Inner<u64>>(42);
+    │                                      ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:199:18
+    │
+199 │         assert!(*m1::borrow_0x42_m1_P_p_0<m1::Inner<u64>>(&_v0) == 42, 1);
+    │                  ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:199:43
+    │
+199 │         assert!(*m1::borrow_0x42_m1_P_p_0<m1::Inner<u64>>(&_v0) == 42, 1);
+    │                                           ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:200:17
+    │
+200 │         assert!(m1::unpack_0x42_m1_P<m1::Inner<u64>>(_v0) == 42, 4);
+    │                 ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:200:38
+    │
+200 │         assert!(m1::unpack_0x42_m1_P<m1::Inner<u64>>(_v0) == 42, 4);
+    │                                      ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:203:19
+    │
+203 │         let _v0 = m1::pack_0x42_m1_T<vector<u64>>(vector[42]);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:204:43
+    │
+204 │         assert!(*0x1::vector::borrow<u64>(m1::borrow_0x42_m1_T_h_0<vector<u64>>(&_v0), 0) == 42, 3);
+    │                                           ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:207:19
+    │
+207 │         let _v0 = m1::pack_0x42_m1_T<vector<u8>>(vector[255u8]);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:208:21
+    │
+208 │         take_struct(m1::pack_0x42_m1_S<vector<u8>>(1, _v0));
+    │                     ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:211:25
+    │
+211 │         let (_v0,_v1) = m1::unpack_0x42_m1_S<u64>(return_struct());
+    │                         ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:212:19
+    │
+212 │         let _v2 = m1::unpack_0x42_m1_T<u64>(_v1);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:217:19
+    │
+217 │         let _v0 = m1::pack_0x42_m1_T<u64>(42);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:218:25
+    │
+218 │         let (_v1,_v2) = m1::unpack_0x42_m1_S<u64>(m1::pack_0x42_m1_S<u64>(43, _v0));
+    │                         ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:218:51
+    │
+218 │         let (_v1,_v2) = m1::unpack_0x42_m1_S<u64>(m1::pack_0x42_m1_S<u64>(43, _v0));
+    │                                                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:219:19
+    │
+219 │         let _v3 = m1::unpack_0x42_m1_T<u64>(_v2);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:19
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:45
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                                             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:66
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                                                                  ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:78
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                                                                              ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:109
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                                                                                                             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:138
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                                                                                                                                          ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:157
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                                                                                                                                                             ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:224:169
+    │
+224 │         let _v0 = m1::unpack_0x42_m1_V<u64>(m1::unpack_0x42_m1_T<m1::V<u64>>(m1::unpack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_Nested<u64>(m1::pack_0x42_m1_T<m1::V<u64>>(m1::pack_0x42_m1_V<u64>(vector[10, 20]))))));
+    │                                                                                                                                                                         ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:229:19
+    │
+229 │         let _v0 = m1::pack_0x42_m1_T<u64>(7);
+    │                   ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:230:25
+    │
+230 │         let (_v1,_v2) = m1::unpack_0x42_m1_S<u64>(m1::pack_0x42_m1_S<u64>(100, _v0));
+    │                         ^^ Unbound module or type alias 'm1'
+
+error: unbound module
+    ┌─ TEMPFILE2:230:51
+    │
+230 │         let (_v1,_v2) = m1::unpack_0x42_m1_S<u64>(m1::pack_0x42_m1_S<u64>(100, _v0));
+    │                                                   ^^ Unbound module or type alias 'm1'
+
+
+task 3 lines 236-236:  run 0x42::m2::try_pack
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 4 lines 238-238:  run 0x42::m2::try_pack_vector
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 5 lines 240-240:  run 0x42::m2::try_unpack
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 6 lines 242-242:  run 0x42::m2::try_unpack_with_let_ignore
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 7 lines 244-244:  run 0x42::m2::try_nested_pack
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 8 lines 246-246:  run 0x42::m2::try_unpack_nested
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 9 lines 248-248:  run 0x42::m2::try_return_struct
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 10 lines 250-250:  run 0x42::m2::try_pass_struct_as_arg
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 11 lines 252-252:  run 0x42::m2::try_pack_unpack_phantom
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}
+task 12 lines 254-254:  run 0x42::m2::try_pack_S3
+Error: Function execution failed with VMError: {
+    major_status: LINKER_ERROR,
+    sub_status: None,
+    location: undefined,
+    indices: [],
+    offsets: [],
+}

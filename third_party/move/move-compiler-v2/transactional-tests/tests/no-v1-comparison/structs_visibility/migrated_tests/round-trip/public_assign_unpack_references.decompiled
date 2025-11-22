@@ -1,0 +1,91 @@
+//**** Cross-compiled for `move` syntax from `tests/no-v1-comparison/structs_visibility/migrated_tests/public_assign_unpack_references.move`
+
+//# publish
+module 0x42::m {
+    struct R has drop {
+        s1: S,
+        s2: S,
+    }
+    struct S has drop {
+        f: u64,
+    }
+    #[pack]
+    public fun pack_0x42_m_R(p0: S, p1: S): R {
+        R{s1: p0, s2: p1}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_R(p0: R): (S, S) {
+        let R{s1: _v0, s2: _v1} = p0;
+        (_v0, _v1)
+    }
+    #[borrow]
+    public fun borrow_0x42_m_R_s1_0(p0: &R): &S {
+        &p0.s1
+    }
+    #[borrow]
+    public fun borrow_0x42_m_R_s2_1(p0: &R): &S {
+        &p0.s2
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_R_s1_0(p0: &mut R): &mut S {
+        &mut p0.s1
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_R_s2_1(p0: &mut R): &mut S {
+        &mut p0.s2
+    }
+    #[pack]
+    public fun pack_0x42_m_S(p0: u64): S {
+        S{f: p0}
+    }
+    #[unpack]
+    public fun unpack_0x42_m_S(p0: S): u64 {
+        let S{f: _v0} = p0;
+        _v0
+    }
+    #[borrow]
+    public fun borrow_0x42_m_S_f_0(p0: &S): &u64 {
+        &p0.f
+    }
+    #[borrow_mut]
+    public fun borrow_mut_0x42_m_S_f_0(p0: &mut S): &mut u64 {
+        &mut p0.f
+    }
+}
+
+
+//# publish
+module 0x42::m2 {
+    use 0x42::m;
+    fun t1() {
+        let _v0 = m::pack_0x42_m_S(0);
+        let _v1 = m::pack_0x42_m_S(1);
+        let _v2 = m::pack_0x42_m_R(_v0, _v1);
+        let _v3 = &_v2;
+        let _v4 = m::borrow_0x42_m_R_s1_0(_v3);
+        let _v5 = m::borrow_0x42_m_R_s2_1(_v3);
+        assert!(*m::borrow_0x42_m_S_f_0(_v4) == 0, 0);
+        assert!(*m::borrow_0x42_m_S_f_0(_v5) == 1, 1);
+    }
+    fun t2() {
+        let _v0 = m::pack_0x42_m_S(0);
+        let _v1 = m::pack_0x42_m_S(1);
+        let _v2 = m::pack_0x42_m_R(_v0, _v1);
+        let _v3 = &mut _v2;
+        let _v4 = m::borrow_mut_0x42_m_R_s1_0(_v3);
+        let _v5 = m::borrow_mut_0x42_m_R_s2_1(_v3);
+        assert!(*m::borrow_mut_0x42_m_S_f_0(_v4) == 0, 0);
+        assert!(*m::borrow_0x42_m_S_f_0(freeze(_v5)) == 1, 1);
+        let _v6 = 5;
+        let _v7 = &mut _v6;
+        let _v8 = m::pack_0x42_m_S(0);
+        _v5 = &mut _v8;
+        assert!(*_v7 == 5, 0);
+        assert!(*m::borrow_0x42_m_S_f_0(freeze(_v5)) == 0, 1);
+    }
+}
+
+
+//# run 0x42::m2::t1
+
+//# run 0x42::m2::t2
