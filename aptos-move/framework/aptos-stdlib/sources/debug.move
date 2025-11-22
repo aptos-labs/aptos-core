@@ -95,9 +95,6 @@ module aptos_std::debug {
         assert_equal(&str, b"\"Can you say \\\"Hel\\\\lo\\\"?\"");
     }
 
-
-    #[test_only]
-    use std::features;
     #[test(s = @0x123)]
     fun test_print_primitive_types(s: signer) {
         let u8 = 255u8;
@@ -127,10 +124,8 @@ module aptos_std::debug {
         let a = @0x1234c0ffee;
         assert_equal(&a, b"@0x1234c0ffee");
 
-        if (features::signer_native_format_fix_enabled()) {
-            let signer = s;
-            assert_equal(&signer, b"signer(@0x123)");
-        }
+        let signer = s;
+        assert_equal(&signer, b"signer(@0x123)");
     }
 
     const MSG_1 : vector<u8> = b"abcdef";
@@ -181,10 +176,8 @@ module aptos_std::debug {
         let v_addr = vector[@0x1234, @0x5678, @0xabcdef];
         assert_equal(&v_addr, b"[ @0x1234, @0x5678, @0xabcdef ]");
 
-        if (features::signer_native_format_fix_enabled()) {
-            let v_signer = vector[s1, s2];
-            assert_equal(&v_signer, b"[ signer(@0x123), signer(@0x456) ]");
-        };
+        let v_signer = vector[s1, s2];
+        assert_equal(&v_signer, b"[ signer(@0x123), signer(@0x456) ]");
 
         let v = vector[
             TestInner {
@@ -227,10 +220,8 @@ module aptos_std::debug {
         let v_addr = vector[vector[@0x1234, @0x5678], vector[@0xabcdef, @0x9999]];
         assert_equal(&v_addr, b"[\n  [ @0x1234, @0x5678 ],\n  [ @0xabcdef, @0x9999 ]\n]");
 
-        if (features::signer_native_format_fix_enabled()) {
-            let v_signer = vector[vector[s1], vector[s2]];
-            assert_equal(&v_signer, b"[\n  [ signer(@0x123) ],\n  [ signer(@0x456) ]\n]");
-        };
+        let v_signer = vector[vector[s1], vector[s2]];
+        assert_equal(&v_signer, b"[\n  [ signer(@0x123) ],\n  [ signer(@0x456) ]\n]");
 
         let v = vector[
             vector[
