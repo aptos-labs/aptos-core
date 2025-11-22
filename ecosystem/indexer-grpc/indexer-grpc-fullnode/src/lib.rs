@@ -17,6 +17,7 @@ pub struct ServiceContext {
     pub processor_task_count: u16,
     pub processor_batch_size: u16,
     pub output_batch_size: u16,
+    pub transaction_channel_size: usize,
 }
 
 #[cfg(test)]
