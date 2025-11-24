@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    keyless::KEYLESS_ACCOUNT_MODULE_NAME, move_utils::as_move_value::AsMoveValue, serialize,
+    keyless::{KeylessOnchainConfig, KEYLESS_ACCOUNT_MODULE_NAME},
+    move_utils::as_move_value::AsMoveValue,
+    serialize,
 };
 use aptos_crypto::CryptoMaterialError;
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
@@ -46,6 +48,8 @@ impl MoveStructType for Groth16VerificationKey {
     const MODULE_NAME: &'static IdentStr = ident_str!(KEYLESS_ACCOUNT_MODULE_NAME);
     const STRUCT_NAME: &'static IdentStr = ident_str!("Groth16VerificationKey");
 }
+
+impl KeylessOnchainConfig for Groth16VerificationKey {}
 
 impl TryFrom<Groth16VerificationKey> for PreparedVerifyingKey<Bn254> {
     type Error = CryptoMaterialError;
