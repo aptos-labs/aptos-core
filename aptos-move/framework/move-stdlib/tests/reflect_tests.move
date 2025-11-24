@@ -28,11 +28,19 @@ module std::reflect_test {
     }
 
     #[test]
-    fun not_found() {
+    fun function_not_found() {
         let e = reflect::resolve< |u64|u64 >(
             @std, &string::utf8(b"reflect_test"), &string::utf8(b"xyz")).unwrap_err();
         assert!(e.error_code() == 1)
     }
+
+    #[test]
+    fun module_not_found() {
+        let e = reflect::resolve< |u64|u64 >(
+            @std, &string::utf8(b"reflect_unknown"), &string::utf8(b"increment")).unwrap_err();
+        assert!(e.error_code() == 1)
+    }
+
 
     #[test]
     fun not_accessible() {

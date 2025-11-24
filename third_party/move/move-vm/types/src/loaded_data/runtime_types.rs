@@ -1688,7 +1688,7 @@ impl<'a> TypeParamMap<'a> {
     /// Produces a type parameter instantiation from the type params in the map,
     /// verifying abilities against type parameter declarations.
     pub fn verify_and_extract_type_args(
-        &mut self,
+        &self,
         param_decls: &[AbilitySet],
     ) -> PartialVMResult<Vec<Type>> {
         let args = (0..param_decls.len())

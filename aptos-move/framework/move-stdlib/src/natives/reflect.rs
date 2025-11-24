@@ -25,12 +25,9 @@ const INVALID_IDENTIFIER: u16 = 0;
 
 fn native_resolve(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    // Prepare for future API without ownership
-    let ty_args = ty_args.as_slice();
-
     // Charge base cost before anything else.
     context.charge(REFLECT_RESOLVE_BASE)?;
 

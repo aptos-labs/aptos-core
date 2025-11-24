@@ -14,8 +14,7 @@ Provides the <code><a href="result.md#0x1_result_Result">Result</a>&lt;T, E&gt;<
 -  [Function `unwrap_err`](#0x1_result_unwrap_err)
 
 
-<pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
-</code></pre>
+<pre><code></code></pre>
 
 
 

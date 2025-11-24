@@ -379,7 +379,10 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 fun_id,
             ) {
                 Ok((module, function)) => self.verify_function(module, function, expected_ty),
-                Err(e) if e.major_status() == StatusCode::FUNCTION_RESOLUTION_FAILURE => {
+                Err(e)
+                    if e.major_status() == StatusCode::FUNCTION_RESOLUTION_FAILURE
+                        || e.major_status() == StatusCode::LINKER_ERROR =>
+                {
                     Ok(Err(FunctionNotFound))
                 },
                 Err(e) => Err(e.to_partial()),

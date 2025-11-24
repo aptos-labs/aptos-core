@@ -822,8 +822,6 @@ procedure {:inline 1} $1_string_internal_is_char_boundary(x: Vec int, i: int) re
 }
 
 
-
-
 // ==================================================================================
 // Native diem_account
 

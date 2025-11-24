@@ -32,7 +32,7 @@ pub fn unwrap_result(value: Value) -> PartialVMResult<Value> {
     match val {
         Some(x) if tag == OK_VARIANT => Ok(x),
         _ => Err(PartialVMError::new_invariant_violation(
-            "invalid result value",
+            "invalid result value: expected Ok(_)",
         )),
     }
 }
@@ -43,7 +43,7 @@ pub fn unwrap_err_result(value: Value) -> PartialVMResult<Value> {
     match val {
         Some(x) if tag == ERR_VARIANT => Ok(x),
         _ => Err(PartialVMError::new_invariant_violation(
-            "invalid result value",
+            "invalid result value: expected Err(_)",
         )),
     }
 }

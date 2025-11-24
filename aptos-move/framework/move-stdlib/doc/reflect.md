@@ -11,10 +11,11 @@ Functionality for reflection in Move.
 -  [Function `resolve`](#0x1_reflect_resolve)
 -  [Function `error_code`](#0x1_reflect_error_code)
 -  [Function `native_resolve`](#0x1_reflect_native_resolve)
+-  [Specification](#@Specification_1)
+    -  [Function `resolve`](#@Specification_1_resolve)
 
 
-<pre><code><b>use</b> <a href="error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="features.md#0x1_features">0x1::features</a>;
+<pre><code><b>use</b> <a href="features.md#0x1_features">0x1::features</a>;
 <b>use</b> 0x1::result;
 <b>use</b> <a href="string.md#0x1_string">0x1::string</a>;
 </code></pre>
@@ -239,6 +240,26 @@ Returns numerical code associated with error.
 
 
 </details>
+
+<a id="@Specification_1"></a>
+
+## Specification
+
+
+<a id="@Specification_1_resolve"></a>
+
+### Function `resolve`
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="reflect.md#0x1_reflect_resolve">resolve</a>&lt;FuncType&gt;(addr: <b>address</b>, module_name: &<a href="string.md#0x1_string_String">string::String</a>, func_name: &<a href="string.md#0x1_string_String">string::String</a>): <a href="result.md#0x1_result_Result">result::Result</a>&lt;FuncType, <a href="reflect.md#0x1_reflect_ReflectionError">reflect::ReflectionError</a>&gt;
+</code></pre>
+
+
+
+
+<pre><code><b>pragma</b> verify = <b>false</b>;
+<b>pragma</b> opaque;
+</code></pre>
 
 
 [move-book]: https://aptos.dev/move/book/SUMMARY
