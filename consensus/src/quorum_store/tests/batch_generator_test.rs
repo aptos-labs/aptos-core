@@ -14,7 +14,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchInfo, SignedBatchInfo},
+    proof_of_store::{BatchInfo, BatchInfoExt, SignedBatchInfo, TBatchInfo},
 };
 use aptos_mempool::{QuorumStoreRequest, QuorumStoreResponse};
 use aptos_types::{quorum_store::BatchId, transaction::SignedTransaction};
@@ -35,14 +35,10 @@ impl MockBatchWriter {
 }
 
 impl BatchWriter for MockBatchWriter {
-    fn persist(&self, _persist_requests: Vec<PersistedValue>) -> Vec<SignedBatchInfo<BatchInfo>> {
-        vec![]
-    }
-
-    fn persist_v2(
+    fn persist(
         &self,
-        _persist_requests: Vec<PersistedValue>,
-    ) -> Vec<SignedBatchInfo<aptos_consensus_types::proof_of_store::BatchInfoExt>> {
+        _persist_requests: Vec<PersistedValue<BatchInfoExt>>,
+    ) -> Vec<SignedBatchInfo<BatchInfoExt>> {
         vec![]
     }
 }

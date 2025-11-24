@@ -30,7 +30,9 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{BatchTransactionFilterConfig, QuorumStoreConfig};
 use aptos_consensus_types::{
-    common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
+    common::Author,
+    proof_of_store::{BatchInfo, BatchInfoExt, ProofCache},
+    request_response::GetPayloadCommand,
 };
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::prelude::*;
@@ -331,7 +333,6 @@ impl InnerBuilder {
                 self.config.receiver_max_total_bytes as u64,
                 self.config.batch_expiry_gap_when_init_usecs,
                 self.transaction_filter_config.clone(),
-                self.batch_info_ext_enabled,
             );
             #[allow(unused_variables)]
             let name = format!("batch_coordinator-{}", i);
@@ -407,8 +408,11 @@ impl InnerBuilder {
                 let response = if let Ok(value) =
                     batch_store.get_batch_from_local(&rpc_request.req.digest())
                 {
-                    let batch: Batch = value.try_into().unwrap();
-                    BatchResponse::Batch(batch)
+                    let batch: Batch<BatchInfoExt> = value.try_into().unwrap();
+                    let batch: Batch<BatchInfo> = batch
+                        .try_into()
+                        .expect("Batch retieval requests must be for V1 batch");
+                    BatchResponse::Batch(batch.into())
                 } else {
                     match aptos_db_clone.get_latest_ledger_info() {
                         Ok(ledger_info) => BatchResponse::NotFound(ledger_info),

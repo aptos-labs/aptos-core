@@ -200,7 +200,7 @@ pub trait QuorumStoreSender: Send + Clone {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<BatchResponse>;
+    ) -> anyhow::Result<BatchResponse<BatchInfo>>;
 
     async fn send_signed_batch_info_msg(
         &self,
@@ -214,7 +214,9 @@ pub trait QuorumStoreSender: Send + Clone {
         recipients: Vec<Author>,
     );
 
-    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>);
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch<BatchInfo>>);
+
+    async fn broadcast_batch_msg_v2(&mut self, batches: Vec<Batch<BatchInfoExt>>);
 
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore<BatchInfo>>);
 
@@ -548,7 +550,7 @@ impl QuorumStoreSender for NetworkSender {
         request: BatchRequest,
         recipient: Author,
         timeout: Duration,
-    ) -> anyhow::Result<BatchResponse> {
+    ) -> anyhow::Result<BatchResponse<BatchInfo>> {
         fail_point!("consensus::send::request_batch", |_| Err(anyhow!("failed")));
         let request_digest = request.digest();
         let msg = ConsensusMsg::BatchRequestMsg(Box::new(request));
@@ -593,9 +595,15 @@ impl QuorumStoreSender for NetworkSender {
         self.send(msg, recipients).await
     }
 
-    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch>) {
+    async fn broadcast_batch_msg(&mut self, batches: Vec<Batch<BatchInfo>>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
+        self.broadcast(msg).await
+    }
+
+    async fn broadcast_batch_msg_v2(&mut self, batches: Vec<Batch<BatchInfoExt>>) {
+        fail_point!("consensus::send::broadcast_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsgV2(Box::new(BatchMsg::new(batches)));
         self.broadcast(msg).await
     }
 

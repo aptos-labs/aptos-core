@@ -9,6 +9,7 @@ use crate::{
         types::{BatchRequest, BatchResponse, PersistedValue},
     },
 };
+use aptos_consensus_types::proof_of_store::{BatchInfo, BatchInfoExt};
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_infallible::Mutex;
@@ -102,7 +103,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         digest: HashValue,
         expiration: u64,
         responders: Arc<Mutex<BTreeSet<PeerId>>>,
-        mut subscriber_rx: oneshot::Receiver<PersistedValue>,
+        mut subscriber_rx: oneshot::Receiver<PersistedValue<BatchInfoExt>>,
     ) -> ExecutorResult<Vec<SignedTransaction>> {
         let validator_verifier = self.validator_verifier.clone();
         let mut request_state = BatchRequesterState::new(responders, self.retry_limit);

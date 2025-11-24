@@ -94,9 +94,12 @@ pub enum UnverifiedEvent {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     SyncInfo(Box<SyncInfo>),
-    BatchMsg(Box<BatchMsg>),
+    BatchMsg(Box<BatchMsg<BatchInfo>>),
+    BatchMsgV2(Box<BatchMsg<BatchInfoExt>>),
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfo>>),
+    SignedBatchInfoMsgV2(Box<SignedBatchInfoMsg<BatchInfoExt>>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfo>>),
+    ProofOfStoreMsgV2(Box<ProofOfStoreMsg<BatchInfoExt>>),
     OptProposalMsg(Box<OptProposalMsg>),
 }
 
@@ -168,6 +171,15 @@ impl UnverifiedEvent {
                         .with_label_values(&["batch"])
                         .observe(start_time.elapsed().as_secs_f64());
                 }
+                VerifiedEvent::BatchMsg(Box::new((*b).into()))
+            },
+            UnverifiedEvent::BatchMsgV2(b) => {
+                if !self_message {
+                    b.verify(peer_id, max_num_batches, validator)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["batch_v2"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
                 VerifiedEvent::BatchMsg(b)
             },
             UnverifiedEvent::SignedBatchInfo(sd) => {
@@ -184,6 +196,20 @@ impl UnverifiedEvent {
                 }
                 VerifiedEvent::SignedBatchInfo(Box::new((*sd).into()))
             },
+            UnverifiedEvent::SignedBatchInfoMsgV2(sd) => {
+                if !self_message {
+                    sd.verify(
+                        peer_id,
+                        max_num_batches,
+                        max_batch_expiry_gap_usecs,
+                        validator,
+                    )?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["signed_batch_v2"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::SignedBatchInfo(sd)
+            },
             UnverifiedEvent::ProofOfStoreMsg(p) => {
                 if !self_message {
                     p.verify(max_num_batches, validator, proof_cache)?;
@@ -192,6 +218,15 @@ impl UnverifiedEvent {
                         .observe(start_time.elapsed().as_secs_f64());
                 }
                 VerifiedEvent::ProofOfStoreMsg(Box::new((*p).into()))
+            },
+            UnverifiedEvent::ProofOfStoreMsgV2(p) => {
+                if !self_message {
+                    p.verify(max_num_batches, validator, proof_cache)?;
+                    counters::VERIFY_MSG
+                        .with_label_values(&["proof_of_store_v2"])
+                        .observe(start_time.elapsed().as_secs_f64());
+                }
+                VerifiedEvent::ProofOfStoreMsg(p)
             },
         })
     }
@@ -207,6 +242,9 @@ impl UnverifiedEvent {
             UnverifiedEvent::SignedBatchInfo(sd) => sd.epoch(),
             UnverifiedEvent::ProofOfStoreMsg(p) => p.epoch(),
             UnverifiedEvent::RoundTimeoutMsg(t) => Ok(t.epoch()),
+            UnverifiedEvent::BatchMsgV2(b) => b.epoch(),
+            UnverifiedEvent::SignedBatchInfoMsgV2(sd) => sd.epoch(),
+            UnverifiedEvent::ProofOfStoreMsgV2(p) => p.epoch(),
         }
     }
 }
@@ -223,6 +261,9 @@ impl From<ConsensusMsg> for UnverifiedEvent {
             ConsensusMsg::SignedBatchInfo(m) => UnverifiedEvent::SignedBatchInfo(m),
             ConsensusMsg::ProofOfStoreMsg(m) => UnverifiedEvent::ProofOfStoreMsg(m),
             ConsensusMsg::RoundTimeoutMsg(m) => UnverifiedEvent::RoundTimeoutMsg(m),
+            ConsensusMsg::BatchMsgV2(m) => UnverifiedEvent::BatchMsgV2(m),
+            ConsensusMsg::SignedBatchInfoMsgV2(m) => UnverifiedEvent::SignedBatchInfoMsgV2(m),
+            ConsensusMsg::ProofOfStoreMsgV2(m) => UnverifiedEvent::ProofOfStoreMsgV2(m),
             _ => unreachable!("Unexpected conversion"),
         }
     }
@@ -237,7 +278,7 @@ pub enum VerifiedEvent {
     RoundTimeoutMsg(Box<RoundTimeoutMsg>),
     OrderVoteMsg(Box<OrderVoteMsg>),
     UnverifiedSyncInfo(Box<SyncInfo>),
-    BatchMsg(Box<BatchMsg>),
+    BatchMsg(Box<BatchMsg<BatchInfoExt>>),
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfoExt>>),
     ProofOfStoreMsg(Box<ProofOfStoreMsg<BatchInfoExt>>),
     // local messages

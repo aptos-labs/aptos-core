@@ -64,11 +64,11 @@ pub enum ConsensusMsg {
     /// it can save slow machines to quickly confirm the execution result.
     CommitDecisionMsg(Box<CommitDecision>),
     /// Quorum Store: Send a Batch of transactions.
-    BatchMsg(Box<BatchMsg>),
+    BatchMsg(Box<BatchMsg<BatchInfo>>),
     /// Quorum Store: Request the payloads of a completed batch.
     BatchRequestMsg(Box<BatchRequest>),
     /// Quorum Store: Response to the batch request.
-    BatchResponse(Box<Batch>),
+    BatchResponse(Box<Batch<BatchInfo>>),
     /// Quorum Store: Send a signed batch digest. This is a vote for the batch and a promise that
     /// the batch of transactions was received and will be persisted until batch expiration.
     SignedBatchInfo(Box<SignedBatchInfoMsg<BatchInfo>>),
@@ -81,7 +81,7 @@ pub enum ConsensusMsg {
     /// Randomness generation message
     RandGenMessage(RandGenMessage),
     /// Quorum Store: Response to the batch request.
-    BatchResponseV2(Box<BatchResponse>),
+    BatchResponseV2(Box<BatchResponse<BatchInfo>>),
     /// OrderVoteMsg is the struct that is broadcasted by a validator on receiving quorum certificate
     /// on a block.
     OrderVoteMsg(Box<OrderVoteMsg>),
@@ -91,11 +91,15 @@ pub enum ConsensusMsg {
     BlockRetrievalRequest(Box<BlockRetrievalRequest>),
     /// OptProposalMsg contains the optimistic proposal and sync info.
     OptProposalMsg(Box<OptProposalMsg>),
+    /// Quorum Store: Send a Batch of transactions.
+    BatchMsgV2(Box<BatchMsg<BatchInfoExt>>),
     /// Quorum Store: Send a signed batch digest with BatchInfoExt. This is a vote for the batch and a promise that
     /// the batch of transactions was received and will be persisted until batch expiration.
     SignedBatchInfoMsgV2(Box<SignedBatchInfoMsg<BatchInfoExt>>),
     /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes) with BatchInfoExt.
     ProofOfStoreMsgV2(Box<ProofOfStoreMsg<BatchInfoExt>>),
+    /// Quorum Store: Response to the batch request.
+    BatchResponseV3(Box<BatchResponse<BatchInfoExt>>),
 }
 
 /// Network type for consensus
@@ -126,8 +130,10 @@ impl ConsensusMsg {
             ConsensusMsg::BatchResponseV2(_) => "BatchResponseV2",
             ConsensusMsg::RoundTimeoutMsg(_) => "RoundTimeoutV2",
             ConsensusMsg::BlockRetrievalRequest(_) => "BlockRetrievalRequest",
+            ConsensusMsg::BatchMsgV2(_) => "BatchMsgV2",
             ConsensusMsg::SignedBatchInfoMsgV2(_) => "SignedBatchInfoMsgV2",
             ConsensusMsg::ProofOfStoreMsgV2(_) => "ProofOfStoreMsgV2",
+            ConsensusMsg::BatchResponseV3(_) => "BatchResponseV3",
         }
     }
 }
