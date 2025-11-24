@@ -29,6 +29,8 @@ pub trait Trait<E: Pairing>:
     > + Sized
     + CanonicalSerialize
 {
+    /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+    /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
 
     fn prove<C: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
