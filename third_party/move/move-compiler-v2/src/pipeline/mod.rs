@@ -17,6 +17,7 @@ pub mod exit_state_analysis;
 pub mod flush_writes_processor;
 pub mod lint_processor;
 pub mod livevar_analysis_processor;
+pub mod reaching_def_analysis_processor;
 pub mod reference_safety;
 pub mod split_critical_edges_processor;
 pub mod uninitialized_use_checker;
