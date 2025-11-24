@@ -7,7 +7,6 @@ script {
             core_resources,
             @0000000000000000000000000000000000000000000000000000000000000001
         );
-        //let core_address: address = signer::address_of(core_resources);
 
         let enabled_blob: vector<u64> = vector[
             17, //PartialGovernanceVoting,

@@ -360,8 +360,9 @@ module aptos_framework::staking_config {
         new_voting_power_increase_limit: u64,
     ) acquires StakingConfig {
         system_addresses::assert_aptos_framework(aptos_framework);
+        //TODO(bowu): revert the limit back to 50
         assert!(
-            new_voting_power_increase_limit > 0 && new_voting_power_increase_limit <= 50,
+            new_voting_power_increase_limit > 0 && new_voting_power_increase_limit <= 50*1_000_000_000,
             error::invalid_argument(EINVALID_VOTING_POWER_INCREASE_LIMIT),
         );
 
