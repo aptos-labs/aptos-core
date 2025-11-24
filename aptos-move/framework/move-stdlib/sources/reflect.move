@@ -43,11 +43,11 @@ module std::reflect {
     enum ReflectionError has copy, drop, store {
         /// The passed module or function name is not a valid Move identifier
         InvalidIdentifier,
-        /// The module or function in the moduke cannot be find.
+        /// The module or function in the moduke cannot be found.
         FunctionNotFound,
-        /// The function in the moduke cannot be accessed. The function must be public.
+        /// The function in the module cannot be accessed. The function must be public.
         FunctionNotAccessible,
-        /// The function exists and is accessible, but doesn't the requested `FuncType`
+        /// The function exists and is accessible, but doesn't match the requested `FuncType`
         /// type argument.
         FunctionIncompatibleType,
         /// The function is generic but cannot be fully instantiated from the provided type, e.g. for `f<X,Y>: |X|`,

@@ -656,7 +656,7 @@ Lifetime: transient
 Whether function reflection is enabled.
 
 
-<pre><code><b>const</b> <a href="features.md#0x1_features_FUNCTION_REFLECTION">FUNCTION_REFLECTION</a>: u64 = 103;
+<pre><code><b>const</b> <a href="features.md#0x1_features_FUNCTION_REFLECTION">FUNCTION_REFLECTION</a>: u64 = 105;
 </code></pre>
 
 
