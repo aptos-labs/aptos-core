@@ -29,6 +29,8 @@ pub trait QuorumStoreStorage: Sync + Send {
 
     fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue<BatchInfo>>, DbError>;
 
+    fn delete_batches_v2(&self, digests: Vec<HashValue>) -> Result<(), DbError>;
+
     fn get_all_batches_v2(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfoExt>>>;
 
     fn save_batch_v2(&self, batch: PersistedValue<BatchInfoExt>) -> Result<(), DbError>;
@@ -113,6 +115,16 @@ impl QuorumStoreStorage for QuorumStoreDB {
 
     fn get_batch(&self, digest: &HashValue) -> Result<Option<PersistedValue<BatchInfo>>, DbError> {
         Ok(self.db.get::<BatchSchema>(digest)?)
+    }
+
+    fn delete_batches_v2(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
+        let mut batch = SchemaBatch::new();
+        for digest in digests.iter() {
+            trace!("QS: db delete digest {}", digest);
+            batch.delete::<BatchV2Schema>(digest)?;
+        }
+        self.db.write_schemas_relaxed(batch)?;
+        Ok(())
     }
 
     fn get_all_batches_v2(&self) -> Result<HashMap<HashValue, PersistedValue<BatchInfoExt>>> {
@@ -214,6 +226,10 @@ pub mod mock {
         }
 
         fn save_batch_id(&self, _: u64, _: BatchId) -> Result<(), DbError> {
+            Ok(())
+        }
+
+        fn delete_batches_v2(&self, digests: Vec<HashValue>) -> Result<(), DbError> {
             Ok(())
         }
 

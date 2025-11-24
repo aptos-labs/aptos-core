@@ -73,6 +73,10 @@ impl QuorumStoreSender for MockQuorumStoreSender {
         unimplemented!()
     }
 
+    async fn broadcast_batch_msg_v2(&mut self, _batches: Vec<Batch<BatchInfoExt>>) {
+        unimplemented!()
+    }
+
     async fn broadcast_proof_of_store_msg(
         &mut self,
         proof_of_stores: Vec<ProofOfStore<BatchInfo>>,

@@ -216,6 +216,8 @@ pub trait QuorumStoreSender: Send + Clone {
 
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch<BatchInfo>>);
 
+    async fn broadcast_batch_msg_v2(&mut self, batches: Vec<Batch<BatchInfoExt>>);
+
     async fn broadcast_proof_of_store_msg(&mut self, proof_of_stores: Vec<ProofOfStore<BatchInfo>>);
 
     async fn broadcast_proof_of_store_msg_v2(
@@ -596,6 +598,12 @@ impl QuorumStoreSender for NetworkSender {
     async fn broadcast_batch_msg(&mut self, batches: Vec<Batch<BatchInfo>>) {
         fail_point!("consensus::send::broadcast_batch", |_| ());
         let msg = ConsensusMsg::BatchMsg(Box::new(BatchMsg::new(batches)));
+        self.broadcast(msg).await
+    }
+
+    async fn broadcast_batch_msg_v2(&mut self, batches: Vec<Batch<BatchInfoExt>>) {
+        fail_point!("consensus::send::broadcast_batch", |_| ());
+        let msg = ConsensusMsg::BatchMsgV2(Box::new(BatchMsg::new(batches)));
         self.broadcast(msg).await
     }
 

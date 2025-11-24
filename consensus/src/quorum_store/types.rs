@@ -4,7 +4,7 @@
 use anyhow::ensure;
 use aptos_consensus_types::{
     common::{BatchPayload, TxnSummaryWithExpiration},
-    proof_of_store::{BatchInfo, TBatchInfo},
+    proof_of_store::{BatchInfo, BatchInfoExt, BatchKind, TBatchInfo},
 };
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use aptos_types::{
@@ -108,6 +108,23 @@ impl<T: TBatchInfo> TryFrom<PersistedValue<T>> for Batch<T> {
     }
 }
 
+impl From<PersistedValue<BatchInfo>> for PersistedValue<BatchInfoExt> {
+    fn from(value: PersistedValue<BatchInfo>) -> Self {
+        let (batch_info, payload) = value.unpack();
+        PersistedValue::new(batch_info.into(), payload)
+    }
+}
+
+impl TryFrom<PersistedValue<BatchInfoExt>> for PersistedValue<BatchInfo> {
+    type Error = anyhow::Error;
+
+    fn try_from(value: PersistedValue<BatchInfoExt>) -> Result<Self, Self::Error> {
+        let (batch_info, payload) = value.unpack();
+        ensure!(!batch_info.is_v2(), "Expected Batch Info V1");
+        Ok(PersistedValue::new(batch_info.unpack_info(), payload))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use aptos_config::config;
@@ -141,6 +158,54 @@ impl Batch<BatchInfo> {
     ) -> Self {
         let payload = BatchPayload::new(batch_author, payload);
         let batch_info = BatchInfo::new(
+            batch_author,
+            batch_id,
+            epoch,
+            expiration,
+            payload.hash(),
+            payload.num_txns() as u64,
+            payload.num_bytes() as u64,
+            gas_bucket_start,
+        );
+        Self::new_generic(batch_info, payload)
+    }
+}
+
+impl Batch<BatchInfoExt> {
+    pub fn new_v2(
+        batch_id: BatchId,
+        payload: Vec<SignedTransaction>,
+        epoch: u64,
+        expiration: u64,
+        batch_author: PeerId,
+        gas_bucket_start: u64,
+        batch_kind: BatchKind,
+    ) -> Self {
+        let payload = BatchPayload::new(batch_author, payload);
+        let batch_info = BatchInfoExt::new_v2(
+            batch_author,
+            batch_id,
+            epoch,
+            expiration,
+            payload.hash(),
+            payload.num_txns() as u64,
+            payload.num_bytes() as u64,
+            gas_bucket_start,
+            batch_kind,
+        );
+        Self::new_generic(batch_info, payload)
+    }
+
+    pub fn new_v1(
+        batch_id: BatchId,
+        payload: Vec<SignedTransaction>,
+        epoch: u64,
+        expiration: u64,
+        batch_author: PeerId,
+        gas_bucket_start: u64,
+    ) -> Self {
+        let payload = BatchPayload::new(batch_author, payload);
+        let batch_info = BatchInfoExt::new_v1(
             batch_author,
             batch_id,
             epoch,
@@ -220,6 +285,38 @@ impl<T: TBatchInfo> Deref for Batch<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.batch_info
+    }
+}
+
+impl From<Batch<BatchInfo>> for Batch<BatchInfoExt> {
+    fn from(batch: Batch<BatchInfo>) -> Self {
+        let Batch {
+            batch_info,
+            payload,
+        } = batch;
+        Self {
+            batch_info: batch_info.into(),
+            payload,
+        }
+    }
+}
+
+impl TryFrom<Batch<BatchInfoExt>> for Batch<BatchInfo> {
+    type Error = anyhow::Error;
+
+    fn try_from(batch: Batch<BatchInfoExt>) -> Result<Self, Self::Error> {
+        ensure!(
+            matches!(batch.batch_info(), &BatchInfoExt::V1 { .. }),
+            "Batch must be V1 type"
+        );
+        let Batch {
+            batch_info,
+            payload,
+        } = batch;
+        Ok(Self {
+            batch_info: batch_info.unpack_info(),
+            payload,
+        })
     }
 }
 
@@ -350,5 +447,13 @@ impl<T: TBatchInfo> BatchMsg<T> {
 
     pub fn take(self) -> Vec<Batch<T>> {
         self.batches
+    }
+}
+
+impl From<BatchMsg<BatchInfo>> for BatchMsg<BatchInfoExt> {
+    fn from(msg: BatchMsg<BatchInfo>) -> Self {
+        Self {
+            batches: msg.batches.into_iter().map(|b| b.into()).collect(),
+        }
     }
 }
