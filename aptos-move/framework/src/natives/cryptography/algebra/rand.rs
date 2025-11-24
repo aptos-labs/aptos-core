@@ -51,7 +51,7 @@ macro_rules! ark_rand_internal {
 #[cfg(feature = "testing")]
 pub fn rand_insecure_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());

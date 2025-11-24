@@ -37,7 +37,7 @@ pub struct CreateSignersForTestingGasParameters {
 fn native_create_signers_for_testing(
     gas_params: &CreateSignersForTestingGasParameters,
     _context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.is_empty());

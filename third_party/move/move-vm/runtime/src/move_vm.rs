@@ -117,6 +117,7 @@ impl MoveVM {
 
         let return_values = {
             let _timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
+
             Interpreter::entrypoint(
                 function,
                 deserialized_args,

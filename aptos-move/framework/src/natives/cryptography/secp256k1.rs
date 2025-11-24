@@ -26,7 +26,7 @@ pub mod abort_codes {
  **************************************************************************************************/
 fn native_ecdsa_recover(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());

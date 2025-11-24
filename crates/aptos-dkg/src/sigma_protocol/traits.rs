@@ -17,6 +17,7 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Valid, Validate,
 };
 use ark_std::{io::Read, UniformRand};
+use serde::Serialize;
 use std::{fmt::Debug, io::Write};
 
 pub trait Trait<E: Pairing>:
@@ -30,27 +31,27 @@ pub trait Trait<E: Pairing>:
 {
     fn dst(&self) -> Vec<u8>;
 
-    fn prove<R: rand_core::RngCore + rand_core::CryptoRng>(
+    fn prove<C: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(
         &self,
         witness: &Self::Domain,
         statement: &Self::Codomain,
-        transcript: &mut merlin::Transcript,
+        ctxt: &C,
         rng: &mut R,
     ) -> Proof<E, Self> {
-        prove_homomorphism(self, witness, statement, transcript, true, rng, &self.dst())
+        prove_homomorphism(self, witness, statement, ctxt, true, rng, &self.dst())
     }
 
     #[allow(non_snake_case)]
-    fn verify<H>(
+    fn verify<C: Serialize, H>(
         &self,
         public_statement: &Self::Codomain,
         proof: &Proof<E, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
-        transcript: &mut merlin::Transcript,
+        ctxt: &C,
     ) -> anyhow::Result<()>
     where
         H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
     {
-        verify_msm_hom::<E, Self>(
+        verify_msm_hom::<_, E, Self>(
             self,
             public_statement,
             match &proof.first_proof_item {
@@ -60,7 +61,7 @@ pub trait Trait<E: Pairing>:
                 },
             },
             &proof.z,
-            transcript,
+            ctxt,
             &self.dst(),
         )
     }
@@ -284,7 +285,7 @@ where
 /// the image under consideration are included in the transcript.
 ///
 /// # Arguments
-/// - `fs_t`: the mutable Merlin transcript to update.
+/// - `ctxt`: Extra "context" material that needs to be hashed for the challenge.
 /// - `hom`: The homomorphism structure carrying its public data (e.g., MSM bases).
 /// - `statement`: The public statement, i.e. the image of a witness under the homomorphism.
 /// - `prover_first_message`: the first message in the Σ-protocol (the prover's commitment)
@@ -294,10 +295,11 @@ where
 /// The derived Fiat–Shamir challenge scalar, after incorporating the domain
 /// separator, public data, statement, and prover’s first message into the transcript.
 pub fn fiat_shamir_challenge_for_sigma_protocol<
+    C: Serialize,
     E: Pairing,
     H: homomorphism::Trait + CanonicalSerialize,
 >(
-    fs_t: &mut merlin::Transcript,
+    ctxt: &C,
     hom: &H,
     statement: &H::Codomain,
     prover_first_message: &H::Codomain,
@@ -307,36 +309,48 @@ where
     H::Domain: Witness<E>,
     H::Codomain: Statement,
 {
-    // Append the Σ-protocol separator to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_sep(fs_t, dst);
+    // Initialise the transcript
+    let mut fs_t = merlin::Transcript::new(dst);
+
+    // Append the "context" to the transcript
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_ctxt(
+        &mut fs_t, ctxt,
+    );
 
     // Append the MSM bases to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_msm_bases(
-        fs_t, hom,
+        &mut fs_t, hom,
     );
 
     // Append the public statement (the image of the witness) to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
-        fs_t,
+        &mut fs_t,
         statement,
     );
 
     // Add the first prover message (the commitment) to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_first_prover_message(
-        fs_t,
+        &mut fs_t,
         prover_first_message,
     );
 
     // Generate the Fiat-Shamir challenge from the updated transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(fs_t)
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
+        &mut fs_t,
+    )
 }
 
 #[allow(non_snake_case)]
-pub fn prove_homomorphism<E: Pairing, H: homomorphism::Trait + CanonicalSerialize, R>(
+pub fn prove_homomorphism<
+    C: Serialize,
+    E: Pairing,
+    H: homomorphism::Trait + CanonicalSerialize,
+    R,
+>(
     homomorphism: &H,
     witness: &H::Domain,
     statement: &H::Codomain,
-    fiat_shamir_transcript: &mut merlin::Transcript,
+    ctxt: &C,
     store_prover_commitment: bool, // true = store prover's commitment, false = store Fiat-Shamir challenge
     rng: &mut R,
     dst: &[u8],
@@ -353,13 +367,8 @@ where
     let A = homomorphism.apply(&r);
 
     // Step 3: Obtain Fiat-Shamir challenge
-    let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
-        fiat_shamir_transcript,
-        homomorphism,
-        statement,
-        &A,
-        dst,
-    );
+    let c =
+        fiat_shamir_challenge_for_sigma_protocol::<_, E, H>(ctxt, homomorphism, statement, &A, dst);
 
     // Step 4: Compute prover response
     let z = r.scaled_add(&witness, c);
@@ -444,12 +453,12 @@ where
 ///   homomorphism whose codomain has components in both G_1 and G_2, we should probably put
 ///   the `Bases` component and MsmOutput inside of enums.
 #[allow(non_snake_case)]
-pub fn verify_msm_hom<E: Pairing, H>(
+pub fn verify_msm_hom<C: Serialize, E: Pairing, H>(
     homomorphism: &H,
     statement: &H::Codomain,
     prover_first_message: &H::Codomain,
     prover_last_message: &H::Domain,
-    fs_transcript: &mut merlin::Transcript,
+    ctxt: &C,
     dst: &[u8],
 ) -> anyhow::Result<()>
 where
@@ -458,8 +467,8 @@ where
     H::Domain: Witness<E>,
 {
     // Step 1: Reproduce the prover's Fiat-Shamir challenge
-    let c = fiat_shamir_challenge_for_sigma_protocol::<E, H>(
-        fs_transcript,
+    let c = fiat_shamir_challenge_for_sigma_protocol::<_, E, H>(
+        ctxt,
         homomorphism,
         statement,
         &prover_first_message,

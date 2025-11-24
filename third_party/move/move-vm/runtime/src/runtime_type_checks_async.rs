@@ -24,7 +24,6 @@ use crate::{
     execution_tracing::{Trace, TraceCursor},
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
-    instr::Instruction,
     interpreter::{CallStack, Stack},
     interpreter_caches::InterpreterFunctionCaches,
     loader::FunctionHandle,
@@ -41,6 +40,7 @@ use move_binary_format::{
 use move_core_types::function::ClosureMask;
 use move_vm_types::{
     gas::UnmeteredGasMeter,
+    instr::Instruction,
     loaded_data::runtime_types::{Type, TypeBuilder},
     ty_interner::{InternedTypePool, TypeVecId},
     values::{Locals, Value},
@@ -594,8 +594,10 @@ where
             CallType::Regular,
             self.vm_config,
             function,
+            None,
             locals,
             frame_cache,
+            &self.type_stack,
         )
     }
 
@@ -640,8 +642,10 @@ where
             call_type,
             self.vm_config,
             callee,
+            None,
             locals,
             callee_frame_cache,
+            &self.type_stack,
         )?;
         std::mem::swap(current_frame, &mut frame);
         self.call_stack.push(frame).map_err(|_| {

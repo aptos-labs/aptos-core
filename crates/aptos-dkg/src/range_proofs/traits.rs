@@ -49,7 +49,6 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         ell: usize, // TODO: change this to u8?
         comm: &Self::Commitment,
         r: &Self::CommitmentRandomness,
-        fs_transcript: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Self;
 
@@ -59,7 +58,6 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         n: usize,
         ell: usize,
         comm: &Self::Commitment,
-        fs_transcript: &mut merlin::Transcript,
     ) -> anyhow::Result<()>;
 
     fn maul(&mut self);

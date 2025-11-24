@@ -5,9 +5,9 @@
 #[cfg(feature = "debugging")]
 use crate::debug::DebugContext;
 #[cfg(feature = "debugging")]
-use crate::instr::Instruction;
-#[cfg(feature = "debugging")]
 use crate::{interpreter::InterpreterDebugInterface, loader::LoadedFunction, RuntimeEnvironment};
+#[cfg(feature = "debugging")]
+use move_vm_types::instr::Instruction;
 #[cfg(feature = "debugging")]
 use ::{
     move_vm_types::values::Locals,

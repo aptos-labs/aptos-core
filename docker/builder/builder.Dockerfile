@@ -5,6 +5,8 @@ WORKDIR /aptos
 
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+# NOTE: the version of LLVM installed here MUST match the version of LLVM rustc
+# uses internally, so we may need to upgrade this when upgrading Rust versions.
 ARG CLANG_VERSION=20
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \

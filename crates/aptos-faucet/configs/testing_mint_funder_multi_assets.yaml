@@ -1,0 +1,29 @@
+server_config:
+  api_path_base: ""
+metrics_server_config:
+  listen_port: 9105
+bypasser_configs: []
+checker_configs: []
+funder_config:
+  type: "MintFunder"
+  node_url: "http://127.0.0.1:8080"
+  chain_id: 4
+  assets:
+    apt:
+      do_not_delegate: false
+      key_file_path: ".aptos/testnet/mint.key"
+      mint_account_address: "0xA550C18"
+      # Uses default "script" transaction method with MINTER_SCRIPT
+    shelbyusd:
+      do_not_delegate: true
+      key_file_path: "./shelbyusd.key"
+      mint_account_address: "7619a5c079936ada2b357a276d7a3feb5ce67c8cbe9969db2a4510738a93657e"
+      transaction_method:
+        type: "entry_function"
+        module_address: "0xe7e04d43ed9badf01ade482175f22d75b7c9f2c31a820d5623b6281fe694783d"
+        module_name: "shelby_usd"
+        function_name: "mint"
+      
+handler_config:
+  use_helpful_errors: true
+  return_rejections_early: false

@@ -127,7 +127,7 @@ macro_rules! multi_pairing_internal {
 }
 pub fn multi_pairing_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(3, ty_args.len());
@@ -170,7 +170,7 @@ pub fn multi_pairing_internal(
 
 pub fn pairing_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(3, ty_args.len());

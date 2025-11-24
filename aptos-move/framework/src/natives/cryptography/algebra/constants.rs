@@ -31,7 +31,7 @@ macro_rules! ark_constant_op_internal {
 
 pub fn zero_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
@@ -99,7 +99,7 @@ pub fn zero_internal(
 
 pub fn one_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
@@ -170,7 +170,7 @@ pub fn one_internal(
 
 pub fn order_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());

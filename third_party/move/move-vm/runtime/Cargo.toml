@@ -27,6 +27,7 @@ move-binary-format = { workspace = true }
 move-bytecode-verifier = { workspace = true }
 move-core-types = { workspace = true }
 move-vm-metrics = { workspace = true }
+move-vm-profiler = { workspace = true }
 move-vm-types = { workspace = true }
 once_cell = { workspace = true }
 parking_lot = { workspace = true }
@@ -50,6 +51,7 @@ test-case = { workspace = true }
 default = [
     "inline-callstack",
 ]
+profiling = ["move-vm-profiler/probe-profiler"]
 testing = []
 fuzzing = ["move-vm-types/fuzzing"]
 failpoints = ["fail/failpoints"]

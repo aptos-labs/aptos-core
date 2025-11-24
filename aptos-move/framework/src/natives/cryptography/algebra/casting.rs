@@ -44,7 +44,7 @@ macro_rules! abort_unless_casting_enabled {
 
 pub fn downcast_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
@@ -80,7 +80,7 @@ pub fn downcast_internal(
 
 pub fn upcast_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());

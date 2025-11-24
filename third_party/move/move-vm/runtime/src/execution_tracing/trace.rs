@@ -4,12 +4,11 @@
 //! Defines the trace data structure which is sufficient to replay Move program execution without
 //! requiring any data accesses (only access to code loader is needed).
 
-use crate::{
-    execution_tracing::recorders::BytecodeFingerprintRecorder, instr::Instruction, LoadedFunction,
-};
+use crate::{execution_tracing::recorders::BytecodeFingerprintRecorder, LoadedFunction};
 use bitvec::vec::BitVec;
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::function::ClosureMask;
+use move_vm_types::instr::Instruction;
 
 /// A non-static call record in the trace. Used for entry-points and closures.
 #[derive(Clone)]

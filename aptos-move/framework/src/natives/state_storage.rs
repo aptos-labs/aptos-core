@@ -51,7 +51,7 @@ impl<'a> NativeStateStorageContext<'a> {
 /// guarantees a fresh state view then.
 fn native_get_usage(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert!(_ty_args.is_empty());

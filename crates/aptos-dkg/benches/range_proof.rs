@@ -92,13 +92,11 @@ fn bench_verify<E: Pairing, B: BatchedRangeProof<E>>(
                     let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
                     let (values, comm, r) =
                         test_utils::range_proof_random_instance::<_, B, _>(&pk, n, ell, &mut rng);
-                    let mut fs_t = merlin::Transcript::new(B::DST);
-                    let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+                    let proof = B::prove(&pk, &values, ell, &comm, &r, &mut rng);
                     (vk, n, ell, comm, proof)
                 },
                 |(vk, n, ell, comm, proof)| {
-                    let mut fs_t = merlin::Transcript::new(B::DST);
-                    proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
+                    proof.verify(&vk, n, ell, &comm).unwrap();
                 },
             )
         },
@@ -123,9 +121,8 @@ fn bench_prove<E: Pairing, B: BatchedRangeProof<E>>(
                     (pk, values, comm, r)
                 },
                 |(pk, values, comm, r)| {
-                    let mut fs_t = merlin::Transcript::new(B::DST);
                     let mut rng = thread_rng();
-                    let _proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+                    let _proof = B::prove(&pk, &values, ell, &comm, &r, &mut rng);
                 },
             )
         },

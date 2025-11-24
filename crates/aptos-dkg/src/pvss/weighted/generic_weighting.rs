@@ -6,10 +6,17 @@
 /// WARNING: This will **NOT** necessarily be secure for any PVSS scheme, since it will reuse encryption
 /// keys, which might not be safe depending on the PVSS scheme.
 use crate::pvss::{
-    traits::{transcript::MalleableTranscript, Transcript},
+    traits::{
+        transcript::{AggregatableTranscript, MalleableTranscript},
+        Transcript,
+    },
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
-use aptos_crypto::{traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial};
+use crate::traits::transcript::Aggregatable;
+use aptos_crypto::{
+    traits::SecretSharingConfig as _, weighted_config::WeightedConfig, CryptoMaterialError,
+    ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
@@ -73,6 +80,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
     type InputSecret = T::InputSecret;
     type PublicParameters = T::PublicParameters;
     type SecretSharingConfig = WeightedConfigBlstrs;
+    // Can probably change this to T::SecretSharingConfig, after editing Reconstructable... but not worth the effort atm
     type SigningPubKey = T::SigningPubKey;
     type SigningSecretKey = T::SigningSecretKey;
 
@@ -139,15 +147,6 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         T::get_dealers(&self.trx)
     }
 
-    fn aggregate_with(
-        &mut self,
-        sc: &Self::SecretSharingConfig,
-        other: &Self,
-    ) -> anyhow::Result<()> {
-        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)?;
-        Ok(())
-    }
-
     fn get_public_key_share(
         &self,
         sc: &Self::SecretSharingConfig,
@@ -210,6 +209,20 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         GenericWeighting {
             trx: T::generate(sc.get_threshold_config(), pp, rng),
         }
+    }
+}
+
+impl<T> Aggregatable<WeightedConfig<ThresholdConfigBlstrs>> for GenericWeighting<T>
+where
+    T: AggregatableTranscript + Transcript<SecretSharingConfig = ThresholdConfigBlstrs>,
+{
+    fn aggregate_with(
+        &mut self,
+        sc: &WeightedConfig<ThresholdConfigBlstrs>,
+        other: &Self,
+    ) -> anyhow::Result<()> {
+        T::aggregate_with(&mut self.trx, sc.get_threshold_config(), &other.trx)?;
+        Ok(())
     }
 }
 

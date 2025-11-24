@@ -4,6 +4,9 @@ All notable changes to the Aptos CLI will be captured in this file. This project
 
 # Unreleased
 
+## [7.11.1]
+- When Move unit tests detect that the legacy struct-based Option module is being loaded, replace it with the pre-compiled binary version.
+
 ## [7.11.0]
 - When using `--bind-to 0.0.0.0`, clients created by the localnet will try to connect at 127.0.0.1, not 0.0.0.0.
 - Add `--docker-network` flag to allow specifying existing Docker network.

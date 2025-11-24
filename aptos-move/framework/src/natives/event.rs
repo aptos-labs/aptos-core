@@ -94,13 +94,13 @@ impl NativeEventContext {
 #[inline]
 fn native_write_to_event_store(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.len() == 3);
 
-    let ty = ty_args.pop().unwrap();
+    let ty = &ty_args[0];
     let msg = arguments.pop_back().unwrap();
     let seq_num = safely_pop_arg!(arguments, u64);
     let guid = safely_pop_arg!(arguments, Vec<u8>);
@@ -110,9 +110,9 @@ fn native_write_to_event_store(
         EVENT_WRITE_TO_EVENT_STORE_BASE
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg)?,
     )?;
-    let ty_tag = context.type_to_type_tag(&ty)?;
+    let ty_tag = context.type_to_type_tag(ty)?;
     let (layout, contains_delayed_fields) = context
-        .type_to_type_layout_with_delayed_fields(&ty)?
+        .type_to_type_layout_with_delayed_fields(ty)?
         .unpack();
 
     let function_value_extension = context.function_value_extension();
@@ -146,13 +146,13 @@ fn native_write_to_event_store(
 #[cfg(feature = "testing")]
 fn native_emitted_events_by_handle(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.len() == 1);
 
-    let ty = ty_args.pop().unwrap();
+    let ty = &ty_args[0];
     let mut guid = safely_pop_arg!(arguments, StructRef)
         .borrow_field(1)?
         .value_as::<StructRef>()?
@@ -179,8 +179,8 @@ fn native_emitted_events_by_handle(
         })?
         .value_as::<AccountAddress>()?;
     let key = EventKey::new(creation_num, addr);
-    let ty_tag = context.type_to_type_tag(&ty)?;
-    let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
+    let ty_tag = context.type_to_type_tag(ty)?;
+    let ty_layout = context.type_to_type_layout_check_no_delayed_fields(ty)?;
     let ctx = context.extensions().get::<NativeEventContext>();
     let events = ctx
         .emitted_v1_events(&key, &ty_tag)
@@ -204,16 +204,16 @@ fn native_emitted_events_by_handle(
 #[cfg(feature = "testing")]
 fn native_emitted_events(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
 
-    let ty = ty_args.pop().unwrap();
+    let ty = &ty_args[0];
 
-    let ty_tag = context.type_to_type_tag(&ty)?;
-    let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
+    let ty_tag = context.type_to_type_tag(ty)?;
+    let ty_layout = context.type_to_type_layout_check_no_delayed_fields(ty)?;
     let ctx = context.extensions().get::<NativeEventContext>();
 
     let events = ctx
@@ -239,13 +239,13 @@ fn native_emitted_events(
 #[inline]
 fn native_write_module_event_to_store(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.len() == 1);
 
-    let ty = ty_args.pop().unwrap();
+    let ty = &ty_args[0];
     let msg = arguments.pop_back().unwrap();
 
     context.charge(
@@ -253,7 +253,7 @@ fn native_write_module_event_to_store(
             + EVENT_WRITE_TO_EVENT_STORE_PER_ABSTRACT_VALUE_UNIT * context.abs_val_size(&msg)?,
     )?;
 
-    let type_tag = context.type_to_type_tag(&ty)?;
+    let type_tag = context.type_to_type_tag(ty)?;
 
     // Additional runtime check for module call.
     let stack_frames = context.stack_frames(1);
@@ -287,7 +287,7 @@ fn native_write_module_event_to_store(
     }
 
     let (layout, contains_delayed_fields) = context
-        .type_to_type_layout_with_delayed_fields(&ty)?
+        .type_to_type_layout_with_delayed_fields(ty)?
         .unpack();
 
     let function_value_extension = context.function_value_extension();
