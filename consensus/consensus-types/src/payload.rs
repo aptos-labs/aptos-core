@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use crate::proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore};
 use anyhow::ensure;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
@@ -290,7 +290,7 @@ pub struct OptQuorumStorePayloadV1 {
 }
 
 impl OptQuorumStorePayloadV1 {
-    pub fn get_all_batch_infos(self) -> Vec<BatchInfo> {
+    pub fn get_all_batch_infos(self) -> Vec<BatchInfoExt> {
         let Self {
             inline_batches,
             opt_batches,
@@ -303,6 +303,7 @@ impl OptQuorumStorePayloadV1 {
             .map(|batch| batch.batch_info)
             .chain(opt_batches)
             .chain(proofs.into_iter().map(|proof| proof.info().clone()))
+            .map(|info| info.into())
             .collect()
     }
 
