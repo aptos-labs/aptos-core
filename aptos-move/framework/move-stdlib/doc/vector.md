@@ -148,18 +148,6 @@ The length of the vectors are not equal.
 
 
 
-<a id="0x1_vector_USE_MOVE_RANGE"></a>
-
-Whether to utilize native vector::move_range
-Vector module cannot call features module, due to cyclic dependency,
-so this is a constant.
-
-
-<pre><code><b>const</b> <a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>: bool = <b>true</b>;
-</code></pre>
-
-
-
 <a id="0x1_vector_empty"></a>
 
 ## Function `empty`
@@ -496,15 +484,10 @@ Pushes all of the elements of the <code>other</code> vector into the <code>self<
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_append">append</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, other: <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;) {
-    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
-        <b>let</b> self_length = self.<a href="vector.md#0x1_vector_length">length</a>();
-        <b>let</b> other_length = other.<a href="vector.md#0x1_vector_length">length</a>();
-        <a href="vector.md#0x1_vector_move_range">move_range</a>(&<b>mut</b> other, 0, other_length, self, self_length);
-        other.<a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>();
-    } <b>else</b> {
-        other.<a href="vector.md#0x1_vector_reverse">reverse</a>();
-        self.<a href="vector.md#0x1_vector_reverse_append">reverse_append</a>(other);
-    }
+    <b>let</b> self_length = self.<a href="vector.md#0x1_vector_length">length</a>();
+    <b>let</b> other_length = other.<a href="vector.md#0x1_vector_length">length</a>();
+    <a href="vector.md#0x1_vector_move_range">move_range</a>(&<b>mut</b> other, 0, other_length, self, self_length);
+    other.<a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>();
 }
 </code></pre>
 
@@ -567,16 +550,7 @@ In many languages this is also called <code>split_off</code>.
     <b>assert</b>!(new_len &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
 
     <b>let</b> other = <a href="vector.md#0x1_vector_empty">empty</a>();
-    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
-        <a href="vector.md#0x1_vector_move_range">move_range</a>(self, new_len, len - new_len, &<b>mut</b> other, 0);
-    } <b>else</b> {
-        <b>while</b> (len &gt; new_len) {
-            other.<a href="vector.md#0x1_vector_push_back">push_back</a>(self.<a href="vector.md#0x1_vector_pop_back">pop_back</a>());
-            len -= 1;
-        };
-        other.<a href="vector.md#0x1_vector_reverse">reverse</a>();
-    };
-
+    <a href="vector.md#0x1_vector_move_range">move_range</a>(self, new_len, len - new_len, &<b>mut</b> other, 0);
     other
 }
 </code></pre>
@@ -776,26 +750,18 @@ Aborts if out of bounds.
     <b>let</b> len = self.<a href="vector.md#0x1_vector_length">length</a>();
     <b>assert</b>!(i &lt;= len, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
 
-    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
-        <b>if</b> (i + 2 &gt;= len) {
-            // When we are close <b>to</b> the end, it is cheaper <b>to</b> not create
-            // a temporary <a href="vector.md#0x1_vector">vector</a>, and swap directly
-            self.<a href="vector.md#0x1_vector_push_back">push_back</a>(e);
-            <b>while</b> (i &lt; len) {
-                self.<a href="vector.md#0x1_vector_swap">swap</a>(i, len);
-                i += 1;
-            };
-        } <b>else</b> {
-            <b>let</b> other = <a href="vector.md#0x1_vector_singleton">singleton</a>(e);
-            <a href="vector.md#0x1_vector_move_range">move_range</a>(&<b>mut</b> other, 0, 1, self, i);
-            other.<a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>();
-        }
-    } <b>else</b> {
+    <b>if</b> (i + 2 &gt;= len) {
+        // When we are close <b>to</b> the end, it is cheaper <b>to</b> not create
+        // a temporary <a href="vector.md#0x1_vector">vector</a>, and swap directly
         self.<a href="vector.md#0x1_vector_push_back">push_back</a>(e);
         <b>while</b> (i &lt; len) {
             self.<a href="vector.md#0x1_vector_swap">swap</a>(i, len);
             i += 1;
         };
+    } <b>else</b> {
+        <b>let</b> other = <a href="vector.md#0x1_vector_singleton">singleton</a>(e);
+        <a href="vector.md#0x1_vector_move_range">move_range</a>(&<b>mut</b> other, 0, 1, self, i);
+        other.<a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>();
     };
 }
 </code></pre>
@@ -827,24 +793,18 @@ Aborts if <code>i</code> is out of bounds.
     // i out of bounds; <b>abort</b>
     <b>if</b> (i &gt;= len) <b>abort</b> <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>;
 
-    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
-        // When we are close <b>to</b> the end, it is cheaper <b>to</b> not create
-        // a temporary <a href="vector.md#0x1_vector">vector</a>, and swap directly
-        <b>if</b> (i + 3 &gt;= len) {
-            len -= 1;
-            <b>while</b> (i &lt; len) self.<a href="vector.md#0x1_vector_swap">swap</a>(i, { i += 1; i });
-            self.<a href="vector.md#0x1_vector_pop_back">pop_back</a>()
-        } <b>else</b> {
-            <b>let</b> other = <a href="vector.md#0x1_vector_empty">empty</a>();
-            <a href="vector.md#0x1_vector_move_range">move_range</a>(self, i, 1, &<b>mut</b> other, 0);
-            <b>let</b> result = other.<a href="vector.md#0x1_vector_pop_back">pop_back</a>();
-            other.<a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>();
-            result
-        }
-    } <b>else</b> {
+    // When we are close <b>to</b> the end, it is cheaper <b>to</b> not create
+    // a temporary <a href="vector.md#0x1_vector">vector</a>, and swap directly
+    <b>if</b> (i + 3 &gt;= len) {
         len -= 1;
         <b>while</b> (i &lt; len) self.<a href="vector.md#0x1_vector_swap">swap</a>(i, { i += 1; i });
         self.<a href="vector.md#0x1_vector_pop_back">pop_back</a>()
+    } <b>else</b> {
+        <b>let</b> other = <a href="vector.md#0x1_vector_empty">empty</a>();
+        <a href="vector.md#0x1_vector_move_range">move_range</a>(self, i, 1, &<b>mut</b> other, 0);
+        <b>let</b> result = other.<a href="vector.md#0x1_vector_pop_back">pop_back</a>();
+        other.<a href="vector.md#0x1_vector_destroy_empty">destroy_empty</a>();
+        result
     }
 }
 </code></pre>
@@ -941,13 +901,7 @@ Aborts if <code>i</code> is out of bounds.
 <pre><code><b>public</b> <b>fun</b> <a href="vector.md#0x1_vector_replace">replace</a>&lt;Element&gt;(self: &<b>mut</b> <a href="vector.md#0x1_vector">vector</a>&lt;Element&gt;, i: u64, val: Element): Element {
     <b>let</b> last_idx = self.<a href="vector.md#0x1_vector_length">length</a>();
     <b>assert</b>!(i &lt; last_idx, <a href="vector.md#0x1_vector_EINDEX_OUT_OF_BOUNDS">EINDEX_OUT_OF_BOUNDS</a>);
-    <b>if</b> (<a href="vector.md#0x1_vector_USE_MOVE_RANGE">USE_MOVE_RANGE</a>) {
-        <a href="mem.md#0x1_mem_replace">mem::replace</a>(self.<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(i), val)
-    } <b>else</b> {
-        self.<a href="vector.md#0x1_vector_push_back">push_back</a>(val);
-        self.<a href="vector.md#0x1_vector_swap">swap</a>(i, last_idx);
-        self.<a href="vector.md#0x1_vector_pop_back">pop_back</a>()
-    }
+    <a href="mem.md#0x1_mem_replace">mem::replace</a>(self.<a href="vector.md#0x1_vector_borrow_mut">borrow_mut</a>(i), val)
 }
 </code></pre>
 
