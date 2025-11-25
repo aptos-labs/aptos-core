@@ -141,6 +141,28 @@ fn test_all_filter() {
 }
 
 #[test]
+fn test_encrypted_transaction_filter() {
+    // Create a filter that only allows encrypted transactions
+    let transactions = utils::create_encrypted_and_plaintext_transactions();
+    let filter = TransactionFilter::empty()
+        .add_encrypted_transaction_filter(true)
+        .add_all_filter(false);
+
+    // Verify that the filter returns only encrypted transactions (txn 0, 1 and 2)
+    let filtered_transactions = filter.filter_transactions(transactions.clone());
+    assert_eq!(filtered_transactions, transactions[0..3].to_vec());
+
+    // Create a filter that denies encrypted transactions
+    let filter = TransactionFilter::empty()
+        .add_encrypted_transaction_filter(false)
+        .add_all_filter(true);
+
+    // Verify that the filter returns only plaintext transactions (txn 3 onwards)
+    let filtered_transactions = filter.filter_transactions(transactions.clone());
+    assert_eq!(filtered_transactions, transactions[3..].to_vec());
+}
+
+#[test]
 fn test_empty_filter() {
     for use_new_txn_payload_format in [false, true] {
         // Create an empty filter
