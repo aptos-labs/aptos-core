@@ -28,7 +28,10 @@ use aptos_logger::prelude::*;
 use aptos_types::{
     epoch_state::EpochState,
     ledger_info::LedgerInfoWithSignatures,
-    on_chain_config::{OnChainConsensusConfig, OnChainExecutionConfig, OnChainRandomnessConfig},
+    on_chain_config::{
+        ConsensusConfigFromOnchain, OnChainConsensusConfig, OnChainExecutionConfig,
+        OnChainRandomnessConfig,
+    },
     transaction::SignedTransaction,
     validator_signer::ValidatorSigner,
 };
@@ -115,7 +118,7 @@ impl TExecutionClient for MockExecutionClient {
         _epoch_state: Arc<EpochState>,
         _commit_signer_provider: Arc<dyn CommitSignerProvider>,
         _payload_manager: Arc<dyn TPayloadManager>,
-        _onchain_consensus_config: &OnChainConsensusConfig,
+        _onchain_consensus_config: &ConsensusConfigFromOnchain,
         _onchain_execution_config: &OnChainExecutionConfig,
         _onchain_randomness_config: &OnChainRandomnessConfig,
         _rand_config: Option<RandConfig>,
