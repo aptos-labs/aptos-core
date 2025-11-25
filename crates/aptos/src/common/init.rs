@@ -109,13 +109,13 @@ impl CliCommand<()> for InitTool {
             network
         } else {
             eprintln!(
-                "Choose network from [devnet, testnet, mainnet, local, custom | defaults to devnet]"
+                "Choose network from [devnet, testnet, mainnet, local, custom | defaults to testnet]"
             );
             let input = read_line("network")?;
             let input = input.trim();
             if input.is_empty() {
-                eprintln!("No network given, using devnet...");
-                Network::Devnet
+                eprintln!("No network given, using testnet...");
+                Network::Testnet
             } else {
                 Network::from_str(input)?
             }
@@ -472,6 +472,6 @@ impl FromStr for Network {
 
 impl Default for Network {
     fn default() -> Self {
-        Self::Devnet
+        Self::Testnet
     }
 }
