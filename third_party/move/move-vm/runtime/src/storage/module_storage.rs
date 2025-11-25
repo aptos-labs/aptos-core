@@ -397,7 +397,7 @@ where
         }
 
         if visited.insert(dependency_id.clone()) {
-            // Dependency is not verified, and we have not visited it yet.
+            // Dependency is not verified, and we have not visited it yet
             let verified_dependency = visit_dependencies_and_verify(
                 dependency_id.clone(),
                 dependency,
