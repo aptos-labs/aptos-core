@@ -113,7 +113,7 @@ module aptos_token::token_coin_swap {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }
 
-    /// Initalize the token listing for a token owner
+    /// Initialize the token listing for a token owner
     fun initialize_token_listing<CoinType>(_token_owner: &signer) {
         abort error::invalid_argument(EDEPRECATED_MODULE)
     }

@@ -67,7 +67,7 @@ use std::{
 
 /// Alternate implementation of [crate::state_store::buffered_state::BufferedState] for use with consensus-only-perf-test feature.
 /// It stores the [StateDelta]s in memory similar to [crate::state_store::buffered_state::BufferedState] except that it does not
-/// commit it to persistant storage.
+/// commit it to persistent storage.
 #[derive(Debug)]
 pub struct FakeBufferedState {
     // state until the latest checkpoint.
