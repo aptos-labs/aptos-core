@@ -1,7 +1,7 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{smoke_test_environment::SwarmBuilder, utils::get_on_chain_resource};
+use crate::{smoke_test_environment::SwarmBuilder, utils::get_keyless_on_chain_resource};
 use aptos::{common::types::GasOptions, test::CliTestFramework};
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -325,7 +325,7 @@ script {{
         inner_private_key: get_sample_esk(),
     };
     let rest_cli = swarm.validators().next().unwrap().rest_client();
-    let config = get_on_chain_resource(&rest_cli).await;
+    let config = get_keyless_on_chain_resource::<Configuration>(&rest_cli).await;
     let ephemeral_key_pair = EphemeralKeyPair::new_with_keyless_config(
         &config,
         esk,
@@ -436,7 +436,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
 
     let rest_cli = swarm.validators().next().unwrap().rest_client();
-    let config = get_on_chain_resource(&rest_cli).await;
+    let config = get_keyless_on_chain_resource::<Configuration>(&rest_cli).await;
 
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),
@@ -503,7 +503,7 @@ async fn test_keyless_groth16_verifies_using_rust_sdk() {
 async fn test_keyless_groth16_verifies_using_rust_sdk_from_jwt() {
     let (_tw_sk, _, _, swarm, mut cli, root_idx) = setup_local_net().await;
     let rest_cli = swarm.validators().next().unwrap().rest_client();
-    let config = get_on_chain_resource(&rest_cli).await;
+    let config = get_keyless_on_chain_resource::<Configuration>(&rest_cli).await;
 
     let esk = EphemeralPrivateKey::Ed25519 {
         inner_private_key: get_sample_esk(),

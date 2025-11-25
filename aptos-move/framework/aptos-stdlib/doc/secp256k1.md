@@ -24,8 +24,7 @@ This module implements ECDSA signatures based on the prime-order secp256k1 ellpt
     -  [Function `ecdsa_recover_internal`](#@Specification_1_ecdsa_recover_internal)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 </code></pre>
 
 

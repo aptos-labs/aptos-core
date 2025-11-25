@@ -109,17 +109,17 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::INLINING_OPTIMIZATION.to_string(),
             description: "Turns on or off inlining optimizations".to_string(),
-            default: Given(false),
+            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
         },
         Experiment {
             name: Experiment::ACROSS_PACKAGE_INLINING.to_string(),
             description: "Turns on or off inlining across package boundaries".to_string(),
-            default: Given(false),
+            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
         },
         Experiment {
             name: Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS.to_string(),
             description: "Turns on or off restricting inlining optimization to primary target modules".to_string(),
-            default: Given(false),
+            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
         },
         Experiment {
             name: Experiment::SPEC_CHECK.to_string(),
@@ -155,7 +155,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::OPTIMIZE_EXTRA.to_string(),
             description: "Use extra optimizations".to_string(),
-            default: Given(false),
+            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
         },
         Experiment {
             name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
@@ -298,6 +298,11 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
                 .to_string(),
             default: Given(false),
         },
+        Experiment {
+            name: Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string(),
+            description: "Turns on or off extended framework optimizations".to_string(),
+            default: Given(false),
+        },
     ];
     experiments
         .into_iter()
@@ -320,6 +325,7 @@ impl Experiment {
     pub const COMPILE_FOR_TESTING: &'static str = "compile-for-testing";
     pub const DEAD_CODE_ELIMINATION: &'static str = "dead-code-elimination";
     pub const DUPLICATE_STRUCT_PARAMS_CHECK: &'static str = "duplicate-struct-params-check";
+    pub const EXTENDED_FRAMEWORK_OPTIMIZATIONS: &'static str = "extended-framework-optimizations";
     pub const FAIL_ON_WARNING: &'static str = "fail-on-warning";
     pub const FLUSH_WRITES_OPTIMIZATION: &'static str = "flush-writes-optimization";
     pub const INLINING: &'static str = "inlining";

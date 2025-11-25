@@ -9,7 +9,7 @@ use crate::quorum_store::counters;
 use aptos_consensus_types::{
     common::{Author, TxnSummaryWithExpiration},
     payload::TDataInfo,
-    proof_of_store::{BatchInfo, ProofOfStore},
+    proof_of_store::{BatchInfoExt, ProofOfStore, TBatchInfo},
     utils::PayloadTxnsSize,
 };
 use aptos_logger::{info, sample, sample::SampleRate, warn};
@@ -30,14 +30,14 @@ use std::{
 /// batch.
 struct QueueItem {
     /// The info of the Batch this item stores
-    info: BatchInfo,
+    info: BatchInfoExt,
     /// Contains the summary of transactions in the batch.
     /// It is optional as the summary can be updated after the proof.
     txn_summaries: Option<Vec<TxnSummaryWithExpiration>>,
 
     /// Contains the proof associated with the batch.
     /// It is optional as the proof can be updated after the summary.
-    proof: Option<ProofOfStore<BatchInfo>>,
+    proof: Option<ProofOfStore<BatchInfoExt>>,
     /// The time when the proof is inserted into this item.
     proof_insertion_time: Option<Instant>,
 }
@@ -57,7 +57,7 @@ impl QueueItem {
 pub struct BatchProofQueue {
     my_peer_id: PeerId,
     // Queue per peer to ensure fairness between peers and priority within peer
-    author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfo>>,
+    author_to_batches: HashMap<PeerId, BTreeMap<BatchSortKey, BatchInfoExt>>,
     // Map of Batch key to QueueItem containing Batch data and proofs
     items: HashMap<BatchKey, QueueItem>,
     // Number of unexpired and uncommitted proofs in which the txn_summary = (sender, replay protector, hash, expiration)
@@ -173,7 +173,7 @@ impl BatchProofQueue {
     }
 
     /// Add the ProofOfStore to proof queue.
-    pub(crate) fn insert_proof(&mut self, proof: ProofOfStore<BatchInfo>) {
+    pub(crate) fn insert_proof(&mut self, proof: ProofOfStore<BatchInfoExt>) {
         if proof.expiration() <= self.latest_block_timestamp {
             counters::inc_rejected_pos_count(counters::POS_EXPIRED_LABEL);
             return;
@@ -258,7 +258,7 @@ impl BatchProofQueue {
 
     pub fn insert_batches(
         &mut self,
-        batches_with_txn_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
+        batches_with_txn_summaries: Vec<(BatchInfoExt, Vec<TxnSummaryWithExpiration>)>,
     ) {
         let start = Instant::now();
 
@@ -341,8 +341,8 @@ impl BatchProofQueue {
 
     fn log_remaining_data_after_pull(
         &self,
-        excluded_batches: &HashSet<BatchInfo>,
-        pulled_proofs: &[ProofOfStore<BatchInfo>],
+        excluded_batches: &HashSet<BatchInfoExt>,
+        pulled_proofs: &[ProofOfStore<BatchInfoExt>],
     ) {
         let mut num_proofs_remaining_after_pull = 0;
         let mut num_txns_remaining_after_pull = 0;
@@ -400,13 +400,13 @@ impl BatchProofQueue {
     // whether the proof queue is fully utilized.
     pub(crate) fn pull_proofs(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<BatchInfoExt>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
-    ) -> (Vec<ProofOfStore<BatchInfo>>, PayloadTxnsSize, u64, bool) {
+    ) -> (Vec<ProofOfStore<BatchInfoExt>>, PayloadTxnsSize, u64, bool) {
         let (result, all_txns, unique_txns, is_full) = self.pull_internal(
             false,
             excluded_batches,
@@ -456,7 +456,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<BatchInfoExt>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -464,7 +464,7 @@ impl BatchProofQueue {
         return_non_full: bool,
         block_timestamp: Duration,
         minimum_batch_age_usecs: Option<u64>,
-    ) -> (Vec<BatchInfo>, PayloadTxnsSize, u64) {
+    ) -> (Vec<BatchInfoExt>, PayloadTxnsSize, u64) {
         let (result, pulled_txns, unique_txns, is_full) = self.pull_batches_internal(
             excluded_batches,
             exclude_authors,
@@ -489,7 +489,7 @@ impl BatchProofQueue {
 
     pub fn pull_batches_internal(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<BatchInfoExt>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -497,7 +497,7 @@ impl BatchProofQueue {
         return_non_full: bool,
         block_timestamp: Duration,
         minimum_batch_age_usecs: Option<u64>,
-    ) -> (Vec<BatchInfo>, PayloadTxnsSize, u64, bool) {
+    ) -> (Vec<BatchInfoExt>, PayloadTxnsSize, u64, bool) {
         let (result, all_txns, unique_txns, is_full) = self.pull_internal(
             true,
             excluded_batches,
@@ -515,14 +515,14 @@ impl BatchProofQueue {
 
     pub fn pull_batches_with_transactions(
         &mut self,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<BatchInfoExt>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
         soft_max_txns_after_filtering: u64,
         return_non_full: bool,
         block_timestamp: Duration,
     ) -> (
-        Vec<(BatchInfo, Vec<SignedTransaction>)>,
+        Vec<(BatchInfoExt, Vec<SignedTransaction>)>,
         PayloadTxnsSize,
         u64,
     ) {
@@ -562,7 +562,7 @@ impl BatchProofQueue {
     fn pull_internal(
         &mut self,
         batches_without_proofs: bool,
-        excluded_batches: &HashSet<BatchInfo>,
+        excluded_batches: &HashSet<BatchInfoExt>,
         exclude_authors: &HashSet<Author>,
         max_txns: PayloadTxnsSize,
         max_txns_after_filtering: u64,
@@ -844,7 +844,7 @@ impl BatchProofQueue {
     }
 
     // Mark in the hashmap committed PoS, but keep them until they expire
-    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfo>) {
+    pub(crate) fn mark_committed(&mut self, batches: Vec<BatchInfoExt>) {
         let start = Instant::now();
         for batch in batches.into_iter() {
             let batch_key = BatchKey::from_info(&batch);
@@ -889,7 +889,7 @@ impl BatchProofQueue {
                 // When the batch is expired, then it will be removed from items.
                 item.mark_committed();
             } else {
-                let batch_sort_key = BatchSortKey::from_info(batch.info());
+                let batch_sort_key = BatchSortKey::from_info(&batch);
                 self.expirations
                     .add_item(batch_sort_key.clone(), batch.expiration());
                 self.author_to_batches
