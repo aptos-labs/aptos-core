@@ -250,7 +250,7 @@ where
 
         let _timer =
             VM_TIMER.timer_with_label("unmetered_get_eagerly_verified_module [cache miss]");
-        let mut visited = HashSet::new();
+        let mut visited = HashSet::with_capacity(64);
         visited.insert(id.clone());
         Ok(Some(visit_dependencies_and_verify(
             id,
