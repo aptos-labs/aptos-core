@@ -16,6 +16,7 @@ use aptos_sdk::{
     types::{transaction::SignedTransaction, LocalAccount},
 };
 use aptos_types::{
+    keyless::KeylessOnchainConfig,
     network_address::{NetworkAddress, Protocol},
     on_chain_config::{OnChainConfig, OnChainConsensusConfig, OnChainExecutionConfig},
 };
@@ -275,6 +276,17 @@ pub async fn get_current_version(rest_client: &RestClient) -> u64 {
         .unwrap()
         .inner()
         .version
+}
+
+pub async fn get_keyless_on_chain_resource<T: KeylessOnchainConfig>(rest_client: &Client) -> T {
+    let maybe_response = rest_client
+        .get_account_resource_bcs::<T>(
+            CORE_CODE_ADDRESS,
+            T::struct_tag().to_canonical_string().as_str(),
+        )
+        .await;
+    let response = maybe_response.unwrap();
+    response.into_inner()
 }
 
 pub async fn get_on_chain_resource<T: OnChainConfig>(rest_client: &Client) -> T {

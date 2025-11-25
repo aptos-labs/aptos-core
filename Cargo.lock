@@ -4951,6 +4951,8 @@ dependencies = [
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
+ "ark-bn254",
+ "ark-groth16",
  "bcs 0.1.4",
  "move-binary-format",
  "move-bytecode-verifier",

@@ -382,7 +382,7 @@ where
 
     // Step 2: Traverse and collect all verified immediate dependencies so that we can verify
     // non-local properties of the module.
-    let mut verified_dependencies = vec![];
+    let mut verified_dependencies = Vec::with_capacity(8);
     for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
         let dependency_id = ModuleId::new(*addr, name.to_owned());
 
@@ -396,22 +396,26 @@ where
             continue;
         }
 
-        if visited.insert(dependency_id.clone()) {
-            // Dependency is not verified, and we have not visited it yet.
-            let verified_dependency = visit_dependencies_and_verify(
-                dependency_id.clone(),
-                dependency,
-                dependency_version,
-                visited,
-                module_cache_with_context,
-            )?;
-            verified_dependencies.push(verified_dependency);
-        } else {
-            // We must have found a cycle otherwise.
-            return Err(module_cyclic_dependency_error!(
-                dependency_id.address(),
-                dependency_id.name()
-            ));
+        use hashbrown::hash_set::Entry;
+        match visited.entry(dependency_id) {
+            Entry::Vacant(v) => {
+                let did = v.get().clone();
+                v.insert();
+                // Dependency is not verified, and we have not visited it yet.
+                let verified_dependency = visit_dependencies_and_verify(
+                    did,
+                    dependency,
+                    dependency_version,
+                    visited,
+                    module_cache_with_context,
+                )?;
+                verified_dependencies.push(verified_dependency);
+            },
+            Entry::Occupied(o) => {
+                // We must have found a cycle otherwise.
+                let did = o.get();
+                return Err(module_cyclic_dependency_error!(did.address(), did.name()));
+            },
         }
     }
 

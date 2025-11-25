@@ -1105,7 +1105,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
         // TODO(Gas): revisit this.
         let env = AptosEnvironment::new(&self.state_store);
-        let vm = AptosVM::new(&env, self.get_state_view());
+        let vm = AptosVM::new(&env);
 
         let resolver = self.state_store.as_move_resolver();
         let code_storage = self.get_state_view().as_aptos_code_storage(&env);
@@ -1177,7 +1177,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// Validates the given transaction by running it through the VM validator.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let env = AptosEnvironment::new(&self.state_store);
-        let vm = AptosVM::new(&env, self.get_state_view());
+        let vm = AptosVM::new(&env);
         vm.validate_transaction(
             txn,
             &self.state_store,

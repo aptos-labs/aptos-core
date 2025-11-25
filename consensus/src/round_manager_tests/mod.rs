@@ -43,7 +43,7 @@ use aptos_consensus_types::{
     opt_proposal_msg::OptProposalMsg,
     order_vote_msg::OrderVoteMsg,
     pipeline::commit_decision::CommitDecision,
-    proof_of_store::BatchInfo,
+    proof_of_store::{BatchInfo, BatchInfoExt},
     proposal_msg::ProposalMsg,
     round_timeout::RoundTimeoutMsg,
     utils::PayloadTxnsSize,
@@ -734,7 +734,7 @@ impl NodeSetup {
 struct MockQuorumStoreCommitNotifier;
 
 impl TQuorumStoreCommitNotifier for MockQuorumStoreCommitNotifier {
-    fn notify(&self, _block_timestamp: u64, _batches: Vec<BatchInfo>) {
+    fn notify(&self, _block_timestamp: u64, _batches: Vec<BatchInfoExt>) {
         unimplemented!()
     }
 }
