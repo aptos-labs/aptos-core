@@ -12,6 +12,7 @@ use aptos_types::{
     quorum_store::BatchId,
     transaction::{
         authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
+        encrypted_payload::EncryptedPayload,
         EntryFunction, Multisig, MultisigTransactionPayload, RawTransaction, Script,
         SignedTransaction, TransactionExecutable, TransactionExecutableRef, TransactionExtraConfig,
         TransactionPayload, TransactionPayloadInner,
@@ -27,6 +28,73 @@ pub fn create_account_authenticator(public_key: Ed25519PublicKey) -> AccountAuth
         public_key,
         signature: Ed25519Signature::dummy_signature(),
     }
+}
+
+/// Creates and returns a list of transactions (3 encrypted and 5 plaintext)
+pub fn create_encrypted_and_plaintext_transactions() -> Vec<SignedTransaction> {
+    let mut transactions = vec![];
+
+    // Create 3 encrypted transactions (all in different states)
+    transactions.push(create_encrypted_transaction());
+    transactions.push(create_encrypted_transaction_failed_state());
+    transactions.push(create_encrypted_transaction_plaintext_state());
+
+    // Create 5 plaintext transactions
+    for _ in 0..5 {
+        let transaction = create_fee_payer_transaction();
+        transactions.push(transaction)
+    }
+
+    transactions
+}
+
+/// Creates and returns an encrypted transaction
+pub fn create_encrypted_transaction() -> SignedTransaction {
+    let encrypted_payload = EncryptedPayload::Encrypted {
+        ciphertext: vec![],
+        extra_config: TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+        },
+        payload_hash: HashValue::random(),
+    };
+
+    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    create_signed_transaction(transaction_payload, false)
+}
+
+/// Creates and returns an encrypted transaction in a failed decryption state
+pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
+    let encrypted_payload = EncryptedPayload::FailedDecryption {
+        ciphertext: vec![],
+        extra_config: TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+        },
+        payload_hash: HashValue::random(),
+        eval_proof: vec![],
+    };
+
+    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    create_signed_transaction(transaction_payload, false)
+}
+
+/// Creates and returns an encrypted transaction in a plaintext state
+pub fn create_encrypted_transaction_plaintext_state() -> SignedTransaction {
+    let encrypted_payload = EncryptedPayload::Decrypted {
+        ciphertext: vec![],
+        extra_config: TransactionExtraConfig::V1 {
+            multisig_address: None,
+            replay_protection_nonce: None,
+        },
+        payload_hash: HashValue::random(),
+        eval_proof: vec![],
+        executable: TransactionExecutable::Empty,
+        decryption_nonce: 0,
+    };
+
+    let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
+    create_signed_transaction(transaction_payload, false)
 }
 
 /// Creates and returns an entry function with the given member ID
