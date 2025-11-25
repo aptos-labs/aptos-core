@@ -310,7 +310,25 @@ impl TBatchInfo for BatchInfoExt {
     }
 
     fn size(&self) -> PayloadTxnsSize {
-        PayloadTxnsSize::new(self.num_txns(), self.num_bytes())
+        PayloadTxnsSize::new(self.info().num_txns(), self.info().num_bytes())
+    }
+}
+
+impl TDataInfo for BatchInfoExt {
+    fn num_txns(&self) -> u64 {
+        self.info().num_txns()
+    }
+
+    fn num_bytes(&self) -> u64 {
+        self.info().num_bytes()
+    }
+
+    fn info(&self) -> &BatchInfo {
+        self.info()
+    }
+
+    fn signers(&self, _ordered_authors: &[PeerId]) -> Vec<PeerId> {
+        vec![self.author()]
     }
 }
 

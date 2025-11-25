@@ -6,7 +6,7 @@ use crate::{
     payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
     proof_of_store::{BatchInfo, BatchInfoExt, ProofCache, ProofOfStore, TBatchInfo},
 };
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use aptos_crypto::{
     hash::{CryptoHash, CryptoHasher},
     HashValue,
@@ -515,11 +515,15 @@ impl Payload {
         }
     }
 
-    fn verify_with_cache(
-        proofs: &[ProofOfStore<BatchInfo>],
+    fn verify_with_cache<T>(
+        proofs: &[ProofOfStore<T>],
         validator: &ValidatorVerifier,
         proof_cache: &ProofCache,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<()>
+    where
+        T: TBatchInfo + Send + Sync + 'static,
+        BatchInfoExt: From<T>,
+    {
         let unverified: Vec<_> = proofs
             .iter()
             .filter(|proof| {
@@ -535,15 +539,15 @@ impl Payload {
         Ok(())
     }
 
-    pub fn verify_inline_batches<'a>(
-        inline_batches: impl Iterator<Item = (&'a BatchInfo, &'a Vec<SignedTransaction>)>,
+    pub fn verify_inline_batches<'a, T: TBatchInfo + 'a>(
+        inline_batches: impl Iterator<Item = (&'a T, &'a Vec<SignedTransaction>)>,
     ) -> anyhow::Result<()> {
         for (batch, payload) in inline_batches {
             // TODO: Can cloning be avoided here?
             let computed_digest = BatchPayload::new(batch.author(), payload.clone()).hash();
             ensure!(
                 computed_digest == *batch.digest(),
-                "Hash of the received inline batch doesn't match the digest value for batch {}: {} != {}",
+                "Hash of the received inline batch doesn't match the digest value for batch {:?}: {} != {}",
                 batch,
                 computed_digest,
                 batch.digest()
@@ -552,9 +556,9 @@ impl Payload {
         Ok(())
     }
 
-    pub fn verify_opt_batches(
+    pub fn verify_opt_batches<T: TBatchInfo>(
         verifier: &ValidatorVerifier,
-        opt_batches: &OptBatches,
+        opt_batches: &OptBatches<T>,
     ) -> anyhow::Result<()> {
         let authors = verifier.address_to_validator_index();
         for batch in &opt_batches.batch_summary {
@@ -592,17 +596,31 @@ impl Payload {
                 )?;
                 Ok(())
             },
-            (true, Payload::OptQuorumStore(opt_quorum_store)) => {
-                let proof_with_data = opt_quorum_store.proof_with_data();
+            (true, Payload::OptQuorumStore(OptQuorumStorePayload::V1(p))) => {
+                let proof_with_data = p.proof_with_data();
                 Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
                 Self::verify_inline_batches(
-                    opt_quorum_store
-                        .inline_batches()
+                    p.inline_batches()
                         .iter()
                         .map(|batch| (batch.info(), batch.transactions())),
                 )?;
-                Self::verify_opt_batches(verifier, opt_quorum_store.opt_batches())?;
+                Self::verify_opt_batches(verifier, p.opt_batches())?;
                 Ok(())
+            },
+            (true, Payload::OptQuorumStore(OptQuorumStorePayload::V2(p))) => {
+                bail!("OptQuorumStorePayload::V2 cannot be accepted yet");
+                #[allow(unreachable_code)]
+                {
+                    let proof_with_data = p.proof_with_data();
+                    Self::verify_with_cache(&proof_with_data.batch_summary, verifier, proof_cache)?;
+                    Self::verify_inline_batches(
+                        p.inline_batches()
+                            .iter()
+                            .map(|batch| (batch.info(), batch.transactions())),
+                    )?;
+                    Self::verify_opt_batches(verifier, p.opt_batches())?;
+                    Ok(())
+                }
             },
             (_, _) => Err(anyhow::anyhow!(
                 "Wrong payload type. Expected Payload::InQuorumStore {} got {} ",
@@ -792,15 +810,26 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                     Payload::DirectMempool(_) => {
                         error!("DirectMempool payload in InQuorumStore filter");
                     },
-                    Payload::OptQuorumStore(opt_qs_payload) => {
-                        for batch in opt_qs_payload.inline_batches().iter() {
+                    Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
+                        for batch in p.inline_batches().iter() {
                             exclude_batches.insert(batch.info().clone().into());
                         }
-                        for batch_info in &opt_qs_payload.opt_batches().batch_summary {
+                        for batch_info in &p.opt_batches().batch_summary {
                             exclude_batches.insert(batch_info.clone().into());
                         }
-                        for proof in &opt_qs_payload.proof_with_data().batch_summary {
+                        for proof in &p.proof_with_data().batch_summary {
                             exclude_batches.insert(proof.info().clone().into());
+                        }
+                    },
+                    Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+                        for batch in p.inline_batches().iter() {
+                            exclude_batches.insert(batch.info().clone());
+                        }
+                        for batch_info in &p.opt_batches().batch_summary {
+                            exclude_batches.insert(batch_info.clone());
+                        }
+                        for proof in &p.proof_with_data().batch_summary {
+                            exclude_batches.insert(proof.info().clone());
                         }
                     },
                 }
