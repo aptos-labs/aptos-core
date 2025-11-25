@@ -3,7 +3,8 @@
 
 use anyhow::{Context, Result};
 use aptos_faucet_core::funder::{
-    ApiConnectionConfig, FunderTrait, MintFunder, TransactionSubmissionConfig,
+    ApiConnectionConfig, AssetConfig, FunderTrait, MintAssetConfig, MintFunder,
+    TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
 };
 use aptos_sdk::{
     crypto::ed25519::Ed25519PublicKey,
@@ -13,7 +14,12 @@ use aptos_sdk::{
     },
 };
 use clap::Parser;
-use std::{collections::HashSet, str::FromStr};
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+    str::FromStr,
+};
+use tokio::sync::RwLock;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -45,6 +51,12 @@ pub struct FaucetCliArgs {
     #[clap(long)]
     pub mint_account_address: Option<AccountAddress>,
 
+    /// Path to the private key file for minting coins.
+    /// To manually generate a keypair, use generate-key:
+    /// `cargo run -p generate-keypair -- -o <output_file_path>`
+    #[clap(long, default_value = "/opt/aptos/etc/mint.key")]
+    pub key_file_path: PathBuf,
+
     /// The maximum amount of gas in OCTA to spend on a single transaction.
     #[clap(long, default_value_t = 500_000)]
     pub max_gas_amount: u64,
@@ -52,11 +64,11 @@ pub struct FaucetCliArgs {
 
 impl FaucetCliArgs {
     async fn run(&self) -> Result<()> {
-        // Get network root key based on the connection config.
-        let key = self
-            .api_connection_args
-            .get_key()
-            .context("Failed to build root key")?;
+        // Create an AssetConfig to get the key
+        let asset_config = AssetConfig::new(None, self.key_file_path.clone());
+
+        // Get network root key from the asset config.
+        let key = asset_config.get_key().context("Failed to build root key")?;
 
         // Build the account that the MintFunder will use.
         let faucet_account = LocalAccount::new(
@@ -79,21 +91,44 @@ impl FaucetCliArgs {
             true, // wait_for_transactions
         );
 
+        // Create asset configuration for the default asset
+        let base_asset_config = AssetConfig::new(None, self.key_file_path.clone());
+        let mint_asset_config = MintAssetConfig::new(
+            base_asset_config,
+            self.mint_account_address,
+            false, // do_not_delegate is set to false - CLI uses delegation
+        );
+
+        // Build assets map with the default asset
+        let mut assets = HashMap::new();
+        assets.insert(
+            DEFAULT_ASSET_NAME.to_string(),
+            (mint_asset_config, RwLock::new(faucet_account)),
+        );
+
         // Build the MintFunder service.
-        let mut mint_funder = MintFunder::new(
+        let mint_funder = MintFunder::new(
             self.api_connection_args.node_url.clone(),
             self.api_connection_args.api_key.clone(),
             self.api_connection_args.additional_headers.clone(),
             self.api_connection_args.chain_id,
             transaction_submission_config,
-            faucet_account,
+            assets,
+            DEFAULT_ASSET_NAME.to_string(),
+            self.amount,
         );
 
         // Create an account that we'll delegate mint functionality to, then use it.
-        mint_funder
-            .use_delegated_account()
+        let delegated_account = mint_funder
+            .use_delegated_account(DEFAULT_ASSET_NAME)
             .await
             .context("Failed to make MintFunder use delegated account")?;
+
+        // Update the assets map with the delegated account that has mint capabilities
+        mint_funder
+            .update_asset_account(DEFAULT_ASSET_NAME, delegated_account)
+            .await
+            .context("Failed to update asset account with delegated account")?;
 
         let accounts: HashSet<AccountAddress> = self
             .accounts
@@ -105,7 +140,7 @@ impl FaucetCliArgs {
         // Mint coins to each of the accounts.
         for account in accounts {
             let response = mint_funder
-                .fund(Some(self.amount), account, false, false)
+                .fund(Some(self.amount), account, None, false, false)
                 .await;
             match response {
                 Ok(response) => println!(

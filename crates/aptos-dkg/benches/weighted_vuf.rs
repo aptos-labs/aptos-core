@@ -14,7 +14,7 @@ use aptos_dkg::{
         insecure_field,
         test_utils::{get_weighted_configs_for_benchmarking, setup_dealing, NoAux},
         traits::Transcript,
-        GenericWeighting, Player, WeightedConfig,
+        GenericWeighting, Player, WeightedConfigBlstrs,
     },
     utils::random::{random_g1_points, random_g2_points},
     weighted_vuf::{
@@ -50,7 +50,7 @@ pub fn all_groups(c: &mut Criterion) {
 
 fn pinkas_wvuf_derive_eval_micro_benches(
     bench_cases: Vec<(
-        WeightedConfig,
+        WeightedConfigBlstrs,
         PublicParameters,
         DealtSecretKey,
         <das::WeightedTranscript as Transcript>::DealtPubKey,
@@ -89,7 +89,7 @@ fn pinkas_wvuf_derive_eval_micro_benches(
             &apks,
             &mut group,
             &mut rng,
-            WeightedConfig::get_worst_case_eligible_subset_of_players,
+            WeightedConfigBlstrs::get_worst_case_eligible_subset_of_players,
             "worst_case",
         );
 
@@ -100,7 +100,7 @@ fn pinkas_wvuf_derive_eval_micro_benches(
                 &apks,
                 &mut group,
                 &mut rng,
-                WeightedConfig::get_worst_case_eligible_subset_of_players,
+                WeightedConfigBlstrs::get_worst_case_eligible_subset_of_players,
                 "worst_case",
                 *num_threads,
             );
@@ -109,7 +109,7 @@ fn pinkas_wvuf_derive_eval_micro_benches(
                 &wc,
                 &mut group,
                 &mut rng,
-                WeightedConfig::get_worst_case_eligible_subset_of_players,
+                WeightedConfigBlstrs::get_worst_case_eligible_subset_of_players,
                 "worst_case",
                 *num_threads,
             );
@@ -118,7 +118,7 @@ fn pinkas_wvuf_derive_eval_micro_benches(
 }
 
 pub fn wvuf_benches<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKey = WT::DealtPubKey,
@@ -128,7 +128,7 @@ pub fn wvuf_benches<
 >(
     group: &mut BenchmarkGroup<WallTime>,
 ) -> Vec<(
-    WeightedConfig,
+    WeightedConfigBlstrs,
     <WVUF as WeightedVUF>::PublicParameters,
     <WT as Transcript>::DealtSecretKey,
     <WT as Transcript>::DealtPubKey,
@@ -162,6 +162,7 @@ where
             &wc,
             &d.pp,
             &d.ssks[0],
+            &d.spks[0],
             &d.eks,
             &d.iss[0],
             &NoAux,
@@ -254,17 +255,20 @@ where
         );
 
         // benchmarks the sequence of WVUF::verify_share calls on shares from a specific subset of players
-        let bc: Vec<(fn(&WeightedConfig, &mut ThreadRng) -> Vec<Player>, String)> = vec![
+        let bc: Vec<(
+            fn(&WeightedConfigBlstrs, &mut ThreadRng) -> Vec<Player>,
+            String,
+        )> = vec![
             (
-                WeightedConfig::get_random_eligible_subset_of_players,
+                WeightedConfigBlstrs::get_random_eligible_subset_of_players,
                 "random".to_string(),
             ),
             (
-                WeightedConfig::get_best_case_eligible_subset_of_players,
+                WeightedConfigBlstrs::get_best_case_eligible_subset_of_players,
                 "best_case".to_string(),
             ),
             (
-                WeightedConfig::get_worst_case_eligible_subset_of_players,
+                WeightedConfigBlstrs::get_worst_case_eligible_subset_of_players,
                 "worst_case".to_string(),
             ),
         ];
@@ -325,7 +329,7 @@ where
 }
 
 fn wvuf_augment_random_keypair<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -334,7 +338,7 @@ fn wvuf_augment_random_keypair<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
     sks: &Vec<WT::DealtSecretKeyShare>,
     pks: &Vec<WT::DealtPubKeyShare>,
@@ -356,7 +360,7 @@ fn wvuf_augment_random_keypair<
 }
 
 fn wvuf_augment_all_pubkeys<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -365,7 +369,7 @@ fn wvuf_augment_all_pubkeys<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
     pks: &Vec<WVUF::PubKeyShare>,
     deltas: &Vec<WVUF::Delta>,
@@ -386,7 +390,7 @@ fn wvuf_augment_all_pubkeys<
 }
 
 fn wvuf_augment_random_pubkey<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -395,7 +399,7 @@ fn wvuf_augment_random_pubkey<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
     pks: &Vec<WVUF::PubKeyShare>,
     deltas: &Vec<WVUF::Delta>,
@@ -420,7 +424,7 @@ fn wvuf_augment_random_pubkey<
 }
 
 fn wvuf_create_share_random<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -428,7 +432,7 @@ fn wvuf_create_share_random<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
@@ -447,7 +451,7 @@ fn wvuf_create_share_random<
 }
 
 fn wvuf_create_share_specific<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -455,7 +459,7 @@ fn wvuf_create_share_specific<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
     player: &Player,
@@ -472,7 +476,7 @@ fn wvuf_create_share_specific<
 }
 
 fn wvuf_create_share_average<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -480,7 +484,7 @@ fn wvuf_create_share_average<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
 ) where
@@ -514,7 +518,7 @@ fn wvuf_create_share_average<
 }
 
 fn wvuf_verify_share_random<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -522,7 +526,7 @@ fn wvuf_verify_share_random<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
@@ -545,7 +549,7 @@ fn wvuf_verify_share_random<
 }
 
 fn wvuf_verify_share_average<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -553,7 +557,7 @@ fn wvuf_verify_share_average<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
@@ -588,7 +592,7 @@ fn wvuf_verify_share_average<
 }
 
 fn wvuf_many_verify_shares<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -597,11 +601,11 @@ fn wvuf_many_verify_shares<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     name: &str,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
@@ -621,7 +625,7 @@ fn wvuf_many_verify_shares<
 }
 
 fn wvuf_verify_share_specific<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
@@ -629,7 +633,7 @@ fn wvuf_verify_share_specific<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     vuf_pp: &WVUF::PublicParameters,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
@@ -651,7 +655,7 @@ fn wvuf_verify_share_specific<
 }
 
 fn wvuf_aggregate_shares<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKey = WT::DealtPubKey,
@@ -661,12 +665,12 @@ fn wvuf_aggregate_shares<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &String,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
@@ -685,7 +689,7 @@ fn wvuf_aggregate_shares<
 }
 
 fn wvuf_verify_proof<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKey = WT::DealtPubKey,
@@ -695,14 +699,14 @@ fn wvuf_verify_proof<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     pp: &WVUF::PublicParameters,
     pk: &WVUF::PubKey,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &String,
 ) where
     WVUF::PublicParameters: for<'a> From<&'a WT::PublicParameters>,
@@ -729,7 +733,7 @@ fn wvuf_verify_proof<
 }
 
 fn wvuf_derive_eval<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKey = WT::DealtPubKey,
@@ -739,13 +743,13 @@ fn wvuf_derive_eval<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     pp: &WVUF::PublicParameters,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &String,
     num_threads: usize,
 ) where
@@ -784,12 +788,12 @@ fn pinkas_wvuf_derive_eval_collect_lagrange_shares_and_rks<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     asks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedSecretKeyShare>,
     apks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &str,
 ) {
     group.bench_function(
@@ -824,12 +828,12 @@ fn pinkas_wvuf_derive_eval_collect_lagrange_shares_and_rks<
 
 fn pinkas_wvuf_derive_eval_rks_multiexps<R: rand_core::RngCore + rand_core::CryptoRng>(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     asks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedSecretKeyShare>,
     apks: &Vec<<PinkasWUF as WeightedVUF>::AugmentedPubKeyShare>,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &str,
     num_threads: usize,
 ) {
@@ -882,10 +886,10 @@ fn pinkas_wvuf_derive_eval_rks_multiexps<R: rand_core::RngCore + rand_core::Cryp
 
 fn pinkas_wvuf_derive_eval_multipairing<R: rand_core::RngCore + rand_core::CryptoRng>(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     group: &mut BenchmarkGroup<WallTime>,
     rng: &mut R,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
     subset_type: &str,
     num_threads: usize,
 ) {
@@ -915,7 +919,7 @@ fn pinkas_wvuf_derive_eval_multipairing<R: rand_core::RngCore + rand_core::Crypt
 }
 
 fn get_apks_and_proofs<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKey = WT::DealtPubKey,
@@ -925,11 +929,11 @@ fn get_apks_and_proofs<
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
     // For efficiency, we re-use the PVSS transcript
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     asks: &Vec<WVUF::AugmentedSecretKeyShare>,
     apks: &Vec<WVUF::AugmentedPubKeyShare>,
     rng: &mut R,
-    pick_subset_fn: fn(&WeightedConfig, &mut R) -> Vec<Player>,
+    pick_subset_fn: fn(&WeightedConfigBlstrs, &mut R) -> Vec<Player>,
 ) -> Vec<(Player, WVUF::AugmentedPubKeyShare, WVUF::ProofShare)> {
     let players = pick_subset_fn(wc, rng);
 
@@ -946,14 +950,14 @@ fn get_apks_and_proofs<
 }
 
 fn wvuf_eval<
-    WT: Transcript<SecretSharingConfig = WeightedConfig>,
+    WT: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = WT::DealtSecretKey,
         PubKeyShare = WT::DealtPubKeyShare,
         SecretKeyShare = WT::DealtSecretKeyShare,
     >,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     sk: &WVUF::SecretKey,
     group: &mut BenchmarkGroup<WallTime>,
 ) where

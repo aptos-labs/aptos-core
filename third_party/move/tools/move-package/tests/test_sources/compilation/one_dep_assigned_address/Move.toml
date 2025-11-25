@@ -5,5 +5,8 @@
 name = "Root"
 version = "0.0.0"
 
+[addresses]
+A = "0x2"
+
 [dependencies]
-OtherDep = { local = "./deps_only/other_dep", addr_subst = { "A" = "B" } }
+OtherDep = { local = "./deps_only/other_dep" }

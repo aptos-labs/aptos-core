@@ -4,10 +4,10 @@
 use crate::{
     invalid_signature,
     keyless::{
-        circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS, KEYLESS_ACCOUNT_MODULE_NAME,
+        circuit_constants, circuit_testcases::SAMPLE_EXP_HORIZON_SECS, KeylessOnchainConfig,
+        KEYLESS_ACCOUNT_MODULE_NAME,
     },
     move_utils::as_move_value::AsMoveValue,
-    on_chain_config::OnChainConfig,
 };
 use move_core_types::{
     ident_str,
@@ -53,6 +53,8 @@ impl MoveStructType for Configuration {
     const STRUCT_NAME: &'static IdentStr = ident_str!("Configuration");
 }
 
+impl KeylessOnchainConfig for Configuration {}
+
 impl Configuration {
     /// Should only be used for testing.
     pub const OVERRIDE_AUD_FOR_TESTING: &'static str = "test.recovery.aud";
@@ -92,9 +94,4 @@ impl Configuration {
             Ok(())
         }
     }
-}
-
-impl OnChainConfig for Configuration {
-    const MODULE_IDENTIFIER: &'static str = KEYLESS_ACCOUNT_MODULE_NAME;
-    const TYPE_IDENTIFIER: &'static str = "Configuration";
 }

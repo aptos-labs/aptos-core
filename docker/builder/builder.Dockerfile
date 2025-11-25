@@ -5,21 +5,32 @@ WORKDIR /aptos
 
 
 RUN rm -f /etc/apt/apt.conf.d/docker-clean; echo 'Binary::apt::APT::Keep-Downloaded-Packages "true";' > /etc/apt/apt.conf.d/keep-cache
+# NOTE: the version of LLVM installed here MUST match the version of LLVM rustc
+# uses internally, so we may need to upgrade this when upgrading Rust versions.
+ARG CLANG_VERSION=20
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list &&  \
-    apt update && apt-get --no-install-recommends install -y \
+    sed -i 's|http://deb.debian.org/debian|http://cloudfront.debian.net/debian|g' /etc/apt/sources.list \
+    && apt update \
+    && apt-get --no-install-recommends install -y \
         binutils \
-        clang \
         cmake \
         curl \
         git \
+        gnupg \
         libdw-dev \
         libpq-dev \
         libssl-dev \
         libudev-dev \
         lld \
-        pkg-config
+        lsb-release \
+        pkg-config \
+        software-properties-common \
+        wget \
+    && bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh ${CLANG_VERSION} \
+    && update-alternatives --install /usr/bin/clang clang /usr/bin/clang-${CLANG_VERSION} 100 \
+    && update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-${CLANG_VERSION} 100
+
 
 ### Build Rust code ###
 FROM rust-base as builder-base

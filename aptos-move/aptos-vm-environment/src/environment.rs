@@ -14,12 +14,15 @@ use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParamet
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
+    keyless::{Configuration, Groth16VerificationKey, KeylessOnchainConfig},
     on_chain_config::{
         ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
     },
     state_store::StateView,
 };
 use aptos_vm_types::storage::StorageGasParameters;
+use ark_bn254::Bn254;
+use ark_groth16::PreparedVerifyingKey;
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
@@ -80,6 +83,18 @@ impl AptosEnvironment {
     #[inline]
     pub fn timed_features(&self) -> &TimedFeatures {
         &self.0.timed_features
+    }
+
+    /// Returns the prepared verifying key for keyless validation.
+    #[inline]
+    pub fn keyless_pvk(&self) -> Option<&PreparedVerifyingKey<Bn254>> {
+        self.0.keyless_pvk.as_ref()
+    }
+
+    /// Returns keyless configurations.
+    #[inline]
+    pub fn keyless_configuration(&self) -> Option<&Configuration> {
+        self.0.keyless_configuration.as_ref()
     }
 
     /// Returns the [VMConfig] used by this environment.
@@ -156,6 +171,12 @@ struct Environment {
     features: Features,
     /// Set of timed features enabled in this environment.
     timed_features: TimedFeatures,
+
+    /// The prepared verification key for keyless accounts. Optional because it might not be set
+    /// on-chain or might fail to parse.
+    keyless_pvk: Option<PreparedVerifyingKey<Bn254>>,
+    /// Some keyless configurations which are not frequently updated.
+    keyless_configuration: Option<Configuration>,
 
     /// Gas feature version used in this environment.
     gas_feature_version: u64,
@@ -258,6 +279,19 @@ impl Environment {
             bcs::to_bytes(&vm_config.verifier_config).expect("Verifier config is serializable");
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
+        // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
+        // via governance (although, currently, we do check for that in `keyless_account.move`).
+        let keyless_pvk =
+            Groth16VerificationKey::fetch_keyless_config(state_view).and_then(|(vk, vk_bytes)| {
+                sha3_256.update(&vk_bytes);
+                vk.try_into().ok()
+            });
+        let keyless_configuration =
+            Configuration::fetch_keyless_config(state_view).map(|(config, config_bytes)| {
+                sha3_256.update(&config_bytes);
+                config
+            });
+
         let hash = sha3_256.finalize().into();
 
         #[allow(deprecated)]
@@ -265,6 +299,8 @@ impl Environment {
             chain_id,
             features,
             timed_features,
+            keyless_pvk,
+            keyless_configuration,
             gas_feature_version,
             gas_params,
             storage_gas_params,

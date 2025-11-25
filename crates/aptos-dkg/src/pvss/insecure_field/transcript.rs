@@ -3,12 +3,12 @@
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
-    pvss,
     pvss::{
-        das, encryption_dlog, traits,
-        traits::{transcript::MalleableTranscript, Convert},
+        self, das, encryption_dlog,
+        traits::{self, transcript::MalleableTranscript, Convert},
         Player, ThresholdConfigBlstrs,
     },
+    traits::transcript::Aggregatable,
     utils::{
         random::{insecure_random_g2_points, random_scalars},
         HasMultiExp,
@@ -82,6 +82,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         _aux: &A,
@@ -156,21 +157,6 @@ impl traits::Transcript for Transcript {
         self.dealers.clone()
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) {
-        debug_assert_eq!(self.C.len(), sc.n);
-        debug_assert_eq!(self.V.len(), sc.n + 1);
-
-        for i in 0..sc.n {
-            self.C[i] += other.C[i];
-            self.V[i] += other.V[i];
-        }
-        self.V[sc.n] += other.V[sc.n];
-        self.dealers.extend_from_slice(other.dealers.as_slice());
-
-        debug_assert_eq!(self.C.len(), other.C.len());
-        debug_assert_eq!(self.V.len(), other.V.len());
-    }
-
     fn get_public_key_share(
         &self,
         _sc: &Self::SecretSharingConfig,
@@ -207,6 +193,29 @@ impl traits::Transcript for Transcript {
             V: insecure_random_g2_points(sc.n + 1, rng),
             C: random_scalars(sc.n, rng),
         }
+    }
+}
+
+impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
+    fn aggregate_with(
+        &mut self,
+        sc: &ThresholdConfigBlstrs,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
+        debug_assert_eq!(self.C.len(), sc.n);
+        debug_assert_eq!(self.V.len(), sc.n + 1);
+
+        for i in 0..sc.n {
+            self.C[i] += other.C[i];
+            self.V[i] += other.V[i];
+        }
+        self.V[sc.n] += other.V[sc.n];
+        self.dealers.extend_from_slice(other.dealers.as_slice());
+
+        debug_assert_eq!(self.C.len(), other.C.len());
+        debug_assert_eq!(self.V.len(), other.V.len());
+
+        Ok(())
     }
 }
 

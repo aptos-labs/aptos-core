@@ -16,8 +16,8 @@ use crate::{
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::{LayoutConverter, LayoutWithDelayedFields},
     },
-    LayoutCache, LayoutCacheEntry, Module, ModuleStorage, RuntimeEnvironment,
-    WithRuntimeEnvironment,
+    Function, FunctionDefinitionLoader, LayoutCache, LayoutCacheEntry, LoadedFunction,
+    LoadedFunctionOwner, Module, ModuleStorage, RuntimeEnvironment, WithRuntimeEnvironment,
 };
 use ambassador::delegate_to_methods;
 use bytes::Bytes;
@@ -35,17 +35,18 @@ use move_core_types::{
 };
 use move_vm_types::{
     gas::{ambassador_impl_DependencyGasMeter, DependencyGasMeter, DependencyKind, NativeGasMeter},
-    loaded_data::runtime_types::Type,
+    loaded_data::runtime_types::{Type, TypeParamMap},
     natives::function::NativeResult,
     values::{AbstractFunction, Value},
 };
 use std::{
     collections::{HashMap, VecDeque},
+    rc::Rc,
     sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
 
-pub type UnboxedNativeFunction = dyn Fn(&mut NativeContext, Vec<Type>, VecDeque<Value>) -> PartialVMResult<NativeResult>
+pub type UnboxedNativeFunction = dyn for<'a> Fn(&mut NativeContext, &'a [Type], VecDeque<Value>) -> PartialVMResult<NativeResult>
     + Send
     + Sync
     + 'static;
@@ -279,6 +280,15 @@ pub struct LoaderContext<'a, 'b> {
     traversal_context: &'a mut TraversalContext<'b>,
 }
 
+/// Error returned by `LoaderContext::resolve_function`
+pub enum FunctionResolutionError {
+    Reserved = 0x0,
+    FunctionNotFound = 0x1,
+    FunctionNotAccessible = 0x2,
+    FunctionIncompatibleType = 0x3,
+    FunctionNotInstantiated = 0x4,
+}
+
 impl<'a, 'b> LoaderContext<'a, 'b> {
     /// Returns a vector of layouts for captured arguments. Used to format captured arguments as
     /// strings. Returns [Ok(None)] in case layouts contain delayed fields (i.e., the values cannot
@@ -344,6 +354,99 @@ impl<'a, 'b> LoaderContext<'a, 'b> {
                 false,
             )
         })
+    }
+
+    /// Resolves a function by module id and function id, with expected function type,
+    /// and return an abstract function which can be used to construct a closure value. This
+    /// invokes the configured loader and handles gas metering.
+    ///
+    /// If the function exists and is public, its type will be matched against the expected
+    /// type. Any type arguments will be instantiated in course of matching. Eventually,
+    /// this function guarantees that the return value has indeed the expected type, including
+    /// constraints on type parameters.
+    pub fn resolve_function(
+        &mut self,
+        module_id: &ModuleId,
+        fun_id: &IdentStr,
+        expected_ty: &Type,
+    ) -> PartialVMResult<Result<Box<dyn AbstractFunction>, FunctionResolutionError>> {
+        use FunctionResolutionError::*;
+        dispatch_loader!(&self.module_storage, loader, {
+            match loader.load_function_definition(
+                &mut self.gas_meter,
+                self.traversal_context,
+                module_id,
+                fun_id,
+            ) {
+                Ok((module, function)) => self.verify_function(module, function, expected_ty),
+                Err(e)
+                    if e.major_status() == StatusCode::FUNCTION_RESOLUTION_FAILURE
+                        || e.major_status() == StatusCode::LINKER_ERROR =>
+                {
+                    Ok(Err(FunctionNotFound))
+                },
+                Err(e) => Err(e.to_partial()),
+            }
+        })
+    }
+
+    fn verify_function(
+        &mut self,
+        module: Arc<Module>,
+        func: Arc<Function>,
+        expected_ty: &Type,
+    ) -> PartialVMResult<Result<Box<dyn AbstractFunction>, FunctionResolutionError>> {
+        use FunctionResolutionError::*;
+        if !func.is_public() {
+            return Ok(Err(FunctionNotAccessible));
+        }
+        let Type::Function {
+            args,
+            results,
+            // Since resolved functions must be public, they always have all possible
+            // abilities (store, copy, and drop), and we don't need to check with
+            // expected abilities.
+            abilities: _,
+        } = expected_ty
+        else {
+            return Ok(Err(FunctionIncompatibleType));
+        };
+        let func_ref = func.as_ref();
+
+        // Match types, inferring instantiation of function in `subst`.
+        let mut subst = TypeParamMap::default();
+        if !subst.match_tys(func_ref.param_tys.iter(), args.iter())
+            || !subst.match_tys(func_ref.return_tys.iter(), results.iter())
+        {
+            return Ok(Err(FunctionIncompatibleType));
+        }
+
+        // Construct the type arguments from the match.
+        let ty_args = match subst.verify_and_extract_type_args(func_ref.ty_param_abilities()) {
+            Ok(ty_args) => ty_args,
+            Err(err) => match err.major_status() {
+                StatusCode::NUMBER_OF_TYPE_ARGUMENTS_MISMATCH => {
+                    return Ok(Err(FunctionNotInstantiated));
+                },
+                StatusCode::CONSTRAINT_NOT_SATISFIED => {
+                    return Ok(Err(FunctionIncompatibleType));
+                },
+                _ => return Err(err),
+            },
+        };
+
+        // Construct result.
+        let env = self.module_storage.runtime_environment();
+        let ty_args_id = env.ty_pool().intern_ty_args(&ty_args);
+        let loaded_fun = Rc::new(LoadedFunction {
+            owner: LoadedFunctionOwner::Module(module),
+            ty_args,
+            ty_args_id,
+            function: func,
+        });
+        Ok(Ok(Box::new(
+            LazyLoadedFunction::new_resolved_not_capturing(env, loaded_fun)?,
+        )))
     }
 }
 

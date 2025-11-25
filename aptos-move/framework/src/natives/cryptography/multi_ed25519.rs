@@ -29,10 +29,10 @@ use std::{collections::VecDeque, convert::TryFrom};
 /// See `public_key_validate_v2_internal` comments in `multi_ed25519.move`.
 fn native_public_key_validate_v2(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    safely_assert_eq!(_ty_args.len(), 0);
+    safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(arguments.len(), 1);
 
     let pks_bytes = safely_pop_arg!(arguments, Vec<u8>);
@@ -58,10 +58,10 @@ fn native_public_key_validate_v2(
 
 fn native_public_key_validate_with_gas_fix(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    safely_assert_eq!(_ty_args.len(), 0);
+    safely_assert_eq!(ty_args.len(), 0);
     safely_assert_eq!(arguments.len(), 1);
 
     let pks_bytes = safely_pop_arg!(arguments, Vec<u8>);
@@ -115,10 +115,10 @@ fn num_valid_subpks(
 
 fn native_signature_verify_strict(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(arguments.len() == 3);
 
     let msg = safely_pop_arg!(arguments, Vec<u8>);
@@ -160,7 +160,7 @@ fn native_signature_verify_strict(
 #[cfg(feature = "testing")]
 fn native_generate_keys(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let n = safely_pop_arg!(arguments, u8);
@@ -187,7 +187,7 @@ fn native_generate_keys(
 #[cfg(feature = "testing")]
 fn native_sign(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let message = safely_pop_arg!(arguments, Vec<u8>);

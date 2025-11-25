@@ -30,7 +30,7 @@ pub struct PrintGasParameters {
 fn native_print(
     gas_params: &PrintGasParameters,
     _context: &mut NativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
     _move_std_addr: AccountAddress,
 ) -> PartialVMResult<NativeResult> {
@@ -38,7 +38,7 @@ fn native_print(
     debug_assert!(args.len() == 1);
 
     let _val = args.pop_back().unwrap();
-    let _ty = ty_args.pop().unwrap();
+    let _ty = &ty_args[0];
 
     // No-op if the feature flag is not present.
     #[cfg(feature = "testing")]
@@ -93,7 +93,7 @@ pub struct PrintStackTraceGasParameters {
 fn native_print_stack_trace(
     gas_params: &PrintStackTraceGasParameters,
     context: &mut NativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.is_empty());
@@ -255,7 +255,7 @@ mod testing {
         context: &mut NativeContext,
         out: &mut String,
         val: Value,
-        ty: Type,
+        ty: &Type,
         move_std_addr: &AccountAddress,
         depth: usize,
         canonicalize: bool,
@@ -266,13 +266,13 @@ mod testing {
         // this debug implementation is
         //  1. Not used in production, instead debug implementation from 0x1::string_utils is used.
         //  2. Not called in block-execution context where delayed fields are relevant.
-        let ty_layout = context.type_to_type_layout_check_no_delayed_fields(&ty)?;
+        let ty_layout = context.type_to_type_layout_check_no_delayed_fields(ty)?;
 
         match ty_layout.as_ref() {
             MoveTypeLayout::Vector(_) => {
                 // Get the inner type T of a vector<T>. Again, we should not see any delayed fields
                 // in the debug context.
-                let inner_ty = get_vector_inner_type(&ty)?;
+                let inner_ty = get_vector_inner_type(ty)?;
                 let inner_tyl = context.type_to_type_layout_check_no_delayed_fields(inner_ty)?;
 
                 match inner_tyl.as_ref() {
@@ -298,7 +298,7 @@ mod testing {
                                     context,
                                     out,
                                     val,
-                                    inner_ty.clone(),
+                                    inner_ty,
                                     move_std_addr,
                                     depth,
                                     canonicalize,
@@ -345,7 +345,7 @@ mod testing {
                     },
                 };
 
-                let annotated_struct_layout = get_annotated_struct_layout(context, &ty)?;
+                let annotated_struct_layout = get_annotated_struct_layout(context, ty)?;
                 let decorated_struct = move_struct.decorate(&annotated_struct_layout);
 
                 print_move_value(

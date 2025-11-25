@@ -9,7 +9,6 @@ use crate::{
     execution_tracing::TraceRecorder,
     frame::Frame,
     frame_type_cache::{FrameTypeCache, PerInstructionCache},
-    instr::Instruction,
     interpreter_caches::InterpreterFunctionCaches,
     loader::LazyLoadedFunction,
     module_traversal::TraversalContext,
@@ -43,9 +42,11 @@ use move_core_types::{
         sub_status::unknown_invariant_violation::EPARANOID_FAILURE, StatusCode, StatusType,
     },
 };
+use move_vm_profiler::{FnGuard, Profiler, VM_PROFILER};
 use move_vm_types::{
     debug_write, debug_writeln,
     gas::{GasMeter, SimpleInstruction},
+    instr::Instruction,
     loaded_data::{runtime_access_specifier::AccessInstance, runtime_types::Type},
     natives::function::NativeResult,
     ty_interner::InternedTypePool,
@@ -343,6 +344,8 @@ where
         function: Rc<LoadedFunction>,
         args: Vec<Value>,
     ) -> VMResult<Vec<Value>> {
+        let fn_guard = VM_PROFILER.function_start(function.as_ref());
+
         let num_locals = function.local_tys().len();
         let mut locals = Locals::new(num_locals);
         for (i, value) in args.into_iter().enumerate() {
@@ -368,8 +371,10 @@ where
             CallType::Regular,
             self.vm_config,
             function,
+            Some(fn_guard),
             locals,
             frame_cache,
+            &self.operand_stack,
         )
         .map_err(|err| self.set_location(err))?;
 
@@ -397,6 +402,15 @@ where
                     gas_meter
                         .charge_drop_frame(non_ref_vals.iter())
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    let actual_stack_size = self.operand_stack.value.len();
+                    let expected_stack_size = current_frame.function.return_tys().len()
+                        + current_frame.caller_value_stack_size as usize;
+                    if actual_stack_size != expected_stack_size {
+                        let err = current_frame
+                            .stack_size_mismatch_error(expected_stack_size, actual_stack_size);
+                        return Err(set_err_info!(current_frame, err));
+                    }
 
                     self.call_stack
                         .type_check_return::<RTTCheck>(&mut self.operand_stack, &mut current_frame)
@@ -467,6 +481,8 @@ where
                         (function, frame_cache)
                     };
 
+                    let fn_guard = VM_PROFILER.function_start(function.as_ref());
+
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
                         &function,
@@ -509,6 +525,7 @@ where
                         &mut current_frame,
                         gas_meter,
                         function,
+                        fn_guard,
                         CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
@@ -561,6 +578,8 @@ where
                         (function, frame_cache)
                     };
 
+                    let fn_guard = VM_PROFILER.function_start(function.as_ref());
+
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
                         &function,
@@ -611,6 +630,7 @@ where
                         &mut current_frame,
                         gas_meter,
                         function,
+                        fn_guard,
                         CallType::Regular,
                         frame_cache,
                         ClosureMask::empty(),
@@ -625,6 +645,7 @@ where
                         .pop_as::<Closure>()
                         .map_err(|e| set_err_info!(current_frame, e))?
                         .unpack();
+
                     let lazy_function = LazyLoadedFunction::expect_this_impl(fun.as_ref())
                         .map_err(|e| set_err_info!(current_frame, e))?;
                     let mask = lazy_function.closure_mask();
@@ -650,6 +671,8 @@ where
                     let callee = lazy_function
                         .as_resolved(self.loader, gas_meter, traversal_context)
                         .map_err(|e| set_err_info!(current_frame, e))?;
+
+                    let fn_guard = VM_PROFILER.function_start(callee.as_ref());
 
                     RTTCheck::check_call_visibility(
                         &current_frame.function,
@@ -711,6 +734,7 @@ where
                             &mut current_frame,
                             gas_meter,
                             callee,
+                            fn_guard,
                             CallType::ClosureDynamicDispatch,
                             // Make sure the frame cache is empty for the new call.
                             frame_cache,
@@ -746,16 +770,32 @@ impl CallStack {
         let callee_has_rt_checks =
             RTTCheck::should_perform_checks(&current_frame.function.function);
         if callee_has_rt_checks {
+            let num_return_tys = current_frame.function.return_tys().len();
+            let actual_type_stack_size = operand_stack.types.len();
+            let expected_type_stack_size =
+                num_return_tys + current_frame.caller_type_stack_size as usize;
+            if actual_type_stack_size != expected_type_stack_size {
+                return Err(current_frame
+                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+            }
             self.check_return_tys::<RTTCheck>(operand_stack, current_frame)?;
             if !caller_has_rt_checks {
                 // The callee has pushed return types, but they aren't used by
                 // the caller, so need to be removed.
-                operand_stack.remove_tys(current_frame.function.return_tys().len())?;
+                operand_stack.remove_tys(num_return_tys)?;
             }
         } else if caller_has_rt_checks {
-            // We are not runtime checking this function, but in the caller,
-            // so we must push the return types of the function onto the type stack,
-            // following the runtime type checking protocol.
+            // We are not runtime checking this function, but in the caller, so we must push the
+            // return types of the function onto the type stack, following the runtime type
+            // checking protocol. Also, we should check that the type stack is balanced: if callee
+            // has no runtime checks, type stack should be at the same state.
+            let actual_type_stack_size = operand_stack.types.len();
+            let expected_type_stack_size = current_frame.caller_type_stack_size as usize;
+            if actual_type_stack_size != expected_type_stack_size {
+                return Err(current_frame
+                    .stack_size_mismatch_error(expected_type_stack_size, actual_type_stack_size));
+            }
+
             let ty_args = current_frame.function.ty_args();
             if ty_args.is_empty() {
                 for ret_ty in current_frame.function.return_tys() {
@@ -781,17 +821,6 @@ impl CallStack {
         current_frame: &mut Frame,
     ) -> PartialVMResult<()> {
         let expected_ret_tys = current_frame.function.return_tys();
-        if !RTTCheck::is_partial_checker()
-            && self.0.is_empty()
-            && operand_stack.types.len() != expected_ret_tys.len()
-        {
-            // If we have full stack available and this is the outermost call on the stack, the
-            // type stack must contain exactly the expected number of returns.
-            return Err(PartialVMError::new_invariant_violation(
-                "unbalanced stack at end of execution",
-            )
-            .with_sub_status(EPARANOID_FAILURE));
-        }
         if expected_ret_tys.is_empty() {
             return Ok(());
         }
@@ -822,6 +851,7 @@ where
         current_frame: &mut Frame,
         gas_meter: &mut impl GasMeter,
         function: Rc<LoadedFunction>,
+        fn_guard: FnGuard,
         call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
@@ -840,6 +870,7 @@ where
                 current_frame,
                 gas_meter,
                 function,
+                fn_guard,
                 call_type,
                 frame_cache,
                 mask,
@@ -875,6 +906,7 @@ where
         current_frame: &Frame,
         gas_meter: &mut impl GasMeter,
         function: Rc<LoadedFunction>,
+        fn_guard: FnGuard,
         call_type: CallType,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
@@ -922,8 +954,10 @@ where
             call_type,
             self.vm_config,
             function,
+            Some(fn_guard),
             locals,
             frame_cache,
+            &self.operand_stack,
         )
     }
 
@@ -1037,7 +1071,7 @@ where
             gas_meter,
             traversal_context,
         );
-        let result = native_function(&mut native_context, ty_args.to_vec(), args)?;
+        let result = native_function(&mut native_context, ty_args, args)?;
 
         // Note(Gas): The order by which gas is charged / error gets returned MUST NOT be modified
         //            here or otherwise it becomes an incompatible change!!!
@@ -1117,6 +1151,9 @@ where
                     ty_args_id,
                 )?;
 
+                // Note: the profiler begins measuring at this point, so it captures only execution time, not loading time.
+                let fn_guard = VM_PROFILER.function_start(&target_func);
+
                 RTTCheck::check_call_visibility(
                     function,
                     &target_func,
@@ -1157,6 +1194,7 @@ where
                     current_frame,
                     gas_meter,
                     Rc::new(target_func),
+                    fn_guard,
                     CallType::NativeDynamicDispatch,
                     frame_cache,
                     ClosureMask::empty(),
@@ -1686,7 +1724,7 @@ pub(crate) const ACCESS_STACK_SIZE_LIMIT: usize = 256;
 
 /// The operand and runtime-type stacks.
 pub(crate) struct Stack {
-    value: Vec<Value>,
+    pub(crate) value: Vec<Value>,
     pub(crate) types: Vec<Type>,
 }
 
@@ -1826,18 +1864,6 @@ impl Stack {
         let len = self.types.len();
         Ok(&self.types[(len - n)..])
     }
-
-    #[cfg_attr(feature = "force-inline", inline(always))]
-    pub(crate) fn check_balance(&self) -> PartialVMResult<()> {
-        if self.types.len() != self.value.len() {
-            return Err(
-                PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
-                    "Paranoid Mode: Type and value stack need to be balanced".to_string(),
-                ),
-            );
-        }
-        Ok(())
-    }
 }
 
 /// A call stack.
@@ -1949,6 +1975,8 @@ impl Frame {
                     )
                 });
 
+                let _guard = VM_PROFILER.instruction_start(instruction);
+
                 // Paranoid Mode: Perform the type stack transition check to make sure all type safety requirements has been met.
                 //
                 // We will run the checks for only the control flow instructions and StLoc here. The majority of checks will be
@@ -1957,10 +1985,6 @@ impl Frame {
                 // The reason for this design is we charge gas during instruction execution and we want to perform checks only after
                 // proper gas has been charged for each instruction.
 
-                RTTCheck::check_operand_stack_balance(
-                    &self.function.function,
-                    &interpreter.operand_stack,
-                )?;
                 RTTCheck::pre_execution_type_stack_transition(
                     self,
                     &mut interpreter.operand_stack,
@@ -2914,10 +2938,6 @@ impl Frame {
                     instruction,
                     frame_cache,
                 )?;
-                RTTCheck::check_operand_stack_balance(
-                    &self.function.function,
-                    &interpreter.operand_stack,
-                )?;
                 RTRCheck::post_execution_transition(
                     self,
                     instruction,
@@ -2927,18 +2947,10 @@ impl Frame {
                 // invariant: advance to pc +1 is iff instruction at pc executed without aborting
                 self.pc += 1;
             }
-            // ok we are out, it's a branch, check the pc for good luck
-            // TODO: re-work the logic here. Tests should have a more
-            // natural way to plug in
+
+            // If out of the loop - it was a branch.
             if self.pc as usize >= code.len() {
-                if cfg!(test) {
-                    // In order to test the behavior of an instruction stream, hitting end of the
-                    // code should report no error so that we can check the
-                    // locals.
-                    return Ok(ExitCode::Return);
-                } else {
-                    return Err(PartialVMError::new(StatusCode::PC_OVERFLOW));
-                }
+                return Err(PartialVMError::new(StatusCode::PC_OVERFLOW));
             }
         }
     }
@@ -2948,5 +2960,16 @@ impl Frame {
             None => Location::Script,
             Some(id) => Location::Module(id.clone()),
         }
+    }
+
+    #[cold]
+    fn stack_size_mismatch_error(&self, expected: usize, actual: usize) -> PartialVMError {
+        let err = PartialVMError::new_invariant_violation(format!(
+            "Stack size mismatch when returning from {}: expected: {}, got: {}",
+            self.function.name_as_pretty_string(),
+            expected,
+            actual
+        ));
+        err.with_sub_status(EPARANOID_FAILURE)
     }
 }

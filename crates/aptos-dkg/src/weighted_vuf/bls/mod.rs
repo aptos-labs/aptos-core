@@ -4,7 +4,7 @@
 use crate::{
     algebra::{lagrange::lagrange_coefficients, polynomials::get_powers_of_tau},
     pvss,
-    pvss::{Player, WeightedConfig},
+    pvss::{Player, WeightedConfigBlstrs},
     utils::{g1_multi_exp, HasMultiExp},
     weighted_vuf::traits::WeightedVUF,
 };
@@ -106,7 +106,7 @@ impl WeightedVUF for BlsWUF {
     }
 
     fn aggregate_shares(
-        wc: &WeightedConfig,
+        wc: &WeightedConfigBlstrs,
         apks_and_proofs: &[(Player, Self::AugmentedPubKeyShare, Self::ProofShare)],
     ) -> Self::Proof {
         // Collect all the evaluation points associated with each player
@@ -142,7 +142,7 @@ impl WeightedVUF for BlsWUF {
 
     // NOTE: This VUF has the same evaluation as its proof.
     fn derive_eval(
-        _wc: &WeightedConfig,
+        _wc: &WeightedConfigBlstrs,
         _pp: &Self::PublicParameters,
         _msg: &[u8],
         _apks: &[Option<Self::AugmentedPubKeyShare>],

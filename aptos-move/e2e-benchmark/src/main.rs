@@ -17,7 +17,7 @@ use aptos_vm_environment::prod_configs::set_layout_caches;
 use clap::Parser;
 use rand::{rngs::StdRng, SeedableRng};
 use serde_json::json;
-use std::{collections::HashMap, fs, process::exit};
+use std::{collections::HashMap, process::exit};
 
 // bump after a bigger test or perf change, so you can easily distinguish runs
 // that are on top of this commit
@@ -95,9 +95,7 @@ struct CalibrationInfo {
 }
 
 fn get_parsed_calibration_values() -> HashMap<String, CalibrationInfo> {
-    let calibration_values =
-        fs::read_to_string("aptos-move/e2e-benchmark/data/calibration_values.tsv")
-            .expect("Unable to read file");
+    let calibration_values = include_str!("../data/calibration_values.tsv");
     calibration_values
         .trim()
         .split('\n')

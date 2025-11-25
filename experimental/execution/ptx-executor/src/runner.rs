@@ -238,7 +238,7 @@ impl<'scope, 'view: 'scope, BaseView: StateView + Sync> Worker<'view, BaseView> 
         let env = AptosEnvironment::new(&self.base_view);
         let vm = {
             let _timer = PER_WORKER_TIMER.timer_with(&[&idx, "vm_init"]);
-            AptosVM::new(&env, &self.base_view)
+            AptosVM::new(&env)
         };
 
         loop {

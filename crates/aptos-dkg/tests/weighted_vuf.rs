@@ -11,7 +11,7 @@ use aptos_dkg::{
         test_utils,
         test_utils::{DealingArgs, NoAux},
         traits::Transcript,
-        Player, WeightedConfig,
+        Player, WeightedConfigBlstrs,
     },
     weighted_vuf::{pinkas::PinkasWUF, traits::WeightedVUF},
 };
@@ -26,7 +26,7 @@ fn test_wvuf_basic_viability() {
 }
 
 fn weighted_wvuf_bvt<
-    T: Transcript<SecretSharingConfig = WeightedConfig>,
+    T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
         PubKey = T::DealtPubKey,
@@ -52,10 +52,10 @@ where
     );
 }
 
-fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
+fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>>(
     rng: &mut StdRng,
-) -> (WeightedConfig, DealingArgs<T>, T) {
-    let wc = WeightedConfig::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
+) -> (WeightedConfigBlstrs, DealingArgs<T>, T) {
+    let wc = WeightedConfigBlstrs::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
 
     let d = test_utils::setup_dealing::<T, StdRng>(&wc, rng);
 
@@ -63,6 +63,7 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
         &wc,
         &d.pp,
         &d.ssks[0],
+        &d.spks[0],
         &d.eks,
         &d.s,
         &NoAux,
@@ -83,7 +84,7 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
 ///
 /// `T` is a (non-weighted) `pvss::traits::Transcript` type.
 fn wvuf_randomly_aggregate_verify_and_derive_eval<
-    T: Transcript<SecretSharingConfig = WeightedConfig>,
+    T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
         PubKey = T::DealtPubKey,
@@ -92,7 +93,7 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     sk: &T::DealtSecretKey,
     pk: &T::DealtPubKey,
     dks: &Vec<T::DecryptPrivKey>,

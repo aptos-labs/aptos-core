@@ -3,7 +3,8 @@
 
 use super::{
     common::{
-        submit_transaction, ApiConnectionConfig, GasUnitPriceManager, TransactionSubmissionConfig,
+        submit_transaction, ApiConnectionConfig, AssetConfig, GasUnitPriceManager,
+        TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
     },
     FunderHealthMessage, FunderTrait,
 };
@@ -46,12 +47,21 @@ pub struct TransferFunderConfig {
 
     /// The amount of coins to fund the receiver account.
     pub amount_to_fund: AmountToFund,
+
+    /// The assets to transfer.
+    pub assets: HashMap<String, AssetConfig>,
 }
 
 impl TransferFunderConfig {
     pub async fn build_funder(&self) -> Result<TransferFunder> {
         // Read in private key.
-        let key = self.api_connection_config.get_key()?;
+        let apt_asset_config = self.assets.get(DEFAULT_ASSET_NAME).ok_or_else(|| {
+            anyhow::anyhow!(
+                "TransferFunder requires an '{}' asset configuration. Please add it to the assets map.",
+                DEFAULT_ASSET_NAME
+            )
+        })?;
+        let key = apt_asset_config.get_key()?;
 
         // Build account address from private key.
         let account_address = account_address_from_private_key(&key);
@@ -106,8 +116,9 @@ pub struct TransferFunder {
     gas_unit_price_override: Option<u64>,
 
     /// When recovering from being overloaded, this struct ensures we handle
-    /// requests in the order they came in.
-    outstanding_requests: RwLock<Vec<(AccountAddress, u64)>>,
+    /// requests in the order they came in. TransferFunder uses DEFAULT_ASSET_NAME for all requests
+    /// since it only handles a single asset. The queue format is Vec<(AccountAddress, u64)>.
+    outstanding_requests: RwLock<HashMap<String, Vec<(AccountAddress, u64)>>>,
 
     /// Amount of time we'll wait for the seqnum to catch up before resetting it.
     wait_for_outstanding_txns_secs: u64,
@@ -147,7 +158,7 @@ impl TransferFunder {
             amount_to_fund,
             gas_unit_price_manager,
             gas_unit_price_override,
-            outstanding_requests: RwLock::new(vec![]),
+            outstanding_requests: RwLock::new(HashMap::new()),
             wait_for_outstanding_txns_secs,
             wait_for_transactions,
         }
@@ -253,6 +264,7 @@ impl FunderTrait for TransferFunder {
         &self,
         amount: Option<u64>,
         receiver_address: AccountAddress,
+        _asset: Option<String>,
         check_only: bool,
         did_bypass_checkers: bool,
     ) -> Result<Vec<SignedTransaction>, AptosTapError> {
@@ -268,6 +280,7 @@ impl FunderTrait for TransferFunder {
         let amount = self.get_amount(amount, did_bypass_checkers);
 
         // Update the sequence numbers of the accounts.
+        // TransferFunder always uses DEFAULT_ASSET_NAME since it only handles a single asset.
         let (_funder_seq_num, receiver_seq_num) = update_sequence_numbers(
             &client,
             &self.faucet_account,
@@ -275,6 +288,7 @@ impl FunderTrait for TransferFunder {
             receiver_address,
             amount,
             self.wait_for_outstanding_txns_secs,
+            DEFAULT_ASSET_NAME,
         )
         .await?;
 

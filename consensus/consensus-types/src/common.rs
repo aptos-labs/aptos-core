@@ -4,7 +4,7 @@
 
 use crate::{
     payload::{OptBatches, OptQuorumStorePayload, PayloadExecutionLimit, TxnAndGasLimits},
-    proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
+    proof_of_store::{BatchInfo, BatchInfoExt, ProofCache, ProofOfStore, TBatchInfo},
 };
 use anyhow::ensure;
 use aptos_crypto::{
@@ -518,13 +518,13 @@ impl Payload {
     fn verify_with_cache(
         proofs: &[ProofOfStore<BatchInfo>],
         validator: &ValidatorVerifier,
-        proof_cache: &ProofCache<BatchInfo>,
+        proof_cache: &ProofCache,
     ) -> anyhow::Result<()> {
         let unverified: Vec<_> = proofs
             .iter()
             .filter(|proof| {
                 proof_cache
-                    .get(proof.info())
+                    .get(&BatchInfoExt::from(proof.info().clone()))
                     .is_none_or(|cached_proof| cached_proof != *proof.multi_signature())
             })
             .collect();
@@ -571,7 +571,7 @@ impl Payload {
     pub fn verify(
         &self,
         verifier: &ValidatorVerifier,
-        proof_cache: &ProofCache<BatchInfo>,
+        proof_cache: &ProofCache,
         quorum_store_enabled: bool,
     ) -> anyhow::Result<()> {
         match (quorum_store_enabled, self) {
@@ -741,7 +741,7 @@ impl BatchPayload {
 #[derive(Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum PayloadFilter {
     DirectMempool(Vec<TransactionSummary>),
-    InQuorumStore(HashSet<BatchInfo>),
+    InQuorumStore(HashSet<BatchInfoExt>),
     Empty,
 }
 
@@ -772,21 +772,21 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                 match payload {
                     Payload::InQuorumStore(proof_with_status) => {
                         for proof in &proof_with_status.proofs {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone().into());
                         }
                     },
                     Payload::InQuorumStoreWithLimit(proof_with_status) => {
                         for proof in &proof_with_status.proof_with_data.proofs {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone().into());
                         }
                     },
                     Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
                     | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                         for proof in &proof_with_data.proofs {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone().into());
                         }
                         for (batch_info, _) in inline_batches {
-                            exclude_batches.insert(batch_info.clone());
+                            exclude_batches.insert(batch_info.clone().into());
                         }
                     },
                     Payload::DirectMempool(_) => {
@@ -794,13 +794,13 @@ impl From<&Vec<&Payload>> for PayloadFilter {
                     },
                     Payload::OptQuorumStore(opt_qs_payload) => {
                         for batch in opt_qs_payload.inline_batches().iter() {
-                            exclude_batches.insert(batch.info().clone());
+                            exclude_batches.insert(batch.info().clone().into());
                         }
                         for batch_info in &opt_qs_payload.opt_batches().batch_summary {
-                            exclude_batches.insert(batch_info.clone());
+                            exclude_batches.insert(batch_info.clone().into());
                         }
                         for proof in &opt_qs_payload.proof_with_data().batch_summary {
-                            exclude_batches.insert(proof.info().clone());
+                            exclude_batches.insert(proof.info().clone().into());
                         }
                     },
                 }

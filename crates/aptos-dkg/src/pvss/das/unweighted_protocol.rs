@@ -10,6 +10,7 @@ use crate::{
         traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
+    traits::transcript::Aggregatable,
     utils::{
         g1_multi_exp, g2_multi_exp,
         random::{
@@ -102,6 +103,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         aux: &A,
@@ -246,27 +248,6 @@ impl traits::Transcript for Transcript {
             .collect::<Vec<Player>>()
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) {
-        debug_assert_eq!(self.C.len(), sc.n);
-        debug_assert_eq!(self.V.len(), sc.n + 1);
-
-        self.hat_w += other.hat_w;
-        self.C_0 += other.C_0;
-
-        for i in 0..sc.n {
-            self.C[i] += other.C[i];
-            self.V[i] += other.V[i];
-        }
-        self.V[sc.n] += other.V[sc.n];
-
-        for sok in &other.soks {
-            self.soks.push(sok.clone());
-        }
-
-        debug_assert_eq!(self.C.len(), other.C.len());
-        debug_assert_eq!(self.V.len(), other.V.len());
-    }
-
     fn get_public_key_share(
         &self,
         _sc: &Self::SecretSharingConfig,
@@ -324,6 +305,35 @@ impl traits::Transcript for Transcript {
             C: insecure_random_g1_points(sc.n, rng),
             C_0: random_g1_point(rng),
         }
+    }
+}
+
+impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
+    fn aggregate_with(
+        &mut self,
+        sc: &ThresholdConfigBlstrs,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
+        debug_assert_eq!(self.C.len(), sc.n);
+        debug_assert_eq!(self.V.len(), sc.n + 1);
+
+        self.hat_w += other.hat_w;
+        self.C_0 += other.C_0;
+
+        for i in 0..sc.n {
+            self.C[i] += other.C[i];
+            self.V[i] += other.V[i];
+        }
+        self.V[sc.n] += other.V[sc.n];
+
+        for sok in &other.soks {
+            self.soks.push(sok.clone());
+        }
+
+        debug_assert_eq!(self.C.len(), other.C.len());
+        debug_assert_eq!(self.V.len(), other.V.len());
+
+        Ok(())
     }
 }
 

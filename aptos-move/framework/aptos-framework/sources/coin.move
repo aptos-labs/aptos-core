@@ -547,6 +547,13 @@ module aptos_framework::coin {
         )
     }
 
+    public(friend) fun get_paired_burn_copy_ref<CoinType>(
+        burn_cap: &BurnCapability<CoinType>
+    ): BurnRef acquires CoinConversionMap, PairedFungibleAssetRefs {
+        let burn_ref = borrow_paired_burn_ref(burn_cap);
+        fungible_asset::generate_burn_copy_ref(burn_ref)
+    }
+
     /// Get the `BurnRef` of paired fungible asset of a coin type from `BurnCapability`.
     public fun get_paired_burn_ref<CoinType>(
         _: &BurnCapability<CoinType>
@@ -1195,12 +1202,20 @@ module aptos_framework::coin {
             spec {
                 use aptos_framework::optional_aggregator;
                 use aptos_framework::aggregator;
-                assume optional_aggregator::is_parallelizable(supply) ==> (aggregator::spec_aggregator_get_val(
-                    option::borrow(supply.aggregator)
-                )
-                    + amount <= aggregator::spec_get_limit(option::borrow(supply.aggregator)));
+                assume optional_aggregator::is_parallelizable(supply) ==>
+                    (
+                        aggregator::spec_aggregator_get_val(
+                            option::borrow(supply.aggregator)
+                        ) + amount
+                            <= aggregator::spec_get_limit(
+                                option::borrow(supply.aggregator)
+                            )
+                    );
                 assume !optional_aggregator::is_parallelizable(supply) ==>
-                    (option::borrow(supply.integer).value + amount <= option::borrow(supply.integer).limit);
+                    (
+                        option::borrow(supply.integer).value + amount
+                            <= option::borrow(supply.integer).limit
+                    );
             };
             optional_aggregator::add(supply, (amount as u128));
         };

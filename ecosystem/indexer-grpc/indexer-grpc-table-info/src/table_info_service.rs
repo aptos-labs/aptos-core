@@ -13,7 +13,6 @@ use aptos_indexer_grpc_fullnode::stream_coordinator::{
 };
 use aptos_indexer_grpc_utils::counters::{log_grpc_step, IndexerGrpcStep};
 use aptos_logger::{debug, error, info, sample, sample::SampleRate};
-use aptos_types::write_set::WriteSet;
 use itertools::Itertools;
 use std::{
     cmp::Ordering as CmpOrdering,
@@ -255,18 +254,22 @@ impl TableInfoService {
             .map(|txn| txn.version)
             .unwrap_or_default();
 
-        // We copy the transactions here in case we need to retry the parsing.
-        let batches: Vec<Vec<TransactionOnChainData>> = transactions
+        let transactions = Arc::new(transactions);
+        for (chunk_idx, batch_size) in transactions
             .chunks(self.parser_batch_size as usize)
-            .map(|chunk| chunk.to_vec())
-            .collect();
+            .enumerate()
+            .map(|(idx, chunk)| (idx, chunk.len()))
+        {
+            let start = chunk_idx * self.parser_batch_size as usize;
+            let end = start + batch_size;
 
-        for batch in batches {
-            let task = tokio::spawn(Self::process_transactions(
-                context.clone(),
-                indexer_async_v2.clone(),
-                batch,
-            ));
+            let transactions = transactions.clone();
+            let context = context.clone();
+            let indexer_async_v2 = indexer_async_v2.clone();
+            let task = tokio::spawn(async move {
+                Self::process_transactions(context, indexer_async_v2, &transactions[start..end])
+                    .await
+            });
             tasks.push(task);
         }
 
@@ -285,7 +288,7 @@ impl TableInfoService {
                     Self::process_transactions(
                         context.clone(),
                         indexer_async_v2.clone(),
-                        transactions,
+                        &transactions,
                     )
                     .await;
                 }
@@ -316,7 +319,7 @@ impl TableInfoService {
     async fn process_transactions(
         context: Arc<ApiContext>,
         indexer_async_v2: Arc<IndexerAsyncV2>,
-        raw_txns: Vec<TransactionOnChainData>,
+        raw_txns: &[TransactionOnChainData],
     ) -> EndVersion {
         let start_time = std::time::Instant::now();
         let start_version = raw_txns[0].version;
@@ -326,11 +329,7 @@ impl TableInfoService {
         loop {
             // NOTE: The retry is unlikely to be helpful. Put a loop here just to avoid panic and
             // allow the rest of FN functionality continue to work.
-            match Self::parse_table_info(
-                context.clone(),
-                raw_txns.clone(),
-                indexer_async_v2.clone(),
-            ) {
+            match Self::parse_table_info(context.clone(), raw_txns, indexer_async_v2.clone()) {
                 Ok(_) => break,
                 Err(e) => {
                     error!(error = ?e, "Error during parse_table_info.");
@@ -393,7 +392,7 @@ impl TableInfoService {
     /// Parse table info from write sets,
     fn parse_table_info(
         context: Arc<ApiContext>,
-        raw_txns: Vec<TransactionOnChainData>,
+        raw_txns: &[TransactionOnChainData],
         indexer_async_v2: Arc<IndexerAsyncV2>,
     ) -> Result<(), Error> {
         if raw_txns.is_empty() {
@@ -402,10 +401,9 @@ impl TableInfoService {
 
         let start_time = std::time::Instant::now();
         let first_version = raw_txns.first().map(|txn| txn.version).unwrap();
-        let write_sets: Vec<WriteSet> = raw_txns.iter().map(|txn| txn.changes.clone()).collect();
-        let write_sets_slice: Vec<&WriteSet> = write_sets.iter().collect();
+        let write_sets = raw_txns.iter().map(|txn| &txn.changes).collect::<Vec<_>>();
         indexer_async_v2
-            .index_table_info(context.db.clone(), first_version, &write_sets_slice)
+            .index_table_info(context.db.clone(), first_version, &write_sets)
             .map_err(|err| anyhow!("[Table Info] Failed to process write sets and index to the table info rocksdb: {}", err))?;
 
         info!(

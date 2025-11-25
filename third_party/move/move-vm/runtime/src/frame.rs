@@ -4,6 +4,7 @@
 use crate::{
     config::VMConfig,
     frame_type_cache::FrameTypeCache,
+    interpreter::Stack,
     loader::{FunctionHandle, LoadedFunctionOwner, StructVariantInfo, VariantFieldInfo},
     module_traversal::TraversalContext,
     reentrancy_checker::CallType,
@@ -26,6 +27,7 @@ use move_core_types::{
     ability::Ability, account_address::AccountAddress, gas_algebra::NumTypeNodes,
     identifier::IdentStr, language_storage::ModuleId, vm_status::StatusCode,
 };
+use move_vm_profiler::FnGuard;
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::{
@@ -56,6 +58,10 @@ pub(crate) struct Frame {
     pub(crate) ty_builder: TypeBuilder,
     // Currently being executed function.
     pub(crate) function: Rc<LoadedFunction>,
+    // Guard used to profile the execution of this function.
+    // Note that this is only stored to keep it alive for the lifetime of the frame.
+    // It is an option so we can pass `None` during the runtime type checks.
+    pub(crate) _guard: Option<FnGuard>,
     // How this frame was established.
     pub(crate) call_type: CallType,
     // Locals for this execution context and their instantiated types.
@@ -64,6 +70,10 @@ pub(crate) struct Frame {
     // Cache of types accessed in this frame, to improve performance when accessing
     // and constructing types.
     pub(crate) frame_cache: Rc<RefCell<FrameTypeCache>>,
+    // Saved value stack size of the caller that created this frame.
+    pub(crate) caller_value_stack_size: u32,
+    // Saved type stack size of the caller that created this frame.
+    pub(crate) caller_type_stack_size: u32,
 }
 
 impl AccessSpecifierEnv for Frame {
@@ -154,8 +164,10 @@ impl Frame {
         call_type: CallType,
         vm_config: &VMConfig,
         function: Rc<LoadedFunction>,
+        guard: Option<FnGuard>,
         locals: Locals,
         frame_cache: Rc<RefCell<FrameTypeCache>>,
+        stack: &Stack,
     ) -> PartialVMResult<Frame> {
         let ty_args = function.ty_args();
 
@@ -213,9 +225,12 @@ impl Frame {
             ty_builder,
             locals,
             function,
+            _guard: guard,
             call_type,
             local_tys,
             frame_cache,
+            caller_value_stack_size: stack.value.len() as u32,
+            caller_type_stack_size: stack.types.len() as u32,
         })
     }
 

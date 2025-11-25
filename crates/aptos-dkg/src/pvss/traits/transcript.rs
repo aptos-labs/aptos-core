@@ -48,11 +48,14 @@
 //! does not hold.
 
 use crate::pvss::{
-    traits::{Convert, HasEncryptionPublicParams, Reconstructable},
+    traits::{Convert, HasEncryptionPublicParams},
     Player,
 };
 use anyhow::bail;
-use aptos_crypto::{SecretSharingConfig, SigningKey, Uniform, ValidCryptoMaterial, VerifyingKey};
+use aptos_crypto::{
+    arkworks::shamir::Reconstructable, SecretSharingConfig, SigningKey, Uniform,
+    ValidCryptoMaterial, VerifyingKey,
+};
 use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
@@ -87,7 +90,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKey: PartialEq
-        + Reconstructable<Self::SecretSharingConfig, Share = Self::DealtSecretKeyShare>;
+        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
     type DealtPubKey;
 
     type InputSecret: Uniform
@@ -126,9 +129,10 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
+        spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
-        aux: &A,
+        session_id: &A,
         dealer: &Player,
         rng: &mut R,
     ) -> Self;
@@ -146,7 +150,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         pp: &Self::PublicParameters,
         spks: &Vec<Self::SigningPubKey>,
         eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>,
+        session_ids: &Vec<A>,
     ) -> anyhow::Result<()>;
 
     /// Returns the set of player IDs who have contributed to this transcript.
@@ -154,28 +158,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     /// the set is of size 1, or the transcript could have been obtained by aggregating `n`
     /// other transcripts, in which case the set will be of size `n`.
     fn get_dealers(&self) -> Vec<Player>;
-
-    /// Aggregates two transcripts.
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Self);
-
-    /// Helper function for aggregating a vector of transcripts
-    fn aggregate(sc: &Self::SecretSharingConfig, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
-        if trxs.is_empty() {
-            bail!("Cannot aggregate empty vector of transcripts")
-        }
-
-        let n = trxs.len();
-        let (first, last) = trxs.split_at_mut(1);
-
-        for other in last {
-            first[0].aggregate_with(sc, other);
-        }
-
-        trxs.truncate(1);
-        let trx = trxs.pop().unwrap();
-        assert_eq!(trx.get_dealers().len(), n);
-        Ok(trx)
-    }
 
     /// Returns the dealt pubkey shore of `player`.
     fn get_public_key_share(
@@ -209,6 +191,48 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         R: rand_core::RngCore + rand_core::CryptoRng;
 }
 
+pub trait Aggregatable<C>: Sized {
+    // Sized was somehow needed for the type alias below
+    /// Aggregates two transcripts using a generic config type.
+    fn aggregate_with(&mut self, sc: &C, other: &Self) -> anyhow::Result<()>;
+
+    /// Helper function for aggregating a vector of transcripts.
+    /// Used primarily for benchmarks and tests.
+    fn aggregate(sc: &C, mut trxs: Vec<Self>) -> anyhow::Result<Self> {
+        if trxs.is_empty() {
+            bail!("Cannot aggregate empty vector of transcripts");
+        }
+
+        let (first, rest) = trxs.split_at_mut(1);
+
+        for other in rest {
+            first[0].aggregate_with(sc, other)?;
+        }
+
+        // `first[0]` has accumulated everything, return it
+        trxs.truncate(1);
+        let trx = trxs.pop().unwrap();
+
+        Ok(trx)
+    }
+}
+
+/// Workaround for the trait alias `AggregatableTranscript = Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>`
+pub trait AggregatableTranscript:
+    Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>
+{
+}
+impl<T> AggregatableTranscript for T where
+    T: Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>
+{
+}
+
+pub trait HasAggregatableSubtranscript<C> {
+    type SubTranscript: Aggregatable<C>;
+
+    fn get_subtranscript(&self) -> Self::SubTranscript;
+}
+
 /// This traits defines testing-only and benchmarking-only interfaces.
 pub trait MalleableTranscript: Transcript {
     /// This is useful for generating many PVSS transcripts from different dealers from a single
@@ -217,7 +241,7 @@ pub trait MalleableTranscript: Transcript {
     fn maul_signature<A: Serialize + Clone>(
         &mut self,
         ssk: &Self::SigningSecretKey,
-        aux: &A,
+        session_id: &A,
         dealer: &Player,
     );
 }
@@ -225,4 +249,7 @@ pub trait MalleableTranscript: Transcript {
 /// This is needed instead of Default because `max_n` influences the public parameters of the DeKARTv2 range proof, and hence the public parameters of `chunky`
 pub trait WithMaxNumShares {
     fn with_max_num_shares(n: usize) -> Self;
+
+    /// This is a modified function which might create public parameters that are fairly nonsensical, but which are sufficient for `generate()`
+    fn with_max_num_shares_for_generate(n: usize) -> Self;
 }

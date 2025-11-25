@@ -74,7 +74,9 @@ async fn test_proof_coordinator_basic() {
     let digest = batch.digest();
 
     for signer in &signers {
-        let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer).unwrap();
+        let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer)
+            .unwrap()
+            .into();
         assert!(proof_coordinator_tx
             .send(ProofCoordinatorCommand::AppendSignature(
                 signer.author(),
@@ -128,7 +130,8 @@ async fn test_proof_coordinator_with_unverified_signatures() {
         for (signer_index, signer) in signers.iter().enumerate() {
             if signer_index > 2 {
                 let signed_batch_info = SignedBatchInfo::new(batch.batch_info().clone(), signer)
-                    .expect("Failed to create SignedBatchInfo");
+                    .expect("Failed to create SignedBatchInfo")
+                    .into();
                 assert!(proof_coordinator_tx
                     .send(ProofCoordinatorCommand::AppendSignature(
                         signer.author(),
@@ -138,7 +141,7 @@ async fn test_proof_coordinator_with_unverified_signatures() {
                     .is_ok())
             } else {
                 let signed_batch_info =
-                    SignedBatchInfo::dummy(batch.batch_info().clone(), signer.author());
+                    SignedBatchInfo::dummy(batch.batch_info().clone().into(), signer.author());
                 assert!(proof_coordinator_tx
                     .send(ProofCoordinatorCommand::AppendSignature(
                         signer.author(),

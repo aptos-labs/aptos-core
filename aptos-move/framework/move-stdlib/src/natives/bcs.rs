@@ -53,17 +53,16 @@ pub fn create_option_u64(enum_option_enabled: bool, value: Option<u64>) -> Value
  *
  **************************************************************************************************/
 /// Rust implementation of Move's `native public fun to_bytes<T>(&T): vector<u8>`
-#[inline]
 fn native_to_bytes(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
     let ref_to_val = safely_pop_arg!(args, Reference);
-    let arg_type = ty_args.pop().unwrap();
+    let arg_type = &ty_args[0];
 
     let layout = if context.get_feature_flags().is_lazy_loading_enabled() {
         // With lazy loading, propagate the error directly. This is because errors here are likely
@@ -76,9 +75,9 @@ fn native_to_bytes(
         //   - Constructing layout runs into dependency limit.
         //   - We cannot do `context.charge(BCS_TO_BYTES_FAILURE)?;` because then we can end up in
         //     the state where out of gas and dependency limit are hit at the same time.
-        context.type_to_type_layout(&arg_type)?
+        context.type_to_type_layout(arg_type)?
     } else {
-        match context.type_to_type_layout(&arg_type) {
+        match context.type_to_type_layout(arg_type) {
             Ok(layout) => layout,
             Err(_) => {
                 context.charge(BCS_TO_BYTES_FAILURE)?;
@@ -125,7 +124,7 @@ fn native_to_bytes(
  **************************************************************************************************/
 fn native_serialized_size(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
@@ -134,9 +133,9 @@ fn native_serialized_size(
     context.charge(BCS_SERIALIZED_SIZE_BASE)?;
 
     let reference = safely_pop_arg!(args, Reference);
-    let ty = ty_args.pop().unwrap();
+    let ty = &ty_args[0];
 
-    let serialized_size = match serialized_size_impl(context, reference, &ty) {
+    let serialized_size = match serialized_size_impl(context, reference, ty) {
         Ok(serialized_size) => serialized_size as u64,
         Err(_) => {
             context.charge(BCS_SERIALIZED_SIZE_FAILURE)?;
@@ -173,15 +172,15 @@ fn serialized_size_impl(
 
 fn native_constant_serialized_size(
     context: &mut SafeNativeContext,
-    mut ty_args: Vec<Type>,
+    ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
 
     context.charge(BCS_CONSTANT_SERIALIZED_SIZE_BASE)?;
 
-    let ty = ty_args.pop().unwrap();
-    let ty_layout = context.type_to_type_layout(&ty)?;
+    let ty = &ty_args[0];
+    let ty_layout = context.type_to_type_layout(ty)?;
 
     let (visited_count, serialized_size_result) = constant_serialized_size(&ty_layout);
     context

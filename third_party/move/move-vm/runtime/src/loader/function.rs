@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    instr::Instruction,
     loader::{access_specifier_loader::load_access_specifier, Module, Script},
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
+    RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use lazy_static::lazy_static;
@@ -26,8 +26,10 @@ use move_core_types::{
     value::MoveTypeLayout,
     vm_status::StatusCode,
 };
+use move_vm_profiler::ProfilerFunction;
 use move_vm_types::{
     gas::DependencyGasMeter,
+    instr::Instruction,
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
@@ -141,6 +143,13 @@ pub struct LoadedFunction {
     pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
     pub function: Arc<Function>,
+}
+
+impl ProfilerFunction for LoadedFunction {
+    #[inline]
+    fn name(&self) -> String {
+        self.name_as_pretty_string()
+    }
 }
 
 impl LoadedFunction {
@@ -295,6 +304,25 @@ impl LazyLoadedFunction {
                 ty_args,
                 mask,
                 captured_layouts,
+            })),
+        })
+    }
+
+    pub(crate) fn new_resolved_not_capturing(
+        runtime_environment: &RuntimeEnvironment,
+        fun: Rc<LoadedFunction>,
+    ) -> PartialVMResult<Self> {
+        let ty_args = fun
+            .ty_args
+            .iter()
+            .map(|t| runtime_environment.ty_to_ty_tag(t))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        Ok(Self {
+            state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
+                fun,
+                ty_args,
+                mask: ClosureMask::empty(),
+                captured_layouts: Some(vec![]),
             })),
         })
     }

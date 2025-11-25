@@ -58,7 +58,6 @@ This module defines the Option type and its methods to represent and handle an o
 
 
 <pre><code><b>use</b> <a href="mem.md#0x1_mem">0x1::mem</a>;
-<b>use</b> <a href="vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 
 

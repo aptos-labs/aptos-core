@@ -13,8 +13,7 @@ This module implements ECDSA signatures based on the prime-order secp256r1 ellpt
 -  [Specification](#@Specification_1)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-</code></pre>
+<pre><code></code></pre>
 
 
 

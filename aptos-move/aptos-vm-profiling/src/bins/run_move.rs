@@ -37,7 +37,7 @@ enum Entrypoint {
 }
 
 fn make_native_create_signer() -> NativeFunction {
-    Arc::new(|_context, ty_args: Vec<Type>, mut args: VecDeque<Value>| {
+    Arc::new(|_context, ty_args: &[Type], mut args: VecDeque<Value>| {
         assert!(ty_args.is_empty());
         assert_eq!(args.len(), 1);
 

@@ -741,6 +741,15 @@ module std::features {
         is_enabled(MONOTONICALLY_INCREASING_COUNTER)
     }
 
+    /// Whether function reflection is enabled.
+    const FUNCTION_REFLECTION: u64 = 105;
+
+    public fun get_function_reflection_feature(): u64 { FUNCTION_REFLECTION }
+
+    public fun is_function_reflection_enabled(): bool acquires Features {
+        is_enabled(FUNCTION_REFLECTION)
+    }
+
     // ============================================================================================
     // Feature Flag Implementation
 

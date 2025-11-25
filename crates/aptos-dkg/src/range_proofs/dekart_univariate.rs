@@ -2,15 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    algebra::{polynomials, GroupGenerators},
-    fiat_shamir,
-    pcs::univariate_kzg,
-    range_proofs::traits,
-    sigma_protocol::homomorphism::Trait,
-    utils, Scalar,
+    algebra::polynomials, fiat_shamir, pcs::univariate_kzg, range_proofs::traits,
+    sigma_protocol::homomorphism::Trait, utils, Scalar,
 };
 use anyhow::ensure;
-use aptos_crypto::arkworks::random::sample_field_element;
+use aptos_crypto::arkworks::{random::sample_field_element, GroupGenerators};
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
     CurveGroup, PrimeGroup, VariableBaseMSM,
@@ -224,12 +220,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ell: usize,
         comm: &Self::Commitment,
         r: &Self::CommitmentRandomness,
-        fs_transcript: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Proof<E>
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
+        let mut fs_transcript = merlin::Transcript::new(Self::DST);
+
         let n = values.len();
         assert!(
             n <= pk.max_n,
@@ -506,7 +503,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             public_statement,
             &bit_commitments,
             c.as_slice().len(),
-            fs_transcript,
+            &mut fs_transcript,
         );
         assert_eq!(ell, betas.len());
         #[cfg(feature = "range_proof_timing")]
@@ -569,8 +566,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         n: usize,
         ell: usize,
         comm: &Self::Commitment,
-        fs_transcript: &mut merlin::Transcript,
     ) -> anyhow::Result<()> {
+        let mut fs_t = merlin::Transcript::new(Self::DST);
+
         assert!(
             ell <= vk.max_ell,
             "ell (got {}) must be ≤ max_ell (which is {})",
@@ -593,7 +591,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             public_statement,
             &bit_commitments,
             self.c.len(),
-            fs_transcript,
+            &mut fs_t,
         );
 
         // Verify h(\tau)

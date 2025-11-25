@@ -4,7 +4,7 @@
 // This file implements the range proof described here: https://alinush.github.io/dekart
 
 use crate::{
-    algebra::{polynomials, GroupGenerators},
+    algebra::polynomials,
     pcs::univariate_hiding_kzg,
     range_proofs::traits,
     sigma_protocol::{self, homomorphism, homomorphism::Trait as _, Trait as _},
@@ -15,6 +15,7 @@ use aptos_crypto::arkworks::{
     random::{
         sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
     },
+    GroupGenerators,
 };
 use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup, VariableBaseMSM};
 use ark_ff::{AdditiveGroup, Field};
@@ -307,12 +308,13 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         ell: usize,
         comm: &Self::Commitment,
         rho: &Self::CommitmentRandomness,
-        fs_t: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Proof<E>
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
+        let mut fs_t = merlin::Transcript::new(Self::DST);
+
         // Step 1a
         let ProverKey {
             vk,
@@ -354,7 +356,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         );
 
         // Step 1b
-        fiat_shamir::append_initial_data(fs_t, Self::DST, vk, PublicStatement {
+        fiat_shamir::append_initial_data(&mut fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
             comm: comm.clone(),
@@ -366,7 +368,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         let hatC = *xi_1 * delta_rho + lagr_g1[0] * r + comm.0;
 
         // Step 2b
-        fiat_shamir::append_hat_f_commitment::<E>(fs_t, &hatC);
+        fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
 
         // Step 3a
         let pi_PoK = two_term_msm::Homomorphism {
@@ -379,12 +381,12 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
                 hiding_kzg_randomness: Scalar(delta_rho),
             },
             &two_term_msm::CodomainShape(hatC - comm.0),
-            fs_t,
+            &Self::DST,
             rng,
         );
 
         // Step 3b
-        fiat_shamir::append_sigma_proof(fs_t, &pi_PoK); // TODO: should be changed to "remainder of sigma proof" since the first message is already in there
+        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
 
         // Step 4a
         let rs: Vec<E::ScalarField> = (0..ell).map(|_| sample_field_element(rng)).collect();
@@ -431,10 +433,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
+        fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
 
         // Step 6
-        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
+        let (beta, betas) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
 
         let hat_f_evals: Vec<E::ScalarField> = {
             let mut v = Vec::with_capacity(num_omegas);
@@ -537,10 +539,10 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             })
             .0;
         // Step 7b
-        fiat_shamir::append_h_commitment::<E>(fs_t, &D);
+        fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
 
         // Step 8
-        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(fs_t, ell);
+        let (mu, mu_h, mus) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
 
         let u_values: Vec<_> = (0..num_omegas)
             .map(|i| {
@@ -555,7 +557,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
             .collect();
 
         // Step 9
-        let gamma = fiat_shamir::get_gamma_challenge::<E>(fs_t, &ck_S.roots_of_unity_in_eval_dom);
+        let gamma =
+            fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &ck_S.roots_of_unity_in_eval_dom);
 
         let a: E::ScalarField = {
             let poly = ark_poly::univariate::DensePolynomial {
@@ -625,8 +628,9 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         n: usize,
         ell: usize,
         comm: &Self::Commitment,
-        fs_t: &mut merlin::Transcript,
     ) -> anyhow::Result<()> {
+        let mut fs_t = merlin::Transcript::new(Self::DST);
+
         // Step 1
         let VerificationKey {
             xi_1,
@@ -654,36 +658,40 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
         } = self;
 
         // Step 2a
-        fiat_shamir::append_initial_data(fs_t, Self::DST, vk, PublicStatement {
+        fiat_shamir::append_initial_data(&mut fs_t, Self::DST, vk, PublicStatement {
             n,
             ell,
             comm: comm.clone(),
         });
 
         // Step 2b
-        fiat_shamir::append_hat_f_commitment::<E>(fs_t, &hatC);
+        fiat_shamir::append_hat_f_commitment::<E>(&mut fs_t, &hatC);
 
         // Step 3
         two_term_msm::Homomorphism {
             base_1: *lagr_0,
             base_2: *xi_1,
         }
-        .verify(&(two_term_msm::CodomainShape(*hatC - comm.0)), pi_PoK, fs_t)?;
+        .verify(
+            &(two_term_msm::CodomainShape(*hatC - comm.0)),
+            pi_PoK,
+            &Self::DST,
+        )?;
 
         // Step 4a
-        fiat_shamir::append_sigma_proof(fs_t, &pi_PoK);
+        fiat_shamir::append_sigma_proof(&mut fs_t, &pi_PoK);
 
         // Step 4b
-        fiat_shamir::append_f_j_commitments::<E>(fs_t, &Cs);
+        fiat_shamir::append_f_j_commitments::<E>(&mut fs_t, &Cs);
 
         // Step 5
-        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(fs_t, ell);
+        let (beta, beta_js) = fiat_shamir::get_beta_challenges::<E>(&mut fs_t, ell);
 
         // Step 6
-        fiat_shamir::append_h_commitment::<E>(fs_t, &D);
+        fiat_shamir::append_h_commitment::<E>(&mut fs_t, &D);
 
         // Step 7
-        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(fs_t, ell);
+        let (mu, mu_h, mu_js) = fiat_shamir::get_mu_challenges::<E>(&mut fs_t, ell);
 
         // Step 8
         let U_bases: Vec<E::G1Affine> = {
@@ -706,7 +714,7 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
 
         // Step 9
         let gamma =
-            fiat_shamir::get_gamma_challenge::<E>(fs_t, &verifier_precomputed.roots_of_unity);
+            fiat_shamir::get_gamma_challenge::<E>(&mut fs_t, &verifier_precomputed.roots_of_unity);
 
         // Step 10
         let a_u = *a * mu

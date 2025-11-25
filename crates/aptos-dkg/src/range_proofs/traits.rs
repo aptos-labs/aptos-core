@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::algebra::GroupGenerators;
-use aptos_crypto::arkworks::random::UniformRand;
+use aptos_crypto::arkworks::{random::UniformRand, GroupGenerators};
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
@@ -50,7 +49,6 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         ell: usize, // TODO: change this to u8?
         comm: &Self::Commitment,
         r: &Self::CommitmentRandomness,
-        fs_transcript: &mut merlin::Transcript,
         rng: &mut R,
     ) -> Self;
 
@@ -60,7 +58,6 @@ pub trait BatchedRangeProof<E: Pairing>: Clone + CanonicalSerialize + CanonicalD
         n: usize,
         ell: usize,
         comm: &Self::Commitment,
-        fs_transcript: &mut merlin::Transcript,
     ) -> anyhow::Result<()>;
 
     fn maul(&mut self);

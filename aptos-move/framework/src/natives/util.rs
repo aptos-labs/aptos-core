@@ -29,7 +29,7 @@ const EFROM_BYTES: u64 = 0x01_0001;
  **************************************************************************************************/
 fn native_from_bytes(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);

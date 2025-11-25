@@ -157,10 +157,7 @@ impl TransactionValidation for PooledVMValidator {
             let vm_validator_locked = vm_validator.lock().unwrap();
 
             use aptos_vm::VMValidator;
-            let vm = AptosVM::new(
-                &vm_validator_locked.state.environment,
-                &vm_validator_locked.state.state_view,
-            );
+            let vm = AptosVM::new(&vm_validator_locked.state.environment);
             vm.validate_transaction(
                 txn,
                 &vm_validator_locked.state.state_view,

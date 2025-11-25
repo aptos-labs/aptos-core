@@ -4,13 +4,13 @@
 
 use crate::{
     package_hooks,
-    resolution::digest::compute_digest,
+    resolution::{digest::compute_digest, git},
     source_package::{
         layout::SourcePackageLayout,
         manifest_parser::{parse_move_manifest_string, parse_source_manifest},
         parsed_manifest::{
             Dependencies, Dependency, FileName, NamedAddress, PackageDigest, PackageName,
-            SourceManifest, SubstOrRename,
+            SourceManifest,
         },
         std_lib::{StdLib, StdVersion},
     },
@@ -31,7 +31,6 @@ use std::{
     fs,
     io::Write,
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     rc::Rc,
 };
 
@@ -39,8 +38,6 @@ pub type ResolvedTable = ResolutionTable<AccountAddress>;
 pub type ResolvedPackage = ResolutionPackage<AccountAddress>;
 pub type ResolvedGraph = ResolutionGraph<AccountAddress>;
 
-// rename_to => (from_package name, from_address_name)
-pub type Renaming = BTreeMap<NamedAddress, (PackageName, NamedAddress)>;
 pub type GraphIndex = PackageName;
 
 type ResolutionTable<T> = BTreeMap<NamedAddress, T>;
@@ -63,8 +60,6 @@ pub struct ResolvingNamedAddress {
 ///    named address will always be that value.
 /// 2. Can be left unassigned in the declaring package. In this case it can receive its value
 ///    through unification across the package graph.
-///
-/// Named addresses can also be renamed in a package and will be re-exported under these new names in this case.
 #[derive(Debug, Clone)]
 pub struct ResolutionGraph<T> {
     pub root_package_path: PathBuf,
@@ -76,9 +71,13 @@ pub struct ResolutionGraph<T> {
     pub graph: DiGraphMap<PackageName, ()>,
     /// A mapping of package name to its resolution
     pub package_table: BTreeMap<PackageName, ResolutionPackage<T>>,
+    /// Pool of all named addresses discovered during resolution.
+    /// It is required that identical named addresses share the same Rc instance.
+    /// Otherwise, address overrides/unification will be incorrect.
+    pub global_named_address_pool: BTreeMap<NamedAddress, ResolvingNamedAddress>,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct ResolutionPackage<T> {
     /// Pointer into the `ResolutionGraph.graph`
     pub resolution_graph_index: GraphIndex,
@@ -86,8 +85,6 @@ pub struct ResolutionPackage<T> {
     pub source_package: SourceManifest,
     /// Where this package is located on the filesystem
     pub package_path: PathBuf,
-    /// The renaming of addresses performed by this package
-    pub renaming: Renaming,
     /// The mapping of addresses for this package (and that are in scope for it)
     pub resolution_table: ResolutionTable<T>,
     /// The digest of the contents of all source files and manifest under the package root
@@ -101,12 +98,25 @@ impl ResolvingGraph {
         build_options: BuildConfig,
         writer: &mut W,
     ) -> Result<ResolvingGraph> {
+        let global_named_address_pool = build_options
+            .additional_named_addresses
+            .clone()
+            .into_iter()
+            .map(|(name, addr)| {
+                (
+                    NamedAddress::from(name),
+                    ResolvingNamedAddress::new(Some(addr)),
+                )
+            })
+            .collect();
+
         let mut resolution_graph = Self {
             root_package_path: root_package_path.clone(),
             build_options: build_options.clone(),
             root_package: root_package.clone(),
             graph: DiGraphMap::new(),
             package_table: BTreeMap::new(),
+            global_named_address_pool,
         };
 
         let override_std = &build_options.override_std;
@@ -135,6 +145,7 @@ impl ResolvingGraph {
             root_package,
             graph,
             package_table,
+            global_named_address_pool,
         } = self;
 
         let mut unresolved_addresses = Vec::new();
@@ -146,7 +157,6 @@ impl ResolvingGraph {
                     resolution_graph_index,
                     source_package,
                     package_path,
-                    renaming,
                     resolution_table,
                     source_digest,
                 } = package;
@@ -170,7 +180,6 @@ impl ResolvingGraph {
                     resolution_graph_index,
                     source_package,
                     package_path,
-                    renaming,
                     resolution_table: resolved_table,
                     source_digest,
                 };
@@ -195,6 +204,7 @@ impl ResolvingGraph {
             root_package,
             graph,
             package_table: resolved_package_table,
+            global_named_address_pool,
         })
     }
 
@@ -221,17 +231,25 @@ impl ResolvingGraph {
             },
         };
 
-        let mut renaming = BTreeMap::new();
         let mut resolution_table = self
             .build_options
             .additional_named_addresses
             .clone()
-            .into_iter()
-            .map(|(name, addr)| {
-                (
-                    NamedAddress::from(name),
-                    ResolvingNamedAddress::new(Some(addr)),
-                )
+            .into_keys()
+            .map(|name| {
+                let named_address = NamedAddress::from(name);
+
+                // Fetch the additional named addresses.
+                //
+                // Notice that these addresses should already exist in the global pool, and
+                // we are performing an Rc::clone here as opposed to a deep clone. This is
+                // to ensure identical named addresses share the same Rc instance.
+                let resolving_named_address = self
+                    .global_named_address_pool
+                    .get(&named_address)
+                    .expect("should be able to get additional named addresses -- they are created during graph initialization")
+                    .clone();
+                (named_address, resolving_named_address)
             })
             .collect();
 
@@ -261,7 +279,7 @@ impl ResolvingGraph {
             })?;
             self.graph.add_edge(package_node_id, dep_node_id, ());
 
-            let (dep_renaming, dep_resolution_table) = self
+            let dep_resolution_table = self
                 .process_dependency(dep_name, dep, package_path.clone(), override_std, writer)
                 .with_context(|| {
                     format!(
@@ -270,19 +288,10 @@ impl ResolvingGraph {
                     )
                 })?;
 
-            ResolutionPackage::extend_renaming(&mut renaming, &dep_name, dep_renaming.clone())
-                .with_context(|| {
-                    format!(
-                        "While resolving address renames in dependency '{}' in package '{}'",
-                        dep_name, package_name
-                    )
-                })?;
-
             ResolutionPackage::extend_resolution_table(
                 &mut resolution_table,
                 &dep_name,
                 dep_resolution_table,
-                dep_renaming,
             )
             .with_context(|| {
                 format!(
@@ -301,7 +310,6 @@ impl ResolvingGraph {
             resolution_graph_index: package_node_id,
             source_package: package,
             package_path,
-            renaming,
             resolution_table,
             source_digest,
         };
@@ -318,7 +326,9 @@ impl ResolvingGraph {
     ) -> Result<()> {
         let package_name = &package.package.name;
         for (name, addr_opt) in package.addresses.clone().unwrap_or_default().into_iter() {
-            match resolution_table.get(&name) {
+            // When creating a new named address, check if it already exists in the global pool.
+            // This is to ensure identical named addresses share the same Rc instance.
+            let resolving_named_address = match self.global_named_address_pool.get(&name) {
                 Some(other) => {
                     other.unify(addr_opt).with_context(|| {
                         format!(
@@ -327,11 +337,19 @@ impl ResolvingGraph {
                             name, package_name
                         )
                     })?;
+                    // Note: this is an Rc::clone.
+                    other.clone()
                 },
                 None => {
-                    resolution_table.insert(name, ResolvingNamedAddress::new(addr_opt));
+                    let resolving_named_address = ResolvingNamedAddress::new(addr_opt);
+                    // Note: this is an Rc::clone.
+                    self.global_named_address_pool
+                        .insert(name, resolving_named_address.clone());
+                    resolving_named_address
                 },
-            }
+            };
+
+            resolution_table.insert(name, resolving_named_address);
         }
 
         if self.build_options.dev_mode && is_root_package {
@@ -405,7 +423,11 @@ impl ResolvingGraph {
         root_path: PathBuf,
         override_std: &Option<StdVersion>,
         writer: &mut W,
-    ) -> Result<(Renaming, ResolvingTable)> {
+    ) -> Result<ResolvingTable> {
+        if dep.subst.is_some() {
+            bail!("Address substitution/renaming is no longer supported.")
+        }
+
         Self::download_and_update_if_remote(
             dep_name_in_pkg,
             &dep,
@@ -450,53 +472,9 @@ impl ResolvingGraph {
         }
 
         let resolving_dep = &self.package_table[&dep_name_in_pkg];
-        let mut renaming = BTreeMap::new();
-        let mut resolution_table = resolving_dep.resolution_table.clone();
+        let resolution_table = resolving_dep.resolution_table.clone();
 
-        // check that address being renamed exists in the dep that is being renamed/imported
-        if let Some(dep_subst) = dep.subst {
-            for (name, rename_from_or_assign) in dep_subst.into_iter() {
-                match rename_from_or_assign {
-                    SubstOrRename::RenameFrom(ident) => {
-                        // Make sure dep has the address that we're importing
-                        if !resolving_dep.resolution_table.contains_key(&ident) {
-                            bail!(
-                                "Tried to rename named address {0} from package '{1}'.\
-                                However, {1} does not contain that address",
-                                ident,
-                                dep_name_in_pkg
-                            );
-                        }
-
-                        // Apply the substitution, NB that the refcell for the address's value is kept!
-                        if let Some(other_val) = resolution_table.remove(&ident) {
-                            resolution_table.insert(name, other_val);
-                        }
-
-                        if renaming.insert(name, (dep_name_in_pkg, ident)).is_some() {
-                            bail!("Duplicate renaming of named address '{0}' found for dependency {1}",
-                                name,
-                                dep_name_in_pkg,
-                            );
-                        }
-                    },
-                    SubstOrRename::Assign(value) => {
-                        resolution_table
-                            .get(&name)
-                            .map(|named_addr| named_addr.unify(Some(value)))
-                            .transpose()
-                            .with_context(|| {
-                                format!(
-                                    "Unable to assign value to named address {} in dependency {}",
-                                    name, dep_name_in_pkg
-                                )
-                            })?;
-                    },
-                }
-            }
-        }
-
-        Ok((renaming, resolution_table))
+        Ok(resolution_table)
     }
 
     fn get_or_add_node(&mut self, package_name: PackageName) -> Result<GraphIndex> {
@@ -591,55 +569,30 @@ impl ResolvingGraph {
                 )?;
 
                 // Confirm git is available.
-                confirm_git_available()?;
+                git::confirm_git_available()?;
 
                 // If the cached folder does not exist, download and clone accordingly
-                Command::new("git")
-                    .args(["clone", git_url, git_path])
-                    .output()
-                    .map_err(|_| {
-                        anyhow::anyhow!("Failed to clone Git repository for package '{}'", dep_name)
-                    })?;
-                Command::new("git")
-                    .args(["-C", git_path, "checkout", git_rev])
-                    .output()
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to checkout Git reference '{}' for package '{}'",
-                            git_rev,
-                            dep_name
-                        )
-                    })?;
+                git::clone(git_url, git_path, dep_name)?;
+                git::checkout(git_path, git_rev, dep_name)?;
             } else if !skip_fetch_latest_git_deps {
                 // Confirm git is available.
-                confirm_git_available()?;
+                git::confirm_git_available()?;
 
                 // Update the git dependency
                 // Check first that it isn't a git rev (if it doesn't work, just continue with the fetch)
-                if let Ok(rev) = Command::new("git")
-                    .args(["-C", git_path, "rev-parse", "--verify", git_rev])
-                    .output()
-                {
-                    if let Ok(parsable_version) = String::from_utf8(rev.stdout) {
-                        // If it's exactly the same, then it's a git rev
-                        if parsable_version.trim().starts_with(git_rev) {
-                            return Ok(());
-                        }
+                if let Ok(parsed_rev) = git::find_rev(git_path, git_rev) {
+                    // If it's exactly the same, then it's a git rev
+                    if parsed_rev.trim().starts_with(git_rev) {
+                        return Ok(());
                     }
                 }
 
-                let tag = Command::new("git")
-                    .args(["-C", git_path, "tag", "--list", git_rev])
-                    .output();
-
-                if let Ok(tag) = tag {
-                    if let Ok(parsable_version) = String::from_utf8(tag.stdout) {
-                        // If it's exactly the same, then it's a git tag, for now tags won't be updated
-                        // Tags don't easily update locally and you can't use reset --hard to cleanup
-                        // any extra files
-                        if parsable_version.trim().starts_with(git_rev) {
-                            return Ok(());
-                        }
+                if let Ok(tag) = git::find_tag(git_path, git_rev) {
+                    // If it's exactly the same, then it's a git tag, for now tags won't be updated
+                    // Tags don't easily update locally and you can't use reset --hard to cleanup
+                    // any extra files
+                    if tag.trim().starts_with(git_rev) {
+                        return Ok(());
                     }
                 }
 
@@ -652,56 +605,8 @@ impl ResolvingGraph {
                 // If the current folder exists, do a fetch and reset to ensure that the branch
                 // is up to date
                 // NOTE: this means that you must run the package system with a working network connection
-                let status = Command::new("git")
-                    .args([
-                        "-C",
-                        git_path,
-                        "fetch",
-                        "origin",
-                    ])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to fetch latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps",
-                            dep_name
-                        )
-                    })?;
-
-                if !status.success() {
-                    return Err(anyhow::anyhow!(
-                            "Failed to fetch to latest Git state for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
-                            dep_name,
-                        status
-                        ));
-                }
-                let status = Command::new("git")
-                    .args([
-                        "-C",
-                        git_path,
-                        "reset",
-                        "--hard",
-                        &format!("origin/{}", git_rev)
-                    ])
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .status()
-                    .map_err(|_| {
-                        anyhow::anyhow!(
-                            "Failed to reset to latest Git state '{}' for package '{}', to skip set --skip-fetch-latest-git-deps",
-                            git_rev,
-                            dep_name
-                        )
-                    })?;
-                if !status.success() {
-                    return Err(anyhow::anyhow!(
-                            "Failed to reset to latest Git state '{}' for package '{}', to skip set --skip-fetch-latest-git-deps | Exit status: {}",
-                            git_rev,
-                            dep_name,
-                        status
-                        ));
-                }
+                git::fetch_origin(git_path, dep_name)?;
+                git::reset_hard(git_path, git_rev, dep_name)?;
             }
         }
         if let Some(node_info) = &dep.node_info {
@@ -712,42 +617,14 @@ impl ResolvingGraph {
 }
 
 impl ResolvingPackage {
-    // Extend and check for duplicate names in rename_to
-    fn extend_renaming(
-        renaming: &mut Renaming,
-        dep_name: &PackageName,
-        dep_renaming: Renaming,
-    ) -> Result<()> {
-        for (rename_to, rename_from) in dep_renaming.into_iter() {
-            // We cannot rename multiple named addresses to the same name. In the future we'll want
-            // to support this.
-            if renaming.insert(rename_to, rename_from).is_some() {
-                bail!(
-                    "Duplicate renaming of named address '{}' found in dependency '{}'",
-                    rename_to,
-                    dep_name
-                );
-            }
-        }
-        Ok(())
-    }
-
     // The resolution table contains the transitive closure of addresses that are known in that
-    // package. Extends the package's resolution table and checks for duplicate renamings that
-    // conflict during this process.
+    // package. Extends the package's resolution table during this process.
     fn extend_resolution_table(
         resolution_table: &mut ResolvingTable,
         dep_name: &PackageName,
         dep_resolution_table: ResolvingTable,
-        dep_renaming: Renaming,
     ) -> Result<()> {
-        let renames = dep_renaming
-            .into_iter()
-            .map(|(rename_to, (_, rename_from))| (rename_from, rename_to))
-            .collect::<BTreeMap<_, _>>();
-
         for (addr_name, addr_value) in dep_resolution_table.into_iter() {
-            let addr_name = renames.get(&addr_name).cloned().unwrap_or(addr_name);
             if let Some(other) = resolution_table.insert(addr_name, addr_value.clone()) {
                 // They need to be the same refcell so resolve to the same location if there are any
                 // possible reassignments
@@ -875,16 +752,6 @@ impl ResolvedGraph {
             })
             .collect()
     }
-
-    pub fn contains_renaming(&self) -> Option<PackageName> {
-        // Make sure no renamings have been performed
-        for (pkg_name, pkg) in self.package_table.iter() {
-            if !pkg.renaming.is_empty() {
-                return Some(*pkg_name);
-            }
-        }
-        None
-    }
 }
 
 impl ResolvedPackage {
@@ -958,24 +825,5 @@ impl ResolvedPackage {
         } else {
             self.source_package.dependencies.keys().copied().collect()
         }
-    }
-}
-
-fn confirm_git_available() -> Result<()> {
-    match Command::new("git").arg("--version").output() {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            if let std::io::ErrorKind::NotFound = e.kind() {
-                bail!(
-                    "git was not found, confirm you have git installed and it is on your PATH. \
-                    Alternatively, skip with --skip-fetch-latest-git-deps"
-                );
-            } else {
-                bail!(
-                    "Unexpected error occurred when checking for presence of `git`: {:#}",
-                    e
-                );
-            }
-        },
     }
 }

@@ -4,7 +4,6 @@
 //! This submodule implements the *public parameters* for this "chunked_elgamal_field" PVSS scheme.
 
 use crate::{
-    algebra::GroupGenerators,
     dlog,
     pvss::{
         chunky::{
@@ -20,6 +19,7 @@ use aptos_crypto::{
     arkworks::{
         hashing,
         serialization::{ark_de, ark_se},
+        GroupGenerators,
     },
     utils, CryptoMaterialError, ValidCryptoMaterial,
 };
@@ -189,5 +189,11 @@ impl<E: Pairing> WithMaxNumShares for PublicParameters<E> {
     fn with_max_num_shares(n: usize) -> Self {
         let mut rng = thread_rng();
         Self::new(n, DEFAULT_ELL_FOR_TESTING, &mut rng)
+    }
+
+    // The only thing from `pp` that `generate()` uses is `pp.ell`, so make the rest as small as possible.
+    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+        let mut rng = thread_rng();
+        Self::new(1, DEFAULT_ELL_FOR_TESTING, &mut rng)
     }
 }
