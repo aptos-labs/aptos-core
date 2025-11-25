@@ -23,6 +23,8 @@ spec:
           value: "info"
         - name: RUST_BACKTRACE
           value: "full"
+        - name: RUST_MIN_STACK
+          value: "104857600"
       resources:
         requests:
           memory: "100Gi"
@@ -32,20 +34,20 @@ spec:
       persistentVolumeClaim:
         claimName: testnet-archive-9
   tolerations:
-  - key: aptos-workload
-    operator: Equal
-    value: "replay-verify"
+    - key: aptos-workload
+      operator: Equal
+      value: "replay-verify"
   affinity:
     nodeAffinity:
       requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
           - matchExpressions:
-            - key: cloud.google.com/machine-family
-              operator: In
-              values:
-              - "t2d"
-              - "c3d"
-            - key: node-restriction.kubernetes.io/aptos-workload
-              operator: In
-              values:
-              - "replay-verify"
+              - key: cloud.google.com/machine-family
+                operator: In
+                values:
+                  - "t2d"
+                  - "c3d"
+              - key: node-restriction.kubernetes.io/aptos-workload
+                operator: In
+                values:
+                  - "replay-verify"
