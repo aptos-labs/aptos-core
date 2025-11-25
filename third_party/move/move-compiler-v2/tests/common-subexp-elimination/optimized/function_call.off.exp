@@ -1,0 +1,140 @@
+
+Diagnostics:
+warning: This assignment/binding to the left-hand-side variable `mut_ref` is unused. Consider removing this assignment/binding, or prefixing the left-hand-side variable with an underscore (e.g., `_mut_ref`), or renaming to `_`
+   ┌─ tests/common-subexp-elimination/optimized/function_call.move:71:23
+   │
+71 │         let mut_ref = &mut y;
+   │                       ^^^^^^
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FunctionCall
+use 0x1::bit_vector
+// Function definition at index 0
+fun bar(l0: u64): u64
+    copy_loc l0
+    call foo
+    move_loc l0
+    call foo
+    add
+    // @5
+    ret
+
+// Function definition at index 1
+fun bar_optimal(l0: u64): u64
+    local l1: u64
+    copy_loc l0
+    call foo
+    st_loc l1
+    copy_loc l1
+    move_loc l0
+    // @5
+    call foo
+    add
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 2
+fun bar_recursive(l0: u64): u64
+    copy_loc l0
+    call foo_child
+    move_loc l0
+    call foo_child
+    add
+    // @5
+    ret
+
+// Function definition at index 3
+fun bar_ref(l0: u64): u64
+    local l1: &u64
+    borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    call foo_ref
+    move_loc l1
+    // @5
+    call foo_ref
+    add
+    ret
+
+// Function definition at index 4
+fun bar_ref2(l0: u64): u64
+    local l1: &mut u64
+    local l2: u64
+    local l3: u64
+    borrow_loc l0
+    call foo_ref
+    mut_borrow_loc l0
+    pop
+    borrow_loc l0
+    // @5
+    call foo_ref
+    add
+    ret
+
+// Function definition at index 5
+fun bar_vec(): vector<u8>
+    call foo_vec
+    pop
+    call foo_vec
+    ret
+
+// Function definition at index 6
+fun bar_with_external_call(l0: u64): u64
+    copy_loc l0
+    call foo_with_external_call
+    move_loc l0
+    call foo_with_external_call
+    add
+    // @5
+    ret
+
+// Function definition at index 7
+fun foo(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 8
+fun foo_child(l0: u64): u64
+    mut_borrow_loc l0
+    call foo_grand_child
+    ret
+
+// Function definition at index 9
+fun foo_grand_child(l0: &mut u64): u64
+    move_loc l0
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 10
+fun foo_ref(l0: &u64): u64
+    move_loc l0
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 11
+fun foo_vec(): vector<u8>
+    vec_pack <u8>, 0
+    ret
+
+// Function definition at index 12
+fun foo_with_external_call(l0: u64): u64
+    local l1: bit_vector::BitVector
+    move_loc l0
+    call bit_vector::new
+    st_loc l1
+    borrow_loc l1
+    call bit_vector::length
+    // @5
+    ret
+
+
+============ bytecode verification succeeded ========
