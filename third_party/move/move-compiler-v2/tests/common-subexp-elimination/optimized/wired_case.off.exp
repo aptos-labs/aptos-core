@@ -1,0 +1,17 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xc0ffee::m
+use 0x1::option
+// Function definition at index 0
+fun test(l0: u64): (u64, option::Option<u64>, option::Option<u64>)
+    copy_loc l0
+    move_loc l0
+    mul
+    call option::none<u64>
+    call option::none<u64>
+    // @5
+    ret
+
+
+============ bytecode verification succeeded ========

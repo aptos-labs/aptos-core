@@ -1,0 +1,2045 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/common-subexp-elimination/optimized/function_call.move:3:14
+  │
+3 │     use std::bit_vector;
+  │              ^^^^^^^^^^ Unused 'use' of alias 'bit_vector'. Consider removing it
+
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := infer($t2)
+  2: $t5 := FunctionCall::foo($t0)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := FunctionCall::foo_vec()
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := infer($t2)
+  2: $t5 := FunctionCall::foo($t0)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := FunctionCall::foo_vec()
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := infer($t2)
+  2: $t5 := FunctionCall::foo($t0)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := FunctionCall::foo_vec()
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+     # refs: []
+     #
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+     # refs: []
+     #
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+     # refs: []
+     #
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+     # refs: []
+     #
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+     # refs: []
+     #
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := FunctionCall::foo($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t4 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t4
+     # refs: []
+     #
+  2: $t5 := FunctionCall::foo($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4, $t5
+     # refs: []
+     #
+  3: $t3 := +($t4, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  4: $t1 := +($t3, $t2)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := FunctionCall::foo_vec()
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  1: $t0 := FunctionCall::foo_vec()
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := copy($t2)
+  2: $t5 := FunctionCall::foo($t0)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := FunctionCall::foo_vec()
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := infer($t2)
+  2: $t5 := FunctionCall::foo($t0)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := FunctionCall::foo_vec()
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := infer($t2)
+  2: $t5 := FunctionCall::foo($t0)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := FunctionCall::foo_vec()
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # flush: $t1
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # flush: $t2
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+     # refs: []
+     #
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+     # refs: []
+     #
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+     # refs: []
+     #
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+     # refs: []
+     #
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # flush: $t1
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+     # refs: []
+     #
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+     # refs: []
+     #
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # flush: $t2
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t4 := infer($t2)
+     # live vars: $t0, $t2, $t4
+     # reaching instruction #2: `t2` @ {0}, `t4` @ {1}
+     # refs: []
+     #
+  2: $t5 := FunctionCall::foo($t0)
+     # live vars: $t2, $t4, $t5
+     # reaching instruction #3: `t2` @ {0}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+     # reaching instruction #5: `t1` @ {4}, `t2` @ {0}, `t3` @ {3}, `t4` @ {1}, `t5` @ {2}
+     # refs: []
+     #
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # flush: $t1
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars:
+     # reaching instruction #1: `t1` @ {0}
+     # refs: []
+     #
+  1: $t0 := FunctionCall::foo_vec()
+     # live vars: $t0
+     # reaching instruction #2: `t0` @ {1}, `t1` @ {0}
+     # refs: []
+     #
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # reaching instruction #1: `t0` @ {0}
+     # refs: []
+     #
+  1: return $t0
+}
+
+============ after CommonSubexpElimination: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := infer($t2)
+  2: $t5 := infer($t2)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := infer($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := infer($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t2
+  1: $t4 := infer($t2)
+     # live vars: $t2, $t4
+  2: $t5 := infer($t2)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars: $t1
+  1: $t0 := infer($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := infer($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t4 := infer($t2)
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  2: $t5 := infer($t2)
+     # live vars: $t2, $t4, $t5
+     # refs: []
+     #
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+     # refs: []
+     #
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := infer($t1)
+     # live vars: $t0
+     # refs: []
+     #
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := FunctionCall::foo($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t4 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4
+     # refs: []
+     #
+  2: $t5 := infer($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t4, $t5
+     # refs: []
+     #
+  3: $t3 := +($t4, $t5)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  4: $t1 := +($t3, $t2)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t1 := FunctionCall::foo_vec()
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  1: $t0 := infer($t1)
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := copy($t2)
+  2: $t5 := copy($t2)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := move($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := copy($t2)
+  2: $t5 := copy($t2)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := move($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := copy($t2)
+  2: $t5 := copy($t2)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := move($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # maybe
+  0: $t2 := FunctionCall::foo($t0)
+     # maybe
+  1: $t4 := copy($t2)
+     # maybe
+  2: $t5 := copy($t2)
+     # maybe
+  3: $t3 := +($t4, $t5)
+     # maybe
+  4: $t1 := +($t3, $t2)
+     # maybe
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # maybe
+  0: $t1 := FunctionCall::foo_vec()
+     # maybe
+  1: $t0 := move($t1)
+     # maybe
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # maybe
+  0: $t2 := move($t0)
+     # maybe
+  1: $t3 := 1
+     # maybe
+  2: $t1 := +($t2, $t3)
+     # maybe
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # maybe
+  0: $t0 := vector::empty<u8>()
+     # maybe
+  1: return $t0
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := copy($t2)
+  2: $t5 := copy($t2)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := move($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t2
+  1: $t4 := copy($t2)
+     # live vars: $t2, $t4
+  2: $t5 := copy($t2)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars: $t1
+  1: $t0 := move($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := move($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+  0: $t2 := FunctionCall::foo($t0)
+  1: $t4 := copy($t2)
+  2: $t5 := copy($t2)
+  3: $t3 := +($t4, $t5)
+  4: $t1 := +($t3, $t2)
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t0 := move($t1)
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := move($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t2 := FunctionCall::foo($t0)
+     # live vars: $t2
+  1: $t4 := copy($t2)
+     # live vars: $t2, $t4
+  2: $t5 := copy($t2)
+     # live vars: $t2, $t4, $t5
+  3: $t3 := +($t4, $t5)
+     # live vars: $t2, $t3
+  4: $t1 := +($t3, $t2)
+     # live vars: $t1
+  5: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8>
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars: $t1
+  1: $t0 := move($t1)
+     # live vars: $t0
+  2: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := move($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64
+  0: $t0 := FunctionCall::foo($t0)
+  1: $t4 := copy($t0)
+  2: $t5 := copy($t0)
+  3: $t4 := +($t4, $t5)
+  4: $t0 := +($t4, $t0)
+  5: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8> [unused]
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: $t1 := move($t1)
+  2: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+  0: $t0 := move($t0)
+  1: $t3 := 1
+  2: $t0 := +($t0, $t3)
+  3: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t0 := FunctionCall::foo($t0)
+     # live vars: $t0
+  1: $t4 := copy($t0)
+     # live vars: $t0, $t4
+  2: $t5 := copy($t0)
+     # live vars: $t0, $t4, $t5
+  3: $t4 := +($t4, $t5)
+     # live vars: $t0, $t4
+  4: $t0 := +($t4, $t0)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8> [unused]
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars: $t1
+  1: $t1 := move($t1)
+     # live vars: $t1
+  2: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 1
+     # live vars: $t0, $t3
+  2: $t0 := +($t0, $t3)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64
+  0: $t0 := FunctionCall::foo($t0)
+  1: $t4 := copy($t0)
+  2: $t5 := copy($t0)
+  3: $t4 := +($t4, $t5)
+  4: $t0 := +($t4, $t0)
+  5: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8> [unused]
+     var $t1: vector<u8>
+  0: $t1 := FunctionCall::foo_vec()
+  1: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+  0: $t0 := move($t0)
+  1: $t3 := 1
+  2: $t0 := +($t0, $t3)
+  3: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t0 := FunctionCall::foo($t0)
+     # live vars: $t0
+  1: $t4 := copy($t0)
+     # live vars: $t0, $t4
+  2: $t5 := copy($t0)
+     # live vars: $t0, $t4, $t5
+  3: $t4 := +($t4, $t5)
+     # live vars: $t0, $t4
+  4: $t0 := +($t4, $t0)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8> [unused]
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 1
+     # live vars: $t0, $t3
+  2: $t0 := +($t0, $t3)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_optimal($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64 [unused]
+     var $t4: u64
+     var $t5: u64
+     # flush: $t0
+     # live vars: $t0
+  0: $t0 := FunctionCall::foo($t0)
+     # live vars: $t0
+  1: $t4 := copy($t0)
+     # live vars: $t0, $t4
+  2: $t5 := copy($t0)
+     # live vars: $t0, $t4, $t5
+  3: $t4 := +($t4, $t5)
+     # live vars: $t0, $t4
+  4: $t0 := +($t4, $t0)
+     # live vars: $t0
+  5: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_vec(): vector<u8> {
+     var $t0: vector<u8> [unused]
+     var $t1: vector<u8>
+     # live vars:
+  0: $t1 := FunctionCall::foo_vec()
+     # live vars: $t1
+  1: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64 [unused]
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 1
+     # live vars: $t0, $t3
+  2: $t0 := +($t0, $t3)
+     # live vars: $t0
+  3: return $t0
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_vec(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FunctionCall
+// Function definition at index 0
+fun bar_optimal(l0: u64): u64
+    move_loc l0
+    call foo
+    st_loc l0
+    copy_loc l0
+    copy_loc l0
+    // @5
+    add
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 1
+fun bar_vec(): vector<u8>
+    call foo_vec
+    ret
+
+// Function definition at index 2
+fun foo(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 3
+fun foo_vec(): vector<u8>
+    vec_pack <u8>, 0
+    ret
+
+
+============ bytecode verification succeeded ========

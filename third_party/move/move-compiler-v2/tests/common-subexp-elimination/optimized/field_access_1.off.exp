@@ -1,0 +1,46 @@
+
+Diagnostics:
+warning: Unused value of parameter `arg2`. Consider removing the parameter, or prefixing with an underscore (e.g., `_arg2`), or binding to `_`
+   ┌─ tests/common-subexp-elimination/optimized/field_access_1.move:16:40
+   │
+16 │     fun test_field_access(arg1: Outer, arg2: u64, x: u64, y: u64): u64 {
+   │                                        ^^^^
+
+warning: Unused value of parameter `x`. Consider removing the parameter, or prefixing with an underscore (e.g., `_x`), or binding to `_`
+   ┌─ tests/common-subexp-elimination/optimized/field_access_1.move:16:51
+   │
+16 │     fun test_field_access(arg1: Outer, arg2: u64, x: u64, y: u64): u64 {
+   │                                                   ^
+
+warning: Unused value of parameter `y`. Consider removing the parameter, or prefixing with an underscore (e.g., `_y`), or binding to `_`
+   ┌─ tests/common-subexp-elimination/optimized/field_access_1.move:16:59
+   │
+16 │     fun test_field_access(arg1: Outer, arg2: u64, x: u64, y: u64): u64 {
+   │                                                           ^
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FiledAccess
+struct Inner has copy + drop
+  value: u64
+
+struct Outer has copy + drop
+  inner: Inner
+
+// Function definition at index 0
+fun test_field_access(l0: Outer, l1: u64, l2: u64, l3: u64): u64
+    borrow_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    borrow_loc l0
+    // @5
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    read_ref
+    add
+    ret
+
+
+============ bytecode verification succeeded ========

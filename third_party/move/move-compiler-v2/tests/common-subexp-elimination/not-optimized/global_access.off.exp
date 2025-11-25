@@ -1,0 +1,136 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::GlobalAccess
+use 0x1::signer
+struct S has drop + key
+  val: u64
+
+struct S1 has drop + key
+  val: u64
+
+// Function definition at index 0
+fun dummy_func(): vector<u8>
+    vec_pack <u8>, 0
+    ret
+
+// Function definition at index 1
+fun move_from_S(l0: &signer) acquires S
+    move_loc l0
+    call signer::address_of
+    move_from S
+    pop
+    ret
+
+// Function definition at index 2
+fun move_to_S(l0: &signer)
+    move_loc l0
+    ld_u64 42
+    pack S
+    move_to S
+    ret
+
+// Function definition at index 3
+fun mutable_borrow_S(l0: &signer) acquires S
+    ld_u64 100
+    pack S
+    move_loc l0
+    call signer::address_of
+    mut_borrow_global S
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 4
+fun test_existence_check_v1(l0: &signer): bool
+    local l1: address
+    local l2: bool
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists S
+    // @5
+    move_loc l0
+    call move_to_S
+    move_loc l1
+    exists S
+    st_loc l2
+    // @10
+    br_false l0
+    move_loc l2
+    ret
+l0: ld_false
+    ret
+
+// Function definition at index 5
+fun test_existence_check_v2(l0: &signer): bool acquires S
+    local l1: address
+    local l2: bool
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists S
+    // @5
+    move_loc l0
+    call move_from_S
+    move_loc l1
+    exists S
+    st_loc l2
+    // @10
+    br_false l0
+    move_loc l2
+    ret
+l0: ld_false
+    ret
+
+// Function definition at index 6
+fun test_existence_check_v3(l0: &signer): bool acquires S
+    local l1: address
+    local l2: bool
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists S
+    // @5
+    move_loc l0
+    call mutable_borrow_S
+    move_loc l1
+    exists S
+    st_loc l2
+    // @10
+    br_false l0
+    move_loc l2
+    ret
+l0: ld_false
+    ret
+
+// Function definition at index 7
+fun test_global_borrow_v1(l0: &signer): u64 acquires S
+    local l1: address
+    local l2: &S
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    borrow_global S
+    // @5
+    move_loc l0
+    call move_to_S
+    move_loc l1
+    borrow_global S
+    st_loc l2
+    // @10
+    borrow_field S, val
+    read_ref
+    move_loc l2
+    borrow_field S, val
+    read_ref
+    // @15
+    add
+    ret
+
+
+============ bytecode verification succeeded ========

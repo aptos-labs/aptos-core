@@ -1,0 +1,3874 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := infer($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := infer($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := infer($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := infer($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := infer($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := infer($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := infer($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := infer($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := infer($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+     # refs: [$t0 => #0, $t3 => #3, $t5 => #5]
+     # #0
+     #   => #5 via [] at line 29
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+     # refs: [$t3 => #3, $t7 => #7]
+     # #3
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+     # refs: []
+     #
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0, $t1 => #1]
+     # #0
+     #   <no edges>
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+     # refs: []
+     #
+  5: $t7 := 1
+     # live vars: $t6, $t7
+     # refs: []
+     #
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t5
+     # refs: [$t0 => #0, $t3 => #3, $t5 => #5]
+     # #0
+     #   => #5 via [] at line 29
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t4
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  3: $t7 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t7
+     # refs: [$t3 => #3, $t7 => #7]
+     # #3
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t6
+     # refs: []
+     #
+  5: $t2 := +($t4, $t6)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  3: $t1 := +($t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0, $t1 => #1]
+     # #0
+     #   <no edges>
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := 42
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t4
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t6 := read_ref($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t6
+     # refs: []
+     #
+  5: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7
+     # refs: []
+     #
+  6: $t2 := +($t6, $t7)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := infer($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := infer($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := infer($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := infer($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := infer($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := infer($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # flush: $t3
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # flush: $t3
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+     # refs: [$t0 => #0, $t3 => #3, $t5 => #5]
+     # #0
+     #   => #5 via [] at line 29
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+     # refs: [$t3 => #3, $t7 => #7]
+     # #3
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+     # refs: []
+     #
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # flush: $t2
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0, $t1 => #1]
+     # #0
+     #   <no edges>
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+     # refs: []
+     #
+  5: $t7 := 1
+     # live vars: $t6, $t7
+     # refs: []
+     #
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # flush: $t3
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+     # reaching instruction #2: `t3` @ {0}, `t5` @ {1}
+     # refs: [$t0 => #0, $t3 => #3, $t5 => #5]
+     # #0
+     #   => #5 via [] at line 29
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+     # reaching instruction #3: `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {2}
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+     # reaching instruction #4: `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `t7` @ {3}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {2}
+     # refs: [$t3 => #3, $t7 => #7]
+     # #3
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+     # reaching instruction #5: `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `t6` @ {4}, `t7` @ {3}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {4}
+     # refs: []
+     #
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+     # reaching instruction #6: `t2` @ {5}, `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `t6` @ {4}, `t7` @ {3}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {4}
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # flush: $t2
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t0` @ {1}, `t2` @ {0}, `t3` @ {1}
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+     # reaching instruction #3: `t0` @ {2}, `t2` @ {0}, `t3` @ {1}, `t4` @ {2}
+     # refs: []
+     #
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+     # reaching instruction #4: `t0` @ {2}, `t1` @ {3}, `t2` @ {0}, `t3` @ {1}, `t4` @ {2}
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: [$t0 => #0, $t1 => #1]
+     # #0
+     #   <no edges>
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # reaching instruction #1: `t3` @ {0}
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+     # reaching instruction #2: `t3` @ {0}, `t5` @ {1}
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+     # reaching instruction #3: `t3` @ {0}, `t4` @ {2}, `t5` @ {1}
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+     # reaching instruction #4: `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {3}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+     # reaching instruction #5: `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `t6` @ {4}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {3}
+     # refs: []
+     #
+  5: $t7 := 1
+     # live vars: $t6, $t7
+     # reaching instruction #6: `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `t6` @ {4}, `t7` @ {5}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {3}
+     # refs: []
+     #
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+     # reaching instruction #7: `t2` @ {6}, `t3` @ {0}, `t4` @ {2}, `t5` @ {1}, `t6` @ {4}, `t7` @ {5}, `Struct QualifiedId { module_id: ModuleId(1), id: StructId(Symbol(133)) }` @ {3}
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t2` @ {0}, `t3` @ {1}
+     # refs: []
+     #
+  3: return $t1
+}
+
+============ after CommonSubexpElimination: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := infer($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := infer($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := infer($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  1: $t5 := infer($t0)
+     # live vars: $t0, $t3, $t5
+     # refs: [$t0 => #0, $t3 => #3, $t5 => #5]
+     # #0
+     #   => #5 via [] at line 29
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  3: $t7 := infer($t0)
+     # live vars: $t3, $t4, $t7
+     # refs: [$t3 => #3, $t7 => #7]
+     # #3
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+     # refs: []
+     #
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0, $t1 => #1]
+     # #0
+     #   <no edges>
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := infer($t0)
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+     # refs: []
+     #
+  5: $t7 := 1
+     # live vars: $t6, $t7
+     # refs: []
+     #
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := borrow_local($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  1: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t5
+     # refs: [$t0 => #0, $t3 => #3, $t5 => #5]
+     # #0
+     #   => #5 via [] at line 29
+     # #3
+     #   <no edges>
+     # #5
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t3, $t4
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  3: $t7 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4, $t7
+     # refs: [$t3 => #3, $t7 => #7]
+     # #3
+     #   <no edges>
+     # #7
+     #   <no edges>
+     # #root
+     #   => #3 via [local `y`] at line 28
+     #
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t6
+     # refs: []
+     #
+  5: $t2 := +($t4, $t6)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t2 := borrow_local($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: [$t2 => #2]
+     # #2
+     #   <no edges>
+     # #root
+     #   => (mut) #2 via [local `y`] at line 22
+     #
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  3: $t1 := +($t3, $t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0, $t1 => #1]
+     # #0
+     #   <no edges>
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t3 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t5 := 42
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t5
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3, $t4
+     # refs: [$t1 => #1, $t3 => #3]
+     # #1
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  4: $t6 := read_ref($t1)
+     # abort state: {returns,aborts}
+     # live vars: $t6
+     # refs: []
+     #
+  5: $t7 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t6, $t7
+     # refs: []
+     #
+  6: $t2 := +($t6, $t7)
+     # abort state: {returns}
+     # live vars: $t2
+     # refs: []
+     #
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := read_ref($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t3 := 1
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  2: $t1 := +($t2, $t3)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  3: return $t1
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # maybe
+  0: $t3 := borrow_local($t1)
+     # maybe
+  1: $t5 := copy($t0)
+     # maybe
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # maybe
+  3: $t7 := move($t0)
+     # maybe
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # maybe
+  5: $t2 := +($t4, $t6)
+     # maybe
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # maybe
+  0: $t2 := borrow_local($t0)
+     # maybe
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # maybe
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # maybe
+  3: $t1 := +($t3, $t4)
+     # maybe
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # maybe
+  0: $t3 := move($t0)
+     # maybe
+  1: $t5 := 42
+     # maybe
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # maybe
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # maybe
+  4: $t6 := read_ref($t1)
+     # maybe
+  5: $t7 := 1
+     # maybe
+  6: $t2 := +($t6, $t7)
+     # maybe
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # maybe
+  0: $t2 := read_ref($t0)
+     # maybe
+  1: $t3 := 1
+     # maybe
+  2: $t1 := +($t2, $t3)
+     # maybe
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # maybe
+  0: $t2 := read_ref($t0)
+     # maybe
+  1: $t3 := 1
+     # maybe
+  2: $t1 := +($t2, $t3)
+     # maybe
+  3: return $t1
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := move($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := move($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t7 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+  5: $t2 := +($t4, $t6)
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t1 := +($t3, $t4)
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+  0: $t3 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+  4: $t6 := read_ref($t1)
+  5: $t7 := 1
+  6: $t2 := +($t6, $t7)
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t1 := +($t2, $t3)
+  3: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t7 := move($t0)
+     # live vars: $t3, $t4, $t7
+  4: $t6 := FunctionCall::foo_global($t7, $t3)
+     # live vars: $t4, $t6
+  5: $t2 := +($t4, $t6)
+     # live vars: $t2
+  6: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t1 := +($t3, $t4)
+     # live vars: $t1
+  4: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64
+     var $t3: &signer
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t3 := move($t0)
+     # live vars: $t1, $t3
+  1: $t5 := 42
+     # live vars: $t1, $t3, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t1, $t3, $t4
+  3: move_to<0x99::FunctionCall::S>($t3, $t4)
+     # live vars: $t1
+  4: $t6 := read_ref($t1)
+     # live vars: $t6
+  5: $t7 := 1
+     # live vars: $t6, $t7
+  6: $t2 := +($t6, $t7)
+     # live vars: $t2
+  7: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t1 := +($t2, $t3)
+     # live vars: $t1
+  3: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer [unused]
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t0 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t0, $t3)
+  5: $t4 := +($t4, $t6)
+  6: return $t4
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t3 := +($t3, $t4)
+  4: return $t3
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &signer [unused]
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+  0: $t0 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t0, $t4)
+  4: $t5 := read_ref($t1)
+  5: $t7 := 1
+  6: $t5 := +($t5, $t7)
+  7: return $t5
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t2 := +($t2, $t3)
+  3: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t2 := +($t2, $t3)
+  3: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer [unused]
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t0 := move($t0)
+     # live vars: $t0, $t3, $t4
+  4: $t6 := FunctionCall::foo_global($t0, $t3)
+     # live vars: $t4, $t6
+  5: $t4 := +($t4, $t6)
+     # live vars: $t4
+  6: return $t4
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t3 := +($t3, $t4)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &signer [unused]
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t5 := 42
+     # live vars: $t0, $t1, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t0, $t1, $t4
+  3: move_to<0x99::FunctionCall::S>($t0, $t4)
+     # live vars: $t1
+  4: $t5 := read_ref($t1)
+     # live vars: $t5
+  5: $t7 := 1
+     # live vars: $t5, $t7
+  6: $t5 := +($t5, $t7)
+     # live vars: $t5
+  7: return $t5
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer [unused]
+  0: $t3 := borrow_local($t1)
+  1: $t5 := copy($t0)
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+  3: $t0 := move($t0)
+  4: $t6 := FunctionCall::foo_global($t0, $t3)
+  5: $t4 := +($t4, $t6)
+  6: return $t4
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+  0: $t2 := borrow_local($t0)
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+  3: $t3 := +($t3, $t4)
+  4: return $t3
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &signer [unused]
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+  0: $t0 := move($t0)
+  1: $t5 := 42
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+  3: move_to<0x99::FunctionCall::S>($t0, $t4)
+  4: $t5 := read_ref($t1)
+  5: $t7 := 1
+  6: $t5 := +($t5, $t7)
+  7: return $t5
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t2 := +($t2, $t3)
+  3: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+  0: $t2 := read_ref($t0)
+  1: $t3 := 1
+  2: $t2 := +($t2, $t3)
+  3: return $t2
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer [unused]
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t0 := move($t0)
+     # live vars: $t0, $t3, $t4
+  4: $t6 := FunctionCall::foo_global($t0, $t3)
+     # live vars: $t4, $t6
+  5: $t4 := +($t4, $t6)
+     # live vars: $t4
+  6: return $t4
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t3 := +($t3, $t4)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &signer [unused]
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t5 := 42
+     # live vars: $t0, $t1, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t0, $t1, $t4
+  3: move_to<0x99::FunctionCall::S>($t0, $t4)
+     # live vars: $t1
+  4: $t5 := read_ref($t1)
+     # live vars: $t5
+  5: $t7 := 1
+     # live vars: $t5, $t7
+  6: $t5 := +($t5, $t7)
+     # live vars: $t5
+  7: return $t5
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun FunctionCall::bar_global($t0: &signer, $t1: u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &u64
+     var $t4: u64
+     var $t5: &signer
+     var $t6: u64
+     var $t7: &signer [unused]
+     # flush: $t3
+     # live vars: $t0, $t1
+  0: $t3 := borrow_local($t1)
+     # live vars: $t0, $t3
+  1: $t5 := copy($t0)
+     # live vars: $t0, $t3, $t5
+  2: $t4 := FunctionCall::foo_global($t5, $t3)
+     # live vars: $t0, $t3, $t4
+  3: $t0 := move($t0)
+     # live vars: $t0, $t3, $t4
+  4: $t6 := FunctionCall::foo_global($t0, $t3)
+     # live vars: $t4, $t6
+  5: $t4 := +($t4, $t6)
+     # live vars: $t4
+  6: return $t4
+}
+
+
+[variant baseline]
+fun FunctionCall::bar_mut_ref($t0: u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: &mut u64
+     var $t3: u64
+     var $t4: u64
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := borrow_local($t0)
+     # live vars: $t2
+  1: $t3 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t2, $t3
+  2: $t4 := FunctionCall::foo_mut_ref($t2)
+     # live vars: $t3, $t4
+  3: $t3 := +($t3, $t4)
+     # live vars: $t3
+  4: return $t3
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_global($t0: &signer, $t1: &u64): u64 {
+     var $t2: u64 [unused]
+     var $t3: &signer [unused]
+     var $t4: 0x99::FunctionCall::S
+     var $t5: u64
+     var $t6: u64 [unused]
+     var $t7: u64
+     # live vars: $t0, $t1
+  0: $t0 := move($t0)
+     # live vars: $t0, $t1
+  1: $t5 := 42
+     # live vars: $t0, $t1, $t5
+  2: $t4 := pack 0x99::FunctionCall::S($t5)
+     # live vars: $t0, $t1, $t4
+  3: move_to<0x99::FunctionCall::S>($t0, $t4)
+     # live vars: $t1
+  4: $t5 := read_ref($t1)
+     # live vars: $t5
+  5: $t7 := 1
+     # live vars: $t5, $t7
+  6: $t5 := +($t5, $t7)
+     # live vars: $t5
+  7: return $t5
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_mut_ref($t0: &mut u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+[variant baseline]
+fun FunctionCall::foo_ref($t0: &u64): u64 {
+     var $t1: u64 [unused]
+     var $t2: u64
+     var $t3: u64
+     # live vars: $t0
+  0: $t2 := read_ref($t0)
+     # live vars: $t2
+  1: $t3 := 1
+     # live vars: $t2, $t3
+  2: $t2 := +($t2, $t3)
+     # live vars: $t2
+  3: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FunctionCall
+struct S has key
+  val: u64
+
+// Function definition at index 0
+fun bar_global(l0: &signer, l1: u64): u64
+    local l2: &u64
+    borrow_loc l1
+    st_loc l2
+    copy_loc l0
+    copy_loc l2
+    call foo_global
+    // @5
+    move_loc l0
+    move_loc l2
+    call foo_global
+    add
+    ret
+
+// Function definition at index 1
+fun bar_mut_ref(l0: u64): u64
+    local l1: &mut u64
+    mut_borrow_loc l0
+    st_loc l1
+    copy_loc l1
+    call foo_mut_ref
+    move_loc l1
+    // @5
+    call foo_mut_ref
+    add
+    ret
+
+// Function definition at index 2
+fun foo_global(l0: &signer, l1: &u64): u64
+    move_loc l0
+    ld_u64 42
+    pack S
+    move_to S
+    move_loc l1
+    // @5
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 3
+fun foo_mut_ref(l0: &mut u64): u64
+    move_loc l0
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 4
+fun foo_ref(l0: &u64): u64
+    move_loc l0
+    read_ref
+    ld_u64 1
+    add
+    ret
+
+
+============ bytecode verification succeeded ========
