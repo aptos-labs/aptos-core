@@ -793,7 +793,7 @@ impl BlockReader for BlockStore {
                             return res;
                         }
                     } else {
-                        info!("Couldn't find execution time for {}", block.id());
+                        debug!("Couldn't find execution time for {}", block.id());
                     }
                     cur_block = self.get_block(block.parent_id());
                 },
