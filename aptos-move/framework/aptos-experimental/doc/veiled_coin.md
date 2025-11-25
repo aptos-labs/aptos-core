@@ -1295,7 +1295,7 @@ Like <code>unveil_to</code>, except the proofs have been deserialized into type-
     // <a href="veiled_coin.md#0x7_veiled_coin_Withdraw">Withdraw</a> `amount` from the veiled balance (leverages the homomorphism of the encryption scheme.)
     elgamal::ciphertext_sub_assign(&<b>mut</b> veiled_balance, &veiled_amount);
 
-    // Update the veiled balance <b>to</b> reflect the veiled withdrawal
+    // Update the veiled balance <b>to</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/reflect.md#0x1_reflect">reflect</a> the veiled withdrawal
     veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(&veiled_balance);
 
     // Emit <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> <b>to</b> indicate a veiled withdrawal occurred
@@ -1378,7 +1378,7 @@ Like <code>fully_veiled_transfer</code>, except the ciphertext and proofs have b
         &std::option::some(transfer_proof.zkrp_amount)
     );
 
-    // Update the veiled balance <b>to</b> reflect the veiled withdrawal
+    // Update the veiled balance <b>to</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/reflect.md#0x1_reflect">reflect</a> the veiled withdrawal
     sender_veiled_coin_store.veiled_balance = elgamal::compress_ciphertext(
         &veiled_balance
     );

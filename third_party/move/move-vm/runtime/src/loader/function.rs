@@ -7,6 +7,7 @@ use crate::{
     module_traversal::TraversalContext,
     native_functions::{NativeFunction, NativeFunctions, UnboxedNativeFunction},
     storage::{loader::traits::Loader, ty_layout_converter::LayoutConverter},
+    RuntimeEnvironment,
 };
 use better_any::{Tid, TidAble, TidExt};
 use lazy_static::lazy_static;
@@ -303,6 +304,25 @@ impl LazyLoadedFunction {
                 ty_args,
                 mask,
                 captured_layouts,
+            })),
+        })
+    }
+
+    pub(crate) fn new_resolved_not_capturing(
+        runtime_environment: &RuntimeEnvironment,
+        fun: Rc<LoadedFunction>,
+    ) -> PartialVMResult<Self> {
+        let ty_args = fun
+            .ty_args
+            .iter()
+            .map(|t| runtime_environment.ty_to_ty_tag(t))
+            .collect::<PartialVMResult<Vec<_>>>()?;
+        Ok(Self {
+            state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
+                fun,
+                ty_args,
+                mask: ClosureMask::empty(),
+                captured_layouts: Some(vec![]),
             })),
         })
     }
