@@ -19,14 +19,17 @@ MAX_STAKE_RATIO=30             # Maximum stake as percentage of total voting pow
 TESTNET_API="https://testnet.movementnetwork.xyz"
 MAINNET_API="https://mainnet.movementnetwork.xyz"
 
-VALIDATOR_IDENTITY_FILE="$1"
+# Operator identity
+OPERATOR_IDENTITY_FILE="$1"
 NETWORK_INPUT="$2"
 STAKE_AMOUNT="$3"
 VALIDATOR_HOST="$4"
-DRY_RUN="${5:-true}"
+VALIDATOR_OWNER_ACCOUNT="$5"
+VALIDATOR_OWNER_PRIVATE_KEY="$6"
+DRY_RUN="${7:-true}"
 
 help_message_and_exit() {
-    echo "Usage: $0 <validator-identity-file> <network> <stake-amount> <validator-host> [dry-run]"
+    echo "Usage: $0 <validator-identity-file> <network> <stake-amount> <validator-host> <validator-owner-account> <validator-owner-private-key> [dry-run]"
     echo "Network options:"
     echo "  testnet               - Movement testnet ($TESTNET_API)"
     echo "  mainnet               - Movement mainnet ($MAINNET_API)"
@@ -120,13 +123,13 @@ dependency_check() {
 }
 
 validate_input() {
-    if [ -z "$VALIDATOR_IDENTITY_FILE" ]; then
+    if [ -z "$OPERATOR_IDENTITY_FILE" ]; then
         echo "Error: Validator identity file not provided"
         help_message_and_exit
     fi
 
-    if [ ! -f "$VALIDATOR_IDENTITY_FILE" ]; then
-        echo "Error: Validator identity file not found: $VALIDATOR_IDENTITY_FILE"
+    if [ ! -f "$OPERATOR_IDENTITY_FILE" ]; then
+        echo "Error: Validator identity file not found: $OPERATOR_IDENTITY_FILE"
         help_message_and_exit
     fi
 
@@ -162,17 +165,27 @@ validate_input() {
         echo "Error: Validator host not provided"
         help_message_and_exit
     fi
+
+    if [ -z "$VALIDATOR_OWNER_ACCOUNT" ]; then
+        echo "Error: Validator account not provided"
+        help_message_and_exit
+    fi
+
+    if [ -z "$VALIDATOR_OWNER_PRIVATE_KEY" ]; then
+        echo "Error: Validator account private key not provided"
+        help_message_and_exit
+    fi
 }
 
 get_identities() {
     # Read values from YAML file and strip quotes
-    ACCOUNT_ADDRESS=$(grep "account_address:" "$VALIDATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
-    ACCOUNT_PRIVATE_KEY=$(grep "account_private_key:" "$VALIDATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
-    CONSENSUS_PRIVATE_KEY=$(grep "consensus_private_key:" "$VALIDATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
-    NETWORK_PRIVATE_KEY=$(grep "network_private_key:" "$VALIDATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
+    OPERATOR_ACCOUNT=$(grep "account_address:" "$OPERATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
+    OPERATOR_ACCOUNT_PRIVATE_KEY=$(grep "account_private_key:" "$OPERATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
+    CONSENSUS_PRIVATE_KEY=$(grep "consensus_private_key:" "$OPERATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
+    NETWORK_PRIVATE_KEY=$(grep "network_private_key:" "$OPERATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
 
     # Validate all fields are present
-    if [ -z "$ACCOUNT_ADDRESS" ] || [ -z "$ACCOUNT_PRIVATE_KEY" ] || [ -z "$CONSENSUS_PRIVATE_KEY" ] || [ -z "$NETWORK_PRIVATE_KEY" ]; then
+    if [ -z "$OPERATOR_ACCOUNT" ] || [ -z "$OPERATOR_ACCOUNT_PRIVATE_KEY" ] || [ -z "$CONSENSUS_PRIVATE_KEY" ] || [ -z "$NETWORK_PRIVATE_KEY" ]; then
         echo "Error: Missing required fields in validator identity file"
         echo "Required fields: account_address, account_private_key, consensus_private_key, network_private_key"
         exit 1
@@ -212,31 +225,31 @@ get_current_validator_set() {
 
 check_not_in_validator_set() {
     # Normalize account address to have 0x prefix for comparison
-    local normalized_account="0x${ACCOUNT_ADDRESS#0x}"
+    local normalized_account="0x${OPERATOR_ACCOUNT#0x}"
     
     # Check if account is already in active validators
     if echo "$ACTIVE_VALIDATORS" | grep -q "^${normalized_account}$"; then
-        echo "Error: Account $ACCOUNT_ADDRESS is already an active validator"
+        echo "Error: Account $OPERATOR_ACCOUNT is already an active validator"
         exit 1
     fi
 
     # Check if account is in pending active validators
     if [ -n "$PENDING_ACTIVE_VALIDATORS" ] && echo "$PENDING_ACTIVE_VALIDATORS" | grep -q "^${normalized_account}$"; then
-        echo "Error: Account $ACCOUNT_ADDRESS is already pending to become active validator"
+        echo "Error: Account $OPERATOR_ACCOUNT is already pending to become active validator"
         exit 1
     fi
 
     # Check if account is in pending inactive validators
     if [ -n "$PENDING_INACTIVE_VALIDATORS" ] && echo "$PENDING_INACTIVE_VALIDATORS" | grep -q "^${normalized_account}$"; then
-        echo "Error: Account $ACCOUNT_ADDRESS is pending to become inactive validator"
+        echo "Error: Account $OPERATOR_ACCOUNT is pending to become inactive validator"
         exit 1
     fi
 
-    echo "Account $ACCOUNT_ADDRESS is not in current validator set - proceeding"
+    echo "Account $OPERATOR_ACCOUNT is not in current validator set - proceeding"
 }
 
 check_account_balance() {
-    BALANCE_OUTPUT=$($MOVEMENT_CLI account balance --account $ACCOUNT_ADDRESS --url $NETWORK_API_ADDRESS 2>&1)
+    BALANCE_OUTPUT=$($MOVEMENT_CLI account balance --account $VALIDATOR_OWNER_ACCOUNT --url $NETWORK_API_ADDRESS 2>&1)
 
     if [ $? -ne 0 ]; then
         echo "Error: Failed to retrieve account balance"
@@ -272,13 +285,14 @@ validate_config() {
 }
 
 # Execution.
+# Validator owner operation.
 init_stake_owner() {
     $MOVEMENT_CLI stake initialize-stake-owner \
         --initial-stake-amount $STAKE_AMOUNT \
-        --operator-address $ACCOUNT_ADDRESS \
-        --voter-address $ACCOUNT_ADDRESS \
-        --sender-account $ACCOUNT_ADDRESS \
-        --private-key $ACCOUNT_PRIVATE_KEY \
+        --operator-address $OPERATOR_ACCOUNT \
+        --voter-address $OPERATOR_ACCOUNT \
+        --sender-account $VALIDATOR_OWNER_ACCOUNT \
+        --private-key $VALIDATOR_OWNER_PRIVATE_KEY \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
         --max-gas 2000 \
@@ -289,13 +303,14 @@ init_stake_owner() {
     fi
 }
 
+# Operator operation.
 update_consensus_keys() {
     $MOVEMENT_CLI node update-consensus-key \
-        --pool-address $ACCOUNT_ADDRESS \
+        --pool-address $VALIDATOR_OWNER_ACCOUNT \
         --consensus-public-key $CONSENSUS_PUBLIC_KEY \
         --proof-of-possession $CONSENSUS_POP \
-        --private-key $ACCOUNT_PRIVATE_KEY \
-        --sender-account $ACCOUNT_ADDRESS \
+        --private-key $OPERATOR_ACCOUNT_PRIVATE_KEY \
+        --sender-account $OPERATOR_ACCOUNT \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
         --max-gas 2000 \
@@ -306,13 +321,15 @@ update_consensus_keys() {
     fi
 }
 
+# Operator operation
+# TODO: add fullnode host here as well.
 update_network_address() {
     $MOVEMENT_CLI node update-validator-network-addresses \
-        --pool-address $ACCOUNT_ADDRESS \
+        --pool-address $VALIDATOR_OWNER_ACCOUNT \
         --validator-host $VALIDATOR_HOST \
         --validator-network-public-key $NETWORK_PUBLIC_KEY \
-        --private-key $ACCOUNT_PRIVATE_KEY \
-        --sender-account $ACCOUNT_ADDRESS \
+        --private-key $OPERATOR_ACCOUNT_PRIVATE_KEY \
+        --sender-account $OPERATOR_ACCOUNT \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
         --max-gas 2000 \
@@ -323,11 +340,12 @@ update_network_address() {
     fi
 }
 
+# Operator operation
 join_the_network() {
     $MOVEMENT_CLI node join-validator-set \
-        --pool-address $ACCOUNT_ADDRESS \
-        --private-key $ACCOUNT_PRIVATE_KEY \
-        --sender-account $ACCOUNT_ADDRESS \
+        --pool-address $VALIDATOR_OWNER_ACCOUNT \
+        --private-key $OPERATOR_ACCOUNT_PRIVATE_KEY \
+        --sender-account $OPERATOR_ACCOUNT \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
         --max-gas 2000 \
@@ -366,6 +384,16 @@ execute() {
     fi
 }
 
+execution_result() {
+    if [ "$DRY_RUN" = "true" ]; then
+        echo "Dry run completed. No changes were made."
+    else
+        echo "Execution completed. Validator set update was successful."
+        echo "Check the updated validator set at:"
+        echo "  $NETWORK_API_ADDRESS/v1/accounts/0x1/resource/0x1::stake::ValidatorSet"
+    fi
+}
+
 
 execution_summary() {
     echo ""
@@ -375,8 +403,12 @@ execution_summary() {
     echo "  Total Voting Power:      $TOTAL_VOTING_POWER octas"
     echo "  Active Validators:       $ACTIVE_VALIDATOR_COUNT"
     echo ""
-    echo "Validator Configuration:"
-    echo "  Account Address:         $ACCOUNT_ADDRESS"
+    echo "Operator Configuration:"
+    echo ""
+    echo "  Account Address:         $OPERATOR_ACCOUNT"
+    echo ""
+    echo "Validator Owner Configuration:"
+    echo "  Account Address:         $VALIDATOR_OWNER_ACCOUNT"
     echo "  Account Balance:         $BALANCE"
     echo "  Stake Amount:            $STAKE_AMOUNT"
     echo "  Validator Host:          $VALIDATOR_HOST"
@@ -404,3 +436,4 @@ check_not_in_validator_set
 check_account_balance
 execution_summary
 execute
+execution_result
