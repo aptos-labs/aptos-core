@@ -1,0 +1,52 @@
+name: Monitor GH Rate Limit and Upload to GCS (gcloud storage)
+
+on:
+  workflow_dispatch:
+#   schedule: # NOTE: the schedule is dictated by PIES
+  push:
+    branches:
+      - 11-21-_gha_monitor_gha_rate_limit # testing
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  RATE_LIMIT_BUCKET: github-rate-limit-bucket
+
+jobs:
+  collect-and-upload:
+    runs-on: runs-on,runner=2cpu-ubuntu22-x64,run-id=${{ github.run_id }}
+
+    steps:
+      - name: Query GitHub API rate limits
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          # Fetch rate limit from GitHub API
+          RATE_LIMIT_DATA=$(curl -s -H "Authorization: Bearer $GITHUB_TOKEN" \
+            https://api.github.com/rate_limit)
+          
+          # Wrap with metadata
+          jq -n \
+            --arg token_name "GITHUB_TOKEN" \
+            --argjson rate_limit "$RATE_LIMIT_DATA" \
+            '{
+              metadata: {
+                token_name: $token_name
+              },
+              rate_limit: $rate_limit
+            }' > rate_limit.json
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_SERVICE_ACCOUNT_EMAIL }} # needed because gcloud storage is GA but under alpha surface on some images
+
+      - name: Upload to GCS using gcloud storage with timestamp
+        run: |
+          TIMESTAMP=$(date -u +%Y-%m-%d_%H%M%S)
+          REPO_NAME="${{ github.repository }}"
+          gcloud storage cp rate_limit.json \
+            gs://${{ env.RATE_LIMIT_BUCKET }}/${REPO_NAME}/${TIMESTAMP}.json
