@@ -1,0 +1,7110 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := 42
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+     # refs: []
+     #
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 100
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `GlobalAccess::S`] at line 22
+     #
+  4: write_ref($t3, $t1)
+     # live vars:
+     # refs: []
+     #
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+     # refs: [$t4 => #4, $t6 => #6]
+     # #4
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #   -> #6 via [struct `GlobalAccess::S`] at line 36
+     #
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [struct `GlobalAccess::S`] at line 36
+     #
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+     # refs: []
+     #
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+     # refs: []
+     #
+  9: return $t1
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := 42
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 100
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `GlobalAccess::S`] at line 22
+     #
+  4: write_ref($t3, $t1)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_from_S($t0)
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t6
+     # refs: [$t4 => #4, $t6 => #6]
+     # #4
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #   -> #6 via [struct `GlobalAccess::S`] at line 36
+     #
+  5: $t5 := read_ref($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [struct `GlobalAccess::S`] at line 36
+     #
+  7: $t7 := read_ref($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t7
+     # refs: []
+     #
+  8: $t1 := +($t5, $t7)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  9: return $t1
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # flush: $t1
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # flush: $t1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # flush: $t1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # flush: $t1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # flush: $t1
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := 42
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+     # refs: []
+     #
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 100
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `GlobalAccess::S`] at line 22
+     #
+  4: write_ref($t3, $t1)
+     # live vars:
+     # refs: []
+     #
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # flush: $t1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_from_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # flush: $t1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # flush: $t1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # flush: $t2
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+     # refs: [$t4 => #4, $t6 => #6]
+     # #4
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #   -> #6 via [struct `GlobalAccess::S`] at line 36
+     #
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [struct `GlobalAccess::S`] at line 36
+     #
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+     # refs: []
+     #
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+     # refs: []
+     #
+  9: return $t1
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # reaching instruction #1: `t0` @ {0}
+     # refs: []
+     #
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # flush: $t1
+     # live vars: $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: []
+     #
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+     # reaching instruction #2: `t1` @ {1}, `t2` @ {0}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {1}
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # live vars: $t1
+     # reaching instruction #1: `t1` @ {0}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := 42
+     # live vars: $t1, $t3
+     # reaching instruction #2: `t1` @ {0}, `t3` @ {1}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+     # reaching instruction #3: `t1` @ {0}, `t2` @ {2}, `t3` @ {1}
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+     # reaching instruction #4: `t1` @ {0}, `t2` @ {2}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {3}
+     # refs: []
+     #
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 100
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+     # reaching instruction #2: `t1` @ {1}, `t2` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+     # reaching instruction #3: `t1` @ {1}, `t2` @ {0}, `t4` @ {2}
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+     # reaching instruction #4: `t1` @ {1}, `t2` @ {0}, `t3` @ {3}, `t4` @ {2}
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `GlobalAccess::S`] at line 22
+     #
+  4: write_ref($t3, $t1)
+     # live vars:
+     # reaching instruction #5: `t1` @ {1}, `t2` @ {0}, `t3` @ {3}, `t4` @ {2}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {4}
+     # refs: []
+     #
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # reaching instruction #3: `t2` @ {0}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # reaching instruction #5: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+     # reaching instruction #6: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # reaching instruction #7: `t1` @ {6}, `t2` @ {0}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # reaching instruction #8: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  8: label L1
+     # flush: $t1
+     # live vars:
+     # reaching instruction #9: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # reaching instruction #10: `t1` @ {6, 9}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # reaching instruction #11: `t1` @ {6, 9}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_from_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # reaching instruction #3: `t2` @ {0}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # reaching instruction #5: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+     # reaching instruction #6: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # reaching instruction #7: `t1` @ {6}, `t2` @ {0}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # reaching instruction #8: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  8: label L1
+     # flush: $t1
+     # live vars:
+     # reaching instruction #9: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # reaching instruction #10: `t1` @ {6, 9}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # reaching instruction #11: `t1` @ {6, 9}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # reaching instruction #3: `t2` @ {0}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # reaching instruction #5: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  5: label L0
+     # flush: $t1
+     # live vars: $t4
+     # reaching instruction #6: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # reaching instruction #7: `t1` @ {6}, `t2` @ {0}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # reaching instruction #8: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  8: label L1
+     # flush: $t1
+     # live vars:
+     # reaching instruction #9: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # reaching instruction #10: `t1` @ {6, 9}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # reaching instruction #11: `t1` @ {6, 9}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # flush: $t2
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # reaching instruction #1: `t2` @ {0}
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # reaching instruction #2: `t2` @ {0}, `t3` @ {1}
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+     # reaching instruction #3: `t2` @ {0}, `t3` @ {1}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # reaching instruction #4: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+     # reaching instruction #5: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t6` @ {4}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: [$t4 => #4, $t6 => #6]
+     # #4
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #   -> #6 via [struct `GlobalAccess::S`] at line 36
+     #
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+     # reaching instruction #6: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t5` @ {5}, `t6` @ {4}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+     # reaching instruction #7: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t5` @ {5}, `t6` @ {4}, `t8` @ {6}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [struct `GlobalAccess::S`] at line 36
+     #
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+     # reaching instruction #8: `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t5` @ {5}, `t6` @ {4}, `t7` @ {7}, `t8` @ {6}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+     # reaching instruction #9: `t1` @ {8}, `t2` @ {0}, `t3` @ {1}, `t4` @ {3}, `t5` @ {5}, `t6` @ {4}, `t7` @ {7}, `t8` @ {6}, `Struct QualifiedId { module_id: ModuleId(2), id: StructId(Symbol(140)) }` @ {2}
+     # refs: []
+     #
+  9: return $t1
+}
+
+============ after CommonSubexpElimination: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := infer($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := infer($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := infer($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := infer($t4)
+     # live vars: $t1
+  7: goto 10
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: label L2
+     # live vars: $t1
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := 42
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+     # refs: []
+     #
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 100
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `GlobalAccess::S`] at line 22
+     #
+  4: write_ref($t3, $t1)
+     # live vars:
+     # refs: []
+     #
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+     # refs: [$t4 => #4, $t6 => #6]
+     # #4
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #   -> #6 via [struct `GlobalAccess::S`] at line 36
+     #
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [struct `GlobalAccess::S`] at line 36
+     #
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+     # refs: []
+     #
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+     # refs: []
+     #
+  9: return $t1
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # abort state: {returns,aborts}
+     # live vars:
+     # refs: []
+     #
+  0: $t0 := vector::empty<u8>()
+     # abort state: {returns}
+     # live vars: $t0
+     # refs: []
+     #
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2
+     # refs: []
+     #
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t1 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := 42
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t3
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: [$t1 => #1]
+     # #1
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := 100
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t1
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: $t4 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t4
+     # refs: []
+     #
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # abort state: {returns}
+     # live vars: $t1, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> (mut) #3 via [struct `GlobalAccess::S`] at line 22
+     #
+  4: write_ref($t3, $t1)
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::move_from_S($t0)
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # abort state: {returns}
+     # live vars: $t2, $t3
+     # refs: []
+     #
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns}
+     # live vars: $t3, $t4
+     # refs: []
+     #
+  4: if ($t3) goto 5 else goto 8
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  5: label L0
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  6: $t1 := infer($t4)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  7: goto 10
+     # abort state: {returns}
+     # live vars: $t4
+     # refs: []
+     #
+  8: label L1
+     # abort state: {returns}
+     # live vars:
+     # refs: []
+     #
+  9: $t1 := false
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 10: label L2
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  0: $t2 := signer::address_of($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2
+     # refs: [$t0 => #0]
+     # #0
+     #   <no edges>
+     # #root
+     #   <no edges>
+     #
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t2, $t3
+     # refs: [$t0 => #0, $t3 => #3]
+     # #0
+     #   <no edges>
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  2: GlobalAccess::move_to_S($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t2, $t3
+     # refs: [$t3 => #3]
+     # #3
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # abort state: {returns,aborts}
+     # live vars: $t3, $t4
+     # refs: [$t3 => #3, $t4 => #4]
+     # #3
+     #   <no edges>
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #3 via [struct `GlobalAccess::S`] at line 33
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t6
+     # refs: [$t4 => #4, $t6 => #6]
+     # #4
+     #   <no edges>
+     # #6
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #   -> #6 via [struct `GlobalAccess::S`] at line 36
+     #
+  5: $t5 := read_ref($t6)
+     # abort state: {returns,aborts}
+     # live vars: $t4, $t5
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   -> #4 via [struct `GlobalAccess::S`] at line 35
+     #
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t8
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   -> #8 via [struct `GlobalAccess::S`] at line 36
+     #
+  7: $t7 := read_ref($t8)
+     # abort state: {returns,aborts}
+     # live vars: $t5, $t7
+     # refs: []
+     #
+  8: $t1 := +($t5, $t7)
+     # abort state: {returns}
+     # live vars: $t1
+     # refs: []
+     #
+  9: return $t1
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: goto 10
+  8: label L1
+  9: $t1 := false
+ 10: label L2
+ 11: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # maybe
+  0: $t0 := vector::empty<u8>()
+     # maybe
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # maybe
+  0: $t2 := signer::address_of($t0)
+     # maybe
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # maybe
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # maybe
+  0: $t1 := move($t0)
+     # maybe
+  1: $t3 := 42
+     # maybe
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # maybe
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # maybe
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # maybe
+  0: $t2 := 100
+     # maybe
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # maybe
+  2: $t4 := signer::address_of($t0)
+     # maybe
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # maybe
+  4: write_ref($t3, $t1)
+     # maybe
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # maybe
+  0: $t2 := signer::address_of($t0)
+     # maybe
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # maybe
+  2: GlobalAccess::move_to_S($t0)
+     # maybe
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # maybe
+  4: if ($t3) goto 5 else goto 8
+     # maybe
+  5: label L0
+     # maybe
+  6: $t1 := move($t4)
+     # maybe
+  7: return $t1
+     # maybe
+  8: label L1
+     # maybe
+  9: $t1 := false
+     # maybe
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # maybe
+  0: $t2 := signer::address_of($t0)
+     # maybe
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # maybe
+  2: GlobalAccess::move_from_S($t0)
+     # maybe
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # maybe
+  4: if ($t3) goto 5 else goto 8
+     # maybe
+  5: label L0
+     # maybe
+  6: $t1 := move($t4)
+     # maybe
+  7: return $t1
+     # maybe
+  8: label L1
+     # maybe
+  9: $t1 := false
+     # maybe
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # maybe
+  0: $t2 := signer::address_of($t0)
+     # maybe
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # maybe
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # maybe
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # maybe
+  4: if ($t3) goto 5 else goto 8
+     # maybe
+  5: label L0
+     # maybe
+  6: $t1 := move($t4)
+     # maybe
+  7: return $t1
+     # maybe
+  8: label L1
+     # maybe
+  9: $t1 := false
+     # maybe
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # maybe
+  0: $t2 := signer::address_of($t0)
+     # maybe
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # maybe
+  2: GlobalAccess::move_to_S($t0)
+     # maybe
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # maybe
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # maybe
+  5: $t5 := read_ref($t6)
+     # maybe
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # maybe
+  7: $t7 := read_ref($t8)
+     # maybe
+  8: $t1 := +($t5, $t7)
+     # maybe
+  9: return $t1
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := move($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := move($t4)
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := move($t4)
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := move($t4)
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t1 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t1 := move($t4)
+  7: return $t1
+  8: label L1
+  9: $t1 := false
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t8)
+  8: $t1 := +($t5, $t7)
+  9: return $t1
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t1 := move($t0)
+     # live vars: $t1
+  1: $t3 := 42
+     # live vars: $t1, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t1, $t2
+  3: move_to<0x99::GlobalAccess::S>($t1, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := move($t4)
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := move($t4)
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t1 := move($t4)
+     # live vars: $t1
+  7: return $t1
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t1 := false
+     # live vars: $t1
+ 10: return $t1
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t8 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t8
+  7: $t7 := read_ref($t8)
+     # live vars: $t5, $t7
+  8: $t1 := +($t5, $t7)
+     # live vars: $t1
+  9: return $t1
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer [unused]
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t0 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t0, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t3 := move($t4)
+  7: return $t3
+  8: label L1
+  9: $t3 := false
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t3 := move($t4)
+  7: return $t3
+  8: label L1
+  9: $t3 := false
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t3 := move($t4)
+  7: return $t3
+  8: label L1
+  9: $t3 := false
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64 [unused]
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64 [unused]
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t6)
+  8: $t5 := +($t5, $t7)
+  9: return $t5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer [unused]
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 42
+     # live vars: $t0, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t0, $t2
+  3: move_to<0x99::GlobalAccess::S>($t0, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64 [unused]
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64 [unused]
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t6
+  7: $t7 := read_ref($t6)
+     # live vars: $t5, $t7
+  8: $t5 := +($t5, $t7)
+     # live vars: $t5
+  9: return $t5
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+  0: $t0 := vector::empty<u8>()
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+  0: $t2 := signer::address_of($t0)
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer [unused]
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+  0: $t0 := move($t0)
+  1: $t3 := 42
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+  3: move_to<0x99::GlobalAccess::S>($t0, $t2)
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+  0: $t2 := 100
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+  2: $t4 := signer::address_of($t0)
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+  4: write_ref($t3, $t1)
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t3 := move($t4)
+  7: return $t3
+  8: label L1
+  9: $t3 := false
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_from_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t3 := move($t4)
+  7: return $t3
+  8: label L1
+  9: $t3 := false
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::mutable_borrow_S($t0)
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+  4: if ($t3) goto 5 else goto 8
+  5: label L0
+  6: $t3 := move($t4)
+  7: return $t3
+  8: label L1
+  9: $t3 := false
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64 [unused]
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64 [unused]
+  0: $t2 := signer::address_of($t0)
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+  2: GlobalAccess::move_to_S($t0)
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+  5: $t5 := read_ref($t6)
+  6: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+  7: $t7 := read_ref($t6)
+  8: $t5 := +($t5, $t7)
+  9: return $t5
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer [unused]
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 42
+     # live vars: $t0, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t0, $t2
+  3: move_to<0x99::GlobalAccess::S>($t0, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64 [unused]
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64 [unused]
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t6
+  7: $t7 := read_ref($t6)
+     # live vars: $t5, $t7
+  8: $t5 := +($t5, $t7)
+     # live vars: $t5
+  9: return $t5
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun GlobalAccess::dummy_func(): vector<u8> {
+     var $t0: vector<u8>
+     # live vars:
+  0: $t0 := vector::empty<u8>()
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_from_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: address
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # flush: $t1
+     # live vars: $t2
+  1: $t1 := move_from<0x99::GlobalAccess::S>($t2)
+     # live vars:
+  2: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::move_to_S($t0: &signer) {
+     var $t1: &signer [unused]
+     var $t2: 0x99::GlobalAccess::S
+     var $t3: u64
+     # live vars: $t0
+  0: $t0 := move($t0)
+     # live vars: $t0
+  1: $t3 := 42
+     # live vars: $t0, $t3
+  2: $t2 := pack 0x99::GlobalAccess::S($t3)
+     # live vars: $t0, $t2
+  3: move_to<0x99::GlobalAccess::S>($t0, $t2)
+     # live vars:
+  4: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::mutable_borrow_S($t0: &signer) {
+     var $t1: 0x99::GlobalAccess::S
+     var $t2: u64
+     var $t3: &mut 0x99::GlobalAccess::S
+     var $t4: address
+     # live vars: $t0
+  0: $t2 := 100
+     # live vars: $t0, $t2
+  1: $t1 := pack 0x99::GlobalAccess::S($t2)
+     # live vars: $t0, $t1
+  2: $t4 := signer::address_of($t0)
+     # live vars: $t1, $t4
+  3: $t3 := borrow_global<0x99::GlobalAccess::S>($t4)
+     # live vars: $t1, $t3
+  4: write_ref($t3, $t1)
+     # live vars:
+  5: return ()
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v1($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v2($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_from_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_existence_check_v3($t0: &signer): bool {
+     var $t1: bool [unused]
+     var $t2: address
+     var $t3: bool
+     var $t4: bool
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::mutable_borrow_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := exists<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: if ($t3) goto 5 else goto 8
+     # live vars: $t4
+  5: label L0
+     # live vars: $t4
+  6: $t3 := move($t4)
+     # live vars: $t3
+  7: return $t3
+     # live vars: $t4
+  8: label L1
+     # live vars:
+  9: $t3 := false
+     # live vars: $t3
+ 10: return $t3
+}
+
+
+[variant baseline]
+fun GlobalAccess::test_global_borrow_v1($t0: &signer): u64 {
+     var $t1: u64 [unused]
+     var $t2: address
+     var $t3: &0x99::GlobalAccess::S
+     var $t4: &0x99::GlobalAccess::S
+     var $t5: u64
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &u64 [unused]
+     # flush: $t2
+     # live vars: $t0
+  0: $t2 := signer::address_of($t0)
+     # live vars: $t0, $t2
+  1: $t3 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t0, $t2, $t3
+  2: GlobalAccess::move_to_S($t0)
+     # flush: $t4
+     # live vars: $t2, $t3
+  3: $t4 := borrow_global<0x99::GlobalAccess::S>($t2)
+     # live vars: $t3, $t4
+  4: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t3)
+     # live vars: $t4, $t6
+  5: $t5 := read_ref($t6)
+     # live vars: $t4, $t5
+  6: $t6 := borrow_field<0x99::GlobalAccess::S>.val($t4)
+     # live vars: $t5, $t6
+  7: $t7 := read_ref($t6)
+     # live vars: $t5, $t7
+  8: $t5 := +($t5, $t7)
+     # live vars: $t5
+  9: return $t5
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::GlobalAccess
+use 0x1::signer
+struct S has drop + key
+  val: u64
+
+struct S1 has drop + key
+  val: u64
+
+// Function definition at index 0
+fun dummy_func(): vector<u8>
+    vec_pack <u8>, 0
+    ret
+
+// Function definition at index 1
+fun move_from_S(l0: &signer) acquires S
+    move_loc l0
+    call signer::address_of
+    move_from S
+    pop
+    ret
+
+// Function definition at index 2
+fun move_to_S(l0: &signer)
+    move_loc l0
+    ld_u64 42
+    pack S
+    move_to S
+    ret
+
+// Function definition at index 3
+fun mutable_borrow_S(l0: &signer) acquires S
+    ld_u64 100
+    pack S
+    move_loc l0
+    call signer::address_of
+    mut_borrow_global S
+    // @5
+    write_ref
+    ret
+
+// Function definition at index 4
+fun test_existence_check_v1(l0: &signer): bool
+    local l1: address
+    local l2: bool
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists S
+    // @5
+    move_loc l0
+    call move_to_S
+    move_loc l1
+    exists S
+    st_loc l2
+    // @10
+    br_false l0
+    move_loc l2
+    ret
+l0: ld_false
+    ret
+
+// Function definition at index 5
+fun test_existence_check_v2(l0: &signer): bool acquires S
+    local l1: address
+    local l2: bool
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists S
+    // @5
+    move_loc l0
+    call move_from_S
+    move_loc l1
+    exists S
+    st_loc l2
+    // @10
+    br_false l0
+    move_loc l2
+    ret
+l0: ld_false
+    ret
+
+// Function definition at index 6
+fun test_existence_check_v3(l0: &signer): bool acquires S
+    local l1: address
+    local l2: bool
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    exists S
+    // @5
+    move_loc l0
+    call mutable_borrow_S
+    move_loc l1
+    exists S
+    st_loc l2
+    // @10
+    br_false l0
+    move_loc l2
+    ret
+l0: ld_false
+    ret
+
+// Function definition at index 7
+fun test_global_borrow_v1(l0: &signer): u64 acquires S
+    local l1: address
+    local l2: &S
+    copy_loc l0
+    call signer::address_of
+    st_loc l1
+    copy_loc l1
+    borrow_global S
+    // @5
+    move_loc l0
+    call move_to_S
+    move_loc l1
+    borrow_global S
+    st_loc l2
+    // @10
+    borrow_field S, val
+    read_ref
+    move_loc l2
+    borrow_field S, val
+    read_ref
+    // @15
+    add
+    ret
+
+
+============ bytecode verification succeeded ========

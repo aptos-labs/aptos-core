@@ -1,0 +1,81 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x42::test
+struct W has copy + drop + store + key
+  x: u64
+
+// Function definition at index 0
+fun foo_2(l0: address, l1: W) acquires W
+    move_loc l0
+    mut_borrow_global W
+    move_loc l1
+    call merge
+    ret
+
+// Function definition at index 1
+fun greater(l0: &W, l1: W): bool
+    move_loc l0
+    borrow_field W, x
+    read_ref
+    borrow_loc l1
+    borrow_field W, x
+    // @5
+    read_ref
+    gt
+    ret
+
+// Function definition at index 2
+fun merge(l0: &mut W, l1: W)
+    local l2: u64
+    local l3: &mut u64
+    borrow_loc l1
+    borrow_field W, x
+    read_ref
+    st_loc l2
+    move_loc l0
+    // @5
+    mut_borrow_field W, x
+    st_loc l3
+    copy_loc l3
+    read_ref
+    move_loc l2
+    // @10
+    add
+    move_loc l3
+    write_ref
+    ret
+
+// Function definition at index 3
+fun test_receiver() acquires W
+    local l0: W
+    ld_u64 3
+    pack W
+    st_loc l0
+    ld_const<address> 1
+    borrow_global W
+    // @5
+    copy_loc l0
+    call greater
+    br_true l0
+    ld_const<address> 1
+    move_loc l0
+    // @10
+    call foo_2
+    ld_const<address> 1
+    borrow_global W
+    borrow_field W, x
+    read_ref
+    // @15
+    ld_u64 5
+    eq
+    br_false l1
+    ret
+l1: ld_u64 0
+    // @20
+    abort
+l0: ld_u64 0
+    abort
+
+
+============ bytecode verification succeeded ========

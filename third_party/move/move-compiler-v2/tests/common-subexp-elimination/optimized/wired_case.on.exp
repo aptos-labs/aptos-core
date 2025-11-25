@@ -1,0 +1,795 @@
+============ bytecode before first stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := infer($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := infer($t4)
+  3: $t2 := option::none<u64>()
+  4: $t3 := option::none<u64>()
+  5: return ($t1, $t2, $t3)
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := infer($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := infer($t4)
+  3: $t2 := option::none<u64>()
+  4: $t3 := option::none<u64>()
+  5: return ($t1, $t2, $t3)
+}
+
+============ after uninitialized_use_checker: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := infer($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := infer($t4)
+  3: $t2 := option::none<u64>()
+  4: $t3 := option::none<u64>()
+  5: return ($t1, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := infer($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+  5: return ($t1, $t2, $t3)
+}
+
+============ after UnusedAssignmentChecker: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := infer($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+  5: return ($t1, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := infer($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+  5: return ($t1, $t2, $t3)
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+     # refs: []
+     #
+  2: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  5: return ($t1, $t2, $t3)
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  1: $t4 := *($t5, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t4
+     # refs: []
+     #
+  2: $t1 := infer($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  3: $t2 := option::none<u64>()
+     # abort state: {returns,aborts}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  4: $t3 := option::none<u64>()
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  5: return ($t1, $t2, $t3)
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := move($t4)
+  3: $t2 := option::none<u64>()
+  4: $t3 := option::none<u64>()
+  5: return ($t1, $t2, $t3)
+}
+
+============ bytecode before second stackless bytecode pipeline ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := infer($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := infer($t4)
+  3: $t2 := option::none<u64>()
+  4: $t3 := option::none<u64>()
+  5: return ($t1, $t2, $t3)
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := infer($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := infer($t4)
+  3: $t2 := option::none<u64>()
+  4: $t3 := option::none<u64>()
+  5: return ($t1, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := infer($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+  5: return ($t1, $t2, $t3)
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := infer($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+  5: return ($t1, $t2, $t3)
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+     # refs: []
+     #
+  2: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  5: return ($t1, $t2, $t3)
+}
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+     # reaching instruction #1: `t5` @ {0}
+     # refs: []
+     #
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+     # reaching instruction #2: `t4` @ {1}, `t5` @ {0}
+     # refs: []
+     #
+  2: $t1 := infer($t4)
+     # live vars: $t1
+     # reaching instruction #3: `t1` @ {2}, `t5` @ {0}
+     # refs: []
+     #
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+     # reaching instruction #4: `t1` @ {2}, `t2` @ {3}, `t5` @ {0}
+     # refs: []
+     #
+  4: $t3 := option::none<u64>()
+     # live vars: $t1, $t2, $t3
+     # reaching instruction #5: `t1` @ {2}, `t2` @ {3}, `t3` @ {4}, `t5` @ {0}
+     # refs: []
+     #
+  5: return ($t1, $t2, $t3)
+}
+
+============ after CommonSubexpElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := infer($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := infer($t4)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t1, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := infer($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t2 := dup($t2)
+     # live vars: $t1, $t2
+  5: $t3 := dup($t2)
+     # live vars: $t1, $t2, $t3
+  6: return ($t1, $t2, $t3)
+}
+
+============ after ReferenceSafetyProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+     # refs: []
+     #
+  2: $t1 := infer($t4)
+     # live vars: $t1
+     # refs: []
+     #
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  4: $t2 := dup($t2)
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  5: $t3 := dup($t2)
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  6: return ($t1, $t2, $t3)
+}
+
+============ after AbortAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # abort state: {returns,aborts}
+     # live vars: $t0
+     # refs: []
+     #
+  0: $t5 := infer($t0)
+     # abort state: {returns,aborts}
+     # live vars: $t0, $t5
+     # refs: []
+     #
+  1: $t4 := *($t5, $t0)
+     # abort state: {returns,aborts}
+     # live vars: $t4
+     # refs: []
+     #
+  2: $t1 := infer($t4)
+     # abort state: {returns,aborts}
+     # live vars: $t1
+     # refs: []
+     #
+  3: $t2 := option::none<u64>()
+     # abort state: {returns}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  4: $t2 := dup($t2)
+     # abort state: {returns}
+     # live vars: $t1, $t2
+     # refs: []
+     #
+  5: $t3 := dup($t2)
+     # abort state: {returns}
+     # live vars: $t1, $t2, $t3
+     # refs: []
+     #
+  6: return ($t1, $t2, $t3)
+}
+
+============ after AbilityProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := move($t4)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t1, $t2, $t3)
+}
+
+============ after ControlFlowGraphSimplifier: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := move($t4)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t1, $t2, $t3)
+}
+
+============ after SplitCriticalEdgesProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := move($t4)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t1, $t2, $t3)
+}
+
+============ after UnreachableCodeProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # maybe
+  0: $t5 := copy($t0)
+     # maybe
+  1: $t4 := *($t5, $t0)
+     # maybe
+  2: $t1 := move($t4)
+     # maybe
+  3: $t2 := option::none<u64>()
+     # maybe
+  4: $t2 := dup($t2)
+     # maybe
+  5: $t3 := dup($t2)
+     # maybe
+  6: return ($t1, $t2, $t3)
+}
+
+============ after UnreachableCodeRemover: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := move($t4)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t1, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := move($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t2 := dup($t2)
+     # live vars: $t1, $t2
+  5: $t3 := dup($t2)
+     # live vars: $t1, $t2, $t3
+  6: return ($t1, $t2, $t3)
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t4 := *($t5, $t0)
+  2: $t1 := move($t4)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t1, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t5
+  1: $t4 := *($t5, $t0)
+     # live vars: $t4
+  2: $t1 := move($t4)
+     # live vars: $t1
+  3: $t2 := option::none<u64>()
+     # live vars: $t1, $t2
+  4: $t2 := dup($t2)
+     # live vars: $t1, $t2
+  5: $t3 := dup($t2)
+     # live vars: $t1, $t2, $t3
+  6: return ($t1, $t2, $t3)
+}
+
+============ after VariableCoalescingTransformer: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64 [unused]
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64 [unused]
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t0 := *($t5, $t0)
+  2: $t0 := move($t0)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t0, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64 [unused]
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64 [unused]
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t5
+  1: $t0 := *($t5, $t0)
+     # live vars: $t0
+  2: $t0 := move($t0)
+     # live vars: $t0
+  3: $t2 := option::none<u64>()
+     # live vars: $t0, $t2
+  4: $t2 := dup($t2)
+     # live vars: $t0, $t2
+  5: $t3 := dup($t2)
+     # live vars: $t0, $t2, $t3
+  6: return ($t0, $t2, $t3)
+}
+
+============ after DeadStoreElimination: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64 [unused]
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64 [unused]
+     var $t5: u64
+  0: $t5 := copy($t0)
+  1: $t0 := *($t5, $t0)
+  2: $t0 := move($t0)
+  3: $t2 := option::none<u64>()
+  4: $t2 := dup($t2)
+  5: $t3 := dup($t2)
+  6: return ($t0, $t2, $t3)
+}
+
+============ after LiveVarAnalysisProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64 [unused]
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64 [unused]
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t5
+  1: $t0 := *($t5, $t0)
+     # live vars: $t0
+  2: $t0 := move($t0)
+     # live vars: $t0
+  3: $t2 := option::none<u64>()
+     # live vars: $t0, $t2
+  4: $t2 := dup($t2)
+     # live vars: $t0, $t2
+  5: $t3 := dup($t2)
+     # live vars: $t0, $t2, $t3
+  6: return ($t0, $t2, $t3)
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::test($t0: u64): (u64, 0x1::option::Option<u64>, 0x1::option::Option<u64>) {
+     var $t1: u64 [unused]
+     var $t2: 0x1::option::Option<u64>
+     var $t3: 0x1::option::Option<u64>
+     var $t4: u64 [unused]
+     var $t5: u64
+     # live vars: $t0
+  0: $t5 := copy($t0)
+     # live vars: $t0, $t5
+  1: $t0 := *($t5, $t0)
+     # live vars: $t0
+  2: $t0 := move($t0)
+     # flush: $t2
+     # live vars: $t0
+  3: $t2 := option::none<u64>()
+     # flush: $t2
+     # live vars: $t0, $t2
+  4: $t2 := dup($t2)
+     # live vars: $t0, $t2
+  5: $t3 := dup($t2)
+     # live vars: $t0, $t2, $t3
+  6: return ($t0, $t2, $t3)
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xc0ffee::m
+use 0x1::option
+// Function definition at index 0
+fun test(l0: u64): (u64, option::Option<u64>, option::Option<u64>)
+    local l1: option::Option<u64>
+    copy_loc l0
+    move_loc l0
+    mul
+    call option::none<u64>
+    st_loc l1
+    // @5
+    copy_loc l1
+    copy_loc l1
+    ret
+
+
+============ bytecode verification succeeded ========
