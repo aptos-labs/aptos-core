@@ -610,11 +610,16 @@ fn load_constructor_function(
     }
 
     // Construct the type arguments from the match.
-    let Ok(ty_args) = map.verify_and_extract_type_args(function.ty_param_abilities()) else {
-        return Err(
-            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(module_loc()),
-        );
-    };
+    let num_ty_args = function.ty_param_abilities().len();
+    let mut ty_args = Vec::with_capacity(num_ty_args);
+    for i in 0..num_ty_args {
+        ty_args.push(map.get_ty_param(i as u16).ok_or_else(|| {
+            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(module_loc())
+        })?);
+    }
+
+    Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
+        .map_err(|e| e.finish(module_loc()))?;
     let ty_args_id = loader
         .runtime_environment()
         .ty_pool()
