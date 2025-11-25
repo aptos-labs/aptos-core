@@ -31,7 +31,7 @@ fun test(l0: &mut S, l1: vector<u8>): option::Option<T>
     // @5
     ld_u64 0
     st_loc l4
-    ld_u64 0
+    copy_loc l4
     st_loc l5
     copy_loc l2
     // @10

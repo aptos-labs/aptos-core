@@ -1,0 +1,48 @@
+
+Diagnostics:
+warning: unused alias
+  ┌─ tests/common-subexp-elimination/optimized/function_call.move:3:14
+  │
+3 │     use std::bit_vector;
+  │              ^^^^^^^^^^ Unused 'use' of alias 'bit_vector'. Consider removing it
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FunctionCall
+// Function definition at index 0
+fun bar_optimal(l0: u64): u64
+    local l1: u64
+    copy_loc l0
+    call foo
+    st_loc l1
+    copy_loc l1
+    move_loc l0
+    // @5
+    call foo
+    add
+    move_loc l1
+    add
+    ret
+
+// Function definition at index 1
+fun bar_vec(): vector<u8>
+    call foo_vec
+    pop
+    call foo_vec
+    ret
+
+// Function definition at index 2
+fun foo(l0: u64): u64
+    move_loc l0
+    ld_u64 1
+    add
+    ret
+
+// Function definition at index 3
+fun foo_vec(): vector<u8>
+    vec_pack <u8>, 0
+    ret
+
+
+============ bytecode verification succeeded ========

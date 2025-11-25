@@ -1,0 +1,147 @@
+
+Diagnostics:
+warning: Unused value of parameter `arg2`. Consider removing the parameter, or prefixing with an underscore (e.g., `_arg2`), or binding to `_`
+   ┌─ tests/common-subexp-elimination/optimized/field_access.move:16:40
+   │
+16 │     fun test_field_access(arg1: Outer, arg2: u64): u64 {
+   │                                        ^^^^
+
+============ after ReachingDefProcessor: ================
+
+[variant baseline]
+fun FiledAccess::test_field_access($t0: 0x99::FiledAccess::Outer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: &0x99::FiledAccess::Inner
+     var $t5: &0x99::FiledAccess::Outer
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &0x99::FiledAccess::Inner
+     var $t9: &0x99::FiledAccess::Outer
+     var $t10: &u64
+     # live vars: $t0, $t1
+     # reaching instruction #0:
+     # refs: []
+     #
+  0: $t5 := borrow_local($t0)
+     # live vars: $t0, $t5
+     # reaching instruction #1: `t5` @ {0}
+     # refs: [$t5 => #5]
+     # #5
+     #   <no edges>
+     # #root
+     #   => #5 via [local `arg1`] at line 17
+     #
+  1: $t4 := borrow_field<0x99::FiledAccess::Outer>.inner($t5)
+     # live vars: $t0, $t4
+     # reaching instruction #2: `t4` @ {1}, `t5` @ {0}
+     # refs: [$t4 => #4]
+     # #4
+     #   <no edges>
+     # #root
+     #   => #4 via [local `arg1`, field `inner`] at line 17
+     #
+  2: $t6 := borrow_field<0x99::FiledAccess::Inner>.value($t4)
+     # live vars: $t0, $t6
+     # reaching instruction #3: `t4` @ {1}, `t5` @ {0}, `t6` @ {2}
+     # refs: [$t6 => #6]
+     # #6
+     #   <no edges>
+     # #root
+     #   => #6 via [local `arg1`, field `inner`, field `value`] at line 17
+     #
+  3: $t3 := read_ref($t6)
+     # live vars: $t0, $t3
+     # reaching instruction #4: `t3` @ {3}, `t4` @ {1}, `t5` @ {0}, `t6` @ {2}
+     # refs: []
+     #
+  4: $t9 := borrow_local($t0)
+     # live vars: $t3, $t9
+     # reaching instruction #5: `t3` @ {3}, `t4` @ {1}, `t5` @ {0}, `t6` @ {2}, `t9` @ {4}
+     # refs: [$t9 => #9]
+     # #9
+     #   <no edges>
+     # #root
+     #   => #9 via [local `arg1`] at line 17
+     #
+  5: $t8 := borrow_field<0x99::FiledAccess::Outer>.inner($t9)
+     # live vars: $t3, $t8
+     # reaching instruction #6: `t3` @ {3}, `t4` @ {1}, `t5` @ {0}, `t6` @ {2}, `t8` @ {5}, `t9` @ {4}
+     # refs: [$t8 => #8]
+     # #8
+     #   <no edges>
+     # #root
+     #   => #8 via [local `arg1`, field `inner`] at line 17
+     #
+  6: $t10 := borrow_field<0x99::FiledAccess::Inner>.value($t8)
+     # live vars: $t3, $t10
+     # reaching instruction #7: `t3` @ {3}, `t4` @ {1}, `t5` @ {0}, `t6` @ {2}, `t8` @ {5}, `t9` @ {4}, `t10` @ {6}
+     # refs: [$t10 => #10]
+     # #10
+     #   <no edges>
+     # #root
+     #   => #10 via [local `arg1`, field `inner`, field `value`] at line 17
+     #
+  7: $t7 := read_ref($t10)
+     # live vars: $t3, $t7
+     # reaching instruction #8: `t3` @ {3}, `t4` @ {1}, `t5` @ {0}, `t6` @ {2}, `t7` @ {7}, `t8` @ {5}, `t9` @ {4}, `t10` @ {6}
+     # refs: []
+     #
+  8: $t2 := +($t3, $t7)
+     # live vars: $t2
+     # reaching instruction #9: `t2` @ {8}, `t3` @ {3}, `t4` @ {1}, `t5` @ {0}, `t6` @ {2}, `t7` @ {7}, `t8` @ {5}, `t9` @ {4}, `t10` @ {6}
+     # refs: []
+     #
+  9: return $t2
+}
+
+============ after CommonSubexpElimination: ================
+
+[variant baseline]
+fun FiledAccess::test_field_access($t0: 0x99::FiledAccess::Outer, $t1: u64): u64 {
+     var $t2: u64
+     var $t3: u64
+     var $t4: &0x99::FiledAccess::Inner
+     var $t5: &0x99::FiledAccess::Outer
+     var $t6: &u64
+     var $t7: u64
+     var $t8: &0x99::FiledAccess::Inner [unused]
+     var $t9: &0x99::FiledAccess::Outer [unused]
+     var $t10: &u64
+  0: $t5 := borrow_local($t0)
+  1: $t4 := borrow_field<0x99::FiledAccess::Outer>.inner($t5)
+  2: $t6 := borrow_field<0x99::FiledAccess::Inner>.value($t4)
+  3: $t3 := read_ref($t6)
+  4: $t10 := infer($t6)
+  5: $t7 := read_ref($t10)
+  6: $t2 := +($t3, $t7)
+  7: return $t2
+}
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x99::FiledAccess
+struct Inner has copy + drop
+  value: u64
+
+struct Outer has copy + drop
+  inner: Inner
+
+// Function definition at index 0
+fun test_field_access(l0: Outer, l1: u64): u64
+    local l2: &u64
+    borrow_loc l0
+    borrow_field Outer, inner
+    borrow_field Inner, value
+    st_loc l2
+    copy_loc l2
+    // @5
+    read_ref
+    move_loc l2
+    read_ref
+    add
+    ret
+
+
+============ bytecode verification succeeded ========
