@@ -50,7 +50,6 @@ type FullnodeResponseStream =
 // Default Values
 pub const DEFAULT_NUM_RETRIES: usize = 3;
 pub const RETRY_TIME_MILLIS: u64 = 100;
-const TRANSACTION_CHANNEL_SIZE: usize = 35;
 const DEFAULT_EMIT_SIZE: usize = 1000;
 const SERVICE_TYPE: &str = "indexer_fullnode";
 
@@ -78,6 +77,7 @@ impl FullnodeData for FullnodeDataService {
         let processor_task_count = self.service_context.processor_task_count;
         let processor_batch_size = self.service_context.processor_batch_size;
         let output_batch_size = self.service_context.output_batch_size;
+        let transaction_channel_size = self.service_context.transaction_channel_size;
         let ending_version = if let Some(count) = r.transactions_count {
             starting_version.saturating_add(count)
         } else {
@@ -88,8 +88,8 @@ impl FullnodeData for FullnodeDataService {
         let context = self.service_context.context.clone();
         let ledger_chain_id = context.chain_id().id();
 
-        // Creates a channel to send the stream to the client
-        let (tx, rx) = mpsc::channel(TRANSACTION_CHANNEL_SIZE);
+        // Creates a channel to send the stream to the client.
+        let (tx, rx) = mpsc::channel(transaction_channel_size);
 
         // Creates a moving average to track tps
         let mut ma = MovingAverage::new(10_000);
@@ -159,7 +159,7 @@ impl FullnodeData for FullnodeDataService {
                     Some(max_version),
                     ledger_chain_id,
                 );
-                let channel_size = TRANSACTION_CHANNEL_SIZE - tx.capacity();
+                let channel_size = transaction_channel_size - tx.capacity();
                 CHANNEL_SIZE
                     .with_label_values(&["2"])
                     .set(channel_size as i64);

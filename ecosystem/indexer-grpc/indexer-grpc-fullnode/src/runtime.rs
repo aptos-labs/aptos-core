@@ -54,6 +54,7 @@ pub fn bootstrap(
     let processor_task_count = node_config.indexer_grpc.processor_task_count;
     let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
+    let transaction_channel_size = node_config.indexer_grpc.transaction_channel_size;
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(
@@ -68,6 +69,7 @@ pub fn bootstrap(
             processor_task_count,
             processor_batch_size,
             output_batch_size,
+            transaction_channel_size,
         };
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
