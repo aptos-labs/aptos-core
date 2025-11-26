@@ -3,23 +3,17 @@
 
 use super::{update_binary, BinaryUpdater, UpdateRequiredInfo};
 use crate::{
-    common::types::{CliCommand, CliTypedResult, PromptOptions},
-    update::update_helper::{build_updater, get_path},
+    common::{
+        types::{CliCommand, CliTypedResult, PromptOptions},
+        update::{get_revela_path, REVELA_BINARY_NAME, TARGET_REVELA_VERSION},
+    },
+    update::update_helper::build_updater,
 };
 use anyhow::{Context, Result};
 use async_trait::async_trait;
 use clap::Parser;
 use self_update::update::ReleaseUpdate;
 use std::path::PathBuf;
-
-const REVELA_BINARY_NAME: &str = "revela";
-const TARGET_REVELA_VERSION: &str = "1.0.0";
-
-const REVELA_EXE_ENV: &str = "REVELA_EXE";
-#[cfg(target_os = "windows")]
-const REVELA_EXE: &str = "revela.exe";
-#[cfg(not(target_os = "windows"))]
-const REVELA_EXE: &str = "revela";
 
 /// Update Revela, the tool used for decompilation.
 #[derive(Debug, Parser)]
@@ -116,14 +110,4 @@ impl CliCommand<String> for RevelaUpdateTool {
     async fn execute(self) -> CliTypedResult<String> {
         update_binary(self).await
     }
-}
-
-pub fn get_revela_path() -> Result<PathBuf> {
-    get_path(
-        "decompiler",
-        REVELA_EXE_ENV,
-        REVELA_BINARY_NAME,
-        REVELA_EXE,
-        false,
-    )
 }

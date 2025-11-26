@@ -3,13 +3,13 @@
 
 use crate::{
     common::{
+        config::GlobalConfig,
         init::Network,
         types::{
             account_address_from_public_key, CliError, CliTypedResult, PromptOptions,
             TransactionOptions, TransactionSummary,
         },
     },
-    config::GlobalConfig,
     CliResult,
 };
 use aptos_build_info::build_information;

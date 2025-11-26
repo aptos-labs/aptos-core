@@ -1,15 +1,13 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::{
-    common::{
-        types::{CliCommand, CliError, CliTypedResult, PromptOptions},
-        utils::{
-            check_if_file_exists, create_dir_if_not_exist, read_dir_files, read_from_file,
-            write_to_user_only_file,
-        },
-    },
+use crate::common::{
+    types::{CliCommand, CliError, CliTypedResult, PromptOptions},
     update::get_revela_path,
+    utils::{
+        check_if_file_exists, create_dir_if_not_exist, read_dir_files, read_from_file,
+        write_to_user_only_file,
+    },
 };
 use anyhow::Context;
 use aptos_types::vm::module_metadata::prelude::*;

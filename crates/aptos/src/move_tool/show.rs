@@ -1,8 +1,10 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use super::IncludedArtifactsArgs;
-use crate::common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions};
+use crate::{
+    common::types::{CliCommand, CliError, CliResult, CliTypedResult, MovePackageOptions},
+    move_tool::IncludedArtifactsArgs,
+};
 use anyhow::Context;
 use aptos_framework::{BuildOptions, BuiltPackage};
 use aptos_types::transaction::EntryABI;
