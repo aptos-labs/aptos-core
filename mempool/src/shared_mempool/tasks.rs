@@ -29,6 +29,7 @@ use aptos_mempool_notifications::CommittedTransaction;
 use aptos_metrics_core::HistogramTimer;
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::state_store::state_view::db_state_view::LatestDbStateCheckpointView;
+use aptos_transaction_tracing::trace::TransactionSource;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -150,7 +151,7 @@ pub(crate) async fn process_client_transaction_submission<NetworkClient, Transac
             &smp,
             vec![(transaction, None, Some(BroadcastPeerPriority::Primary))],
             timeline_state,
-            true,
+            None,
         );
     log_txn_process_results(&statuses, None);
 
@@ -228,7 +229,7 @@ pub(crate) async fn process_transaction_broadcast<NetworkClient, TransactionVali
 {
     timer.stop_and_record();
     let _timer = counters::process_txn_submit_latency_timer(peer.network_id());
-    let results = process_incoming_transactions(&smp, transactions, timeline_state, false);
+    let results = process_incoming_transactions(&smp, transactions, timeline_state, Some(peer));
     log_txn_process_results(&results, Some(peer));
 
     let ack_response = gen_ack_response(message_id, results, &peer);
@@ -310,7 +311,7 @@ pub(crate) fn process_incoming_transactions<NetworkClient, TransactionValidator>
         Option<BroadcastPeerPriority>,
     )>,
     timeline_state: TimelineState,
-    client_submitted: bool,
+    sending_peer: Option<PeerNetworkId>,
 ) -> Vec<SubmissionStatusBundle>
 where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
@@ -398,7 +399,7 @@ where
         smp,
         timeline_state,
         &mut statuses,
-        client_submitted,
+        sending_peer,
     );
     notify_subscribers(SharedMempoolNotification::NewTransactions, &smp.subscribers);
     statuses
@@ -479,7 +480,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
     smp: &SharedMempool<NetworkClient, TransactionValidator>,
     timeline_state: TimelineState,
     statuses: &mut Vec<(SignedTransaction, (MempoolStatus, Option<StatusCode>))>,
-    client_submitted: bool,
+    sending_peer: Option<PeerNetworkId>,
 ) where
     NetworkClient: NetworkClientInterface<MempoolSyncMsg>,
     TransactionValidator: TransactionValidation,
@@ -503,6 +504,7 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             .collect::<Vec<_>>()
     });
     vm_validation_timer.stop_and_record();
+
     {
         let mut mempool = smp.mempool.lock();
         for (idx, (transaction, account_sequence_number, ready_time_at_sender, priority)) in
@@ -511,7 +513,9 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
             if let Ok(validation_result) = &validation_results[idx] {
                 match validation_result.status() {
                     None => {
+                        // Add the transaction to mempool
                         let ranking_score = validation_result.score();
+                        let client_submitted = sending_peer.is_none();
                         let mempool_status = mempool.add_txn(
                             transaction.clone(),
                             ranking_score,
@@ -521,6 +525,18 @@ fn validate_and_add_transactions<NetworkClient, TransactionValidator>(
                             ready_time_at_sender,
                             priority.clone(),
                         );
+
+                        // Update the transaction trace collector
+                        let transaction_source = match sending_peer {
+                            Some(peer) => TransactionSource::RemotePeer(peer),
+                            None => TransactionSource::RestApi,
+                        };
+                        smp.transaction_trace_collector
+                            .transaction_received_in_mempool(
+                                transaction_source,
+                                transaction.committed_hash(),
+                            );
+
                         statuses.push((transaction, (mempool_status, None)));
                     },
                     Some(validation_status) => {
@@ -663,7 +679,7 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                     // gc before pulling block as extra protection against txns that may expire in consensus
                     // Note: this gc operation relies on the fact that consensus uses the system time to determine block timestamp
                     let curr_time = aptos_infallible::duration_since_epoch();
-                    mempool.gc_by_expiration_time(curr_time);
+                    mempool.garbage_collect_by_expiration_time(curr_time);
                 }
 
                 let max_txns = cmp::max(max_txns, 1);
@@ -673,6 +689,10 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                 );
                 txns =
                     mempool.get_batch(max_txns, max_bytes, return_non_full, exclude_transactions);
+
+                // Update the transaction trace collector
+                smp.transaction_trace_collector
+                    .transactions_pulled_by_quorum_store(&txns);
             }
 
             // mempool_service_transactions is logged inside get_batch
@@ -688,7 +708,14 @@ pub(crate) fn process_quorum_store_request<NetworkClient, TransactionValidator>(
                 counters::COMMIT_CONSENSUS_LABEL,
                 transactions.len(),
             );
+
+            // Update the transaction trace collector
+            smp.transaction_trace_collector
+                .transactions_rejected_by_quorum_store(&transactions);
+
+            // Process the rejected transactions
             process_rejected_transactions(&smp.mempool, transactions);
+
             (
                 QuorumStoreResponse::CommitResponse(),
                 callback,
@@ -739,7 +766,7 @@ pub(crate) fn process_committed_transactions(
     }
 
     if block_timestamp_usecs > 0 {
-        pool.gc_by_expiration_time(block_timestamp);
+        pool.garbage_collect_by_expiration_time(block_timestamp);
     }
 }
 

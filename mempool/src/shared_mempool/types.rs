@@ -20,6 +20,7 @@ use aptos_crypto::HashValue;
 use aptos_infallible::{Mutex, RwLock};
 use aptos_network::application::interface::NetworkClientInterface;
 use aptos_storage_interface::DbReader;
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     account_address::AccountAddress, mempool_status::MempoolStatus, transaction::SignedTransaction,
     vm_status::DiscardedVMStatus,
@@ -57,6 +58,7 @@ pub(crate) struct SharedMempool<NetworkClient, TransactionValidator> {
     pub broadcast_within_validator_network: Arc<RwLock<bool>>,
     pub use_case_history: Arc<Mutex<UseCaseHistory>>,
     pub transaction_filter_config: TransactionFilterConfig,
+    pub transaction_trace_collector: Arc<TransactionTraceCollector>,
 }
 
 impl<
@@ -73,6 +75,7 @@ impl<
         validator: Arc<RwLock<TransactionValidator>>,
         subscribers: Vec<UnboundedSender<SharedMempoolNotification>>,
         node_type: NodeType,
+        transaction_trace_collector: Arc<TransactionTraceCollector>,
     ) -> Self {
         let network_interface =
             MempoolNetworkInterface::new(network_client, node_type, config.clone());
@@ -90,6 +93,7 @@ impl<
             broadcast_within_validator_network: Arc::new(RwLock::new(true)),
             use_case_history: Arc::new(Mutex::new(use_case_history)),
             transaction_filter_config,
+            transaction_trace_collector,
         }
     }
 

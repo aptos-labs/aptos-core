@@ -245,7 +245,7 @@ impl TTLIndex {
     }
 
     /// Garbage collect all old transactions.
-    pub(crate) fn gc(&mut self, now: Duration) -> Vec<TTLOrderingKey> {
+    pub(crate) fn garbage_collect(&mut self, now: Duration) -> Vec<TTLOrderingKey> {
         // Ideally, we should garbage collect all transactions with expiration time < now.
         let max_expiration_time = now.saturating_sub(Duration::from_micros(1));
         let ttl_key = TTLOrderingKey {

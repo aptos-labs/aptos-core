@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use aptos_config::{config::PeerRole, network_id::PeerNetworkId};
+use aptos_crypto::HashValue;
+use aptos_transaction_tracing::trace::TransactionTrace;
 use aptos_types::{network_address::NetworkAddress, PeerId};
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, fmt, fmt::Display, time::Duration};
@@ -15,6 +17,7 @@ pub enum PeerMonitoringServiceResponse {
     NetworkInformation(NetworkInformationResponse), // Holds the response for network information
     NodeInformation(NodeInformationResponse), // Holds the response for node information
     ServerProtocolVersion(ServerProtocolVersionResponse), // Returns the current server protocol version
+    TransactionInformation(TransactionInformationResponse), // Holds the response for transaction information
 }
 
 impl PeerMonitoringServiceResponse {
@@ -25,6 +28,7 @@ impl PeerMonitoringServiceResponse {
             Self::NetworkInformation(_) => "network_information",
             Self::NodeInformation(_) => "node_information",
             Self::ServerProtocolVersion(_) => "server_protocol_version",
+            Self::TransactionInformation(_) => "transaction_information",
         }
     }
 
@@ -117,6 +121,29 @@ impl Display for NodeInformationResponse {
     }
 }
 
+/// A response for the transaction information request
+#[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TransactionInformationResponse {
+    // A mapping from transaction hashes to transaction trace
+    pub transaction_traces: BTreeMap<HashValue, TransactionTrace>,
+}
+
+impl TransactionInformationResponse {
+    pub fn new(transaction_traces: BTreeMap<HashValue, TransactionTrace>) -> Self {
+        Self { transaction_traces }
+    }
+}
+
+impl Display for TransactionInformationResponse {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{{ transaction_traces: {:?} }}",
+            self.transaction_traces.keys().collect::<Vec<&HashValue>>(),
+        )
+    }
+}
+
 #[derive(Clone, Debug, Error)]
 #[error("Unexpected response variant: {0}")]
 pub struct UnexpectedResponseError(pub String);
@@ -171,6 +198,20 @@ impl TryFrom<PeerMonitoringServiceResponse> for ServerProtocolVersionResponse {
             PeerMonitoringServiceResponse::ServerProtocolVersion(inner) => Ok(inner),
             _ => Err(UnexpectedResponseError(format!(
                 "expected server_protocol_version_response, found {}",
+                response.get_label()
+            ))),
+        }
+    }
+}
+
+impl TryFrom<PeerMonitoringServiceResponse> for TransactionInformationResponse {
+    type Error = UnexpectedResponseError;
+
+    fn try_from(response: PeerMonitoringServiceResponse) -> crate::Result<Self, Self::Error> {
+        match response {
+            PeerMonitoringServiceResponse::TransactionInformation(inner) => Ok(inner),
+            _ => Err(UnexpectedResponseError(format!(
+                "expected transaction_information_response, found {}",
                 response.get_label()
             ))),
         }

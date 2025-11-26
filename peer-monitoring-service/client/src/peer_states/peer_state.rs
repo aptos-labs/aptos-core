@@ -9,6 +9,7 @@ use crate::{
         network_info::NetworkInfoState,
         node_info::NodeInfoState,
         request_tracker::RequestTracker,
+        transaction_info::TransactionInfoState,
     },
     Error, PeerMonitoringServiceClient,
 };
@@ -16,6 +17,7 @@ use aptos_config::{
     config::{NodeConfig, PeerMonitoringServiceConfig},
     network_id::PeerNetworkId,
 };
+use aptos_crypto::HashValue;
 use aptos_id_generator::{IdGenerator, U64IdGenerator};
 use aptos_infallible::RwLock;
 use aptos_network::application::{interface::NetworkClient, metadata::PeerMetadata};
@@ -23,9 +25,10 @@ use aptos_peer_monitoring_service_types::{
     response::PeerMonitoringServiceResponse, PeerMonitoringMetadata, PeerMonitoringServiceMessage,
 };
 use aptos_time_service::{TimeService, TimeServiceTrait};
+use aptos_transaction_tracing::trace::TransactionTrace;
 use rand::{rngs::OsRng, Rng};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     fmt,
     fmt::{Display, Formatter},
     ops::Deref,
@@ -193,6 +196,7 @@ impl PeerState {
         let average_latency_ping_secs = latency_info_state.get_average_latency_ping_secs();
         peer_monitoring_metadata.average_ping_latency_secs = average_latency_ping_secs;
 
+        // Get and store the latest latency ping
         let latest_ping_latency_secs = latency_info_state.get_latest_latency_ping_secs();
         peer_monitoring_metadata.latest_ping_latency_secs = latest_ping_latency_secs;
 
@@ -211,6 +215,17 @@ impl PeerState {
         peer_monitoring_metadata.latest_node_info_response = node_info_response;
 
         Ok(peer_monitoring_metadata)
+    }
+
+    /// Extracts and returns the transaction traces from the peer state
+    pub fn extract_transaction_traces(
+        &self,
+    ) -> Result<Option<BTreeMap<HashValue, TransactionTrace>>, Error> {
+        let transaction_info_state = self.get_transaction_info_state()?;
+        let transaction_traces = transaction_info_state
+            .get_latest_transaction_info_response()
+            .map(|transaction_info_response| transaction_info_response.transaction_traces);
+        Ok(transaction_traces)
     }
 
     /// Returns the peer state value associated with the given key
@@ -267,6 +282,23 @@ impl PeerState {
             PeerStateValue::NodeInfoState(node_info_state) => Ok(node_info_state),
             peer_state_value => Err(Error::UnexpectedError(format!(
                 "Invalid peer state value found! Expected node_info_state but got: {:?}",
+                peer_state_value
+            ))),
+        }
+    }
+
+    /// Returns a copy of the transaction info state
+    pub(crate) fn get_transaction_info_state(&self) -> Result<TransactionInfoState, Error> {
+        let peer_state_value = self
+            .get_peer_state_value(&PeerStateKey::TransactionInfo)?
+            .read()
+            .clone();
+        match peer_state_value {
+            PeerStateValue::TransactionInfoState(transaction_info_state) => {
+                Ok(transaction_info_state)
+            },
+            peer_state_value => Err(Error::UnexpectedError(format!(
+                "Invalid peer state value found! Expected transaction_info_state but got: {:?}",
                 peer_state_value
             ))),
         }

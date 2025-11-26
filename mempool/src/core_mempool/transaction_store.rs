@@ -21,6 +21,7 @@ use crate::{
 use aptos_config::config::MempoolConfig;
 use aptos_crypto::HashValue;
 use aptos_logger::{prelude::*, Level};
+use aptos_transaction_tracing::trace_collector::TransactionTraceCollector;
 use aptos_types::{
     account_address::AccountAddress,
     mempool_status::{MempoolStatus, MempoolStatusCode},
@@ -31,6 +32,7 @@ use std::{
     collections::HashMap,
     mem::size_of,
     ops::Bound,
+    sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 
@@ -99,10 +101,16 @@ pub struct TransactionStore {
     // eager expiration
     eager_expire_threshold: Option<Duration>,
     eager_expire_time: Duration,
+
+    // Transaction trace collector
+    transaction_trace_collector: Arc<TransactionTraceCollector>,
 }
 
 impl TransactionStore {
-    pub(crate) fn new(config: &MempoolConfig) -> Self {
+    pub(crate) fn new(
+        config: &MempoolConfig,
+        transaction_trace_collector: Arc<TransactionTraceCollector>,
+    ) -> Self {
         let mut timeline_index = HashMap::new();
         for sender_bucket in 0..config.num_sender_buckets {
             timeline_index.insert(
@@ -138,6 +146,9 @@ impl TransactionStore {
             // eager expiration
             eager_expire_threshold: config.eager_expire_threshold_ms.map(Duration::from_millis),
             eager_expire_time: Duration::from_millis(config.eager_expire_time_ms),
+
+            // Transaction trace collector
+            transaction_trace_collector,
         }
     }
 
@@ -902,16 +913,16 @@ impl TransactionStore {
     }
 
     /// Garbage collect old transactions.
-    pub(crate) fn gc_by_system_ttl(&mut self, gc_time: Duration) {
-        self.gc(gc_time, true);
+    pub(crate) fn garbage_collect_by_system_ttl(&mut self, gc_time: Duration) {
+        self.garbage_collect(gc_time, true);
     }
 
     /// Garbage collect old transactions based on client-specified expiration time.
-    pub(crate) fn gc_by_expiration_time(&mut self, block_time: Duration) {
-        self.gc(self.eager_expire_time(block_time), false);
+    pub(crate) fn garbage_collect_by_expiration_time(&mut self, block_time: Duration) {
+        self.garbage_collect(self.eager_expire_time(block_time), false);
     }
 
-    fn gc(&mut self, now: Duration, by_system_ttl: bool) {
+    fn garbage_collect(&mut self, now: Duration, by_system_ttl: bool) {
         let (metric_label, index, log_event) = if by_system_ttl {
             (
                 counters::GC_SYSTEM_TTL_LABEL,
@@ -929,7 +940,7 @@ impl TransactionStore {
             .with_label_values(&[metric_label])
             .inc();
 
-        let mut gc_txns = index.gc(now);
+        let mut gc_txns = index.garbage_collect(now);
         // sort the expired txns by order of replay protector per account
         gc_txns.sort_by_key(|key| (key.address, key.replay_protector));
         let mut gc_iter = gc_txns.iter().peekable();
@@ -991,6 +1002,10 @@ impl TransactionStore {
                             .with_label_values(&[metric_label, status])
                             .observe(time_delta.as_secs_f64());
                     }
+
+                    // Update the transaction trace collector
+                    self.transaction_trace_collector
+                        .transaction_expired_in_mempool(&txn.txn, !by_system_ttl);
 
                     // remove txn
                     self.index_remove(&txn);

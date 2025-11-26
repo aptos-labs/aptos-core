@@ -3046,6 +3046,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-time-service",
  "aptos-transaction-filters",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-vm-validator",
  "bcs 0.1.4",
@@ -3482,6 +3483,7 @@ dependencies = [
  "aptos-telemetry",
  "aptos-temppath",
  "aptos-time-service",
+ "aptos-transaction-tracing",
  "aptos-types",
  "aptos-validator-transaction-pool",
  "aptos-vm",
@@ -3615,6 +3617,7 @@ dependencies = [
  "aptos-build-info",
  "aptos-channels",
  "aptos-config",
+ "aptos-crypto",
  "aptos-id-generator",
  "aptos-infallible",
  "aptos-logger",
@@ -3624,6 +3627,7 @@ dependencies = [
  "aptos-peer-monitoring-service-server",
  "aptos-peer-monitoring-service-types",
  "aptos-time-service",
+ "aptos-transaction-tracing",
  "aptos-types",
  "bcs 0.1.4",
  "enum_dispatch",
@@ -3655,6 +3659,7 @@ dependencies = [
  "aptos-peer-monitoring-service-types",
  "aptos-storage-interface",
  "aptos-time-service",
+ "aptos-transaction-tracing",
  "aptos-types",
  "bcs 0.1.4",
  "bytes",
@@ -3674,6 +3679,8 @@ name = "aptos-peer-monitoring-service-types"
 version = "0.1.0"
 dependencies = [
  "aptos-config",
+ "aptos-crypto",
+ "aptos-transaction-tracing",
  "aptos-types",
  "bcs 0.1.4",
  "serde",
@@ -4682,6 +4689,24 @@ dependencies = [
  "tempfile",
  "tokio",
  "url",
+]
+
+[[package]]
+name = "aptos-transaction-tracing"
+version = "0.1.0"
+dependencies = [
+ "aptos-config",
+ "aptos-consensus-types",
+ "aptos-crypto",
+ "aptos-logger",
+ "aptos-mempool-notifications",
+ "aptos-time-service",
+ "aptos-types",
+ "chrono",
+ "dashmap 7.0.0-rc2",
+ "futures",
+ "move-core-types",
+ "serde",
 ]
 
 [[package]]
