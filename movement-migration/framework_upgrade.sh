@@ -97,5 +97,6 @@ cargo run -p movement move run-script --script-path movement-migration/move2/sou
 cargo run -p movement move run-script --script-path movement-migration/move2/sources/v0.1/proposal_1_upgrade_framework/3-aptos-token.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
 cargo run -p movement move run-script --script-path movement-migration/move2/sources/v0.1/proposal_1_upgrade_framework/4-aptos-token-objects.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
 
+cargo run -p movement move run-script --script-path movement-migration/post-move2-upgrade/scripts/force-epoch-change.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
 # initialize the ggp extension this has to be done within the same epoch 
 cargo run -p movement move run-script --script-path movement-migration/post-move2-upgrade/scripts/after-move2-upgrade.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
