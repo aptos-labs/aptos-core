@@ -1,0 +1,29 @@
+// Purpose: baseline success case—reading an indexed ref for a matching enum tag.
+// Flow:
+//   (1) create Foo::A(42) -> store in foo
+//   (2) borrow payload_ref = &foo.A::x (tag-protected reference)
+//   (3) read payload_ref; succeeds because tag still A
+// Diagram:
+//   foo ──▶ Foo::A { x:42 } ◀── read_ref target
+
+//# publish
+module 0xc0ffe1::indexed_tag_happy
+
+enum Foo has drop
+  A
+    x: u64
+
+public fun read_tag_ok(): u64
+    local foo: Foo
+
+    ld_u64 42
+    pack_variant Foo, A
+    st_loc foo
+
+    borrow_loc foo
+    borrow_variant_field Foo, A::x
+    read_ref
+    ret
+
+//# run 0xc0ffe1::indexed_tag_happy::read_tag_ok --verbose
+
