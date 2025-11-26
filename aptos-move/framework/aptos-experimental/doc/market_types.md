@@ -1021,6 +1021,12 @@
 <dd>
 
 </dd>
+<dt>
+<code>fill_id: u128</code>
+</dt>
+<dd>
+
+</dd>
 </dl>
 
 
@@ -2526,7 +2532,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_filled">emit_event_for_bulk_order_filled</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, sequence_number: u64, user: <b>address</b>, filled_size: u64, price: u64, orig_price: u64, is_bid: bool)
+<pre><code><b>public</b> <b>fun</b> <a href="market_types.md#0x7_market_types_emit_event_for_bulk_order_filled">emit_event_for_bulk_order_filled</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, sequence_number: u64, user: <b>address</b>, filled_size: u64, price: u64, orig_price: u64, is_bid: bool, fill_id: u128)
 </code></pre>
 
 
@@ -2544,6 +2550,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     price: u64,
     orig_price: u64,
     is_bid: bool,
+    fill_id: u128,
 ) {
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
@@ -2558,6 +2565,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
                 price,
                 orig_price,
                 is_bid,
+                fill_id,
             }
         );
     };
