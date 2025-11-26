@@ -29,7 +29,7 @@ VALIDATOR_OWNER_PRIVATE_KEY="$6"
 DRY_RUN="${7:-true}"
 
 help_message_and_exit() {
-    echo "Usage: $0 <validator-identity-file> <network> <stake-amount> <validator-host> <validator-owner-account> <validator-owner-private-key> [dry-run]"
+    echo "Usage: $0 <operator-identity-file> <network> <stake-amount> <validator-host> <validator-owner-account> <validator-owner-private-key> [dry-run]"
     echo "Network options:"
     echo "  testnet               - Movement testnet ($TESTNET_API)"
     echo "  mainnet               - Movement mainnet ($MAINNET_API)"
@@ -145,6 +145,9 @@ validate_input() {
             ;;
         "mainnet")
             NETWORK_API_ADDRESS="$MAINNET_API"
+            ;;
+        "previewnet")
+            NETWORK_API_ADDRESS="https://previewnet.devnet.movementnetwork.xyz"
             ;;
         "custom:"*)
             NETWORK_API_ADDRESS="${NETWORK_INPUT#custom:}"
