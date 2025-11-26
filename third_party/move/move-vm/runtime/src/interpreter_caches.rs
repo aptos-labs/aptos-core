@@ -20,6 +20,7 @@ pub struct InterpreterFunctionCaches {
 }
 
 impl InterpreterFunctionCaches {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
         Self {
             function_instruction_caches: HashMap::new(),
