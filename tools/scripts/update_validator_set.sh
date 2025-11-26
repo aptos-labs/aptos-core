@@ -290,11 +290,11 @@ validate_config() {
 # Execution.
 # Validator owner operation.
 init_stake_owner() {
-    $MOVEMENT_CLI stake initialize-stake-owner \
-        --initial-stake-amount $STAKE_AMOUNT \
-        --operator-address $OPERATOR_ACCOUNT \
-        --voter-address $OPERATOR_ACCOUNT \
-        --sender-account $VALIDATOR_OWNER_ACCOUNT \
+    $MOVEMENT_CLI stake create-staking-contract \
+        --operator $OPERATOR_ACCOUNT \
+        --voter $OPERATOR_ACCOUNT \
+        --amount $STAKE_AMOUNT \
+        --commission-percentage 10 \
         --private-key $VALIDATOR_OWNER_PRIVATE_KEY \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
@@ -306,10 +306,28 @@ init_stake_owner() {
     fi
 }
 
+# Get pool address
+get_pool_address() {
+    POOL_ADDRESS_OUTPUT=$($MOVEMENT_CLI node get-stake-pool --owner-address $VALIDATOR_OWNER_ACCOUNT --url $NETWORK_API_ADDRESS 2>&1)
+
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to retrieve stake pool address"
+        echo "$POOL_ADDRESS_OUTPUT"
+        exit 1
+    fi
+
+    POOL_ADDRESS=$(echo "$POOL_ADDRESS_OUTPUT" | jq -r '.Result[0].pool_address')
+
+    if [ -z "$POOL_ADDRESS" ] || [ "$POOL_ADDRESS" = "null" ]; then
+        echo "Error: Unable to parse stake pool address from response"
+        exit 1
+    fi
+}
+
 # Operator operation.
 update_consensus_keys() {
     $MOVEMENT_CLI node update-consensus-key \
-        --pool-address $VALIDATOR_OWNER_ACCOUNT \
+        --pool-address $POOL_ADDRESS \
         --consensus-public-key $CONSENSUS_PUBLIC_KEY \
         --proof-of-possession $CONSENSUS_POP \
         --private-key $OPERATOR_ACCOUNT_PRIVATE_KEY \
@@ -328,7 +346,7 @@ update_consensus_keys() {
 # TODO: add fullnode host here as well.
 update_network_address() {
     $MOVEMENT_CLI node update-validator-network-addresses \
-        --pool-address $VALIDATOR_OWNER_ACCOUNT \
+        --pool-address $POOL_ADDRESS \
         --validator-host $VALIDATOR_HOST \
         --validator-network-public-key $NETWORK_PUBLIC_KEY \
         --private-key $OPERATOR_ACCOUNT_PRIVATE_KEY \
@@ -346,7 +364,7 @@ update_network_address() {
 # Operator operation
 join_the_network() {
     $MOVEMENT_CLI node join-validator-set \
-        --pool-address $VALIDATOR_OWNER_ACCOUNT \
+        --pool-address $POOL_ADDRESS \
         --private-key $OPERATOR_ACCOUNT_PRIVATE_KEY \
         --sender-account $OPERATOR_ACCOUNT \
         --url $NETWORK_API_ADDRESS \
@@ -370,6 +388,10 @@ execute() {
         # Initialize stake owner
         echo "Initializing stake owner..."
         init_stake_owner
+        
+        # Get pool address
+        echo "Retrieving stake pool address..."
+        get_pool_address
 
         # Update consensus keys
         echo "Updating consensus keys..."
