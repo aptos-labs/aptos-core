@@ -914,8 +914,9 @@ Can only be called as part of the Aptos governance proposal process established 
     new_voting_power_increase_limit: u64,
 ) <b>acquires</b> <a href="staking_config.md#0x1_staking_config_StakingConfig">StakingConfig</a> {
     <a href="system_addresses.md#0x1_system_addresses_assert_aptos_framework">system_addresses::assert_aptos_framework</a>(aptos_framework);
+    //TODO(bowu): revert the limit back <b>to</b> 50
     <b>assert</b>!(
-        new_voting_power_increase_limit &gt; 0 && new_voting_power_increase_limit &lt;= 50,
+        new_voting_power_increase_limit &gt; 0 && new_voting_power_increase_limit &lt;= 50*1_000_000_000,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="staking_config.md#0x1_staking_config_EINVALID_VOTING_POWER_INCREASE_LIMIT">EINVALID_VOTING_POWER_INCREASE_LIMIT</a>),
     );
 
