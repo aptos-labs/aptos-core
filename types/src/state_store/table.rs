@@ -27,12 +27,14 @@ impl FromStr for TableHandle {
     }
 }
 
+#[cfg(feature = "move-table-ext")]
 impl From<move_table_extension::TableHandle> for TableHandle {
     fn from(hdl: move_table_extension::TableHandle) -> Self {
         Self(hdl.0)
     }
 }
 
+#[cfg(feature = "move-table-ext")]
 impl From<&move_table_extension::TableHandle> for TableHandle {
     fn from(hdl: &move_table_extension::TableHandle) -> Self {
         Self(hdl.0)

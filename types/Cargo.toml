@@ -44,15 +44,15 @@ lru = { workspace = true }
 move-binary-format = { workspace = true }
 move-core-types = { workspace = true }
 move-model = { workspace = true }
-move-table-extension = { workspace = true }
+move-table-extension = { workspace = true, optional = true }
 move-vm-types = { workspace = true }
 num-bigint = { workspace = true }
 num-derive = { workspace = true }
 num-traits = { workspace = true }
 once_cell = { workspace = true }
 passkey-types = { workspace = true }
-poem-openapi = { workspace = true }
-poem-openapi-derive = { workspace = true }
+poem-openapi = { workspace = true, optional = true }
+poem-openapi-derive = { workspace = true, optional = true }
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
 quick_cache = { workspace = true }
@@ -67,7 +67,6 @@ serde-big-array = { workspace = true }
 serde_bytes = { workspace = true }
 serde_json = { workspace = true }
 serde_with = { workspace = true }
-serde_yaml = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
@@ -91,11 +90,14 @@ proptest = { workspace = true }
 proptest-derive = { workspace = true }
 reqwest = { workspace = true }
 serde_json = { workspace = true }
+serde_yaml = { workspace = true }
 tokio = { workspace = true }
 url = { workspace = true }
 
 [features]
-default = []
+default = ["move-table-ext", "poem"]
+move-table-ext = ["move-table-extension"]
+poem = ["poem-openapi", "poem-openapi-derive"]
 testing = ["aptos-crypto/fuzzing"]
 fuzzing = ["proptest", "proptest-derive", "aptos-crypto/fuzzing", "move-core-types/fuzzing", "arbitrary"]
 
