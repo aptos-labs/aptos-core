@@ -298,7 +298,7 @@ init_stake_owner() {
         --private-key $VALIDATOR_OWNER_PRIVATE_KEY \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
-        --max-gas 2000 \
+        --max-gas 20000 \
         --assume-yes
     if [ $? -ne 0 ]; then
         echo "Error: Failed to initialize stake owner"
@@ -316,7 +316,7 @@ update_consensus_keys() {
         --sender-account $OPERATOR_ACCOUNT \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
-        --max-gas 2000 \
+        --max-gas 20000 \
         --assume-yes
     if [ $? -ne 0 ]; then
         echo "Error: Failed to update consensus keys"
@@ -335,7 +335,7 @@ update_network_address() {
         --sender-account $OPERATOR_ACCOUNT \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
-        --max-gas 2000 \
+        --max-gas 20000 \
         --assume-yes
     if [ $? -ne 0 ]; then
         echo "Error: Failed to update network address"
@@ -351,7 +351,7 @@ join_the_network() {
         --sender-account $OPERATOR_ACCOUNT \
         --url $NETWORK_API_ADDRESS \
         --gas-unit-price 100 \
-        --max-gas 2000 \
+        --max-gas 20000 \
         --assume-yes
     if [ $? -ne 0 ]; then
         echo "Error: Failed to join the validator set"
