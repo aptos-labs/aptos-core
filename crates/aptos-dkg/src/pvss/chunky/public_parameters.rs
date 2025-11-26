@@ -34,7 +34,7 @@ const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be 
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
     utils::powers(
         E::ScalarField::from(1u64 << ell),
-        num_chunks_per_scalar::<E>(ell) as usize,
+        num_chunks_per_scalar::<E::ScalarField>(ell) as usize,
     )
 }
 
@@ -142,7 +142,8 @@ impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, rng: &mut R) -> Self {
         let max_num_chunks_padded =
-            ((max_num_shares * num_chunks_per_scalar::<E>(ell) as usize) + 1).next_power_of_two()
+            ((max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) as usize) + 1)
+                .next_power_of_two()
                 - 1;
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?

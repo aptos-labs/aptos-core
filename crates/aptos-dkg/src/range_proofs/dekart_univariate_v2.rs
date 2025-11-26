@@ -236,6 +236,8 @@ impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type PublicStatement = PublicStatement<E>;
     type VerificationKey = VerificationKey<E>;
 
+    /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+    /// transcript operations within the protocol are uniquely namespaced
     const DST: &[u8] = b"APTOS_UNIVARIATE_DEKART_V2_RANGE_PROOF_DST";
 
     fn commitment_key_from_prover_key(pk: &Self::ProverKey) -> Self::CommitmentKey {
