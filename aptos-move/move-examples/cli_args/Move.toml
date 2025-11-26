@@ -6,7 +6,5 @@ upgrade_policy = "compatible"
 [addresses]
 test_account = "_"
 
-[dependencies.AptosFramework]
-git = "https://github.com/aptos-labs/aptos-framework.git"
-subdir = "aptos-framework"
-rev = "mainnet"
+[dependencies]
+AptosFramework = { local = "../../framework/aptos-framework" }
