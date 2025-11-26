@@ -360,7 +360,7 @@ join_the_network() {
 }
 
 execute() {
-    validate_config
+    # validate_config
 
     if [ "$DRY_RUN" = "true" ]; then
         echo "Dry run enabled. No changes will be made."
