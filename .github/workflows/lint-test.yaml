@@ -170,7 +170,7 @@ jobs:
 
       - name: check for pnpm
         run: |
-          source ~/.bashrc && pnpm
+          whoami && ls ~/.bashrc && cat ~/.bashrc && source ~/.bashrc && pnpm
         shell: bash
 
       - name: Run targeted rust unit tests
