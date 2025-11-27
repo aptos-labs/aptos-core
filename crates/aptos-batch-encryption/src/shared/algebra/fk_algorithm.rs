@@ -385,7 +385,10 @@ impl<
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         let mut f = Vec::from(f);
-        f.extend(std::iter::repeat_n(F::zero(), self.toeplitz_domain.dimension() + 1 - f.len()));
+        f.extend(std::iter::repeat_n(
+            F::zero(),
+            self.toeplitz_domain.dimension() + 1 - f.len(),
+        ));
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
         let h_term_commitments = self.toeplitz_domain.eval_prepared(
@@ -402,7 +405,10 @@ impl<
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         let mut f = Vec::from(f);
-        f.extend(std::iter::repeat_n(F::zero(), self.toeplitz_domain.dimension() + 1 - f.len()));
+        f.extend(std::iter::repeat_n(
+            F::zero(),
+            self.toeplitz_domain.dimension() + 1 - f.len(),
+        ));
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
         let h_term_commitments = self.toeplitz_domain.eval_prepared(
@@ -433,9 +439,10 @@ impl EPTest for FKDomain<Fr, G1Projective> {
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         let mut f = Vec::from(f);
-        f.extend(
-            std::iter::repeat_n(Fr::zero(), self.toeplitz_domain.dimension() + 1 - f.len()),
-        );
+        f.extend(std::iter::repeat_n(
+            Fr::zero(),
+            self.toeplitz_domain.dimension() + 1 - f.len(),
+        ));
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
         let h_term_commitments = self.toeplitz_domain.eval_prepared(
@@ -605,7 +612,6 @@ mod tests {
                 tau_powers_fr.push(cur);
                 cur *= &tau;
             }
-
 
             let tau_powers_g1 = G1Projective::from(G1Affine::generator()).batch_mul(&tau_powers_fr);
             let tau_powers_g1_projective: Vec<Vec<G1Projective>> = vec![tau_powers_g1

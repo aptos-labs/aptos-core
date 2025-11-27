@@ -32,10 +32,8 @@ type SymmetricCipher = Aes128Gcm;
 type SymmetricNonce =
     Nonce<<AesGcm<Aes128, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>> as AeadCore>::NonceSize>;
 
-
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct SymmetricKey(GenericArray<u8, KeySize>);
-
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct OneTimePad(GenericArray<u8, KeySize>);
@@ -278,7 +276,6 @@ mod tests {
 
         assert_eq!(decrypted_plaintext, plaintext);
     }
-
 
     #[test]
     fn test_otp() {
