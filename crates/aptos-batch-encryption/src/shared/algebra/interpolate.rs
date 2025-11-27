@@ -69,7 +69,7 @@ mod tests {
         let mut f = Fr::zero();
         let mut xs = vec![];
         for _i in 0..2 {
-            f = f - Fr::one();
+            f -= Fr::one();
             xs.push(f);
         }
 
@@ -82,7 +82,7 @@ mod tests {
         println!("{:?}", l);
 
         for x in &xs[1..] {
-            assert_eq!(l.evaluate(&x), Fr::zero());
+            assert_eq!(l.evaluate(x), Fr::zero());
         }
         assert!(l.evaluate(&xs[0]) != Fr::zero());
     }

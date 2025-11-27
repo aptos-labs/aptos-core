@@ -600,7 +600,7 @@ mod tests {
             let tau = Fr::rand(&mut rng);
 
             let mut tau_powers_fr = vec![Fr::one()];
-            let mut cur = tau.clone();
+            let mut cur = tau;
             for _ in 0..poly_degree {
                 tau_powers_fr.push(cur);
                 cur *= &tau;
@@ -641,7 +641,7 @@ mod tests {
             let tau = Fr::rand(&mut rng);
 
             let mut tau_powers_fr = vec![Fr::one()];
-            let mut cur = tau.clone();
+            let mut cur = tau;
             for _ in 0..poly_degree {
                 tau_powers_fr.push(cur);
                 cur *= &tau;
@@ -666,7 +666,7 @@ mod tests {
 
             let evaluation_proofs = fk_domain.eval_proofs_at_roots_of_unity(&poly.coeffs, 0);
 
-            for i in 0..poly_degree {
+            for (i, pf) in evaluation_proofs.iter().enumerate().take(poly_degree) {
                 let lhs = PairingSetting::pairing(
                     G1Projective::from(commitment)
                         - (G1Projective::generator()
@@ -674,7 +674,7 @@ mod tests {
                     G2Projective::generator(),
                 );
                 let rhs = PairingSetting::pairing(
-                    evaluation_proofs[i],
+                    pf,
                     G2Projective::from(tau_g2)
                         - (G2Projective::generator() * fk_domain.fft_domain.element(i)),
                 );
