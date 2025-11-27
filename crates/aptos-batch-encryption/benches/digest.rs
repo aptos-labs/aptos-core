@@ -169,7 +169,7 @@ pub fn setup(c: &mut Criterion) {
                     let mut file = File::create("setup.bcs").unwrap();
                     file.write_all(&bcs::to_bytes(&setup).unwrap()).unwrap();
                     //panic!();
-                    
+
                 });
             },
         );
@@ -194,7 +194,7 @@ pub fn deserialize(c: &mut Criterion) {
                     file.read_to_end(&mut contents).unwrap();
                     let _setup: DigestKey = bcs::from_bytes(&contents).unwrap();
 
-                    
+
                 });
             },
         );
