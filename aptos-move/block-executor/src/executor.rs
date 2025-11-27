@@ -1821,6 +1821,13 @@ where
                 Ok(maybe_block_epilogue_txn) => {
                     // Update state counters & insert verified modules into cache (safe after error check).
                     counters::update_state_counters(versioned_cache.stats(), true);
+                    unsafe {
+                        module_cache_manager_guard
+                            .environment()
+                            .runtime_environment()
+                            .ty_pool()
+                            .publish_unchecked();
+                    }
                     (
                         module_cache_manager_guard
                             .module_cache_mut()
@@ -1976,6 +1983,13 @@ where
                 Ok(maybe_block_epilogue_txn) => {
                     // Update state counters & insert verified modules into cache (safe after error check).
                     counters::update_state_counters(versioned_cache.stats(), true);
+                    unsafe {
+                        module_cache_manager_guard
+                            .environment()
+                            .runtime_environment()
+                            .ty_pool()
+                            .publish_unchecked();
+                    }
                     (
                         module_cache_manager_guard
                             .module_cache_mut()
@@ -2541,6 +2555,13 @@ where
         module_cache_manager_guard
             .module_cache_mut()
             .insert_verified(unsync_map.into_modules_iter())?;
+        unsafe {
+            module_cache_manager_guard
+                .environment()
+                .runtime_environment()
+                .ty_pool()
+                .publish_unchecked();
+        }
 
         Ok(BlockOutput::new(ret, block_epilogue_txn))
     }
