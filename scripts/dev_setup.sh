@@ -125,7 +125,7 @@ function install_clang {
   VERSION=${2:-20}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    "${PRE_COMMAND[@]}" apt-get install gnupg lsb-release software-properties-common wget
+    "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
     "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
