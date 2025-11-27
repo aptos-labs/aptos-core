@@ -11,6 +11,7 @@ use crate::pipeline::{
 use move_stackless_bytecode::function_target::FunctionTarget;
 
 pub mod ability_processor;
+pub mod common_subexp_elimination;
 pub mod control_flow_graph_simplifier;
 pub mod dead_store_elimination;
 pub mod exit_state_analysis;
@@ -33,6 +34,7 @@ pub fn register_formatters(target: &FunctionTarget) {
     ExitStateAnalysisProcessor::register_formatters(target);
     FlushWritesProcessor::register_formatters(target);
     LiveVarAnalysisProcessor::register_formatters(target);
+    reaching_def_analysis_processor::ReachingDefProcessor::register_formatters(target);
     reference_safety::register_formatters(target);
     UninitializedUseChecker::register_formatters(target);
     UnreachableCodeProcessor::register_formatters(target);

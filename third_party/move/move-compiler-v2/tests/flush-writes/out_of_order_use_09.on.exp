@@ -32,6 +32,73 @@ public fun m::test() {
      var $t3: u64
      var $t4: u64
      var $t5: u64
+     var $t6: u64
+     var $t7: u64
+     var $t8: u64
+     var $t9: u64
+     # live vars:
+  0: $t0 := m::one()
+     # live vars: $t0
+  1: $t1 := m::one()
+     # live vars: $t0, $t1
+  2: $t2 := m::one()
+     # live vars: $t0, $t1, $t2
+  3: $t3 := m::one()
+     # live vars: $t0, $t1, $t2, $t3
+  4: $t4 := m::one()
+     # flush: $t5
+     # live vars: $t0, $t1, $t2, $t3, $t4
+  5: $t5 := m::one()
+     # live vars: $t0, $t1, $t2, $t3, $t4, $t5
+  6: $t6 := infer($t0)
+     # live vars: $t1, $t2, $t3, $t4, $t5, $t6
+  7: $t7 := infer($t2)
+     # live vars: $t1, $t3, $t4, $t5, $t6, $t7
+  8: $t8 := infer($t3)
+     # live vars: $t1, $t4, $t5, $t6, $t7, $t8
+  9: $t9 := infer($t4)
+     # live vars: $t1, $t5, $t6, $t7, $t8, $t9
+ 10: m::consume_5($t6, $t7, $t8, $t9, $t5)
+     # live vars: $t1
+ 11: m::consume_1($t1)
+     # live vars:
+ 12: return ()
+}
+
+============ after FlushWritesProcessor: ================
+
+[variant baseline]
+fun m::consume_1($t0: u64) {
+     # live vars: $t0
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::consume_5($t0: u64, $t1: u64, $t2: u64, $t3: u64, $t4: u64) {
+     # live vars: $t0, $t1, $t2, $t3, $t4
+  0: return ()
+}
+
+
+[variant baseline]
+fun m::one(): u64 {
+     var $t0: u64
+     # live vars:
+  0: $t0 := 1
+     # live vars: $t0
+  1: return $t0
+}
+
+
+[variant baseline]
+public fun m::test() {
+     var $t0: u64
+     var $t1: u64
+     var $t2: u64
+     var $t3: u64
+     var $t4: u64
+     var $t5: u64
      var $t6: u64 [unused]
      var $t7: u64 [unused]
      var $t8: u64 [unused]
@@ -42,13 +109,13 @@ public fun m::test() {
      # live vars: $t0
   1: $t1 := m::one()
      # live vars: $t0, $t1
-  2: $t2 := m::one()
+  2: $t2 := copy($t1)
      # live vars: $t0, $t1, $t2
-  3: $t3 := m::one()
+  3: $t3 := copy($t1)
      # live vars: $t0, $t1, $t2, $t3
-  4: $t4 := m::one()
+  4: $t4 := copy($t1)
      # live vars: $t0, $t1, $t2, $t3, $t4
-  5: $t5 := m::one()
+  5: $t5 := copy($t1)
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5
   6: $t0 := move($t0)
      # live vars: $t0, $t1, $t2, $t3, $t4, $t5
@@ -93,11 +160,11 @@ fun one(): u64
     call one
     call one
     st_loc l0
-    call one
-    call one
+    copy_loc l0
+    copy_loc l0
     // @5
-    call one
-    call one
+    copy_loc l0
+    copy_loc l0
     call consume_5
     move_loc l0
     call consume_1

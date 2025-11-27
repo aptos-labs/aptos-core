@@ -87,30 +87,29 @@ fun test(l0: u64): u64
     call one
     // @30
     call id
-    call one
-    call id
     st_loc l10
+    copy_loc l10
     st_loc l11
-    // @35
     st_loc l8
+    // @35
     st_loc l9
     move_loc l6
     move_loc l5
     move_loc l4
-    // @40
     move_loc l9
+    // @40
     move_loc l8
-    move_loc l11
     move_loc l10
+    move_loc l11
     call cons_7
-    // @45
     st_loc l9
+    // @45
     move_loc l7
     move_loc l9
     call cons_2_another
     move_loc l1
-    // @50
     ret
+    // @50
 l0: ld_u64 42
     abort
 

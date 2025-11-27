@@ -913,7 +913,7 @@ fun m::test($t0: &mut 0x42::m::S, $t1: vector<u8>) {
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10
   7: $t11 := vector::length<0x42::m::T>($t6)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11
-  8: $t12 := vector::length<0x42::m::T>($t6)
+  8: $t12 := copy($t11)
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
   9: label L0
      # live vars: $t1, $t2, $t6, $t8, $t9, $t10, $t11, $t12
@@ -1053,36 +1053,35 @@ fun test(l0: &mut S, l1: vector<u8>)
     vec_len <T>
     // @15
     st_loc l7
-    copy_loc l3
-    vec_len <T>
+    copy_loc l7
     st_loc l8
 l3: copy_loc l6
-    // @20
     copy_loc l8
+    // @20
     lt
     br_true l0
     branch l1
 l0: copy_loc l1
-    // @25
     copy_loc l2
+    // @25
     copy_loc l3
     copy_loc l6
     vec_borrow <T>
     call __lambda__1_inline_1_956__test
-    // @30
     br_false l2
+    // @30
     ld_true
     st_loc l4
     move_loc l6
     st_loc l5
-    // @35
 l1: nop
+    // @35
     move_loc l3
     pop
     ret
 l2: move_loc l6
-    // @40
     copy_loc l7
+    // @40
     add
     st_loc l6
     branch l3

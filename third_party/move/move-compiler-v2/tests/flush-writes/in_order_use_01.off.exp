@@ -24,10 +24,20 @@ module 0xc0ffee::m
     call one
     call one
     call one
-    call one
+    st_loc l0
     // @5
-    call one
-    call one
+    copy_loc l0
+    st_loc l1
+    copy_loc l0
+    copy_loc l0
+    st_loc l5
+    // @10
+    st_loc l6
+    move_loc l0
+    move_loc l6
+    move_loc l5
+    move_loc l1
+    // @15
     call consume
     ret
 
