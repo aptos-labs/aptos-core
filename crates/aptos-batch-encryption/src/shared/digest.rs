@@ -159,7 +159,8 @@ impl DigestKey {
         pfs: &EvalProofs<IS>,
     ) -> Result<()> {
         pfs.computed_proofs
-            .iter().try_for_each(|(id, pf)| self.verify_pf(digest, *id, *pf))
+            .iter()
+            .try_for_each(|(id, pf)| self.verify_pf(digest, *id, *pf))
     }
 }
 

@@ -1,19 +1,22 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use ark_ff::field_hashers::{DefaultFieldHasher, HashToField};
-use ark_ff::{BigInteger, PrimeField, UniformRand as _};
+use super::runner::run_ts;
+use crate::{
+    group::{Fq, Fr, G1Affine, G2Affine},
+    shared::symmetric::{hash_g2_element, hmac_kdf, OneTimePad, SymmetricCiphertext, SymmetricKey},
+};
+use ark_ff::{
+    field_hashers::{DefaultFieldHasher, HashToField},
+    BigInteger, PrimeField, UniformRand as _,
+};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize as _, Compress, Validate};
 use ark_std::rand::thread_rng;
 use rand::RngCore;
 use sha2::Sha256;
 
-use super::runner::run_ts;
-use crate::shared::symmetric::{hash_g2_element, hmac_kdf, OneTimePad, SymmetricCiphertext, SymmetricKey};
-use crate::group::{Fq, Fr, G2Affine, G1Affine};
-
 #[test]
 fn test_hmac_kdf() {
-    for i in [ 1, 2, 7, 8, 31, 32, 33, 63, 64, 65 ] {
+    for i in [1, 2, 7, 8, 31, 32, 33, 63, 64, 65] {
         let mut input = vec![0u8; i];
         rand::thread_rng().fill_bytes(&mut input);
         let ts_result = run_ts("hmac_kdf", &input).unwrap();
@@ -26,7 +29,7 @@ fn test_hmac_kdf() {
 
 #[test]
 fn test_hash_to_fr() {
-    for i in [ 1, 2, 7, 8, 31, 32, 33, 63, 64, 65 ] {
+    for i in [1, 2, 7, 8, 31, 32, 33, 63, 64, 65] {
         let mut input = vec![0u8; i];
         rand::thread_rng().fill_bytes(&mut input);
         let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fr>>::new(&[]);
@@ -41,7 +44,7 @@ fn test_hash_to_fr() {
 
 #[test]
 fn test_hash_to_fq() {
-    for i in [ 1, 2, 7, 8, 31, 32, 33, 63, 64, 65 ] {
+    for i in [1, 2, 7, 8, 31, 32, 33, 63, 64, 65] {
         let mut input = vec![0u8; i];
         rand::thread_rng().fill_bytes(&mut input);
         let field_hasher = <DefaultFieldHasher<Sha256> as HashToField<Fq>>::new(&[]);
@@ -70,8 +73,9 @@ fn test_symmetric_encrypt() {
     let mut input = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut input);
     let symmetric_key_rust = SymmetricKey::from_bytes(input);
-    let ct_from_ts : SymmetricCiphertext = bcs::from_bytes(&run_ts("symmetric_encrypt", &input).unwrap()).unwrap();
-    let result : String = symmetric_key_rust.decrypt(&ct_from_ts).unwrap();
+    let ct_from_ts: SymmetricCiphertext =
+        bcs::from_bytes(&run_ts("symmetric_encrypt", &input).unwrap()).unwrap();
+    let result: String = symmetric_key_rust.decrypt(&ct_from_ts).unwrap();
 
     assert_eq!(result, String::from("hi"));
 }
@@ -87,7 +91,6 @@ fn test_otp_generation() {
     assert_eq!(ts_result, rust_result);
 }
 
-
 #[test]
 fn test_otp_padding() {
     let mut key_bytes = [0u8; 16];
@@ -97,7 +100,7 @@ fn test_otp_padding() {
     let rust_key = SymmetricKey::from_bytes(key_bytes);
     let rust_otp = OneTimePad::from_source_bytes(otp_bytes);
     let rust_result = bcs::to_bytes(&rust_otp.pad_key(&rust_key)).unwrap();
-    let mut input : Vec<u8> = Vec::new();
+    let mut input: Vec<u8> = Vec::new();
     input.extend_from_slice(&key_bytes);
     input.extend_from_slice(&otp_bytes);
     let ts_result = run_ts("otp_padding", &input).unwrap();
@@ -105,8 +108,6 @@ fn test_otp_padding() {
     println!("{:?}", rust_result);
     assert_eq!(ts_result, rust_result);
 }
-
-
 
 #[test]
 fn test_hash_g2_element() {
@@ -117,7 +118,9 @@ fn test_hash_g2_element() {
     g2.serialize_with_mode(&mut input, Compress::Yes).unwrap();
     println!("{:?}", input);
     let ts_result_bytes = run_ts("hash_g2_element", &input).unwrap();
-    let ts_result = G1Affine::deserialize_with_mode(ts_result_bytes.as_slice(), Compress::Yes, Validate::Yes).unwrap();
+    let ts_result =
+        G1Affine::deserialize_with_mode(ts_result_bytes.as_slice(), Compress::Yes, Validate::Yes)
+            .unwrap();
 
     assert_eq!(rust_result, ts_result);
 }
