@@ -956,7 +956,6 @@ else
   exit 1
 fi
 
-welcome_message
 if [[ "$BATCH_MODE" == "false" ]]; then
   welcome_message
   printf "Proceed with installing necessary dependencies? (y/N) > "
@@ -1072,11 +1071,8 @@ if [[ "$INSTALL_POSTGRES" == "true" ]]; then
   install_postgres
 fi
 
-
-echo "checking whether to install node and pnpm"
 if [[ "$INSTALL_JSTS" == "true" ]]; then
   # javascript and typescript tools
-  echo "installing node and pnpm"
   install_nodejs "$PACKAGE_MANAGER"
   install_pnpm "$PACKAGE_MANAGER"
 fi
