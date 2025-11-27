@@ -299,7 +299,7 @@ mod tests {
 
     #[test]
     fn test_hmac_kdf() {
-        println!("{:?}", hmac_kdf(&[1u8]));
+        println!("{:?}", hmac_kdf([1u8]));
     }
 
     #[test]

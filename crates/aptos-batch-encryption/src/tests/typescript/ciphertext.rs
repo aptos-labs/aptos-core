@@ -67,7 +67,7 @@ fn test_bibe_ct_encrypt_decrypt_ts() {
 
 
     let dk = BIBEDecryptionKey::reconstruct(
-        &vec![msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
+        &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
         &tc,
     )
         .unwrap();
@@ -155,7 +155,7 @@ fn test_ct_encrypt_decrypt_ts() {
     let pfs = pfs.compute_all(&dk);
 
     let dk = BIBEDecryptionKey::reconstruct(
-        &vec![msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
+        &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
         &tc,
     )
         .unwrap();
