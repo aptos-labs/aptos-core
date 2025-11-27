@@ -682,7 +682,9 @@ function install_nodejs {
 }
 
 function install_pnpm {
-  curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
+  whoami
+  pwd
+  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
 }
 
 function install_python3 {
