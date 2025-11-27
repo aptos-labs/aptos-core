@@ -1,15 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-import { describe, expect, it, vi } from "vitest";
-import { hash_to_fq, hash_to_fr, hmac_kdf, SymmetricCiphertext, SymmetricKey, Test} from '../src/symmetric';
+import { describe, expect, it} from "vitest";
 import { randomBytes } from '@noble/ciphers/utils.js';
-import { gcm } from '@noble/ciphers/aes.js';
-import { bn254 } from '@noble/curves/bn254.js';
-import { sha256 } from '@noble/hashes/sha2.js';
-import { hash_to_field } from '@noble/curves/abstract/hash-to-curve.js'
-import { Serializable, Serializer, Deserializer } from "@aptos-labs/ts-sdk";
-import { warn } from "console";
-import { H2COpts } from "@noble/curves/abstract/hash-to-curve.js";
 import { leBytesToBigint, bigintToLEBytes } from "../src/util.js";
 
 
