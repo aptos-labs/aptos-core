@@ -170,8 +170,7 @@ jobs:
 
       - name: check for pnpm
         run: |
-          whoami ; ls ~/.bashrc ; cat ~/.bashrc ; . ~/.bashrc ; echo $PNPM_HOME; echo $PATH ; pnpm
-        shell: bash
+          whoami ; ls ~/.bashrc ; cat ~/.bashrc ; source ~/.bashrc ; echo $PNPM_HOME; echo $PATH ; pnpm
 
       - name: Run targeted rust unit tests
         uses: ./.github/actions/rust-targeted-unit-tests
