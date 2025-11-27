@@ -19,7 +19,6 @@ use crate::{
     traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
-use ark_ec::AffineRepr;
 use ark_ff::UniformRand as _;
 use ark_std::rand::rngs::StdRng;
 use rand_core::SeedableRng;
