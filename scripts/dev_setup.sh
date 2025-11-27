@@ -670,8 +670,13 @@ function install_xsltproc {
 function install_nodejs {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh
-    "${PRE_COMMAND[@]}" -E bash nodesource_setup.sh
+    if [ "${PRE_COMMAND[@]}" == "sudo" ]; then
+      "${PRE_COMMAND[@]}" -E bash nodesource_setup.sh
+    else
+      "${PRE_COMMAND[@]}" bash nodesource_setup.sh
+    fi
   fi
+
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
 }
