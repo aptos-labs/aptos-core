@@ -67,7 +67,7 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
             quotient.reverse();
 
             let quotient_evals = domain2.fft(&quotient);
-            let divisor_evals = domain2.fft(&divisor);
+            let divisor_evals = domain2.fft(divisor);
             //let (quotient_evals, divisor_evals) = rayon::join(
             //        || domain2.fft(&quotient),
             //        || domain2.fft(&divisor),
@@ -83,7 +83,7 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
             let mut result: Vec<T> = product
                 .into_iter()
                 .zip(self)
-                .map(|(x, y)| y.clone() - x)
+                .map(|(x, y)| *y - x)
                 .collect();
 
             let mut i = 0;
@@ -103,7 +103,7 @@ fn recurse<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     level: usize,
     pos: usize,
 ) -> Vec<T> {
-    if f.len() == 0 {
+    if f.is_empty() {
         vec![T::zero()]
     } else if f.len() == 1 {
         vec![f[0]]
@@ -161,7 +161,7 @@ pub fn multi_point_eval_with_mult_tree<F: FftField, T: DomainCoeff<F> + Mul<F, O
     f: &[T],
     mult_tree: &Vec<Vec<DensePolynomial<F>>>,
 ) -> Vec<T> {
-    recurse(f, &mult_tree, mult_tree.len() - 1, 0)
+    recurse(f, mult_tree, mult_tree.len() - 1, 0)
 }
 
 #[cfg(test)]

@@ -6,7 +6,7 @@ use rayon::iter::{IntoParallelIterator as _, ParallelIterator as _};
 
 pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>>> {
     let mut bases: Vec<DensePolynomial<F>> = roots
-        .into_iter()
+        .iter()
         .cloned()
         .map(|u| DenseUVPolynomial::from_coefficients_vec(vec![-u, F::one()]))
         .collect();
@@ -22,7 +22,7 @@ pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>
     assert_eq!(2usize.pow(depth), num_leaves);
 
     for i in 1..=(num_leaves.ilog2() as usize) {
-        let len_at_i = 2usize.pow(depth as u32 - i as u32);
+        let len_at_i = 2usize.pow(depth - i as u32);
         let result_at_i = (0..len_at_i)
             .into_par_iter()
             .map(|j| result[i - 1][2 * j].clone() * &result[i - 1][2 * j + 1])

@@ -17,8 +17,8 @@ fn lagrange(x: Fr, other_xs: &[Fr], vanishing_poly: &DensePolynomial<Fr>) -> Den
 
     let denominator: Fr = other_xs
         .into_par_iter()
-        .map(|other_x| (x.clone() - other_x).inverse().unwrap())
-        .reduce(|| Fr::one(), |a, b| a * b);
+        .map(|other_x| (x - other_x).inverse().unwrap())
+        .reduce(Fr::one, |a, b| a * b);
 
     result = result * denominator;
 
@@ -33,7 +33,7 @@ pub fn interpolate(xs: &[Fr], ys: &[Fr]) -> DensePolynomial<Fr> {
         .zip(ys.into_par_iter())
         .enumerate()
         .map(|(i, (x, y))| {
-            let other_xs = vec![&xs[..i], &xs[i + 1..]].concat();
+            let other_xs = [&xs[..i], &xs[i + 1..]].concat();
             lagrange(*x, &other_xs, &vanishing_poly) * *y
         })
         .reduce(

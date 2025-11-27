@@ -29,7 +29,7 @@ pub struct FFTDomainId<const N: usize> {
 impl<const N: usize> FFTDomainId<N> {
     pub fn new<Coeffs>(id_set: &FFTDomainIdSet<N, Coeffs>, x_index: usize, y: Fr) -> Self {
         Self {
-            eval_domain: id_set.eval_domain.clone(),
+            eval_domain: id_set.eval_domain,
             x_index: x_index % id_set.eval_domain.size(),
             y,
         }
@@ -54,7 +54,7 @@ impl<const N: usize> Id for FFTDomainId<N> {
     type Set = FFTDomainIdSet<N, UncomputedCoeffs>;
 
     fn x(&self) -> Fr {
-        self.eval_domain.group_gen().pow(&[self.x_index as u64])
+        self.eval_domain.group_gen().pow([self.x_index as u64])
     }
 
     fn y(&self) -> Fr {
@@ -127,7 +127,7 @@ impl<const N: usize> IdSet for FFTDomainIdSet<N, UncomputedCoeffs> {
         (0..self.eval_domain.size())
             .zip(self.poly_evals.clone())
             // .filter(|(_x, y)| *y != Fr::zero()) //forgot why I added this
-            .map(move |(x, y)| FFTDomainId::new(&self, x, y))
+            .map(move |(x, y)| FFTDomainId::new(self, x, y))
             .collect()
     }
 }
@@ -139,7 +139,7 @@ impl<const N: usize> OssifiedIdSet for FFTDomainIdSet<N, FFTDomainComputedCoeffs
         (0..self.eval_domain.size())
             .zip(self.poly_evals.clone())
             // .filter(|(_x, y)| *y != Fr::zero()) //forgot why I added this
-            .map(move |(x, y)| FFTDomainId::new(&self, x, y))
+            .map(move |(x, y)| FFTDomainId::new(self, x, y))
             .collect()
     }
 
@@ -164,7 +164,7 @@ impl<const N: usize> OssifiedIdSet for FFTDomainIdSet<N, FFTDomainComputedCoeffs
             )
             .collect();
 
-        HashMap::from_iter(pfs.into_iter())
+        HashMap::from_iter(pfs)
     }
 
     /// same as above
@@ -185,7 +185,7 @@ impl<const N: usize> OssifiedIdSet for FFTDomainIdSet<N, FFTDomainComputedCoeffs
             )
             .collect();
 
-        HashMap::from_iter(pfs.into_iter())
+        HashMap::from_iter(pfs)
     }
 
     #[allow(unused_variables)]

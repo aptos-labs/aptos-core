@@ -147,8 +147,7 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
             self.as_vec()
                 .into_iter()
                 .zip(pfs)
-                .collect::<Vec<(Self::Id, G1Affine)>>()
-                .into_iter(),
+                .collect::<Vec<(Self::Id, G1Affine)>>(),
         )
     }
 
@@ -168,8 +167,7 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
             self.as_vec()
                 .into_iter()
                 .zip(pfs)
-                .collect::<Vec<(Self::Id, G1Affine)>>()
-                .into_iter(),
+                .collect::<Vec<(Self::Id, G1Affine)>>(),
         )
     }
 
@@ -183,7 +181,7 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
             .fk_domain
             .eval_proofs_at_x_coords_alt(
                 &self.poly_coeffs(),
-                &ids.into_iter().map(|id| id.x()).collect::<Vec<Fr>>(),
+                &ids.iter().map(|id| id.x()).collect::<Vec<Fr>>(),
                 round,
             )
             .iter()
@@ -194,8 +192,7 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
             self.as_vec()
                 .into_iter()
                 .zip(pfs)
-                .collect::<Vec<(Self::Id, G1Affine)>>()
-                .into_iter(),
+                .collect::<Vec<(Self::Id, G1Affine)>>(),
         )
     }
 

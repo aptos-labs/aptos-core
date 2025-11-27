@@ -55,7 +55,7 @@ impl DigestKey {
         let tau = Fr::rand(rng);
 
         let mut tau_powers_fr = vec![Fr::one()];
-        let mut cur = tau.clone();
+        let mut cur = tau;
         for _ in 0..batch_size {
             tau_powers_fr.push(cur);
             cur *= &tau;
@@ -159,9 +159,7 @@ impl DigestKey {
         pfs: &EvalProofs<IS>,
     ) -> Result<()> {
         pfs.computed_proofs
-            .iter()
-            .map(|(id, pf)| self.verify_pf(digest, *id, *pf))
-            .collect()
+            .iter().try_for_each(|(id, pf)| self.verify_pf(digest, *id, *pf))
     }
 }
 
@@ -199,7 +197,7 @@ pub struct EvalProofs<IS: OssifiedIdSet> {
 
 impl<IS: OssifiedIdSet> EvalProofs<IS> {
     pub fn get(&self, i: &IS::Id) -> Option<G1Affine> {
-        self.computed_proofs.get(i).map(|g1| *g1)
+        self.computed_proofs.get(i).copied()
     }
 }
 

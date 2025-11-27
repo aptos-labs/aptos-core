@@ -232,7 +232,7 @@ impl<I: Id, T: BIBEEncryptionKey> BIBECTEncrypt<I> for T {
         plaintext: &impl Plaintext,
         id: I,
     ) -> Result<BIBECiphertext<I>> {
-         let r = vec![Fr::rand(rng), Fr::rand(rng)];
+         let r = [Fr::rand(rng), Fr::rand(rng)];
         let hashed_encryption_key: G1Affine = symmetric::hash_g2_element(self.sig_mpk_g2())?;
 
         let ct_g2 = [
