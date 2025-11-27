@@ -47,7 +47,7 @@ impl EncryptionKey {
     pub(crate) fn new_for_testing() -> Self {
         use ark_ec::AffineRepr as _;
 
-        Self { 
+        Self {
             sig_mpk_g2: G2Affine::generator(),
             tau_g2: G2Affine::generator(),
         }

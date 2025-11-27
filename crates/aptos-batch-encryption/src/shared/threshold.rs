@@ -26,7 +26,7 @@ pub fn keygen(rng: &mut impl RngCore, n: usize, t: usize, batch_size: usize) -> 
     let sign_sk_shares = shamir_params.share(sign_sk, rng);
 
     let sk_shares = sign_sk_shares.iter().map(
-        |share| 
+        |share|
         MasterSecretKeyShare {
             sign_sk: *share,
             digest_setup: digest_setup.clone(),
@@ -47,7 +47,7 @@ pub struct DecryptionKeyShare(ShamirGroupShare);
 
 
 impl MasterSecretKeyShare {
-    pub fn derive_decryption_key_share(&self, digest: &SuccinctDigest, batch_num: usize) -> DecryptionKeyShare 
+    pub fn derive_decryption_key_share(&self, digest: &SuccinctDigest, batch_num: usize) -> DecryptionKeyShare
     {
         let hashed_batch_num : G1Affine = hash_batch_num(batch_num);
 
@@ -89,7 +89,7 @@ mod tests {
         let number_of_parties = 16;
         let threshold = 8;
         let mut rng = thread_rng();
-        
+
         let (tpk, msk_shares) = keygen(&mut rng, number_of_parties, threshold, batch_size);
         let pk = &tpk.pk;
 
