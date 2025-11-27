@@ -1073,6 +1073,7 @@ fi
 
 if [[ "$INSTALL_JSTS" == "true" ]]; then
   # javascript and typescript tools
+  echo "installing node and pnpm"
   install_nodejs "$PACKAGE_MANAGER"
   install_pnpm "$PACKAGE_MANAGER"
 fi
