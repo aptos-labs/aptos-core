@@ -34,6 +34,7 @@ pub fn compute_mult_tree<F: FftField>(roots: &[F]) -> Vec<Vec<DensePolynomial<F>
 }
 
 pub fn quotient<F: FftField>(
+    #[allow(clippy::ptr_arg)]
     mult_tree: &Vec<Vec<DensePolynomial<F>>>,
     divisor_index: usize,
 ) -> DensePolynomial<F> {
