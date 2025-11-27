@@ -1,0 +1,227 @@
+
+running 30 tests
+test shared::algebra::differentiate::tests::test_differentiate ... ignored
+test shared::algebra::differentiate::tests::test_differentiate_2 ... ignored
+test shared::algebra::fk_algorithm::tests::compute_eval_proofs_at_roots_of_unity ... ignored
+test shared::algebra::fk_algorithm::tests::test_serialize_deserialize ... ignored
+test shared::algebra::interpolate::tests::test_divide ... ignored
+test shared::algebra::interpolate::tests::test_vanishing_poly ... ignored
+test shared::algebra::mult_tree::tests::test_mult_tree ... ignored
+test shared::algebra::mult_tree::tests::test_quotient ... ignored
+test shared::algebra::multi_point_eval::tests::test_compute_mult_tree ... ignored
+test shared::algebra::multi_point_eval::tests::test_compute_mult_tree_2 ... ignored
+test shared::algebra::multi_point_eval::tests::test_inv_mod_xpow ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_2 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_3 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_4 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_naive ... ignored
+test shared::algebra::multi_point_eval::tests::test_remainder ... ignored
+test shared::algebra::multi_point_eval::tests::test_remainder_2 ... ignored
+test shared::algebra::shamir::tests::test_all_lagrange ... ignored
+test shared::algebra::shamir::tests::test_reconstruct ... ignored
+test shared::algebra::shamir::tests::test_reconstruct_in_exponent ... ignored
+test shared::ciphertext::tests::test_bibe_ct_encrypt_decrypt ... ignored
+test shared::ciphertext::tests::test_ct_encrypt_decrypt ... ignored
+test shared::digest::tests::compute_and_verify_all_opening_proofs ... ignored
+test shared::digest::tests::test_digest_key_capacity ... ignored
+test shared::key_derivation::tests::test_reconstruct_verify ... ignored
+test shared::symmetric::tests::test_otp ... ignored
+test shared::symmetric::tests::test_symmetric_encrypt_decrypt ... ignored
+test tests::fptx_smoke::fptx_serialize_deserialize_setup ... ignored
+test tests::fptx_smoke::smoke ... ignored
+
+test result: ok. 0 passed; 0 failed; 30 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+FPTX::digest/32         time:   [5.4899 ms 5.5649 ms 5.6451 ms]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+FPTX::digest/128        time:   [5.2979 ms 5.3201 ms 5.3445 ms]
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+FPTX::digest/512        time:   [13.480 ms 13.608 ms 13.744 ms]
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+FPTX::digest/2048       time:   [39.845 ms 40.405 ms 40.975 ms]
+
+FPTX::encrypt/32        time:   [3.8697 ms 3.8716 ms 3.8735 ms]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+FPTX::encrypt/128       time:   [3.8539 ms 3.8559 ms 3.8580 ms]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+FPTX::encrypt/512       time:   [3.8327 ms 3.8348 ms 3.8369 ms]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+FPTX::encrypt/2048      time:   [3.8786 ms 3.8806 ms 3.8826 ms]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+
+FPTX::verify_ct/32      time:   [41.496 µs 41.508 µs 41.521 µs]
+Found 9 outliers among 100 measurements (9.00%)
+  2 (2.00%) low mild
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+FPTX::verify_ct/128     time:   [41.708 µs 41.716 µs 41.724 µs]
+Found 11 outliers among 100 measurements (11.00%)
+  4 (4.00%) low mild
+  4 (4.00%) high mild
+  3 (3.00%) high severe
+FPTX::verify_ct/512     time:   [41.149 µs 41.158 µs 41.168 µs]
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+FPTX::verify_ct/2048    time:   [41.344 µs 41.359 µs 41.376 µs]
+Found 12 outliers among 100 measurements (12.00%)
+  3 (3.00%) low mild
+  4 (4.00%) high mild
+  5 (5.00%) high severe
+
+FPTX::eval_proofs_compute_all/32
+                        time:   [6.0628 ms 6.0855 ms 6.1109 ms]
+Found 3 outliers among 10 measurements (30.00%)
+  1 (10.00%) low mild
+  2 (20.00%) high mild
+FPTX::eval_proofs_compute_all/128
+                        time:   [16.248 ms 16.352 ms 16.430 ms]
+FPTX::eval_proofs_compute_all/256
+                        time:   [44.383 ms 44.546 ms 44.775 ms]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low severe
+  1 (10.00%) high severe
+FPTX::eval_proofs_compute_all/512
+                        time:   [130.94 ms 132.13 ms 133.05 ms]
+FPTX::eval_proofs_compute_all/2048
+                        time:   [1.3958 s 1.4093 s 1.4224 s]
+
+FPTX::eval_proofs_compute_all_2/32
+                        time:   [32.970 ms 33.322 ms 33.827 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+FPTX::eval_proofs_compute_all_2/128
+                        time:   [82.910 ms 84.041 ms 84.904 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
+FPTX::eval_proofs_compute_all_2/256
+                        time:   [175.23 ms 178.05 ms 180.57 ms]
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
+FPTX::eval_proofs_compute_all_2/512
+                        time:   [365.01 ms 371.07 ms 377.19 ms]
+FPTX::eval_proofs_compute_all_2/2048
+                        time:   [1.8233 s 1.8541 s 1.8876 s]
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low severe
+  1 (10.00%) high severe
+
+FPTX::derive_decryption_key_share/n=128, t=86
+                        time:   [89.930 µs 89.950 µs 89.972 µs]
+Found 16 outliers among 100 measurements (16.00%)
+  1 (1.00%) low severe
+  6 (6.00%) low mild
+  3 (3.00%) high mild
+  6 (6.00%) high severe
+FPTX::derive_decryption_key_share/n=256, t=171
+                        time:   [83.184 µs 83.208 µs 83.233 µs]
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+FPTX::derive_decryption_key_share/n=512, t=342
+                        time:   [73.476 µs 73.494 µs 73.514 µs]
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+FPTX::derive_decryption_key_share/n=1024, t=683
+                        time:   [83.468 µs 83.497 µs 83.529 µs]
+Found 8 outliers among 100 measurements (8.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+
+FPTX::verify_decryption_key_share/32
+                        time:   [1.6661 ms 1.6663 ms 1.6666 ms]
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low severe
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+FPTX::verify_decryption_key_share/128
+                        time:   [1.6656 ms 1.6659 ms 1.6662 ms]
+Found 8 outliers among 100 measurements (8.00%)
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+FPTX::verify_decryption_key_share/512
+                        time:   [1.6645 ms 1.6648 ms 1.6651 ms]
+Found 13 outliers among 100 measurements (13.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  7 (7.00%) high mild
+  3 (3.00%) high severe
+FPTX::verify_decryption_key_share/2048
+                        time:   [1.6664 ms 1.6672 ms 1.6681 ms]
+Found 7 outliers among 100 measurements (7.00%)
+  3 (3.00%) high mild
+  4 (4.00%) high severe
+
+FPTX::reconstruct_decryption_key/n=128, t=86
+                        time:   [5.2330 ms 5.2662 ms 5.3002 ms]
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+FPTX::reconstruct_decryption_key/n=256, t=171
+                        time:   [8.1280 ms 8.1591 ms 8.1917 ms]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+FPTX::reconstruct_decryption_key/n=512, t=342
+                        time:   [12.717 ms 12.762 ms 12.811 ms]
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+FPTX::reconstruct_decryption_key/n=1024, t=683
+                        time:   [20.673 ms 20.850 ms 21.028 ms]
+
+FPTX::decrypt (full batch, all cts)/32
+                        time:   [2.4230 ms 2.4254 ms 2.4280 ms]
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+FPTX::decrypt (full batch, all cts)/128
+                        time:   [6.1153 ms 6.1321 ms 6.1488 ms]
+FPTX::decrypt (full batch, all cts)/512
+                        time:   [18.988 ms 19.002 ms 19.015 ms]
+FPTX::decrypt (full batch, all cts)/2048
+                        time:   [71.778 ms 71.811 ms 71.846 ms]
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
