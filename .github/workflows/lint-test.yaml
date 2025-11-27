@@ -166,7 +166,7 @@ jobs:
 
       - name: Run dev_setup.sh
         run: |
-          scripts/dev_setup.sh -b -p -r -y -P -t
+          scripts/dev_setup.sh -b -p -r -y -P -t -J
 
       - name: Run targeted rust unit tests
         uses: ./.github/actions/rust-targeted-unit-tests
