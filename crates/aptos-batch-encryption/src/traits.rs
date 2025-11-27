@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use crate::shared::algebra::shamir::ThresholdConfig;
 use anyhow::Result;
 use rand_core::{CryptoRng, RngCore};

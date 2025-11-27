@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 import { randomBytes } from '@noble/ciphers/utils.js';
 import { gcm } from '@noble/ciphers/aes.js';
 import { Serializable, Serializer, Deserializer } from "@aptos-labs/ts-sdk";

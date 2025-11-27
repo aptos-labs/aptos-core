@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use aptos_batch_encryption::group::{
     Fr, G1Affine, G1Projective, G2Affine, G2Prepared, PairingOutput, PairingSetting
 };

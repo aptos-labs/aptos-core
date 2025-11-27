@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use ark_bn254::Bn254;
 use ark_ec::{bn::Bn, pairing::Pairing, AffineRepr};
 use ark_ff::{BigInteger, PrimeField, UniformRand};

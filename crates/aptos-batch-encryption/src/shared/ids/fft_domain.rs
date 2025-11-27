@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use super::{free_roots::UncomputedCoeffs, Id, IdSet, OssifiedIdSet};
 use crate::{
     group::{Fr, G1Affine},

@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use crate::group::{Fr, G1Affine};
 use ed25519_dalek::VerifyingKey;
 use std::{collections::HashMap, hash::Hash};

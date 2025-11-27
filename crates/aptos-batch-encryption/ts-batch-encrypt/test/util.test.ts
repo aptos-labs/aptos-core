@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it, vi } from "vitest";
 import { hash_to_fq, hash_to_fr, hmac_kdf, SymmetricCiphertext, SymmetricKey, Test} from '../src/symmetric';
 import { randomBytes } from '@noble/ciphers/utils.js';

@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 //use batch_ibe::group::{Fr, G1Projective};
 //use ark_poly::{univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain, Radix2EvaluationDomain};
 //use batch_ibe::{shared::digest::DigestKey, shared::algebra::fk_algorithm::FKDomain};

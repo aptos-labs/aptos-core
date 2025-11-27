@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use super::multi_point_eval::multi_point_eval;
 use crate::{
     group::{Fr, G1Affine, G1Projective},

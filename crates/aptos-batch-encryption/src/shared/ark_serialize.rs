@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 //! copied from https://github.com/arkworks-rs/algebra/issues/178#issuecomment-1413219278
 //!
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};

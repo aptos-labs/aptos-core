@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 //! This module deals with computing and generating opening proofs for "digests",
 //! which are KZG polynomial commitments which commit to a set of IDs.
 
