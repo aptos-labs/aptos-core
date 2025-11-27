@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use crate::{
     errors::ReconstructError,
     group::{Fr, G1Affine, G1Projective},

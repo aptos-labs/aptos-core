@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use super::{
     algebra::shamir::{ShamirGroupShare, ThresholdConfig},
     symmetric,

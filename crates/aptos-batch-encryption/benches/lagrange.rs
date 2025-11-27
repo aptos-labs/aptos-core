@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use aptos_batch_encryption::shared::algebra::shamir::ThresholdConfig;
 use ark_poly::EvaluationDomain;
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};

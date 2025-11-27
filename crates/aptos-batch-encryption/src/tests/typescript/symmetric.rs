@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use ark_ff::field_hashers::{DefaultFieldHasher, HashToField};
 use ark_ff::{BigInteger, PrimeField, UniformRand as _};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize as _, Compress, Validate};

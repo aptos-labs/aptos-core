@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 
 import { Serializable, Serializer, Deserializer } from "@aptos-labs/ts-sdk";
 import * as ed from '@noble/ed25519';

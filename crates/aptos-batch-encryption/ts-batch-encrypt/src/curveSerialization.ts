@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 import type { Fp2 } from '@noble/curves/abstract/tower.js';
 import type { WeierstrassPoint, WeierstrassPointCons } from '@noble/curves/abstract/weierstrass.js';
 import { bn254 } from '@noble/curves/bn254.js';

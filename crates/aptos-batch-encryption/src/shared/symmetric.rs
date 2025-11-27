@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use crate::{
     errors::BatchEncryptionError,
     group::{Fq, G1Affine, G2Affine},

@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use aptos_batch_encryption::{
     schemes::fptx::FPTX,
     shared::{algebra::shamir::ThresholdConfig, key_derivation::BIBEDecryptionKeyShare},
