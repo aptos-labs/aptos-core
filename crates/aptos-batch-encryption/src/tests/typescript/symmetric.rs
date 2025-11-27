@@ -97,7 +97,7 @@ fn test_otp_padding() {
     let rust_key = SymmetricKey::from_bytes(key_bytes.clone());
     let rust_otp = OneTimePad::from_source_bytes(&otp_bytes);
     let rust_result = bcs::to_bytes(&rust_otp.pad_key(&rust_key)).unwrap();
-    let mut input : Vec<u8> = Vec::new(); 
+    let mut input : Vec<u8> = Vec::new();
     input.extend_from_slice(&key_bytes);
     input.extend_from_slice(&otp_bytes);
     let ts_result = run_ts("otp_padding", &input).unwrap();
