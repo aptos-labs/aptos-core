@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::{
-    digest::{Digest, EvalProofs}, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey}
+    digest::{Digest, EvalProofs}, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey},
 };
 use crate::{
     errors::{BatchEncryptionError, CTVerifyError},
@@ -124,8 +124,14 @@ impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
 }
 
 #[cfg(test)]
+use super::ids::FreeRootId;
+
+#[cfg(test)]
 impl BIBECiphertext<FreeRootId> {
+
     pub(crate) fn blank_for_testing() -> Self {
+        use ark_std::Zero;
+
         BIBECiphertext {
             id: FreeRootId::new(Fr::zero()),
             ct_g2: [
