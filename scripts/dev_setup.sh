@@ -125,7 +125,7 @@ function install_clang {
   VERSION=${2:-20}
 
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
-    "${PRE_COMMAND[@]}" apt-get install gnupg lsb-release software-properties-common wget
+    "${PRE_COMMAND[@]}" apt-get install -y gnupg lsb-release software-properties-common wget
     "${PRE_COMMAND[@]}" bash -c "$(wget -O - https://apt.llvm.org/llvm.sh)" llvm.sh "${VERSION}"
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang clang "/usr/bin/clang-${VERSION}" 100
     "${PRE_COMMAND[@]}" update-alternatives --install /usr/bin/clang++ clang++ "/usr/bin/clang++-${VERSION}" 100
@@ -670,14 +670,21 @@ function install_xsltproc {
 function install_nodejs {
   if [[ "$PACKAGE_MANAGER" == "apt-get" ]]; then
     curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR_VERSION}.x" -o nodesource_setup.sh
-    "${PRE_COMMAND[@]}" -E bash nodesource_setup.sh
+    if [[ "${PRE_COMMAND[*]}" == "sudo" ]]; then
+      "${PRE_COMMAND[@]}" -E bash nodesource_setup.sh
+    else
+      "${PRE_COMMAND[@]}" bash nodesource_setup.sh
+    fi
   fi
+
   install_pkg nodejs "$PACKAGE_MANAGER"
   install_pkg npm "$PACKAGE_MANAGER"
 }
 
 function install_pnpm {
-  curl -fsSL https://get.pnpm.io/install.sh | "${PRE_COMMAND[@]}" env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
+  whoami
+  pwd
+  curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=8.2.0 SHELL="$(which bash)" bash -
 }
 
 function install_python3 {
