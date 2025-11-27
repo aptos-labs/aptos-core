@@ -9,10 +9,7 @@ use crate::{
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use ark_std::rand::{
-    seq::SliceRandom,
-    thread_rng, Rng as _,
-};
+use ark_std::rand::{seq::SliceRandom, thread_rng, Rng as _};
 use rayon::ThreadPoolBuilder;
 
 #[test]

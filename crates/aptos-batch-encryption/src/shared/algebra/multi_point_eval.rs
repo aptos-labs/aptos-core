@@ -80,11 +80,7 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
                 .collect();
             let product = domain2.ifft(&product_evals);
 
-            let mut result: Vec<T> = product
-                .into_iter()
-                .zip(self)
-                .map(|(x, y)| *y - x)
-                .collect();
+            let mut result: Vec<T> = product.into_iter().zip(self).map(|(x, y)| *y - x).collect();
 
             let mut i = 0;
             while i < result.len() && result[i] != T::zero() {

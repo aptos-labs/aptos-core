@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::{
-    digest::{Digest, EvalProofs}, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey},
+    digest::{Digest, EvalProofs},
+    key_derivation::BIBEDecryptionKey,
+    symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey},
 };
 use crate::{
     errors::{BatchEncryptionError, CTVerifyError},
@@ -36,7 +38,6 @@ pub struct PreparedBIBECiphertext {
     padded_key: OneTimePaddedKey,
     symmetric_ciphertext: SymmetricCiphertext,
 }
-
 
 pub trait BIBEEncryptionKey {
     fn sig_mpk_g2(&self) -> G2Affine;
@@ -128,7 +129,6 @@ use super::ids::FreeRootId;
 
 #[cfg(test)]
 impl BIBECiphertext<FreeRootId> {
-
     pub(crate) fn blank_for_testing() -> Self {
         use ark_std::Zero;
 
@@ -146,7 +146,6 @@ impl BIBECiphertext<FreeRootId> {
 }
 
 impl<I: Id> BIBECiphertext<I> {
-
     pub fn prepare(
         &self,
         digest: &Digest,
@@ -238,7 +237,7 @@ impl<I: Id, T: BIBEEncryptionKey> BIBECTEncrypt<I> for T {
         plaintext: &impl Plaintext,
         id: I,
     ) -> Result<BIBECiphertext<I>> {
-         let r = [Fr::rand(rng), Fr::rand(rng)];
+        let r = [Fr::rand(rng), Fr::rand(rng)];
         let hashed_encryption_key: G1Affine = symmetric::hash_g2_element(self.sig_mpk_g2())?;
 
         let ct_g2 = [
@@ -247,12 +246,9 @@ impl<I: Id, T: BIBEEncryptionKey> BIBECTEncrypt<I> for T {
             (-(G2Affine::generator() * r[1])).into(),
         ];
 
-
-
         let otp_source_gt: PairingOutput =
             PairingSetting::pairing(G1Affine::generator() * id.y(), G2Affine::generator()) * r[0]
                 - PairingSetting::pairing(hashed_encryption_key, self.sig_mpk_g2()) * r[1];
-
 
         let mut otp_source_bytes = Vec::new();
         otp_source_gt.serialize_compressed(&mut otp_source_bytes)?;
@@ -386,8 +382,7 @@ pub mod tests {
     fn test_ct_verify() {
         let mut rng = thread_rng();
         let tc = ThresholdConfig::new(1, 1);
-        let (ek, _, _,  _, _, _) =
-            FPTX::setup_for_testing(rng.gen(), 8, 1, &tc, &tc).unwrap();
+        let (ek, _, _, _, _, _) = FPTX::setup_for_testing(rng.gen(), 8, 1, &tc, &tc).unwrap();
 
         let plaintext = String::from("hi");
         let associated_data = String::from("associated data");

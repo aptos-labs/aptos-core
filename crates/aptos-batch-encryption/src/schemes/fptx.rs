@@ -37,10 +37,7 @@ pub struct EncryptionKey {
 
 impl EncryptionKey {
     pub fn new(sig_mpk_g2: G2Affine, tau_g2: G2Affine) -> Self {
-        Self {
-            sig_mpk_g2,
-            tau_g2,
-        }
+        Self { sig_mpk_g2, tau_g2 }
     }
 
     #[cfg(test)]
@@ -142,12 +139,9 @@ impl BatchThresholdEncryption for FPTX {
         round: Self::Round,
         pool: &rayon::ThreadPool,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
-        let mut ids: FreeRootIdSet<UncomputedCoeffs> = FreeRootIdSet::from_slice(
-            &cts.iter()
-                .map(|ct| ct.id())
-                .collect::<Vec<FreeRootId>>(),
-        )
-        .ok_or(anyhow!(""))?;
+        let mut ids: FreeRootIdSet<UncomputedCoeffs> =
+            FreeRootIdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<FreeRootId>>())
+                .ok_or(anyhow!(""))?;
 
         pool.install(|| digest_key.digest(&mut ids, round))
     }

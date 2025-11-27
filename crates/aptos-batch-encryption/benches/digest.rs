@@ -169,7 +169,6 @@ pub fn setup(c: &mut Criterion) {
                     let mut file = File::create("setup.bcs").unwrap();
                     file.write_all(&bcs::to_bytes(&setup).unwrap()).unwrap();
                     //panic!();
-
                 });
             },
         );
@@ -179,7 +178,6 @@ pub fn setup(c: &mut Criterion) {
 pub fn deserialize(c: &mut Criterion) {
     let mut group = c.benchmark_group("DigestKey::deserialize");
     group.significance_level(0.1).sample_size(10);
-
 
     {
         let num_rounds = 10000_usize;
@@ -193,8 +191,6 @@ pub fn deserialize(c: &mut Criterion) {
                     let mut contents = vec![];
                     file.read_to_end(&mut contents).unwrap();
                     let _setup: DigestKey = bcs::from_bytes(&contents).unwrap();
-
-
                 });
             },
         );
