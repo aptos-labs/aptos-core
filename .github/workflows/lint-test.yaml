@@ -170,7 +170,7 @@ jobs:
 
       - name: check for pnpm
         run: |
-          env
+          source ~/.bashrc; env
         shell: bash
 
       - name: Run targeted rust unit tests
