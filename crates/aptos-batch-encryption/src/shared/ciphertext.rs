@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::{
-    digest::{Digest, EvalProofs}, ids::FreeRootId, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey}
+    digest::{Digest, EvalProofs}, key_derivation::BIBEDecryptionKey, symmetric::{self, OneTimePad, OneTimePaddedKey, SymmetricCiphertext, SymmetricKey}
 };
 use crate::{
     errors::{BatchEncryptionError, CTVerifyError},
@@ -12,7 +12,7 @@ use crate::{
 use anyhow::Result;
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_serialize::CanonicalSerialize;
-use ark_std::{UniformRand, Zero};
+use ark_std::UniformRand;
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use rand_core::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
