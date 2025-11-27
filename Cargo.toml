@@ -58,6 +58,7 @@ members = [
     "crates/aptos-api-tester",
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
+    "crates/aptos-batch-encryption",
     "crates/aptos-build-info",
     "crates/aptos-collections",
     "crates/aptos-compression",
