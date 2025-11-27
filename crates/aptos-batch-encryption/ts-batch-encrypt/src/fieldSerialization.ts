@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 import type { Fp2, Fp6, Fp12 } from "@noble/curves/abstract/tower.js";
 
 const BIGINT_SIZE = 32;

@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 import { bn254 } from '@noble/curves/bn254.js';
 import { randomBytes } from "@noble/hashes/utils.js";
 import { bytesToG1, bytesToG2, g1ToBytes, g2ToBytes } from "../src/curveSerialization.js";

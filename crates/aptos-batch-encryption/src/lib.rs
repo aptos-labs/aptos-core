@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 #![allow(refining_impl_trait)]
 pub mod errors;
 pub mod group;

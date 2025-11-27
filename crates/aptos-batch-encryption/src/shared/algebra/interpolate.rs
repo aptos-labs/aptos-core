@@ -1,3 +1,5 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
 use super::mult_tree::compute_mult_tree;
 use crate::group::Fr;
 use ark_ff::Field;
