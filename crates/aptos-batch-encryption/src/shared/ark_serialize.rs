@@ -39,15 +39,15 @@ pub mod tests {
         struct A(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G1Affine);
 
         let g1 = G1Affine::zero();
-        println!("{:?}", bcs::to_bytes(&A(g1.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g1)));
         let mut g1 = G1Affine::generator();
-        println!("{:?}", bcs::to_bytes(&A(g1.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g1)));
         g1 = (g1 + G1Projective::from(g1)).into();
-        println!("{:?}", bcs::to_bytes(&A(g1.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g1)));
         g1 = (g1 + G1Projective::from(g1)).into();
-        println!("{:?}", bcs::to_bytes(&A(g1.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g1)));
         g1 = (g1 + G1Projective::from(g1)).into();
-        println!("{:?}", bcs::to_bytes(&A(g1.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g1)));
     }
 
     #[test]
@@ -56,18 +56,18 @@ pub mod tests {
         struct A(#[serde(serialize_with = "ark_se", deserialize_with = "ark_de")] G2Affine);
 
         let g2 = G2Affine::zero();
-        println!("{:?}", bcs::to_bytes(&A(g2.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g2)));
         let mut g2 = G2Affine::generator();
-        println!("{:?}", bcs::to_bytes(&A(g2.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g2)));
         println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
         g2 = (g2 + G2Projective::from(g2)).into();
-        println!("{:?}", bcs::to_bytes(&A(g2.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g2)));
         println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
         g2 = (g2 + G2Projective::from(g2)).into();
-        println!("{:?}", bcs::to_bytes(&A(g2.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g2)));
         println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
         g2 = (g2 + G2Projective::from(g2)).into();
-        println!("{:?}", bcs::to_bytes(&A(g2.clone())));
+        println!("{:?}", bcs::to_bytes(&A(g2)));
         println!("{:?}", g2.x.c1.into_bigint().to_bytes_le());
     }
 }

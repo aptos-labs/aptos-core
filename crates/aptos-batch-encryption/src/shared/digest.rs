@@ -209,8 +209,8 @@ pub(crate) mod tests {
     use ark_std::rand::thread_rng;
 
     #[allow(unused)]
-    pub(crate) fn digest_and_pfs_for_testing<'a>(
-        dk: &'a DigestKey,
+    pub(crate) fn digest_and_pfs_for_testing(
+        dk: &DigestKey,
     ) -> (Digest, EvalProofsPromise<FreeRootIdSet<ComputedCoeffs>>) {
         let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
         let mut counter = Fr::zero();

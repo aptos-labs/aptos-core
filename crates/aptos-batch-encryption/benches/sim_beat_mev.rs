@@ -28,9 +28,9 @@ pub fn critical_path(c: &mut Criterion) {
                         .into_par_iter()
                         .map(|_| {
                             let pad =
-                                PairingSetting::pairing(&input.0, input.1.clone());
-                            let pad2 = pad + pad;
-                            pad2
+                                PairingSetting::pairing(input.0, input.1.clone());
+                            
+                            pad + pad
                         })
                         .collect::<Vec<PairingOutput>>()
                 });

@@ -27,7 +27,7 @@ pub fn compute(c: &mut Criterion) {
     }
 
     group.bench_with_input(BenchmarkId::from_parameter(8), &(setup, ids), |b, input| {
-        b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+        b.iter(|| input.0.digest(&mut input.1.clone(), 0));
     });
 
     // 32
@@ -43,7 +43,7 @@ pub fn compute(c: &mut Criterion) {
         BenchmarkId::from_parameter(32),
         &(setup, ids),
         |b, input| {
-            b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+            b.iter(|| input.0.digest(&mut input.1.clone(), 0));
         },
     );
 
@@ -61,7 +61,7 @@ pub fn compute(c: &mut Criterion) {
         BenchmarkId::from_parameter(128),
         &(setup, ids),
         |b, input| {
-            b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+            b.iter(|| input.0.digest(&mut input.1.clone(), 0));
         },
     );
 
@@ -79,7 +79,7 @@ pub fn compute(c: &mut Criterion) {
         BenchmarkId::from_parameter(512),
         &(setup, ids),
         |b, input| {
-            b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+            b.iter(|| input.0.digest(&mut input.1.clone(), 0));
         },
     );
 }
@@ -100,7 +100,7 @@ pub fn compute_arbitrary_x(c: &mut Criterion) {
             BenchmarkId::from_parameter(batch_size),
             &(setup, ids),
             |b, input| {
-                b.iter(|| (*input).0.digest(&mut input.1.clone(), 0));
+                b.iter(|| input.0.digest(&mut input.1.clone(), 0));
             },
         );
     }
@@ -156,7 +156,8 @@ pub fn setup(c: &mut Criterion) {
 
     let batch_size = 128;
 
-    for num_rounds in [10000 as usize] {
+    {
+        let num_rounds = 10000_usize;
         let mut rng = thread_rng();
 
         group.bench_with_input(
@@ -168,7 +169,7 @@ pub fn setup(c: &mut Criterion) {
                     let mut file = File::create("setup.bcs").unwrap();
                     file.write_all(&bcs::to_bytes(&setup).unwrap()).unwrap();
                     //panic!();
-                    ()
+                    
                 });
             },
         );
@@ -180,7 +181,8 @@ pub fn deserialize(c: &mut Criterion) {
     group.significance_level(0.1).sample_size(10);
 
 
-    for num_rounds in [10000 as usize] {
+    {
+        let num_rounds = 10000_usize;
 
         group.bench_with_input(
             BenchmarkId::from_parameter(num_rounds),
@@ -192,7 +194,7 @@ pub fn deserialize(c: &mut Criterion) {
                     file.read_to_end(&mut contents).unwrap();
                     let _setup: DigestKey = bcs::from_bytes(&contents).unwrap();
 
-                    ()
+                    
                 });
             },
         );

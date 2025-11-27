@@ -48,7 +48,7 @@ fn smoke() {
         dk_shares
             .iter()
             .zip(vks)
-            .map(|(dk_share, vk)| FPTX::verify_decryption_key_share(&vk, &d, &dk_share))
+            .map(|(dk_share, vk)| FPTX::verify_decryption_key_share(&vk, &d, dk_share))
             .collect::<Result<Vec<()>>>()
             .unwrap();
 
