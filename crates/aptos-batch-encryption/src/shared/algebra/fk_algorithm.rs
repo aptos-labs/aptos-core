@@ -336,7 +336,7 @@ impl<
 
         let tau_powers_reversed: Vec<Vec<T>> = tau_powers
             .into_iter()
-            .map(|tau_powers_for_round| Vec::from(tau_powers_for_round).into_iter().rev().collect())
+            .map(|tau_powers_for_round| tau_powers_for_round.into_iter().rev().collect())
             .collect();
 
         let prepared_toeplitz_inputs = tau_powers_reversed
@@ -385,7 +385,7 @@ impl<
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         let mut f = Vec::from(f);
-        f.extend(std::iter::repeat(F::zero()).take(self.toeplitz_domain.dimension() + 1 - f.len()));
+        f.extend(std::iter::repeat_n(F::zero(), self.toeplitz_domain.dimension() + 1 - f.len()));
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
         let h_term_commitments = self.toeplitz_domain.eval_prepared(
@@ -402,7 +402,7 @@ impl<
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         let mut f = Vec::from(f);
-        f.extend(std::iter::repeat(F::zero()).take(self.toeplitz_domain.dimension() + 1 - f.len()));
+        f.extend(std::iter::repeat_n(F::zero(), self.toeplitz_domain.dimension() + 1 - f.len()));
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
         let h_term_commitments = self.toeplitz_domain.eval_prepared(
@@ -412,7 +412,7 @@ impl<
             &self.prepared_toeplitz_inputs[round],
         );
 
-        multi_point_eval(&h_term_commitments, &x_coords)
+        multi_point_eval(&h_term_commitments, x_coords)
     }
 }
 
@@ -434,7 +434,7 @@ impl EPTest for FKDomain<Fr, G1Projective> {
         // dimension.
         let mut f = Vec::from(f);
         f.extend(
-            std::iter::repeat(Fr::zero()).take(self.toeplitz_domain.dimension() + 1 - f.len()),
+            std::iter::repeat_n(Fr::zero(), self.toeplitz_domain.dimension() + 1 - f.len()),
         );
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
@@ -448,9 +448,9 @@ impl EPTest for FKDomain<Fr, G1Projective> {
         multi_point_eval_naive(
             &h_term_commitments
                 .into_iter()
-                .map(|g| G1Affine::from(g))
+                .map(G1Affine::from)
                 .collect::<Vec<G1Affine>>(),
-            &x_coords,
+            x_coords,
         )
     }
 }
