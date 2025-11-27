@@ -47,7 +47,7 @@ pub fn pairing(c: &mut Criterion) {
                         .map(|_| {
                             let pad_ml =
                                 PairingSetting::multi_miller_loop(&input.0, input.1.clone());
-                            
+
                             PairingSetting::final_exponentiation(pad_ml).unwrap()
                         })
                         .collect::<Vec<PairingOutput<ark_bn254::Bn254>>>()

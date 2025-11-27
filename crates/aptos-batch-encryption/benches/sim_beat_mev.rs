@@ -29,7 +29,7 @@ pub fn critical_path(c: &mut Criterion) {
                         .map(|_| {
                             let pad =
                                 PairingSetting::pairing(input.0, input.1.clone());
-                            
+
                             pad + pad
                         })
                         .collect::<Vec<PairingOutput>>()
