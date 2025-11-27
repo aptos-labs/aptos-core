@@ -956,6 +956,7 @@ else
   exit 1
 fi
 
+welcome_message
 if [[ "$BATCH_MODE" == "false" ]]; then
   welcome_message
   printf "Proceed with installing necessary dependencies? (y/N) > "
