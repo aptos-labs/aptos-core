@@ -168,10 +168,6 @@ jobs:
         run: |
           scripts/dev_setup.sh -b -p -r -y -P -t -J
 
-      - name: check for pnpm
-        run: |
-          export PATH=$PATH:/home/runner/.local/share/pnpm ; pnpm
-
       - name: Run targeted rust unit tests
         uses: ./.github/actions/rust-targeted-unit-tests
         with:
