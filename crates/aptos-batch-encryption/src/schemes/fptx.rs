@@ -141,7 +141,7 @@ impl BatchThresholdEncryption for FPTX {
         pool: &rayon::ThreadPool,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: FreeRootIdSet<UncomputedCoeffs> = FreeRootIdSet::from_slice(
-            &cts.into_iter()
+            &cts.iter()
                 .map(|ct| ct.id())
                 .collect::<Vec<FreeRootId>>(),
         )
