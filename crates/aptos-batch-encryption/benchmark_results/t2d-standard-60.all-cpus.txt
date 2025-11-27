@@ -1,0 +1,294 @@
+
+running 30 tests
+test shared::algebra::differentiate::tests::test_differentiate ... ignored
+test shared::algebra::differentiate::tests::test_differentiate_2 ... ignored
+test shared::algebra::fk_algorithm::tests::compute_eval_proofs_at_roots_of_unity ... ignored
+test shared::algebra::fk_algorithm::tests::test_serialize_deserialize ... ignored
+test shared::algebra::interpolate::tests::test_divide ... ignored
+test shared::algebra::interpolate::tests::test_vanishing_poly ... ignored
+test shared::algebra::mult_tree::tests::test_mult_tree ... ignored
+test shared::algebra::mult_tree::tests::test_quotient ... ignored
+test shared::algebra::multi_point_eval::tests::test_compute_mult_tree ... ignored
+test shared::algebra::multi_point_eval::tests::test_compute_mult_tree_2 ... ignored
+test shared::algebra::multi_point_eval::tests::test_inv_mod_xpow ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_2 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_3 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_4 ... ignored
+test shared::algebra::multi_point_eval::tests::test_multi_point_eval_naive ... ignored
+test shared::algebra::multi_point_eval::tests::test_remainder ... ignored
+test shared::algebra::multi_point_eval::tests::test_remainder_2 ... ignored
+test shared::algebra::shamir::tests::test_all_lagrange ... ignored
+test shared::algebra::shamir::tests::test_reconstruct ... ignored
+test shared::algebra::shamir::tests::test_reconstruct_in_exponent ... ignored
+test shared::ciphertext::tests::test_bibe_ct_encrypt_decrypt ... ignored
+test shared::ciphertext::tests::test_ct_encrypt_decrypt ... ignored
+test shared::digest::tests::compute_and_verify_all_opening_proofs ... ignored
+test shared::digest::tests::test_digest_key_capacity ... ignored
+test shared::key_derivation::tests::test_reconstruct_verify ... ignored
+test shared::symmetric::tests::test_otp ... ignored
+test shared::symmetric::tests::test_symmetric_encrypt_decrypt ... ignored
+test tests::fptx_smoke::fptx_serialize_deserialize_setup ... ignored
+test tests::fptx_smoke::smoke ... ignored
+
+test result: ok. 0 passed; 0 failed; 30 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+FPTX::digest/32         time:   [3.7254 ms 3.7884 ms 3.8583 ms]
+                        change: [+136.35% +140.67% +144.81%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+FPTX::digest/128        time:   [6.4033 ms 6.4885 ms 6.5761 ms]
+                        change: [+32.083% +33.876% +35.970%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+FPTX::digest/512        time:   [15.920 ms 16.180 ms 16.446 ms]
+                        change: [-3.8387% -2.1026% -0.4235%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+FPTX::digest/2048       time:   [46.074 ms 46.876 ms 47.698 ms]
+                        change: [-30.861% -29.469% -28.260%] (p = 0.00 < 0.05)
+                        Performance has improved.
+
+FPTX::encrypt/32        time:   [3.9340 ms 3.9399 ms 3.9465 ms]
+                        change: [-4.3592% -3.9725% -3.5741%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+FPTX::encrypt/128       time:   [3.9403 ms 3.9486 ms 3.9578 ms]
+                        change: [-5.0874% -4.7325% -4.3469%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  5 (5.00%) high mild
+  3 (3.00%) high severe
+FPTX::encrypt/512       time:   [3.9615 ms 3.9788 ms 3.9971 ms]
+                        change: [-3.9718% -3.4222% -2.8537%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 11 outliers among 100 measurements (11.00%)
+  11 (11.00%) high mild
+FPTX::encrypt/2048      time:   [3.9273 ms 3.9359 ms 3.9456 ms]
+                        change: [-4.1536% -3.7243% -3.2875%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 5 outliers among 100 measurements (5.00%)
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+
+FPTX::verify_ct/32      time:   [45.282 µs 45.436 µs 45.605 µs]
+                        change: [+0.2039% +0.7544% +1.2826%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  5 (5.00%) high mild
+FPTX::verify_ct/128     time:   [44.855 µs 45.148 µs 45.464 µs]
+                        change: [-1.0293% -0.3466% +0.3699%] (p = 0.35 > 0.05)
+                        No change in performance detected.
+Found 12 outliers among 100 measurements (12.00%)
+  9 (9.00%) high mild
+  3 (3.00%) high severe
+FPTX::verify_ct/512     time:   [44.237 µs 44.388 µs 44.582 µs]
+                        change: [-1.0577% -0.6076% -0.1447%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 12 outliers among 100 measurements (12.00%)
+  2 (2.00%) low mild
+  6 (6.00%) high mild
+  4 (4.00%) high severe
+FPTX::verify_ct/2048    time:   [45.036 µs 45.231 µs 45.447 µs]
+                        change: [-0.6679% -0.1163% +0.4205%] (p = 0.68 > 0.05)
+                        No change in performance detected.
+Found 7 outliers among 100 measurements (7.00%)
+  7 (7.00%) high mild
+
+FPTX::eval_proofs_compute_all/32
+                        time:   [5.1583 ms 5.2196 ms 5.2806 ms]
+                        change: [+12.184% +13.671% +15.098%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+FPTX::eval_proofs_compute_all/128
+                        time:   [12.350 ms 12.516 ms 12.734 ms]
+                        change: [-59.533% -58.959% -58.326%] (p = 0.00 < 0.05)
+                        Performance has improved.
+FPTX::eval_proofs_compute_all/256
+                        time:   [32.740 ms 32.989 ms 33.249 ms]
+                        change: [-63.784% -63.070% -62.182%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high mild
+FPTX::eval_proofs_compute_all/512
+                        time:   [98.173 ms 98.869 ms 99.894 ms]
+                        change: [-66.646% -66.064% -65.605%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 10 measurements (20.00%)
+  1 (10.00%) low mild
+  1 (10.00%) high mild
+FPTX::eval_proofs_compute_all/2048
+                        time:   [1.0252 s 1.0378 s 1.0506 s]
+                        change: [-69.053% -68.610% -68.236%] (p = 0.00 < 0.05)
+                        Performance has improved.
+
+FPTX::eval_proofs_compute_all_2/32
+                        time:   [25.002 ms 25.217 ms 25.542 ms]
+                        change: [+32.286% +35.046% +38.858%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+FPTX::eval_proofs_compute_all_2/128
+                        time:   [73.834 ms 75.167 ms 77.111 ms]
+                        change: [-28.976% -27.063% -24.680%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) high severe
+FPTX::eval_proofs_compute_all_2/256
+                        time:   [154.52 ms 159.06 ms 162.86 ms]
+                        change: [-40.462% -38.294% -36.071%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 1 outliers among 10 measurements (10.00%)
+  1 (10.00%) low mild
+FPTX::eval_proofs_compute_all_2/512
+                        time:   [321.69 ms 328.55 ms 335.71 ms]
+                        change: [-44.944% -43.566% -42.224%] (p = 0.00 < 0.05)
+                        Performance has improved.
+FPTX::eval_proofs_compute_all_2/2048
+                        time:   [1.5118 s 1.5540 s 1.5967 s]
+                        change: [-51.841% -50.382% -48.900%] (p = 0.00 < 0.05)
+                        Performance has improved.
+
+FPTX::derive_decryption_key_share/n=128, t=86
+                        time:   [87.935 µs 88.063 µs 88.224 µs]
+                        change: [+13.787% +14.313% +14.853%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 8 outliers among 100 measurements (8.00%)
+  2 (2.00%) low mild
+  6 (6.00%) high severe
+FPTX::derive_decryption_key_share/n=256, t=171
+                        time:   [74.447 µs 74.670 µs 74.928 µs]
+                        change: [-6.5839% -6.2290% -5.8375%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  3 (3.00%) high severe
+FPTX::derive_decryption_key_share/n=512, t=342
+                        time:   [87.969 µs 88.264 µs 88.594 µs]
+                        change: [+18.809% +19.538% +20.305%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+FPTX::derive_decryption_key_share/n=1024, t=683
+                        time:   [76.893 µs 77.202 µs 77.589 µs]
+                        change: [-1.3718% -0.9715% -0.5420%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 11 outliers among 100 measurements (11.00%)
+  3 (3.00%) low mild
+  3 (3.00%) high mild
+  5 (5.00%) high severe
+
+FPTX::verify_decryption_key_share/32
+                        time:   [1.7542 ms 1.7593 ms 1.7645 ms]
+                        change: [-4.8174% -4.4804% -4.1349%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+FPTX::verify_decryption_key_share/128
+                        time:   [1.7501 ms 1.7544 ms 1.7593 ms]
+                        change: [-3.3014% -2.8267% -2.3410%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  2 (2.00%) high severe
+FPTX::verify_decryption_key_share/512
+                        time:   [1.7360 ms 1.7397 ms 1.7441 ms]
+                        change: [-6.4877% -6.0698% -5.6471%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  1 (1.00%) low severe
+  1 (1.00%) low mild
+  2 (2.00%) high mild
+  5 (5.00%) high severe
+FPTX::verify_decryption_key_share/2048
+                        time:   [1.7487 ms 1.7536 ms 1.7589 ms]
+                        change: [-3.9377% -3.4852% -3.0122%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  8 (8.00%) high mild
+
+FPTX::reconstruct_decryption_key/n=128, t=86
+                        time:   [5.8634 ms 5.9015 ms 5.9418 ms]
+                        change: [+21.239% +22.147% +23.110%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  5 (5.00%) high mild
+FPTX::reconstruct_decryption_key/n=256, t=171
+                        time:   [9.2056 ms 9.3242 ms 9.4531 ms]
+                        change: [-0.6858% +0.7153% +2.0923%] (p = 0.32 > 0.05)
+                        No change in performance detected.
+Found 5 outliers among 100 measurements (5.00%)
+  2 (2.00%) high mild
+  3 (3.00%) high severe
+FPTX::reconstruct_decryption_key/n=512, t=342
+                        time:   [14.595 ms 14.749 ms 14.918 ms]
+                        change: [-18.975% -18.153% -17.139%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  8 (8.00%) high mild
+  1 (1.00%) high severe
+FPTX::reconstruct_decryption_key/n=1024, t=683
+                        time:   [23.676 ms 23.996 ms 24.341 ms]
+                        change: [-32.652% -31.662% -30.766%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 7 outliers among 100 measurements (7.00%)
+  6 (6.00%) high mild
+  1 (1.00%) high severe
+
+FPTX::decrypt (full batch, all cts)/32
+                        time:   [2.4146 ms 2.4218 ms 2.4290 ms]
+                        change: [-94.931% -94.912% -94.895%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+FPTX::decrypt (full batch, all cts)/128
+                        time:   [5.0518 ms 5.0570 ms 5.0627 ms]
+                        change: [-97.330% -97.323% -97.316%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 8 outliers among 100 measurements (8.00%)
+  7 (7.00%) high mild
+  1 (1.00%) high severe
+FPTX::decrypt (full batch, all cts)/512
+                        time:   [14.905 ms 14.957 ms 15.021 ms]
+                        change: [-1.2072% -0.6420% -0.0652%] (p = 0.03 < 0.05)
+                        Change within noise threshold.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) high mild
+  5 (5.00%) high severe
+FPTX::decrypt (full batch, all cts)/2048
+                        time:   [56.360 ms 56.407 ms 56.458 ms]
+                        change: [-0.6929% -0.5705% -0.4324%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
