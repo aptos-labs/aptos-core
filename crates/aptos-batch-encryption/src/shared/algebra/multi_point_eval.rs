@@ -288,9 +288,9 @@ mod tests {
     fn test_multi_point_eval_3() {
         let mut rng = thread_rng();
         let one = Fr::one();
-        let two = one.clone() + &one;
-        let three = two.clone() + &one;
-        let four = two.clone() + &two;
+        let two = one + one;
+        let three = two + one;
+        let four = two + two;
 
         let f = [Fr::rand(&mut rng); 4];
         let x_coords = [one, two, three, four];
@@ -317,9 +317,9 @@ mod tests {
     fn test_multi_point_eval_4() {
         let mut rng = thread_rng();
         let one = Fr::one();
-        let two = one.clone() + &one;
-        let three = two.clone() + &one;
-        let four = two.clone() + &two;
+        let two = one + one;
+        let three = two + one;
+        let four = two + two;
 
         let f = [G1Projective::rand(&mut rng); 4];
         let x_coords = [one, two, three, four];
@@ -360,8 +360,8 @@ mod tests {
     fn test_compute_mult_tree_2() {
         let one = Fr::one();
         let two = Fr::one() + Fr::one();
-        let three = two.clone() + Fr::one();
-        let four = two.clone() + &two;
+        let three = two + Fr::one();
+        let four = two + two;
 
         let pone: DensePolynomial<Fr> = DenseUVPolynomial::from_coefficients_vec(vec![-one, one]);
         let ptwo: DensePolynomial<Fr> = DenseUVPolynomial::from_coefficients_vec(vec![-two, one]);

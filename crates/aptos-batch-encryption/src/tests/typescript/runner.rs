@@ -45,7 +45,7 @@ pub(super) fn run_ts(fn_name: &str, input: &[u8]) -> anyhow::Result<Vec<u8>> {
 
     {
         let mut stdin = child.stdin.take().context("no stdin")?;
-        stdin.write_all(&input)?;
+        stdin.write_all(input)?;
         // drop stdin to signal EOF
     }
 

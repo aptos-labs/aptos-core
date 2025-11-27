@@ -58,7 +58,7 @@ fn test_hash_to_fq() {
 fn test_symmetric_key_serialize() {
     let mut input = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut input);
-    let rust_result = bcs::to_bytes(&SymmetricKey::from_bytes(input.clone())).unwrap();
+    let rust_result = bcs::to_bytes(&SymmetricKey::from_bytes(input)).unwrap();
     let ts_result = run_ts("symmetric_key_serialize", &input).unwrap();
     println!("{:?}", ts_result);
     println!("{:?}", rust_result);
@@ -69,7 +69,7 @@ fn test_symmetric_key_serialize() {
 fn test_symmetric_encrypt() {
     let mut input = [0u8; 16];
     rand::thread_rng().fill_bytes(&mut input);
-    let symmetric_key_rust = SymmetricKey::from_bytes(input.clone());
+    let symmetric_key_rust = SymmetricKey::from_bytes(input);
     let ct_from_ts : SymmetricCiphertext = bcs::from_bytes(&run_ts("symmetric_encrypt", &input).unwrap()).unwrap();
     let result : String = symmetric_key_rust.decrypt(&ct_from_ts).unwrap();
 
@@ -80,7 +80,7 @@ fn test_symmetric_encrypt() {
 fn test_otp_generation() {
     let mut input = [0u8; 64];
     rand::thread_rng().fill_bytes(&mut input);
-    let rust_result = bcs::to_bytes(&OneTimePad::from_source_bytes(&input)).unwrap();
+    let rust_result = bcs::to_bytes(&OneTimePad::from_source_bytes(input)).unwrap();
     let ts_result = run_ts("otp_generation", &input).unwrap();
     println!("{:?}", ts_result);
     println!("{:?}", rust_result);
@@ -94,8 +94,8 @@ fn test_otp_padding() {
     let mut otp_bytes = [0u8; 64];
     rand::thread_rng().fill_bytes(&mut key_bytes);
     rand::thread_rng().fill_bytes(&mut otp_bytes);
-    let rust_key = SymmetricKey::from_bytes(key_bytes.clone());
-    let rust_otp = OneTimePad::from_source_bytes(&otp_bytes);
+    let rust_key = SymmetricKey::from_bytes(key_bytes);
+    let rust_otp = OneTimePad::from_source_bytes(otp_bytes);
     let rust_result = bcs::to_bytes(&rust_otp.pad_key(&rust_key)).unwrap();
     let mut input : Vec<u8> = Vec::new();
     input.extend_from_slice(&key_bytes);

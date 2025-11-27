@@ -77,7 +77,7 @@ pub fn verify_ct(c: &mut Criterion) {
         let ct = FPTX::encrypt(&ek, &mut rng, &msg, &associated_data).unwrap();
 
         group.bench_with_input(BenchmarkId::from_parameter(batch_size), &ct, |b, ct| {
-            b.iter(|| FPTX::verify_ct(&ct, &associated_data).unwrap());
+            b.iter(|| FPTX::verify_ct(ct, &associated_data).unwrap());
         });
     }
 }
@@ -169,7 +169,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
             BenchmarkId::from_parameter(format!("n={}, t={}", n, t)),
             &(msk_share, d),
             |b, input| {
-                b.iter(|| FPTX::derive_decryption_key_share(&input.0, &input.1));
+                b.iter(|| FPTX::derive_decryption_key_share(input.0, &input.1));
             },
         );
     }
