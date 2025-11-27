@@ -11,8 +11,6 @@ import { get_random_fr, hash_g2_element, hash_to_fr, OneTimePad, SymmetricCipher
 import { leBytesToBigint, bigintToLEBytes, fp12ToLEBytes } from './fieldSerialization.ts';
 import { bytesToG2, G2_SIZE, g2ToBytes } from './curveSerialization.ts';
 import { bn254 } from "@noble/curves/bn254.js";
-// (removed unused import: line 14)
-import { deserialize, serialize } from "v8";
 
 
 /**
