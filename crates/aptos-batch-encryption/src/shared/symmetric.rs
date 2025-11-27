@@ -44,7 +44,7 @@ pub struct OneTimePaddedKey(GenericArray<u8, KeySize>);
 
 impl OneTimePaddedKey {
     #[cfg(test)]
-    pub(crate) fn blank_for_testing() -> Self { 
+    pub(crate) fn blank_for_testing() -> Self {
         let blank = vec![0; 16];
         Self(GenericArray::clone_from_slice(blank.as_slice()))
     }
@@ -58,7 +58,7 @@ pub struct SymmetricCiphertext {
 
 impl SymmetricCiphertext {
     #[cfg(test)]
-    pub(crate) fn blank_for_testing() -> Self { 
+    pub(crate) fn blank_for_testing() -> Self {
         Self {
             nonce: SymmetricNonce::default(),
             ct_body: vec![],

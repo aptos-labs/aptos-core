@@ -23,7 +23,7 @@ fn ts_init() {
 
         let output = child.wait_with_output().context("failed to run pnpm install").unwrap();
         if !output.status.success() {
-           println!("pnpm install failed with error {}", 
+           println!("pnpm install failed with error {}",
                 String::from_utf8_lossy(&output.stderr)
             );
         }

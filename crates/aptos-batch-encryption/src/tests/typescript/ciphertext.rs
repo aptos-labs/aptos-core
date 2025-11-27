@@ -99,7 +99,7 @@ fn test_ed25519() {
     println!("{:?}", bcs::to_bytes(&secretKey).unwrap().len());
     println!("{:?}", bcs::to_bytes(&publicKey).unwrap().len());
     println!("{:?}", bcs::to_bytes(&signature).unwrap().len());
-    
+
     let input = bcs::to_bytes(&TestEd25519 {
         secretKey,
         publicKey,
