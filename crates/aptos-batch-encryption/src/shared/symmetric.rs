@@ -58,10 +58,6 @@ pub struct SymmetricCiphertext {
 
 impl SymmetricCiphertext {
     #[cfg(test)]
-    pub(crate) fn blank_nonce_for_testing() -> SymmetricNonce { 
-        SymmetricNonce::default()
-    }
-    #[cfg(test)]
     pub(crate) fn blank_for_testing() -> Self { 
         Self {
             nonce: SymmetricNonce::default(),
@@ -128,7 +124,7 @@ impl SymmetricKey {
     }
 
     /// Decrypt any plaintext that is deserializeable from bytes.
-    pub fn decrypt<'a, P: Plaintext>(&self, ciphertext: &SymmetricCiphertext) -> Result<P> {
+    pub fn decrypt<P: Plaintext>(&self, ciphertext: &SymmetricCiphertext) -> Result<P> {
         use aes_gcm::KeyInit as _; // putting this in the global scope causes Hmac<Sha256> to be
                                    // ambiguous for some reason
 

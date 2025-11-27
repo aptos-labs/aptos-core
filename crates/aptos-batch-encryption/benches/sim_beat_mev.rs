@@ -1,11 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_batch_encryption::group::{
-    Fr, G1Affine, G1Projective, G2Affine, G2Prepared, PairingOutput, PairingSetting
+    Fr, G1Affine, G2Affine, G2Prepared, PairingOutput, PairingSetting
 };
 use ark_ec::{
     pairing::{Pairing},
-    VariableBaseMSM,
 };
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::{rand::thread_rng, UniformRand};

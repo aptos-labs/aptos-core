@@ -1,14 +1,12 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use ark_bn254::Bn254;
 use ark_ec::{bn::Bn, pairing::Pairing, AffineRepr};
 use ark_ff::{BigInteger, PrimeField, UniformRand};
-use ark_serialize::{CanonicalDeserializeWithFlags, CanonicalSerialize, Compress, EmptyFlags, Validate};
+use ark_serialize::{CanonicalDeserializeWithFlags, CanonicalSerialize, Compress, EmptyFlags};
 use ark_std::rand::thread_rng;
-use ark_std::One;
 
 use super::runner::run_ts;
-use crate::group::{Fr, G1Affine, G2Affine, PairingOutput};
+use crate::group::{Fr, G1Affine, G2Affine};
 
 #[test]
 fn test_g1_serialization() {

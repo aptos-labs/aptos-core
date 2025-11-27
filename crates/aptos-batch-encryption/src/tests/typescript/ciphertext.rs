@@ -1,7 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use std::any::type_name;
 
 use ark_std::rand::Rng as _;
 use ark_std::{rand::thread_rng, Zero, One};
@@ -36,7 +35,7 @@ fn test_bibe_ciphertext_serialization() {
 fn test_dummy() {
     let ek = EncryptionKey::new_for_testing();
     let mut rng = thread_rng();
-    let bibe_ct = ek.bibe_encrypt(&mut rng, &String::from("hi"), FreeRootId::new(Fr::one()));
+    let _bibe_ct = ek.bibe_encrypt(&mut rng, &String::from("hi"), FreeRootId::new(Fr::one()));
 }
 
 #[test]
@@ -60,7 +59,7 @@ fn test_bibe_ct_encrypt_decrypt_ts() {
 
     let plaintext = String::from("hi");
 
-    let id = FreeRootId::new(Fr::one());
+    let _id = FreeRootId::new(Fr::one());
 
     let ek_bytes = bcs::to_bytes(&ek).unwrap();
     let ct_bytes = run_ts("bibe_ciphertext_encrypt", &ek_bytes).unwrap();
