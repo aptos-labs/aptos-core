@@ -1072,6 +1072,8 @@ if [[ "$INSTALL_POSTGRES" == "true" ]]; then
   install_postgres
 fi
 
+
+echo "checking whether to install node and pnpm"
 if [[ "$INSTALL_JSTS" == "true" ]]; then
   # javascript and typescript tools
   echo "installing node and pnpm"
