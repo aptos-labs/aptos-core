@@ -1,6 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-import { Deserializer, Serializable, Serializer, type Uint8 } from '@aptos-labs/ts-sdk';
+import { Deserializer, Serializable, Serializer} from '@aptos-labs/ts-sdk';
 import { hmac_kdf, hash_to_fq, hash_to_fr, SymmetricKey, Test, OneTimePad, hash_g2_element } from './symmetric.ts';
 import { leBytesToBigint, bigintToLEBytes, leBytesToFp12, fp12ToLEBytes } from './fieldSerialization.ts';
 import { bn254 } from '@noble/curves/bn254.js';

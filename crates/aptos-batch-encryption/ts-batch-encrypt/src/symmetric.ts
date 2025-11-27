@@ -8,10 +8,9 @@ import { sha256 } from '@noble/hashes/sha2.js';
 import { type H2COpts, hash_to_field } from '@noble/curves/abstract/hash-to-curve.js';
 import { bn254 } from '@noble/curves/bn254.js';
 import { leBytesToBigint } from './fieldSerialization.ts';
-import { weierstrass, type WeierstrassPoint } from '@noble/curves/abstract/weierstrass.js';
+import { type WeierstrassPoint } from '@noble/curves/abstract/weierstrass.js';
 import type { Fp2 } from '@noble/curves/abstract/tower.js';
 import { g2ToBytes, weierstrassEquation } from './curveSerialization.ts';
-import { hash } from 'crypto';
 
 export class Test extends Serializable {
   s: string;
