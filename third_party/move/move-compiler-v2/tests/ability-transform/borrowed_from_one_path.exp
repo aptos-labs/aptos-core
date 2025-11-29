@@ -1086,7 +1086,7 @@ fun m::f($t0: u8, $t1: &vector<u64>): u64 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0x42::m
 struct R has key
   data: vector<u64>

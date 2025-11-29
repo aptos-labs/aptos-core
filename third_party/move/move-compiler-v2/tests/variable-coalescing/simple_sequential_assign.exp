@@ -122,7 +122,7 @@ fun m::sequential($t0: u64): u64 {
 
 
 ============ disassembled file-format ==================
-// Bytecode version v9
+// Bytecode version v10
 module 0xc0ffee::m
 // Function definition at index 0
 fun sequential(l0: u64): u64

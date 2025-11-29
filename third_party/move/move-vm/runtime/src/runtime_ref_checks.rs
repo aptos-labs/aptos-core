@@ -238,6 +238,10 @@ pub(crate) struct RefCheckState {
 
     /// Stack of per-frame reference states.
     frame_stack: Vec<FrameRefState>,
+
+    /// Whether the current function is borrow field mut api
+    /// if some, it contains the offset
+    pub in_borrow_field_mut_api: Option<u8>,
 }
 
 /// A trait for determining the behavior of the runtime reference checks.
@@ -325,14 +329,30 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             Call(_) | CallGeneric(_) | Branch(_) => {
                 // `Call` and `CallGeneric` are handled by calling `core_call_transition` elsewhere
             },
-            BrFalse(_) | BrTrue(_) | CallClosure(_) | Abort => {
+            BrFalse(_) | BrTrue(_) | CallClosure(_) => {
                 // remove the top value from the shadow stack
+                if ref_state.in_borrow_field_mut_api.is_some() {
+                    return Ok(());
+                }
                 let _ = ref_state.pop_from_shadow_stack()?;
             },
+            Abort => {
+                if ref_state.in_borrow_field_mut_api.is_some() {
+                    ref_state.in_borrow_field_mut_api = None;
+                    return Ok(());
+                }
+            },
             Ret => {
+                if ref_state.in_borrow_field_mut_api.is_some() {
+                    ref_state.in_borrow_field_mut_api = None;
+                    return Ok(());
+                }
                 ref_state.return_(frame.function.return_tys().len())?;
             },
             ReadRef => {
+                if ref_state.in_borrow_field_mut_api.is_some() {
+                    return Ok(());
+                }
                 ref_state.pop_ref_push_non_ref()?;
             },
             StLoc(_)
@@ -442,6 +462,9 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
         ty_cache: &mut FrameTypeCache,
     ) -> PartialVMResult<()> {
         use Instruction::*;
+        if ref_state.in_borrow_field_mut_api.is_some() {
+            return Ok(());
+        }
         match instruction {
             Pop => {
                 let top = ref_state.pop_from_shadow_stack()?;
@@ -1249,6 +1272,7 @@ impl RefCheckState {
         Self {
             shadow_stack: Vec::new(),
             frame_stack: Vec::new(),
+            in_borrow_field_mut_api: None,
         }
     }
 
@@ -1713,6 +1737,10 @@ impl RefCheckState {
         num_locals: usize,
         mask: ClosureMask,
     ) -> PartialVMResult<()> {
+        // when calling a borrow field mut api, we directly check mutably borrowing the fieldat offset
+        if let Some(offset) = self.in_borrow_field_mut_api {
+            return self.borrow_child_with_label::<true>(offset as usize);
+        }
         // Keep track of all reference argument's IDs.
         let mut ref_arg_ids = Vec::new();
         // Keep track of mutable reference param indexes.
