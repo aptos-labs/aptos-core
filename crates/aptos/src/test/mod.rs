@@ -859,6 +859,7 @@ impl CliTestFramework {
             ignore_compile_warnings: false,
             compute_coverage: false,
             dump_state: false,
+            fail_fast: false,
         }
         .execute()
         .await

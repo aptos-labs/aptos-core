@@ -4,15 +4,15 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
+use aptos_crypto::{blstrs::random_scalar, traits::SecretSharingConfig as _};
 use aptos_dkg::{
     pvss,
     pvss::{
         test_utils,
         test_utils::{DealingArgs, NoAux},
-        traits::{SecretSharingConfig, Transcript},
-        Player, WeightedConfig,
+        traits::Transcript,
+        Player, WeightedConfigBlstrs,
     },
-    utils::random::random_scalar,
     weighted_vuf::{pinkas::PinkasWUF, traits::WeightedVUF},
 };
 use aptos_runtimes::spawn_rayon_thread_pool;
@@ -26,7 +26,7 @@ fn test_wvuf_basic_viability() {
 }
 
 fn weighted_wvuf_bvt<
-    T: Transcript<SecretSharingConfig = WeightedConfig>,
+    T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
         PubKey = T::DealtPubKey,
@@ -52,10 +52,10 @@ where
     );
 }
 
-fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
+fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>>(
     rng: &mut StdRng,
-) -> (WeightedConfig, DealingArgs<T>, T) {
-    let wc = WeightedConfig::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
+) -> (WeightedConfigBlstrs, DealingArgs<T>, T) {
+    let wc = WeightedConfigBlstrs::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
 
     let d = test_utils::setup_dealing::<T, StdRng>(&wc, rng);
 
@@ -63,6 +63,7 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
         &wc,
         &d.pp,
         &d.ssks[0],
+        &d.spks[0],
         &d.eks,
         &d.s,
         &NoAux,
@@ -83,7 +84,7 @@ fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfig>>(
 ///
 /// `T` is a (non-weighted) `pvss::traits::Transcript` type.
 fn wvuf_randomly_aggregate_verify_and_derive_eval<
-    T: Transcript<SecretSharingConfig = WeightedConfig>,
+    T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
         PubKey = T::DealtPubKey,
@@ -92,7 +93,7 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     >,
     R: rand_core::RngCore + rand_core::CryptoRng,
 >(
-    wc: &WeightedConfig,
+    wc: &WeightedConfigBlstrs,
     sk: &T::DealtSecretKey,
     pk: &T::DealtPubKey,
     dks: &Vec<T::DecryptPrivKey>,
@@ -111,7 +112,7 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     let (mut sks, pks): (Vec<WVUF::SecretKeyShare>, Vec<WVUF::PubKeyShare>) = (0..wc
         .get_total_num_players())
         .map(|p| {
-            let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(p), &dks[p]);
+            let (sk, pk) = trx.decrypt_own_share(&wc, &wc.get_player(p), &dks[p], pvss_pp);
             (sk, pk)
         })
         .collect::<Vec<(WVUF::SecretKeyShare, WVUF::PubKeyShare)>>()

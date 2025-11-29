@@ -9,7 +9,7 @@ use crate::{
 use aptos_consensus_types::{
     common::{Payload, PayloadFilter, ProofWithData, TxnSummaryWithExpiration},
     payload::{OptQuorumStorePayload, PayloadExecutionLimit},
-    proof_of_store::{BatchInfo, ProofOfStore, ProofOfStoreMsg},
+    proof_of_store::{BatchInfoExt, ProofOfStore, ProofOfStoreMsg},
     request_response::{GetPayloadCommand, GetPayloadResponse},
     utils::PayloadTxnsSize,
 };
@@ -21,9 +21,9 @@ use std::{cmp::min, collections::HashSet, sync::Arc, time::Duration};
 
 #[derive(Debug)]
 pub enum ProofManagerCommand {
-    ReceiveProofs(ProofOfStoreMsg),
-    ReceiveBatches(Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>),
-    CommitNotification(u64, Vec<BatchInfo>),
+    ReceiveProofs(ProofOfStoreMsg<BatchInfoExt>),
+    ReceiveBatches(Vec<(BatchInfoExt, Vec<TxnSummaryWithExpiration>)>),
+    CommitNotification(u64, Vec<BatchInfoExt>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -62,7 +62,7 @@ impl ProofManager {
         }
     }
 
-    pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore>) {
+    pub(crate) fn receive_proofs(&mut self, proofs: Vec<ProofOfStore<BatchInfoExt>>) {
         for proof in proofs.into_iter() {
             self.batch_proof_queue.insert_proof(proof);
         }
@@ -79,7 +79,7 @@ impl ProofManager {
 
     pub(crate) fn receive_batches(
         &mut self,
-        batch_summaries: Vec<(BatchInfo, Vec<TxnSummaryWithExpiration>)>,
+        batch_summaries: Vec<(BatchInfoExt, Vec<TxnSummaryWithExpiration>)>,
     ) {
         self.batch_proof_queue.insert_batches(batch_summaries);
         self.update_remaining_txns_and_proofs();
@@ -88,7 +88,7 @@ impl ProofManager {
     pub(crate) fn handle_commit_notification(
         &mut self,
         block_timestamp: u64,
-        batches: Vec<BatchInfo>,
+        batches: Vec<BatchInfoExt>,
     ) {
         trace!(
             "QS: got clean request from execution at block timestamp {}",
@@ -184,6 +184,23 @@ impl ProofManager {
             };
         counters::NUM_INLINE_BATCHES.observe(inline_block.len() as f64);
         counters::NUM_INLINE_TXNS.observe(inline_block_size.count() as f64);
+
+        // TODO(ibalajiarun): Avoid clones
+        let inline_block: Vec<_> = inline_block
+            .into_iter()
+            .map(|(info, txns)| (info.info().clone(), txns))
+            .collect();
+        let opt_batches: Vec<_> = opt_batches
+            .into_iter()
+            .map(|info| info.info().clone())
+            .collect();
+        let proof_block: Vec<_> = proof_block
+            .into_iter()
+            .map(|proof| {
+                let (info, sig) = proof.unpack();
+                ProofOfStore::new(info.info().clone(), sig)
+            })
+            .collect();
 
         let response = if request.maybe_optqs_payload_pull_params.is_some() {
             let inline_batches = inline_block.into();

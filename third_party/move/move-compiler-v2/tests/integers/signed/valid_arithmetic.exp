@@ -4188,400 +4188,428 @@ fun valid_arithmetic::test_sub4($t0: 0x42::valid_arithmetic::S1, $t1: 0x42::vali
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.valid_arithmetic {
-enum E1 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i64>
- }
-}
-enum E2 has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<i128>
- }
-}
-enum E3<T> has copy, drop {
- V1{
-	s: S1
- },
- V2{
-	s: S2
- },
- V3{
-	s: S3<T>
- }
-}
-struct S1 has copy, drop {
-	x: u64,
-	y: i64,
-	z: i128
-}
-struct S2 has copy, drop {
-	x: S1,
-	y: i64,
-	z: i128
-}
-struct S3<T> has copy, drop {
-	x: T,
-	y: S1,
-	z: S2
-}
+// Bytecode version v9
+module 0x42::valid_arithmetic
+enum E1 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i64>
 
-test_add1(x: i64): i64 /* def_idx: 0 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: MoveLoc[0](x: i64)
-	2: Add
-	3: Ret
-}
-test_add2(x: i128): i128 /* def_idx: 1 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: MoveLoc[0](x: i128)
-	2: Add
-	3: Ret
-}
-test_add3(s1: S1, s2: S2, s3: S3<i64>): i64 /* def_idx: 2 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[0](S1.y: i64)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[1](S2.y: i64)
-	5: ReadRef
-	6: Add
-	7: ImmBorrowLoc[2](s3: S3<i64>)
-	8: ImmBorrowFieldGeneric[0](S3.x: T)
-	9: ReadRef
-	10: Add
-	11: Ret
-}
-test_add4(s1: S1, s2: S2, s3: S3<i128>): i128 /* def_idx: 3 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[3](S1.z: i128)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[4](S2.z: i128)
-	5: ReadRef
-	6: Add
-	7: ImmBorrowLoc[2](s3: S3<i128>)
-	8: ImmBorrowFieldGeneric[1](S3.x: T)
-	9: ReadRef
-	10: Add
-	11: Ret
-}
-test_div1(x: i64, y: i64): i64 /* def_idx: 4 */ {
-B0:
-	0: MoveLoc[0](x: i64)
-	1: MoveLoc[1](y: i64)
-	2: Div
-	3: Ret
-}
-test_div2(x: i128, y: i128): i128 /* def_idx: 5 */ {
-B0:
-	0: MoveLoc[0](x: i128)
-	1: MoveLoc[1](y: i128)
-	2: Div
-	3: Ret
-}
-test_div3(s1: S1, s2: S2, s3: S3<i64>): i64 /* def_idx: 6 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[0](S1.y: i64)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[1](S2.y: i64)
-	5: ReadRef
-	6: Div
-	7: ImmBorrowLoc[2](s3: S3<i64>)
-	8: ImmBorrowFieldGeneric[0](S3.x: T)
-	9: ReadRef
-	10: Div
-	11: Ret
-}
-test_div4(s1: S1, s2: S2, s3: S3<i128>): i128 /* def_idx: 7 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[3](S1.z: i128)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[4](S2.z: i128)
-	5: ReadRef
-	6: Div
-	7: ImmBorrowLoc[2](s3: S3<i128>)
-	8: ImmBorrowFieldGeneric[1](S3.x: T)
-	9: ReadRef
-	10: Div
-	11: Ret
-}
-test_mix1(x: i64, y: i64, z: i64): i64 /* def_idx: 8 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: CopyLoc[1](y: i64)
-	2: Add
-	3: CopyLoc[2](z: i64)
-	4: Sub
-	5: MoveLoc[0](x: i64)
-	6: Mul
-	7: MoveLoc[1](y: i64)
-	8: Div
-	9: MoveLoc[2](z: i64)
-	10: Mod
-	11: Ret
-}
-test_mix2(x: i128, y: i128, z: i128): i128 /* def_idx: 9 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: CopyLoc[1](y: i128)
-	2: Add
-	3: CopyLoc[2](z: i128)
-	4: Sub
-	5: MoveLoc[0](x: i128)
-	6: Mul
-	7: MoveLoc[1](y: i128)
-	8: Div
-	9: MoveLoc[2](z: i128)
-	10: Mod
-	11: Ret
-}
-test_mix3(s1: S1, s2: S2, s3: S3<i64>): i64 /* def_idx: 10 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[0](S1.y: i64)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[1](S2.y: i64)
-	5: ReadRef
-	6: Add
-	7: ImmBorrowLoc[2](s3: S3<i64>)
-	8: ImmBorrowFieldGeneric[0](S3.x: T)
-	9: ReadRef
-	10: Sub
-	11: ImmBorrowLoc[0](s1: S1)
-	12: ImmBorrowField[0](S1.y: i64)
-	13: ReadRef
-	14: Mul
-	15: ImmBorrowLoc[1](s2: S2)
-	16: ImmBorrowField[1](S2.y: i64)
-	17: ReadRef
-	18: Div
-	19: ImmBorrowLoc[2](s3: S3<i64>)
-	20: ImmBorrowFieldGeneric[0](S3.x: T)
-	21: ReadRef
-	22: Mod
-	23: Ret
-}
-test_mix4(s1: S1, s2: S2, s3: S3<i128>): i128 /* def_idx: 11 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[3](S1.z: i128)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[4](S2.z: i128)
-	5: ReadRef
-	6: Add
-	7: ImmBorrowLoc[2](s3: S3<i128>)
-	8: ImmBorrowFieldGeneric[1](S3.x: T)
-	9: ReadRef
-	10: Sub
-	11: ImmBorrowLoc[0](s1: S1)
-	12: ImmBorrowField[3](S1.z: i128)
-	13: ReadRef
-	14: Mul
-	15: ImmBorrowLoc[1](s2: S2)
-	16: ImmBorrowField[4](S2.z: i128)
-	17: ReadRef
-	18: Div
-	19: ImmBorrowLoc[2](s3: S3<i128>)
-	20: ImmBorrowFieldGeneric[1](S3.x: T)
-	21: ReadRef
-	22: Mod
-	23: Ret
-}
-test_mod1(x: i64, y: i64): i64 /* def_idx: 12 */ {
-B0:
-	0: MoveLoc[0](x: i64)
-	1: MoveLoc[1](y: i64)
-	2: Mod
-	3: Ret
-}
-test_mod2(x: i128, y: i128): i128 /* def_idx: 13 */ {
-B0:
-	0: MoveLoc[0](x: i128)
-	1: MoveLoc[1](y: i128)
-	2: Mod
-	3: Ret
-}
-test_mod3(s1: S1, s2: S2, s3: S3<i64>): i64 /* def_idx: 14 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[0](S1.y: i64)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[1](S2.y: i64)
-	5: ReadRef
-	6: Mod
-	7: ImmBorrowLoc[2](s3: S3<i64>)
-	8: ImmBorrowFieldGeneric[0](S3.x: T)
-	9: ReadRef
-	10: Mod
-	11: Ret
-}
-test_mod4(s1: S1, s2: S2, s3: S3<i128>): i128 /* def_idx: 15 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[3](S1.z: i128)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[4](S2.z: i128)
-	5: ReadRef
-	6: Mod
-	7: ImmBorrowLoc[2](s3: S3<i128>)
-	8: ImmBorrowFieldGeneric[1](S3.x: T)
-	9: ReadRef
-	10: Mod
-	11: Ret
-}
-test_mul1(x: i64, y: i64): i64 /* def_idx: 16 */ {
-B0:
-	0: MoveLoc[0](x: i64)
-	1: MoveLoc[1](y: i64)
-	2: Mul
-	3: Ret
-}
-test_mul2(x: i128, y: i128): i128 /* def_idx: 17 */ {
-B0:
-	0: MoveLoc[0](x: i128)
-	1: MoveLoc[1](y: i128)
-	2: Mul
-	3: Ret
-}
-test_mul3(s1: S1, s2: S2, s3: S3<i64>): i64 /* def_idx: 18 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[0](S1.y: i64)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[1](S2.y: i64)
-	5: ReadRef
-	6: Mul
-	7: ImmBorrowLoc[2](s3: S3<i64>)
-	8: ImmBorrowFieldGeneric[0](S3.x: T)
-	9: ReadRef
-	10: Mul
-	11: Ret
-}
-test_mul4(s1: S1, s2: S2, s3: S3<i128>): i128 /* def_idx: 19 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[3](S1.z: i128)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[4](S2.z: i128)
-	5: ReadRef
-	6: Mul
-	7: ImmBorrowLoc[2](s3: S3<i128>)
-	8: ImmBorrowFieldGeneric[1](S3.x: T)
-	9: ReadRef
-	10: Mul
-	11: Ret
-}
-test_neg1(x: i64, y: i64): i64 /* def_idx: 20 */ {
-B0:
-	0: CopyLoc[0](x: i64)
-	1: Negate
-	2: CopyLoc[1](y: i64)
-	3: Add
-	4: CopyLoc[0](x: i64)
-	5: Negate
-	6: CopyLoc[1](y: i64)
-	7: Negate
-	8: Mul
-	9: MoveLoc[0](x: i64)
-	10: Negate
-	11: Div
-	12: MoveLoc[1](y: i64)
-	13: Negate
-	14: Mod
-	15: Sub
-	16: Ret
-}
-test_neg2(x: i128, y: i128): i128 /* def_idx: 21 */ {
-B0:
-	0: CopyLoc[0](x: i128)
-	1: Negate
-	2: CopyLoc[1](y: i128)
-	3: Add
-	4: CopyLoc[0](x: i128)
-	5: Negate
-	6: CopyLoc[1](y: i128)
-	7: Negate
-	8: Mul
-	9: MoveLoc[0](x: i128)
-	10: Negate
-	11: Div
-	12: MoveLoc[1](y: i128)
-	13: Negate
-	14: Mod
-	15: Sub
-	16: Ret
-}
-test_sub1(x: i64, y: i64): i64 /* def_idx: 22 */ {
-B0:
-	0: MoveLoc[0](x: i64)
-	1: MoveLoc[1](y: i64)
-	2: Sub
-	3: Ret
-}
-test_sub2(x: i128, y: i128): i128 /* def_idx: 23 */ {
-B0:
-	0: MoveLoc[0](x: i128)
-	1: MoveLoc[1](y: i128)
-	2: Sub
-	3: Ret
-}
-test_sub3(s1: S1, s2: S2, s3: S3<i64>): i64 /* def_idx: 24 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[0](S1.y: i64)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[1](S2.y: i64)
-	5: ReadRef
-	6: Sub
-	7: ImmBorrowLoc[2](s3: S3<i64>)
-	8: ImmBorrowFieldGeneric[0](S3.x: T)
-	9: ReadRef
-	10: Sub
-	11: Ret
-}
-test_sub4(s1: S1, s2: S2, s3: S3<i128>): i128 /* def_idx: 25 */ {
-B0:
-	0: ImmBorrowLoc[0](s1: S1)
-	1: ImmBorrowField[3](S1.z: i128)
-	2: ReadRef
-	3: ImmBorrowLoc[1](s2: S2)
-	4: ImmBorrowField[4](S2.z: i128)
-	5: ReadRef
-	6: Sub
-	7: ImmBorrowLoc[2](s3: S3<i128>)
-	8: ImmBorrowFieldGeneric[1](S3.x: T)
-	9: ReadRef
-	10: Sub
-	11: Ret
-}
-}
+enum E2 has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<i128>
+
+enum E3<T0> has copy + drop
+  V1
+    s: S1
+  V2
+    s: S2
+  V3
+    s: S3<T0>
+
+struct S1 has copy + drop
+  x: u64
+  y: i64
+  z: i128
+
+struct S2 has copy + drop
+  x: S1
+  y: i64
+  z: i128
+
+struct S3<T0> has copy + drop
+  x: T0
+  y: S1
+  z: S2
+
+// Function definition at index 0
+fun test_add1(l0: i64): i64
+    copy_loc l0
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 1
+fun test_add2(l0: i128): i128
+    copy_loc l0
+    move_loc l0
+    add
+    ret
+
+// Function definition at index 2
+fun test_add3(l0: S1, l1: S2, l2: S3<i64>): i64
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    // @5
+    read_ref
+    add
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    // @10
+    add
+    ret
+
+// Function definition at index 3
+fun test_add4(l0: S1, l1: S2, l2: S3<i128>): i128
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    // @5
+    read_ref
+    add
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    // @10
+    add
+    ret
+
+// Function definition at index 4
+fun test_div1(l0: i64, l1: i64): i64
+    move_loc l0
+    move_loc l1
+    div
+    ret
+
+// Function definition at index 5
+fun test_div2(l0: i128, l1: i128): i128
+    move_loc l0
+    move_loc l1
+    div
+    ret
+
+// Function definition at index 6
+fun test_div3(l0: S1, l1: S2, l2: S3<i64>): i64
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    // @5
+    read_ref
+    div
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    // @10
+    div
+    ret
+
+// Function definition at index 7
+fun test_div4(l0: S1, l1: S2, l2: S3<i128>): i128
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    // @5
+    read_ref
+    div
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    // @10
+    div
+    ret
+
+// Function definition at index 8
+fun test_mix1(l0: i64, l1: i64, l2: i64): i64
+    copy_loc l0
+    copy_loc l1
+    add
+    copy_loc l2
+    sub
+    // @5
+    move_loc l0
+    mul
+    move_loc l1
+    div
+    move_loc l2
+    // @10
+    mod
+    ret
+
+// Function definition at index 9
+fun test_mix2(l0: i128, l1: i128, l2: i128): i128
+    copy_loc l0
+    copy_loc l1
+    add
+    copy_loc l2
+    sub
+    // @5
+    move_loc l0
+    mul
+    move_loc l1
+    div
+    move_loc l2
+    // @10
+    mod
+    ret
+
+// Function definition at index 10
+fun test_mix3(l0: S1, l1: S2, l2: S3<i64>): i64
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    // @5
+    read_ref
+    add
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    // @10
+    sub
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    mul
+    // @15
+    borrow_loc l1
+    borrow_field S2, y
+    read_ref
+    div
+    borrow_loc l2
+    // @20
+    borrow_field S3<i64>, x
+    read_ref
+    mod
+    ret
+
+// Function definition at index 11
+fun test_mix4(l0: S1, l1: S2, l2: S3<i128>): i128
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    // @5
+    read_ref
+    add
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    // @10
+    sub
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    mul
+    // @15
+    borrow_loc l1
+    borrow_field S2, z
+    read_ref
+    div
+    borrow_loc l2
+    // @20
+    borrow_field S3<i128>, x
+    read_ref
+    mod
+    ret
+
+// Function definition at index 12
+fun test_mod1(l0: i64, l1: i64): i64
+    move_loc l0
+    move_loc l1
+    mod
+    ret
+
+// Function definition at index 13
+fun test_mod2(l0: i128, l1: i128): i128
+    move_loc l0
+    move_loc l1
+    mod
+    ret
+
+// Function definition at index 14
+fun test_mod3(l0: S1, l1: S2, l2: S3<i64>): i64
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    // @5
+    read_ref
+    mod
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    // @10
+    mod
+    ret
+
+// Function definition at index 15
+fun test_mod4(l0: S1, l1: S2, l2: S3<i128>): i128
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    // @5
+    read_ref
+    mod
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    // @10
+    mod
+    ret
+
+// Function definition at index 16
+fun test_mul1(l0: i64, l1: i64): i64
+    move_loc l0
+    move_loc l1
+    mul
+    ret
+
+// Function definition at index 17
+fun test_mul2(l0: i128, l1: i128): i128
+    move_loc l0
+    move_loc l1
+    mul
+    ret
+
+// Function definition at index 18
+fun test_mul3(l0: S1, l1: S2, l2: S3<i64>): i64
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    // @5
+    read_ref
+    mul
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    // @10
+    mul
+    ret
+
+// Function definition at index 19
+fun test_mul4(l0: S1, l1: S2, l2: S3<i128>): i128
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    // @5
+    read_ref
+    mul
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    // @10
+    mul
+    ret
+
+// Function definition at index 20
+fun test_neg1(l0: i64, l1: i64): i64
+    copy_loc l0
+    negate
+    copy_loc l1
+    add
+    copy_loc l0
+    // @5
+    negate
+    copy_loc l1
+    negate
+    mul
+    move_loc l0
+    // @10
+    negate
+    div
+    move_loc l1
+    negate
+    mod
+    // @15
+    sub
+    ret
+
+// Function definition at index 21
+fun test_neg2(l0: i128, l1: i128): i128
+    copy_loc l0
+    negate
+    copy_loc l1
+    add
+    copy_loc l0
+    // @5
+    negate
+    copy_loc l1
+    negate
+    mul
+    move_loc l0
+    // @10
+    negate
+    div
+    move_loc l1
+    negate
+    mod
+    // @15
+    sub
+    ret
+
+// Function definition at index 22
+fun test_sub1(l0: i64, l1: i64): i64
+    move_loc l0
+    move_loc l1
+    sub
+    ret
+
+// Function definition at index 23
+fun test_sub2(l0: i128, l1: i128): i128
+    move_loc l0
+    move_loc l1
+    sub
+    ret
+
+// Function definition at index 24
+fun test_sub3(l0: S1, l1: S2, l2: S3<i64>): i64
+    borrow_loc l0
+    borrow_field S1, y
+    read_ref
+    borrow_loc l1
+    borrow_field S2, y
+    // @5
+    read_ref
+    sub
+    borrow_loc l2
+    borrow_field S3<i64>, x
+    read_ref
+    // @10
+    sub
+    ret
+
+// Function definition at index 25
+fun test_sub4(l0: S1, l1: S2, l2: S3<i128>): i128
+    borrow_loc l0
+    borrow_field S1, z
+    read_ref
+    borrow_loc l1
+    borrow_field S2, z
+    // @5
+    read_ref
+    sub
+    borrow_loc l2
+    borrow_field S3<i128>, x
+    read_ref
+    // @10
+    sub
+    ret
+
+
 ============ bytecode verification succeeded ========

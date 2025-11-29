@@ -14,7 +14,7 @@ use aptos_types::{
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -172,6 +172,22 @@ pub struct NativeCodeContext {
     requested_module_bundle: Option<PublishRequest>,
 }
 
+impl SessionListener for NativeCodeContext {
+    fn start(&mut self, _session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        // TODO(sessions): consider not enabling context for prologue.
+        self.enabled = true;
+        self.requested_module_bundle = None;
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
+}
+
 impl NativeCodeContext {
     #[allow(clippy::new_without_default)]
     pub fn new() -> Self {
@@ -247,7 +263,7 @@ fn unpack_allowed_dep(v: Value) -> PartialVMResult<(AccountAddress, String)> {
  **************************************************************************************************/
 fn native_request_publish(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(matches!(args.len(), 4 | 5));

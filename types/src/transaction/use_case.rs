@@ -41,6 +41,15 @@ fn parse_use_case(payload: &TransactionPayload) -> UseCaseKey {
                 None
             }
         },
+        EncryptedPayload(encrypted_payload) => {
+            if let Ok(TransactionExecutableRef::EntryFunction(entry_fun)) =
+                encrypted_payload.executable_ref()
+            {
+                Some(entry_fun)
+            } else {
+                None
+            }
+        },
     };
 
     match maybe_entry_func {

@@ -2090,12 +2090,16 @@ impl<'env> Docgen<'env> {
             .collect_vec();
 
         match (module_opt, parts_sym.len()) {
-            (Some(module), 0) => Some(self.ref_for_module(&module)),
+            (Some(module), 0) if !self.no_link_module(&module) => {
+                Some(self.ref_for_module(&module))
+            },
             (Some(module), 1) => try_func_struct_or_const(&module, parts_sym[0], true),
             (None, 0) => None,
             (None, 1) => {
                 // A simple name. Resolve either to module or to item in current module.
-                if let Some(module) = self.env.find_module_by_name(parts_sym[0]) {
+                if let Some(module) = self.env.find_module_by_name(parts_sym[0])
+                    && !self.no_link_module(&module)
+                {
                     Some(self.ref_for_module(&module))
                 } else if let Some(module) = &self.current_module {
                     try_func_struct_or_const(module, parts_sym[0], false)
@@ -2146,6 +2150,16 @@ impl<'env> Docgen<'env> {
         } else {
             "".to_string()
         }
+    }
+
+    /// Determines modules for which we do not create auto links.
+    /// For some module names, the autolink heuristic delivers bad
+    /// results, here those can be filtered out.
+    fn no_link_module(&self, module_env: &ModuleEnv) -> bool {
+        let str = self.env.symbol_pool().string(module_env.get_name().name());
+        // The module `result` clashes with variable `result` frequently used in the spec
+        // `ensures` condition.
+        str.as_str() == "result"
     }
 
     /// Return the label for an item in a module.

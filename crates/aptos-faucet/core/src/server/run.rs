@@ -9,7 +9,10 @@ use crate::{
         build_openapi_service, convert_error, mint, BasicApi, CaptchaApi, FundApi,
         FundApiComponents,
     },
-    funder::{ApiConnectionConfig, FunderConfig, MintFunderConfig, TransactionSubmissionConfig},
+    funder::{
+        ApiConnectionConfig, AssetConfig, FunderConfig, MintAssetConfig, MintFunderConfig,
+        TransactionSubmissionConfig, DEFAULT_ASSET_NAME,
+    },
     middleware::middleware_log,
 };
 use anyhow::{anyhow, Context, Result};
@@ -18,14 +21,18 @@ use aptos_faucet_metrics_server::{run_metrics_server, MetricsServerConfig};
 use aptos_logger::info;
 use aptos_sdk::{
     crypto::ed25519::Ed25519PrivateKey,
-    types::{account_config::aptos_test_root_address, chain_id::ChainId},
+    types::{
+        account_address::AccountAddress, account_config::aptos_test_root_address, chain_id::ChainId,
+    },
 };
 use clap::Parser;
 use futures::{channel::oneshot::Sender as OneShotSender, lock::Mutex};
 use poem::{http::Method, listener::TcpAcceptor, middleware::Cors, EndpointExt, Route, Server};
 use reqwest::Url;
 use serde::{Deserialize, Serialize};
-use std::{fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc};
+use std::{
+    collections::HashMap, fs::File, io::BufReader, path::PathBuf, pin::Pin, str::FromStr, sync::Arc,
+};
 use tokio::{net::TcpListener, sync::Semaphore, task::JoinSet};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -251,7 +258,7 @@ impl RunConfig {
         do_not_delegate: bool,
         chain_id: Option<ChainId>,
     ) -> Self {
-        let (key_file_path, key) = match funder_key {
+        let (key_file_path, _key) = match funder_key {
             FunderKeyEnum::KeyFile(key_file_path) => (key_file_path, None),
             FunderKeyEnum::Key(key) => (PathBuf::from_str("/dummy").unwrap(), Some(key)),
         };
@@ -273,8 +280,6 @@ impl RunConfig {
                     api_url,
                     None,
                     None,
-                    key_file_path,
-                    key,
                     chain_id.unwrap_or_else(ChainId::test),
                 ),
                 transaction_submission_config: TransactionSubmissionConfig::new(
@@ -287,8 +292,16 @@ impl RunConfig {
                     35,      // wait_for_outstanding_txns_secs
                     false,   // wait_for_transactions
                 ),
-                mint_account_address: Some(aptos_test_root_address()),
-                do_not_delegate,
+                assets: HashMap::from([(
+                    DEFAULT_ASSET_NAME.to_string(),
+                    MintAssetConfig::new(
+                        AssetConfig::new(_key, key_file_path),
+                        Some(aptos_test_root_address()),
+                        do_not_delegate,
+                    ),
+                )]),
+                default_asset: MintFunderConfig::get_default_asset_name(),
+                amount_to_fund: 100_000_000_000,
             }),
             handler_config: HandlerConfig {
                 use_helpful_errors: true,
@@ -350,16 +363,28 @@ pub struct RunSimple {
     #[clap(long, default_value_t = 8081)]
     pub listen_port: u16,
 
+    /// Path to the private key file for the APT asset
+    #[clap(long, default_value = "/tmp/mint.key")]
+    pub key_file_path: PathBuf,
+
+    /// Address of the mint account (optional)
     #[clap(long)]
-    do_not_delegate: bool,
+    pub mint_account_address: Option<AccountAddress>,
+
+    /// Whether to skip delegation
+    #[clap(long)]
+    pub do_not_delegate: bool,
 }
 
 impl RunSimple {
     pub async fn run_simple(&self) -> Result<()> {
-        let key = self
-            .api_connection_config
+        // Create an AssetConfig from the CLI arguments to get the key
+        let asset_config = AssetConfig::new(None, self.key_file_path.clone());
+
+        let key = asset_config
             .get_key()
             .context("Failed to load private key")?;
+
         let run_config = RunConfig::build_for_cli(
             self.api_connection_config.node_url.clone(),
             self.listen_address.clone(),

@@ -52,10 +52,13 @@ where
 {
     /// Creates a new depth checker for the specified loader to query struct definitions if needed.
     pub(crate) fn new(struct_definition_loader: &'a T) -> Self {
-        let maybe_max_depth = struct_definition_loader
-            .runtime_environment()
-            .vm_config()
-            .max_value_nest_depth;
+        let vm_config = struct_definition_loader.runtime_environment().vm_config();
+        // Gate by other config which will be enabled in 1.38. Will be removed after it is enabled.
+        let maybe_max_depth = if vm_config.propagate_dependency_limit_error {
+            None
+        } else {
+            vm_config.max_value_nest_depth
+        };
         Self {
             struct_definition_loader,
             maybe_max_depth,
@@ -117,7 +120,9 @@ where
                     let struct_name = self.get_struct_name($idx)?;
                     return Err(PartialVMError::new_invariant_violation(format!(
                         "Constructing a formula for {}::{}::{} has non-empty visiting set",
-                        struct_name.module.address, struct_name.module.name, struct_name.name
+                        struct_name.module().address,
+                        struct_name.module().name,
+                        struct_name.name()
                     )));
                 }
                 formula
@@ -216,7 +221,7 @@ where
             let struct_name = self.get_struct_name(idx)?;
             let msg = format!(
                 "Definition of struct {}::{}::{} is recursive: failed to construct its depth formula",
-                struct_name.module.address, struct_name.module.name, struct_name.name
+                struct_name.module().address, struct_name.module().name, struct_name.name()
             );
             return Err(
                 PartialVMError::new(StatusCode::RUNTIME_CYCLIC_MODULE_DEPENDENCY).with_message(msg),
@@ -277,7 +282,9 @@ where
             let struct_name = self.get_struct_name(idx)?;
             let msg = format!(
                 "Depth formula for struct {}::{}::{} is already cached",
-                struct_name.module.address, struct_name.module.name, struct_name.name
+                struct_name.module().address,
+                struct_name.module().name,
+                struct_name.name()
             );
             return Err(PartialVMError::new_invariant_violation(msg));
         }

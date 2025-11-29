@@ -158,7 +158,7 @@ impl Default for ExecutionBackpressureTxnLimitConfig {
                 metric: ExecutionBackpressureMetric::Percentile(0.5),
                 target_block_time_ms: 90,
             },
-            min_calibrated_txns_per_block: 8,
+            min_calibrated_txns_per_block: 30,
         }
     }
 }
@@ -383,7 +383,7 @@ impl Default for ConsensusConfig {
             optimistic_sig_verification: true,
             enable_round_timeout_msg: true,
             enable_optimistic_proposal_rx: true,
-            enable_optimistic_proposal_tx: false,
+            enable_optimistic_proposal_tx: true,
         }
     }
 }

@@ -38,7 +38,7 @@ pub const EFEATURE_NOT_ENABLED: u64 = 2;
  **************************************************************************************************/
 fn native_move_range(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if !context

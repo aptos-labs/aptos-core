@@ -78,10 +78,6 @@ fn test_module_does_not_exist() {
     assert_none!(assert_ok!(result));
 
     let result =
-        module_storage.unmetered_get_module_metadata(&AccountAddress::ZERO, ident_str!("a"));
-    assert_none!(assert_ok!(result));
-
-    let result =
         module_storage.unmetered_get_deserialized_module(&AccountAddress::ZERO, ident_str!("a"));
     assert_none!(assert_ok!(result));
 
@@ -119,9 +115,9 @@ fn test_deserialized_caching() {
 
     let module_storage = module_bytes_storage.into_unsync_module_storage();
 
-    let result = module_storage.unmetered_get_module_metadata(a_id.address(), a_id.name());
-    let expected = make_module("a", vec!["b", "c"], vec![]).0.metadata;
-    assert_eq!(assert_some!(assert_ok!(result)), expected);
+    let result = module_storage.unmetered_get_deserialized_module(a_id.address(), a_id.name());
+    let expected = make_module("a", vec!["b", "c"], vec![]).0;
+    assert_eq!(assert_some!(assert_ok!(result)).as_ref(), &expected);
     module_storage.assert_cached_state(vec![&a_id], vec![]);
 
     let result = module_storage.unmetered_get_deserialized_module(c_id.address(), c_id.name());

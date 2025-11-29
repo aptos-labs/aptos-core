@@ -216,6 +216,7 @@ pub fn build_model(
             skip_attribute_checks,
             known_attributes,
             experiments,
+            print_errors: true,
         },
     };
     let compiler_version = compiler_version.unwrap_or_default();
@@ -266,6 +267,7 @@ impl BuiltPackage {
                 skip_attribute_checks,
                 known_attributes: options.known_attributes.clone(),
                 experiments: options.experiments.clone(),
+                print_errors: true,
             },
         })
     }

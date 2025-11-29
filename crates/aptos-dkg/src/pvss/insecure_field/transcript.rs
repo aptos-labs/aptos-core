@@ -3,19 +3,21 @@
 
 use crate::{
     algebra::polynomials::shamir_secret_share,
-    pvss,
     pvss::{
-        das, encryption_dlog, traits,
-        traits::{transcript::MalleableTranscript, Convert, SecretSharingConfig},
-        Player, ThresholdConfig,
+        self, das, encryption_dlog,
+        traits::{self, transcript::MalleableTranscript, Convert},
+        Player, ThresholdConfigBlstrs,
     },
+    traits::transcript::Aggregatable,
     utils::{
         random::{insecure_random_g2_points, random_scalars},
         HasMultiExp,
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381, traits::SecretSharingConfig as _, CryptoMaterialError, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G2Projective, Scalar};
 use rand::thread_rng;
@@ -63,9 +65,13 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = ThresholdConfig;
+    type SecretSharingConfig = ThresholdConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
+
+    fn dst() -> Vec<u8> {
+        b"APTOS_INSECURE_FIELD_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         "insecure_field_pvss".to_string()
@@ -76,6 +82,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         _aux: &A,
@@ -150,21 +157,6 @@ impl traits::Transcript for Transcript {
         self.dealers.clone()
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) {
-        debug_assert_eq!(self.C.len(), sc.n);
-        debug_assert_eq!(self.V.len(), sc.n + 1);
-
-        for i in 0..sc.n {
-            self.C[i] += other.C[i];
-            self.V[i] += other.V[i];
-        }
-        self.V[sc.n] += other.V[sc.n];
-        self.dealers.extend_from_slice(other.dealers.as_slice());
-
-        debug_assert_eq!(self.C.len(), other.C.len());
-        debug_assert_eq!(self.V.len(), other.V.len());
-    }
-
     fn get_public_key_share(
         &self,
         _sc: &Self::SecretSharingConfig,
@@ -182,12 +174,17 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         player: &Player,
         _dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         (self.C[player.id], self.get_public_key_share(sc, player))
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
@@ -196,6 +193,29 @@ impl traits::Transcript for Transcript {
             V: insecure_random_g2_points(sc.n + 1, rng),
             C: random_scalars(sc.n, rng),
         }
+    }
+}
+
+impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
+    fn aggregate_with(
+        &mut self,
+        sc: &ThresholdConfigBlstrs,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
+        debug_assert_eq!(self.C.len(), sc.n);
+        debug_assert_eq!(self.V.len(), sc.n + 1);
+
+        for i in 0..sc.n {
+            self.C[i] += other.C[i];
+            self.V[i] += other.V[i];
+        }
+        self.V[sc.n] += other.V[sc.n];
+        self.dealers.extend_from_slice(other.dealers.as_slice());
+
+        debug_assert_eq!(self.C.len(), other.C.len());
+        debug_assert_eq!(self.V.len(), other.V.len());
+
+        Ok(())
     }
 }
 

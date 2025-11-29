@@ -7,7 +7,10 @@
 use crate::{
     ast::{Operation, TraceKind, Value},
     builder::model_builder::{ConstEntry, EntryVisibility, ModelBuilder, SpecOrBuiltinFunEntry},
-    metadata::LanguageVersion,
+    metadata::{
+        lang_feature_versions::{COMPILE_FOR_TESTING_VALUE, SINT_LANGUAGE_VERSION_VALUE},
+        LanguageVersion,
+    },
     model::{Parameter, TypeParameter, TypeParameterKind},
     options::ModelBuilderOptions,
     ty::{Constraint, PrimitiveType, ReferenceKind, Type},
@@ -63,7 +66,10 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
     };
 
     {
-        if options.language_version.is_at_least(LanguageVersion::V2_3) {
+        if options
+            .language_version
+            .is_at_least(COMPILE_FOR_TESTING_VALUE)
+        {
             use EntryVisibility::SpecAndImpl;
             // Compiler builtin constants.
             trans.define_const(
@@ -83,6 +89,8 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
         };
 
         // Builtin Constants (for specifications)
+
+        // Unsigned integers
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_U8"),
             mk_int_const(
@@ -132,6 +140,7 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
             ),
         );
 
+        // Signed integers
         trans.define_const(
             trans.builtin_qualified_symbol("MAX_I8"),
             mk_int_const(
@@ -579,26 +588,30 @@ pub(crate) fn declare_builtins(trans: &mut ModelBuilder) {
                 visibility: SpecAndImpl,
             },
         );
-
-        trans.define_spec_or_builtin_fun(
-            trans.unary_op_symbol(&PA::UnaryOp_::Negate),
-            SpecOrBuiltinFunEntry {
-                loc: loc.clone(),
-                oper: Operation::Negate,
-                type_params: vec![param_t_decl.clone()],
-                type_param_constraints: [(
-                    0,
-                    Constraint::SomeNumber(
-                        PrimitiveType::all_signed_int_types().into_iter().collect(),
-                    ),
-                )]
-                .into_iter()
-                .collect(),
-                params: vec![mk_param(trans, 1, param_t.clone())],
-                result_type: param_t.clone(),
-                visibility: SpecAndImpl,
-            },
-        );
+        if options
+            .language_version
+            .is_at_least(SINT_LANGUAGE_VERSION_VALUE)
+        {
+            trans.define_spec_or_builtin_fun(
+                trans.unary_op_symbol(&PA::UnaryOp_::Negate),
+                SpecOrBuiltinFunEntry {
+                    loc: loc.clone(),
+                    oper: Operation::Negate,
+                    type_params: vec![param_t_decl.clone()],
+                    type_param_constraints: [(
+                        0,
+                        Constraint::SomeNumber(
+                            PrimitiveType::all_signed_int_types().into_iter().collect(),
+                        ),
+                    )]
+                    .into_iter()
+                    .collect(),
+                    params: vec![mk_param(trans, 1, param_t.clone())],
+                    result_type: param_t.clone(),
+                    visibility: SpecAndImpl,
+                },
+            );
+        }
     }
 
     {

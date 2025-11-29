@@ -28,7 +28,7 @@ pub const EFEATURE_NOT_ENABLED: u64 = 1;
  **************************************************************************************************/
 fn native_swap(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if !context

@@ -1433,6 +1433,7 @@ fn struct_def_(
         abilities: abilities_vec,
         type_parameters: pty_params,
         layout: pfields,
+        visibility: pvisibility,
     } = pstruct;
     let was_in_deprecated_code = context.enter_possibly_deprecated_member(&name.0);
     let attributes = flatten_attributes(context, AttributePosition::Struct, attributes);
@@ -1442,12 +1443,14 @@ fn struct_def_(
         .shadow_for_type_parameters(type_parameters.iter().map(|tp| &tp.name));
     let abilities = ability_set(context, "modifier", abilities_vec);
     let fields = struct_layout(context, &name, pfields);
+    let visibility = visibility(pvisibility);
     let sdef = E::StructDefinition {
         attributes,
         loc,
         abilities,
         type_parameters,
         layout: fields,
+        visibility,
     };
     context.set_to_outer_scope(old_aliases);
     context.set_in_deprecated_code(was_in_deprecated_code);

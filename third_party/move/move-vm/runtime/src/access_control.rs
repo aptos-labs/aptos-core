@@ -20,6 +20,8 @@ pub struct AccessControlState {
 
 impl AccessControlState {
     /// Enters a function, applying its access specifier to the state.
+    // note(inline): do not inline, they are called once per function, and increase `execute_main`
+    // quite a bit, we want to avoid those compile times
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn enter_function(
         &mut self,
@@ -47,6 +49,8 @@ impl AccessControlState {
     }
 
     /// Exit function, restoring access state before entering.
+    // note(inline): do not inline, they are called once per function, and increase `execute_main`
+    // quite a bit, we want to avoid those compile times
     #[cfg_attr(feature = "force-inline", inline(always))]
     pub(crate) fn exit_function(&mut self, fun: &LoadedFunction) -> PartialVMResult<()> {
         if !matches!(fun.access_specifier(), AccessSpecifier::Any) {

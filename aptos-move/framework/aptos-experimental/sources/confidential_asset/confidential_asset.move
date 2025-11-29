@@ -533,6 +533,8 @@ module aptos_experimental::confidential_asset {
     }
 
     /// Sets the auditor's public key for the specified token.
+    ///
+    /// NOTE: Ensures that new_auditor_ek is a valid Ristretto255 point
     public fun set_auditor(
         aptos_framework: &signer, token: Object<Metadata>, new_auditor_ek: vector<u8>
     ) acquires FAConfig, FAController {

@@ -139,8 +139,9 @@ ecosystem/indexer-grpc/indexer-transaction-generator/*.yaml
 # ignore antithesis
 genesis_antithesis_*/
 
-# ignore cursor rules
+# ignore cursor rules / claude settings
 .cursor/rules
+.claude
 
 #ignore proptest regressions
 **/proptest_regressions/*
@@ -150,3 +151,6 @@ gha-creds-*.json
 
 # Ignore cache for move-package-resolver tests
 third_party/move/tools/move-package-resolver/cache
+
+# Ignore cache for docs
+.docs-cache

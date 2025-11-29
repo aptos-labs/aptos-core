@@ -10,6 +10,8 @@ use crate::{
 };
 use aptos_abstract_gas_usage::CalibrationAlgebra;
 use aptos_bitvec::BitVec;
+#[cfg(fuzzing)]
+use aptos_block_executor::code_cache_global_manager::ModuleHotCacheSnapshot;
 use aptos_block_executor::{
     code_cache_global_manager::AptosModuleCacheManager, txn_commit_hook::NoOpTransactionCommitHook,
     txn_provider::default::DefaultTxnProvider,
@@ -19,6 +21,9 @@ use aptos_framework::ReleaseBundle;
 use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_meter::{AptosGasMeter, GasAlgebra, StandardGasAlgebra, StandardGasMeter};
 use aptos_gas_profiling::{GasProfiler, TransactionGasLog};
+use aptos_gas_schedule::{
+    AptosGasParameters, InitialGasSchedule, ToOnChainGasSchedule, LATEST_GAS_FEATURE_VERSION,
+};
 use aptos_keygen::KeyGen;
 use aptos_rest_client::AptosBaseUrl;
 use aptos_transaction_simulation::{
@@ -43,16 +48,17 @@ use aptos_types::{
     contract_event::ContractEvent,
     move_utils::MemberId,
     on_chain_config::{
-        AptosVersion, CurrentTimeMicroseconds, FeatureFlag, Features, OnChainConfig, ValidatorSet,
+        AptosVersion, CurrentTimeMicroseconds, FeatureFlag, Features, GasScheduleV2, OnChainConfig,
+        ValidatorSet,
     },
     state_store::{state_key::StateKey, state_value::StateValue, StateView, TStateView},
     transaction::{
         signature_verified_transaction::{
             into_signature_verified_block, SignatureVerifiedTransaction,
         },
-        AuxiliaryInfo, BlockOutput, ExecutionStatus, SignedTransaction, Transaction,
-        TransactionExecutableRef, TransactionOutput, TransactionStatus, VMValidatorResult,
-        ViewFunctionOutput,
+        AuxiliaryInfo, BlockOutput, ExecutionStatus, PersistedAuxiliaryInfo, SignedTransaction,
+        Transaction, TransactionExecutableRef, TransactionOutput, TransactionStatus,
+        VMValidatorResult, ViewFunctionOutput,
     },
     vm_status::VMStatus,
     write_set::{WriteOp, WriteSet, WriteSetMut},
@@ -87,6 +93,7 @@ use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
+    cell::Cell,
     collections::{BTreeMap, BTreeSet},
     env,
     fs::{self, OpenOptions},
@@ -132,6 +139,20 @@ fn empty_in_memory_state_store() -> FakeExecutorStateStore {
     DeltaStateStore::new_with_base(EitherStateView::Left(EmptyStateView))
 }
 
+/// Represents per-block execution state used to control special modes (e.g., fuzzing/shared cache).
+/// In normal runs, this remains `None` and the executor behaves as before.
+enum BlockState {
+    None,
+    Fuzzing(SharedCacheState),
+}
+
+/// Shared cache state used only in fuzzing/test flows to enable hot module cache persistence and
+/// deterministic block metadata increments across transaction blocks.
+struct SharedCacheState {
+    manager: AptosModuleCacheManager,
+    next_block_id: Cell<u64>,
+}
+
 /// Provides an environment to run a VM instance.
 ///
 /// This struct is a mock in-memory implementation of the Aptos executor.
@@ -148,6 +169,9 @@ pub struct FakeExecutorImpl<O: OutputLogger> {
     /// s.t. the comparison test is executed (BothComparison).
     executor_mode: Option<ExecutorMode>,
     allow_block_executor_fallback: bool,
+    /// Encapsulated execution state. When set to `Fuzzing`, it enables hot cache persistence and
+    /// TxnSlice metadata generation for linearized blocks.
+    block_state: BlockState,
 }
 
 pub type FakeExecutor = FakeExecutorImpl<GoldenOutputs>;
@@ -164,6 +188,8 @@ pub struct Measurement {
     execution_gas: u64,
     /// In internal gas units
     io_gas: u64,
+
+    had_error: bool,
 }
 
 const GAS_SCALING_FACTOR: f64 = 1_000_000.0;
@@ -187,6 +213,10 @@ impl Measurement {
 
     pub fn io_gas_units(&self) -> f64 {
         self.io_gas as f64 / GAS_SCALING_FACTOR
+    }
+
+    pub fn had_error(&self) -> bool {
+        self.had_error
     }
 }
 
@@ -219,6 +249,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            block_state: BlockState::None,
         };
         executor.apply_write_set(write_set);
         executor
@@ -229,6 +260,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         write_set: &WriteSet,
         chain_id: ChainId,
         executor_thread_pool: Arc<rayon::ThreadPool>,
+        module_cache_manager: Option<AptosModuleCacheManager>,
     ) -> Self {
         let state_store = empty_in_memory_state_store();
         state_store.set_chain_id(chain_id).unwrap();
@@ -243,6 +275,14 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            // Enable a shared module cache for fuzzing/test usage with external thread pool.
+            block_state: match module_cache_manager {
+                Some(manager) => BlockState::Fuzzing(SharedCacheState {
+                    manager,
+                    next_block_id: Cell::new(1),
+                }),
+                None => BlockState::None,
+            },
         };
         executor.apply_write_set(write_set);
         executor
@@ -287,6 +327,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            block_state: BlockState::None,
         }
     }
 
@@ -328,6 +369,56 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// enabled if E2E_PARALLEL_EXEC is set. This overrides the default.
     pub fn set_parallel(self) -> Self {
         self.set_executor_mode(ExecutorMode::BothComparison)
+    }
+
+    /// Sets the gas unit scaling factor by publishing a modified GasScheduleV2 and
+    /// forcing an epoch end. Chainable for convenient creation-time configuration.
+    pub fn with_gas_scaling(mut self, gas_scaling_factor: u64) -> Self {
+        self.modify_gas_scaling(gas_scaling_factor);
+        self
+    }
+
+    /// Mutably sets the gas unit scaling factor by updating on-chain gas schedule state
+    /// in this executor's simulated store.
+    pub fn override_one_gas_param(&mut self, param: &str, param_value: u64) {
+        let entries = AptosGasParameters::initial()
+            .to_on_chain_gas_schedule(LATEST_GAS_FEATURE_VERSION)
+            .into_iter()
+            .map(|(name, val)| {
+                if name == param {
+                    (name, param_value)
+                } else {
+                    (name, val)
+                }
+            })
+            .collect::<Vec<_>>();
+        let gas_schedule = GasScheduleV2 {
+            feature_version: LATEST_GAS_FEATURE_VERSION,
+            entries,
+        };
+        let schedule_bytes = bcs::to_bytes(&gas_schedule).expect("bcs");
+
+        // Core framework signer.
+        let core_signer_arg = MoveValue::Signer(AccountAddress::ONE)
+            .simple_serialize()
+            .unwrap();
+
+        // Publish schedule for next epoch, then force end epoch to apply immediately.
+        self.exec("gas_schedule", "set_for_next_epoch", vec![], vec![
+            core_signer_arg.clone(),
+            MoveValue::vector_u8(schedule_bytes)
+                .simple_serialize()
+                .unwrap(),
+        ]);
+        self.exec("aptos_governance", "force_end_epoch", vec![], vec![
+            core_signer_arg,
+        ]);
+    }
+
+    /// Mutably sets the gas unit scaling factor by updating on-chain gas schedule state
+    /// in this executor's simulated store.
+    pub fn modify_gas_scaling(&mut self, gas_scaling_factor: u64) {
+        self.override_one_gas_param("txn.gas_unit_scaling_factor", gas_scaling_factor);
     }
 
     pub fn disable_block_executor_fallback(&mut self) {
@@ -386,6 +477,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
             rng: KeyGen::from_seed(RNG_SEED),
             executor_mode: None,
             allow_block_executor_fallback: true,
+            block_state: BlockState::None,
         }
     }
 
@@ -736,40 +828,103 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     fn execute_transaction_block_impl_with_state_view(
         &self,
         txn_block: Vec<SignatureVerifiedTransaction>,
-        onchain_config: BlockExecutorConfigFromOnchain,
-        sequential: bool,
         state_view: &(impl StateView + Sync),
+        config: BlockExecutorConfig,
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
-        let config = BlockExecutorConfig {
-            local: BlockExecutorLocalConfig {
-                blockstm_v2: false,
-                concurrency_level: if sequential {
-                    1
-                } else {
-                    usize::min(4, num_cpus::get())
-                },
-                allow_fallback: self.allow_block_executor_fallback,
-                discard_failed_blocks: false,
-                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
-            },
-            onchain: onchain_config,
+        let auxiliary_info = (0..txn_block.len() as u32)
+            .map(|i| {
+                AuxiliaryInfo::new(
+                    PersistedAuxiliaryInfo::V1 {
+                        transaction_index: i,
+                    },
+                    None,
+                )
+            })
+            .collect::<Vec<_>>();
+        let txn_provider = DefaultTxnProvider::new(txn_block, auxiliary_info);
+        let metadata = self.get_txn_slice_metadata();
+        let result = {
+            AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
+                _,
+                NoOpTransactionCommitHook<VMStatus>,
+                _,
+            >(
+                self.executor_thread_pool.clone(),
+                &txn_provider,
+                &state_view,
+                self.module_cache_manager_opt()
+                    .unwrap_or(&AptosModuleCacheManager::new()),
+                config,
+                metadata,
+                None,
+            )
+            .map(BlockOutput::into_transaction_outputs_forced)
         };
-        let txn_provider = DefaultTxnProvider::new_without_info(txn_block);
-        AptosVMBlockExecutorWrapper::execute_block_on_thread_pool::<
-            _,
-            NoOpTransactionCommitHook<VMStatus>,
-            _,
-        >(
-            self.executor_thread_pool.clone(),
-            &txn_provider,
-            &state_view,
-            // Do not use shared module caches in tests.
-            &AptosModuleCacheManager::new(),
-            config,
-            TransactionSliceMetadata::unknown(),
-            None,
-        )
-        .map(BlockOutput::into_transaction_outputs_forced)
+        let outputs = result?;
+        Ok(outputs)
+    }
+
+    /// Returns a reference to the shared module cache manager if enabled (fuzzing/test). Otherwise
+    /// returns [None].
+    fn module_cache_manager_opt(&self) -> Option<&AptosModuleCacheManager> {
+        match &self.block_state {
+            BlockState::Fuzzing(shared) => Some(&shared.manager),
+            BlockState::None => None,
+        }
+    }
+
+    /// Generates a [TransactionSliceMetadata::Block] when running with a shared cache (fuzzing/test)
+    /// to enable cache reuse across calls. For normal runs, returns [None].
+    fn get_txn_slice_metadata(&self) -> TransactionSliceMetadata {
+        match &self.block_state {
+            BlockState::Fuzzing(shared) => {
+                let child = shared.next_block_id.get();
+                shared.next_block_id.set(child + 1);
+                TransactionSliceMetadata::block(
+                    HashValue::from_u64(child - 1),
+                    HashValue::from_u64(child),
+                )
+            },
+            BlockState::None => TransactionSliceMetadata::unknown(),
+        }
+    }
+
+    #[cfg(fuzzing)]
+    fn maybe_snapshot_hot_cache(
+        &self,
+        state_view: &(impl StateView + Sync),
+        local_cfg: &BlockExecutorModuleCacheLocalConfig,
+        metadata: TransactionSliceMetadata,
+    ) -> Option<ModuleHotCacheSnapshot> {
+        match &self.block_state {
+            BlockState::Fuzzing(shared) => {
+                let mut guard = shared
+                    .manager
+                    .try_lock(state_view, local_cfg, metadata)
+                    .unwrap();
+                Some(guard.snapshot_hot_cache())
+            },
+            BlockState::None => None,
+        }
+    }
+
+    #[cfg(fuzzing)]
+    fn maybe_rollback_hot_cache(
+        &self,
+        state_view: &(impl StateView + Sync),
+        local_cfg: &BlockExecutorModuleCacheLocalConfig,
+        metadata: TransactionSliceMetadata,
+        snapshot: Option<ModuleHotCacheSnapshot>,
+    ) {
+        if let Some(s) = snapshot {
+            if let BlockState::Fuzzing(shared) = &self.block_state {
+                let mut guard = shared
+                    .manager
+                    .try_lock(state_view, local_cfg, metadata)
+                    .unwrap();
+                guard.rollback_hot_cache(s);
+            }
+        }
     }
 
     pub fn execute_transaction_block_with_state_view(
@@ -777,8 +932,12 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         txn_block: Vec<Transaction>,
         state_view: &(impl StateView + Sync),
     ) -> Result<Vec<TransactionOutput>, VMStatus> {
+        // Note: When executing with TransactionSliceMetadata::Block (e.g., in fuzzing/shared-cache
+        // modes), the block executor may append a synthetic BlockEpilogue at the end of the block.
+        // Callers that require outputs.len() == txns.len() must trim this themselves.
         let mut trace_map: (usize, Vec<usize>, Vec<usize>) = TraceSeqMapping::default();
-
+        #[cfg(fuzzing)]
+        let mut snapshot: Option<ModuleHotCacheSnapshot> = None;
         // dump serialized transaction details before execution, if tracing
         /*
         if let Some(trace_dir) = &self.trace_dir {
@@ -805,23 +964,67 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
         // TODO fetch values from state?
         let onchain_config = BlockExecutorConfigFromOnchain::on_but_large_for_test();
 
+        #[cfg(fuzzing)]
+        // Generate consecutive block metadata when using a shared cache (fuzzing/test).
+        // The same metadata is reused across sequential and parallel runs in comparison mode.
+        let metadata = self.get_txn_slice_metadata();
+
+        #[allow(unused_mut)]
+        let mut config: BlockExecutorConfig = BlockExecutorConfig {
+            local: BlockExecutorLocalConfig {
+                blockstm_v2: false,
+                concurrency_level: 1,
+                allow_fallback: self.allow_block_executor_fallback,
+                discard_failed_blocks: false,
+                module_cache_config: BlockExecutorModuleCacheLocalConfig::default(),
+            },
+            onchain: onchain_config.clone(),
+        };
+
+        #[cfg(fuzzing)]
+        {
+            if mode == ExecutorMode::BothComparison {
+                snapshot = self.maybe_snapshot_hot_cache(
+                    state_view,
+                    &config.local.module_cache_config,
+                    metadata,
+                );
+                assert!(
+                    snapshot.is_some(),
+                    "snapshot should be Some if mode is BothComparison"
+                );
+            }
+        }
+
         let sequential_output = if mode != ExecutorMode::ParallelOnly {
             Some(self.execute_transaction_block_impl_with_state_view(
                 sig_verified_block.clone(),
-                onchain_config.clone(),
-                true,
                 state_view,
+                config.clone(),
             ))
         } else {
             None
         };
 
+        #[cfg(fuzzing)]
+        {
+            if mode == ExecutorMode::BothComparison {
+                self.maybe_rollback_hot_cache(
+                    state_view,
+                    &config.local.module_cache_config,
+                    metadata,
+                    snapshot.take(),
+                );
+            }
+        }
+
         let parallel_output = if mode != ExecutorMode::SequentialOnly {
+            // use the number of threads specified in the executor thread pool as specified at construction time
+            config.local.concurrency_level = self.executor_thread_pool.current_num_threads();
             Some(self.execute_transaction_block_impl_with_state_view(
                 sig_verified_block,
-                onchain_config,
-                false,
                 state_view,
+                config.clone(),
             ))
         } else {
             None
@@ -902,7 +1105,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
 
         // TODO(Gas): revisit this.
         let env = AptosEnvironment::new(&self.state_store);
-        let vm = AptosVM::new(&env, self.get_state_view());
+        let vm = AptosVM::new(&env);
 
         let resolver = self.state_store.as_move_resolver();
         let code_storage = self.get_state_view().as_aptos_code_storage(&env);
@@ -974,7 +1177,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
     /// Validates the given transaction by running it through the VM validator.
     pub fn validate_transaction(&self, txn: SignedTransaction) -> VMValidatorResult {
         let env = AptosEnvironment::new(&self.state_store);
-        let vm = AptosVM::new(&env, self.get_state_view());
+        let vm = AptosVM::new(&env);
         vm.validate_transaction(
             txn,
             &self.state_store,
@@ -1204,7 +1407,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 ),
             };
             let elapsed = start.elapsed();
-            if let Err(err) = result {
+            if let Err(err) = &result {
                 if !should_error {
                     println!(
                         "Entry function under measurement failed with an error. Continuing, but measurements are probably not what is expected. Error: {}",
@@ -1222,6 +1425,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     io_gas: regular
                         .as_ref()
                         .map_or(0, |gas| gas.algebra().io_gas_used().into()),
+                    had_error: result.is_err(),
                 });
             }
             i += 1;
@@ -1240,6 +1444,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     + measurements[mid].execution_gas)
                     / 2,
                 io_gas: (measurements[mid - 1].io_gas + measurements[mid].io_gas) / 2,
+                had_error: measurements[mid - 1].had_error || measurements[mid].had_error,
             };
         }
 
@@ -1505,6 +1710,15 @@ pub fn assert_outputs_equal(
     for (idx, (txn_output_1, txn_output_2)) in
         txns_output_1.iter().zip(txns_output_2.iter()).enumerate()
     {
+        assert_eq!(
+            txn_output_1.status(),
+            txn_output_2.status(),
+            "Different statuses for {:?} and {:?} for transaction outputs at index {}",
+            name1,
+            name2,
+            idx,
+        );
+
         // Gas is usually the problem, so check it separately to
         // have a concise error message.
         assert_eq!(

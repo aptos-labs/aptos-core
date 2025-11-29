@@ -9,8 +9,7 @@ Order book type definitions
 -  [Struct `OrderIdType`](#0x7_order_book_types_OrderIdType)
 -  [Struct `AccountClientOrderId`](#0x7_order_book_types_AccountClientOrderId)
 -  [Struct `UniqueIdxType`](#0x7_order_book_types_UniqueIdxType)
--  [Enum `OrderBookType`](#0x7_order_book_types_OrderBookType)
--  [Enum `AscendingIdGenerator`](#0x7_order_book_types_AscendingIdGenerator)
+-  [Struct `OrderType`](#0x7_order_book_types_OrderType)
 -  [Enum `TimeInForce`](#0x7_order_book_types_TimeInForce)
 -  [Enum `TriggerCondition`](#0x7_order_book_types_TriggerCondition)
 -  [Enum `OrderMatchDetails`](#0x7_order_book_types_OrderMatchDetails)
@@ -19,13 +18,14 @@ Order book type definitions
     -  [Fields:](#@Fields:_1)
 -  [Struct `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
 -  [Constants](#@Constants_2)
--  [Function `single_order_book_type`](#0x7_order_book_types_single_order_book_type)
--  [Function `bulk_order_book_type`](#0x7_order_book_types_bulk_order_book_type)
+-  [Function `single_order_type`](#0x7_order_book_types_single_order_type)
+-  [Function `bulk_order_type`](#0x7_order_book_types_bulk_order_type)
+-  [Function `is_bulk_order_type`](#0x7_order_book_types_is_bulk_order_type)
+-  [Function `is_single_order_type`](#0x7_order_book_types_is_single_order_type)
 -  [Function `new_default_big_ordered_map`](#0x7_order_book_types_new_default_big_ordered_map)
+-  [Function `next_order_id`](#0x7_order_book_types_next_order_id)
 -  [Function `new_order_id_type`](#0x7_order_book_types_new_order_id_type)
 -  [Function `new_account_client_order_id`](#0x7_order_book_types_new_account_client_order_id)
--  [Function `new_ascending_id_generator`](#0x7_order_book_types_new_ascending_id_generator)
--  [Function `next_ascending_id`](#0x7_order_book_types_next_ascending_id)
 -  [Function `new_unique_idx_type`](#0x7_order_book_types_new_unique_idx_type)
 -  [Function `descending_idx`](#0x7_order_book_types_descending_idx)
 -  [Function `get_order_id_value`](#0x7_order_book_types_get_order_id_value)
@@ -38,7 +38,8 @@ Order book type definitions
 -  [Function `price_move_down_condition`](#0x7_order_book_types_price_move_down_condition)
 -  [Function `index`](#0x7_order_book_types_index)
 -  [Function `destroy_order_match`](#0x7_order_book_types_destroy_order_match)
--  [Function `destroy_order_match_details`](#0x7_order_book_types_destroy_order_match_details)
+-  [Function `destroy_single_order_match_details`](#0x7_order_book_types_destroy_single_order_match_details)
+-  [Function `destroy_bulk_order_match_details`](#0x7_order_book_types_destroy_bulk_order_match_details)
 -  [Function `get_matched_size`](#0x7_order_book_types_get_matched_size)
 -  [Function `get_account_from_match_details`](#0x7_order_book_types_get_account_from_match_details)
 -  [Function `get_order_id_from_match_details`](#0x7_order_book_types_get_order_id_from_match_details)
@@ -51,20 +52,26 @@ Order book type definitions
 -  [Function `get_client_order_id_from_match_details`](#0x7_order_book_types_get_client_order_id_from_match_details)
 -  [Function `is_bid_from_match_details`](#0x7_order_book_types_is_bid_from_match_details)
 -  [Function `get_book_type_from_match_details`](#0x7_order_book_types_get_book_type_from_match_details)
--  [Function `new_order_match_details`](#0x7_order_book_types_new_order_match_details)
+-  [Function `is_bulk_order_from_match_details`](#0x7_order_book_types_is_bulk_order_from_match_details)
+-  [Function `is_single_order_from_match_details`](#0x7_order_book_types_is_single_order_from_match_details)
+-  [Function `get_sequence_number_from_match_details`](#0x7_order_book_types_get_sequence_number_from_match_details)
+-  [Function `new_single_order_match_details`](#0x7_order_book_types_new_single_order_match_details)
+-  [Function `new_bulk_order_match_details`](#0x7_order_book_types_new_bulk_order_match_details)
 -  [Function `new_order_match_details_with_modified_size`](#0x7_order_book_types_new_order_match_details_with_modified_size)
 -  [Function `new_order_match`](#0x7_order_book_types_new_order_match)
--  [Function `validate_reinsertion_request`](#0x7_order_book_types_validate_reinsertion_request)
+-  [Function `validate_single_order_reinsertion_request`](#0x7_order_book_types_validate_single_order_reinsertion_request)
+-  [Function `validate_bulk_order_reinsertion_request`](#0x7_order_book_types_validate_bulk_order_reinsertion_request)
 -  [Function `new_active_matched_order`](#0x7_order_book_types_new_active_matched_order)
 -  [Function `destroy_active_matched_order`](#0x7_order_book_types_destroy_active_matched_order)
 -  [Function `get_active_matched_size`](#0x7_order_book_types_get_active_matched_size)
--  [Function `get_active_matched_book_type`](#0x7_order_book_types_get_active_matched_book_type)
--  [Function `destroy_active_match_order`](#0x7_order_book_types_destroy_active_match_order)
+-  [Function `is_active_matched_book_type_single_order`](#0x7_order_book_types_is_active_matched_book_type_single_order)
+-  [Function `reverse_bits`](#0x7_order_book_types_reverse_bits)
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 </code></pre>
 
 
@@ -156,72 +163,15 @@ Order book type definitions
 
 </details>
 
-<a id="0x7_order_book_types_OrderBookType"></a>
+<a id="0x7_order_book_types_OrderType"></a>
 
-## Enum `OrderBookType`
+## Struct `OrderType`
 
 
 
-<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a> <b>has</b> <b>copy</b>, drop, store
+<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>SingleOrderBook</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>BulkOrderBook</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
-<a id="0x7_order_book_types_AscendingIdGenerator"></a>
-
-## Enum `AscendingIdGenerator`
-
-
-
-<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a> <b>has</b> drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>FromCounter</summary>
 
 
 <details>
@@ -230,17 +180,13 @@ Order book type definitions
 
 <dl>
 <dt>
-<code>value: u64</code>
+<code>type: u16</code>
 </dt>
 <dd>
 
 </dd>
 </dl>
 
-
-</details>
-
-</details>
 
 </details>
 
@@ -426,7 +372,7 @@ identifier, account, priority index, price, sizes, and side.
 
 
 <details>
-<summary>V1</summary>
+<summary>SingleOrder</summary>
 
 
 <details>
@@ -494,8 +440,66 @@ identifier, account, priority index, price, sizes, and side.
 <dd>
 
 </dd>
+</dl>
+
+
+</details>
+
+</details>
+
+<details>
+<summary>BulkOrder</summary>
+
+
+<details>
+<summary>Fields</summary>
+
+
+<dl>
 <dt>
-<code>order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a></code>
+<code>order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code><a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a></code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>price: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>remaining_size: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>is_bid: bool</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>sequence_number: u64</code>
+</dt>
+<dd>
+
+</dd>
+<dt>
+<code>metadata: M</code>
 </dt>
 <dd>
 
@@ -601,7 +605,7 @@ particular match operation.
  Remaining size of the maker order
 </dd>
 <dt>
-<code>order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a></code>
+<code>order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a></code>
 </dt>
 <dd>
 
@@ -634,11 +638,38 @@ particular match operation.
 
 
 
+<a id="0x7_order_book_types_BULK_ORDER_TYPE"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_BULK_ORDER_TYPE">BULK_ORDER_TYPE</a>: u16 = 1;
+</code></pre>
+
+
+
 <a id="0x7_order_book_types_EINVALID_TIME_IN_FORCE"></a>
 
 
 
 <pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_EINVALID_TIME_IN_FORCE">EINVALID_TIME_IN_FORCE</a>: u64 = 5;
+</code></pre>
+
+
+
+<a id="0x7_order_book_types_E_REINSERT_ORDER_MISMATCH"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x7_order_book_types_SINGLE_ORDER_TYPE"></a>
+
+
+
+<pre><code><b>const</b> <a href="order_book_types.md#0x7_order_book_types_SINGLE_ORDER_TYPE">SINGLE_ORDER_TYPE</a>: u16 = 0;
 </code></pre>
 
 
@@ -652,13 +683,13 @@ particular match operation.
 
 
 
-<a id="0x7_order_book_types_single_order_book_type"></a>
+<a id="0x7_order_book_types_single_order_type"></a>
 
-## Function `single_order_book_type`
+## Function `single_order_type`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_single_order_book_type">single_order_book_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_single_order_type">single_order_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>
 </code></pre>
 
 
@@ -667,8 +698,8 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_single_order_book_type">single_order_book_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a> {
-    OrderBookType::SingleOrderBook
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_single_order_type">single_order_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> {
+    <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> { type: <a href="order_book_types.md#0x7_order_book_types_SINGLE_ORDER_TYPE">SINGLE_ORDER_TYPE</a> }
 }
 </code></pre>
 
@@ -676,13 +707,13 @@ particular match operation.
 
 </details>
 
-<a id="0x7_order_book_types_bulk_order_book_type"></a>
+<a id="0x7_order_book_types_bulk_order_type"></a>
 
-## Function `bulk_order_book_type`
+## Function `bulk_order_type`
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_bulk_order_book_type">bulk_order_book_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_bulk_order_type">bulk_order_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>
 </code></pre>
 
 
@@ -691,8 +722,56 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_bulk_order_book_type">bulk_order_book_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a> {
-    OrderBookType::BulkOrderBook
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_bulk_order_type">bulk_order_type</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> {
+    <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> { type: <a href="order_book_types.md#0x7_order_book_types_BULK_ORDER_TYPE">BULK_ORDER_TYPE</a> }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_is_bulk_order_type"></a>
+
+## Function `is_bulk_order_type`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bulk_order_type">is_bulk_order_type</a>(order_type: &<a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bulk_order_type">is_bulk_order_type</a>(order_type: &<a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a>): bool {
+    order_type.type == <a href="order_book_types.md#0x7_order_book_types_BULK_ORDER_TYPE">BULK_ORDER_TYPE</a>
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_is_single_order_type"></a>
+
+## Function `is_single_order_type`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_single_order_type">is_single_order_type</a>(order_type: &<a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_single_order_type">is_single_order_type</a>(order_type: &<a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a>): bool {
+    order_type.type == <a href="order_book_types.md#0x7_order_book_types_SINGLE_ORDER_TYPE">SINGLE_ORDER_TYPE</a>
 }
 </code></pre>
 
@@ -721,6 +800,31 @@ particular match operation.
         <a href="order_book_types.md#0x7_order_book_types_BIG_MAP_LEAF_DEGREE">BIG_MAP_LEAF_DEGREE</a>,
         <b>true</b>
     )
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_next_order_id"></a>
+
+## Function `next_order_id`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_order_id">next_order_id</a>(): <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> {
+    // reverse bits <b>to</b> make order ids random, so indices on top of them are shuffled.
+    <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a> { order_id: <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>()) }
 }
 </code></pre>
 
@@ -771,55 +875,6 @@ particular match operation.
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: String
 ): <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> {
     <a href="order_book_types.md#0x7_order_book_types_AccountClientOrderId">AccountClientOrderId</a> { <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_types_new_ascending_id_generator"></a>
-
-## Function `new_ascending_id_generator`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_ascending_id_generator">new_ascending_id_generator</a>(): <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_ascending_id_generator">new_ascending_id_generator</a>(): <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a> {
-    AscendingIdGenerator::FromCounter { value: 0 }
-}
-</code></pre>
-
-
-
-</details>
-
-<a id="0x7_order_book_types_next_ascending_id"></a>
-
-## Function `next_ascending_id`
-
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_ascending_id">next_ascending_id</a>(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>): u128
-</code></pre>
-
-
-
-<details>
-<summary>Implementation</summary>
-
-
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_next_ascending_id">next_ascending_id</a>(self: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">AscendingIdGenerator</a>): u128 {
-    self.value += 1;
-    self.value <b>as</b> u128
 }
 </code></pre>
 
@@ -1009,7 +1064,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time_secs: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>
 </code></pre>
 
 
@@ -1018,8 +1073,8 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
-    TriggerCondition::TimeBased(time)
+<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_time_based_trigger_condition">new_time_based_trigger_condition</a>(time_secs: u64): <a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a> {
+    TriggerCondition::TimeBased(time_secs)
 }
 </code></pre>
 
@@ -1081,7 +1136,7 @@ particular match operation.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">order_book_types::TriggerCondition</a>): (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;)
 </code></pre>
 
 
@@ -1090,7 +1145,7 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>):
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_index">index</a>(self: &<a href="order_book_types.md#0x7_order_book_types_TriggerCondition">TriggerCondition</a>):
     (<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;u64&gt;) {
     match(self) {
         TriggerCondition::PriceMoveAbove(price) =&gt; {
@@ -1137,13 +1192,13 @@ particular match operation.
 
 </details>
 
-<a id="0x7_order_book_types_destroy_order_match_details"></a>
+<a id="0x7_order_book_types_destroy_single_order_match_details"></a>
 
-## Function `destroy_order_match_details`
+## Function `destroy_single_order_match_details`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order_match_details">destroy_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, M)
 </code></pre>
 
 
@@ -1152,10 +1207,10 @@ particular match operation.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_order_match_details">destroy_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_single_order_match_details">destroy_single_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;String&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, M, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a>) {
-    <b>let</b> OrderMatchDetails::V1 {
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, Option&lt;String&gt;, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, u64, bool, <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>, M) {
+    <b>let</b> OrderMatchDetails::SingleOrder {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         client_order_id,
@@ -1166,9 +1221,44 @@ particular match operation.
         is_bid,
         time_in_force,
         metadata,
-        order_book_type
     } = self;
-    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, metadata, order_book_type)
+    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, metadata)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_destroy_bulk_order_match_details"></a>
+
+## Function `destroy_bulk_order_match_details`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, u64, u64, bool, u64, M)
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_bulk_order_match_details">destroy_bulk_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, <b>address</b>, <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>, u64, u64, bool, u64, M) {
+    <b>let</b> OrderMatchDetails::BulkOrder {
+        order_id,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        unique_priority_idx,
+        price,
+        remaining_size,
+        is_bid,
+        sequence_number,
+        metadata,
+    } = self;
+    (order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, unique_priority_idx, price, remaining_size, is_bid, sequence_number, metadata)
 }
 </code></pre>
 
@@ -1377,7 +1467,11 @@ Validates that a reinsertion request is valid for the given original order.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_time_in_force_from_match_details">get_time_in_force_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
 ): <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a> {
-    self.time_in_force
+    <b>if</b> (self is OrderMatchDetails::SingleOrder) {
+        self.time_in_force
+    } <b>else</b> {
+        <a href="order_book_types.md#0x7_order_book_types_good_till_cancelled">good_till_cancelled</a>()
+    }
 }
 </code></pre>
 
@@ -1429,7 +1523,11 @@ Validates that a reinsertion request is valid for the given original order.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_client_order_id_from_match_details">get_client_order_id_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
 ): Option&lt;String&gt; {
-    self.client_order_id
+    <b>if</b> (self is OrderMatchDetails::SingleOrder) {
+        <b>return</b> self.client_order_id
+    } <b>else</b> {
+        <b>return</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_none">option::none</a>()
+    }
 }
 </code></pre>
 
@@ -1469,7 +1567,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_book_type_from_match_details">get_book_type_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_book_type_from_match_details">get_book_type_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>
 </code></pre>
 
 
@@ -1480,8 +1578,12 @@ Validates that a reinsertion request is valid for the given original order.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_book_type_from_match_details">get_book_type_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
-): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a> {
-    self.order_book_type
+): <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a> {
+    <b>if</b> (self is OrderMatchDetails::SingleOrder) {
+        <a href="order_book_types.md#0x7_order_book_types_single_order_type">single_order_type</a>()
+    } <b>else</b> {
+        <a href="order_book_types.md#0x7_order_book_types_bulk_order_type">bulk_order_type</a>()
+    }
 }
 </code></pre>
 
@@ -1489,13 +1591,13 @@ Validates that a reinsertion request is valid for the given original order.
 
 </details>
 
-<a id="0x7_order_book_types_new_order_match_details"></a>
+<a id="0x7_order_book_types_is_bulk_order_from_match_details"></a>
 
-## Function `new_order_match_details`
+## Function `is_bulk_order_from_match_details`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details">new_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bulk_order_from_match_details">is_bulk_order_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): bool
 </code></pre>
 
 
@@ -1504,7 +1606,86 @@ Validates that a reinsertion request is valid for the given original order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details">new_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_bulk_order_from_match_details">is_bulk_order_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): bool {
+    self is OrderMatchDetails::BulkOrder
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_is_single_order_from_match_details"></a>
+
+## Function `is_single_order_from_match_details`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_single_order_from_match_details">is_single_order_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_single_order_from_match_details">is_single_order_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): bool {
+    self is OrderMatchDetails::SingleOrder
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_get_sequence_number_from_match_details"></a>
+
+## Function `get_sequence_number_from_match_details`
+
+This should only be called on bulk orders, aborts if called for non-bulk order.
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_sequence_number_from_match_details">get_sequence_number_from_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_sequence_number_from_match_details">get_sequence_number_from_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): u64 {
+    self.sequence_number
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_new_single_order_match_details"></a>
+
+## Function `new_single_order_match_details`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_single_order_match_details">new_single_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, client_order_id: <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string_String">string::String</a>&gt;, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, orig_size: u64, remaining_size: u64, is_bid: bool, time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">order_book_types::TimeInForce</a>, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_single_order_match_details">new_single_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
     order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>,
     <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
     client_order_id: Option&lt;String&gt;,
@@ -1514,10 +1695,9 @@ Validates that a reinsertion request is valid for the given original order.
     remaining_size: u64,
     is_bid: bool,
     time_in_force: <a href="order_book_types.md#0x7_order_book_types_TimeInForce">TimeInForce</a>,
-    metadata: M,
-    order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a>
+    metadata: M
 ): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt; {
-    OrderMatchDetails::V1 {
+    OrderMatchDetails::SingleOrder {
         order_id,
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         client_order_id,
@@ -1528,7 +1708,48 @@ Validates that a reinsertion request is valid for the given original order.
         is_bid,
         time_in_force,
         metadata,
-        order_book_type
+    }
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x7_order_book_types_new_bulk_order_match_details"></a>
+
+## Function `new_bulk_order_match_details`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: <b>copy</b>, drop, store&gt;(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>, unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">order_book_types::UniqueIdxType</a>, price: u64, remaining_size: u64, is_bid: bool, sequence_number: u64, metadata: M): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_bulk_order_match_details">new_bulk_order_match_details</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>,
+    <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: <b>address</b>,
+    unique_priority_idx: <a href="order_book_types.md#0x7_order_book_types_UniqueIdxType">UniqueIdxType</a>,
+    price: u64,
+    remaining_size: u64,
+    is_bid: bool,
+    sequence_number: u64,
+    metadata: M
+): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt; {
+    OrderMatchDetails::BulkOrder {
+        order_id,
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
+        unique_priority_idx,
+        price,
+        remaining_size,
+        is_bid,
+        sequence_number,
+        metadata,
     }
 }
 </code></pre>
@@ -1543,7 +1764,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, remaining_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: <b>copy</b>, drop, store&gt;(self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, remaining_size: u64): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;
 </code></pre>
 
 
@@ -1552,23 +1773,12 @@ Validates that a reinsertion request is valid for the given original order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_order_match_details_with_modified_size">new_order_match_details_with_modified_size</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
     remaining_size: u64
 ): <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt; {
-    OrderMatchDetails::V1 {
-        order_id: self.order_id,
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>: self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
-        client_order_id: self.client_order_id,
-        unique_priority_idx: self.unique_priority_idx,
-        price: self.price,
-        orig_size: self.orig_size,
-        remaining_size,
-        is_bid: self.is_bid,
-        time_in_force: self.time_in_force,
-        metadata: self.metadata,
-        order_book_type: self.order_book_type
-    }
+    self.remaining_size = remaining_size;
+    self
 }
 </code></pre>
 
@@ -1606,13 +1816,13 @@ Validates that a reinsertion request is valid for the given original order.
 
 </details>
 
-<a id="0x7_order_book_types_validate_reinsertion_request"></a>
+<a id="0x7_order_book_types_validate_single_order_reinsertion_request"></a>
 
-## Function `validate_reinsertion_request`
+## Function `validate_single_order_reinsertion_request`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_validate_reinsertion_request">validate_reinsertion_request</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, other: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): bool
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_validate_single_order_reinsertion_request">validate_single_order_reinsertion_request</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, other: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): bool
 </code></pre>
 
 
@@ -1621,10 +1831,13 @@ Validates that a reinsertion request is valid for the given original order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_validate_reinsertion_request">validate_reinsertion_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_validate_single_order_reinsertion_request">validate_single_order_reinsertion_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
     self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
     other: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
 ): bool {
+    <b>assert</b>!(self is OrderMatchDetails::SingleOrder, <a href="order_book_types.md#0x7_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+    <b>assert</b>!(other is OrderMatchDetails::SingleOrder, <a href="order_book_types.md#0x7_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+
     self.order_id == other.order_id &&
     self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == other.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> &&
     self.unique_priority_idx == other.unique_priority_idx &&
@@ -1638,13 +1851,48 @@ Validates that a reinsertion request is valid for the given original order.
 
 </details>
 
+<a id="0x7_order_book_types_validate_bulk_order_reinsertion_request"></a>
+
+## Function `validate_bulk_order_reinsertion_request`
+
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_validate_bulk_order_reinsertion_request">validate_bulk_order_reinsertion_request</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, other: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_validate_bulk_order_reinsertion_request">validate_bulk_order_reinsertion_request</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+    other: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">OrderMatchDetails</a>&lt;M&gt;,
+): bool {
+    <b>assert</b>!(self is OrderMatchDetails::BulkOrder, <a href="order_book_types.md#0x7_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+    <b>assert</b>!(other is OrderMatchDetails::BulkOrder, <a href="order_book_types.md#0x7_order_book_types_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+
+    self.order_id == other.order_id &&
+    self.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> == other.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a> &&
+    self.unique_priority_idx == other.unique_priority_idx &&
+    self.price == other.price &&
+    self.is_bid == other.is_bid &&
+    self.sequence_number == other.sequence_number
+}
+</code></pre>
+
+
+
+</details>
+
 <a id="0x7_order_book_types_new_active_matched_order"></a>
 
 ## Function `new_active_matched_order`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_active_matched_order">new_active_matched_order</a>(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, matched_size: u64, remaining_size: u64, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_active_matched_order">new_active_matched_order</a>(order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, matched_size: u64, remaining_size: u64, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>
 </code></pre>
 
 
@@ -1654,7 +1902,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_active_matched_order">new_active_matched_order</a>(
-    order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, matched_size: u64, remaining_size: u64, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a>
+    order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, matched_size: u64, remaining_size: u64, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a>
 ): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> {
     <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> { order_id, matched_size, remaining_size, order_book_type }
 }
@@ -1670,7 +1918,7 @@ Validates that a reinsertion request is valid for the given original order.
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_matched_order">destroy_active_matched_order</a>(self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, u64, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_matched_order">destroy_active_matched_order</a>(self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, u64, <a href="order_book_types.md#0x7_order_book_types_OrderType">order_book_types::OrderType</a>)
 </code></pre>
 
 
@@ -1681,8 +1929,9 @@ Validates that a reinsertion request is valid for the given original order.
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_matched_order">destroy_active_matched_order</a>(
     self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a>
-): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, u64, u64, <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a>) {
-    (self.order_id, self.matched_size, self.remaining_size, self.order_book_type)
+): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, u64, u64, <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a>) {
+    <b>let</b> <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> { order_id, matched_size, remaining_size, order_book_type } = self;
+    (order_id, matched_size, remaining_size, order_book_type)
 }
 </code></pre>
 
@@ -1714,13 +1963,13 @@ Validates that a reinsertion request is valid for the given original order.
 
 </details>
 
-<a id="0x7_order_book_types_get_active_matched_book_type"></a>
+<a id="0x7_order_book_types_is_active_matched_book_type_single_order"></a>
 
-## Function `get_active_matched_book_type`
+## Function `is_active_matched_book_type_single_order`
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_active_matched_book_type">get_active_matched_book_type</a>(self: &<a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">order_book_types::OrderBookType</a>
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_active_matched_book_type_single_order">is_active_matched_book_type_single_order</a>(self: &<a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>): bool
 </code></pre>
 
 
@@ -1729,10 +1978,10 @@ Validates that a reinsertion request is valid for the given original order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_get_active_matched_book_type">get_active_matched_book_type</a>(
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_is_active_matched_book_type_single_order">is_active_matched_book_type_single_order</a>(
     self: &<a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a>
-): <a href="order_book_types.md#0x7_order_book_types_OrderBookType">OrderBookType</a> {
-    self.order_book_type
+): bool {
+    <a href="order_book_types.md#0x7_order_book_types_is_single_order_type">is_single_order_type</a>(&self.order_book_type)
 }
 </code></pre>
 
@@ -1740,13 +1989,15 @@ Validates that a reinsertion request is valid for the given original order.
 
 </details>
 
-<a id="0x7_order_book_types_destroy_active_match_order"></a>
+<a id="0x7_order_book_types_reverse_bits"></a>
 
-## Function `destroy_active_match_order`
+## Function `reverse_bits`
+
+Reverse the bits in a u128 value using divide and conquer approach
+This is more efficient than the bit-by-bit approach, reducing from O(n) to O(log n)
 
 
-
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_match_order">destroy_active_match_order</a>(self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">order_book_types::ActiveMatchedOrder</a>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">order_book_types::OrderIdType</a>, u64, u64)
+<pre><code><b>fun</b> <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(value: u128): u128
 </code></pre>
 
 
@@ -1755,8 +2006,31 @@ Validates that a reinsertion request is valid for the given original order.
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_match_order">destroy_active_match_order</a>(self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a>): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, u64, u64) {
-    (self.order_id, self.matched_size, self.remaining_size)
+<pre><code><b>fun</b> <a href="order_book_types.md#0x7_order_book_types_reverse_bits">reverse_bits</a>(value: u128): u128 {
+    <b>let</b> v = value;
+
+    // Swap odd and even bits
+    v = ((v & 0x55555555555555555555555555555555) &lt;&lt; 1) | ((v &gt;&gt; 1) & 0x55555555555555555555555555555555);
+
+    // Swap consecutive pairs
+    v = ((v & 0x33333333333333333333333333333333) &lt;&lt; 2) | ((v &gt;&gt; 2) & 0x33333333333333333333333333333333);
+
+    // Swap nibbles
+    v = ((v & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f) &lt;&lt; 4) | ((v &gt;&gt; 4) & 0x0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f);
+
+    // Swap bytes
+    v = ((v & 0x00ff00ff00ff00ff00ff00ff00ff00ff) &lt;&lt; 8) | ((v &gt;&gt; 8) & 0x00ff00ff00ff00ff00ff00ff00ff00ff);
+
+    // Swap 2-byte chunks
+    v = ((v & 0x0000ffff0000ffff0000ffff0000ffff) &lt;&lt; 16) | ((v &gt;&gt; 16) & 0x0000ffff0000ffff0000ffff0000ffff);
+
+    // Swap 4-byte chunks
+    v = ((v & 0x00000000ffffffff00000000ffffffff) &lt;&lt; 32) | ((v &gt;&gt; 32) & 0x00000000ffffffff00000000ffffffff);
+
+    // Swap 8-byte chunks
+    v = (v &lt;&lt; 64) | (v &gt;&gt; 64);
+
+    v
 }
 </code></pre>
 

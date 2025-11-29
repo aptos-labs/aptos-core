@@ -21,7 +21,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 pub(crate) fn native_dispatch(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let (module_name, func_name) = extract_function_info(&mut arguments)?;
@@ -50,7 +50,7 @@ pub(crate) fn native_dispatch(
     Err(SafeNativeError::FunctionDispatch {
         module_name,
         func_name,
-        ty_args,
+        ty_args: ty_args.to_vec(),
         args: arguments.into_iter().collect(),
     })
 }

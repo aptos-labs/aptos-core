@@ -4,12 +4,13 @@
 
 use crate::{
     module_traversal::TraversalContext,
+    native_functions::DependencyGasMeterWrapper,
     storage::{
         loader::traits::{ModuleMetadataLoader, StructDefinitionLoader},
         module_storage::FunctionValueExtensionAdapter,
         ty_layout_converter::LayoutConverter,
     },
-    ModuleStorage,
+    Loader, ModuleStorage,
 };
 use bytes::Bytes;
 use move_binary_format::errors::*;
@@ -31,20 +32,133 @@ use move_vm_types::{
 use std::collections::btree_map::{BTreeMap, Entry};
 use triomphe::Arc as TriompheArc;
 
+/// A hack to be able to use [MoveVmDataCache] in native context where there is no access to
+/// static gas meter.
+pub trait NativeContextMoveVmDataCache {
+    /// Used by native context only! Returns true if resource exists in global storage, and false
+    /// otherwise. Also, returns the number of bytes loaded (if any, otherwise [None]).
+    fn native_check_resource_exists(
+        &mut self,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(bool, Option<NumBytes>)>;
+}
+
+/// Provides access to global storage for Move VM.
+pub trait MoveVmDataCache: NativeContextMoveVmDataCache {
+    /// Loads resource from global storage. Returns the immutable reference to it, along with the
+    /// number of bytes loaded (if any, otherwise [None]).
+    ///
+    /// Note: default implementation loads the resource for mutation, casting the mutable reference
+    /// to immutable.
+    fn load_resource(
+        &mut self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&GlobalValue, Option<NumBytes>)> {
+        let (gv, bytes_loaded) = self.load_resource_mut(gas_meter, traversal_context, addr, ty)?;
+        Ok((gv, bytes_loaded))
+    }
+
+    /// Loads resource from global storage. Returns the mutable reference to it, along with the
+    /// number of bytes loaded (if any, otherwise [None]).
+    fn load_resource_mut(
+        &mut self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)>;
+}
+
+/// Adapter for data cache that also stores references to code and data global storages. In case
+/// resource is not yet in data cache, global storage is used to add it there.
+pub struct MoveVmDataCacheAdapter<'a, LoaderImpl> {
+    data_cache: &'a mut TransactionDataCache,
+    resource_resolver: &'a dyn ResourceResolver,
+    loader: &'a LoaderImpl,
+}
+
+impl<'a, LoaderImpl> NativeContextMoveVmDataCache for MoveVmDataCacheAdapter<'a, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
+    fn native_check_resource_exists(
+        &mut self,
+        gas_meter: &mut dyn DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(bool, Option<NumBytes>)> {
+        let mut gas_meter = DependencyGasMeterWrapper::new(gas_meter);
+        let (gv, bytes_loaded) = self.load_resource(&mut gas_meter, traversal_context, addr, ty)?;
+        let exists = gv.exists();
+        Ok((exists, bytes_loaded))
+    }
+}
+
+impl<'a, LoaderImpl> MoveVmDataCacheAdapter<'a, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
+    pub fn new(
+        data_cache: &'a mut TransactionDataCache,
+        resource_resolver: &'a dyn ResourceResolver,
+        loader: &'a LoaderImpl,
+    ) -> Self {
+        Self {
+            data_cache,
+            resource_resolver,
+            loader,
+        }
+    }
+}
+
+impl<'a, LoaderImpl> MoveVmDataCache for MoveVmDataCacheAdapter<'a, LoaderImpl>
+where
+    LoaderImpl: Loader,
+{
+    fn load_resource_mut(
+        &mut self,
+        gas_meter: &mut impl DependencyGasMeter,
+        traversal_context: &mut TraversalContext,
+        addr: &AccountAddress,
+        ty: &Type,
+    ) -> PartialVMResult<(&mut GlobalValue, Option<NumBytes>)> {
+        let bytes_loaded = if !self.data_cache.contains_resource(addr, ty) {
+            let (entry, bytes_loaded) = TransactionDataCache::create_data_cache_entry(
+                self.loader,
+                &LayoutConverter::new(self.loader),
+                gas_meter,
+                traversal_context,
+                self.loader.unmetered_module_storage(),
+                self.resource_resolver,
+                addr,
+                ty,
+            )?;
+            self.data_cache.insert_resource(*addr, ty.clone(), entry)?;
+            Some(bytes_loaded)
+        } else {
+            None
+        };
+
+        let gv = self.data_cache.get_resource_mut(addr, ty)?;
+        Ok((gv, bytes_loaded))
+    }
+}
+
 /// An entry in the data cache, containing resource's [GlobalValue] as well as additional cached
 /// information such as tag, layout, and a flag whether there are any delayed fields inside the
 /// resource.
-pub(crate) struct DataCacheEntry {
+struct DataCacheEntry {
     struct_tag: StructTag,
     layout: TriompheArc<MoveTypeLayout>,
     contains_delayed_fields: bool,
     value: GlobalValue,
-}
-
-impl DataCacheEntry {
-    pub(crate) fn value(&self) -> &GlobalValue {
-        &self.value
-    }
 }
 
 /// Transaction data cache. Keep updates within a transaction so they can all be published at
@@ -138,7 +252,7 @@ impl TransactionDataCache {
     /// Retrieves data from the remote on-chain storage and converts it into a [DataCacheEntry].
     /// Also returns the size of the loaded resource in bytes. This method does not add the entry
     /// to the cache - it is the caller's responsibility to add it there.
-    pub(crate) fn create_data_cache_entry(
+    fn create_data_cache_entry(
         metadata_loader: &impl ModuleMetadataLoader,
         layout_converter: &LayoutConverter<impl StructDefinitionLoader>,
         gas_meter: &mut impl DependencyGasMeter,
@@ -164,7 +278,7 @@ impl TransactionDataCache {
         )?;
 
         let (data, bytes_loaded) = {
-            let metadata = metadata_loader.load_module_metadata(
+            let module = metadata_loader.load_module_for_metadata(
                 gas_meter,
                 traversal_context,
                 &struct_tag.module_id(),
@@ -175,7 +289,7 @@ impl TransactionDataCache {
             resource_resolver.get_resource_bytes_with_metadata_and_layout(
                 addr,
                 &struct_tag,
-                &metadata,
+                &module.metadata,
                 layout_with_delayed_fields.layout_when_contains_delayed_fields(),
             )?
         };
@@ -214,7 +328,7 @@ impl TransactionDataCache {
 
     /// Returns true if resource has been inserted into the cache. Otherwise, returns false. The
     /// state of the cache does not chang when calling this function.
-    pub(crate) fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
+    fn contains_resource(&self, addr: &AccountAddress, ty: &Type) -> bool {
         self.account_map
             .get(addr)
             .is_some_and(|account_cache| account_cache.contains_key(ty))
@@ -222,7 +336,7 @@ impl TransactionDataCache {
 
     /// Stores a new entry for loaded resource into the data cache. Returns an error if there is an
     /// entry already for the specified address-type pair.
-    pub(crate) fn insert_resource(
+    fn insert_resource(
         &mut self,
         addr: AccountAddress,
         ty: Type,
@@ -242,7 +356,7 @@ impl TransactionDataCache {
 
     /// Returns the resource from the data cache. If resource has not been inserted (i.e., it does
     /// not exist in cache), an error is returned.
-    pub(crate) fn get_resource_mut(
+    fn get_resource_mut(
         &mut self,
         addr: &AccountAddress,
         ty: &Type,

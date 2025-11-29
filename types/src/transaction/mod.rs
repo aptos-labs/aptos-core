@@ -12,9 +12,12 @@ use crate::{
     keyless::{KeylessPublicKey, KeylessSignature},
     ledger_info::LedgerInfo,
     proof::{TransactionInfoListWithProof, TransactionInfoWithProof},
-    transaction::authenticator::{
-        AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature, SingleKeyAuthenticator,
-        TransactionAuthenticator,
+    transaction::{
+        authenticator::{
+            AASigningData, AccountAuthenticator, AnyPublicKey, AnySignature,
+            SingleKeyAuthenticator, TransactionAuthenticator,
+        },
+        encrypted_payload::EncryptedPayload,
     },
     vm_status::{DiscardedVMStatus, KeptVMStatus, StatusCode, StatusType, VMStatus},
     write_set::{HotStateOp, WriteSet},
@@ -46,6 +49,7 @@ pub mod authenticator;
 pub mod block_epilogue;
 mod block_output;
 mod change_set;
+pub mod encrypted_payload;
 mod module;
 mod multisig;
 mod script;
@@ -546,6 +550,10 @@ impl RawTransaction {
         self.payload
     }
 
+    pub fn payload_ref(&self) -> &TransactionPayload {
+        &self.payload
+    }
+
     pub fn executable_ref(&self) -> Result<TransactionExecutableRef<'_>> {
         self.payload.executable_ref()
     }
@@ -679,6 +687,8 @@ pub enum TransactionPayload {
     /// Contains an executable (script/entry function) along with extra configuration.
     /// Once this new format is fully rolled out, above payload variants will be deprecated.
     Payload(TransactionPayloadInner),
+    /// Represents an encrypted transaction payload
+    EncryptedPayload(EncryptedPayload),
 }
 
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -761,6 +771,9 @@ impl TransactionPayload {
             TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
                 extra_config.is_multisig()
             },
+            TransactionPayload::EncryptedPayload(encrypted_payload) => {
+                encrypted_payload.extra_config().is_multisig()
+            },
         }
     }
 
@@ -793,6 +806,9 @@ impl TransactionPayload {
             TransactionPayload::ModuleBundle(_) => {
                 Err(format_err!("ModuleBundle variant is deprecated"))
             },
+            TransactionPayload::EncryptedPayload(encrypted_payload) => {
+                encrypted_payload.executable()
+            },
         }
     }
 
@@ -808,6 +824,9 @@ impl TransactionPayload {
             },
             TransactionPayload::ModuleBundle(_) => {
                 Err(format_err!("ModuleBundle variant is deprecated"))
+            },
+            TransactionPayload::EncryptedPayload(encrypted_payload) => {
+                encrypted_payload.executable_ref()
             },
         }
     }
@@ -826,6 +845,9 @@ impl TransactionPayload {
             },
             TransactionPayload::Payload(TransactionPayloadInner::V1 { extra_config, .. }) => {
                 extra_config.clone()
+            },
+            TransactionPayload::EncryptedPayload(encrypted_payload) => {
+                encrypted_payload.extra_config().clone()
             },
         }
     }
@@ -918,6 +940,10 @@ impl TransactionPayload {
             executable,
             extra_config,
         })
+    }
+
+    pub fn is_encrypted_variant(&self) -> bool {
+        matches!(self, Self::EncryptedPayload(_))
     }
 }
 
@@ -1536,10 +1562,17 @@ impl TransactionStatus {
         }
     }
 
-    pub fn from_vm_status(vm_status: VMStatus, features: &Features) -> Self {
+    pub fn from_vm_status(
+        vm_status: VMStatus,
+        features: &Features,
+        memory_limit_exceeded_as_miscellaneous_error: bool,
+    ) -> Self {
         let status_code = vm_status.status_code();
         // TODO: keep_or_discard logic should be deprecated from Move repo and refactored into here.
-        match vm_status.keep_or_discard(features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES)) {
+        match vm_status.keep_or_discard(
+            features.is_enabled(FeatureFlag::ENABLE_FUNCTION_VALUES),
+            memory_limit_exceeded_as_miscellaneous_error,
+        ) {
             Ok(recorded) => match recorded {
                 // TODO(bowu):status code should be removed from transaction status
                 KeptVMStatus::MiscellaneousError => {

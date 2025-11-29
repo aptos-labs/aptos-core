@@ -4,7 +4,10 @@
 
 #![allow(clippy::non_canonical_partial_ord_impl)]
 
-use crate::loaded_data::struct_name_indexing::StructNameIndex;
+use crate::{
+    loaded_data::struct_name_indexing::StructNameIndex,
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
+};
 use derivative::Derivative;
 use itertools::Itertools;
 use move_binary_format::{
@@ -258,8 +261,36 @@ impl StructType {
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StructIdentifier {
-    pub module: ModuleId,
-    pub name: Identifier,
+    module: ModuleId,
+    interned_module_id: InternedModuleId,
+    name: Identifier,
+}
+
+impl StructIdentifier {
+    pub fn new(module_id_pool: &InternedModuleIdPool, module: ModuleId, name: Identifier) -> Self {
+        let interned_module_id = module_id_pool.intern_by_ref(&module);
+        Self {
+            module,
+            interned_module_id,
+            name,
+        }
+    }
+
+    pub fn module(&self) -> &ModuleId {
+        &self.module
+    }
+
+    pub fn interned_module_id(&self) -> InternedModuleId {
+        self.interned_module_id
+    }
+
+    pub fn name(&self) -> &Identifier {
+        &self.name
+    }
+
+    pub fn into_module_and_name(self) -> (ModuleId, Identifier) {
+        (self.module, self.name)
+    }
 }
 
 #[derive(Debug, Clone, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -306,7 +337,7 @@ pub struct TypePreorderTraversalIter<'a> {
 impl<'a> Iterator for TypePreorderTraversalIter<'a> {
     type Item = &'a Type;
 
-    #[inline(always)]
+    #[cfg_attr(feature = "force-inline", inline(always))]
     fn next(&mut self) -> Option<Self::Item> {
         use Type::*;
 
@@ -1160,25 +1191,35 @@ impl TypeBuilder {
         self.subst_impl(ty, ty_args, &mut count, 1, check)
     }
 
-    #[cfg_attr(feature = "force-inline", inline(always))]
+    #[inline]
     fn check(&self, count: &mut u64, depth: u64) -> PartialVMResult<()> {
         if *count >= self.max_ty_size {
-            return Err(
-                PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
-                    "Type size is larger than maximum {}",
-                    self.max_ty_size
-                )),
-            );
+            return self.too_many_nodes_error();
         }
         if depth > self.max_ty_depth {
-            return Err(
-                PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED).with_message(format!(
-                    "Type depth is larger than maximum {}",
-                    self.max_ty_depth
-                )),
-            );
+            return self.too_large_depth_error();
         }
         Ok(())
+    }
+
+    #[cold]
+    fn too_many_nodes_error(&self) -> PartialVMResult<()> {
+        Err(
+            PartialVMError::new(StatusCode::TOO_MANY_TYPE_NODES).with_message(format!(
+                "Type size is larger than maximum {}",
+                self.max_ty_size
+            )),
+        )
+    }
+
+    #[cold]
+    fn too_large_depth_error(&self) -> PartialVMResult<()> {
+        Err(
+            PartialVMError::new(StatusCode::VM_MAX_TYPE_DEPTH_REACHED).with_message(format!(
+                "Type depth is larger than maximum {}",
+                self.max_ty_depth
+            )),
+        )
     }
 
     fn create_constant_ty_impl(
@@ -1200,6 +1241,12 @@ impl TypeBuilder {
             S::U64 => U64,
             S::U128 => U128,
             S::U256 => U256,
+            S::I8 => I8,
+            S::I16 => I16,
+            S::I32 => I32,
+            S::I64 => I64,
+            S::I128 => I128,
+            S::I256 => I256,
             S::Address => Address,
             S::Vector(elem_tok) => {
                 let elem_ty = self.create_constant_ty_impl(elem_tok, count, depth + 1)?;
@@ -1213,12 +1260,16 @@ impl TypeBuilder {
                 );
             },
 
-            tok => {
+            S::Signer
+            | S::Function(..)
+            | S::Reference(_)
+            | S::MutableReference(_)
+            | S::TypeParameter(_) => {
                 return Err(
                     PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
                         .with_message(format!(
                             "{:?} is not allowed or is not a meaningful token for a constant",
-                            tok
+                            const_tok
                         )),
                 );
             },
@@ -1498,12 +1549,14 @@ impl<'a> TypeParamMap<'a> {
         self.map.get(&idx).map(|ty| (*ty).clone())
     }
 
+    pub fn arity(&self) -> usize {
+        self.map.len()
+    }
+
     /// Matches the actual type to the expected type, binding any type args to the necessary type
     /// as stored in the map. The expected type must be a concrete type (no [Type::TyParam]).
     ///
     /// Returns true if a successful match is made.
-    // TODO: is this really needed in presence of paranoid mode? This does a deep structural
-    //       comparison and is expensive.
     pub fn match_ty(&mut self, ty: &Type, expected_ty: &'a Type) -> bool {
         match (ty, expected_ty) {
             // The important case, deduce the type params.
@@ -1613,6 +1666,36 @@ impl<'a> TypeParamMap<'a> {
             | (Type::MutableReference(_), _)
             | (Type::Reference(_), _) => false,
         }
+    }
+
+    /// Matches sequences of types using `match_ty`.
+    pub fn match_tys(
+        &mut self,
+        actuals: impl ExactSizeIterator<Item = &'a Type>,
+        expected: impl ExactSizeIterator<Item = &'a Type>,
+    ) -> bool {
+        if actuals.len() != expected.len() {
+            return false;
+        }
+        for (actual, formal) in actuals.zip(expected) {
+            if !self.match_ty(actual, formal) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Produces a type parameter instantiation from the type params in the map,
+    /// verifying abilities against type parameter declarations.
+    pub fn verify_and_extract_type_args(
+        &self,
+        param_decls: &[AbilitySet],
+    ) -> PartialVMResult<Vec<Type>> {
+        let args = (0..param_decls.len())
+            .filter_map(|idx| self.map.get(&(idx as u16)).cloned().cloned())
+            .collect_vec();
+        Type::verify_ty_arg_abilities(param_decls, &args)?;
+        Ok(args)
     }
 }
 
@@ -1906,6 +1989,12 @@ mod unit_tests {
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U64)), U64);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U128)), U128);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::U256)), U256);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I8)), I8);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I16)), I16);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I32)), I32);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I64)), I64);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I128)), I128);
+        assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::I256)), I256);
         assert_eq!(assert_ok!(ty_builder.create_constant_ty(&S::Bool)), Bool);
         assert_eq!(
             assert_ok!(ty_builder.create_constant_ty(&S::Address)),

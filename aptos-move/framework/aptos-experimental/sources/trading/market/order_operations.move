@@ -10,7 +10,7 @@ module aptos_experimental::order_operations {
     };
     use aptos_experimental::order_book_types::{
         OrderIdType,
-        single_order_book_type
+        single_order_type
     };
     use aptos_experimental::single_order_types::SingleOrder;
     use aptos_experimental::pre_cancellation_tracker::{
@@ -129,7 +129,7 @@ module aptos_experimental::order_operations {
             orig_size,
             remaining_size,
             is_bid,
-            _trigger_condition,
+            trigger_condition,
             time_in_force,
             metadata
         ) = order.destroy_single_order();
@@ -141,6 +141,8 @@ module aptos_experimental::order_operations {
                 is_bid,
                 price,
                 time_in_force,
+                single_order_type(),
+                    trigger_condition,
                 metadata
             ),
             remaining_size
@@ -188,12 +190,12 @@ module aptos_experimental::order_operations {
             orig_size,
             remaining_size,
             is_bid,
-            _trigger_condition,
+            trigger_condition,
             time_in_force,
             metadata
         ) = order.destroy_single_order();
         cleanup_order_internal(
-            account, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, price, metadata, callbacks
+            account, order_id, client_order_id, single_order_type(), is_bid, time_in_force, remaining_size, price, trigger_condition, metadata, callbacks, false
         );
         if (emit_event) {
             market.emit_event_for_order(

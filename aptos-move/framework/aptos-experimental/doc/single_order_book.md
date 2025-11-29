@@ -7,18 +7,17 @@ This module provides a core order book functionality for a trading system. On a 
 components
 1. ActiveOrderBook: This is the main order book that keeps track of active orders and their states. The active order
 book is backed by a BigOrderedMap, which is a data structure that allows for efficient insertion, deletion, and matching of the order
-The orders are matched based on time-price priority.
+The orders are matched based on price-time priority.
 2. PendingOrderBookIndex: This keeps track of pending orders. The pending orders are those that are not active yet. Three
 types of pending orders are supported.
-- Price move up - Trigggered when the price moves above a certain price level
+- Price move up - Triggered when the price moves above a certain price level
 - Price move down - Triggered when the price moves below a certain price level
 - Time based - Triggered when a certain time has passed
-3. Orders: This is a BigOrderMap of order id to order details.
+3. Orders: This is a BigOrderedMap of order id to order details.
 
 
 -  [Enum `SingleOrderRequest`](#0x7_single_order_book_SingleOrderRequest)
 -  [Enum `SingleOrderBook`](#0x7_single_order_book_SingleOrderBook)
--  [Enum `OrderType`](#0x7_single_order_book_OrderType)
 -  [Struct `TestMetadata`](#0x7_single_order_book_TestMetadata)
 -  [Constants](#@Constants_0)
 -  [Function `__lambda__1__get_single_match_for_taker`](#0x7_single_order_book___lambda__1__get_single_match_for_taker)
@@ -33,10 +32,10 @@ types of pending orders are supported.
 -  [Function `try_cancel_order_with_client_order_id`](#0x7_single_order_book_try_cancel_order_with_client_order_id)
 -  [Function `try_cancel_order`](#0x7_single_order_book_try_cancel_order)
 -  [Function `client_order_id_exists`](#0x7_single_order_book_client_order_id_exists)
--  [Function `place_maker_order`](#0x7_single_order_book_place_maker_order)
+-  [Function `place_maker_or_pending_order`](#0x7_single_order_book_place_maker_or_pending_order)
 -  [Function `place_ready_maker_order_with_unique_idx`](#0x7_single_order_book_place_ready_maker_order_with_unique_idx)
 -  [Function `reinsert_order`](#0x7_single_order_book_reinsert_order)
--  [Function `place_pending_maker_order`](#0x7_single_order_book_place_pending_maker_order)
+-  [Function `place_pending_order_internal`](#0x7_single_order_book_place_pending_order_internal)
 -  [Function `get_single_match_for_taker`](#0x7_single_order_book_get_single_match_for_taker)
 -  [Function `decrease_order_size`](#0x7_single_order_book_decrease_order_size)
 -  [Function `get_order_id_by_client_id`](#0x7_single_order_book_get_order_id_by_client_id)
@@ -50,9 +49,9 @@ types of pending orders are supported.
 
 
 <pre><code><b>use</b> <a href="../../aptos-framework/doc/big_ordered_map.md#0x1_big_ordered_map">0x1::big_ordered_map</a>;
-<b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">0x1::option</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/string.md#0x1_string">0x1::string</a>;
+<b>use</b> <a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context">0x1::transaction_context</a>;
 <b>use</b> <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
 <b>use</b> <a href="pending_order_book_index.md#0x7_pending_order_book_index">0x7::pending_order_book_index</a>;
@@ -206,71 +205,6 @@ types of pending orders are supported.
 
 </details>
 
-<a id="0x7_single_order_book_OrderType"></a>
-
-## Enum `OrderType`
-
-
-
-<pre><code>enum <a href="single_order_book.md#0x7_single_order_book_OrderType">OrderType</a> <b>has</b> <b>copy</b>, drop, store
-</code></pre>
-
-
-
-<details>
-<summary>Variants</summary>
-
-
-<details>
-<summary>GoodTilCancelled</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>PostOnly</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-<details>
-<summary>FillOrKill</summary>
-
-
-<details>
-<summary>Fields</summary>
-
-
-<dl>
-</dl>
-
-
-</details>
-
-</details>
-
-</details>
-
 <a id="0x7_single_order_book_TestMetadata"></a>
 
 ## Struct `TestMetadata`
@@ -303,20 +237,20 @@ types of pending orders are supported.
 ## Constants
 
 
-<a id="0x7_single_order_book_EORDER_ALREADY_EXISTS"></a>
-
-
-
-<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
-</code></pre>
-
-
-
 <a id="0x7_single_order_book_E_REINSERT_ORDER_MISMATCH"></a>
 
 
 
 <pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>: u64 = 8;
+</code></pre>
+
+
+
+<a id="0x7_single_order_book_EORDER_ALREADY_EXISTS"></a>
+
+
+
+<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_EORDER_ALREADY_EXISTS">EORDER_ALREADY_EXISTS</a>: u64 = 1;
 </code></pre>
 
 
@@ -380,6 +314,15 @@ types of pending orders are supported.
 
 
 <pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>: u64 = 10;
+</code></pre>
+
+
+
+<a id="0x7_single_order_book_ETRIGGER_COND_NOT_FOUND"></a>
+
+
+
+<pre><code><b>const</b> <a href="single_order_book.md#0x7_single_order_book_ETRIGGER_COND_NOT_FOUND">ETRIGGER_COND_NOT_FOUND</a>: u64 = 11;
 </code></pre>
 
 
@@ -546,9 +489,8 @@ types of pending orders are supported.
         remaining_size,
         is_bid,
         time_in_force,
-        metadata,
-        _single_order_book_type
-    ) = order_match_details.destroy_order_match_details();
+        metadata
+    ) = order_match_details.destroy_single_order_match_details();
     SingleOrderRequest::V1 {
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_id,
@@ -796,15 +738,15 @@ If order doesn't exist, it aborts with EORDER_NOT_FOUND.
 
 </details>
 
-<a id="0x7_single_order_book_place_maker_order"></a>
+<a id="0x7_single_order_book_place_maker_or_pending_order"></a>
 
-## Function `place_maker_order`
+## Function `place_maker_or_pending_order`
 
 Places a maker order to the order book. If the order is a pending order, it is added to the pending order book
-else it is added to the active order book. The API aborts if its not a maker order or if the order already exists
+else it is added to the active order book. The API aborts if it's not a maker order or if the order already exists
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_order">place_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_or_pending_order">place_maker_or_pending_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -813,16 +755,15 @@ else it is added to the active order book. The API aborts if its not a maker ord
 <summary>Implementation</summary>
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_order">place_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, ascending_id_generator: &<b>mut</b> AscendingIdGenerator, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_maker_or_pending_order">place_maker_or_pending_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> PriceTimeIndex, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
 ) {
     <b>let</b> ascending_idx =
-        new_unique_idx_type(ascending_id_generator.next_ascending_id());
+        new_unique_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
     <b>if</b> (order_req.trigger_condition.is_some()) {
-        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>(ascending_id_generator, order_req);
+        <b>return</b> self.<a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>(order_req);
     };
     self.<a href="single_order_book.md#0x7_single_order_book_place_ready_maker_order_with_unique_idx">place_ready_maker_order_with_unique_idx</a>(price_time_idx, order_req, ascending_idx);
-
 }
 </code></pre>
 
@@ -877,9 +818,9 @@ else it is added to the active order book. The API aborts if its not a maker ord
             order_req.order_id
         );
     };
-    price_time_idx.<a href="single_order_book.md#0x7_single_order_book_place_maker_order">place_maker_order</a>(
+    price_time_idx.place_maker_order(
         order_req.order_id,
-        single_order_book_type(),
+        single_order_type(),
         order_req.price,
         ascending_idx,
         order_req.remaining_size,
@@ -898,7 +839,7 @@ else it is added to the active order book. The API aborts if its not a maker ord
 
 Reinserts a maker order to the order book. This is used when the order is removed from the order book
 but the clearinghouse fails to settle all or part of the order. If the order doesn't exist in the order book,
-it is added to the order book, if it exists, it's size is updated.
+it is added to the order book, if it exists, its size is updated.
 
 
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="single_order_book.md#0x7_single_order_book_reinsert_order">reinsert_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, price_time_idx: &<b>mut</b> <a href="price_time_index.md#0x7_price_time_index_PriceTimeIndex">price_time_index::PriceTimeIndex</a>, reinsert_order: <a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;, original_order: &<a href="order_book_types.md#0x7_order_book_types_OrderMatchDetails">order_book_types::OrderMatchDetails</a>&lt;M&gt;)
@@ -916,7 +857,7 @@ it is added to the order book, if it exists, it's size is updated.
     reinsert_order: OrderMatchDetails&lt;M&gt;,
     original_order: &OrderMatchDetails&lt;M&gt;,
 ) {
-    <b>assert</b>!(reinsert_order.validate_reinsertion_request(original_order), <a href="single_order_book.md#0x7_single_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
+    <b>assert</b>!(reinsert_order.validate_single_order_reinsertion_request(original_order), <a href="single_order_book.md#0x7_single_order_book_E_REINSERT_ORDER_MISMATCH">E_REINSERT_ORDER_MISMATCH</a>);
     <b>let</b> order_id = reinsert_order.get_order_id_from_match_details();
     <b>let</b> unique_idx = reinsert_order.get_unique_priority_idx_from_match_details();
 
@@ -941,13 +882,13 @@ it is added to the order book, if it exists, it's size is updated.
 
 </details>
 
-<a id="0x7_single_order_book_place_pending_maker_order"></a>
+<a id="0x7_single_order_book_place_pending_order_internal"></a>
 
-## Function `place_pending_maker_order`
+## Function `place_pending_order_internal`
 
 
 
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, ascending_id_generator: &<b>mut</b> <a href="order_book_types.md#0x7_order_book_types_AscendingIdGenerator">order_book_types::AscendingIdGenerator</a>, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: <b>copy</b>, drop, store&gt;(self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">single_order_book::SingleOrderBook</a>&lt;M&gt;, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">single_order_book::SingleOrderRequest</a>&lt;M&gt;)
 </code></pre>
 
 
@@ -956,12 +897,12 @@ it is added to the order book, if it exists, it's size is updated.
 <summary>Implementation</summary>
 
 
-<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>&lt;M: store + <b>copy</b> + drop&gt;(
-    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, ascending_id_generator: &<b>mut</b> AscendingIdGenerator, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
+<pre><code><b>fun</b> <a href="single_order_book.md#0x7_single_order_book_place_pending_order_internal">place_pending_order_internal</a>&lt;M: store + <b>copy</b> + drop&gt;(
+    self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, order_req: <a href="single_order_book.md#0x7_single_order_book_SingleOrderRequest">SingleOrderRequest</a>&lt;M&gt;
 ) {
     <b>let</b> order_id = order_req.order_id;
     <b>let</b> ascending_idx =
-        new_unique_idx_type(ascending_id_generator.next_ascending_id());
+        new_unique_idx_type(<a href="../../aptos-framework/doc/transaction_context.md#0x1_transaction_context_monotonically_increasing_counter">transaction_context::monotonically_increasing_counter</a>());
     <b>let</b> order =
         new_single_order(
             order_id,
@@ -979,7 +920,16 @@ it is added to the order book, if it exists, it's size is updated.
 
     self.orders.add(order_id, new_order_with_state(order, <b>false</b>));
 
-    self.pending_orders.<a href="single_order_book.md#0x7_single_order_book_place_pending_maker_order">place_pending_maker_order</a>(
+    <b>if</b> (order_req.client_order_id.is_some()) {
+        self.client_order_ids.add(
+            new_account_client_order_id(
+                order_req.<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_req.client_order_id.destroy_some()
+            ),
+            order_req.order_id
+        );
+    };
+
+    self.pending_orders.place_pending_order(
         order_id,
         order_req.trigger_condition.destroy_some(),
         ascending_idx,
@@ -1014,7 +964,7 @@ API to ensure that the order is a taker order before calling this API, otherwise
 ): OrderMatch&lt;M&gt; {
     <b>let</b> (order_id, matched_size, remaining_size, order_book_type) =
         active_matched_order.destroy_active_matched_order();
-    <b>assert</b>!(order_book_type == single_order_book_type(), <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>);
+    <b>assert</b>!(order_book_type == single_order_type(), <a href="single_order_book.md#0x7_single_order_book_ENOT_SINGLE_ORDER_BOOK">ENOT_SINGLE_ORDER_BOOK</a>);
 
     <b>let</b> order_with_state = <b>if</b> (remaining_size == 0) {
         <b>let</b> order = self.orders.remove(&order_id);
@@ -1029,13 +979,8 @@ API to ensure that the order is a taker order before calling this API, otherwise
     };
 
     <b>let</b> (order, is_active) = order_with_state.destroy_order_from_state();
-    <b>if</b> (remaining_size == 0 && order.get_client_order_id().is_some()) {
-        self.client_order_ids.remove(
-            &new_account_client_order_id(
-                order.get_account(), order.get_client_order_id().destroy_some()
-            )
-        );
-    };
+    <b>assert</b>!(is_active, <a href="single_order_book.md#0x7_single_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>);
+
     <b>let</b> (
         <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>,
         order_id,
@@ -1045,12 +990,15 @@ API to ensure that the order is a taker order before calling this API, otherwise
         orig_size,
         size,
         is_bid,
-        _trigger_condition,
+        _,
         time_in_force,
         metadata
     ) = order.destroy_single_order();
-    <b>assert</b>!(is_active, <a href="single_order_book.md#0x7_single_order_book_EINVALID_INACTIVE_ORDER_STATE">EINVALID_INACTIVE_ORDER_STATE</a>);
-    new_order_match(new_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata, single_order_book_type()), matched_size)
+
+    <b>if</b> (remaining_size == 0 && client_order_id.is_some()) {
+        self.client_order_ids.remove(&new_account_client_order_id(<a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id.destroy_some()));
+    };
+    new_order_match(new_single_order_match_details(order_id, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, client_order_id, unique_priority_idx, price, orig_size, size, is_bid, time_in_force, metadata), matched_size)
 }
 </code></pre>
 
@@ -1301,12 +1249,21 @@ Removes and returns the orders that are ready to be executed based on the curren
     self: &<b>mut</b> <a href="single_order_book.md#0x7_single_order_book_SingleOrderBook">SingleOrderBook</a>&lt;M&gt;, current_price: u64, order_limit: u64
 ): <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;SingleOrder&lt;M&gt;&gt; {
     <b>let</b> self_orders = &<b>mut</b> self.orders;
+    <b>let</b> self_client_order_ids = &<b>mut</b> self.client_order_ids;
     <b>let</b> order_ids = self.pending_orders.<a href="single_order_book.md#0x7_single_order_book_take_ready_price_based_orders">take_ready_price_based_orders</a>(current_price, order_limit);
     <b>let</b> orders = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_empty">vector::empty</a>();
 
     order_ids.for_each(|order_id| {
         <b>let</b> order_with_state = self_orders.remove(&order_id);
         <b>let</b> (order, _) = order_with_state.destroy_order_from_state();
+        <b>let</b> client_order_id = order.get_client_order_id();
+        <b>if</b> (client_order_id.is_some()) {
+            self_client_order_ids.remove(
+                &new_account_client_order_id(
+                    order.get_account(), client_order_id.destroy_some()
+                )
+            );
+        };
         orders.push_back(order);
     });
     orders

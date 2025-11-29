@@ -45,7 +45,6 @@ permissions:
   pull-requests: write
   contents: read
   id-token: write
-  actions: write #required for workflow cancellation via check-aptos-core
 
 on:
   # Allow triggering manually
@@ -117,8 +116,7 @@ on:
         description: The number of test jobs to run in parallel. If not specified, defaults to 1
         default: 1
 
-  schedule:
-    - cron: "0 22 * * 1-5" # The main branch cadence. This runs every Mon-Fri
+  # schedule: # NOTE: the schedule is dictated by PIES
   pull_request:
     paths:
       - ".github/workflows/forge-stable.yaml"
@@ -170,7 +168,7 @@ jobs:
               { TEST_NAME: 'changing-working-quorum-test-high-load', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'changing_working_quorum_test_high_load', FORGE_ENABLE_FAILPOINTS: true },
               { TEST_NAME: 'pfn-const-tps-realistic-env', FORGE_RUNNER_DURATION_SECS: 900, FORGE_TEST_SUITE: 'pfn_const_tps_with_realistic_env' },
               { TEST_NAME: 'realistic-env-max-load-long', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'realistic_env_max_load_large' },
-              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 3600, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust' }
+              { TEST_NAME: 'etna', FORGE_RUNNER_DURATION_SECS: 7200, FORGE_TEST_SUITE: 'etna', FORGE_IMAGE_NAME: 'etna-rust' }
             ];
 
             const matrix = testName != "all" ? tests.filter(test => test.TEST_NAME === testName) : tests;
@@ -213,19 +211,16 @@ jobs:
 
       - name: Determine branch based on cadence
         id: determine-test-branch
-        # NOTE: the schedule cron MUST match the one in the 'on.schedule.cron' section above
         run: |
           BRANCH=""
-          if [[ "${{ github.event_name }}" == "schedule" ]]; then
-            echo "BRANCH=main" >> $GITHUB_OUTPUT
-          elif [[ "${{ github.event_name }}" == "push" ]]; then
+          if [[ "${{ github.event_name }}" == "push" ]]; then
             echo "BRANCH=${{ github.ref_name }}" >> $GITHUB_OUTPUT
           # on workflow_dispatch, this will simply use the inputs.GIT_SHA given (or the default)
           elif [[ -n "${{ inputs.GIT_SHA }}" ]]; then
             echo "BRANCH=${{ inputs.GIT_SHA }}" >> $GITHUB_OUTPUT
           # if GIT_SHA not provided, use the branch where workflow runs on
           else
-            echo "BRANCH=${{ github.head_ref }}" >> $GITHUB_OUTPUT
+            echo "BRANCH=${{ github.head_ref || github.ref_name }}" >> $GITHUB_OUTPUT
           fi
           echo "Branch: $(grep BRANCH= $GITHUB_OUTPUT)"
       # Use the branch hash instead of the full branch name to stay under kubernetes namespace length limit
@@ -234,10 +229,6 @@ jobs:
         run: |
           # Hashing the branch name
           echo "BRANCH_HASH=$(echo -n "${{ steps.determine-test-branch.outputs.BRANCH }}" | sha256sum | cut -c1-10)" >> $GITHUB_OUTPUT
-
-      - uses: aptos-labs/aptos-core/.github/actions/check-aptos-core@main
-        with:
-          cancel-workflow: ${{ github.event_name == 'schedule' }} # Cancel the workflow if it is scheduled on a fork
 
       # actions/get-latest-docker-image-tag requires docker utilities and having authenticated to internal docker image registries
       - uses: aptos-labs/aptos-core/.github/actions/docker-setup@main

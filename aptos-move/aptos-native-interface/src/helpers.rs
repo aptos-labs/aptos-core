@@ -20,6 +20,17 @@ macro_rules! safely_pop_arg {
             },
         }
     }};
+    ($args:ident) => {{
+        use $crate::reexports::move_vm_types::natives::function::{PartialVMError, StatusCode};
+        match $args.pop_back() {
+            Some(val) => val,
+            None => {
+                return Err($crate::SafeNativeError::InvariantViolation(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR),
+                ))
+            },
+        }
+    }};
 }
 
 /// Returns a field value of the specified type from a struct at a given index.
@@ -55,26 +66,6 @@ macro_rules! safely_assert_eq {
                         PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR),
                     ));
                 }
-            },
-        }
-    }};
-}
-
-/// Pops a `Type` argument off the type argument stack inside a safe native. Returns a
-/// `SafeNativeError::InvariantViolation(UNKNOWN_INVARIANT_VIOLATION_ERROR)` in case there are not
-/// enough arguments on the stack.
-///
-/// NOTE: Expects as its argument an object that has a `fn pop(&self) -> Option<_>` method (e.g., a `Vec<_>`)
-#[macro_export]
-macro_rules! safely_pop_type_arg {
-    ($ty_args:ident) => {{
-        use $crate::reexports::move_vm_types::natives::function::{PartialVMError, StatusCode};
-        match $ty_args.pop() {
-            Some(ty) => ty,
-            None => {
-                return Err($crate::SafeNativeError::InvariantViolation(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR),
-                ))
             },
         }
     }};

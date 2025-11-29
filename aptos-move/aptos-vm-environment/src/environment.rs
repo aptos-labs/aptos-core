@@ -6,7 +6,7 @@ use crate::{
     natives::aptos_natives_with_builder,
     prod_configs::{
         aptos_default_ty_builder, aptos_prod_ty_builder, aptos_prod_vm_config,
-        get_timed_feature_override,
+        get_async_runtime_checks, get_timed_feature_override,
     },
 };
 use aptos_gas_algebra::DynamicExpression;
@@ -14,26 +14,30 @@ use aptos_gas_schedule::{AptosGasParameters, MiscGasParameters, NativeGasParamet
 use aptos_native_interface::SafeNativeBuilder;
 use aptos_types::{
     chain_id::ChainId,
+    keyless::{Configuration, Groth16VerificationKey, KeylessOnchainConfig},
     on_chain_config::{
         ConfigurationResource, Features, OnChainConfig, TimedFeatures, TimedFeaturesBuilder,
     },
     state_store::StateView,
 };
 use aptos_vm_types::storage::StorageGasParameters;
+use ark_bn254::Bn254;
+use ark_groth16::PreparedVerifyingKey;
 use move_vm_runtime::{config::VMConfig, RuntimeEnvironment, WithRuntimeEnvironment};
 use sha3::{Digest, Sha3_256};
 use std::sync::Arc;
+use triomphe::Arc as TriompheArc;
 
 /// A runtime environment which can be used for VM initialization and more. Contains features
 /// used by execution, gas parameters, VM configs and global caches. Note that it is the user's
 /// responsibility to make sure the environment is consistent, for now it should only be used per
 /// block of transactions because all features or configs are updated only on per-block basis.
-pub struct AptosEnvironment(Arc<Environment>);
+pub struct AptosEnvironment(TriompheArc<Environment>);
 
 impl AptosEnvironment {
     /// Returns new execution environment based on the current state.
     pub fn new(state_view: &impl StateView) -> Self {
-        Self(Arc::new(Environment::new(state_view, false, None)))
+        Self(TriompheArc::new(Environment::new(state_view, false, None)))
     }
 
     /// Returns new execution environment based on the current state, also using the provided gas
@@ -42,7 +46,7 @@ impl AptosEnvironment {
         state_view: &impl StateView,
         gas_hook: Arc<dyn Fn(DynamicExpression) + Send + Sync>,
     ) -> Self {
-        Self(Arc::new(Environment::new(
+        Self(TriompheArc::new(Environment::new(
             state_view,
             false,
             Some(gas_hook),
@@ -52,7 +56,7 @@ impl AptosEnvironment {
     /// Returns new execution environment based on the current state, also injecting create signer
     /// native for government proposal simulation. Should not be used for regular execution.
     pub fn new_with_injected_create_signer_for_gov_sim(state_view: &impl StateView) -> Self {
-        Self(Arc::new(Environment::new(state_view, true, None)))
+        Self(TriompheArc::new(Environment::new(state_view, true, None)))
     }
 
     /// Returns new environment but with delayed field optimization enabled. Should only be used by
@@ -60,7 +64,7 @@ impl AptosEnvironment {
     /// enabled or not depends on the feature flag.
     pub fn new_with_delayed_field_optimization_enabled(state_view: &impl StateView) -> Self {
         let env = Environment::new(state_view, false, None).try_enable_delayed_field_optimization();
-        Self(Arc::new(env))
+        Self(TriompheArc::new(env))
     }
 
     /// Returns the [ChainId] used by this environment.
@@ -79,6 +83,18 @@ impl AptosEnvironment {
     #[inline]
     pub fn timed_features(&self) -> &TimedFeatures {
         &self.0.timed_features
+    }
+
+    /// Returns the prepared verifying key for keyless validation.
+    #[inline]
+    pub fn keyless_pvk(&self) -> Option<&PreparedVerifyingKey<Bn254>> {
+        self.0.keyless_pvk.as_ref()
+    }
+
+    /// Returns keyless configurations.
+    #[inline]
+    pub fn keyless_configuration(&self) -> Option<&Configuration> {
+        self.0.keyless_configuration.as_ref()
     }
 
     /// Returns the [VMConfig] used by this environment.
@@ -120,6 +136,11 @@ impl AptosEnvironment {
     pub fn verifier_config_bytes(&self) -> &Vec<u8> {
         &self.0.verifier_bytes
     }
+
+    /// Returns true if runtime checks can be performed after execution.
+    pub fn async_runtime_checks_enabled(&self) -> bool {
+        self.0.async_runtime_checks_enabled
+    }
 }
 
 impl Clone for AptosEnvironment {
@@ -151,6 +172,12 @@ struct Environment {
     /// Set of timed features enabled in this environment.
     timed_features: TimedFeatures,
 
+    /// The prepared verification key for keyless accounts. Optional because it might not be set
+    /// on-chain or might fail to parse.
+    keyless_pvk: Option<PreparedVerifyingKey<Bn254>>,
+    /// Some keyless configurations which are not frequently updated.
+    keyless_configuration: Option<Configuration>,
+
     /// Gas feature version used in this environment.
     gas_feature_version: u64,
     /// Gas parameters used in this environment. Error is stored if gas parameters were not found
@@ -174,6 +201,11 @@ struct Environment {
     /// We stored bytes instead of hash because config is expected to be smaller than the crypto
     /// hash itself.
     verifier_bytes: Vec<u8>,
+
+    /// If true, runtime checks such as paranoid may not be performed during speculative execution
+    /// of transactions, but instead once at post-commit time based on the collected execution
+    /// trace. This is a node config and will never change for the lifetime of the environment.
+    async_runtime_checks_enabled: bool,
 }
 
 impl Environment {
@@ -247,6 +279,19 @@ impl Environment {
             bcs::to_bytes(&vm_config.verifier_config).expect("Verifier config is serializable");
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);
 
+        // We use an `Option` to handle the VK not being set on-chain, or an incorrect VK being set
+        // via governance (although, currently, we do check for that in `keyless_account.move`).
+        let keyless_pvk =
+            Groth16VerificationKey::fetch_keyless_config(state_view).and_then(|(vk, vk_bytes)| {
+                sha3_256.update(&vk_bytes);
+                vk.try_into().ok()
+            });
+        let keyless_configuration =
+            Configuration::fetch_keyless_config(state_view).map(|(config, config_bytes)| {
+                sha3_256.update(&config_bytes);
+                config
+            });
+
         let hash = sha3_256.finalize().into();
 
         #[allow(deprecated)]
@@ -254,6 +299,8 @@ impl Environment {
             chain_id,
             features,
             timed_features,
+            keyless_pvk,
+            keyless_configuration,
             gas_feature_version,
             gas_params,
             storage_gas_params,
@@ -261,6 +308,7 @@ impl Environment {
             inject_create_signer_for_gov_sim,
             hash,
             verifier_bytes,
+            async_runtime_checks_enabled: get_async_runtime_checks(),
         }
     }
 

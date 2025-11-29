@@ -24,4 +24,4 @@ Aptos is a layer 1 blockchain bringing a paradigm shift to Web3 through better t
 
 You can learn more about contributing to the Aptos project by reading our [Contribution Guide](https://github.com/aptos-labs/aptos-core/blob/main/CONTRIBUTING.md) and by viewing our [Code of Conduct](https://github.com/aptos-labs/aptos-core/blob/main/CODE_OF_CONDUCT.md).
 
-Aptos Core is licensed under [Apache 2.0](https://github.com/aptos-labs/aptos-core/blob/main/LICENSE).
+Aptos Core is licensed under [Innovation-Enabling Source Code License](https://github.com/aptos-labs/aptos-core/blob/main/LICENSE).

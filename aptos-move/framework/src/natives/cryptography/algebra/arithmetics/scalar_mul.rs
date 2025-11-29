@@ -90,7 +90,7 @@ macro_rules! ark_msm_bigint_wnaf_cost {
 
 pub fn scalar_mul_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
@@ -234,7 +234,7 @@ macro_rules! ark_msm_internal {
 
 pub fn multi_scalar_mul_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());

@@ -5,8 +5,8 @@ use crate::{
     code_cache_global::GlobalModuleCache,
     counters::{
         GLOBAL_LAYOUT_CACHE_NUM_NON_ENTRIES, GLOBAL_MODULE_CACHE_NUM_MODULES,
-        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_TYPES, NUM_INTERNED_TYPE_VECS,
-        STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
+        GLOBAL_MODULE_CACHE_SIZE_IN_BYTES, NUM_INTERNED_MODULE_IDS, NUM_INTERNED_TYPES,
+        NUM_INTERNED_TYPE_VECS, STRUCT_NAME_INDEX_MAP_NUM_ENTRIES,
     },
 };
 use aptos_gas_schedule::gas_feature_versions::RELEASE_V1_34;
@@ -49,6 +49,13 @@ macro_rules! alert_or_println {
         }
     };
 }
+
+#[cfg(fuzzing)]
+/// This snapshot of the global module cache for fuzzing allows comparison of parallel and sequential
+/// executions of the same block. It captures the cache state before the block is executed for the first
+/// time and rolls it back afterwards.
+pub type ModuleHotCacheSnapshot =
+    GlobalModuleCache<ModuleId, CompiledModule, Module, AptosModuleExtension>;
 
 /// Manages module caches and the execution environment, possibly across multiple blocks.
 pub struct ModuleCacheManager<K, D, V, E> {
@@ -142,11 +149,19 @@ where
         NUM_INTERNED_TYPES.set(num_interned_tys as i64);
         let num_interned_ty_vecs = runtime_environment.ty_pool().num_interned_ty_vecs();
         NUM_INTERNED_TYPE_VECS.set(num_interned_ty_vecs as i64);
+        let num_interned_module_ids = runtime_environment.module_id_pool().len();
+        NUM_INTERNED_MODULE_IDS.set(num_interned_module_ids as i64);
 
         if num_interned_tys > config.max_interned_tys
             || num_interned_ty_vecs > config.max_interned_ty_vecs
         {
             runtime_environment.ty_pool().flush();
+            self.module_cache.flush();
+        }
+
+        if num_interned_module_ids > config.max_interned_module_ids {
+            runtime_environment.module_id_pool().flush();
+            runtime_environment.struct_name_index_map().flush();
             self.module_cache.flush();
         }
 
@@ -308,6 +323,20 @@ impl AptosModuleCacheManagerGuard<'_> {
             module_cache: GlobalModuleCache::empty(),
         }
     }
+
+    /// Takes a shallow snapshot of the current global module cache (hot cache).
+    /// Only available under fuzzing. The snapshot shares underlying Arc module code.
+    #[cfg(fuzzing)]
+    pub fn snapshot_hot_cache(&self) -> ModuleHotCacheSnapshot {
+        self.module_cache().clone_for_fuzzing()
+    }
+
+    /// Rolls back the global module cache to a previously captured snapshot.
+    /// Only available under fuzzing.
+    #[cfg(fuzzing)]
+    pub fn rollback_hot_cache(&mut self, snapshot: ModuleHotCacheSnapshot) {
+        *self.module_cache_mut() = snapshot;
+    }
 }
 
 /// If Aptos framework exists, loads "transaction_validation.move" and all its transitive
@@ -399,15 +428,17 @@ mod test {
         V: Deref<Target = Arc<D>>,
         E: WithSize,
     {
-        assert_ok!(manager
-            .environment
-            .as_mut()
-            .unwrap()
-            .runtime_environment()
-            .struct_name_to_idx_for_test(StructIdentifier {
-                module: ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap()),
-                name: Identifier::new(name).unwrap()
-            }));
+        let runtime_environment = manager.environment.as_mut().unwrap().runtime_environment();
+
+        let module_id = ModuleId::new(AccountAddress::ZERO, Identifier::new("m").unwrap());
+
+        assert_ok!(
+            runtime_environment.struct_name_to_idx_for_test(StructIdentifier::new(
+                runtime_environment.module_id_pool(),
+                module_id,
+                Identifier::new(name).unwrap()
+            ))
+        );
     }
 
     fn assert_struct_name_index_map_size_eq<K, D, V, E>(
@@ -460,6 +491,7 @@ mod test {
             max_interned_tys: 100,
             max_interned_ty_vecs: 100,
             max_layout_cache_size: 10,
+            max_interned_module_ids: 100,
         };
 
         // Populate the cache for testing.
@@ -639,5 +671,49 @@ mod test {
         }
         let sum = handles.into_iter().map(|h| h.join().unwrap()).sum::<i32>();
         assert_eq!(sum, 1);
+    }
+
+    #[cfg(fuzzing)]
+    #[test]
+    fn test_snapshot_and_rollback_hot_cache() {
+        use std::sync::Arc;
+        // Use a real state with framework so we can populate the hot cache with verified modules
+        let state_view = InMemoryStateStore::from_head_genesis();
+        let mut guard = AptosModuleCacheManagerGuard::none_for_state_view(&state_view);
+
+        // Prefetch Aptos framework into the hot cache
+        assert!(prefetch_aptos_framework(&state_view, &mut guard).is_ok());
+        assert!(guard.module_cache().num_modules() > 0);
+
+        let snapshot = guard.snapshot_hot_cache();
+        let size_before = guard.module_cache().size_in_bytes();
+        let count_before = guard.module_cache().num_modules();
+
+        // Mutate: mark a known framework module as overridden
+        let tx_val_id = ModuleId::new(
+            AccountAddress::ONE,
+            Identifier::new("transaction_validation").unwrap(),
+        );
+        // Ensure it's present before mutation
+        let module = guard
+            .module_cache()
+            .get(&tx_val_id)
+            .expect("module present");
+        guard.module_cache_mut().flush();
+        assert!(guard.module_cache().get(&tx_val_id).is_none());
+
+        assert_ne!(guard.module_cache().size_in_bytes(), size_before);
+        assert_ne!(guard.module_cache().num_modules(), count_before);
+
+        // Rollback and verify restored state
+        guard.rollback_hot_cache(snapshot);
+
+        assert_eq!(guard.module_cache().size_in_bytes(), size_before);
+        assert_eq!(guard.module_cache().num_modules(), count_before);
+        let got = guard
+            .module_cache()
+            .get(&tx_val_id)
+            .expect("module present");
+        assert!(Arc::ptr_eq(&got, &module));
     }
 }

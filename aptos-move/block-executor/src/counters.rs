@@ -3,11 +3,13 @@
 
 use aptos_metrics_core::{
     exponential_buckets, register_avg_counter_vec, register_histogram, register_histogram_vec,
-    register_int_counter, register_int_counter_vec, register_int_gauge, Histogram, HistogramVec,
-    IntCounter, IntCounterVec, IntGauge, TimerHelper,
+    register_int_counter, register_int_counter_vec, register_int_gauge, register_int_gauge_vec,
+    Histogram, HistogramVec, IntCounter, IntCounterVec, IntGauge, IntGaugeVec, IntGaugeVecHelper,
+    TimerHelper,
 };
 use aptos_mvhashmap::BlockStateStats;
 use aptos_types::fee_statement::FeeStatement;
+use move_vm_runtime::execution_tracing::Trace;
 use once_cell::sync::Lazy;
 
 pub struct GasType;
@@ -57,15 +59,6 @@ pub static BLOCK_EXECUTOR_INNER_EXECUTE_BLOCK: Lazy<Histogram> = Lazy::new(|| {
         "The time spent in the most-inner part of executing a block of transactions, \
         i.e. for BlockSTM that is how long parallel or sequential execution took.",
         exponential_buckets(/*start=*/ 1e-3, /*factor=*/ 2.0, /*count=*/ 20).unwrap(),
-    )
-    .unwrap()
-});
-
-/// Count of times the module publishing fallback was triggered in parallel execution.
-pub static MODULE_PUBLISHING_FALLBACK_COUNT: Lazy<IntCounter> = Lazy::new(|| {
-    register_int_counter!(
-        "aptos_execution_module_publishing_fallback_count",
-        "Count times module was read and written in parallel execution (sequential fallback)"
     )
     .unwrap()
 });
@@ -171,6 +164,17 @@ pub static TASK_EXECUTE_SECONDS: Lazy<Histogram> = Lazy::new(|| {
         "aptos_execution_task_execute_seconds",
         // metric description
         "The time spent in seconds for task execution in Block STM",
+        time_buckets(),
+    )
+    .unwrap()
+});
+
+pub static TRACE_REPLAY_SECONDS: Lazy<Histogram> = Lazy::new(|| {
+    register_histogram!(
+        // metric name
+        "user_txn_trace_replay_seconds",
+        // metric description
+        "The time spent when replaying trace for async paranoid checks",
         time_buckets(),
     )
     .unwrap()
@@ -435,3 +439,35 @@ pub static NUM_INTERNED_TYPE_VECS: Lazy<IntGauge> = Lazy::new(|| {
     )
     .unwrap()
 });
+
+pub static NUM_INTERNED_MODULE_IDS: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "num_interned_module_ids",
+        "Number of interned module IDs cached in execution environment"
+    )
+    .unwrap()
+});
+
+/// Collection of counters for gathering statistics about the execution trace of the user
+/// transaction.
+static TRACE_COUNTERS: Lazy<IntGaugeVec> = Lazy::new(|| {
+    register_int_gauge_vec!(
+        "trace_counters",
+        "Various statistics for user payload execution trace",
+        &["name"],
+    )
+    .unwrap()
+});
+
+/// Records statistics about trace size.
+pub(crate) fn update_txn_trace_counters(trace: &Trace) {
+    TRACE_COUNTERS.set_with(
+        &["num_instructions"],
+        trace.num_recorded_instructions() as i64,
+    );
+    TRACE_COUNTERS.set_with(
+        &["num_branch_outcomes"],
+        trace.num_recorded_branch_outcomes() as i64,
+    );
+    TRACE_COUNTERS.set_with(&["num_calls"], trace.num_recorded_calls() as i64);
+}

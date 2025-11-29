@@ -30,8 +30,7 @@ sizes are limited to $\{1, 2, 4, 8, 16\}$.
     -  [Function `verify_batch_range_proof_internal`](#@Specification_1_verify_batch_range_proof_internal)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
+<pre><code><b>use</b> <a href="../../move-stdlib/doc/features.md#0x1_features">0x1::features</a>;
 <b>use</b> <a href="ristretto255.md#0x1_ristretto255">0x1::ristretto255</a>;
 <b>use</b> <a href="ristretto255_pedersen.md#0x1_ristretto255_pedersen">0x1::ristretto255_pedersen</a>;
 </code></pre>

@@ -494,6 +494,50 @@ pub mod cli {
     ) -> Result<(), String> {
         std::fs::create_dir_all(destination_path).map_err(|e| e.to_string())?;
 
+        // Transactional tests come as a single .move file
+        let path = std::path::Path::new(project_path);
+        if path.is_file()
+            && path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .is_some_and(|ext| ext == "move")
+        {
+            let pre_compiled_deps = precompiled_v2_stdlib_fuzzer();
+            match transactional_test_to_runnable_state(path, pre_compiled_deps) {
+                Ok(runnable_state) => {
+                    if runnable_state.operations.is_empty() {
+                        return Err("No valid operations found in transactional test".to_string());
+                    }
+
+                    let bytes = runnable_state.dearbitrary_first().finish();
+                    let mut hasher = Sha256::new();
+                    hasher.update(&bytes);
+                    let hash = hasher.finalize();
+
+                    let filename = format!(
+                        "{}/transactional_test_{}.bytes",
+                        destination_path,
+                        hex::encode(hash)
+                    );
+
+                    if let Err(e) = File::create(&filename).and_then(|mut f| f.write_all(&bytes)) {
+                        debug_println_error!(
+                            "Failed to write transactional test {}: {}",
+                            project_path,
+                            e
+                        );
+                    } else {
+                        println!("Transactional test saved to {}", filename);
+                    }
+
+                    return Ok(());
+                },
+                Err(e) => {
+                    return Err(e);
+                },
+            }
+        }
+
         let package = compile_source_code_from_project(project_path)?;
         let runnable_states = to_runnablestate_from_package(&package)?;
 
@@ -717,6 +761,73 @@ pub mod cli {
                 }
             }
         }
+        Ok(())
+    }
+
+    /// Recursively finds all transactional `.move` test files under `base_dir`,
+    /// converts each into a `RunnableStateWithOperations` using the transactional
+    /// test runner, and writes the serialized bytes to `destination_path`.
+    /// Files that fail to convert or produce no operations are skipped.
+    pub fn generate_transactional_runnable_states_recursive(
+        base_dir: &str,
+        destination_path: &str,
+    ) -> Result<(), String> {
+        std::fs::create_dir_all(destination_path).map_err(|e| e.to_string())?;
+
+        let pre_compiled_deps = precompiled_v2_stdlib_fuzzer();
+
+        let test_files: Vec<_> = WalkDir::new(base_dir)
+            .follow_links(false)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "move"))
+            .map(|entry| entry.path().to_path_buf())
+            .collect();
+
+        println!("Found {} transactional test files", test_files.len());
+
+        test_files.par_iter().for_each(|path| {
+            match transactional_test_to_runnable_state(path, pre_compiled_deps) {
+                Ok(runnable_state) => {
+                    if runnable_state.operations.is_empty() {
+                        debug_println_error!(
+                            "Skipping empty transactional test (no operations produced): {}",
+                            path.display()
+                        );
+                        return;
+                    }
+
+                    let bytes = runnable_state.dearbitrary_first().finish();
+                    let mut hasher = Sha256::new();
+                    hasher.update(&bytes);
+                    let hash = hasher.finalize();
+
+                    let filename = format!(
+                        "{}/transactional_test_{}.bytes",
+                        destination_path,
+                        hex::encode(hash)
+                    );
+
+                    if let Err(e) = File::create(&filename).and_then(|mut f| f.write_all(&bytes)) {
+                        debug_println_error!(
+                            "Failed to write transactional test {}: {}",
+                            path.display(),
+                            e
+                        );
+                    } else {
+                        println!("Transactional test saved to {}", filename);
+                    }
+                },
+                Err(e) => {
+                    debug_println_error!(
+                        "Error processing transactional test {}: {}",
+                        path.display(),
+                        e
+                    );
+                },
+            }
+        });
+
         Ok(())
     }
 }

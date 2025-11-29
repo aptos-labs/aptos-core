@@ -22,7 +22,6 @@ and reducing the size of existing orders.
 <b>use</b> <a href="market_types.md#0x7_market_types">0x7::market_types</a>;
 <b>use</b> <a href="order_book.md#0x7_order_book">0x7::order_book</a>;
 <b>use</b> <a href="order_book_types.md#0x7_order_book_types">0x7::order_book_types</a>;
-<b>use</b> <a href="order_placement.md#0x7_order_placement">0x7::order_placement</a>;
 <b>use</b> <a href="pre_cancellation_tracker.md#0x7_pre_cancellation_tracker">0x7::pre_cancellation_tracker</a>;
 <b>use</b> <a href="single_order_types.md#0x7_single_order_types">0x7::single_order_types</a>;
 </code></pre>
@@ -225,7 +224,7 @@ It it the caller's responsibility to ensure that the account is authorized to mo
         orig_size,
         remaining_size,
         is_bid,
-        _trigger_condition,
+        trigger_condition,
         time_in_force,
         metadata
     ) = order.destroy_single_order();
@@ -237,6 +236,8 @@ It it the caller's responsibility to ensure that the account is authorized to mo
             is_bid,
             price,
             time_in_force,
+            single_order_type(),
+                trigger_condition,
             metadata
         ),
         remaining_size
@@ -297,12 +298,12 @@ It it the caller's responsibility to ensure that the account is authorized to mo
         orig_size,
         remaining_size,
         is_bid,
-        _trigger_condition,
+        trigger_condition,
         time_in_force,
         metadata
     ) = order.destroy_single_order();
     cleanup_order_internal(
-        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, single_order_book_type(), is_bid, time_in_force, remaining_size, price, metadata, callbacks
+        <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, order_id, client_order_id, single_order_type(), is_bid, time_in_force, remaining_size, price, trigger_condition, metadata, callbacks, <b>false</b>
     );
     <b>if</b> (emit_event) {
         market.emit_event_for_order(

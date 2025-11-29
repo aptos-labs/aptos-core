@@ -18,7 +18,7 @@ use std::{collections::VecDeque, ops::Mul, rc::Rc};
 
 pub fn mul_internal(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());

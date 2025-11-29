@@ -8,11 +8,12 @@ use crate::{
     dedicated_handlers::handlers::{
         HandlerTrait, V0DelegatedFetchHandler, V0FetchHandler, V0SignatureHandler, V0VerifyHandler,
     },
+    deployment_information::DeploymentInformation,
     error::PepperServiceError,
     external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
     utils,
+    vuf_keypair::VUFKeypair,
 };
-use aptos_build_info::build_information;
 use aptos_keyless_pepper_common::BadPepperRequestError;
 use aptos_logger::{error, info, warn};
 use hyper::{
@@ -67,7 +68,7 @@ const UNEXPECTED_ERROR_MESSAGE: &str = "An unexpected error was encountered!";
 async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     origin: String,
     request: Request<Body>,
-    vuf_private_key: Arc<ark_bls12_381::Fr>,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
@@ -102,7 +103,7 @@ where
     // Invoke the handler and generate the response
     match request_handler
         .handle_request(
-            vuf_private_key,
+            vuf_keypair,
             jwk_cache,
             cached_resources,
             pepper_request,
@@ -171,21 +172,25 @@ fn create_response_builder(origin: String, status_code: StatusCode) -> response:
 }
 
 /// Generates a response for the about endpoint
-fn generate_about_response(origin: String) -> Result<Response<Body>, Infallible> {
-    // Get the build information
-    let build_information = build_information!();
-
-    // Serialize the build information
-    let build_info_json = match serde_json::to_string_pretty(&build_information) {
-        Ok(json) => json,
-        Err(error) => {
-            error!("Failed to serialize build information to JSON: {}", error);
-            return generate_internal_server_error_response(origin);
-        },
-    };
+fn generate_about_response(
+    origin: String,
+    deployment_information: DeploymentInformation,
+) -> Result<Response<Body>, Infallible> {
+    // Serialize the deployment information
+    let deployment_info_json =
+        match serde_json::to_string_pretty(&deployment_information.get_deployment_information()) {
+            Ok(json) => json,
+            Err(error) => {
+                error!(
+                    "Failed to serialize deployment information to JSON: {}",
+                    error
+                );
+                return generate_internal_server_error_response(origin);
+            },
+        };
 
     // Generate the response
-    generate_json_response(origin, StatusCode::OK, build_info_json)
+    generate_json_response(origin, StatusCode::OK, deployment_info_json)
 }
 
 /// Generates a 400 response for bad requests
@@ -304,11 +309,12 @@ fn generate_text_response(
 /// Handles the given request and returns a response
 pub async fn handle_request(
     request: Request<Body>,
-    vuf_keypair: Arc<(String, Arc<ark_bls12_381::Fr>)>,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
+    deployment_information: DeploymentInformation,
 ) -> Result<Response<Body>, Infallible> {
     // Get the request origin
     let origin = utils::get_request_origin(&request);
@@ -323,7 +329,7 @@ pub async fn handle_request(
     let request_path = request.uri().path();
     if request_method == Method::GET {
         match request_path {
-            ABOUT_PATH => return generate_about_response(origin),
+            ABOUT_PATH => return generate_about_response(origin, deployment_information.clone()),
             GROTH16_VK_PATH => {
                 let groth16_vk = cached_resources.read_on_chain_groth16_vk();
                 return generate_cached_resource_response(
@@ -346,22 +352,24 @@ pub async fn handle_request(
                 );
             },
             VUF_PUB_KEY_PATH => {
-                let (vuf_pub_key, _) = vuf_keypair.deref();
-                return generate_json_response(origin, StatusCode::OK, vuf_pub_key.clone());
+                return generate_json_response(
+                    origin,
+                    StatusCode::OK,
+                    vuf_keypair.vuf_public_key_json().clone(),
+                );
             },
             _ => { /* Continue below */ },
         };
     }
 
     // Handle any POST requests
-    let (_, vuf_priv_key) = vuf_keypair.deref();
     if request_method == Method::POST {
         match request_path {
             DELEGATED_FETCH_PATH => {
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0DelegatedFetchHandler,
@@ -374,7 +382,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0FetchHandler,
@@ -387,7 +395,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0SignatureHandler,
@@ -400,7 +408,7 @@ pub async fn handle_request(
                 return call_dedicated_request_handler(
                     origin,
                     request,
-                    vuf_priv_key.clone(),
+                    vuf_keypair.clone(),
                     jwk_cache,
                     cached_resources,
                     &V0VerifyHandler,

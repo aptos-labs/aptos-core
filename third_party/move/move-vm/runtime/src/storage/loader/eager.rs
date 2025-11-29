@@ -19,11 +19,11 @@ use move_binary_format::{
     access::ScriptAccess,
     errors::{PartialVMError, PartialVMResult, VMResult},
     file_format::CompiledScript,
+    CompiledModule,
 };
 use move_core_types::{
     identifier::IdentStr,
     language_storage::{ModuleId, TypeTag},
-    metadata::Metadata,
     vm_status::StatusCode,
 };
 use move_vm_types::{
@@ -169,10 +169,10 @@ where
 
         self.module_storage
             .unmetered_get_existing_eagerly_verified_module(
-                struct_name.module.address(),
-                struct_name.module.name(),
+                struct_name.module().address(),
+                struct_name.module().name(),
             )
-            .and_then(|module| module.get_struct(struct_name.name.as_ident_str()))
+            .and_then(|module| module.get_struct(struct_name.name().as_ident_str()))
             .map_err(|err| err.to_partial())
     }
 }
@@ -237,16 +237,16 @@ impl<'a, T> ModuleMetadataLoader for EagerLoader<'a, T>
 where
     T: ModuleStorage,
 {
-    fn load_module_metadata(
+    fn load_module_for_metadata(
         &self,
         _gas_meter: &mut impl DependencyGasMeter,
         _traversal_context: &mut TraversalContext,
         module_id: &ModuleId,
-    ) -> PartialVMResult<Vec<Metadata>> {
+    ) -> PartialVMResult<Arc<CompiledModule>> {
         // Note:
         //   For backwards compatibility, metadata accesses were never metered.
         self.module_storage
-            .unmetered_get_existing_module_metadata(module_id.address(), module_id.name())
+            .unmetered_get_existing_deserialized_module(module_id.address(), module_id.name())
             .map_err(|err| err.to_partial())
     }
 }

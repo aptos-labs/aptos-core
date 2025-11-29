@@ -9,7 +9,7 @@ use aptos_native_interface::{
     RawSafeNative, SafeNativeBuilder, SafeNativeContext, SafeNativeError, SafeNativeResult,
 };
 use better_any::{Tid, TidAble};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -24,6 +24,21 @@ pub struct RandomnessContext {
     // True if the current transaction's payload was a public(friend) or
     // private entry function, which also has `#[randomness]` annotation.
     unbiasable: bool,
+}
+
+impl SessionListener for RandomnessContext {
+    fn start(&mut self, _session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.txn_local_state = vec![0; 8];
+        self.unbiasable = false;
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
 }
 
 impl RandomnessContext {
@@ -56,7 +71,7 @@ impl RandomnessContext {
 
 pub fn fetch_and_increment_txn_counter(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if context.gas_feature_version() >= RELEASE_V1_23 {
@@ -77,7 +92,7 @@ pub fn fetch_and_increment_txn_counter(
 
 pub fn is_unbiasable(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // Because we need to run a special transaction prologue to pre-charge maximum
@@ -104,4 +119,24 @@ pub fn make_all(
     ];
 
     builder.make_named_natives(natives)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extension_update() {
+        let mut ctx = RandomnessContext::new();
+        ctx.unbiasable = true;
+        ctx.txn_local_state = vec![1; 8];
+        ctx.start(&[0; 32], &[], 0);
+
+        let RandomnessContext {
+            txn_local_state,
+            unbiasable,
+        } = ctx;
+        assert!(!unbiasable);
+        assert_eq!(txn_local_state, vec![0; 8]);
+    }
 }

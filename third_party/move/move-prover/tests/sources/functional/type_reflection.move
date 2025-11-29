@@ -143,6 +143,48 @@ module 0x43::test {
         ensures result.bytes == b"bool";
     }
 
+    fun test_type_name_concrete_i8(): ascii::String {
+        type_name::into_string(type_name::get<i8>())
+    }
+    spec test_type_name_concrete_i8 {
+        ensures result.bytes == b"i8";
+    }
+
+    fun test_type_name_concrete_i16(): ascii::String {
+        type_name::into_string(type_name::get<i16>())
+    }
+    spec test_type_name_concrete_i16 {
+        ensures result.bytes == b"i16";
+    }
+
+    fun test_type_name_concrete_i32(): ascii::String {
+        type_name::into_string(type_name::get<i32>())
+    }
+    spec test_type_name_concrete_i32 {
+        ensures result.bytes == b"i32";
+    }
+
+    fun test_type_name_concrete_i64(): ascii::String {
+        type_name::into_string(type_name::get<i64>())
+    }
+    spec test_type_name_concrete_i64 {
+        ensures result.bytes == b"i64";
+    }
+
+    fun test_type_name_concrete_i128(): ascii::String {
+        type_name::into_string(type_name::get<i128>())
+    }
+    spec test_type_name_concrete_i128 {
+        ensures result.bytes == b"i128";
+    }
+
+    fun test_type_name_concrete_i256(): ascii::String {
+        type_name::into_string(type_name::get<i256>())
+    }
+    spec test_type_name_concrete_i256 {
+        ensures result.bytes == b"i256";
+    }
+
     fun test_type_name_concrete_vector(): ascii::String {
         type_name::into_string(type_name::get<vector<vector<u8>>>())
     }

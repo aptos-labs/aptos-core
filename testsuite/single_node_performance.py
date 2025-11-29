@@ -3,6 +3,7 @@
 # Copyright © Aptos Foundation
 # SPDX-License-Identifier: Apache-2.0
 
+import math
 import re
 import os
 import tempfile
@@ -273,6 +274,10 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("order-book-balanced-matches80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("order-book-balanced-size-skewed80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
     RunGroupConfig(key=RunGroupKey("monotonic-counter-single"), included_in=Flow.CONTINUOUS, waived=True),
+
+    RunGroupConfig(key=RunGroupKey("fibonacci-recursive20"), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(key=RunGroupKey("fibonacci-tail-recursive20"), included_in=Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(key=RunGroupKey("fibonacci-iterative20"), included_in=Flow.CONTINUOUS, waived=True),
 
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_connected_components", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--connected-tx-grps 5000", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
     RunGroupConfig(expected_tps=50000, key=RunGroupKey("coin_transfer_hotspot", executor_type="sharded"), key_extra=RunGroupKeyExtra(sharding_traffic_flags="--hotspot-probability 0.8", transaction_type_override=""), included_in=Flow.REPRESENTATIVE, waived=True),
@@ -895,6 +900,14 @@ with tempfile.TemporaryDirectory() as tmpdirname:
         )
 
         if not HIDE_OUTPUT:
+            def get_tps_delta(r: RunGroupInstance) -> str:
+                tps = r.single_node_result.tps
+                if not math.isclose(r.expected_tps, 0):
+                    delta = (tps - r.expected_tps) / r.expected_tps * 100
+                    return f"{delta:+.2f}%"
+                else:
+                    return "N/A"
+
             print_table(
                 results,
                 by_levels=True,
@@ -902,6 +915,7 @@ with tempfile.TemporaryDirectory() as tmpdirname:
                     ("block_size", lambda r: r.block_size),
                     ("expected t/s", lambda r: r.expected_tps),
                     ("t/s", lambda r: int(round(r.single_node_result.tps))),
+                    ("delta", get_tps_delta),
                 ],
             )
             print_table(

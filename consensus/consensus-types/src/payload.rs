@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, ProofOfStore};
+use crate::proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore};
 use anyhow::ensure;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
@@ -13,7 +13,7 @@ use std::{
 
 pub type OptBatches = BatchPointer<BatchInfo>;
 
-pub type ProofBatches = BatchPointer<ProofOfStore>;
+pub type ProofBatches = BatchPointer<ProofOfStore<BatchInfo>>;
 
 pub trait TDataInfo {
     fn num_txns(&self) -> u64;
@@ -290,7 +290,7 @@ pub struct OptQuorumStorePayloadV1 {
 }
 
 impl OptQuorumStorePayloadV1 {
-    pub fn get_all_batch_infos(self) -> Vec<BatchInfo> {
+    pub fn get_all_batch_infos(self) -> Vec<BatchInfoExt> {
         let Self {
             inline_batches,
             opt_batches,
@@ -303,11 +303,16 @@ impl OptQuorumStorePayloadV1 {
             .map(|batch| batch.batch_info)
             .chain(opt_batches)
             .chain(proofs.into_iter().map(|proof| proof.info().clone()))
+            .map(|info| info.into())
             .collect()
     }
 
     pub fn max_txns_to_execute(&self) -> Option<u64> {
         self.execution_limits.max_txns_to_execute()
+    }
+
+    pub fn block_gas_limit(&self) -> Option<u64> {
+        self.execution_limits.block_gas_limit()
     }
 
     pub fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {
@@ -382,7 +387,7 @@ impl OptQuorumStorePayload {
         &self.inline_batches
     }
 
-    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore> {
+    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore<BatchInfo>> {
         &self.proofs
     }
 

@@ -3,8 +3,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{interpreter::InterpreterDebugInterface, LoadedFunction, RuntimeEnvironment};
-use move_binary_format::file_format::Bytecode;
-use move_vm_types::values::{self, Locals};
+use move_vm_types::{
+    instr::Instruction,
+    values::{self, Locals},
+};
 use std::{
     collections::BTreeSet,
     io::{self, Write},
@@ -145,7 +147,7 @@ impl DebugContext {
         function: &LoadedFunction,
         locals: &Locals,
         pc: u16,
-        instr: &Bytecode,
+        instr: &Instruction,
         runtime_environment: &RuntimeEnvironment,
         interpreter: &dyn InterpreterDebugInterface,
     ) {

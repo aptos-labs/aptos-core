@@ -154,6 +154,9 @@ pub enum FeatureFlag {
     EnableTrustedCode,
     EnableEnumOption,
     VMBinaryFormatV9,
+    EnableFrameworkForOption,
+    SessionContinuation,
+    EnableFunctionReflection,
 }
 
 fn generate_features_blob(writer: &CodeWriter, data: &[u64]) {
@@ -407,6 +410,9 @@ impl From<FeatureFlag> for AptosFeatureFlag {
             FeatureFlag::EnableTrustedCode => AptosFeatureFlag::ENABLE_TRUSTED_CODE,
             FeatureFlag::EnableEnumOption => AptosFeatureFlag::ENABLE_ENUM_OPTION,
             FeatureFlag::VMBinaryFormatV9 => AptosFeatureFlag::VM_BINARY_FORMAT_V9,
+            FeatureFlag::EnableFrameworkForOption => AptosFeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION,
+            FeatureFlag::SessionContinuation => AptosFeatureFlag::SESSION_CONTINUATION,
+            FeatureFlag::EnableFunctionReflection => AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION,
         }
     }
 }
@@ -587,6 +593,9 @@ impl From<AptosFeatureFlag> for FeatureFlag {
             AptosFeatureFlag::ENABLE_TRUSTED_CODE => FeatureFlag::EnableTrustedCode,
             AptosFeatureFlag::ENABLE_ENUM_OPTION => FeatureFlag::EnableEnumOption,
             AptosFeatureFlag::VM_BINARY_FORMAT_V9 => FeatureFlag::VMBinaryFormatV9,
+            AptosFeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION => FeatureFlag::EnableFrameworkForOption,
+            AptosFeatureFlag::SESSION_CONTINUATION => FeatureFlag::SessionContinuation,
+            AptosFeatureFlag::ENABLE_FUNCTION_REFLECTION => FeatureFlag::EnableFunctionReflection,
         }
     }
 }

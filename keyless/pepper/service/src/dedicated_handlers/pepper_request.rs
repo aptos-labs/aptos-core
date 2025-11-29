@@ -8,6 +8,7 @@ use crate::{
     error::PepperServiceError,
     external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
     metrics,
+    vuf_keypair::VUFKeypair,
 };
 use aptos_keyless_pepper_common::{
     jwt::Claims,
@@ -28,7 +29,6 @@ use aptos_types::{
 };
 use jsonwebtoken::{Algorithm::RS256, DecodingKey, TokenData, Validation};
 use std::{
-    ops::Deref,
     sync::Arc,
     time::{Instant, SystemTime, UNIX_EPOCH},
 };
@@ -47,7 +47,7 @@ const EMAIL_UID_KEY: &str = "email";
 
 /// Handles the given pepper request, returning the pepper base, pepper and account address
 pub async fn handle_pepper_request(
-    vuf_private_key: Arc<ark_bls12_381::Fr>,
+    vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
     cached_resources: CachedResources,
     jwt: String,
@@ -104,7 +104,7 @@ pub async fn handle_pepper_request(
 
         // Derive the pepper and account address
         let derivation_result =
-            derive_pepper_and_account_address(vuf_private_key, derivation_path, &pepper_input);
+            derive_pepper_and_account_address(vuf_keypair, derivation_path, &pepper_input);
 
         // Update the derivation metrics
         metrics::update_pepper_derivation_metrics(derivation_result.is_ok(), derivation_start_time);
@@ -142,7 +142,7 @@ fn create_account_address(
 
 /// Creates the pepper base using the VUF private key and the pepper input
 fn create_pepper_base(
-    vuf_private_key: Arc<ark_bls12_381::Fr>,
+    vuf_keypair: Arc<VUFKeypair>,
     pepper_input: &PepperInput,
 ) -> Result<Vec<u8>, PepperServiceError> {
     // Serialize the pepper input using BCS
@@ -155,14 +155,13 @@ fn create_pepper_base(
 
     // Generate the pepper base and proof using the VUF
     let (pepper_base, vuf_proof) =
-        vuf::bls12381_g1_bls::Bls12381G1Bls::eval(vuf_private_key.deref(), &input_bytes).map_err(
-            |error| {
+        vuf::bls12381_g1_bls::Bls12381G1Bls::eval(vuf_keypair.vuf_private_key(), &input_bytes)
+            .map_err(|error| {
                 PepperServiceError::InternalError(format!(
                     "Failed to evaluate bls12381_g1_bls VUF: {}",
                     error
                 ))
-            },
-        )?;
+            })?;
 
     // Verify that the proof is empty
     if !vuf_proof.is_empty() {
@@ -170,6 +169,18 @@ fn create_pepper_base(
             "The VUF proof is not empty! This shouldn't happen.".to_string(),
         ));
     }
+
+    // Verify the pepper base output (this ensures we only ever return valid outputs,
+    // and protects against various security issues, e.g., fault based side channels).
+    vuf::bls12381_g1_bls::Bls12381G1Bls::verify(
+        vuf_keypair.vuf_public_key(),
+        &input_bytes,
+        &pepper_base,
+        &vuf_proof,
+    )
+    .map_err(|error| {
+        PepperServiceError::InternalError(format!("VUF verification failed: {}", error))
+    })?;
 
     Ok(pepper_base)
 }
@@ -243,13 +254,13 @@ fn derive_pepper(
 }
 
 /// Derives the pepper base, pepper bytes and account address
-fn derive_pepper_and_account_address(
-    vuf_private_key: Arc<ark_bls12_381::Fr>,
+pub fn derive_pepper_and_account_address(
+    vuf_keypair: Arc<VUFKeypair>,
     derivation_path: Option<String>,
     pepper_input: &PepperInput,
 ) -> Result<(Vec<u8>, Vec<u8>, AccountAddress), PepperServiceError> {
     // Create the pepper base using the vuf private key and the pepper input
-    let pepper_base = create_pepper_base(vuf_private_key, pepper_input)?;
+    let pepper_base = create_pepper_base(vuf_keypair, pepper_input)?;
 
     // Derive the pepper using the verified derivation path and the pepper base
     let verified_derivation_path = get_verified_derivation_path(derivation_path)?;
@@ -452,8 +463,6 @@ fn verify_public_key_expiry_date_secs(
 mod tests {
     use super::*;
     use crate::{accounts::account_managers::AccountRecoveryManager, tests::utils};
-    use aptos_keyless_pepper_common::vuf::slip_10::ed25519_dalek::Digest;
-    use ark_ff::PrimeField;
 
     // Test token data constants
     const TEST_TOKEN_ISSUER: &str = "token_issuer";
@@ -491,6 +500,45 @@ mod tests {
     const TEST_SUB_OVERRIDE_DERIVED_PEPPER_HEX: &str =
         "21a8d5768336a41a5872351c806d56cca994b0acbe7f054afeed22bee06ef2";
     const TEST_SUB_OVERRIDE_PEPPER_BASE_HEX: &str = "b14111748bc9bde79f0a7edea91b06432800107c448dbe9cc89b47a49ec5094e2fe8976790f6574c7eb9abdc7c5b1df5";
+
+    #[test]
+    fn test_create_pepper_base() {
+        // Create a test pepper input
+        let pepper_input = PepperInput {
+            iss: TEST_TOKEN_ISSUER.into(),
+            uid_key: SUB_UID_KEY.into(),
+            uid_val: TEST_TOKEN_SUB.into(),
+            aud: TEST_TOKEN_AUD.into(),
+        };
+
+        // Create a test VUF keypair
+        let vuf_keypair = utils::create_vuf_keypair(Some(TEST_SUB_VUF_PRIVATE_KEY_SEED));
+
+        // Create the pepper base
+        let pepper_base = create_pepper_base(vuf_keypair.clone(), &pepper_input).unwrap();
+
+        // Verify the pepper base matches the expected value
+        assert_eq!(
+            hex::encode(pepper_base),
+            TEST_SUB_PEPPER_BASE_HEX.to_string()
+        );
+
+        // Create an invalid keypair where the public and private keys do not match
+        let invalid_private_key = *utils::create_vuf_keypair(None).vuf_private_key();
+        let invalid_vuf_keypair = VUFKeypair::new(
+            invalid_private_key,
+            *vuf_keypair.vuf_public_key(),
+            vuf_keypair.vuf_public_key_json().clone(),
+        );
+
+        // Create the pepper base using the invalid keypair. This should fail with
+        // a verification error, because the public and private keys don't match.
+        let pepper_service_error =
+            create_pepper_base(Arc::new(invalid_vuf_keypair), &pepper_input).unwrap_err();
+        assert!(pepper_service_error
+            .to_string()
+            .contains("VUF verification failed"));
+    }
 
     #[test]
     fn test_get_uid_key_and_value() {
@@ -547,12 +595,12 @@ mod tests {
         .await
         .unwrap();
 
-        // Get the VUF private key
-        let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
+        // Get the VUF keypair
+        let vuf_keypair = utils::create_vuf_keypair(Some(TEST_SUB_VUF_PRIVATE_KEY_SEED));
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            vuf_private_key,
+            vuf_keypair,
             &pepper_input,
             TEST_SUB_PEPPER_BASE_HEX,
             TEST_SUB_DERIVED_PEPPER_HEX,
@@ -583,12 +631,12 @@ mod tests {
         .await
         .unwrap();
 
-        // Get the VUF private key
-        let vuf_private_key = get_test_vuf_private_key(TEST_EMAIL_VUF_PRIVATE_KEY_SEED);
+        // Get the VUF keypair
+        let vuf_keypair = utils::create_vuf_keypair(Some(TEST_EMAIL_VUF_PRIVATE_KEY_SEED));
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            vuf_private_key,
+            vuf_keypair,
             &pepper_input,
             TEST_EMAIL_PEPPER_BASE_HEX,
             TEST_EMAIL_DERIVED_PEPPER_HEX,
@@ -618,12 +666,12 @@ mod tests {
         .await
         .unwrap();
 
-        // Get the VUF private key
-        let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
+        // Get the VUF keypair
+        let vuf_keypair = utils::create_vuf_keypair(Some(TEST_SUB_VUF_PRIVATE_KEY_SEED));
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            vuf_private_key,
+            vuf_keypair,
             &pepper_input,
             TEST_SUB_PEPPER_BASE_HEX,
             TEST_SUB_DERIVED_PEPPER_HEX,
@@ -658,12 +706,12 @@ mod tests {
         .await
         .unwrap();
 
-        // Get the VUF private key
-        let vuf_private_key = get_test_vuf_private_key(TEST_SUB_VUF_PRIVATE_KEY_SEED);
+        // Get the VUF keypair
+        let vuf_keypair = utils::create_vuf_keypair(Some(TEST_SUB_VUF_PRIVATE_KEY_SEED));
 
         // Verify the pepper base, derived pepper and account address
         verify_base_pepper_and_address_generation(
-            vuf_private_key,
+            vuf_keypair,
             &pepper_input,
             TEST_SUB_OVERRIDE_PEPPER_BASE_HEX,
             TEST_SUB_OVERRIDE_DERIVED_PEPPER_HEX,
@@ -688,19 +736,9 @@ mod tests {
         }
     }
 
-    /// Returns the test VUF private key from the given seed
-    fn get_test_vuf_private_key(seed: [u8; 32]) -> Arc<ark_bls12_381::Fr> {
-        // Derive the VUF private key from the seed
-        let mut sha3_hasher = sha3::Sha3_512::new();
-        sha3_hasher.update(seed);
-        let vuf_private_key =
-            ark_bls12_381::Fr::from_be_bytes_mod_order(sha3_hasher.finalize().as_slice());
-        Arc::new(vuf_private_key)
-    }
-
     /// Verifies the generated pepper base, derived pepper and account address against the expected values
     fn verify_base_pepper_and_address_generation(
-        vuf_private_key: Arc<ark_bls12_381::Fr>,
+        vuf_keypair: Arc<VUFKeypair>,
         pepper_input: &PepperInput,
         expected_pepper_base_hex: &str,
         expected_derived_pepper_hex: &str,
@@ -708,7 +746,7 @@ mod tests {
     ) {
         // Derive the pepper base, pepper and account address
         let (pepper_base, derived_pepper_bytes, address) =
-            derive_pepper_and_account_address(vuf_private_key, None, pepper_input).unwrap();
+            derive_pepper_and_account_address(vuf_keypair, None, pepper_input).unwrap();
 
         // Verify the pepper base, derived pepper and account address
         assert_eq!(hex::encode(pepper_base), expected_pepper_base_hex);

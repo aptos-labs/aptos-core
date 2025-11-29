@@ -56,20 +56,26 @@ fn is_supported_number_of_bits(num_bits: usize) -> bool {
 }
 
 /// The Bulletproofs library only supports batch sizes of 1, 2, 4, 8, or 16.
+/// The restriction to powers of two is unfortunate, but remains true. (One can deal with it in
+/// in applications by having the verifier append Pedersen commitment(s) to zero.)
+/// TODO: This is not true (at least not anymore). Consider relaxing.
 fn is_supported_batch_size(batch_size: usize) -> bool {
     matches!(batch_size, 1 | 2 | 4 | 8 | 16)
 }
 
 /// Public parameters of the Bulletproof range proof system, for both individual and batch proving
+/// The `party_capacity` argument is the max batch size.
+/// TODO: As explained above `is_supported_batch_size`, consider relaxing this. (Ensure it remains
+///  backwards-compatible)
 static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
     Lazy::new(|| BulletproofGens::new(MAX_RANGE_BITS, 16));
 
 fn native_verify_range_proof(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let dst = safely_pop_arg!(args, Vec<u8>);
@@ -106,10 +112,10 @@ fn native_verify_range_proof(
 
 fn native_verify_batch_range_proof(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let dst = safely_pop_arg!(args, Vec<u8>);
@@ -156,10 +162,10 @@ fn native_verify_batch_range_proof(
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_prove_range(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let rand_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;
@@ -222,10 +228,10 @@ fn native_test_only_prove_range(
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_batch_prove_range(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    debug_assert!(_ty_args.is_empty());
+    debug_assert!(ty_args.is_empty());
     debug_assert!(args.len() == 6);
 
     let rand_base_handle = get_point_handle(&safely_pop_arg!(args, StructRef))?;

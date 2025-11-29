@@ -28,7 +28,7 @@ use ark_serialize::CanonicalDeserialize;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{language_storage::TypeTag, vm_status::StatusCode};
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use once_cell::sync::Lazy;
 use std::{any::Any, hash::Hash, rc::Rc};
 
@@ -188,6 +188,21 @@ const E_TOO_MUCH_MEMORY_USED: u64 = 0x09_0003;
 pub struct AlgebraContext {
     bytes_used: usize,
     objs: Vec<Rc<dyn Any>>,
+}
+
+impl SessionListener for AlgebraContext {
+    fn start(&mut self, _session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {
+        self.bytes_used = 0;
+        self.objs.clear();
+    }
+
+    fn finish(&mut self) {
+        // No state changes to save.
+    }
+
+    fn abort(&mut self) {
+        // No state changes to abort. Context will be reset on new session's start.
+    }
 }
 
 impl AlgebraContext {
@@ -357,4 +372,21 @@ pub fn make_all(
     )]);
 
     builder.make_named_natives(natives)
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_extension_update() {
+        let mut ctx = AlgebraContext::new();
+        ctx.bytes_used = 20;
+        ctx.objs.push(Rc::new("something".to_string()));
+        ctx.start(&[0; 32], &[], 0);
+
+        let AlgebraContext { bytes_used, objs } = ctx;
+        assert_eq!(bytes_used, 0);
+        assert!(objs.is_empty());
+    }
 }

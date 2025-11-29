@@ -16,7 +16,7 @@ use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, ProofWithData},
     payload::{BatchPointer, TDataInfo},
-    proof_of_store::BatchInfo,
+    proof_of_store::{BatchInfo, BatchInfoExt},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
@@ -28,7 +28,7 @@ use itertools::Itertools;
 use std::{collections::HashMap, future::Future, ops::Deref, pin::Pin, sync::Arc};
 
 pub trait TQuorumStoreCommitNotifier: Send + Sync {
-    fn notify(&self, block_timestamp: u64, batches: Vec<BatchInfo>);
+    fn notify(&self, block_timestamp: u64, batches: Vec<BatchInfoExt>);
 }
 
 pub struct QuorumStoreCommitNotifier {
@@ -42,7 +42,7 @@ impl QuorumStoreCommitNotifier {
 }
 
 impl TQuorumStoreCommitNotifier for QuorumStoreCommitNotifier {
-    fn notify(&self, block_timestamp: u64, batches: Vec<BatchInfo>) {
+    fn notify(&self, block_timestamp: u64, batches: Vec<BatchInfoExt>) {
         let mut tx = self.coordinator_tx.clone();
 
         if let Err(e) = tx.try_send(CoordinatorCommand::CommitNotification(
@@ -178,24 +178,24 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 Payload::InQuorumStore(proof_with_status) => proof_with_status
                     .proofs
                     .iter()
-                    .map(|proof| proof.info().clone())
+                    .map(|proof| proof.info().clone().into())
                     .collect::<Vec<_>>(),
                 Payload::InQuorumStoreWithLimit(proof_with_status) => proof_with_status
                     .proof_with_data
                     .proofs
                     .iter()
-                    .map(|proof| proof.info().clone())
+                    .map(|proof| proof.info().clone().into())
                     .collect::<Vec<_>>(),
                 Payload::QuorumStoreInlineHybrid(inline_batches, proof_with_data, _)
                 | Payload::QuorumStoreInlineHybridV2(inline_batches, proof_with_data, _) => {
                     inline_batches
                         .iter()
-                        .map(|(batch_info, _)| batch_info.clone())
+                        .map(|(batch_info, _)| batch_info.clone().into())
                         .chain(
                             proof_with_data
                                 .proofs
                                 .iter()
-                                .map(|proof| proof.info().clone()),
+                                .map(|proof| proof.info().clone().into()),
                         )
                         .collect::<Vec<_>>()
                 },
@@ -499,6 +499,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                     all_txns,
                     opt_qs_payload.proof_with_data().deref().clone(),
                     opt_qs_payload.max_txns_to_execute(),
+                    opt_qs_payload.block_gas_limit(),
                     [
                         opt_qs_payload.opt_batches().deref().clone(),
                         opt_qs_payload.inline_batches().batch_infos(),

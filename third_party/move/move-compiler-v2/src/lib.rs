@@ -58,7 +58,6 @@ use log::{debug, info, log_enabled, Level};
 use move_binary_format::errors::VMError;
 use move_bytecode_source_map::source_map::SourceMap;
 use move_core_types::vm_status::StatusType;
-use move_disassembler::disassembler::Disassembler;
 use move_model::{
     metadata::LanguageVersion,
     model::{GlobalEnv, Loc, MoveIrLoc},
@@ -472,9 +471,15 @@ pub fn env_optimization_pipeline<'a, 'b>(options: &'a Options) -> EnvProcessorPi
     // those simplifications can take advantage of the inlining.
     let do_inlining_optimization = options.experiment_on(Experiment::INLINING_OPTIMIZATION);
     if do_inlining_optimization {
+        // This allows inlining a call that comes from a different package
         let across_package = options.experiment_on(Experiment::ACROSS_PACKAGE_INLINING);
+        // This allows performing an inlining optimization to a function that does not belong to the primary target package
+        let allow_non_primary_targets =
+            options.experiment_on(Experiment::INLINING_OPTIMIZATION_TO_NON_PRIMARY_TARGETS);
         env_pipeline.add("inlining optimization", {
-            move |env: &mut GlobalEnv| inlining_optimization::optimize(env, across_package)
+            move |env: &mut GlobalEnv| {
+                inlining_optimization::optimize(env, across_package, allow_non_primary_targets)
+            }
         });
     }
     if options.experiment_on(Experiment::AST_SIMPLIFY_FULL) {
@@ -619,7 +624,14 @@ pub fn stackless_bytecode_optimization_pipeline(options: &Options) -> FunctionTa
 pub fn disassemble_compiled_units(units: &[CompiledUnit]) -> anyhow::Result<String> {
     let disassembled_units: anyhow::Result<Vec<_>> = units
         .iter()
-        .map(|unit| Disassembler::from_unit(unit).disassemble())
+        .map(|unit| match unit {
+            CompiledUnit::Module(module) => {
+                move_asm::disassembler::disassemble_module(String::new(), &module.module, false)
+            },
+            CompiledUnit::Script(script) => {
+                move_asm::disassembler::disassemble_script(String::new(), &script.script)
+            },
+        })
         .collect();
     Ok(disassembled_units?.concat())
 }

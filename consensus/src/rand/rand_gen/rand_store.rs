@@ -349,7 +349,7 @@ mod tests {
     use aptos_consensus_types::common::Author;
     use aptos_crypto::{bls12381, HashValue, Uniform};
     use aptos_dkg::{
-        pvss::{traits::Transcript, Player, WeightedConfig},
+        pvss::{traits::Transcript, Player, WeightedConfigBlstrs},
         weighted_vuf::traits::WeightedVUF,
     };
     use aptos_types::{
@@ -421,6 +421,7 @@ mod tests {
                 &input_secret,
                 0,
                 &private_keys[0],
+                &public_keys[0],
             );
             let (sk, pk) = DefaultDKG::decrypt_secret_share_from_transcript(
                 &dkg_pub_params,
@@ -444,7 +445,7 @@ mod tests {
             let rand_keys = RandKeys::new(ask, apk, pk_shares, num_validators);
             let weights: Vec<usize> = weights.into_iter().map(|x| x as usize).collect();
             let half_total_weights = weights.clone().into_iter().sum::<usize>() / 2;
-            let weighted_config = WeightedConfig::new(half_total_weights, weights).unwrap();
+            let weighted_config = WeightedConfigBlstrs::new(half_total_weights, weights).unwrap();
             let rand_config = RandConfig::new(
                 authors[my_index],
                 target_epoch,

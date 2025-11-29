@@ -32,6 +32,7 @@ use move_vm_types::loaded_data::{
 };
 use move_vm_types::{
     loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap},
+    module_id_interner::InternedModuleIdPool,
     ty_interner::InternedTypePool,
 };
 use std::sync::Arc;
@@ -67,6 +68,9 @@ pub struct RuntimeEnvironment {
 
     /// Pool of interned type representations. Same lifetime as struct index map.
     interned_ty_pool: Arc<InternedTypePool>,
+
+    /// Pool of interned module ids.
+    interned_module_id_pool: Arc<InternedModuleIdPool>,
 }
 
 impl RuntimeEnvironment {
@@ -75,18 +79,20 @@ impl RuntimeEnvironment {
     pub fn new(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
     ) -> Self {
-        Self::new_for_move_third_party_tests(natives, true)
+        Self::new_for_move_third_party_tests(natives, true, true)
     }
 
     /// API to control the enum option feature flag depending on whether the caller is from aptos or not
     pub fn new_for_move_third_party_tests(
         natives: impl IntoIterator<Item = (AccountAddress, Identifier, Identifier, NativeFunction)>,
         enable_enum_option: bool,
+        enable_framework_for_option: bool,
     ) -> Self {
         let vm_config = VMConfig {
             // Keep the paranoid mode on as we most likely want this for tests.
             paranoid_type_checks: true,
             enable_enum_option,
+            enable_framework_for_option,
             ..VMConfig::default()
         };
         Self::new_with_config(natives, vm_config)
@@ -106,6 +112,7 @@ impl RuntimeEnvironment {
             struct_name_index_map: Arc::new(StructNameIndexMap::empty()),
             ty_tag_cache: Arc::new(TypeTagCache::empty()),
             interned_ty_pool: Arc::new(InternedTypePool::new()),
+            interned_module_id_pool: Arc::new(InternedModuleIdPool::new()),
         }
     }
 
@@ -117,6 +124,10 @@ impl RuntimeEnvironment {
     /// Returns the type pool for interning that is currently used by this runtime environment.
     pub fn ty_pool(&self) -> &InternedTypePool {
         &self.interned_ty_pool
+    }
+
+    pub fn module_id_pool(&self) -> &InternedModuleIdPool {
+        &self.interned_module_id_pool
     }
 
     /// Enables delayed field optimization for this environment.
@@ -156,6 +167,7 @@ impl RuntimeEnvironment {
             locally_verified_script.0,
             self.struct_name_index_map(),
             self.ty_pool(),
+            self.module_id_pool(),
         )
         .map_err(|err| err.finish(Location::Script))
     }
@@ -208,6 +220,7 @@ impl RuntimeEnvironment {
             locally_verified_module.0,
             self.struct_name_index_map(),
             self.ty_pool(),
+            self.module_id_pool(),
         );
 
         // Note: loader V1 implementation does not set locations for this error.
@@ -226,6 +239,7 @@ impl RuntimeEnvironment {
             locally_verified_module.0,
             self.struct_name_index_map(),
             self.ty_pool(),
+            self.module_id_pool(),
         )
         .map_err(|err| err.finish(Location::Undefined))
     }
@@ -290,7 +304,7 @@ impl RuntimeEnvironment {
 
     /// Returns the re-indexing map currently used by this runtime environment to remap struct
     /// identifiers into indices.
-    pub(crate) fn struct_name_index_map(&self) -> &StructNameIndexMap {
+    pub fn struct_name_index_map(&self) -> &StructNameIndexMap {
         &self.struct_name_index_map
     }
 
@@ -315,7 +329,8 @@ impl RuntimeEnvironment {
         Ok(match ty {
             Struct { idx, .. } | StructInstantiation { idx, .. } => {
                 let struct_identifier = self.struct_name_index_map().idx_to_struct_name(*idx)?;
-                Some((struct_identifier.module, struct_identifier.name))
+                let (module, name) = struct_identifier.into_module_and_name();
+                Some((module, name))
             },
             Bool
             | U8
@@ -352,6 +367,7 @@ impl RuntimeEnvironment {
         self.ty_tag_cache.flush();
         self.struct_name_index_map.flush();
         self.interned_ty_pool.flush();
+        self.interned_module_id_pool.flush();
     }
 
     /// Flushes the global verified module cache. Should be used when verifier configuration has
@@ -398,7 +414,8 @@ impl RuntimeEnvironment {
         name: &IdentStr,
     ) -> Option<Bytes> {
         let enable_enum_option = self.vm_config().enable_enum_option;
-        if enable_enum_option {
+        let enable_framework_for_option = self.vm_config().enable_framework_for_option;
+        if !enable_framework_for_option && enable_enum_option {
             if addr == OPTION_MODULE_ID.address() && *name == *OPTION_MODULE_ID.name() {
                 return Some(self.get_option_module_bytes());
             }
@@ -418,6 +435,7 @@ impl Clone for RuntimeEnvironment {
             struct_name_index_map: Arc::clone(&self.struct_name_index_map),
             ty_tag_cache: Arc::clone(&self.ty_tag_cache),
             interned_ty_pool: Arc::clone(&self.interned_ty_pool),
+            interned_module_id_pool: Arc::clone(&self.interned_module_id_pool),
         }
     }
 }

@@ -32,6 +32,7 @@ use move_vm_types::{
         runtime_types::{StructIdentifier, StructLayout, StructType, Type},
         struct_name_indexing::{StructNameIndex, StructNameIndexMap},
     },
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
     ty_interner::{InternedTypePool, TypeVecId},
 };
 use std::{
@@ -48,6 +49,8 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct Module {
     id: ModuleId,
+
+    pub(crate) interned_id: InternedModuleId,
 
     // size in bytes
     #[allow(dead_code)]
@@ -157,10 +160,13 @@ impl Module {
         module: Arc<CompiledModule>,
         struct_name_index_map: &StructNameIndexMap,
         ty_pool: &InternedTypePool,
+        module_id_pool: &InternedModuleIdPool,
     ) -> PartialVMResult<Self> {
         let _timer = VM_TIMER.timer_with_label("Module::new");
 
         let id = module.self_id();
+        let interned_id = module_id_pool.intern_by_ref(&id);
+
         let friends = module
             .immediate_friends_iter()
             .map(|(addr, name)| ModuleId::new(*addr, name.to_owned()))
@@ -190,11 +196,8 @@ impl Module {
             let struct_name = module.identifier_at(struct_handle.name);
             let module_handle = module.module_handle_at(struct_handle.module);
             let module_id = module.module_id_for_handle(module_handle);
-
-            let struct_name = StructIdentifier {
-                module: module_id,
-                name: struct_name.to_owned(),
-            };
+            let struct_name =
+                StructIdentifier::new(module_id_pool, module_id, struct_name.to_owned());
             struct_idxs.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
             struct_names.push(struct_name)
         }
@@ -378,6 +381,7 @@ impl Module {
 
         Ok(Self {
             id,
+            interned_id,
             size,
             module,
             structs,
@@ -401,7 +405,7 @@ impl Module {
     /// Creates a new Module instance for testing purposes.
     /// This method creates a minimal Module with empty contents.
     #[cfg(any(test, feature = "testing"))]
-    pub fn new_for_test(module_id: ModuleId) -> Self {
+    pub fn new_for_test(module_id_pool: &InternedModuleIdPool, module_id: ModuleId) -> Self {
         use move_binary_format::file_format::empty_module;
 
         // Start with an empty module
@@ -415,7 +419,8 @@ impl Module {
         let module_arc = Arc::new(empty_module);
 
         Self {
-            id: module_id,
+            id: module_id.clone(),
+            interned_id: module_id_pool.intern(module_id),
             size: 0,
             module: module_arc,
             structs: vec![],

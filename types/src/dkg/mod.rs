@@ -177,6 +177,7 @@ pub trait MayHaveRoundingSummary {
 /// NOTE: this is a subset of the full scheme. Some data items/algorithms are not used in DKG and are omitted.
 pub trait DKGTrait: Debug {
     type DealerPrivateKey;
+    type DealerPublicKey; // This is the public key associated with `DealerPrivateKey`
     type PublicParams: Clone + Debug + Send + Sync + MayHaveRoundingSummary;
     type Transcript: Clone + Send + Sync + Serialize + for<'a> Deserialize<'a>;
     type InputSecret: Uniform;
@@ -197,6 +198,7 @@ pub trait DKGTrait: Debug {
         input_secret: &Self::InputSecret,
         my_index: u64,
         sk: &Self::DealerPrivateKey,
+        pk: &Self::DealerPublicKey,
     ) -> Self::Transcript;
 
     /// NOTE: used in VM.

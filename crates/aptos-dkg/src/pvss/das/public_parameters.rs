@@ -4,10 +4,13 @@
 //! This submodule implements the *public parameters* for this PVSS scheme.
 
 use crate::{
-    constants::G2_PROJ_NUM_BYTES,
     pvss::{encryption_elgamal, traits},
+    traits::transcript::WithMaxNumShares,
 };
-use aptos_crypto::{CryptoMaterialError, ValidCryptoMaterial, ValidCryptoMaterialStringExt};
+use aptos_crypto::{
+    blstrs::G2_PROJ_NUM_BYTES, CryptoMaterialError, ValidCryptoMaterial,
+    ValidCryptoMaterialStringExt,
+};
 use aptos_crypto_derive::{DeserializeKey, SerializeKey};
 use blstrs::{G1Projective, G2Projective};
 use pairing::group::Group;
@@ -87,6 +90,17 @@ impl ValidCryptoMaterial for PublicParameters {
 
     fn to_bytes(&self) -> Vec<u8> {
         self.to_bytes()
+    }
+}
+
+impl WithMaxNumShares for PublicParameters {
+    fn with_max_num_shares(_n: usize) -> Self {
+        Self::default()
+    }
+
+    // Setup is fast enough
+    fn with_max_num_shares_for_generate(_n: usize) -> Self {
+        Self::default()
     }
 }
 

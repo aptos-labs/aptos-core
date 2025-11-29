@@ -12,13 +12,17 @@ use move_binary_format::{
     errors::PartialVMResult,
     file_format::{CompiledScript, FunctionDefinitionIndex, SignatureIndex, Visibility},
 };
-use move_core_types::{ident_str, language_storage::ModuleId};
+use move_core_types::{
+    ident_str,
+    language_storage::{pseudo_script_module_id, ModuleId},
+};
 use move_vm_types::{
     loaded_data::{
         runtime_access_specifier::AccessSpecifier,
         runtime_types::{StructIdentifier, Type},
         struct_name_indexing::StructNameIndexMap,
     },
+    module_id_interner::{InternedModuleId, InternedModuleIdPool},
     ty_interner::{InternedTypePool, TypeVecId},
 };
 use std::{collections::BTreeMap, ops::Deref, sync::Arc};
@@ -29,6 +33,8 @@ use std::{collections::BTreeMap, ops::Deref, sync::Arc};
 // (rather than "compiled") to make available data needed for execution.
 #[derive(Clone, Debug)]
 pub struct Script {
+    pub(crate) interned_id: InternedModuleId,
+
     // primitive pools
     pub(crate) script: Arc<CompiledScript>,
 
@@ -49,16 +55,17 @@ impl Script {
         script: Arc<CompiledScript>,
         struct_name_index_map: &StructNameIndexMap,
         ty_pool: &InternedTypePool,
+        module_id_pool: &InternedModuleIdPool,
     ) -> PartialVMResult<Self> {
+        let interned_id = module_id_pool.intern_by_ref(pseudo_script_module_id());
+
         let mut struct_names = vec![];
         for struct_handle in script.struct_handles() {
             let struct_name = script.identifier_at(struct_handle.name);
             let module_handle = script.module_handle_at(struct_handle.module);
             let module_id = script.module_id_for_handle(module_handle);
-            let struct_name = StructIdentifier {
-                module: module_id,
-                name: struct_name.to_owned(),
-            };
+            let struct_name =
+                StructIdentifier::new(module_id_pool, module_id, struct_name.to_owned());
             struct_names.push(struct_name_index_map.struct_name_to_idx(&struct_name)?);
         }
 
@@ -96,7 +103,7 @@ impl Script {
             });
         }
 
-        let code = script.code.code.clone();
+        let code = script.code.code.iter().map(|b| b.clone().into()).collect();
         let parameters = script.signature_at(script.parameters).clone();
 
         let param_tys = parameters
@@ -119,6 +126,7 @@ impl Script {
             ty_param_abilities,
             native: None,
             is_native: false,
+            is_dispatchable_native: false,
             visibility: Visibility::Private,
             is_entry: false,
             // TODO: main does not have a name. Revisit.
@@ -136,6 +144,7 @@ impl Script {
         let single_signature_token_map = load_single_signatures_for_script(&script, &struct_names)?;
 
         Ok(Self {
+            interned_id,
             script,
             function_refs,
             function_instantiations,

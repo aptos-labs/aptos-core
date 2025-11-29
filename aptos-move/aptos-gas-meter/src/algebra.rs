@@ -107,29 +107,6 @@ where
     }
 }
 
-impl<T> StandardGasAlgebra<'_, T>
-where
-    T: BlockSynchronizationKillSwitch,
-{
-    #[inline(always)]
-    fn charge(&mut self, amount: InternalGas) -> (InternalGas, PartialVMResult<()>) {
-        match self.balance.checked_sub(amount) {
-            Some(new_balance) => {
-                self.balance = new_balance;
-                (amount, Ok(()))
-            },
-            None => {
-                let old_balance = self.balance;
-                self.balance = 0.into();
-                (
-                    old_balance,
-                    Err(PartialVMError::new(StatusCode::OUT_OF_GAS)),
-                )
-            },
-        }
-    }
-}
-
 impl<T> GasAlgebra for StandardGasAlgebra<'_, T>
 where
     T: BlockSynchronizationKillSwitch,
@@ -140,6 +117,10 @@ where
 
     fn vm_gas_params(&self) -> &VMGasParameters {
         &self.vm_gas_params
+    }
+
+    fn storage_gas_params(&self) -> &StorageGasParameters {
+        &self.storage_gas_params
     }
 
     fn io_pricing(&self) -> &IoPricing {
@@ -205,15 +186,21 @@ where
 
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
 
-        let (actual, res) = self.charge(amount);
-        if self.feature_version >= 12 {
-            self.execution_gas_used += actual;
-        }
-        res?;
+        match self.balance.checked_sub(amount) {
+            Some(new_balance) => {
+                self.balance = new_balance;
+                self.execution_gas_used += amount;
+            },
+            None => {
+                let old_balance = self.balance;
+                self.balance = 0.into();
+                if self.feature_version >= 12 {
+                    self.execution_gas_used += old_balance;
+                }
+                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
+            },
+        };
 
-        if self.feature_version < 12 {
-            self.execution_gas_used += amount;
-        }
         if self.feature_version >= 7 && self.execution_gas_used > self.max_execution_gas {
             Err(PartialVMError::new(StatusCode::EXECUTION_LIMIT_REACHED))
         } else {
@@ -227,15 +214,21 @@ where
     ) -> PartialVMResult<()> {
         let amount = abstract_amount.evaluate(self.feature_version, &self.vm_gas_params);
 
-        let (actual, res) = self.charge(amount);
-        if self.feature_version >= 12 {
-            self.io_gas_used += actual;
-        }
-        res?;
+        match self.balance.checked_sub(amount) {
+            Some(new_balance) => {
+                self.balance = new_balance;
+                self.io_gas_used += amount;
+            },
+            None => {
+                let old_balance = self.balance;
+                self.balance = 0.into();
+                if self.feature_version >= 12 {
+                    self.io_gas_used += old_balance;
+                }
+                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
+            },
+        };
 
-        if self.feature_version < 12 {
-            self.io_gas_used += amount;
-        }
         if self.feature_version >= 7 && self.io_gas_used > self.max_io_gas {
             Err(PartialVMError::new(StatusCode::IO_LIMIT_REACHED))
         } else {
@@ -280,17 +273,23 @@ where
             },
         );
 
-        let (actual, res) = self.charge(gas_consumed_internal);
-        if self.feature_version >= 12 {
-            self.storage_fee_in_internal_units += actual;
-            self.storage_fee_used += amount;
-        }
-        res?;
+        match self.balance.checked_sub(gas_consumed_internal) {
+            Some(new_balance) => {
+                self.balance = new_balance;
+                self.storage_fee_in_internal_units += gas_consumed_internal;
+                self.storage_fee_used += amount;
+            },
+            None => {
+                let old_balance = self.balance;
+                self.balance = 0.into();
+                if self.feature_version >= 12 {
+                    self.storage_fee_in_internal_units += old_balance;
+                    self.storage_fee_used += amount;
+                }
+                return Err(PartialVMError::new(StatusCode::OUT_OF_GAS));
+            },
+        };
 
-        if self.feature_version < 12 {
-            self.storage_fee_in_internal_units += gas_consumed_internal;
-            self.storage_fee_used += amount;
-        }
         if self.feature_version >= 7 && self.storage_fee_used > self.max_storage_fee {
             return Err(PartialVMError::new(StatusCode::STORAGE_LIMIT_REACHED));
         }

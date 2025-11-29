@@ -24,6 +24,13 @@ use once_cell::sync::OnceCell;
 
 static PARANOID_TYPE_CHECKS: OnceCell<bool> = OnceCell::new();
 static PARANOID_REF_CHECKS: OnceCell<bool> = OnceCell::new();
+
+/// Controls when additional checks (such as paranoid type checks) are performed. If set to true,
+/// the trace may be collected during execution and Block-STM may perform the checks during post
+/// commit processing once (instead of for every speculative execution). Note that there are other
+/// factors that influence if checks are done async, such as block size, available workers, etc. If
+/// not set - always performs the checks in-place at runtime.
+static ASYNC_RUNTIME_CHECKS: OnceCell<bool> = OnceCell::new();
 static TIMED_FEATURE_OVERRIDE: OnceCell<TimedFeatureOverride> = OnceCell::new();
 
 /// If enabled, types layouts are cached in a global long-living cache. Caches ensure the behavior
@@ -38,6 +45,16 @@ pub fn set_paranoid_type_checks(enable: bool) {
 /// Returns the paranoid type check flag if already set, and true otherwise.
 pub fn get_paranoid_type_checks() -> bool {
     PARANOID_TYPE_CHECKS.get().cloned().unwrap_or(true)
+}
+
+/// Sets the async check flag.
+pub fn set_async_runtime_checks(enable: bool) {
+    ASYNC_RUNTIME_CHECKS.set(enable).ok();
+}
+
+/// Returns the async check flag if already set, and false otherwise.
+pub fn get_async_runtime_checks() -> bool {
+    ASYNC_RUNTIME_CHECKS.get().cloned().unwrap_or(false)
 }
 
 /// Set the paranoid reference check flag.
@@ -166,6 +183,7 @@ pub fn aptos_prod_vm_config(
     let deserializer_config = aptos_prod_deserializer_config(features);
     let verifier_config = aptos_prod_verifier_config(gas_feature_version, features);
     let enable_enum_option = features.is_enabled(FeatureFlag::ENABLE_ENUM_OPTION);
+    let enable_framework_for_option = features.is_enabled(FeatureFlag::ENABLE_FRAMEWORK_FOR_OPTION);
 
     let layout_max_size = if gas_feature_version >= RELEASE_V1_30 {
         512
@@ -200,8 +218,7 @@ pub fn aptos_prod_vm_config(
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
-        use_call_tree_and_instruction_cache: features
-            .is_call_tree_and_instruction_vm_cache_enabled(),
+        enable_function_caches: features.is_call_tree_and_instruction_vm_cache_enabled(),
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
         optimize_trusted_code: features.is_trusted_code_enabled(),
@@ -210,6 +227,7 @@ pub fn aptos_prod_vm_config(
         enable_enum_option,
         enable_layout_caches,
         propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
+        enable_framework_for_option,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

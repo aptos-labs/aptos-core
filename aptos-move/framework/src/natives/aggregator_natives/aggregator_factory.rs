@@ -28,7 +28,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 fn native_new_aggregator(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
@@ -48,7 +48,7 @@ fn native_new_aggregator(
     // the strategy from `table` implementation: taking hash of transaction and
     // number of aggregator instances created so far.
     let mut hasher = DefaultHasher::new(&[0_u8; 0]);
-    hasher.update(&aggregator_context.txn_hash());
+    hasher.update(&aggregator_context.session_hash());
     hasher.update(&(aggregator_data.num_aggregators() as u32).to_be_bytes());
     let hash = hasher.finish().to_vec();
 

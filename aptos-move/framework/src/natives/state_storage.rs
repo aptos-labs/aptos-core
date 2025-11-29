@@ -9,7 +9,7 @@ use aptos_types::{state_store::state_key::StateKey, vm_status::StatusCode};
 use aptos_vm_types::resolver::StateStorageView;
 use better_any::{Tid, TidAble};
 use move_binary_format::errors::PartialVMError;
-use move_vm_runtime::native_functions::NativeFunction;
+use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use move_vm_types::{
     loaded_data::runtime_types::Type,
     values::{Struct, Value},
@@ -21,6 +21,16 @@ use std::collections::VecDeque;
 #[derive(Tid)]
 pub struct NativeStateStorageContext<'a> {
     resolver: &'a dyn StateStorageView<Key = StateKey>,
+}
+
+// This extension only carries a reference to pre-block view, so all session-related APIs are
+// no-ops.
+impl<'a> SessionListener for NativeStateStorageContext<'a> {
+    fn start(&mut self, _session_hash: &[u8; 32], _script_hash: &[u8], _session_counter: u8) {}
+
+    fn finish(&mut self) {}
+
+    fn abort(&mut self) {}
 }
 
 impl<'a> NativeStateStorageContext<'a> {
@@ -41,7 +51,7 @@ impl<'a> NativeStateStorageContext<'a> {
 /// guarantees a fresh state view then.
 fn native_get_usage(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert!(_ty_args.is_empty());

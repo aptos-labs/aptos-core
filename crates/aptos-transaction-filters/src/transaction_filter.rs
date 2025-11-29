@@ -343,6 +343,18 @@ fn matches_entry_function(
                 },
             }
         },
+        TransactionPayload::EncryptedPayload(payload) => {
+            if let Ok(executable) = payload.executable_ref() {
+                match executable {
+                    TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                    TransactionExecutableRef::EntryFunction(entry_function) => {
+                        compare_entry_function(entry_function, address, module_name, function)
+                    },
+                }
+            } else {
+                false
+            }
+        },
     }
 }
 
@@ -374,6 +386,18 @@ fn matches_entry_function_module_address(
                 },
             }
         },
+        TransactionPayload::EncryptedPayload(payload) => {
+            if let Ok(executable) = payload.executable_ref() {
+                match executable {
+                    TransactionExecutableRef::Script(_) | TransactionExecutableRef::Empty => false,
+                    TransactionExecutableRef::EntryFunction(entry_function) => {
+                        compare_entry_function_module_address(entry_function, module_address)
+                    },
+                }
+            } else {
+                false
+            }
+        },
     }
 }
 
@@ -397,6 +421,13 @@ fn matches_multisig_address(
                     .unwrap_or(false),
             }
         },
+        TransactionPayload::EncryptedPayload(payload) => match payload.extra_config() {
+            TransactionExtraConfig::V1 {
+                multisig_address, ..
+            } => multisig_address
+                .map(|multisig_address| multisig_address == *address)
+                .unwrap_or(false),
+        },
     }
 }
 
@@ -419,6 +450,19 @@ fn matches_script_argument_address(
                 TransactionExecutableRef::Script(script) => {
                     compare_script_argument_address(script, address)
                 },
+            }
+        },
+        TransactionPayload::EncryptedPayload(payload) => {
+            if let Ok(executable) = payload.executable_ref() {
+                match executable {
+                    TransactionExecutableRef::EntryFunction(_)
+                    | TransactionExecutableRef::Empty => false,
+                    TransactionExecutableRef::Script(script) => {
+                        compare_script_argument_address(script, address)
+                    },
+                }
+            } else {
+                false
             }
         },
     }

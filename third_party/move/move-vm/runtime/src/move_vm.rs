@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::{
-    data_cache::TransactionDataCache,
+    data_cache::MoveVmDataCache,
+    execution_tracing::{NoOpTraceRecorder, TraceRecorder},
     interpreter::Interpreter,
     interpreter_caches::InterpreterFunctionCaches,
     module_traversal::TraversalContext,
@@ -23,7 +24,6 @@ use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
     loaded_data::runtime_types::Type,
-    resolver::ResourceResolver,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
@@ -44,6 +44,27 @@ pub struct SerializedReturnValues {
 pub struct MoveVM;
 
 impl MoveVM {
+    pub fn execute_loaded_function(
+        function: LoadedFunction,
+        serialized_args: Vec<impl Borrow<[u8]>>,
+        data_cache: &mut impl MoveVmDataCache,
+        gas_meter: &mut impl GasMeter,
+        traversal_context: &mut TraversalContext,
+        extensions: &mut NativeContextExtensions,
+        loader: &impl Loader,
+    ) -> VMResult<SerializedReturnValues> {
+        Self::execute_loaded_function_with_tracing(
+            function,
+            serialized_args,
+            data_cache,
+            gas_meter,
+            traversal_context,
+            extensions,
+            loader,
+            &mut NoOpTraceRecorder,
+        )
+    }
+
     /// Executes provided function with the specified arguments. The arguments are serialized, and
     /// are not checked by the VM. It is the responsibility of the caller of this function to
     /// verify that they are well-formed.
@@ -55,15 +76,15 @@ impl MoveVM {
     ///
     /// When execution finishes, the return values of the function are returned. Additionally, if
     /// there are any mutable references passed as arguments, these values are also returned.
-    pub fn execute_loaded_function(
+    pub fn execute_loaded_function_with_tracing(
         function: LoadedFunction,
         serialized_args: Vec<impl Borrow<[u8]>>,
-        data_cache: &mut TransactionDataCache,
+        data_cache: &mut impl MoveVmDataCache,
         gas_meter: &mut impl GasMeter,
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
         loader: &impl Loader,
-        resource_resolver: &impl ResourceResolver,
+        trace_recorder: &mut impl TraceRecorder,
     ) -> VMResult<SerializedReturnValues> {
         let vm_config = loader.runtime_environment().vm_config();
 
@@ -96,6 +117,7 @@ impl MoveVM {
 
         let return_values = {
             let _timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
+
             Interpreter::entrypoint(
                 function,
                 deserialized_args,
@@ -105,10 +127,10 @@ impl MoveVM {
                 loader,
                 &ty_depth_checker,
                 &layout_converter,
-                resource_resolver,
                 gas_meter,
                 traversal_context,
                 extensions,
+                trace_recorder,
             )?
         };
 

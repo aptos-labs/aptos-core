@@ -20,7 +20,6 @@ use move_core_types::{
     account_address::AccountAddress,
     identifier::{IdentStr, Identifier},
     language_storage::ModuleId,
-    metadata::Metadata,
     vm_status::StatusCode,
 };
 use move_vm_types::{code::ModuleBytesStorage, module_linker_error, sha3_256};
@@ -132,6 +131,9 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
             .vm_config()
             .enable_lazy_loading;
         let is_enum_option_enabled = staged_runtime_environment.vm_config().enable_enum_option;
+        let is_framework_for_option_enabled = staged_runtime_environment
+            .vm_config()
+            .enable_framework_for_option;
         let deserializer_config = &staged_runtime_environment.vm_config().deserializer_config;
 
         // For every module in bundle, run compatibility checks and construct a new bytes storage
@@ -176,16 +178,18 @@ impl<'a, M: ModuleStorage> StagingModuleStorage<'a, M> {
                 if let Some(old_module_ref) =
                     existing_module_storage.unmetered_get_deserialized_module(addr, name)?
                 {
-                    if is_enum_option_enabled
+                    if !is_framework_for_option_enabled
+                        && is_enum_option_enabled
                         && old_module_ref.self_id().is_option()
                         && old_module_ref.self_id() == compiled_module.self_id()
                     {
-                        continue;
+                        // skip check for option module during publishing
+                    } else {
+                        let old_module = old_module_ref.as_ref();
+                        compatibility
+                            .check(old_module, &compiled_module)
+                            .map_err(|e| e.finish(Location::Undefined))?;
                     }
-                    let old_module = old_module_ref.as_ref();
-                    compatibility
-                        .check(old_module, &compiled_module)
-                        .map_err(|e| e.finish(Location::Undefined))?;
                 }
             }
 

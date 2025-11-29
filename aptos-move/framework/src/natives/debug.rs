@@ -27,7 +27,7 @@ use std::collections::VecDeque;
 #[inline]
 fn native_print(
     _: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
@@ -54,7 +54,7 @@ fn native_print(
 #[inline]
 fn native_stack_trace(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
@@ -73,7 +73,7 @@ fn native_stack_trace(
 #[inline]
 fn native_old_debug_print(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if cfg!(feature = "testing") {
@@ -91,7 +91,7 @@ fn native_old_debug_print(
 #[inline]
 fn native_old_print_stacktrace(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());

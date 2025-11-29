@@ -30,3 +30,7 @@ e2e-move-tests = { path = "../e2e-move-tests" }
 rand = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
+
+[features]
+default = []
+profiling = ["e2e-move-tests/profiling"]

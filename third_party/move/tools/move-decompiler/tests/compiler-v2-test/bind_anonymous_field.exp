@@ -16,16 +16,20 @@ module 0x42::test {
     }
     fun match(x: E1) {
         let _v0 = &x;
-        if (_v0 is V1) {
+        loop {
+            if (!(_v0 is V1)) {
+                if (_v0 is V2) break;
+                abort 14566554180833181697
+            };
             let _v1 = &_v0._0;
             let E1::V1{_0: _v2} = x;
             let S0{_0: _v3} = _v2;
-        } else if (_v0 is V2) {
-            let _v4 = &(&_v0._0)._1;
-            let E1::V2{_0: _v5} = x;
-            let S1{_0: _v6, _1: _v7} = _v5;
-            let S0{_0: _v8} = _v7;
-        } else abort 14566554180833181697;
+            return ()
+        };
+        let _v4 = &(&_v0._0)._1;
+        let E1::V2{_0: _v5} = x;
+        let S1{_0: _v6, _1: _v7} = _v5;
+        let S0{_0: _v8} = _v7;
     }
     fun nested(x: S1) {
         let S1{_0: _v0, _1: _v1} = x;
@@ -39,17 +43,17 @@ module 0x42::test {
 --- unable to recompile the decompiled code:
 exiting with context checking errors
 error: cannot select field `_0` since it has different types in variants of enum `E1`
-   ┌─ bind_anonymous_field.move:20:24
+   ┌─ bind_anonymous_field.move:24:24
    │
-20 │             let _v1 = &_v0._0;
+24 │             let _v1 = &_v0._0;
    │                        ^^^
    │
    = field `_0` has type `S1` in variant `V2` and type `S0` in variant `V1`
 
 error: cannot select field `_0` since it has different types in variants of enum `E1`
-   ┌─ bind_anonymous_field.move:24:26
+   ┌─ bind_anonymous_field.move:29:22
    │
-24 │             let _v4 = &(&_v0._0)._1;
-   │                          ^^^
+29 │         let _v4 = &(&_v0._0)._1;
+   │                      ^^^
    │
    = field `_0` has type `S1` in variant `V2` and type `S0` in variant `V1`

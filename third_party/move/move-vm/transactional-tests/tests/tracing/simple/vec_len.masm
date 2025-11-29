@@ -1,0 +1,12 @@
+//# publish
+module 0x22::test
+
+public fun vec_len_instr(): u64
+    local v: vector<u64>
+    ld_const<vector<u64>> [10, 20, 30]
+    st_loc v
+    borrow_loc v
+    vec_len <u64>
+    ret
+
+//# run --verbose 0x22::test::vec_len_instr --display-trace

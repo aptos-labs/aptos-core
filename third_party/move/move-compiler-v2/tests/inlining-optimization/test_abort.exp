@@ -1,0 +1,258 @@
+// -- Model dump before first bytecode pipeline
+module 0xc0ffee::n {
+    public fun not_inlined(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        {
+          let x: u64 = 3;
+          n::not_inlined(Borrow(Mutable)(x));
+          m::one(Borrow(Mutable)(x));
+          Add<u64>(x, m::two())
+        }
+    }
+    private fun one(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 43);
+          Tuple()
+        }
+    }
+    public fun two(): u64 {
+        2
+    }
+} // end 0xc0ffee::m
+
+// -- Sourcified model before first bytecode pipeline
+module 0xc0ffee::n {
+    public fun not_inlined(x: &mut u64) {
+        if (*x > 5) {
+            if (*x > 5) () else abort 42;
+            *x = 42;
+        } else {
+            *x = *x + 1;
+        }
+    }
+}
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        let x = 3;
+        0xc0ffee::n::not_inlined(&mut x);
+        one(&mut x);
+        x + two()
+    }
+    fun one(x: &mut u64) {
+        if (*x > 5) {
+            if (*x > 5) () else abort 42;
+            *x = 42;
+        } else {
+            *x = *x + 43;
+        }
+    }
+    public fun two(): u64 {
+        2
+    }
+}
+
+// -- Model dump before second bytecode pipeline
+module 0xc0ffee::n {
+    public fun not_inlined(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 1);
+          Tuple()
+        }
+    }
+} // end 0xc0ffee::n
+module 0xc0ffee::m {
+    public fun compute(): u64 {
+        {
+          let x: u64 = 3;
+          n::not_inlined(Borrow(Mutable)(x));
+          {
+            let (x: &mut u64): (&mut u64) = Tuple(Borrow(Mutable)(x));
+            if Gt<u64>(Deref(x), 5) {
+              if Gt<u64>(Deref(x), 5) {
+                Tuple()
+              } else {
+                Abort(42)
+              };
+              x = 42;
+              Tuple()
+            } else {
+              x = Add<u64>(Deref(x), 43);
+              Tuple()
+            }
+          };
+          Add<u64>(x, 2)
+        }
+    }
+    private fun one(x: &mut u64) {
+        if Gt<u64>(Deref(x), 5) {
+          if Gt<u64>(Deref(x), 5) {
+            Tuple()
+          } else {
+            Abort(42)
+          };
+          x = 42;
+          Tuple()
+        } else {
+          x = Add<u64>(Deref(x), 43);
+          Tuple()
+        }
+    }
+    public fun two(): u64 {
+        2
+    }
+} // end 0xc0ffee::m
+
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0xc0ffee::n
+// Function definition at index 0
+#[persistent] public fun not_inlined(l0: &mut u64)
+    copy_loc l0
+    read_ref
+    ld_u64 5
+    gt
+    br_false l0
+    // @5
+    copy_loc l0
+    read_ref
+    ld_u64 5
+    gt
+    br_false l1
+    // @10
+    ld_u64 42
+    move_loc l0
+    write_ref
+    ret
+l1: move_loc l0
+    // @15
+    pop
+    ld_u64 42
+    abort
+l0: copy_loc l0
+    read_ref
+    // @20
+    ld_u64 1
+    add
+    move_loc l0
+    write_ref
+    ret
+
+// Bytecode version v9
+module 0xc0ffee::m
+use 0xc0ffee::n
+// Function definition at index 0
+#[persistent] public fun compute(): u64
+    local l0: u64
+    local l1: &mut u64
+    ld_u64 3
+    st_loc l0
+    mut_borrow_loc l0
+    call n::not_inlined
+    mut_borrow_loc l0
+    // @5
+    st_loc l1
+    copy_loc l1
+    read_ref
+    ld_u64 5
+    gt
+    // @10
+    br_false l0
+    copy_loc l1
+    read_ref
+    ld_u64 5
+    gt
+    // @15
+    br_false l1
+    ld_u64 42
+    move_loc l1
+    write_ref
+l2: move_loc l0
+    // @20
+    ld_u64 2
+    add
+    ret
+l1: move_loc l1
+    pop
+    // @25
+    ld_u64 42
+    abort
+l0: copy_loc l1
+    read_ref
+    ld_u64 43
+    // @30
+    add
+    move_loc l1
+    write_ref
+    branch l2
+
+// Function definition at index 1
+fun one(l0: &mut u64)
+    copy_loc l0
+    read_ref
+    ld_u64 5
+    gt
+    br_false l0
+    // @5
+    copy_loc l0
+    read_ref
+    ld_u64 5
+    gt
+    br_false l1
+    // @10
+    ld_u64 42
+    move_loc l0
+    write_ref
+    ret
+l1: move_loc l0
+    // @15
+    pop
+    ld_u64 42
+    abort
+l0: copy_loc l0
+    read_ref
+    // @20
+    ld_u64 43
+    add
+    move_loc l0
+    write_ref
+    ret
+
+// Function definition at index 2
+#[persistent] public fun two(): u64
+    ld_u64 2
+    ret
+
+
+============ bytecode verification succeeded ========

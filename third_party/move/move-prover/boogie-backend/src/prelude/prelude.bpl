@@ -39,21 +39,228 @@ function $Arbitrary_value_of{{S}}(): {{T}};
 {% endfor %}
 
 // ============================================================================================
-// Primitive Types
+// Integer Types
 
-const $MAX_U8: int;
-axiom $MAX_U8 == 255;
-const $MAX_U16: int;
-axiom $MAX_U16 == 65535;
-const $MAX_U32: int;
-axiom $MAX_U32 == 4294967295;
-const $MAX_U64: int;
-axiom $MAX_U64 == 18446744073709551615;
-const $MAX_U128: int;
-axiom $MAX_U128 == 340282366920938463463374607431768211455;
-const $MAX_U256: int;
-axiom $MAX_U256 == 115792089237316195423570985008687907853269984665640564039457584007913129639935;
+// Constants, Instructions, and Procedures needed by both unsigned and signed integers, but defined separately.
+{% macro integer_type(name, typename, min, max) %}
+const $MIN_{{name}}: int;
+const $MAX_{{name}}: int;
+axiom $MIN_{{name}} == {{min}};
+axiom $MAX_{{name}} == {{max}};
 
+function $IsValid'{{typename}}'(v: int): bool {
+  v >= $MIN_{{name}} && v <= $MAX_{{name}}
+}
+
+function {:inline} $IsEqual'{{typename}}'(x: int, y: int): bool {
+    x == y
+}
+
+procedure {:inline 1} $Cast{{name}}(src: int) returns (dst: int)
+{
+    if (src < $MIN_{{name}} || src > $MAX_{{name}}) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src;
+}
+
+procedure {:inline 1} $Add{{name}}(src1: int, src2: int) returns (dst: int)
+{
+    if (src1 + src2 > $MAX_{{name}} || src1 + src2 < $MIN_{{name}}) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src1 + src2;
+}
+
+procedure {:inline 1} $Add{{name}}_unchecked(src1: int, src2: int) returns (dst: int)
+{
+    dst := src1 + src2;
+}
+
+procedure {:inline 1} $Sub{{name}}(src1: int, src2: int) returns (dst: int)
+{
+    if (src1 - src2 > $MAX_{{name}} || src1 - src2 < $MIN_{{name}}) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src1 - src2;
+}
+
+procedure {:inline 1} $Mul{{name}}(src1: int, src2: int) returns (dst: int)
+{
+    if (src1 * src2 > $MAX_{{name}} || src1 * src2 < $MIN_{{name}}) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src1 * src2;
+}
+{% endmacro %}
+
+{{ self::integer_type(name="U8", typename="u8", min=0, max=255) }}
+{{ self::integer_type(name="U16", typename="u16", min=0, max=65535) }}
+{{ self::integer_type(name="U32", typename="u32", min=0, max=4294967295) }}
+{{ self::integer_type(name="U64", typename="u64", min=0, max="18446744073709551615") }}
+{{ self::integer_type(name="U128", typename="u128", min=0, max="340282366920938463463374607431768211455") }}
+{{ self::integer_type(name="U256", typename="u256", min=0, max="115792089237316195423570985008687907853269984665640564039457584007913129639935") }}
+{{ self::integer_type(name="I8", typename="i8", min=-128, max=127) }}
+{{ self::integer_type(name="I16", typename="i16", min=-32768, max=32767) }}
+{{ self::integer_type(name="I32", typename="i32", min=-2147483648, max=2147483647) }}
+{{ self::integer_type(name="I64", typename="i64", min="-9223372036854775808", max="9223372036854775807") }}
+{{ self::integer_type(name="I128", typename="i128", min="-170141183460469231731687303715884105728", max="170141183460469231731687303715884105727") }}
+{{ self::integer_type(name="I256", typename="i256", min="-57896044618658097711785492504343953926634992332820282019728792003956564819968", max="57896044618658097711785492504343953926634992332820282019728792003956564819967") }}
+
+// Instructions and Procedures shared by unsigned and signed integers
+
+// uninterpreted function to return an undefined value.
+function $undefined_int(): int;
+
+procedure {:inline 1} $Div(src1: int, src2: int) returns (dst: int)
+{
+    if (src2 == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src1 div src2;
+}
+
+procedure {:inline 1} $Mod(src1: int, src2: int) returns (dst: int)
+{
+    if (src2 == 0) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := src1 mod src2;
+}
+
+// Unimplemented binary arithmetic operations; return the dst
+procedure {:inline 1} $ArithBinaryUnimplemented(src1: int, src2: int) returns (dst: int);
+
+// Instructions and Procedures unique to unsigned integers
+
+// Recursive exponentiation function
+// Undefined unless e >=0.  $pow(0,0) is also undefined.
+function $pow(n: int, e: int): int {
+    if n != 0 && e == 0 then 1
+    else if e > 0 then n * $pow(n, e - 1)
+    else $undefined_int()
+}
+
+function $shl(src1: int, p: int): int {
+    src1 * $pow(2, p)
+}
+
+function $shr(src1: int, p: int): int {
+    src1 div $pow(2, p)
+}
+
+procedure {:inline 1} $Shr(src1: int, src2: int) returns (dst: int)
+{
+    var res: int;
+    // src2 is a u8
+    assume src2 >= 0 && src2 < 256;
+    dst := $shr(src1, src2);
+}
+
+{% macro shift_funs_and_procs(name, bits) %}
+function $shl{{name}}(src1: int, p: int): int {
+    (src1 * $pow(2, p)) mod ($MAX_{{name}} + 1)
+}
+
+procedure {:inline 1} $Shl{{name}}(src1: int, src2: int) returns (dst: int)
+{
+    // src2 is a u8
+    assume src2 >= 0 && src2 < 256;
+    {% if bits > 0 %}
+    if (src2 >= {{bits}}) {
+        call $ExecFailureAbort();
+        return;
+    }
+    {% endif %}
+    dst := $shl{{name}}(src1, src2);
+}
+
+procedure {:inline 1} $Shr{{name}}(src1: int, src2: int) returns (dst: int)
+{
+    // src2 is a u8
+    assume src2 >= 0 && src2 < 256;
+    {% if bits > 0 %}
+    if (src2 >= {{bits}}) {
+        call $ExecFailureAbort();
+        return;
+    }
+    {% endif %}
+    dst := $shr(src1, src2);
+}
+{% endmacro %}
+
+{{ self::shift_funs_and_procs(name="U8", bits=8) }}
+{{ self::shift_funs_and_procs(name="U16", bits=16) }}
+{{ self::shift_funs_and_procs(name="U32", bits=32) }}
+{{ self::shift_funs_and_procs(name="U64", bits=64) }}
+{{ self::shift_funs_and_procs(name="U128", bits=128) }}
+{{ self::shift_funs_and_procs(name="U256", bits=0) }}
+
+// Instructions and Procedures unique to signed integers
+
+{% macro negate_proc(name) %}
+procedure {:inline 1} $Negate{{name}}(src: int) returns (dst: int)
+{
+     if (src <= $MIN_{{name}}) {
+        call $ExecFailureAbort();
+        return;
+    }
+    dst := -src;
+}
+{% endmacro %}
+
+{{ self::negate_proc(name="I8") }}
+{{ self::negate_proc(name="I16") }}
+{{ self::negate_proc(name="I32") }}
+{{ self::negate_proc(name="I64") }}
+{{ self::negate_proc(name="I128") }}
+{{ self::negate_proc(name="I256") }}
+
+// ============================================================================================
+// Logical Procedures
+
+procedure {:inline 1} $Lt(src1: int, src2: int) returns (dst: bool)
+{
+    dst := src1 < src2;
+}
+
+procedure {:inline 1} $Gt(src1: int, src2: int) returns (dst: bool)
+{
+    dst := src1 > src2;
+}
+
+procedure {:inline 1} $Le(src1: int, src2: int) returns (dst: bool)
+{
+    dst := src1 <= src2;
+}
+
+procedure {:inline 1} $Ge(src1: int, src2: int) returns (dst: bool)
+{
+    dst := src1 >= src2;
+}
+
+procedure {:inline 1} $And(src1: bool, src2: bool) returns (dst: bool)
+{
+    dst := src1 && src2;
+}
+
+procedure {:inline 1} $Or(src1: bool, src2: bool) returns (dst: bool)
+{
+    dst := src1 || src2;
+}
+
+procedure {:inline 1} $Not(src: bool) returns (dst: bool)
+{
+    dst := !src;
+}
+
+// ============================================================================================
 // Templates for bitvector operations
 
 {%- for impl in bv_instances %}
@@ -193,30 +400,6 @@ function {:inline} $IsValid'bool'(v: bool): bool {
   true
 }
 
-function $IsValid'u8'(v: int): bool {
-  v >= 0 && v <= $MAX_U8
-}
-
-function $IsValid'u16'(v: int): bool {
-  v >= 0 && v <= $MAX_U16
-}
-
-function $IsValid'u32'(v: int): bool {
-  v >= 0 && v <= $MAX_U32
-}
-
-function $IsValid'u64'(v: int): bool {
-  v >= 0 && v <= $MAX_U64
-}
-
-function $IsValid'u128'(v: int): bool {
-  v >= 0 && v <= $MAX_U128
-}
-
-function $IsValid'u256'(v: int): bool {
-  v >= 0 && v <= $MAX_U256
-}
-
 function $IsValid'num'(v: int): bool {
   true
 }
@@ -233,31 +416,6 @@ function {:inline} $IsValidRange(r: $Range): bool {
 // Intentionally not inlined so it serves as a trigger in quantifiers.
 function $InRange(r: $Range, i: int): bool {
    r->lb <= i && i < r->ub
-}
-
-
-function {:inline} $IsEqual'u8'(x: int, y: int): bool {
-    x == y
-}
-
-function {:inline} $IsEqual'u16'(x: int, y: int): bool {
-    x == y
-}
-
-function {:inline} $IsEqual'u32'(x: int, y: int): bool {
-    x == y
-}
-
-function {:inline} $IsEqual'u64'(x: int, y: int): bool {
-    x == y
-}
-
-function {:inline} $IsEqual'u128'(x: int, y: int): bool {
-    x == y
-}
-
-function {:inline} $IsEqual'u256'(x: int, y: int): bool {
-    x == y
 }
 
 function {:inline} $IsEqual'num'(x: int, y: int): bool {
@@ -316,6 +474,13 @@ function {:inline} $Dereference<T>(ref: $Mutation T): T {
 // Update the value of a mutation.
 function {:inline} $UpdateMutation<T>(m: $Mutation T, v: T): $Mutation T {
     $Mutation(m->l, m->p, v)
+}
+
+// Havoc the content of the mutation, preserving location and path.
+procedure {:inline 1} $HavocMutation<T>(m: $Mutation T) returns (r: $Mutation T) {
+    r->l := m->l;
+    r->p := m->p;
+    // r->v stays uninitialized, thus havoced
 }
 
 function {:inline} $ChildMutation<T1, T2>(m: $Mutation T1, offset: int, v: T2): $Mutation T2 {
@@ -448,205 +613,6 @@ procedure {:inline 1} $InitVerification() {
 // Instructions
 
 
-procedure {:inline 1} $CastU8(src: int) returns (dst: int)
-{
-    if (src > $MAX_U8) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src;
-}
-
-procedure {:inline 1} $CastU16(src: int) returns (dst: int)
-{
-    if (src > $MAX_U16) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src;
-}
-
-procedure {:inline 1} $CastU32(src: int) returns (dst: int)
-{
-    if (src > $MAX_U32) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src;
-}
-
-procedure {:inline 1} $CastU64(src: int) returns (dst: int)
-{
-    if (src > $MAX_U64) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src;
-}
-
-procedure {:inline 1} $CastU128(src: int) returns (dst: int)
-{
-    if (src > $MAX_U128) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src;
-}
-
-procedure {:inline 1} $CastU256(src: int) returns (dst: int)
-{
-    if (src > $MAX_U256) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src;
-}
-
-procedure {:inline 1} $AddU8(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 + src2 > $MAX_U8) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU16(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 + src2 > $MAX_U16) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU16_unchecked(src1: int, src2: int) returns (dst: int)
-{
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU32(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 + src2 > $MAX_U32) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU32_unchecked(src1: int, src2: int) returns (dst: int)
-{
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU64(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 + src2 > $MAX_U64) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU64_unchecked(src1: int, src2: int) returns (dst: int)
-{
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU128(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 + src2 > $MAX_U128) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU128_unchecked(src1: int, src2: int) returns (dst: int)
-{
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU256(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 + src2 > $MAX_U256) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $AddU256_unchecked(src1: int, src2: int) returns (dst: int)
-{
-    dst := src1 + src2;
-}
-
-procedure {:inline 1} $Sub(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 < src2) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 - src2;
-}
-
-// uninterpreted function to return an undefined value.
-function $undefined_int(): int;
-
-// Recursive exponentiation function
-// Undefined unless e >=0.  $pow(0,0) is also undefined.
-function $pow(n: int, e: int): int {
-    if n != 0 && e == 0 then 1
-    else if e > 0 then n * $pow(n, e - 1)
-    else $undefined_int()
-}
-
-function $shl(src1: int, p: int): int {
-    src1 * $pow(2, p)
-}
-
-function $shlU8(src1: int, p: int): int {
-    (src1 * $pow(2, p)) mod 256
-}
-
-function $shlU16(src1: int, p: int): int {
-    (src1 * $pow(2, p)) mod 65536
-}
-
-function $shlU32(src1: int, p: int): int {
-    (src1 * $pow(2, p)) mod 4294967296
-}
-
-function $shlU64(src1: int, p: int): int {
-    (src1 * $pow(2, p)) mod 18446744073709551616
-}
-
-function $shlU128(src1: int, p: int): int {
-    (src1 * $pow(2, p)) mod 340282366920938463463374607431768211456
-}
-
-function $shlU256(src1: int, p: int): int {
-    (src1 * $pow(2, p)) mod 115792089237316195423570985008687907853269984665640564039457584007913129639936
-}
-
-function $shr(src1: int, p: int): int {
-    src1 div $pow(2, p)
-}
-
-// We need to know the size of the destination in order to drop bits
-// that have been shifted left more than that, so we have $ShlU8/16/32/64/128/256
-procedure {:inline 1} $ShlU8(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 8) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shlU8(src1, src2);
-}
-
 // Template for cast and shift operations of bitvector types
 
 {%- for impl in bv_instances %}
@@ -753,247 +719,6 @@ procedure {:inline 1} $ShrBv{{impl.base}}From{{instance}}(src1: bv{{impl.base}},
 {%- endfor %}
 {%- endfor %}
 
-procedure {:inline 1} $ShlU16(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 16) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shlU16(src1, src2);
-}
-
-procedure {:inline 1} $ShlU32(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 32) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shlU32(src1, src2);
-}
-
-procedure {:inline 1} $ShlU64(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 64) {
-       call $ExecFailureAbort();
-       return;
-    }
-    dst := $shlU64(src1, src2);
-}
-
-procedure {:inline 1} $ShlU128(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 128) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shlU128(src1, src2);
-}
-
-procedure {:inline 1} $ShlU256(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    dst := $shlU256(src1, src2);
-}
-
-procedure {:inline 1} $Shr(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    dst := $shr(src1, src2);
-}
-
-procedure {:inline 1} $ShrU8(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 8) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shr(src1, src2);
-}
-
-procedure {:inline 1} $ShrU16(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 16) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shr(src1, src2);
-}
-
-procedure {:inline 1} $ShrU32(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 32) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shr(src1, src2);
-}
-
-procedure {:inline 1} $ShrU64(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 64) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shr(src1, src2);
-}
-
-procedure {:inline 1} $ShrU128(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    if (src2 >= 128) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := $shr(src1, src2);
-}
-
-procedure {:inline 1} $ShrU256(src1: int, src2: int) returns (dst: int)
-{
-    var res: int;
-    // src2 is a u8
-    assume src2 >= 0 && src2 < 256;
-    dst := $shr(src1, src2);
-}
-
-procedure {:inline 1} $MulU8(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 * src2 > $MAX_U8) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 * src2;
-}
-
-procedure {:inline 1} $MulU16(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 * src2 > $MAX_U16) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 * src2;
-}
-
-procedure {:inline 1} $MulU32(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 * src2 > $MAX_U32) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 * src2;
-}
-
-procedure {:inline 1} $MulU64(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 * src2 > $MAX_U64) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 * src2;
-}
-
-procedure {:inline 1} $MulU128(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 * src2 > $MAX_U128) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 * src2;
-}
-
-procedure {:inline 1} $MulU256(src1: int, src2: int) returns (dst: int)
-{
-    if (src1 * src2 > $MAX_U256) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 * src2;
-}
-
-procedure {:inline 1} $Div(src1: int, src2: int) returns (dst: int)
-{
-    if (src2 == 0) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 div src2;
-}
-
-procedure {:inline 1} $Mod(src1: int, src2: int) returns (dst: int)
-{
-    if (src2 == 0) {
-        call $ExecFailureAbort();
-        return;
-    }
-    dst := src1 mod src2;
-}
-
-procedure {:inline 1} $ArithBinaryUnimplemented(src1: int, src2: int) returns (dst: int);
-
-procedure {:inline 1} $Lt(src1: int, src2: int) returns (dst: bool)
-{
-    dst := src1 < src2;
-}
-
-procedure {:inline 1} $Gt(src1: int, src2: int) returns (dst: bool)
-{
-    dst := src1 > src2;
-}
-
-procedure {:inline 1} $Le(src1: int, src2: int) returns (dst: bool)
-{
-    dst := src1 <= src2;
-}
-
-procedure {:inline 1} $Ge(src1: int, src2: int) returns (dst: bool)
-{
-    dst := src1 >= src2;
-}
-
-procedure {:inline 1} $And(src1: bool, src2: bool) returns (dst: bool)
-{
-    dst := src1 && src2;
-}
-
-procedure {:inline 1} $Or(src1: bool, src2: bool) returns (dst: bool)
-{
-    dst := src1 || src2;
-}
-
-procedure {:inline 1} $Not(src: bool) returns (dst: bool)
-{
-    dst := !src;
-}
-
 // Pack and Unpack are auto-generated for each type T
 
 
@@ -1095,8 +820,6 @@ procedure {:inline 1} $1_string_internal_index_of(x: Vec int, y: Vec int) return
 
 procedure {:inline 1} $1_string_internal_is_char_boundary(x: Vec int, i: int) returns (r: bool) {
 }
-
-
 
 
 // ==================================================================================
@@ -1310,6 +1033,12 @@ datatype $TypeParamInfo {
     $TypeParamU64(),
     $TypeParamU128(),
     $TypeParamU256(),
+    $TypeParamI8(),
+    $TypeParamI16(),
+    $TypeParamI32(),
+    $TypeParamI64(),
+    $TypeParamI128(),
+    $TypeParamI256(),
     $TypeParamAddress(),
     $TypeParamSigner(),
     $TypeParamVector(e: $TypeParamInfo),

@@ -1,45 +1,35 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-#[cfg(test)]
-use aptos_dkg::range_proofs::traits::BatchedRangeProof;
+use aptos_crypto::arkworks::GroupGenerators;
 use aptos_dkg::{
-    range_proofs::dekart_univariate::{Proof, DST},
+    range_proofs::{
+        dekart_univariate::Proof as UnivariateDeKART,
+        dekart_univariate_v2::Proof as UnivariateDeKARTv2, traits::BatchedRangeProof,
+    },
     utils::test_utils,
 };
+use ark_bls12_381::Bls12_381;
+use ark_bn254::Bn254;
 use ark_ec::pairing::Pairing;
-use ark_std::rand::thread_rng;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use rand::thread_rng;
+use std::fmt::Debug;
 
 #[cfg(test)]
-fn run_range_proof_completeness<E: Pairing, B: BatchedRangeProof<E>>(n: usize, ell: usize) {
+fn assert_range_proof_correctness<E: Pairing, B: BatchedRangeProof<E>>(
+    setup: &RangeProofUniversalSetup<E, B>,
+    n: usize,
+    ell: usize,
+) {
     let mut rng = thread_rng();
-    let (pk, vk, values, comm, r) =
-        test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
-    println!("setup finished for n={}, ell={}, prove starting", n, ell);
+    let RangeProofUniversalSetup { pk, vk } = setup;
+    let (values, comm, r) =
+        test_utils::range_proof_random_instance::<_, B, _>(pk, n, ell, &mut rng);
+    println!("setup finished, prove starting for n={}, ell={}", n, ell);
 
-    let mut fs_t = merlin::Transcript::new(DST);
-    let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
-    println!("prove finished, vrfy1 starting (n={}, ell={})", n, ell);
-
-    let mut fs_t = merlin::Transcript::new(DST);
-    proof.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
-
-    println!("vrfy finished, vrfy2 starting (n={}, ell={})", n, ell);
-    let mut invalid_proof = proof.clone();
-    invalid_proof.maul();
-    let mut fs_t = merlin::Transcript::new(DST);
-    assert!(invalid_proof.verify(&vk, n, ell, &comm, &mut fs_t).is_err())
-}
-
-#[cfg(test)]
-fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(n: usize, ell: usize) {
-    let mut rng = thread_rng();
-    let (pk, vk, values, comm, r) =
-        test_utils::range_proof_random_instance::<E, B, _>(n, ell, &mut rng);
-    println!("setup finished for n={}, ell={}, prove starting", n, ell);
-
-    let mut fs_t = merlin::Transcript::new(DST);
-    let proof = B::prove(&pk, &values, ell, &comm, &r, &mut fs_t, &mut rng);
+    let proof = B::prove(pk, &values, ell, &comm, &r, &mut rng);
+    proof.verify(vk, n, ell, &comm).unwrap();
 
     // === Serialize to memory ===
     let encoded = {
@@ -61,19 +51,55 @@ fn run_serialize_range_proof<E: Pairing, B: BatchedRangeProof<E>>(n: usize, ell:
     let decoded = B::deserialize_compressed(&*encoded).expect("Deserialization failed");
 
     // Verify still succeeds
-    let mut fs_t = merlin::Transcript::new(DST);
-    decoded.verify(&vk, n, ell, &comm, &mut fs_t).unwrap();
-
-    // Make invalid
-    let mut invalid_proof = decoded.clone();
-    invalid_proof.maul();
-    let mut fs_t = merlin::Transcript::new(DST);
-    assert!(invalid_proof.verify(&vk, n, ell, &comm, &mut fs_t).is_err());
+    decoded.verify(vk, n, ell, &comm).unwrap();
 
     println!(
         "Serialization round-trip test passed for n={}, ell={}",
         n, ell
     );
+
+    // Make invalid
+    let mut invalid_proof = decoded.clone();
+    invalid_proof.maul();
+    assert!(invalid_proof.verify(vk, n, ell, &comm).is_err());
+}
+
+#[cfg(test)]
+fn assert_keys_serialization<E: Pairing, B: BatchedRangeProof<E>>(
+    setup: &RangeProofUniversalSetup<E, B>,
+) where
+    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
+    B::VerificationKey: CanonicalDeserialize + Eq + Debug,
+{
+    let RangeProofUniversalSetup { pk, vk } = setup;
+
+    // === Prover key serialization/deserialization ===
+    let pk_encoded = {
+        let mut v = Vec::new();
+        pk.serialize_compressed(&mut v)
+            .expect("Prover key serialization should succeed");
+        v
+    };
+    println!("Serialized pk size: {} bytes", pk_encoded.len());
+
+    let pk_decoded = B::ProverKey::deserialize_compressed(&*pk_encoded)
+        .expect("Prover key deserialization should succeed");
+    assert_eq!(pk, &pk_decoded, "Round-trip pk failed");
+
+    // === Verifier key serialization/deserialization ===
+    let vk_encoded = {
+        let mut v = Vec::new();
+        vk.serialize_compressed(&mut v)
+            .expect("Verifier key serialization should succeed");
+        v
+    };
+    println!("Serialized vk size: {} bytes", vk_encoded.len());
+
+    let vk_decoded = B::VerificationKey::deserialize_compressed(&*vk_encoded)
+        .expect("Verifier key deserialization should succeed");
+    assert_eq!(vk, &vk_decoded, "Round-trip vk failed");
+
+    println!("Prover and Verifier key serialization round-trip passed.");
 }
 
 #[cfg(test)]
@@ -88,34 +114,67 @@ const TEST_CASES: &[(usize, usize)] = &[
     (16, 7),
     (16, 8),
     (16, 16),
-    (255, 16),
-    (255, 32),
-    (512, 32),
-    (1024, 32),
-    (2047, 32),
 ];
 
 #[cfg(test)]
-macro_rules! for_each_curve {
-    ($f:ident, $n:expr, $ell:expr) => {
-        use ark_bls12_381::Bls12_381;
-        use ark_bn254::Bn254;
-
-        $f::<Bn254, Proof<Bn254>>($n, $ell);
-        $f::<Bls12_381, Proof<Bls12_381>>($n, $ell);
-    };
+/// A **reusable** setup structure.
+struct RangeProofUniversalSetup<E: Pairing, B: BatchedRangeProof<E>> {
+    pk: B::ProverKey,
+    vk: B::VerificationKey,
 }
 
-#[test]
-fn range_proof_completeness_multi() {
+#[cfg(test)]
+/// Generate a fixed setup for a single curve
+fn make_single_curve_setup<E, B>(n: usize, ell: usize) -> RangeProofUniversalSetup<E, B>
+where
+    E: Pairing,
+    B: BatchedRangeProof<E>,
+{
+    let mut rng = thread_rng();
+    let group_generators = GroupGenerators::default();
+    let (pk, vk) = B::setup(n, ell, group_generators, &mut rng);
+    RangeProofUniversalSetup { pk, vk }
+}
+
+#[cfg(test)]
+fn assert_correctness_for_range_proof_and_curve<E, B>()
+where
+    E: Pairing,
+    B: BatchedRangeProof<E>,
+{
+    let setups = make_single_curve_setup::<E, B>(31, 16);
     for &(n, ell) in TEST_CASES {
-        for_each_curve!(run_range_proof_completeness, n, ell);
+        assert_range_proof_correctness::<E, B>(&setups, n, ell);
     }
 }
 
-#[test]
-fn serialize_range_proof_multi() {
+#[cfg(test)]
+fn assert_correctness_and_serialization_for_range_proof_and_curve<E, B>()
+where
+    E: Pairing,
+    B: BatchedRangeProof<E>,
+    B::ProverKey: CanonicalSerialize + CanonicalDeserialize + Eq + Debug,
+    B::VerificationKey: CanonicalDeserialize + Eq + Debug,
+{
+    let setups = make_single_curve_setup::<E, B>(31, 16);
     for &(n, ell) in TEST_CASES {
-        for_each_curve!(run_serialize_range_proof, n, ell);
+        assert_range_proof_correctness::<E, B>(&setups, n, ell);
+        assert_keys_serialization::<E, B>(&setups);
     }
+}
+
+#[cfg(test)]
+#[test]
+fn assert_correctness_of_all_range_proofs() {
+    assert_correctness_for_range_proof_and_curve::<Bn254, UnivariateDeKART<Bn254>>();
+    assert_correctness_for_range_proof_and_curve::<Bls12_381, UnivariateDeKART<Bls12_381>>();
+
+    assert_correctness_and_serialization_for_range_proof_and_curve::<
+        Bn254,
+        UnivariateDeKARTv2<Bn254>,
+    >();
+    assert_correctness_and_serialization_for_range_proof_and_curve::<
+        Bls12_381,
+        UnivariateDeKARTv2<Bls12_381>,
+    >();
 }

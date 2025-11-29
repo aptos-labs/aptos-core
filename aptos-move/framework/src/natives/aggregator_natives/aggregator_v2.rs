@@ -137,7 +137,7 @@ fn create_aggregator_with_max_value(
 
 fn native_create_aggregator(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
@@ -154,7 +154,7 @@ fn native_create_aggregator(
 
 fn native_create_unbounded_aggregator(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 0);
@@ -170,7 +170,7 @@ fn native_create_unbounded_aggregator(
  **************************************************************************************************/
 fn native_try_add(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
@@ -216,7 +216,7 @@ fn native_try_add(
  **************************************************************************************************/
 fn native_try_sub(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
@@ -259,7 +259,7 @@ fn native_try_sub(
 
 fn native_is_at_least_impl(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
@@ -297,7 +297,7 @@ fn native_is_at_least_impl(
 
 fn native_read(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
@@ -333,7 +333,7 @@ fn native_read(
 
 fn native_snapshot(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
@@ -368,7 +368,7 @@ fn native_snapshot(
 
 fn native_create_snapshot(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);
@@ -406,7 +406,7 @@ fn native_create_snapshot(
 
 fn native_copy_snapshot(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     Err(SafeNativeError::Abort {
@@ -420,7 +420,7 @@ fn native_copy_snapshot(
 
 fn native_read_snapshot(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);
@@ -449,7 +449,7 @@ fn native_read_snapshot(
  **************************************************************************************************/
 fn native_string_concat(
     _context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // Deprecated function in favor of `derive_string_concat`.
@@ -464,7 +464,7 @@ fn native_string_concat(
 
 fn native_read_derived_string(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 0);
@@ -489,7 +489,7 @@ fn native_read_derived_string(
 
 fn native_create_derived_string(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 0);
@@ -530,7 +530,7 @@ fn native_create_derived_string(
 
 fn native_derive_string_concat(
     context: &mut SafeNativeContext,
-    ty_args: Vec<Type>,
+    ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);

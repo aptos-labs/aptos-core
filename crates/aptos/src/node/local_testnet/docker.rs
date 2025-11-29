@@ -111,6 +111,20 @@ pub async fn pull_docker_image(image_name: &str) -> Result<()> {
 }
 
 /// Create a network. If the network already exists, that's fine, just move on.
+/// Check if a Docker network exists.
+pub async fn network_exists(network_name: &str) -> Result<bool> {
+    let docker = get_docker().await?;
+
+    // Try to inspect the network. If it exists, this will succeed.
+    match docker.inspect_network::<&str>(network_name, None).await {
+        Ok(_) => Ok(true),
+        Err(BollardError::DockerResponseServerError {
+            status_code: 404, ..
+        }) => Ok(false),
+        Err(err) => Err(err.into()),
+    }
+}
+
 pub async fn create_network(network_name: &str) -> Result<()> {
     let docker = get_docker().await?;
 

@@ -25,8 +25,8 @@ use move_core_types::{
 };
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_runtime::{
-    module_traversal::TraversalContext, LoadedFunction, LoadedFunctionOwner, Loader,
-    RuntimeEnvironment,
+    execution_tracing::NoOpTraceRecorder, module_traversal::TraversalContext, LoadedFunction,
+    LoadedFunctionOwner, Loader, RuntimeEnvironment,
 };
 use move_vm_types::{
     gas::GasMeter,
@@ -500,8 +500,15 @@ fn validate_and_construct(
         )?;
         args.push(arg);
     }
-    let serialized_result =
-        session.execute_loaded_function(function, args, gas_meter, traversal_context, loader)?;
+    let serialized_result = session.execute_loaded_function(
+        function,
+        args,
+        gas_meter,
+        traversal_context,
+        loader,
+        // No need to record the trace for argument construction.
+        &mut NoOpTraceRecorder,
+    )?;
     let mut ret_vals = serialized_result.return_values;
     // We know ret_vals.len() == 1
     Ok(ret_vals
@@ -584,20 +591,21 @@ fn load_constructor_function(
         return Err(err);
     }
 
+    let module_loc = || Location::Module(module_id.clone());
+
     let (module, function) =
         loader.load_function_definition(gas_meter, traversal_context, module_id, function_name)?;
 
     if function.return_tys().len() != 1 {
         // For functions that are marked constructor this should not happen.
-        return Err(PartialVMError::new(StatusCode::ABORTED).finish(Location::Undefined));
+        return Err(PartialVMError::new(StatusCode::ABORTED).finish(module_loc()));
     }
 
     let mut map = TypeParamMap::default();
     if !map.match_ty(&function.return_tys()[0], expected_return_ty) {
         // For functions that are marked constructor this should not happen.
         return Err(
-            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .finish(Location::Undefined),
+            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(module_loc()),
         );
     }
 
@@ -606,13 +614,12 @@ fn load_constructor_function(
     let mut ty_args = Vec::with_capacity(num_ty_args);
     for i in 0..num_ty_args {
         ty_args.push(map.get_ty_param(i as u16).ok_or_else(|| {
-            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE)
-                .finish(Location::Undefined)
+            PartialVMError::new(StatusCode::INVALID_MAIN_FUNCTION_SIGNATURE).finish(module_loc())
         })?);
     }
 
     Type::verify_ty_arg_abilities(function.ty_param_abilities(), &ty_args)
-        .map_err(|e| e.finish(Location::Module(module_id.clone())))?;
+        .map_err(|e| e.finish(module_loc()))?;
     let ty_args_id = loader
         .runtime_environment()
         .ty_pool()

@@ -58,8 +58,7 @@ shares left.
     -  [Function `multiply_then_divide`](#@Specification_1_multiply_then_divide)
 
 
-<pre><code><b>use</b> <a href="../../move-stdlib/doc/error.md#0x1_error">0x1::error</a>;
-<b>use</b> <a href="simple_map.md#0x1_simple_map">0x1::simple_map</a>;
+<pre><code><b>use</b> <a href="simple_map.md#0x1_simple_map">0x1::simple_map</a>;
 <b>use</b> <a href="../../move-stdlib/doc/vector.md#0x1_vector">0x1::vector</a>;
 </code></pre>
 

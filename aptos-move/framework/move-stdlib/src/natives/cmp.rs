@@ -35,7 +35,7 @@ const ORDERING_GREATER_THAN_VARIANT: u16 = 2;
  **************************************************************************************************/
 fn native_compare(
     context: &mut SafeNativeContext,
-    _ty_args: Vec<Type>,
+    _ty_args: &[Type],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 2);

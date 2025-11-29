@@ -10,8 +10,5 @@ use std::collections::VecDeque;
 ///
 /// A raw native needs to be made into a closure that carries various configurations before
 /// it can be used in the VM.
-pub type RawSafeNative = fn(
-    &mut SafeNativeContext,
-    Vec<Type>,
-    VecDeque<Value>,
-) -> SafeNativeResult<SmallVec<[Value; 1]>>;
+pub type RawSafeNative =
+    fn(&mut SafeNativeContext, &[Type], VecDeque<Value>) -> SafeNativeResult<SmallVec<[Value; 1]>>;

@@ -273,7 +273,7 @@ impl Session {
         txn: SignedTransaction,
     ) -> Result<(VMStatus, TransactionOutput)> {
         let env = AptosEnvironment::new(&self.state_store);
-        let vm = AptosVM::new(&env, &self.state_store);
+        let vm = AptosVM::new(&env);
         let log_context = AdapterLogSchema::new(self.state_store.id(), 0);
 
         let resolver = self.state_store.as_move_resolver();
@@ -326,6 +326,7 @@ impl Session {
                 name_from_executable(executable)
             },
             TransactionPayload::ModuleBundle(_) => unreachable!(),
+            TransactionPayload::EncryptedPayload(_) => "encrypted".to_string(),
         };
 
         let output_path = self

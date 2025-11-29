@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{HISTOGRAM, POST_BODY_BYTES, REQUEST_SOURCE_CLIENT, RESPONSE_STATUS};
-use aptos_api_types::X_APTOS_CLIENT;
+use aptos_api_types::{TRACEPARENT, X_APTOS_CLIENT};
 use aptos_logger::{
     debug, info,
     prelude::{sample, SampleRate},
@@ -22,11 +22,40 @@ const REQUEST_SOURCE_CLIENT_UNKNOWN: &str = "unknown";
 static REQUEST_SOURCE_CLIENT_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"aptos-[a-zA-Z\-]+/[0-9A-Za-z\.\-]+").unwrap());
 
+/// Extracts trace_id and span_id from the traceparent header (W3C Trace Context format).
+/// Format: version-trace_id-parent_id-trace_flags
+/// Example: 00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01
+/// Returns (trace_id, span_id) if valid, otherwise generates them.
+fn extract_trace_context(request: &Request) -> (Option<String>, Option<String>) {
+    // First, try to extract from traceparent header
+    if let Some(traceparent) = request.headers().get(TRACEPARENT) {
+        if let Ok(traceparent_str) = traceparent.to_str() {
+            // W3C Trace Context format: version-trace_id-parent_id-trace_flags
+            let parts: Vec<&str> = traceparent_str.split('-').collect();
+            if parts.len() == 4 && parts[1].len() == 32 && parts[2].len() == 16 {
+                return (Some(parts[1].to_string()), Some(parts[2].to_string()));
+            }
+        }
+    }
+
+    // If no traceparent header or invalid format, generate IDs
+    // Use a simple timestamp-based ID as fallback
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    let trace_id = format!("{:032x}", nanos);
+    let span_id = format!("{:016x}", nanos & 0xFFFFFFFFFFFFFFFF);
+    (Some(trace_id), Some(span_id))
+}
+
 /// Logs information about the request and response if the response status code
 /// is >= 500, to help us debug since this will be an error on our side.
 /// We also do general logging of the status code alone regardless of what it is.
 pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Response> {
     let start = std::time::Instant::now();
+
+    let (trace_id, span_id) = extract_trace_context(&request);
 
     let mut log = HttpRequestLog {
         remote_addr: request.remote_addr().as_socket_addr().cloned(),
@@ -54,6 +83,8 @@ pub async fn middleware_log<E: Endpoint>(next: E, request: Request) -> Result<Re
             .headers()
             .get(header::CONTENT_LENGTH)
             .and_then(|v| v.to_str().ok().map(|v| v.to_string())),
+        trace_id,
+        span_id,
     };
 
     let response = next.get_response(request).await;
@@ -149,4 +180,6 @@ pub struct HttpRequestLog {
     pub elapsed: std::time::Duration,
     forwarded: Option<String>,
     content_length: Option<String>,
+    trace_id: Option<String>,
+    span_id: Option<String>,
 }

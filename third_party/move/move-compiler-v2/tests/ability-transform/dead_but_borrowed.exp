@@ -295,18 +295,16 @@ fun explicate_drop::test0(): u8 {
 
 
 ============ disassembled file-format ==================
-// Move bytecode v9
-module 42.explicate_drop {
+// Bytecode version v9
+module 0x42::explicate_drop
+// Function definition at index 0
+fun test0(): u8
+    local l0: u8
+    ld_u8 42
+    st_loc l0
+    borrow_loc l0
+    read_ref
+    ret
 
 
-test0(): u8 /* def_idx: 0 */ {
-L0:	$t2: u8
-B0:
-	0: LdU8(42)
-	1: StLoc[0]($t2: u8)
-	2: ImmBorrowLoc[0]($t2: u8)
-	3: ReadRef
-	4: Ret
-}
-}
 ============ bytecode verification succeeded ========

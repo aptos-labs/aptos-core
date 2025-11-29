@@ -6,24 +6,25 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
-use aptos_crypto::hash::CryptoHash;
-use aptos_dkg::{
-    constants::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
-    pvss::{
-        das,
-        das::unweighted_protocol,
-        insecure_field, test_utils,
-        test_utils::{
-            get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
-            reconstruct_dealt_secret_key_randomly, NoAux,
-        },
-        traits::{transcript::Transcript, SecretSharingConfig},
-        GenericWeighting, ThresholdConfig,
+use aptos_crypto::{
+    blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
+    traits::SecretSharingConfig as _,
+};
+use aptos_dkg::pvss::{
+    chunky, das,
+    das::unweighted_protocol,
+    insecure_field, test_utils,
+    test_utils::{
+        get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
+        reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    utils::random::random_scalar,
+    traits::transcript::{Transcript, WithMaxNumShares},
+    GenericWeighting, ThresholdConfigBlstrs,
 };
 use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
+
+// TODO: Add a test for public parameters serialization roundtrip?
 
 #[test]
 fn test_pvss_all_unweighted() {
@@ -43,6 +44,21 @@ fn test_pvss_all_unweighted() {
 
         // Insecure testing-only field-element PVSS
         pvss_deal_verify_and_reconstruct::<insecure_field::Transcript>(&tc, seed.to_bytes_le());
+    }
+
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s over BN254 instead
+    let tcs = test_utils::get_threshold_configs_for_testing_smaller();
+    for tc in tcs.iter().take(20) {
+        // Reduce the number of tcs to make it a bit faster?
+        println!("\nTesting {tc} PVSS");
+
+        let seed = random_scalar(&mut rng);
+
+        // Chunky
+        pvss_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
+            &tc,
+            seed.to_bytes_le(),
+        );
     }
 }
 
@@ -89,6 +105,34 @@ fn test_pvss_transcript_size() {
         print_transcript_size::<das::Transcript>("Actual", &sc, actual_size);
     }
 
+    // Restarting the loop here because now it'll grab **arkworks** `ThresholdConfig`s with BN254
+    // uses default chunk sizes, so probably want to modify this at some point to allow a wider range
+    // Ideally should iterate over a vec of (t, n), not the actual threshold configs... but won't be a bottleneck
+    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+        // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
+        println!();
+        let actual_size = actual_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(&sc);
+        print_transcript_size::<chunky::Transcript<ark_bn254::Bn254>>(
+            "Actual for BN254",
+            &sc,
+            actual_size,
+        );
+    }
+
+    // Restarting so it grabs BLS12-381 instead of BN254... TODO: could get rid of this with some work
+    for sc in get_threshold_configs_for_benchmarking().iter().take(1) {
+        // Only trying 1 for now to keep tests fast (also the second one has the same n, which means it would yield the same size...)
+
+        println!();
+        let actual_size =
+            actual_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(&sc);
+        print_transcript_size::<chunky::Transcript<ark_bls12_381::Bls12_381>>(
+            "Actual for BLS12_381",
+            &sc,
+            actual_size,
+        );
+    }
+
     for wc in get_weighted_configs_for_benchmarking() {
         let actual_size = actual_transcript_size::<das::Transcript>(wc.get_threshold_config());
         print_transcript_size::<das::Transcript>("Actual", wc.get_threshold_config(), actual_size);
@@ -98,6 +142,7 @@ fn test_pvss_transcript_size() {
     }
 }
 
+#[cfg(test)]
 fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingConfig, size: usize) {
     let name = T::scheme_name();
     println!("{size_type:8} transcript size for {sc} {name}: {size} bytes");
@@ -111,7 +156,8 @@ fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingCo
 ///  1. Deals a secret, creating a transcript
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
-fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
+#[cfg(test)]
+fn pvss_deal_verify_and_reconstruct<T: Transcript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -126,6 +172,7 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
         &sc,
         &d.pp,
         &d.ssks[0],
+        &d.spks[0],
         &d.eks,
         &d.s,
         &NoAux,
@@ -140,22 +187,29 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript + CryptoHash>(
         .expect("serialized transcript should deserialize correctly");
 
     assert_eq!(trx, trx_deserialized);
-    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx) {
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
         panic!("Reconstructed SK did not match");
     }
 }
 
+#[cfg(test)]
 fn actual_transcript_size<T: Transcript>(sc: &T::SecretSharingConfig) -> usize {
     let mut rng = thread_rng();
 
-    let trx = T::generate(&sc, &mut rng);
+    let trx = T::generate(
+        &sc,
+        &T::PublicParameters::with_max_num_shares_for_generate(sc.get_total_num_shares()),
+        &mut rng,
+    );
     let actual_size = trx.to_bytes().len();
 
     actual_size
 }
 
-fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfig>>(
-    sc: &ThresholdConfig,
+#[cfg(test)]
+fn expected_transcript_size<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>>(
+    sc: &ThresholdConfigBlstrs,
 ) -> usize {
     if T::scheme_name() == unweighted_protocol::DAS_SK_IN_G1 {
         G2_PROJ_NUM_BYTES

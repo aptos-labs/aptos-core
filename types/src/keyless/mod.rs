@@ -1,11 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::transaction::{
-    authenticator::{
-        AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
+use crate::{
+    keyless::circuit_constants::prepared_vk_for_testing,
+    state_store::state_key::StateKey,
+    transaction::{
+        authenticator::{
+            AnyPublicKey, AnySignature, EphemeralPublicKey, EphemeralSignature, MAX_NUM_OF_SIGS,
+        },
+        SignedTransaction,
     },
-    SignedTransaction,
 };
 use anyhow::bail;
 use aptos_crypto::{poseidon_bn254, CryptoMaterialError, ValidCryptoMaterial};
@@ -14,9 +18,18 @@ use ark_bn254::Bn254;
 use ark_groth16::PreparedVerifyingKey;
 use ark_serialize::CanonicalSerialize;
 use base64::URL_SAFE_NO_PAD;
+use bytes::Bytes;
+use move_core_types::{
+    account_address::AccountAddress,
+    ident_str,
+    identifier::IdentStr,
+    language_storage::{StructTag, CORE_CODE_ADDRESS},
+    move_resource::{MoveResource, MoveStructType},
+};
 use once_cell::sync::Lazy;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
+    collections::BTreeMap,
     str,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -32,7 +45,7 @@ pub mod proof_simulation;
 pub mod test_utils;
 mod zkp_sig;
 
-use crate::keyless::circuit_constants::prepared_vk_for_testing;
+use crate::state_store::StateView;
 pub use bn254_circom::{
     g1_projective_str_to_affine, g2_projective_str_to_affine, get_public_inputs_hash, G1Bytes,
     G2Bytes, G1_PROJECTIVE_COMPRESSED_NUM_BYTES, G2_PROJECTIVE_COMPRESSED_NUM_BYTES,
@@ -40,7 +53,6 @@ pub use bn254_circom::{
 pub use configuration::Configuration;
 pub use groth16_sig::{Groth16Proof, Groth16ProofAndStatement, ZeroKnowledgeSig};
 pub use groth16_vk::Groth16VerificationKey;
-use move_core_types::account_address::AccountAddress;
 pub use openid_sig::{Claims, OpenIdSig};
 pub use zkp_sig::ZKP;
 
@@ -50,6 +62,49 @@ pub const KEYLESS_ACCOUNT_MODULE_NAME: &str = "keyless_account";
 /// A VK that we use often for keyless e2e tests and smoke tests.
 pub static VERIFICATION_KEY_FOR_TESTING: Lazy<PreparedVerifyingKey<Bn254>> =
     Lazy::new(prepared_vk_for_testing);
+
+/// A Rust representation of keyless Group storing configs.
+#[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Default)]
+pub struct KeylessGroupResource {
+    pub group: BTreeMap<StructTag, Bytes>,
+}
+
+impl MoveStructType for KeylessGroupResource {
+    const MODULE_NAME: &'static IdentStr = ident_str!(KEYLESS_ACCOUNT_MODULE_NAME);
+    const STRUCT_NAME: &'static IdentStr = ident_str!("Group");
+}
+
+impl MoveResource for KeylessGroupResource {}
+
+pub trait KeylessConfigStorage {
+    fn fetch_keyless_config_bytes(&self, state_key: &StateKey) -> Option<Bytes>;
+}
+
+impl<T> KeylessConfigStorage for T
+where
+    T: StateView,
+{
+    fn fetch_keyless_config_bytes(&self, state_key: &StateKey) -> Option<Bytes> {
+        self.get_state_value(state_key)
+            .ok()?
+            .map(|s| s.bytes().clone())
+    }
+}
+
+pub trait KeylessOnchainConfig: MoveStructType + DeserializeOwned {
+    fn fetch_keyless_config<T>(storage: &T) -> Option<(Self, Bytes)>
+    where
+        T: KeylessConfigStorage + ?Sized,
+    {
+        let state_key =
+            StateKey::resource_group(&CORE_CODE_ADDRESS, &KeylessGroupResource::struct_tag());
+        let bytes = storage.fetch_keyless_config_bytes(&state_key)?;
+        let group = bcs::from_bytes::<KeylessGroupResource>(&bytes).ok()?;
+        let bytes = group.group.get(&Self::struct_tag())?;
+        let config = bcs::from_bytes::<Self>(bytes).ok()?;
+        Some((config, bytes.clone()))
+    }
+}
 
 #[macro_export]
 macro_rules! invalid_signature {

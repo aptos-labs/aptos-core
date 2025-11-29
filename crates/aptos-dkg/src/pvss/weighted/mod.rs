@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 pub mod generic_weighting;
-mod weighted_config;
 
+pub use aptos_crypto::weighted_config::WeightedConfigBlstrs;
 pub use generic_weighting::GenericWeighting;
-pub use weighted_config::WeightedConfig;

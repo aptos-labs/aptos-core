@@ -3,33 +3,39 @@
 
 use crate::{
     algebra::polynomials::{get_nonzero_powers_of_tau, shamir_secret_share},
-    fiat_shamir, pvss,
     pvss::{
+        self,
         contribution::{batch_verify_soks, Contribution, SoK},
-        das, encryption_dlog, schnorr, traits,
-        traits::{transcript::MalleableTranscript, HasEncryptionPublicParams, SecretSharingConfig},
-        LowDegreeTest, Player, ThresholdConfig,
+        das, encryption_dlog, schnorr,
+        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
+        LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
+    traits::transcript::Aggregatable,
     utils::{
-        g1_multi_exp, g2_multi_exp, multi_pairing,
+        g1_multi_exp, g2_multi_exp,
         random::{
             insecure_random_g1_points, insecure_random_g2_points, random_g1_point, random_g2_point,
-            random_scalar,
+            random_scalars,
         },
     },
 };
 use anyhow::bail;
-use aptos_crypto::{bls12381, CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial};
+use aptos_crypto::{
+    bls12381,
+    blstrs::{multi_pairing, random_scalar},
+    traits::SecretSharingConfig as _,
+    CryptoMaterialError, Genesis, SigningKey, ValidCryptoMaterial,
+};
 use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
 use blstrs::{G1Projective, G2Projective, Gt};
 use group::Group;
+use rand::thread_rng;
 use serde::{Deserialize, Serialize};
 use std::ops::{Add, Mul, Neg, Sub};
 
 pub const DAS_SK_IN_G1: &'static str = "das_sk_in_g1";
 
 /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
-const DAS_PVSS_FIAT_SHAMIR_DST: &[u8; 30] = b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST";
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq, BCSCryptoHash, CryptoHasher)]
 #[allow(non_snake_case)]
@@ -80,9 +86,13 @@ impl traits::Transcript for Transcript {
     type EncryptPubKey = encryption_dlog::g1::EncryptPubKey;
     type InputSecret = pvss::input_secret::InputSecret;
     type PublicParameters = das::PublicParameters;
-    type SecretSharingConfig = ThresholdConfig;
+    type SecretSharingConfig = ThresholdConfigBlstrs;
     type SigningPubKey = bls12381::PublicKey;
     type SigningSecretKey = bls12381::PrivateKey;
+
+    fn dst() -> Vec<u8> {
+        b"APTOS_DAS_PVSS_FIAT_SHAMIR_DST".to_vec()
+    }
 
     fn scheme_name() -> String {
         DAS_SK_IN_G1.to_string()
@@ -93,6 +103,7 @@ impl traits::Transcript for Transcript {
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
+        _spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
         aux: &A,
@@ -165,18 +176,9 @@ impl traits::Transcript for Transcript {
             );
         }
 
-        // Derive challenges deterministically via Fiat-Shamir; easier to debug for distributed systems
-        // TODO: benchmark this
-        let (f, extra) = fiat_shamir::fiat_shamir_das(
-            self,
-            sc,
-            pp,
-            spks,
-            eks,
-            auxs,
-            &DAS_PVSS_FIAT_SHAMIR_DST[..],
-            2,
-        );
+        // Deriving challenges by flipping coins: less complex to implement & less likely to get wrong. Creates bad RNG risks but we deem that acceptable.
+        let mut rng = thread_rng();
+        let extra = random_scalars(2, &mut rng);
 
         // Verify signature(s) on the secret commitment, player ID and `aux`
         let g_2 = *pp.get_commitment_base();
@@ -190,7 +192,13 @@ impl traits::Transcript for Transcript {
         )?;
 
         // Verify the committed polynomial is of the right degree
-        let ldt = LowDegreeTest::new(f, sc.t, sc.n + 1, true, sc.get_batch_evaluation_domain())?;
+        let ldt = LowDegreeTest::random(
+            &mut rng,
+            sc.t,
+            sc.n + 1,
+            true,
+            sc.get_batch_evaluation_domain(),
+        );
         ldt.low_degree_test_on_g2(&self.V)?;
 
         //
@@ -240,27 +248,6 @@ impl traits::Transcript for Transcript {
             .collect::<Vec<Player>>()
     }
 
-    fn aggregate_with(&mut self, sc: &Self::SecretSharingConfig, other: &Transcript) {
-        debug_assert_eq!(self.C.len(), sc.n);
-        debug_assert_eq!(self.V.len(), sc.n + 1);
-
-        self.hat_w += other.hat_w;
-        self.C_0 += other.C_0;
-
-        for i in 0..sc.n {
-            self.C[i] += other.C[i];
-            self.V[i] += other.V[i];
-        }
-        self.V[sc.n] += other.V[sc.n];
-
-        for sok in &other.soks {
-            self.soks.push(sok.clone());
-        }
-
-        debug_assert_eq!(self.C.len(), other.C.len());
-        debug_assert_eq!(self.V.len(), other.V.len());
-    }
-
     fn get_public_key_share(
         &self,
         _sc: &Self::SecretSharingConfig,
@@ -278,6 +265,7 @@ impl traits::Transcript for Transcript {
         _sc: &Self::SecretSharingConfig,
         player: &Player,
         dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
         let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
         let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
@@ -291,7 +279,11 @@ impl traits::Transcript for Transcript {
     }
 
     #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, rng: &mut R) -> Self
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
@@ -313,6 +305,35 @@ impl traits::Transcript for Transcript {
             C: insecure_random_g1_points(sc.n, rng),
             C_0: random_g1_point(rng),
         }
+    }
+}
+
+impl Aggregatable<ThresholdConfigBlstrs> for Transcript {
+    fn aggregate_with(
+        &mut self,
+        sc: &ThresholdConfigBlstrs,
+        other: &Transcript,
+    ) -> anyhow::Result<()> {
+        debug_assert_eq!(self.C.len(), sc.n);
+        debug_assert_eq!(self.V.len(), sc.n + 1);
+
+        self.hat_w += other.hat_w;
+        self.C_0 += other.C_0;
+
+        for i in 0..sc.n {
+            self.C[i] += other.C[i];
+            self.V[i] += other.V[i];
+        }
+        self.V[sc.n] += other.V[sc.n];
+
+        for sok in &other.soks {
+            self.soks.push(sok.clone());
+        }
+
+        debug_assert_eq!(self.C.len(), other.C.len());
+        debug_assert_eq!(self.V.len(), other.V.len());
+
+        Ok(())
     }
 }
 
