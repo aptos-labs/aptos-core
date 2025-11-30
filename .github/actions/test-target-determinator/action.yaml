@@ -47,7 +47,7 @@ runs:
     - name: Run the framework upgrade test determinator
       id: framework_upgrade_determinator
       run: |
-        export RESULT=$(cargo x targeted-framework-upgrade-tests | awk -F'Framework upgrade test required: ' '{print $2}')
+        export RESULT=$(RUSTFLAGS="--cfg tokio_unstable -C link-arg=-fuse-ld=lld -C force-frame-pointers=yes -C force-unwind-tables=yes" cargo x targeted-framework-upgrade-tests | awk -F'Framework upgrade test required: ' '{print $2}')
         echo "Framework upgrade test required: $RESULT"
         echo "run_framework_upgrade_test=$RESULT" >> $GITHUB_OUTPUT
       shell: bash
