@@ -28,11 +28,15 @@ runs:
     - name: Output the changed files
       run: cargo x changed-files -vv
       shell: bash
+      with:
+        RUSTFLAGS: "-cfg tokio_unstable -C link-arg=-fuse-ld=lld -C force-frame-pointers=yes -C force-unwind-tables=yes"
 
     # Output the affected packages
     - name: Output the affected packages
       run: cargo x affected-packages -vv
       shell: bash
+      with:
+        RUSTFLAGS: "-cfg tokio_unstable -C link-arg=-fuse-ld=lld -C force-frame-pointers=yes -C force-unwind-tables=yes"
 
     # Run the execution performance test determinator
     - name: Run the execution performance test determinator
@@ -42,6 +46,8 @@ runs:
           echo "Execution performance test required: $RESULT"
           echo "run_execution_performance_test=$RESULT" >> $GITHUB_OUTPUT
       shell: bash
+      with:
+        RUSTFLAGS: "-cfg tokio_unstable -C link-arg=-fuse-ld=lld -C force-frame-pointers=yes -C force-unwind-tables=yes"
 
     # Run the framework upgrade test determinator
     - name: Run the framework upgrade test determinator
