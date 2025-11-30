@@ -40,15 +40,15 @@ rustflags = [
   "-C",
   "force-unwind-tables=yes",
   "-C",
-  "target-cpu=x86-64-v3",
+  "target-cpu=x86-64-v4",
 ]
 
 [env]
 CC_x86_64_unknown_linux_gnu = "clang"
 CXX_x86_64_unknown_linux_gnu = "clang++"
-CFLAGS_x86_64_unknown_linux_gnu = "-flto=thin -march=x86-64-v3"
+CFLAGS_x86_64_unknown_linux_gnu = "-flto=thin -march=x86-64-v4"
 # Need `-mpclmul` for RocksDB to build until its build script is fixed.
-CXXFLAGS_x86_64_unknown_linux_gnu = "-flto=thin -march=x86-64-v3 -mpclmul"
+CXXFLAGS_x86_64_unknown_linux_gnu = "-flto=thin -march=x86-64-v4 -mpclmul"
 
 # 64 bit MSVC
 [target.x86_64-pc-windows-msvc]
