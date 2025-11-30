@@ -16,6 +16,11 @@
 # fast fail.
 set -eo pipefail
 
+echo "OS release:"
+cat /etc/os-release
+echo "CPU info:"
+cat /proc/cpuinfo
+
 NODE_MAJOR_VERSION=20
 SHELLCHECK_VERSION=0.7.1
 GRCOV_VERSION=0.8.2
