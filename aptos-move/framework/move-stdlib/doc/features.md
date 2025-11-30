@@ -157,6 +157,8 @@ return true.
 -  [Function `is_distribute_transaction_fee_enabled`](#0x1_features_is_distribute_transaction_fee_enabled)
 -  [Function `get_monotonically_increasing_counter_feature`](#0x1_features_get_monotonically_increasing_counter_feature)
 -  [Function `is_monotonically_increasing_counter_enabled`](#0x1_features_is_monotonically_increasing_counter_enabled)
+-  [Function `get_function_reflection_feature`](#0x1_features_get_function_reflection_feature)
+-  [Function `is_function_reflection_enabled`](#0x1_features_is_function_reflection_enabled)
 -  [Function `change_feature_flags`](#0x1_features_change_feature_flags)
 -  [Function `change_feature_flags_internal`](#0x1_features_change_feature_flags_internal)
 -  [Function `change_feature_flags_for_next_epoch`](#0x1_features_change_feature_flags_for_next_epoch)
@@ -645,6 +647,16 @@ Lifetime: transient
 
 
 <pre><code><b>const</b> <a href="features.md#0x1_features_FEE_PAYER_ENABLED">FEE_PAYER_ENABLED</a>: u64 = 22;
+</code></pre>
+
+
+
+<a id="0x1_features_FUNCTION_REFLECTION"></a>
+
+Whether function reflection is enabled.
+
+
+<pre><code><b>const</b> <a href="features.md#0x1_features_FUNCTION_REFLECTION">FUNCTION_REFLECTION</a>: u64 = 105;
 </code></pre>
 
 
@@ -4004,6 +4016,52 @@ Deprecated feature
 
 <pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_monotonically_increasing_counter_enabled">is_monotonically_increasing_counter_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
     <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_MONOTONICALLY_INCREASING_COUNTER">MONOTONICALLY_INCREASING_COUNTER</a>)
+}
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_get_function_reflection_feature"></a>
+
+## Function `get_function_reflection_feature`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_function_reflection_feature">get_function_reflection_feature</a>(): u64
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_get_function_reflection_feature">get_function_reflection_feature</a>(): u64 { <a href="features.md#0x1_features_FUNCTION_REFLECTION">FUNCTION_REFLECTION</a> }
+</code></pre>
+
+
+
+</details>
+
+<a id="0x1_features_is_function_reflection_enabled"></a>
+
+## Function `is_function_reflection_enabled`
+
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_function_reflection_enabled">is_function_reflection_enabled</a>(): bool
+</code></pre>
+
+
+
+<details>
+<summary>Implementation</summary>
+
+
+<pre><code><b>public</b> <b>fun</b> <a href="features.md#0x1_features_is_function_reflection_enabled">is_function_reflection_enabled</a>(): bool <b>acquires</b> <a href="features.md#0x1_features_Features">Features</a> {
+    <a href="features.md#0x1_features_is_enabled">is_enabled</a>(<a href="features.md#0x1_features_FUNCTION_REFLECTION">FUNCTION_REFLECTION</a>)
 }
 </code></pre>
 

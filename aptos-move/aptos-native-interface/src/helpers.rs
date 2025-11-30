@@ -20,6 +20,17 @@ macro_rules! safely_pop_arg {
             },
         }
     }};
+    ($args:ident) => {{
+        use $crate::reexports::move_vm_types::natives::function::{PartialVMError, StatusCode};
+        match $args.pop_back() {
+            Some(val) => val,
+            None => {
+                return Err($crate::SafeNativeError::InvariantViolation(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR),
+                ))
+            },
+        }
+    }};
 }
 
 /// Returns a field value of the specified type from a struct at a given index.

@@ -106,12 +106,11 @@ module std::bit_vector_tests {
         let bitlen = 133;
         let bitvector = bit_vector::new(bitlen);
 
-        let i = 0;
         for (i in 0..bitlen) {
             bitvector.set(i);
         };
 
-        i = bitlen - 1;
+        let i = bitlen - 1;
         while (i > 0) {
             assert!(bitvector.is_index_set(i), 0);
             bitvector.shift_left(1);
