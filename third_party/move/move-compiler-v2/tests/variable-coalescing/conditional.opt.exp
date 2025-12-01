@@ -43,13 +43,14 @@ fun m::test($t0: bool): u64 {
 [variant baseline]
 fun m::test($t0: bool): u64 {
      var $t1: u64
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
   1: label L0
   2: $t1 := 3
-  3: return $t1
-  4: label L1
-  5: $t1 := 3
-  6: return $t1
+  3: label L2
+  4: return $t1
+  5: label L1
+  6: $t1 := 3
+  7: goto 3
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -59,21 +60,23 @@ fun m::test($t0: bool): u64 {
      var $t1: u64
      # live vars: $t0
      # events: b:$t0, e:$t0
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
      # live vars:
   1: label L0
      # live vars:
      # events: b:$t1
   2: $t1 := 3
      # live vars: $t1
-  3: return $t1
+  3: label L2
+     # live vars: $t1
+  4: return $t1
      # live vars:
-  4: label L1
+  5: label L1
      # live vars:
-  5: $t1 := 3
+  6: $t1 := 3
      # live vars: $t1
      # events: e:$t1
-  6: return $t1
+  7: goto 3
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -81,13 +84,14 @@ fun m::test($t0: bool): u64 {
 [variant baseline]
 fun m::test($t0: bool): u64 {
      var $t1: u64
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
   1: label L0
   2: $t1 := 3
-  3: return $t1
-  4: label L1
-  5: $t1 := 3
-  6: return $t1
+  3: label L2
+  4: return $t1
+  5: label L1
+  6: $t1 := 3
+  7: goto 3
 }
 
 ============ after DeadStoreElimination: ================
@@ -95,13 +99,14 @@ fun m::test($t0: bool): u64 {
 [variant baseline]
 fun m::test($t0: bool): u64 {
      var $t1: u64
-  0: if ($t0) goto 1 else goto 4
+  0: if ($t0) goto 1 else goto 5
   1: label L0
   2: $t1 := 3
-  3: return $t1
-  4: label L1
-  5: $t1 := 3
-  6: return $t1
+  3: label L2
+  4: return $t1
+  5: label L1
+  6: $t1 := 3
+  7: goto 3
 }
 
 
@@ -110,13 +115,17 @@ fun m::test($t0: bool): u64 {
 module 0xc0ffee::m
 // Function definition at index 0
 fun test(l0: bool): u64
+    local l1: u64
     move_loc l0
     br_false l0
     ld_u64 3
-    ret
-l0: ld_u64 3
+    st_loc l1
+l1: move_loc l1
     // @5
     ret
+l0: ld_u64 3
+    st_loc l1
+    branch l1
 
 
 ============ bytecode verification succeeded ========

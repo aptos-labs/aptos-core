@@ -1417,7 +1417,7 @@ fun valid_control_flow::test1($t0: i64, $t1: i64): i64 {
      # live vars: $t0, $t1, $t5
   1: $t4 := >($t5, $t1)
      # live vars: $t0, $t1, $t4
-  2: if ($t4) goto 3 else goto 13
+  2: if ($t4) goto 3 else goto 14
      # live vars: $t0, $t1
   3: label L0
      # live vars: $t0, $t1
@@ -1425,27 +1425,29 @@ fun valid_control_flow::test1($t0: i64, $t1: i64): i64 {
      # live vars: $t0, $t1, $t4
   5: label L2
      # live vars: $t0, $t1, $t4
-  6: if ($t4) goto 7 else goto 10
+  6: if ($t4) goto 7 else goto 11
      # live vars: $t0, $t1
   7: label L3
      # live vars: $t0
   8: $t5 := move($t0)
      # live vars: $t5
-  9: return $t5
-     # live vars: $t0, $t1
- 10: label L4
-     # live vars: $t1
- 11: $t5 := move($t1)
+  9: label L5
      # live vars: $t5
- 12: return $t5
+ 10: return $t5
      # live vars: $t0, $t1
- 13: label L1
+ 11: label L4
+     # live vars: $t1
+ 12: $t5 := move($t1)
+     # live vars: $t5
+ 13: goto 9
      # live vars: $t0, $t1
- 14: $t5 := copy($t0)
+ 14: label L1
+     # live vars: $t0, $t1
+ 15: $t5 := copy($t0)
      # live vars: $t0, $t1, $t5
- 15: $t4 := ==($t5, $t1)
+ 16: $t4 := ==($t5, $t1)
      # live vars: $t0, $t1, $t4
- 16: goto 5
+ 17: goto 5
 }
 
 
@@ -1461,7 +1463,7 @@ fun valid_control_flow::test2($t0: i128, $t1: i128): i128 {
      # live vars: $t0, $t1, $t5
   1: $t4 := >($t5, $t1)
      # live vars: $t0, $t1, $t4
-  2: if ($t4) goto 3 else goto 13
+  2: if ($t4) goto 3 else goto 14
      # live vars: $t0, $t1
   3: label L0
      # live vars: $t0, $t1
@@ -1469,27 +1471,29 @@ fun valid_control_flow::test2($t0: i128, $t1: i128): i128 {
      # live vars: $t0, $t1, $t4
   5: label L2
      # live vars: $t0, $t1, $t4
-  6: if ($t4) goto 7 else goto 10
+  6: if ($t4) goto 7 else goto 11
      # live vars: $t0, $t1
   7: label L3
      # live vars: $t0
   8: $t5 := move($t0)
      # live vars: $t5
-  9: return $t5
-     # live vars: $t0, $t1
- 10: label L4
-     # live vars: $t1
- 11: $t5 := move($t1)
+  9: label L5
      # live vars: $t5
- 12: return $t5
+ 10: return $t5
      # live vars: $t0, $t1
- 13: label L1
+ 11: label L4
+     # live vars: $t1
+ 12: $t5 := move($t1)
+     # live vars: $t5
+ 13: goto 9
      # live vars: $t0, $t1
- 14: $t5 := copy($t0)
+ 14: label L1
+     # live vars: $t0, $t1
+ 15: $t5 := copy($t0)
      # live vars: $t0, $t1, $t5
- 15: $t4 := ==($t5, $t1)
+ 16: $t4 := ==($t5, $t1)
      # live vars: $t0, $t1, $t4
- 16: goto 5
+ 17: goto 5
 }
 
 
@@ -1726,6 +1730,7 @@ struct S3<T0> has copy + drop
 // Function definition at index 0
 fun test1(l0: i64, l1: i64): i64
     local l2: bool
+    local l3: i64
     copy_loc l0
     copy_loc l1
     gt
@@ -1733,23 +1738,27 @@ fun test1(l0: i64, l1: i64): i64
     ld_true
     // @5
     st_loc l2
-l2: move_loc l2
+l3: move_loc l2
     br_false l1
     move_loc l0
-    ret
+    st_loc l3
     // @10
-l1: move_loc l1
+l2: move_loc l3
     ret
+l1: move_loc l1
+    st_loc l3
+    branch l2
+    // @15
 l0: copy_loc l0
     copy_loc l1
     eq
-    // @15
     st_loc l2
-    branch l2
+    branch l3
 
 // Function definition at index 1
 fun test2(l0: i128, l1: i128): i128
     local l2: bool
+    local l3: i128
     copy_loc l0
     copy_loc l1
     gt
@@ -1757,19 +1766,22 @@ fun test2(l0: i128, l1: i128): i128
     ld_true
     // @5
     st_loc l2
-l2: move_loc l2
+l3: move_loc l2
     br_false l1
     move_loc l0
-    ret
+    st_loc l3
     // @10
-l1: move_loc l1
+l2: move_loc l3
     ret
+l1: move_loc l1
+    st_loc l3
+    branch l2
+    // @15
 l0: copy_loc l0
     copy_loc l1
     eq
-    // @15
     st_loc l2
-    branch l2
+    branch l3
 
 // Function definition at index 2
 fun test3(l0: i64, l1: i64): i64

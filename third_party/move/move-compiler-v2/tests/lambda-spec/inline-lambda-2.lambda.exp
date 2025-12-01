@@ -992,7 +992,7 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
      # live vars: $t0, $t1, $t5
   3: $t4 := ==($t5, $t0)
      # live vars: $t1, $t4
-  4: if ($t4) goto 5 else goto 10
+  4: if ($t4) goto 5 else goto 11
      # live vars: $t1
   5: label L0
      # live vars: $t1
@@ -1002,13 +1002,15 @@ fun m::__lambda__1_inline_1_956__test($t0: vector<u8>, $t1: u64, $t2: &0x42::m::
      # live vars: $t7, $t8
   8: $t4 := >($t7, $t8)
      # live vars: $t4
-  9: return $t4
-     # live vars: $t1
- 10: label L1
-     # live vars:
- 11: $t4 := false
+  9: label L2
      # live vars: $t4
- 12: return $t4
+ 10: return $t4
+     # live vars: $t1
+ 11: label L1
+     # live vars:
+ 12: $t4 := false
+     # live vars: $t4
+ 13: goto 9
 }
 
 
@@ -1089,6 +1091,7 @@ l2: move_loc l6
 
 // Function definition at index 1
 fun __lambda__1_inline_1_956__test(l0: vector<u8>, l1: u64, l2: &T): bool
+    local l3: bool
     nop
     move_loc l2
     borrow_field T, issuer
@@ -1101,9 +1104,13 @@ fun __lambda__1_inline_1_956__test(l0: vector<u8>, l1: u64, l2: &T): bool
     ld_u64 0
     gt
     // @10
+    st_loc l3
+l1: move_loc l3
     ret
 l0: ld_false
-    ret
+    st_loc l3
+    // @15
+    branch l1
 
 
 ============ bytecode verification succeeded ========

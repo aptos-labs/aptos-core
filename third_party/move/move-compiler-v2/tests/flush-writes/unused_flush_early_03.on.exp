@@ -83,17 +83,19 @@ public fun m::test1() {
      # live vars: $t0, $t2
  21: $t3 := ==($t2, $t0)
      # live vars: $t3
- 22: if ($t3) goto 23 else goto 26
+ 22: if ($t3) goto 25 else goto 23
      # live vars:
- 23: label L6
+ 23: label L11
      # live vars:
- 24: m::bar()
+ 24: goto 27
      # live vars:
- 25: return ()
+ 25: label L6
      # live vars:
- 26: label L8
+ 26: m::bar()
      # live vars:
- 27: return ()
+ 27: label L8
+     # live vars:
+ 28: return ()
 }
 
 
@@ -135,11 +137,11 @@ l3: move_loc l0
     // @15
     ld_u64 0
     eq
-    br_false l4
-    call bar
-    ret
+    br_true l4
+    branch l5
+l4: call bar
     // @20
-l4: ret
+l5: ret
 
 
 ============ bytecode verification succeeded ========
