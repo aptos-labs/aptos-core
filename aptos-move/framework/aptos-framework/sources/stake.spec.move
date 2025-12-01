@@ -299,9 +299,9 @@ spec aptos_framework::stake {
             + len(post_pending_inactive_validators);
 
         aborts_if !validator_find_bool && !option::is_some(spec_find_validator(active_validators, pool_address));
-        aborts_if !validator_find_bool && vector::length(validator_set.active_validators) <= option::borrow(spec_find_validator(active_validators, pool_address));
+        aborts_if !validator_find_bool && vector::length(validator_set.active_validators) <= option::spec_borrow(spec_find_validator(active_validators, pool_address));
         aborts_if !validator_find_bool && vector::length(validator_set.active_validators) < 2;
-        aborts_if validator_find_bool && vector::length(validator_set.pending_active) <= option::borrow(spec_find_validator(pending_active, pool_address));
+        aborts_if validator_find_bool && vector::length(validator_set.pending_active) <= option::spec_borrow(spec_find_validator(pending_active, pool_address));
         let post p_validator_set = global<ValidatorSet>(@aptos_framework);
         let validator_stake = (get_next_epoch_voting_power(stake_pool) as u128);
         ensures validator_find_bool && validator_set.total_joining_power > validator_stake ==>
@@ -473,9 +473,9 @@ spec aptos_framework::stake {
         let validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let post post_validator_perf = global<ValidatorPerformance>(@aptos_framework);
         let validator_len = len(validator_perf.validators);
-        ensures (option::is_some(ghost_proposer_idx) && option::borrow(ghost_proposer_idx) < validator_len) ==>
-            (post_validator_perf.validators[option::borrow(ghost_proposer_idx)].successful_proposals ==
-                validator_perf.validators[option::borrow(ghost_proposer_idx)].successful_proposals + 1);
+        ensures (option::is_some(ghost_proposer_idx) && option::spec_borrow(ghost_proposer_idx) < validator_len) ==>
+            (post_validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
+                validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
     }
 
     spec next_validator_consensus_infos {
@@ -655,7 +655,7 @@ spec aptos_framework::stake {
         pragma opaque;
         aborts_if false;
         ensures option::is_none(result) ==> (forall i in 0..len(v): v[i].addr != addr);
-        ensures option::is_some(result) ==> v[option::borrow(result)].addr == addr;
+        ensures option::is_some(result) ==> v[option::spec_borrow(result)].addr == addr;
         // Additional postcondition to help the quantifier instantiation.
         ensures option::is_some(result) ==> spec_contains(v, addr);
         ensures [abstract] result == spec_find_validator(v,addr);
