@@ -12,22 +12,19 @@ module 0xcafe::Module0 {
     public fun function3(p0: bool, p1: bool) {
         let _v0 = Enum0::Variant0{};
         let _v1 = &_v0;
-        'l0: loop {
-            loop {
-                if (!(_v1 is Variant2)) {
-                    if (_v1 is Variant1) {
-                        let Enum0::Variant1{field: _v2} = _v0;
-                        if (!p1) break;
-                        break
-                    };
-                    if (_v1 is Variant0) break 'l0;
-                    abort 14566554180833181697
-                };
+        loop {
+            if (_v1 is Variant2) {
                 let Enum0::Variant2{} = _v0;
-                return ()
+                break
             };
-            return ()
+            if (_v1 is Variant1) {
+                let Enum0::Variant1{field: _v2} = _v0;
+                if (p1) break;
+                break
+            };
+            assert!(_v1 is Variant0, 14566554180833181697);
+            let Enum0::Variant0{} = _v0;
+            break
         };
-        let Enum0::Variant0{} = _v0;
     }
 }

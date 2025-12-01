@@ -238,17 +238,19 @@ public fun m::test($t0: u64) {
      # live vars: $t0, $t1
   4: $t2 := >($t0, $t1)
      # live vars: $t2
-  5: if ($t2) goto 6 else goto 9
+  5: if ($t2) goto 8 else goto 6
      # live vars:
-  6: label L0
+  6: label L3
      # live vars:
-  7: m::foo()
+  7: goto 10
      # live vars:
-  8: return ()
+  8: label L0
      # live vars:
-  9: label L2
+  9: m::foo()
      # live vars:
- 10: return ()
+ 10: label L2
+     # live vars:
+ 11: return ()
 }
 
 
@@ -285,11 +287,11 @@ fun one(): u64
     // @5
     move_loc l1
     gt
-    br_false l0
-    call foo
-    ret
+    br_true l0
+    branch l1
+l0: call foo
     // @10
-l0: ret
+l1: ret
 
 // Function definition at index 3
 fun two(): u64

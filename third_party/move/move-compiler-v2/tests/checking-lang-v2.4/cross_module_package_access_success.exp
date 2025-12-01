@@ -315,7 +315,10 @@ fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
      var $t2: &0xc0ffee::m::Wrapper
   0: $t2 := borrow_local($t0)
   1: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
-  2: return $t1
+  2: if ($t1) goto 4 else goto 3
+  3: label L1
+  4: label L0
+  5: return $t1
 }
 
 
@@ -593,7 +596,10 @@ fun n5::test_test_variant($t0: 0xc0ffee::m::Wrapper): bool {
      var $t2: &0xc0ffee::m::Wrapper
   0: $t2 := borrow_local($t0)
   1: $t1 := test_variant 0xc0ffee::m::Wrapper::V1($t2)
-  2: return $t1
+  2: if ($t1) goto 4 else goto 3
+  3: label L1
+  4: label L0
+  5: return $t1
 }
 
 

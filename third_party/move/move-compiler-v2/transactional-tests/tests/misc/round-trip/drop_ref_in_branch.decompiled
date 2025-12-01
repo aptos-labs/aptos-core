@@ -10,11 +10,7 @@ module 0x42::m {
     {
         let _v0 = borrow_global_mut<R>(@0x42);
         let _v1 = get_vmut(_v0);
-        if (*_v1 > 0) {
-            *_v1 = 0;
-            return ()
-        };
-        some(_v0);
+        if (*_v1 > 0) *_v1 = 0 else some(_v0);
     }
     fun get_vmut(p0: &mut R): &mut u64 {
         &mut p0.v
