@@ -153,6 +153,7 @@ members = [
     "experimental/runtimes",
     "experimental/storage/hexy",
     "experimental/storage/layered-map",
+    "experimental/storage/smt",
     "keyless/pepper/common",
     "keyless/pepper/example-client-rust",
     "keyless/pepper/service",

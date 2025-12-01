@@ -17466,6 +17466,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "smt"
+version = "0.1.0"
+dependencies = [
+ "aptos-crypto",
+]
+
+[[package]]
 name = "smt2parser"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
