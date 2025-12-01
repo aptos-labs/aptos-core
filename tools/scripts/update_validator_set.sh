@@ -356,7 +356,7 @@ update_consensus_keys() {
 # Operator operation
 # TODO: add fullnode host here as well.
 update_network_address() {
-	$MOVEMENT_CLI node update-validator-network-addresses \
+	aptos node update-validator-network-addresses \
 		--pool-address "$POOL_ADDRESS" \
 		--validator-host "$VALIDATOR_HOST" \
 		--validator-network-public-key "$NETWORK_PUBLIC_KEY" \
@@ -366,6 +366,7 @@ update_network_address() {
 		--gas-unit-price 100 \
 		--max-gas 20000 \
 		--assume-yes
+
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to update network address"
 		exit 1
@@ -684,6 +685,4 @@ check_account_balance
 execution_summary
 execute
 execution_result
-
-# >>> Delegated pool flow inserted here, after execution_result <<<
 setup_delegated_pool_flow
