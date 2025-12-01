@@ -1,5 +1,5 @@
 processed 2 tasks
-task 0 lines 3-40:  publish [module 0xc0ffee::m {]
+task 0 lines 3-32:  publish [module 0xc0ffee::m {]
 warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
   ┌─ TEMPFILE:8:17
   │
@@ -13,4 +13,4 @@ warning: Unused value of parameter `p0`. Consider removing the parameter, or pre
    │                  ^^
 
 
-task 1 lines 43-43:  run 0xc0ffee::m::main
+task 1 lines 35-35:  run 0xc0ffee::m::main

@@ -3,8 +3,9 @@
 //# publish
 module 0xc0ffee::m {
     public fun test(p0: bool): u32 {
-        if (p0) return 1u32;
-        9u32
+        let _v0;
+        if (p0) _v0 = 1u32 else _v0 = 9u32;
+        _v0
     }
 }
 

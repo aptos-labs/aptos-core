@@ -18,86 +18,79 @@ module 0xc0ffee::m {
     }
     public fun test1(p0: A) {
         let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.a is Q1))) {
-            if (!((_v0 is V1) && (&_v0.b is R1))) {
-                loop {
-                    if (_v0 is V1) {
-                        let _v1 = &_v0.a;
-                        let _v2 = &_v0.b;
-                        if (_v1 is Q2) {
-                            if (_v2 is R2) break}
-                    };
-                    abort 14566554180833181697
-                };
-                let A::V1{a: _v3, b: _v4} = p0;
-                let Q::Q2{} = _v3;
-                let R::R2{} = _v4;
-                return ()
-            };
-            let A::V1{a: _v5, b: _v6} = p0;
-            let R::R1{} = _v6;
-            return ()
-        };
-        let A::V1{a: _v7, b: _v8} = p0;
-        let Q::Q1{} = _v7;
-    }
-    public fun test2(p0: A) {
-        let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.a is Q1))) {
-            if (!((_v0 is V1) && (&_v0.b is R1))) {
-                assert!(_v0 is V1, 14566554180833181697);
-                let A::V1{a: _v1, b: _v2} = p0;
-                return ()
-            };
+        if ((_v0 is V1) && (&_v0.a is Q1)) {
+            let A::V1{a: _v1, b: _v2} = p0;
+            let Q::Q1{} = _v1;
+        } else if ((_v0 is V1) && (&_v0.b is R1)) {
             let A::V1{a: _v3, b: _v4} = p0;
             let R::R1{} = _v4;
-            return ()
+        } else {
+            loop {
+                if (_v0 is V1) {
+                    let _v5 = &_v0.a;
+                    let _v6 = &_v0.b;
+                    if (_v5 is Q2) {
+                        if (_v6 is R2) break}
+                };
+                abort 14566554180833181697
+            };
+            let A::V1{a: _v7, b: _v8} = p0;
+            let Q::Q2{} = _v7;
+            let R::R2{} = _v8;
         };
-        let A::V1{a: _v5, b: _v6} = p0;
-        let Q::Q1{} = _v5;
+    }
+    public fun test2(p0: A) {
+        let _v0;
+        let _v1;
+        let _v2 = &p0;
+        if ((_v2 is V1) && (&_v2.a is Q1)) {
+            let A::V1{a: _v3, b: _v4} = p0;
+            let Q::Q1{} = _v3;
+        } else if ((_v2 is V1) && (&_v2.b is R1)) {
+            let A::V1{a: _v5, b: _v6} = p0;
+            let R::R1{} = _v6;
+        } else if (_v2 is V1) A::V1{a: _v1, b: _v0} = p0 else abort 14566554180833181697;
     }
     public fun test3(p0: A) {
         let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.a is Q1))) {
-            if (!((_v0 is V1) && (&_v0.b is R1))) return ();
+        if ((_v0 is V1) && (&_v0.a is Q1)) {
             let A::V1{a: _v1, b: _v2} = p0;
-            let R::R1{} = _v2;
-            return ()
-        };
-        let A::V1{a: _v3, b: _v4} = p0;
-        let Q::Q1{} = _v3;
+            let Q::Q1{} = _v1;
+        } else if (_v0 is V1) {
+            if (&_v0.b is R1) {
+                let A::V1{a: _v3, b: _v4} = p0;
+                let R::R1{} = _v4;
+            }};
     }
     public fun test4(p0: A) {
-        let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.a is Q1))) {
-            assert!(_v0 is V1, 14566554180833181697);
-            let A::V1{a: _v1, b: _v2} = p0;
-            return ()
-        };
-        let A::V1{a: _v3, b: _v4} = p0;
-        let Q::Q1{} = _v3;
+        let _v0;
+        let _v1;
+        let _v2 = &p0;
+        if ((_v2 is V1) && (&_v2.a is Q1)) {
+            let A::V1{a: _v3, b: _v4} = p0;
+            let Q::Q1{} = _v3;
+        } else if (_v2 is V1) A::V1{a: _v1, b: _v0} = p0 else abort 14566554180833181697;
     }
     public fun test5(p0: A) {
         let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.a is Q1))) {
-            assert!((_v0 is V1) && (&_v0.a is Q2), 14566554180833181697);
+        if ((_v0 is V1) && (&_v0.a is Q1)) {
             let A::V1{a: _v1, b: _v2} = p0;
-            let Q::Q2{} = _v1;
-            return ()
-        };
-        let A::V1{a: _v3, b: _v4} = p0;
-        let Q::Q1{} = _v3;
+            let Q::Q1{} = _v1;
+        } else if ((_v0 is V1) && (&_v0.a is Q2)) {
+            let A::V1{a: _v3, b: _v4} = p0;
+            let Q::Q2{} = _v3;
+        } else abort 14566554180833181697;
     }
     public fun test6(p0: A) {
         let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.a is Q1))) {
-            if (!((_v0 is V1) && (&_v0.a is Q2))) return ();
+        if ((_v0 is V1) && (&_v0.a is Q1)) {
             let A::V1{a: _v1, b: _v2} = p0;
-            let Q::Q2{} = _v1;
-            return ()
-        };
-        let A::V1{a: _v3, b: _v4} = p0;
-        let Q::Q1{} = _v3;
+            let Q::Q1{} = _v1;
+        } else if (_v0 is V1) {
+            if (&_v0.a is Q2) {
+                let A::V1{a: _v3, b: _v4} = p0;
+                let Q::Q2{} = _v3;
+            }};
     }
 }
 
@@ -125,36 +118,32 @@ module 0xc0ffee::n {
     }
     public fun test(p0: A) {
         let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.a is P1))) {
-            if (!((_v0 is V1) && (&_v0.b is Q1))) {
-                if (!((_v0 is V1) && (&_v0.c is R1))) {
-                    loop {
-                        if (_v0 is V1) {
-                            let _v1 = &_v0.a;
-                            let _v2 = &_v0.b;
-                            let _v3 = &_v0.c;
-                            if (_v1 is P2) {
-                                if (_v2 is Q2) {
-                                    if (_v3 is R2) break}}
-                        };
-                        abort 14566554180833181697
-                    };
-                    let A::V1{a: _v4, b: _v5, c: _v6} = p0;
-                    let P::P2{} = _v4;
-                    let Q::Q2{} = _v5;
-                    let R::R2{} = _v6;
-                    return ()
+        if ((_v0 is V1) && (&_v0.a is P1)) {
+            let A::V1{a: _v1, b: _v2, c: _v3} = p0;
+            let P::P1{} = _v1;
+        } else if ((_v0 is V1) && (&_v0.b is Q1)) {
+            let A::V1{a: _v4, b: _v5, c: _v6} = p0;
+            let Q::Q1{} = _v5;
+        } else if ((_v0 is V1) && (&_v0.c is R1)) {
+            let A::V1{a: _v7, b: _v8, c: _v9} = p0;
+            let R::R1{} = _v9;
+        } else {
+            loop {
+                if (_v0 is V1) {
+                    let _v10 = &_v0.a;
+                    let _v11 = &_v0.b;
+                    let _v12 = &_v0.c;
+                    if (_v10 is P2) {
+                        if (_v11 is Q2) {
+                            if (_v12 is R2) break}}
                 };
-                let A::V1{a: _v7, b: _v8, c: _v9} = p0;
-                let R::R1{} = _v9;
-                return ()
+                abort 14566554180833181697
             };
-            let A::V1{a: _v10, b: _v11, c: _v12} = p0;
-            let Q::Q1{} = _v11;
-            return ()
+            let A::V1{a: _v13, b: _v14, c: _v15} = p0;
+            let P::P2{} = _v13;
+            let Q::Q2{} = _v14;
+            let R::R2{} = _v15;
         };
-        let A::V1{a: _v13, b: _v14, c: _v15} = p0;
-        let P::P1{} = _v13;
     }
 }
 
@@ -196,16 +185,13 @@ module 0xc0ffee::o {
         }
     }
     public fun test1(p0: E) {
-        let _v0 = &p0;
-        loop {
-            if (!(_v0 is V1)) {
-                if (_v0 is V2) break;
-                abort 14566554180833181697
-            };
-            let E::V1{a: _v1, b: _v2} = p0;
-            return ()
-        };
-        let E::V2{a: _v3, b: _v4, c: _v5} = p0;
+        let _v0;
+        let _v1;
+        let _v2;
+        let _v3;
+        let _v4;
+        let _v5 = &p0;
+        if (_v5 is V1) E::V1{a: _v4, b: _v3} = p0 else if (_v5 is V2) E::V2{a: _v2, b: _v1, c: _v0} = p0 else abort 14566554180833181697;
     }
     public fun test2(p0: E) {
         let _v0 = &p0;
@@ -214,69 +200,77 @@ module 0xc0ffee::o {
             if (_v0 is V1) {
                 _v1 = &_v0.b;
                 if (_v1 is G1) {
-                    if (&_v1.a is H1) break}
+                    if (&_v1.a is H1) {
+                        let E::V1{a: _v2, b: _v3} = p0;
+                        let G::G1{a: _v4, b: _v5} = _v3;
+                        let H::H1{a: _v6} = _v4;
+                        break
+                    }}
             };
-            loop {
-                if (_v0 is V1) {
-                    _v1 = &_v0.b;
-                    if (_v1 is G1) {
-                        if (&_v1.b is H1) break}
-                };
-                if (!((_v0 is V1) && (&_v0.a is F1))) {
-                    if (!((_v0 is V1) && (&_v0.a is F2))) {
-                        assert!(_v0 is V2, 14566554180833181697);
-                        let E::V2{a: _v2, b: _v3, c: _v4} = p0;
-                        return ()
-                    };
-                    let E::V1{a: _v5, b: _v6} = p0;
-                    let F::F2{a: _v7} = _v5;
-                    return ()
-                };
-                let E::V1{a: _v8, b: _v9} = p0;
-                let F::F1{} = _v8;
-                return ()
+            if (_v0 is V1) {
+                _v1 = &_v0.b;
+                if (_v1 is G1) {
+                    if (&_v1.b is H1) {
+                        let E::V1{a: _v7, b: _v8} = p0;
+                        let G::G1{a: _v9, b: _v10} = _v8;
+                        let H::H1{a: _v11} = _v10;
+                        break
+                    }}
             };
-            let E::V1{a: _v10, b: _v11} = p0;
-            let G::G1{a: _v12, b: _v13} = _v11;
-            let H::H1{a: _v14} = _v13;
-            return ()
+            if (_v0 is V1) {
+                if (&_v0.a is F1) {
+                    let E::V1{a: _v12, b: _v13} = p0;
+                    let F::F1{} = _v12;
+                    break
+                }};
+            if (_v0 is V1) {
+                if (&_v0.a is F2) {
+                    let E::V1{a: _v14, b: _v15} = p0;
+                    let F::F2{a: _v16} = _v14;
+                    break
+                }};
+            assert!(_v0 is V2, 14566554180833181697);
+            let E::V2{a: _v17, b: _v18, c: _v19} = p0;
+            break
         };
-        let E::V1{a: _v15, b: _v16} = p0;
-        let G::G1{a: _v17, b: _v18} = _v16;
-        let H::H1{a: _v19} = _v17;
     }
     public fun test3(p0: E) {
         let _v0 = &p0;
-        if (!((_v0 is V1) && (&_v0.b is G1))) {
-            if (!((_v0 is V1) && (&_v0.a is F2))) {
-                loop {
-                    if (_v0 is V1) {
-                        let _v1 = &_v0.a;
-                        let _v2 = &_v0.b;
-                        if (_v1 is F1) {
-                            if (_v2 is G2) {
-                                if (&_v2.a is H2) break}}
-                    };
-                    if (!((_v0 is V1) && (&_v0.a is F1))) {
-                        assert!(_v0 is V2, 14566554180833181697);
-                        let E::V2{a: _v3, b: _v4, c: _v5} = p0;
-                        return ()
-                    };
-                    let E::V1{a: _v6, b: _v7} = p0;
-                    let F::F1{} = _v6;
-                    return ()
-                };
-                let E::V1{a: _v8, b: _v9} = p0;
-                let F::F1{} = _v8;
-                let G::G2{a: _v10} = _v9;
-                let H::H2{b: _v11} = _v10;
-                return ()
+        loop {
+            if (_v0 is V1) {
+                if (&_v0.b is G1) {
+                    let E::V1{a: _v1, b: _v2} = p0;
+                    let G::G1{a: _v3, b: _v4} = _v2;
+                    break
+                }};
+            if (_v0 is V1) {
+                if (&_v0.a is F2) {
+                    let E::V1{a: _v5, b: _v6} = p0;
+                    let F::F2{a: _v7} = _v5;
+                    break
+                }};
+            if (_v0 is V1) {
+                let _v8 = &_v0.a;
+                let _v9 = &_v0.b;
+                if (_v8 is F1) {
+                    if (_v9 is G2) {
+                        if (&_v9.a is H2) {
+                            let E::V1{a: _v10, b: _v11} = p0;
+                            let F::F1{} = _v10;
+                            let G::G2{a: _v12} = _v11;
+                            let H::H2{b: _v13} = _v12;
+                            break
+                        }}}
             };
-            let E::V1{a: _v12, b: _v13} = p0;
-            let F::F2{a: _v14} = _v12;
-            return ()
+            if (_v0 is V1) {
+                if (&_v0.a is F1) {
+                    let E::V1{a: _v14, b: _v15} = p0;
+                    let F::F1{} = _v14;
+                    break
+                }};
+            assert!(_v0 is V2, 14566554180833181697);
+            let E::V2{a: _v16, b: _v17, c: _v18} = p0;
+            break
         };
-        let E::V1{a: _v15, b: _v16} = p0;
-        let G::G1{a: _v17, b: _v18} = _v16;
     }
 }
