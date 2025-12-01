@@ -37,6 +37,41 @@ pub trait Reconstructable<SSC: traits::SecretSharingConfig>: Sized {
     fn reconstruct(sc: &SSC, shares: &[ShamirShare<Self::ShareValue>]) -> Result<Self>;
 }
 
+use crate::weighted_config::WeightedConfigArkworks;
+
+
+// impl<F: FftField, SK: Reconstructable<ShamirThresholdConfig<F>>> Reconstructable<WeightedConfigArkworks<F>> for SK {
+//     type ShareValue = Vec<SK::ShareValue>;
+
+//     fn reconstruct(
+//         sc: &WeightedConfigArkworks<F>,
+//         shares: &[ShamirShare<Self::ShareValue>],
+//     ) -> anyhow::Result<Self> {
+//         let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
+
+//         // println!();
+//         for (player, sub_shares) in shares {
+//             // println!(
+//             //     "Flattening {} share(s) for player {player}",
+//             //     sub_shares.len()
+//             // );
+//             for (pos, share) in sub_shares.iter().enumerate() {
+//                 let virtual_player = sc.get_virtual_player(player, pos);
+
+//                 // println!(
+//                 //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
+//                 //     share
+//                 // );
+//                 // TODO(Performance): Avoiding the cloning here might be nice
+//                 let tuple = (virtual_player, share.clone());
+//                 flattened_shares.push(tuple);
+//             }
+//         }
+
+//         SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
+//     }
+// }
+
 /// Configuration for a threshold cryptography scheme. Usually one restricts `F` to `Primefield`
 /// but any field is theoretically possible.
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
@@ -299,15 +334,16 @@ impl<F: FftField> ShamirThresholdConfig<F> {
 impl<T: WeightedSum> Reconstructable<ShamirThresholdConfig<T::Scalar>> for T {
     type ShareValue = T;
 
+    // Can receive more than `sc.t` shares, but will only use the first `sc.t` shares for efficiency
     fn reconstruct(
         sc: &ShamirThresholdConfig<T::Scalar>,
         shares: &[ShamirShare<Self::ShareValue>],
     ) -> Result<Self> {
-        if shares.len() != sc.t {
-            Err(anyhow!("Incorrect number of shares provided"))
+        if shares.len() < sc.t {
+            Err(anyhow!("Incorrect number of shares provided, received {} but expected at least {}", shares.len(), sc.t))
         } else {
             let (roots_of_unity_indices, bases): (Vec<usize>, Vec<Self::ShareValue>) =
-                shares.iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
+                shares[..sc.t].iter().map(|(p, g_y)| (p.get_id(), g_y)).collect();
 
             let lagrange_coeffs = sc.lagrange_for_subset(&roots_of_unity_indices);
 

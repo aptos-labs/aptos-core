@@ -6,6 +6,8 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
+#[cfg(test)]
+use aptos_crypto::weighted_config::WeightedConfigArkworks;
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
     traits::SecretSharingConfig as _,
@@ -33,6 +35,7 @@ fn test_pvss_all_unweighted() {
     //
     // Unweighted PVSS tests
     //
+    // TODO: might be better to grab (t,n) pairs, then intialise them for each PVSS using `new()` ? and consider renaming that `new_from_threshold()` ?
     let tcs = test_utils::get_threshold_configs_for_testing();
     for tc in tcs {
         println!("\nTesting {tc} PVSS");
@@ -91,6 +94,18 @@ fn test_pvss_all_weighted() {
 
         // Provably-secure Das PVSS
         pvss_deal_verify_and_reconstruct::<das::WeightedTranscript>(&wc, seed.to_bytes_le());
+    }
+
+    // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead
+    let wcs = test_utils::get_weighted_configs_for_testing();
+    for wc in wcs {
+        println!("\nTesting {wc} PVSS");
+        let seed = random_scalar(&mut rng);
+
+        pvss_deal_verify_and_reconstruct_asdfasdf::<ark_bn254::Bn254, chunky::WeightedTranscript<ark_bn254::Bn254>>(
+            &wc,
+            seed.to_bytes_le(),
+        );
     }
 }
 
@@ -166,6 +181,45 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript>(
     let mut rng = StdRng::from_seed(seed_bytes);
 
     let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+
+    // Test dealing
+    let trx = T::deal(
+        &sc,
+        &d.pp,
+        &d.ssks[0],
+        &d.spks[0],
+        &d.eks,
+        &d.s,
+        &NoAux,
+        &sc.get_player(0),
+        &mut rng,
+    );
+    trx.verify(&sc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &vec![NoAux])
+        .expect("PVSS transcript failed verification");
+
+    // Test transcript (de)serialization
+    let trx_deserialized = T::try_from(trx.to_bytes().as_slice())
+        .expect("serialized transcript should deserialize correctly");
+
+    assert_eq!(trx, trx_deserialized);
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
+        panic!("Reconstructed SK did not match");
+    }
+}
+
+use ark_ec::pairing::Pairing;
+// TODO: merge this shit
+#[cfg(test)]
+fn pvss_deal_verify_and_reconstruct_asdfasdf<E: Pairing, T: Transcript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>>(
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    seed_bytes: [u8; 32],
+) {
+    // println!();
+    // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
+    let mut rng = StdRng::from_seed(seed_bytes);
+
+    let d = test_utils::setup_dealing_weighted::<E, T, StdRng>(sc, &mut rng);
 
     // Test dealing
     let trx = T::deal(

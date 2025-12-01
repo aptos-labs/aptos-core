@@ -42,12 +42,61 @@ pub struct WeightedConfig<TC: ThresholdConfig> {
     min_weight: usize,
 }
 
+/// Splits a flattened list into sublists for each player based on their weights.
+///
+/// # Parameters
+/// - `flattened`: A slice containing the flattened list of items to split.
+/// - `sc`: A `WeightedConfig` that provides the weight for each player.
+///
+/// # Returns
+/// A vector of vectors, where each inner vector contains the items assigned to a single player.
+pub fn unflatten_by_weights<T, TC>(flattened: &[T], sc: &WeightedConfig<TC>) -> Vec<Vec<T>>
+where
+    T: Clone,
+    TC: ThresholdConfig,
+{
+    let mut start = 0;
+    (0..sc.get_total_num_players())
+        .map(|i| {
+            let weight = sc.get_player_weight(&sc.get_player(i));
+            let slice = &flattened[start..start + weight];
+            start += weight;
+            slice.to_vec()
+        })
+        .collect()
+}
+
 /// Weighted config for the BLSTRS-based PVSS
 pub type WeightedConfigBlstrs = WeightedConfig<ThresholdConfigBlstrs>;
 
 /// Weighted config for the Arkworks-based PVSS
 #[allow(type_alias_bounds)]
 pub type WeightedConfigArkworks<F: FftField> = WeightedConfig<ShamirThresholdConfig<F>>;
+
+// impl<F: FftField, 
+//      SK: Reconstructable<ShamirThresholdConfig<F>>>
+//     Reconstructable<WeightedConfigArkworks<F>> for SK
+// {
+//     type ShareValue = Vec<SK::ShareValue>;
+
+//     fn reconstruct(
+//         sc: &WeightedConfigArkworks<F>,
+//         shares: &[ShamirShare<Self::ShareValue>],
+//     ) -> anyhow::Result<Self> {
+//         let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
+
+//         for (player, sub_shares) in shares {
+//             for (pos, share) in sub_shares.iter().enumerate() {
+//                 let virtual_player = sc.get_virtual_player(player, pos);
+//                 // TODO(Performance): Avoiding the cloning here might be nice
+//                 let tuple = (virtual_player, share.clone());
+//                 flattened_shares.push(tuple);
+//             }
+//         }
+
+//         SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
+//     }
+// }
 
 impl<TC: ThresholdConfig> WeightedConfig<TC> {
     #[allow(non_snake_case)]

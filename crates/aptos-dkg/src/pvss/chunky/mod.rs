@@ -8,6 +8,7 @@ mod input_secret;
 mod keys;
 mod public_parameters;
 mod transcript;
-// mod weighted_transcript; TODO: to add soon
+mod weighted_transcript;
 
 pub use transcript::Transcript;
+pub use weighted_transcript::{Transcript as WeightedTranscript};

@@ -27,7 +27,7 @@ pub use aptos_crypto::{
     blstrs::{G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES, SCALAR_NUM_BYTES},
 };
 use ark_ec::pairing::Pairing;
-use ark_ff::{Fp, FpConfig};
+use ark_ff::{FftField, Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use more_asserts::{assert_ge, assert_le};
 use rand::Rng;
@@ -42,6 +42,7 @@ pub mod sigma_protocol;
 pub mod utils;
 pub mod weighted_vuf;
 use aptos_crypto::arkworks::shamir::ShamirShare;
+use aptos_crypto::weighted_config::WeightedConfigArkworks;
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
 ///
@@ -86,6 +87,11 @@ impl<E: Pairing> Scalar<E> {
         vv.into_iter().map(Self::vec_from_inner).collect()
     }
 
+    /// Converts a `Vec<Vec<Vec<E::ScalarField>>>` into a `Vec<Vec<Vec<Scalar<E>>>>` safely.
+    pub fn vecvecvec_from_inner(vvv: Vec<Vec<Vec<E::ScalarField>>>) -> Vec<Vec<Vec<Self>>> {
+        vvv.into_iter().map(Self::vecvec_from_inner).collect()
+    }
+
     /// Converts a `&[E::ScalarField]` into a `Vec<Scalar<E>>` safely.
     pub fn vec_from_inner_slice(slice: &[E::ScalarField]) -> Vec<Self> {
         slice.iter().copied().map(Self).collect()
@@ -123,3 +129,143 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
         )?))
     }
 }
+
+// TODO: make this stuff more generic, like blstrs....
+// TODO: can make stuff more generic... what if we make a thresholdconfig a weightedconfig with weights 1?
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+    Reconstructable<WeightedConfigArkworks<E::ScalarField>> for Scalar<E>
+{
+    type ShareValue = Vec<Scalar<E>>;
+
+    fn reconstruct(
+        sc: &WeightedConfigArkworks<E::ScalarField>,
+        shares: &[ShamirShare<Self::ShareValue>],
+    ) -> anyhow::Result<Self> {
+        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
+
+        // println!();
+        for (player, sub_shares) in shares {
+            // println!(
+            //     "Flattening {} share(s) for player {player}",
+            //     sub_shares.len()
+            // );
+            for (pos, share) in sub_shares.iter().enumerate() {
+                let virtual_player = sc.get_virtual_player(player, pos);
+
+                // println!(
+                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
+                //     share
+                // );
+                // TODO(Performance): Avoiding the cloning here might be nice
+                let tuple = (virtual_player, share.clone());
+                flattened_shares.push(tuple);
+            }
+        }
+
+        assert_ge!(flattened_shares.len(), sc.get_threshold_weight());
+        assert_le!(flattened_shares.len(), sc.get_total_weight());
+
+        Scalar::<E>::reconstruct(sc.get_threshold_config(), &flattened_shares)
+    }
+}
+
+
+// impl<F: FftField, SK: Reconstructable<ShamirThresholdConfig<F>>> Reconstructable<WeightedConfigArkworks<F>> for SK {
+//     type ShareValue = Vec<SK::ShareValue>;
+
+//     fn reconstruct(
+//         sc: &WeightedConfigArkworks<F>,
+//         shares: &[ShamirShare<Self::ShareValue>],
+//     ) -> anyhow::Result<Self> {
+//         let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
+
+//         // println!();
+//         for (player, sub_shares) in shares {
+//             // println!(
+//             //     "Flattening {} share(s) for player {player}",
+//             //     sub_shares.len()
+//             // );
+//             for (pos, share) in sub_shares.iter().enumerate() {
+//                 let virtual_player = sc.get_virtual_player(player, pos);
+
+//                 // println!(
+//                 //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
+//                 //     share
+//                 // );
+//                 // TODO(Performance): Avoiding the cloning here might be nice
+//                 let tuple = (virtual_player, share.clone());
+//                 flattened_shares.push(tuple);
+//             }
+//         }
+
+//         SK::reconstruct(sc.get_threshold_config(), &flattened_shares)
+//     }
+// }
+
+
+// impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+//     Reconstructable<WeightedConfigArkworks<E::ScalarField>> for Vec<Scalar<E>>
+// {
+//     type ShareValue = Vec<Scalar<E>>;
+
+//     fn reconstruct(
+//         sc: &WeightedConfigArkworks<E::ScalarField>,
+//         shares: &[ShamirShare<Self::ShareValue>],
+//     ) -> anyhow::Result<Self> {
+//         assert_ge!(shares.len(), sc.get_threshold_weight());
+//         assert_le!(shares.len(), sc.get_total_weight());
+
+//         // Number of entries per vector (assume all shares are same length)
+//         let entry_count = shares[0].1.len();
+
+//         // Reconstruct each entry independently
+//         let mut result = Vec::with_capacity(entry_count);
+
+//         for idx in 0..entry_count {
+//             // Extract the idx-th element from each share
+//             let shares_for_idx: Vec<(Player, E::ScalarField)> = shares
+//                 .iter()
+//                 .map(|(player, vec)| (*player, vec[idx].0))
+//                 .collect();
+
+//             // Reconstruct this element
+//             let reconstructed = Scalar(E::ScalarField::reconstruct(
+//                 &sc.get_threshold_config(),
+//                 &shares_for_idx,
+//             )?);
+
+//             result.push(reconstructed);
+//         }
+
+//         Ok(result)
+//     }
+// }
+
+// impl<C, T> Reconstructable<C> for Vec<T>
+// where
+//     T: Reconstructable<C> + Clone, // Clone may be needed depending on ShareValue
+// {
+//     type ShareValue = Vec<T>;
+
+//     fn reconstruct(
+//         config: &C,
+//         shares: &[ShamirShare<Self::ShareValue>],
+//     ) -> anyhow::Result<Self> {
+//         assert!(!shares.is_empty(), "No shares provided");
+
+//         // Number of entries per vector (assume all shares are the same length)
+//         let entry_count = shares[0].1.len();
+
+//         // Reconstruct each entry independently
+//         (0..entry_count)
+//             .map(|idx| {
+//                 let shares_for_idx: Vec<(Player, T::ShareValue)> = shares
+//                     .iter()
+//                     .map(|(player, vec)| (*player, vec[idx].clone()))
+//                     .collect();
+
+//                 T::reconstruct(config, &shares_for_idx)
+//             })
+//             .collect()
+//     }
+// }

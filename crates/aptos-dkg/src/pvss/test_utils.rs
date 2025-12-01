@@ -9,14 +9,13 @@ use crate::pvss::{
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
 use aptos_crypto::{
-    arkworks::shamir::Reconstructable,
-    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
-    SigningKey, Uniform,
+    SigningKey, Uniform, arkworks::shamir::Reconstructable, traits::{self, SecretSharingConfig as _, ThresholdConfig as _}, weighted_config::WeightedConfigArkworks
 };
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
 use serde::Serialize;
 use std::ops::AddAssign;
+use aptos_crypto::weighted_config::WeightedConfig;
 
 /// Type used to indicate that dealears are not including any auxiliary data in their PVSS transcript
 /// signatures.
@@ -56,6 +55,69 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
     );
 
     let pp = T::PublicParameters::with_max_num_shares(sc.get_total_num_players());
+
+    let ssks = (0..sc.get_total_num_players())
+        .map(|_| T::SigningSecretKey::generate(&mut rng))
+        .collect::<Vec<T::SigningSecretKey>>();
+    let spks = ssks
+        .iter()
+        .map(|ssk| ssk.verifying_key())
+        .collect::<Vec<T::SigningPubKey>>();
+
+    let dks = (0..sc.get_total_num_players())
+        .map(|_| T::DecryptPrivKey::generate(&mut rng))
+        .collect::<Vec<T::DecryptPrivKey>>();
+    let eks = dks
+        .iter()
+        .map(|dk| dk.to(&pp.get_encryption_public_params()))
+        .collect();
+
+    // println!();
+    // println!("DKs: {:?}", dks);
+    // println!("EKs: {:?}", eks);
+
+    let iss = (0..sc.get_total_num_players())
+        .map(|_| T::InputSecret::generate(&mut rng))
+        .collect::<Vec<T::InputSecret>>();
+
+    let mut s = T::InputSecret::zero();
+    for is in &iss {
+        s.add_assign(is)
+    }
+
+    let dpk: <T as Transcript>::DealtPubKey = s.to(&pp);
+    let dsk: <T as Transcript>::DealtSecretKey = s.to(&pp);
+    // println!("Dealt SK: {:?}", sk);
+
+    assert_eq!(ssks.len(), spks.len());
+
+    DealingArgs {
+        pp,
+        ssks,
+        spks,
+        dks,
+        eks,
+        iss,
+        s,
+        dsk,
+        dpk,
+    }
+}
+
+use ark_ec::pairing::Pairing;
+
+// TODO: merge.... you only changed pp
+pub fn setup_dealing_weighted<E: Pairing, T: Transcript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>, R: rand_core::RngCore + rand_core::CryptoRng>(
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    mut rng: &mut R,
+) -> DealingArgs<T> {
+    println!(
+        "Setting up dealing for {} PVSS, with {}",
+        T::scheme_name(),
+        sc
+    );
+
+    let pp = T::PublicParameters::with_max_num_shares(sc.get_total_weight());
 
     let ssks = (0..sc.get_total_num_players())
         .map(|_| T::SigningSecretKey::generate(&mut rng))
@@ -156,38 +218,38 @@ pub fn get_threshold_configs_for_testing_smaller<T: traits::ThresholdConfig>() -
     tcs
 }
 
-pub fn get_weighted_configs_for_testing() -> Vec<WeightedConfigBlstrs> {
+pub fn get_weighted_configs_for_testing<T: traits::ThresholdConfig>() -> Vec<WeightedConfig<T>> {
     let mut wcs = vec![];
 
     // 1-out-of-1 weighted
-    wcs.push(WeightedConfigBlstrs::new(1, vec![1]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(1, vec![1]).unwrap());
 
     // 1-out-of-2, weights 2 0
-    wcs.push(WeightedConfigBlstrs::new(1, vec![2]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(1, vec![2]).unwrap());
     // 1-out-of-2, weights 1 1
-    wcs.push(WeightedConfigBlstrs::new(1, vec![1, 1]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(1, vec![1, 1]).unwrap());
     // 2-out-of-2, weights 1 1
-    wcs.push(WeightedConfigBlstrs::new(2, vec![1, 1]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(2, vec![1, 1]).unwrap());
 
     // 1-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfigBlstrs::new(1, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(1, vec![1, 1, 1]).unwrap());
     // 2-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfigBlstrs::new(2, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(2, vec![1, 1, 1]).unwrap());
     // 3-out-of-3, weights 1 1 1
-    wcs.push(WeightedConfigBlstrs::new(3, vec![1, 1, 1]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(3, vec![1, 1, 1]).unwrap());
 
     // 3-out-of-5, weights 2 1 2
-    wcs.push(WeightedConfigBlstrs::new(3, vec![2, 1, 2]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(3, vec![2, 1, 2]).unwrap());
 
     // 3-out-of-7, weights 2 3 2
-    wcs.push(WeightedConfigBlstrs::new(3, vec![2, 3, 2]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(3, vec![2, 3, 2]).unwrap());
 
     // 50-out-of-100, weights [11, 13, 9, 10, 12, 8, 7, 14, 10, 6]
-    wcs.push(WeightedConfigBlstrs::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
+    wcs.push(WeightedConfig::<T>::new(50, vec![11, 13, 9, 10, 12, 8, 7, 14, 10, 6]).unwrap());
 
     // 7-out-of-15, weights [0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]
     wcs.push(
-        WeightedConfigBlstrs::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap(),
+        WeightedConfig::<T>::new(7, vec![0, 0, 0, 2, 2, 2, 0, 0, 0, 3, 3, 3, 0, 0, 0]).unwrap(),
     );
 
     wcs
@@ -273,6 +335,21 @@ where
     R: rand_core::RngCore,
 {
     // Test reconstruction from t random shares
+
+    // let players = sc
+    //     .get_random_eligible_subset_of_players(rng);
+    // eprintln!("!!!!!!!!!!!!!! players lijst {:?}", players);
+    // let players_and_shares = players
+    //     .into_iter()
+    //     .map(|p| {
+    //         let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()], pp);
+
+    //         assert_eq!(pk, trx.get_public_key_share(sc, &p));
+
+    //         (p, sk)
+    //     })
+    //     .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
+
     let players_and_shares = sc
         .get_random_eligible_subset_of_players(rng)
         .into_iter()
@@ -284,6 +361,11 @@ where
             (p, sk)
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
+
+//    eprint!("!!!!!!!!!!! {:?}", players_and_shares.len());
+//    eprint!("!!!!!!!!!!! {:?}", players_and_shares[0].1.len());
+//   eprint!("!!!!!!!!!!! {:?}", players_and_shares[1].1.len());
+
 
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }
