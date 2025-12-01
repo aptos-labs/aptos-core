@@ -1087,37 +1087,18 @@ impl Generator<'_> {
         let target = self.require_unary_target(id, targets);
         let temp =
             self.gen_auto_ref_arg(&self.require_unary_arg(id, args), ReferenceKind::Immutable);
+        let mut bool_temp = Some(target);
+        let success_label = self.new_label(id);
         let inst = self.env().get_node_instantiation(id);
-        if variants.len() == 1 {
-            // Test single variant: directly translate
-            self.emit_with(id, |attr| {
-                Bytecode::Call(
-                    attr,
-                    vec![target],
-                    BytecodeOperation::TestVariant(
-                        struct_id.module_id,
-                        struct_id.id,
-                        variants[0],
-                        inst,
-                    ),
-                    vec![temp],
-                    None,
-                )
-            })
-        } else {
-            // Test more than one variant: create branches
-            let mut bool_temp = Some(target);
-            let success_label = self.new_label(id);
-            self.gen_test_variants_operation(
-                id,
-                &mut bool_temp,
-                success_label,
-                &struct_id.instantiate(inst),
-                variants.to_vec(),
-                temp,
-            );
-            self.emit_with(id, |attr| Bytecode::Label(attr, success_label))
-        }
+        self.gen_test_variants_operation(
+            id,
+            &mut bool_temp,
+            success_label,
+            &struct_id.instantiate(inst),
+            variants.to_vec(),
+            temp,
+        );
+        self.emit_with(id, |attr| Bytecode::Label(attr, success_label))
     }
 
     fn gen_cast_call(&mut self, targets: Vec<TempIndex>, id: NodeId, args: &[Exp]) {

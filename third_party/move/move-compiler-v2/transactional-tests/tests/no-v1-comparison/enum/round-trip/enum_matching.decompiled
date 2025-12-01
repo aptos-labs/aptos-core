@@ -54,7 +54,9 @@ module 0x42::m {
         _v2 + _v3
     }
     public fun is_inner1(p0: &Inner): bool {
-        p0 is Inner1
+        let _v0 = p0 is Inner1;
+        if (_v0) return _v0;
+        _v0
     }
     public fun is_some<T0>(p0: &Option<T0>): bool {
         loop {
