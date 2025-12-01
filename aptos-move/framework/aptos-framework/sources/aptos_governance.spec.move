@@ -269,7 +269,7 @@ spec aptos_framework::aptos_governance {
         let addr = aptos_std::type_info::type_of<AptosCoin>().account_address;
         aborts_if !exists<coin::CoinInfo<AptosCoin>>(addr);
         let maybe_supply = global<coin::CoinInfo<AptosCoin>>(addr).supply;
-        let supply = option::borrow(maybe_supply);
+        let supply = option::spec_borrow(maybe_supply);
         let total_supply = aptos_framework::optional_aggregator::optional_aggregator_value(supply);
         let early_resolution_vote_threshold_value = total_supply / 2 + 1;
 
@@ -433,7 +433,7 @@ spec aptos_framework::aptos_governance {
         aborts_if !exists<GovernanceEvents>(@aptos_framework);
 
         // verify voting::get_proposal_state
-        let early_resolution_threshold = option::borrow(proposal.early_resolution_vote_threshold);
+        let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
         let is_voting_period_over = timestamp::spec_now_seconds() > proposal_expiration;
 
         let new_proposal_yes_votes_0 = proposal.yes_votes + real_voting_power;
@@ -517,7 +517,7 @@ spec aptos_framework::aptos_governance {
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);
-        let early_resolution_threshold = option::borrow(proposal.early_resolution_vote_threshold);
+        let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
         aborts_if timestamp::now_seconds() <= proposal.expiration_secs &&
             (option::is_none(proposal.early_resolution_vote_threshold) ||
             proposal.yes_votes < early_resolution_threshold && proposal.no_votes < early_resolution_threshold);
@@ -812,7 +812,7 @@ spec aptos_framework::aptos_governance {
         let voting_forum = global<voting::VotingForum<GovernanceProposal>>(@aptos_framework);
         let proposal = table::spec_get(voting_forum.proposals, proposal_id);
         aborts_if !table::spec_contains(voting_forum.proposals, proposal_id);
-        let early_resolution_threshold = option::borrow(proposal.early_resolution_vote_threshold);
+        let early_resolution_threshold = option::spec_borrow(proposal.early_resolution_vote_threshold);
         let voting_period_over = timestamp::now_seconds() > proposal.expiration_secs;
         let be_resolved_early = option::is_some(proposal.early_resolution_vote_threshold) &&
                                     (proposal.yes_votes >= early_resolution_threshold ||

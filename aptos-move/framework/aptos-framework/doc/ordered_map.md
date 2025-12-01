@@ -2207,7 +2207,7 @@ Apply the function to a mutable reference of each key-value pair in the map.
 <b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result);
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, key);
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(self, key) == value;
-<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result)) && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(
+<b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; ((<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result)) && (<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result) == <a href="ordered_map.md#0x1_ordered_map_spec_get">spec_get</a>(<b>old</b>(
     self), key)));
 <b>ensures</b> [abstract] !<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) + 1 == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self);
 <b>ensures</b> [abstract] <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(<b>old</b>(self), key) ==&gt; <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(<b>old</b>(self)) == <a href="ordered_map.md#0x1_ordered_map_spec_len">spec_len</a>(self);
@@ -2542,11 +2542,11 @@ std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
 (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)
 && k != key: std::cmp::compare(key, k) == std::cmp::Ordering::Less);
 <b>ensures</b> [abstract] result.is_some() &lt;==&gt;
-    <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result)) &&
-    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result), key) == std::cmp::Ordering::Less)
-    && (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k), std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result), k), std::cmp::compare(key, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result): ((<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
+    <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
+    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Less)
+    && (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k), std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k), std::cmp::compare(key, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result): ((<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
     std::cmp::compare(k, key) == std::cmp::Ordering::Less)) ==&gt;
-    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result), k) == std::cmp::Ordering::Greater);
+    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k) == std::cmp::Ordering::Greater);
 </code></pre>
 
 
@@ -2568,11 +2568,11 @@ std::cmp::compare(result_1, k) == std::cmp::Ordering::Greater;
 (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) && k != key:
 std::cmp::compare(key, k) == std::cmp::Ordering::Greater);
 <b>ensures</b> [abstract] result.is_some() &lt;==&gt;
-    <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result)) &&
-    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result), key) == std::cmp::Ordering::Greater)
-    && (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result): ((<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
+    <a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result)) &&
+    (std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), key) == std::cmp::Ordering::Greater)
+    && (<b>forall</b> k: K {<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k)} <b>where</b> k != <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result): ((<a href="ordered_map.md#0x1_ordered_map_spec_contains_key">spec_contains_key</a>(self, k) &&
     std::cmp::compare(k, key) == std::cmp::Ordering::Greater)) ==&gt;
-    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result), k) == std::cmp::Ordering::Less);
+    std::cmp::compare(<a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result), k) == std::cmp::Ordering::Less);
 </code></pre>
 
 
