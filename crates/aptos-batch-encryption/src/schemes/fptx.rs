@@ -20,8 +20,7 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ark_ff::UniformRand as _;
-use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore};
-use ark_std::rand::SeedableRng;
+use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
 

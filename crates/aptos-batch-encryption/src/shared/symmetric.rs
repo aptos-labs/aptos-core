@@ -13,9 +13,11 @@ use ark_ff::{
     Field,
 };
 use ark_serialize::CanonicalSerialize as _;
-use ark_std::Zero;
+use ark_std::{
+    rand::{CryptoRng, RngCore},
+    Zero,
+};
 use hmac::{Hmac, Mac};
-use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{
     digest::{

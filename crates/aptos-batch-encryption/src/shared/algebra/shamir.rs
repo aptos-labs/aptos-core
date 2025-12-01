@@ -12,9 +12,8 @@ use crate::{
 use anyhow::Result;
 use ark_ec::VariableBaseMSM as _;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
-use ark_std::UniformRand;
+use ark_std::{rand::RngCore, UniformRand};
 use num_traits::{One, Zero};
-use ark_std::rand::RngCore;
 use rayon::iter::{IndexedParallelIterator as _, IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};

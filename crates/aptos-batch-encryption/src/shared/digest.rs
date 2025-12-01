@@ -11,9 +11,11 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
-use ark_std::UniformRand;
+use ark_std::{
+    rand::{CryptoRng, RngCore},
+    UniformRand,
+};
 use num_traits::{One, Zero};
-use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
