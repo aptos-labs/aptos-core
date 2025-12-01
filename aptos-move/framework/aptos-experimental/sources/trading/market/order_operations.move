@@ -38,6 +38,7 @@ module aptos_experimental::order_operations {
         market: &mut Market<M>,
         user: address,
         client_order_id: String,
+        cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let order =
@@ -46,7 +47,7 @@ module aptos_experimental::order_operations {
             );
         if (order.is_some()) {
             // Order is already placed in the order book, so we can cancel it
-            return cancel_single_order_helper(market, order.destroy_some(), true, callbacks);
+            return cancel_single_order_helper(market, order.destroy_some(), true, cancel_reason, callbacks);
         };
         pre_cancel_order_for_tracker(
             market.get_pre_cancellation_tracker_mut(),
@@ -70,10 +71,11 @@ module aptos_experimental::order_operations {
         account: address,
         order_id: OrderIdType,
         emit_event: bool,
+        cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): SingleOrder<M> {
         let order = market.get_order_book_mut().cancel_order(account, order_id);
-        cancel_single_order_helper(market, order, emit_event, callbacks);
+        cancel_single_order_helper(market, order, emit_event, cancel_reason, callbacks);
         order
     }
 
@@ -85,12 +87,13 @@ module aptos_experimental::order_operations {
         account: address,
         order_id: OrderIdType,
         emit_event: bool,
+        cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): option::Option<SingleOrder<M>> {
         let maybe_order = market.get_order_book_mut().try_cancel_order(account, order_id);
         if (maybe_order.is_some()) {
             let order = maybe_order.destroy_some();
-            cancel_single_order_helper(market, order, emit_event, callbacks);
+            cancel_single_order_helper(market, order, emit_event, cancel_reason, callbacks);
             option::some(order)
         } else {
             option::none()
@@ -179,6 +182,7 @@ module aptos_experimental::order_operations {
         market: &mut Market<M>,
         order: SingleOrder<M>,
         emit_event: bool,
+        cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         let (
@@ -209,7 +213,7 @@ module aptos_experimental::order_operations {
                 is_bid,
                 false,
                 aptos_experimental::market_types::order_status_cancelled(),
-                std::string::utf8(b"Order cancelled"),
+                cancel_reason,
                 metadata,
                 option::none(), // trigger_condition
                 time_in_force,

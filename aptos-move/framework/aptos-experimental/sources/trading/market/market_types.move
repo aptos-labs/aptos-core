@@ -415,6 +415,7 @@ module aptos_experimental::market_types {
         price: u64,
         orig_price: u64,
         is_bid: bool,
+        fill_id: u128,
     }
 
 
@@ -666,6 +667,7 @@ module aptos_experimental::market_types {
         price: u64,
         orig_price: u64,
         is_bid: bool,
+        fill_id: u128,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
@@ -680,6 +682,7 @@ module aptos_experimental::market_types {
                     price,
                     orig_price,
                     is_bid,
+                    fill_id,
                 }
             );
         };
