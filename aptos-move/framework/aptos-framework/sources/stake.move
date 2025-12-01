@@ -1311,11 +1311,11 @@ module aptos_framework::stake {
         while ({
             spec {
                 invariant len(validator_perf.validators) == validator_len;
-                invariant (option::is_some(ghost_proposer_idx) && option::borrow(
+                invariant (option::is_some(ghost_proposer_idx) && option::spec_borrow(
                     ghost_proposer_idx
                 ) < validator_len) ==>
-                    (validator_perf.validators[option::borrow(ghost_proposer_idx)].successful_proposals ==
-                        ghost_valid_perf.validators[option::borrow(ghost_proposer_idx)].successful_proposals + 1);
+                    (validator_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals ==
+                        ghost_valid_perf.validators[option::spec_borrow(ghost_proposer_idx)].successful_proposals + 1);
             };
             f < f_len
         }) {

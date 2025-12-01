@@ -2112,7 +2112,7 @@ Maintains the sorted-by-issuer invariant in <code><a href="jwks.md#0x1_jwks_AllP
 <pre><code><b>pragma</b> opaque;
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result) &lt;==&gt; (<b>forall</b> jwk: <a href="jwks.md#0x1_jwks_ProviderJWKs">ProviderJWKs</a> <b>where</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(<b>old</b>(<a href="jwks.md#0x1_jwks">jwks</a>).entries, jwk): jwk.issuer != issuer);
 <b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_none">option::is_none</a>(result) ==&gt; <b>old</b>(<a href="jwks.md#0x1_jwks">jwks</a>) == <a href="jwks.md#0x1_jwks">jwks</a>;
-<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(<b>old</b>(<a href="jwks.md#0x1_jwks">jwks</a>).entries, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_borrow">option::borrow</a>(result));
+<b>ensures</b> <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_is_some">option::is_some</a>(result) ==&gt; <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_spec_contains">vector::spec_contains</a>(<b>old</b>(<a href="jwks.md#0x1_jwks">jwks</a>).entries, <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_spec_borrow">option::spec_borrow</a>(result));
 </code></pre>
 
 
