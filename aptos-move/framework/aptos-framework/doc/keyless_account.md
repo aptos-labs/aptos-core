@@ -148,50 +148,110 @@ The 288-byte Groth16 verification key (VK) for the ZK relation that implements k
 <dd>
  An override <code>aud</code> for the identity of a recovery service, which will help users recover their keyless accounts
  associated with dapps or wallets that have disappeared.
- IMPORTANT: This recovery service **cannot** on its own take over user accounts; a user must first sign in
+ IMPORTANT: This recovery service **cannot**, on its own, take over user accounts: a user must first sign in
  via OAuth in the recovery service in order to allow it to rotate any of that user's keyless accounts.
+
+ Furthermore, the ZKP eventually expires, so there is a limited window within which a malicious recovery
+ service could rotate accounts. In the future, we can make this window arbitrarily small by further lowering
+ the maximum expiration horizon for ZKPs used for recovery, instead of relying on the <code>max_exp_horizon_secs</code>
+ value in this resource.
+
+ If changed: There is no prover service support yet for recovery mode => ZKPs with override aud's enabled
+   will not be served by the prover service => as long as training wheels are "on," such recovery ZKPs will
+   never arrive on chain.
+   (Once support is implemented in the prover service, in an abundance of caution, the training wheel check
+    should only pass if the override aud in the public statement matches one in this list. Therefore, changes
+    to this value should be picked up automatically by the prover service.)
 </dd>
 <dt>
 <code>max_signatures_per_txn: u16</code>
 </dt>
 <dd>
  No transaction can have more than this many keyless signatures.
+
+ If changed: Only affects the Aptos validators; prover service not impacted.
 </dd>
 <dt>
 <code>max_exp_horizon_secs: u64</code>
 </dt>
 <dd>
- How far in the future from the JWT issued at time the EPK expiry can be set.
+ How far in the future from the JWT's issued-at-time can the EPK expiration date be set?
+ Specifically, validators enforce that the ZKP's expiration horizon is less than this <code>max_exp_horizon_secs</code>
+ value.
+
+ If changed: Only affects the Aptos validators; prover service not impacted.
 </dd>
 <dt>
 <code>training_wheels_pubkey: <a href="../../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option_Option">option::Option</a>&lt;<a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u8&gt;&gt;</code>
 </dt>
 <dd>
- The training wheels PK, if training wheels are on
+ The training wheels PK, if training wheels are on.
+
+ If changed: Prover service has to be re-deployed with the associated training wheel SK.
 </dd>
 <dt>
 <code>max_commited_epk_bytes: u16</code>
 </dt>
 <dd>
  The max length of an ephemeral public key supported in our circuit (93 bytes)
+
+ Note: Currently, the circuit derives the JWT's nonce field by hashing the EPK as:
+ ```
+ Poseidon_6(
+   epk_0, epk_1, epk_2,
+   max_commited_epk_bytes,
+   exp_date,
+   epk_blinder
+ )
+ ```
+ and the public inputs hash by hashing the EPK with other inputs as:
+ ```
+ Poseidon_14(
+   epk_0, epk_1, epk_2,
+   max_commited_epk_bytes,
+   [...]
+ )
+ ```
+ where <code>max_committed_epk_byte</code> is passed in as one of the witnesses to the circuit. As a result, (some)
+ changes to this field could technically be handled by the same circuit: e.g., if we let the epk_i chunks
+ exceed 31 bytes, but no more than 32, then <code>max_commited_epk_bytes</code> could now be in (93, 96]. Whether such a
+ restricted set of changes is useful remains unclear. Therefore, the verdict will be that...
+
+ If changed: (Likely) requires a circuit change because over-decreasing (or increasing) it leads to fewer (or
+   more) EPK chunks. This would break the current way the circuit hashes the nonce and the public inputs.
+   => prover service redeployment.
 </dd>
 <dt>
 <code>max_iss_val_bytes: u16</code>
 </dt>
 <dd>
  The max length of the value of the JWT's <code>iss</code> field supported in our circuit (e.g., <code>"https://accounts.google.com"</code>)
+
+ If changed: Requires a circuit change because the <code>iss</code> field value is hashed inside the circuit as
+   <code>HashBytesToFieldWithLen(MAX_ISS_VALUE_LEN)(iss_value, iss_value_len)</code> where <code>MAX_ISS_VALUE_LEN</code> is a
+   circuit constant hard-coded to <code>max_iss_val_bytes</code> (i.e., to 120) => prover service redeployment..
 </dd>
 <dt>
 <code>max_extra_field_bytes: u16</code>
 </dt>
 <dd>
  The max length of the JWT field name and value (e.g., <code>"max_age":"18"</code>) supported in our circuit
+
+ If changed: Requires a circuit change because the extra field key-value pair is hashed inside the circuit as
+   <code>HashBytesToFieldWithLen(MAX_EXTRA_FIELD_KV_PAIR_LEN)(extra_field, extra_field_len)</code> where
+   <code>MAX_EXTRA_FIELD_KV_PAIR_LEN</code> is a circuit constant hard-coded to <code>max_extra_field_bytes</code> (i.e., to 350)
+    => prover service redeployment.
 </dd>
 <dt>
 <code>max_jwt_header_b64_bytes: u32</code>
 </dt>
 <dd>
- The max length of the base64url-encoded JWT header in bytes supported in our circuit
+ The max length of the base64url-encoded JWT header in bytes supported in our circuit.
+
+ If changed: Requires a circuit change because the JWT header is hashed inside the circuit as
+   <code>HashBytesToFieldWithLen(MAX_B64U_JWT_HEADER_W_DOT_LEN)(b64u_jwt_header_w_dot, b64u_jwt_header_w_dot_len)</code>
+   where <code>MAX_B64U_JWT_HEADER_W_DOT_LEN</code> is a circuit constant hard-coded to <code>max_jwt_header_b64_bytes</code>
+   (i.e., to 350) => prover service redeployment.
 </dd>
 </dl>
 
