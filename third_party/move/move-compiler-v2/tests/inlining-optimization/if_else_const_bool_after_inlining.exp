@@ -60,13 +60,17 @@ module 0xc0ffee::m {
 module 0xc0ffee::m
 // Function definition at index 0
 #[persistent] public fun code(l0: bool): u64
+    local l1: u64
     move_loc l0
     br_false l0
     ld_u64 1
-    ret
-l0: ld_u64 2
+    st_loc l1
+l1: move_loc l1
     // @5
     ret
+l0: ld_u64 2
+    st_loc l1
+    branch l1
 
 // Function definition at index 1
 fun one(): u64

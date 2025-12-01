@@ -418,57 +418,63 @@ fun bools(l0: bool, l1: bool): bool
     local l2: bool
     local l3: bool
     local l4: bool
+    local l5: bool
     copy_loc l0
     br_false l0
     copy_loc l1
     st_loc l2
-l9: move_loc l2
+l10: move_loc l2
     // @5
     br_false l1
     ld_true
     st_loc l3
-l8: move_loc l3
+l9: move_loc l3
     br_false l2
     // @10
     ld_true
     st_loc l4
-l6: move_loc l4
+l7: move_loc l4
     br_false l3
     ld_true
     // @15
+    st_loc l5
+l5: move_loc l5
     ret
 l3: move_loc l0
     br_true l4
+    // @20
     move_loc l1
     not
-    // @20
-    ret
+    st_loc l5
+    branch l5
 l4: ld_false
-    ret
-l2: copy_loc l0
-    br_true l5
     // @25
+    st_loc l5
+    branch l5
+l2: copy_loc l0
+    br_true l6
     copy_loc l1
-    st_loc l4
-    branch l6
-l5: ld_false
-    st_loc l4
     // @30
-    branch l6
+    st_loc l4
+    branch l7
+l6: ld_false
+    st_loc l4
+    branch l7
+    // @35
 l1: copy_loc l0
-    br_false l7
+    br_false l8
     copy_loc l1
     not
-    // @35
     st_loc l3
-    branch l8
-l7: ld_false
-    st_loc l3
-    branch l8
     // @40
-l0: ld_false
-    st_loc l2
     branch l9
+l8: ld_false
+    st_loc l3
+    branch l9
+l0: ld_false
+    // @45
+    st_loc l2
+    branch l10
 
 // Function definition at index 3
 fun equality<T0: drop>(l0: T0, l1: T0): bool
@@ -488,6 +494,7 @@ fun inequality<T0: drop>(l0: T0, l1: T0): bool
 fun order(l0: u64, l1: u64): bool
     local l2: bool
     local l3: bool
+    local l4: bool
     copy_loc l0
     copy_loc l1
     lt
@@ -497,7 +504,7 @@ fun order(l0: u64, l1: u64): bool
     copy_loc l1
     le
     st_loc l2
-l4: move_loc l2
+l5: move_loc l2
     br_false l1
     // @10
     copy_loc l0
@@ -506,23 +513,27 @@ l4: move_loc l2
     not
     st_loc l3
     // @15
-l3: move_loc l3
+l4: move_loc l3
     br_false l2
     move_loc l0
     move_loc l1
     ge
     // @20
     not
+    st_loc l4
+l3: move_loc l4
     ret
 l2: ld_false
-    ret
-l1: ld_false
     // @25
-    st_loc l3
+    st_loc l4
     branch l3
+l1: ld_false
+    st_loc l3
+    branch l4
+    // @30
 l0: ld_false
     st_loc l2
-    branch l4
+    branch l5
 
 
 ============ bytecode verification succeeded ========

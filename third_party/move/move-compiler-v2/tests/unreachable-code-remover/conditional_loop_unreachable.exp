@@ -111,27 +111,31 @@ fun m::test($t0: bool, $t1: bool) {
      var $t8: u64 [unused]
      var $t9: u64 [unused]
      # maybe
-  0: if ($t0) goto 1 else goto 9
+  0: if ($t0) goto 3 else goto 1
      # maybe
-  1: label L2
+  1: label L9
      # maybe
-  2: if ($t1) goto 3 else goto 7
+  2: goto 11
      # maybe
-  3: label L9
+  3: label L2
      # maybe
-  4: goto 5
+  4: if ($t1) goto 5 else goto 7
      # maybe
-  5: label L8
+  5: label L10
      # maybe
-  6: goto 5
+  6: goto 9
      # maybe
-  7: label L6
+  7: label L11
      # maybe
-  8: return ()
+  8: goto 11
      # maybe
-  9: label L3
+  9: label L8
      # maybe
- 10: return ()
+ 10: goto 9
+     # maybe
+ 11: label L1
+     # maybe
+ 12: return ()
 }
 
 ============ after UnreachableCodeRemover: ================
@@ -146,17 +150,19 @@ fun m::test($t0: bool, $t1: bool) {
      var $t7: u64 [unused]
      var $t8: u64 [unused]
      var $t9: u64 [unused]
-  0: if ($t0) goto 1 else goto 9
-  1: label L2
-  2: if ($t1) goto 3 else goto 7
-  3: label L9
-  4: goto 5
-  5: label L8
-  6: goto 5
-  7: label L6
-  8: return ()
-  9: label L3
- 10: return ()
+  0: if ($t0) goto 3 else goto 1
+  1: label L9
+  2: goto 11
+  3: label L2
+  4: if ($t1) goto 5 else goto 7
+  5: label L10
+  6: goto 9
+  7: label L11
+  8: goto 11
+  9: label L8
+ 10: goto 9
+ 11: label L1
+ 12: return ()
 }
 
 
@@ -166,14 +172,15 @@ module 0xc0ffee::m
 // Function definition at index 0
 fun test(l0: bool, l1: bool)
     move_loc l0
-    br_false l0
-    move_loc l1
-    br_false l1
-    branch l2
+    br_true l0
+    branch l1
+l0: move_loc l1
+    br_false l2
     // @5
-l2: branch l2
+    branch l3
+l2: branch l1
+l3: branch l3
 l1: ret
-l0: ret
 
 
 ============ bytecode verification succeeded ========
