@@ -3043,7 +3043,7 @@ impl AptosVMBlockExecutor {
 
         let log_context = AdapterLogSchema::new(state_view.id(), 0);
         let num_txns = txn_provider.num_txns();
-        info!(
+        debug!(
             log_context,
             "Executing block, transaction count: {}", num_txns
         );
