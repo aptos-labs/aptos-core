@@ -14,9 +14,11 @@ use crate::{
 use anyhow::Result;
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_serialize::CanonicalSerialize;
-use ark_std::UniformRand;
+use ark_std::{
+    rand::{CryptoRng, RngCore},
+    UniformRand,
+};
 use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey, SECRET_KEY_LENGTH};
-use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
