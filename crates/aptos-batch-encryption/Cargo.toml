@@ -38,8 +38,8 @@ rand = { workspace = true }
 serde_json = { workspace = true }
 
 [dev-dependencies]
-criterion = "0.5"
-itertools = "0.14.0"
+criterion = { workspace = true }
+itertools = { workspace = true }
 
 
 #[[bench]]
