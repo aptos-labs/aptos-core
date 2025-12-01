@@ -3,15 +3,21 @@
 //# publish
 module 0x42::Mutual {
     fun even(p0: u64): bool {
-        let _v0 = p0 == 0;
+        let _v0;
+        let _v1 = p0 == 0;
         loop {
-            if (_v0) return true else {
+            if (!_v1) {
                 p0 = p0 - 1;
-                if (!(p0 == 0)) break
+                if (p0 == 0) {
+                    _v0 = false;
+                    break
+                };
+                _v0 = even(p0 - 1);
+                break
             };
-            return false
+            return true
         };
-        even(p0 - 1)
+        _v0
     }
     public fun recursion_check() {
         assert!(even(4), 0);

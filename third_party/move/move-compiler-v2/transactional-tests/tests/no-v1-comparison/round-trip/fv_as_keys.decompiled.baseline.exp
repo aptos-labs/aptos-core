@@ -1,32 +1,32 @@
 processed 23 tasks
-task 0 lines 3-78:  publish [module 0x99::test_struct {]
+task 0 lines 3-79:  publish [module 0x99::test_struct {]
 Error: compilation errors:
  error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-   ┌─ TEMPFILE:33:17
+   ┌─ TEMPFILE:34:17
    │
-33 │         assert!(_v3(_v2) == 1, 14566554180833181696);
+34 │         assert!(_v3(_v2) == 1, 14566554180833181696);
    │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-   ┌─ TEMPFILE:36:17
+   ┌─ TEMPFILE:37:17
    │
-36 │         assert!(_v5(_v4) == 2, 14566554180833181696);
+37 │         assert!(_v5(_v4) == 2, 14566554180833181696);
    │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-   ┌─ TEMPFILE:51:17
+   ┌─ TEMPFILE:52:17
    │
-51 │         assert!(_v3(_v2) == 1, 14566554180833181696);
+52 │         assert!(_v3(_v2) == 1, 14566554180833181696);
    │                 ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-   ┌─ TEMPFILE:54:17
+   ┌─ TEMPFILE:55:17
    │
-54 │         assert!(_v5(_v4) == 2, 14566554180833181696);
+55 │         assert!(_v5(_v4) == 2, 14566554180833181696);
    │                 ^^^^^^^^
 
 
-task 1 lines 81-81:  run --verbose --signers 0x1 -- 0x99::test_struct::init
+task 1 lines 82-82:  run --verbose --signers 0x1 -- 0x99::test_struct::init
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -36,7 +36,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 2 lines 83-83:  run --verbose --signers 0x1 -- 0x99::test_struct::test_exist
+task 2 lines 84-84:  run --verbose --signers 0x1 -- 0x99::test_struct::test_exist
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -46,7 +46,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 3 lines 85-85:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_1
+task 3 lines 86-86:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_1
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -56,7 +56,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 4 lines 87-87:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_2
+task 4 lines 88-88:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_2
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -66,7 +66,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 5 lines 89-89:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_3
+task 5 lines 90-90:  run --verbose --signers 0x1 -- 0x99::test_struct::test_not_exist_3
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -76,7 +76,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 6 lines 91-91:  run --verbose --signers 0x1 -- 0x99::test_struct::test_bad_borrow_from
+task 6 lines 92-92:  run --verbose --signers 0x1 -- 0x99::test_struct::test_bad_borrow_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -86,7 +86,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 7 lines 93-93:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from
+task 7 lines 94-94:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -96,7 +96,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 8 lines 95-95:  run --verbose --signers 0x1 -- 0x99::test_struct::test_bad_move_from
+task 8 lines 96-96:  run --verbose --signers 0x1 -- 0x99::test_struct::test_bad_move_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -106,7 +106,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 9 lines 97-97:  run --verbose --signers 0x1 -- 0x99::test_struct::test_move_from
+task 9 lines 98-98:  run --verbose --signers 0x1 -- 0x99::test_struct::test_move_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -116,7 +116,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 10 lines 99-99:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from
+task 10 lines 100-100:  run --verbose --signers 0x1 -- 0x99::test_struct::test_borrow_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_struct doesn't exist,
     major_status: LINKER_ERROR,
@@ -126,50 +126,50 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 11 lines 101-210:  publish [module 0x99::test_enum {]
+task 11 lines 102-212:  publish [module 0x99::test_enum {]
 Error: compilation errors:
  error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-    ┌─ TEMPFILE1:149:19
+    ┌─ TEMPFILE1:151:19
     │
-149 │             _v0 = _v4(_v5)
+151 │             _v0 = _v4(_v5)
     │                   ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has copy + drop + store` was provided
-    ┌─ TEMPFILE1:153:19
+    ┌─ TEMPFILE1:155:19
     │
-153 │             _v0 = _v6(_v7)
+155 │             _v0 = _v6(_v7)
     │                   ^^^^^^^^
 
 error: cannot select field `fv1` since it has different types in variants of enum `Wrapper<||u64 has drop + store>`
-    ┌─ TEMPFILE1:164:24
+    ┌─ TEMPFILE1:166:24
     │
-164 │             let _v3 = &_v2.fv1;
+166 │             let _v3 = &_v2.fv1;
     │                        ^^^
     │
     = field `fv1` has type `|||u64 has drop + store|u64 has copy + drop + store` in variant `V2` and type `|||u64 has drop + store|u64 has copy + store` in variant `V1`
 
 error: cannot select field `fv1` since it has different types in variants of enum `Wrapper<||u64 has drop + store>`
-    ┌─ TEMPFILE1:169:24
+    ┌─ TEMPFILE1:171:24
     │
-169 │             let _v6 = &_v2.fv1;
+171 │             let _v6 = &_v2.fv1;
     │                        ^^^
     │
     = field `fv1` has type `|||u64 has drop + store|u64 has copy + drop + store` in variant `V2` and type `|||u64 has drop + store|u64 has copy + store` in variant `V1`
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-    ┌─ TEMPFILE1:190:19
+    ┌─ TEMPFILE1:192:19
     │
-190 │             _v0 = _v4(_v5)
+192 │             _v0 = _v4(_v5)
     │                   ^^^^^^^^
 
 error: expected function type has argument of type `||u64 has copy + drop` but `||u64 has drop + store` was provided
-    ┌─ TEMPFILE1:194:19
+    ┌─ TEMPFILE1:196:19
     │
-194 │             _v0 = _v6(_v7)
+196 │             _v0 = _v6(_v7)
     │                   ^^^^^^^^
 
 
-task 12 lines 213-213:  run --verbose --signers 0x1 -- 0x99::test_enum::init
+task 12 lines 215-215:  run --verbose --signers 0x1 -- 0x99::test_enum::init
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -179,7 +179,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 13 lines 215-215:  run --verbose --signers 0x1 -- 0x99::test_enum::bad_init
+task 13 lines 217-217:  run --verbose --signers 0x1 -- 0x99::test_enum::bad_init
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -189,7 +189,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 14 lines 217-217:  run --verbose --signers 0x1 -- 0x99::test_enum::test_exist
+task 14 lines 219-219:  run --verbose --signers 0x1 -- 0x99::test_enum::test_exist
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -199,7 +199,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 15 lines 219-219:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_1
+task 15 lines 221-221:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_1
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -209,7 +209,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 16 lines 221-221:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_2
+task 16 lines 223-223:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_2
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -219,7 +219,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 17 lines 223-223:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_3
+task 17 lines 225-225:  run --verbose --signers 0x1 -- 0x99::test_enum::test_not_exist_3
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -229,7 +229,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 18 lines 225-225:  run --verbose --signers 0x1 -- 0x99::test_enum::test_bad_borrow_from
+task 18 lines 227-227:  run --verbose --signers 0x1 -- 0x99::test_enum::test_bad_borrow_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -239,7 +239,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 19 lines 227-227:  run --verbose --signers 0x1 -- 0x99::test_enum::test_borrow_from
+task 19 lines 229-229:  run --verbose --signers 0x1 -- 0x99::test_enum::test_borrow_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -249,7 +249,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 20 lines 229-229:  run --verbose --signers 0x1 -- 0x99::test_enum::test_bad_move_from
+task 20 lines 231-231:  run --verbose --signers 0x1 -- 0x99::test_enum::test_bad_move_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -259,7 +259,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 21 lines 231-231:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from
+task 21 lines 233-233:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,
@@ -269,7 +269,7 @@ Error: Function execution failed with VMError: {
     offsets: [],
     exec_state: None,
 }
-task 22 lines 233-233:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from
+task 22 lines 235-235:  run --verbose --signers 0x1 -- 0x99::test_enum::test_move_from
 Error: Function execution failed with VMError: {
     message: Linker Error: Module 0000000000000000000000000000000000000000000000000000000000000099::test_enum doesn't exist,
     major_status: LINKER_ERROR,

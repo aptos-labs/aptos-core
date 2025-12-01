@@ -195,6 +195,13 @@ impl StacklessControlFlowGraph {
         let bytecode = &code[pc as usize];
 
         for label in bytecode.branch_dests() {
+            assert!(
+                label_offsets.contains_key(&label),
+                "{} not in {:?} for {:?}",
+                label,
+                label_offsets,
+                code
+            );
             block_ids.insert(*label_offsets.get(&label).unwrap());
         }
 

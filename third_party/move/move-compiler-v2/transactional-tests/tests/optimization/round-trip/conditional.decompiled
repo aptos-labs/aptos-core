@@ -7,8 +7,9 @@ module 0xc0ffee::m {
         assert!(test(false) == 3, 1);
     }
     fun test(p0: bool): u64 {
-        if (p0) return 3;
-        3
+        let _v0;
+        if (p0) _v0 = 3 else _v0 = 3;
+        _v0
     }
 }
 

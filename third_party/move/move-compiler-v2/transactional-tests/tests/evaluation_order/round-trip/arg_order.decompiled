@@ -3,8 +3,9 @@
 //# publish
 module 0x42::test {
     public fun two_args(p0: u64, p1: bool): u64 {
-        if (p1) return p0;
-        0
+        let _v0;
+        if (p1) _v0 = p0 else _v0 = 0;
+        _v0
     }
 }
 

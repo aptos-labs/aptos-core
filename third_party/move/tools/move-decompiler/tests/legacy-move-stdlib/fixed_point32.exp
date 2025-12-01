@@ -44,16 +44,18 @@ module 0x1::fixed_point32 {
         *&(&self).value == 0
     }
     public fun max(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
-        let _v0 = *&(&num1).value;
-        let _v1 = *&(&num2).value;
-        if (_v0 > _v1) return num1;
-        num2
+        let _v0;
+        let _v1 = *&(&num1).value;
+        let _v2 = *&(&num2).value;
+        if (_v1 > _v2) _v0 = num1 else _v0 = num2;
+        _v0
     }
     public fun min(num1: FixedPoint32, num2: FixedPoint32): FixedPoint32 {
-        let _v0 = *&(&num1).value;
-        let _v1 = *&(&num2).value;
-        if (_v0 < _v1) return num1;
-        num2
+        let _v0;
+        let _v1 = *&(&num1).value;
+        let _v2 = *&(&num2).value;
+        if (_v1 < _v2) _v0 = num1 else _v0 = num2;
+        _v0
     }
     public fun multiply_u64(val: u64, multiplier: FixedPoint32): u64 {
         let _v0 = val as u128;
@@ -65,8 +67,8 @@ module 0x1::fixed_point32 {
     public fun round(self: FixedPoint32): u64 {
         let _v0 = floor(self) << 32u8;
         let _v1 = _v0 + 2147483648;
-        if (*&(&self).value < _v1) return _v0 >> 32u8;
-        ceil(self)
+        if (*&(&self).value < _v1) _v1 = _v0 >> 32u8 else _v1 = ceil(self);
+        _v1
     }
 }
 

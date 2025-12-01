@@ -13,12 +13,20 @@ enum Data has drop
 // Function definition at index 0
 fun test_v1(): bool
     local l0: Data
+    local l1: bool
     ld_u64 43
     pack_variant Data, V1
     st_loc l0
     borrow_loc l0
     test_variant Data, V1
     // @5
+    st_loc l1
+    copy_loc l1
+    br_false l0
+    move_loc l1
+    ret
+    // @10
+l0: move_loc l1
     ret
 
 // Function definition at index 1

@@ -28,15 +28,12 @@ module 0xcafe::vectors {
     }
     fun loops_with_break_no_inline(p0: &vector<u8>) {
         let _v0 = 0;
-        'l0: loop {
-            loop {
-                let _v1 = 0x1::vector::length<u8>(p0);
-                if (!(_v0 < _v1)) break 'l0;
-                if (*0x1::vector::borrow<u8>(p0, _v0) != 0u8) break;
-                _v0 = _v0 + 1;
-                continue
-            };
-            return ()
+        loop {
+            let _v1 = 0x1::vector::length<u8>(p0);
+            if (!(_v0 < _v1)) break;
+            if (*0x1::vector::borrow<u8>(p0, _v0) != 0u8) break;
+            _v0 = _v0 + 1;
+            continue
         };
     }
     public entry fun guess_without_break_with_inline(p0: vector<u8>) {
