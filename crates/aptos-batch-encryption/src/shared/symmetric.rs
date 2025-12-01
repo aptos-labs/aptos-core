@@ -15,7 +15,7 @@ use ark_ff::{
 use ark_serialize::CanonicalSerialize as _;
 use ark_std::Zero;
 use hmac::{Hmac, Mac};
-use rand_core::{CryptoRng, RngCore};
+use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{
     digest::{
@@ -88,6 +88,8 @@ impl SymmetricKey {
     pub fn new<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         use aes_gcm::KeyInit as _; // putting this in the global scope causes Hmac<Sha256> to be
                                    // ambiguous for some reason
+
+        // unwrap is safe here b/c the above array is of the correct size
         Self(Aes128Gcm::generate_key(rng))
     }
 
@@ -195,9 +197,8 @@ mod tests {
     };
     use aes_gcm::{aead::Aead as _, Key};
     use ark_ff::field_hashers::{DefaultFieldHasher, HashToField};
-    use ark_std::rand::thread_rng;
+    use ark_std::rand::{thread_rng, RngCore as _};
     use generic_array::arr;
-    use rand_core::RngCore;
     use sha2::Sha256;
 
     #[test]

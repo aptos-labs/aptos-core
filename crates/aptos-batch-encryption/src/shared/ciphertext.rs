@@ -15,8 +15,8 @@ use anyhow::Result;
 use ark_ec::{pairing::Pairing, AffineRepr};
 use ark_serialize::CanonicalSerialize;
 use ark_std::UniformRand;
-use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
-use rand_core::{CryptoRng, RngCore};
+use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey, SECRET_KEY_LENGTH};
+use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::hash::Hash;
 
@@ -104,7 +104,11 @@ impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
         plaintext: &impl Plaintext,
         associated_data: &impl AssociatedData,
     ) -> Result<Ciphertext<I>> {
-        let signing_key: SigningKey = SigningKey::generate(rng);
+        // Doing this to avoid rand dependency hell
+        let mut signing_key_bytes: [u8; SECRET_KEY_LENGTH] = [0; SECRET_KEY_LENGTH];
+        rng.fill_bytes(&mut signing_key_bytes);
+
+        let signing_key: SigningKey = SigningKey::from_bytes(&signing_key_bytes);
         let vk = signing_key.verifying_key();
         let hashed_id = I::from_verifying_key(&vk);
         let bibe_ct = self.bibe_encrypt(rng, plaintext, hashed_id)?;

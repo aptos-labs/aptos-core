@@ -20,8 +20,8 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use ark_ff::UniformRand as _;
-use ark_std::rand::rngs::StdRng;
-use rand_core::SeedableRng;
+use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore};
+use ark_std::rand::SeedableRng;
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
 
@@ -124,7 +124,7 @@ impl BatchThresholdEncryption for FPTX {
         ))
     }
 
-    fn encrypt<R: rand_core::CryptoRng + rand_core::RngCore>(
+    fn encrypt<R: CryptoRng + RngCore>(
         ek: &Self::EncryptionKey,
         rng: &mut R,
         msg: &impl Plaintext,

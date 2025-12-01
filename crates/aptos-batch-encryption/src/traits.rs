@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::shared::algebra::shamir::ThresholdConfig;
 use anyhow::Result;
-use rand_core::{CryptoRng, RngCore};
+use ark_std::rand::{CryptoRng, RngCore};
 use rayon::ThreadPool;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
