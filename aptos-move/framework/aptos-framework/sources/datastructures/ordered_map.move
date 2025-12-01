@@ -1407,7 +1407,7 @@ module aptos_std::ordered_map {
             assert spec_contains_key(map, 4);
             assert spec_get(map, 4) == 6;
             assert option::is_some(result_2);
-            assert option::borrow(result_2) == 5;
+            assert option::spec_borrow(result_2) == 5;
         };
         spec {
             assert keys[0] == 1;
@@ -1447,7 +1447,7 @@ module aptos_std::ordered_map {
             assert keys[1] == 2;
             assert spec_contains_key(map, 2);
             assert option::is_some(result_2);
-            assert option::borrow(result_2) == 2;
+            assert option::spec_borrow(result_2) == 2;
         };
     }
 
