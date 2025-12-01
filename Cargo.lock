@@ -205,12 +205,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anes"
-version = "0.1.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b46cbb362ab8752921c97e041f5e366ee6297bd428a31275b9fcf1e380f7299"
-
-[[package]]
 name = "annotate-snippets"
 version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -710,14 +704,13 @@ dependencies = [
  "ark-serialize 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
  "ark-std 0.5.0",
  "bcs 0.1.4",
- "criterion 0.5.1",
+ "criterion",
  "csv",
  "ed25519-dalek 2.1.1",
  "ff",
  "generic-array",
  "hmac 0.12.1",
  "itertools 0.13.0",
- "itertools 0.14.0",
  "lazy_static",
  "num-traits",
  "rand 0.7.3",
@@ -774,7 +767,7 @@ dependencies = [
  "cfg-if",
  "claims",
  "concurrent-queue",
- "criterion 0.3.6",
+ "criterion",
  "crossbeam",
  "dashmap 7.0.0-rc2",
  "derivative",
@@ -806,7 +799,7 @@ dependencies = [
  "aptos-types",
  "bcs 0.1.4",
  "clap 4.5.21",
- "criterion 0.3.6",
+ "criterion",
  "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
  "move-core-types",
@@ -1146,7 +1139,7 @@ dependencies = [
  "bulletproofs",
  "byteorder",
  "bytes",
- "criterion 0.3.6",
+ "criterion",
  "curve25519-dalek 3.2.0",
  "curve25519-dalek-ng",
  "digest 0.9.0",
@@ -1418,7 +1411,7 @@ dependencies = [
  "bcs 0.1.4",
  "blst",
  "blstrs",
- "criterion 0.3.6",
+ "criterion",
  "derive_more 0.99.17",
  "ff",
  "group",
@@ -1572,7 +1565,7 @@ dependencies = [
  "arr_macro",
  "bcs 0.1.4",
  "bytes",
- "criterion 0.3.6",
+ "criterion",
  "fail",
  "itertools 0.13.0",
  "move-core-types",
@@ -1716,7 +1709,7 @@ dependencies = [
  "aptos-storage-interface",
  "aptos-types",
  "bcs 0.1.4",
- "criterion 0.3.6",
+ "criterion",
  "derive_more 0.99.17",
  "itertools 0.13.0",
  "once_cell",
@@ -1756,7 +1749,7 @@ dependencies = [
  "aptos-experimental-layered-map",
  "aptos-infallible",
  "aptos-metrics-core",
- "criterion 0.3.6",
+ "criterion",
  "itertools 0.13.0",
  "once_cell",
  "proptest",
@@ -1777,7 +1770,7 @@ dependencies = [
  "aptos-schemadb",
  "aptos-temppath",
  "bitvec",
- "criterion 0.3.6",
+ "criterion",
  "itertools 0.13.0",
  "once_cell",
  "proptest",
@@ -4032,7 +4025,7 @@ dependencies = [
  "aptos-types",
  "aptos-vault-client",
  "claims",
- "criterion 0.3.6",
+ "criterion",
  "hex",
  "once_cell",
  "proptest",
@@ -4072,7 +4065,7 @@ dependencies = [
  "aptos-types",
  "aptos-vm",
  "bitvec",
- "criterion 0.3.6",
+ "criterion",
  "dashmap 7.0.0-rc2",
  "itertools 0.13.0",
  "once_cell",
@@ -4558,7 +4551,7 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-logging",
  "clap 4.5.21",
- "criterion 0.3.6",
+ "criterion",
  "criterion-cpu-time",
  "num_cpus",
  "proptest",
@@ -4808,7 +4801,7 @@ dependencies = [
  "ciborium",
  "claims",
  "coset",
- "criterion 0.3.6",
+ "criterion",
  "dashmap 7.0.0-rc2",
  "derivative",
  "fixed",
@@ -7626,7 +7619,7 @@ dependencies = [
  "atty",
  "cast",
  "clap 2.34.0",
- "criterion-plot 0.4.5",
+ "criterion-plot",
  "csv",
  "itertools 0.10.5",
  "lazy_static",
@@ -7644,38 +7637,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "criterion"
-version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
-dependencies = [
- "anes",
- "cast",
- "ciborium",
- "clap 4.5.21",
- "criterion-plot 0.5.0",
- "is-terminal",
- "itertools 0.10.5",
- "num-traits",
- "once_cell",
- "oorandom",
- "plotters",
- "rayon",
- "regex",
- "serde",
- "serde_derive",
- "serde_json",
- "tinytemplate",
- "walkdir",
-]
-
-[[package]]
 name = "criterion-cpu-time"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "63aaaf47e457badbcb376c65a49d0f182c317ebd97dc6d1ced94c8e1d09c0f3a"
 dependencies = [
- "criterion 0.3.6",
+ "criterion",
  "libc",
 ]
 
@@ -7684,16 +7651,6 @@ name = "criterion-plot"
 version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2673cc8207403546f45f5fd319a974b1e6983ad1a3ee7e6041650013be041876"
-dependencies = [
- "cast",
- "itertools 0.10.5",
-]
-
-[[package]]
-name = "criterion-plot"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
 dependencies = [
  "cast",
  "itertools 0.10.5",
@@ -11397,15 +11354,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "itertools"
-version = "0.14.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
-dependencies = [
- "either",
-]
-
-[[package]]
 name = "itoa"
 version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -11757,11 +11705,11 @@ dependencies = [
 
 [[package]]
 name = "lazy_static"
-version = "1.5.0"
+version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bbd2bcb4c963f2ddae06a2efc7e9f3591312473c50c6685e1f298068316e66fe"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
 dependencies = [
- "spin 0.9.8",
+ "spin 0.5.2",
 ]
 
 [[package]]
@@ -15986,9 +15934,9 @@ checksum = "60a357793950651c4ed0f3f52338f53b2f809f32d83a07f72909fa13e4c6c1e3"
 
 [[package]]
 name = "rayon"
-version = "1.11.0"
+version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368f01d005bf8fd9b1206fb6fa653e6c4a81ceb1466406b81792d87c5677a58f"
+checksum = "e4963ed1bc86e4f3ee217022bd855b297cef07fb9eac5dfa1f788b220b49b3bd"
 dependencies = [
  "either",
  "rayon-core",
@@ -15996,9 +15944,9 @@ dependencies = [
 
 [[package]]
 name = "rayon-core"
-version = "1.13.0"
+version = "1.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
+checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
@@ -17030,11 +16978,10 @@ checksum = "a3f0bf26fd526d2a95683cd0f87bf103b8539e2ca1ef48ce002d67aad59aa0b4"
 
 [[package]]
 name = "serde"
-version = "1.0.228"
+version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
+checksum = "3fb1c873e1b9b056a4dc4c0c198b24c3ffa059243875552b2bd0933b1aee4ce2"
 dependencies = [
- "serde_core",
  "serde_derive",
 ]
 
@@ -17115,19 +17062,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_core"
-version = "1.0.228"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41d385c7d4ca58e59fc732af25c3983b67ac852c1a25000afe1175de458b67ad"
-dependencies = [
- "serde_derive",
-]
-
-[[package]]
 name = "serde_derive"
-version = "1.0.228"
+version = "1.0.197"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d540f220d3187173da220f885ab66608367b6574e925011a9353e4badda91d79"
+checksum = "7eb0b34b42edc17f6b7cac84a52a1c5f0e1bb2227e997ca9011ea3dd34e8610b"
 dependencies = [
  "proc-macro2",
  "quote",
