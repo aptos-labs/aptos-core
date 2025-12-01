@@ -13,7 +13,7 @@ use anyhow::{anyhow, Result};
 use ark_ec::{pairing::Pairing, AffineRepr, ScalarMul, VariableBaseMSM};
 use ark_std::UniformRand;
 use num_traits::{One, Zero};
-use rand_core::{CryptoRng, RngCore};
+use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

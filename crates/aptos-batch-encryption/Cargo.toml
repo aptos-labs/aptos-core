@@ -17,27 +17,25 @@ ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-
 ark-poly = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff", features = ["parallel"] }
 ark-serialize = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff" }
 ark-std = { version = "0.5.0", features = ["getrandom"] }
-
-csv = "1.3.0"
 ed25519-dalek = { version = "2.1.1", features = ["asm", "rand_core", "serde"] }
-ff = "0.13.0"
-num-traits = "0.2.19"
-rand_core = "0.6.4"
-serde = { version = "1.0.210", features = ["derive", "serde_derive"] }
 sha2 = { version = "0.10.8", features = ["asm", "asm-aarch64", "sha2-asm"] }
-rayon = "1.10.0"
-itertools = "0.14.0"
-anyhow = "1.0.98"
-hmac = "0.12.1"
-aes-gcm = "0.10.3"
-bcs = "0.1.6"
-thiserror = "2.0.12"
-generic-array = { version = "0.14.7", features = ["serde"] }
-lazy_static = "1.5.0"
-rand.workspace = true
-serde_json.workspace = true
-postcard = "1.1.3"
-bitcode = { version = "0.6.6", features = ["serde"] }
+
+csv = { workspace = true }
+ff = { workspace = true }
+num-traits = { workspace = true }
+rand_core = { workspace = true }
+serde = { workspace = true }
+rayon = { workspace = true }
+itertools = { workspace = true }
+anyhow = { workspace = true }
+hmac = { workspace = true }
+aes-gcm = { workspace = true }
+bcs = { workspace = true }
+thiserror = { workspace = true }
+generic-array = { workspace = true }
+lazy_static = { workspace = true }
+rand = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 criterion = "0.5"

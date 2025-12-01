@@ -12,7 +12,7 @@ use crate::{
 };
 use anyhow::Result;
 use ark_ec::{pairing::Pairing as _, AffineRepr};
-use rand_core::{CryptoRng, RngCore};
+use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

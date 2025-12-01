@@ -14,7 +14,7 @@ use ark_ec::VariableBaseMSM as _;
 use ark_poly::{EvaluationDomain, Radix2EvaluationDomain};
 use ark_std::UniformRand;
 use num_traits::{One, Zero};
-use rand_core::RngCore;
+use ark_std::rand::RngCore;
 use rayon::iter::{IndexedParallelIterator as _, IntoParallelIterator, ParallelIterator as _};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
