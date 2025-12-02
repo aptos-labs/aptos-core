@@ -2255,7 +2255,6 @@ dependencies = [
  "redis",
  "rstest",
  "serde",
- "serde_json",
  "tikv-jemallocator",
  "tokio",
  "tokio-stream",
