@@ -352,14 +352,15 @@ derive_delegated_resource_account() {
 		exit 1
 	fi
 
-	DELEGATED_RESOURCE_ACCOUNT=$(echo "$output" | jq -r '.Result[0].resource_account // empty' 2>/dev/null || true)
+	DELEGATED_RESOURCE_ACCOUNT=$(echo "$output" | jq -r '.Result[0].resource_account // empty' 2>/dev/null)
 
-	if [ -n "$DELEGATED_RESOURCE_ACCOUNT" ]; then
-		echo "Derived delegated resource account (for info): $DELEGATED_RESOURCE_ACCOUNT"
-	else
-		echo "Derived resource account; CLI output:"
+	if [ -z "$DELEGATED_RESOURCE_ACCOUNT" ]; then
+		echo "Error: Failed to parse delegated resource account from CLI output"
 		echo "$output"
+		exit 1
 	fi
+
+	echo "Derived delegated resource account: $DELEGATED_RESOURCE_ACCOUNT"
 }
 
 get_delegated_pool_address() {
