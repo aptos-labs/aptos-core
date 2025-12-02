@@ -20,7 +20,7 @@ fn smoke() {
     let tp = ThreadPoolBuilder::new().build().unwrap();
 
     let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
-        FPTX::setup_for_testing(rng.gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
+        FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
 
     let plaintext: String = String::from("hi");
     let associated_data: String = String::from("hi");
@@ -95,7 +95,7 @@ fn fptx_serialize_deserialize_setup() {
     let tc_happy = ThresholdConfig::new(8, 5);
     let tc_slow = ThresholdConfig::new(8, 3);
 
-    let setup = FPTX::setup_for_testing(rng.gen(), 8, 2, &tc_happy, &tc_slow).unwrap();
+    let setup = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc_happy, &tc_slow).unwrap();
 
     let bytes = bcs::to_bytes(&setup).unwrap();
     let setup2: (
