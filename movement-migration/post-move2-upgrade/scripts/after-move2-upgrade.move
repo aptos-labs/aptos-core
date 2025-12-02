@@ -7,6 +7,7 @@ script {
 
     fun main(core_resources: &signer) {
         let core_signer = aptos_governance::get_signer_testnet_only(core_resources, @0000000000000000000000000000000000000000000000000000000000000001);
+        governed_gas_pool::initialize_governed_gas_pool_extension(&core_signer);
         //TODO: we should relax the max to 1000M move, for minimal, we should update to 10M Move before official migration
         staking_config::update_required_stake(&core_signer, 1000, 100_000_000_000_000_000);
 
