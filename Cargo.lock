@@ -694,14 +694,15 @@ version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "anyhow",
- "ark-bls12-381 0.5.0-alpha.0",
- "ark-bn254 0.5.0-alpha.0",
- "ark-ec 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-ff 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-ff-asm 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-ff-macros 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-poly 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-serialize 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
+ "aptos-crypto",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-ff-asm 0.5.0",
+ "ark-ff-macros 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "bcs 0.1.4",
  "criterion",
@@ -1116,16 +1117,16 @@ dependencies = [
  "arbitrary",
  "ark-bls12-381 0.4.0",
  "ark-bls12-381 0.5.0",
- "ark-bn254 0.5.0",
+ "ark-bn254",
  "ark-ec 0.4.2",
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-ec 0.5.0",
  "ark-ff 0.4.2",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-ff 0.5.0",
  "ark-groth16",
- "ark-poly 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-poly 0.5.0",
  "ark-relations",
  "ark-serialize 0.4.2",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-serialize 0.5.0",
  "ark-snark",
  "ark-std 0.5.0",
  "base64 0.13.1",
@@ -1402,11 +1403,11 @@ dependencies = [
  "aptos-crypto-derive",
  "aptos-runtimes",
  "ark-bls12-381 0.5.0",
- "ark-bn254 0.5.0",
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-poly 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "bcs 0.1.4",
  "blst",
@@ -2010,10 +2011,10 @@ dependencies = [
  "aptos-vm",
  "aptos-vm-types",
  "ark-bls12-381 0.5.0",
- "ark-bn254 0.5.0",
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "bcs 0.1.4",
  "better_any",
@@ -2899,9 +2900,9 @@ dependencies = [
  "aptos-metrics-core",
  "aptos-time-service",
  "aptos-types",
- "ark-bn254 0.5.0",
+ "ark-bn254",
  "ark-groth16",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-serialize 0.5.0",
  "async-trait",
  "bcs 0.1.4",
  "blstrs",
@@ -4785,12 +4786,12 @@ dependencies = [
  "aptos-infallible",
  "aptos-proptest-helpers",
  "arbitrary",
- "ark-bn254 0.5.0",
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
  "ark-groth16",
  "ark-relations",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "async-trait",
  "base64 0.13.1",
@@ -4928,7 +4929,7 @@ dependencies = [
  "aptos-vm-environment",
  "aptos-vm-logging",
  "aptos-vm-types",
- "ark-bn254 0.5.0",
+ "ark-bn254",
  "ark-groth16",
  "bcs 0.1.4",
  "bytes",
@@ -4983,7 +4984,7 @@ dependencies = [
  "aptos-table-natives",
  "aptos-types",
  "aptos-vm-types",
- "ark-bn254 0.5.0",
+ "ark-bn254",
  "ark-groth16",
  "bcs 0.1.4",
  "move-binary-format",
@@ -5185,34 +5186,13 @@ dependencies = [
 
 [[package]]
 name = "ark-bls12-381"
-version = "0.5.0-alpha.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "ark-ec 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-ff 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-serialize 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-std 0.5.0",
-]
-
-[[package]]
-name = "ark-bls12-381"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3df4dcc01ff89867cd86b0da835f23c3f02738353aaee7dde7495af71363b8d5"
 dependencies = [
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-std 0.5.0",
-]
-
-[[package]]
-name = "ark-bn254"
-version = "0.5.0-alpha.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "ark-ec 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-ff 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
 ]
 
@@ -5222,8 +5202,8 @@ version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d69eab57e8d2663efa5c63135b2af4f396d66424f88954c21104125ab6b3e6bc"
 dependencies = [
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
  "ark-std 0.5.0",
 ]
 
@@ -5235,10 +5215,10 @@ checksum = "1e0c292754729c8a190e50414fd1a37093c786c709899f29c9f7daccecfa855e"
 dependencies = [
  "ahash 0.8.11",
  "ark-crypto-primitives-macros",
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
  "ark-relations",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-serialize 0.5.0",
  "ark-snark",
  "ark-std 0.5.0",
  "blake2",
@@ -5278,47 +5258,6 @@ dependencies = [
  "zeroize",
 ]
 
-[[package]]
-name = "ark-ec"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "ahash 0.8.11",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-poly 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-std 0.5.0",
- "educe",
- "fnv",
- "hashbrown 0.15.3",
- "itertools 0.13.0",
- "num-bigint 0.4.4",
- "num-integer",
- "num-traits",
- "rayon",
- "zeroize",
-]
-
-[[package]]
-name = "ark-ec"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "ahash 0.8.11",
- "ark-ff 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-poly 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-serialize 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-std 0.5.0",
- "educe",
- "fnv",
- "hashbrown 0.15.3",
- "itertools 0.13.0",
- "num-bigint 0.4.4",
- "num-integer",
- "num-traits",
- "rayon",
- "zeroize",
-]
 
 [[package]]
 name = "ark-ff"
@@ -5345,29 +5284,9 @@ name = "ark-ff"
 version = "0.5.0"
 source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
- "ark-ff-asm 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff-macros 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-std 0.5.0",
- "arrayvec 0.7.4",
- "digest 0.10.7",
- "educe",
- "itertools 0.13.0",
- "num-bigint 0.4.4",
- "num-traits",
- "paste",
- "rayon",
- "zeroize",
-]
-
-[[package]]
-name = "ark-ff"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "ark-ff-asm 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-ff-macros 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-serialize 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
+ "ark-ff-asm 0.5.0",
+ "ark-ff-macros 0.5.0",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "arrayvec 0.7.4",
  "digest 0.10.7",
@@ -5388,15 +5307,6 @@ checksum = "3ed4aa4fe255d0bc6d79373f7e31d2ea147bcf486cba1be5ba7ea85abdb92348"
 dependencies = [
  "quote",
  "syn 1.0.109",
-]
-
-[[package]]
-name = "ark-ff-asm"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "quote",
- "syn 2.0.87",
 ]
 
 [[package]]
@@ -5434,29 +5344,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-ff-macros"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "num-bigint 0.4.4",
- "num-traits",
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
 name = "ark-groth16"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88f1d0f3a534bb54188b8dcc104307db6c56cdae574ddc3212aec0625740fc7e"
 dependencies = [
  "ark-crypto-primitives",
- "ark-ec 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-poly 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-poly 0.5.0",
  "ark-relations",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "rayon",
 ]
@@ -5480,23 +5378,8 @@ version = "0.5.0"
 source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "ahash 0.8.11",
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-std 0.5.0",
- "educe",
- "fnv",
- "hashbrown 0.15.3",
- "rayon",
-]
-
-[[package]]
-name = "ark-poly"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "ahash 0.8.11",
- "ark-ff 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
- "ark-serialize 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
+ "ark-ff 0.5.0",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
  "educe",
  "fnv",
@@ -5510,7 +5393,7 @@ version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec46ddc93e7af44bcab5230937635b06fb5744464dd6a7e7b083e80ebd274384"
 dependencies = [
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-ff 0.5.0",
  "ark-std 0.5.0",
  "tracing",
  "tracing-subscriber 0.2.25",
@@ -5533,20 +5416,7 @@ name = "ark-serialize"
 version = "0.5.0"
 source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
- "ark-serialize-derive 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ark-std 0.5.0",
- "arrayvec 0.7.4",
- "digest 0.10.7",
- "num-bigint 0.4.4",
- "rayon",
-]
-
-[[package]]
-name = "ark-serialize"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "ark-serialize-derive 0.5.0 (git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff)",
+ "ark-serialize-derive 0.5.0",
  "ark-std 0.5.0",
  "arrayvec 0.7.4",
  "digest 0.10.7",
@@ -5576,24 +5446,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "ark-serialize-derive"
-version = "0.5.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn 2.0.87",
-]
-
-[[package]]
 name = "ark-snark"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d368e2848c2d4c129ce7679a7d0d2d612b6a274d3ea6a13bad4445d61b381b88"
 dependencies = [
- "ark-ff 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-ff 0.5.0",
  "ark-relations",
- "ark-serialize 0.5.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "ark-serialize 0.5.0",
  "ark-std 0.5.0",
 ]
 

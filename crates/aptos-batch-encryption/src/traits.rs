@@ -1,6 +1,5 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use crate::shared::algebra::shamir::ThresholdConfig;
 use anyhow::Result;
 use ark_std::rand::{CryptoRng, RngCore};
 use rayon::ThreadPool;
@@ -8,6 +7,8 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
+    type ThresholdConfig : aptos_crypto::ThresholdConfig;
+
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
     /// deploy this scheme, the functionality here will have to be implemented in the SDK.
     type EncryptionKey;
@@ -62,8 +63,8 @@ pub trait BatchThresholdEncryption {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &ThresholdConfig,
-        tc_slowpath: &ThresholdConfig,
+        tc_happypath: &Self::ThresholdConfig,
+        tc_slowpath: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
@@ -137,7 +138,7 @@ pub trait BatchThresholdEncryption {
     /// shares surpasses the threshold.
     fn reconstruct_decryption_key(
         shares: &[Self::DecryptionKeyShare],
-        config: &ThresholdConfig,
+        config: &Self::ThresholdConfig,
         pool: &ThreadPool,
     ) -> Result<Self::DecryptionKey>;
 
