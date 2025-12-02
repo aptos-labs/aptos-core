@@ -411,7 +411,7 @@ impl<'a> Instrumenter<'a> {
                 );
             },
             Call(id, _, MoveTo(mid, sid, targs), srcs, _) => {
-                let addr_exp = self.builder.mk_temporary(srcs[1]);
+                let addr_exp = self.builder.mk_temporary(srcs[0]);
                 self.generate_modifies_check(
                     PropKind::Assert,
                     spec,

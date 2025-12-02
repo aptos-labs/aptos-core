@@ -58,6 +58,6 @@ module 0x99::m {
     fun init_module(account: &signer) {
         let v = 0x1::option::none<u64>();
         let f: ||0x1::option::Option<u64> has copy + drop + store = || id(v);
-        move_to<FunctionStore>(FunctionStore{f: f}, account);
+        move_to<FunctionStore>(account, FunctionStore{f: f});
     }
 }

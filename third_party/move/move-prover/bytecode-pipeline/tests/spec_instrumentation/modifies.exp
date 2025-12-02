@@ -73,7 +73,7 @@ public fun B::move_to_test_incorrect($t0|account: &signer, $t1|addr2: address) {
   3: $t6 := move($t0)
   4: $t7 := 2
   5: $t8 := pack 0x0::B::T($t7)
-  6: move_to<0x0::B::T>($t8, $t6)
+  6: move_to<0x0::B::T>($t6, $t8)
   7: $t9 := move($t1)
   8: $t10 := A::read_at($t9)
   9: $t3 := $t10
@@ -278,7 +278,7 @@ public fun B::move_to_test_incorrect($t0|account: signer, $t1|addr2: address) {
  12: $t8 := pack 0x0::B::T($t7)
      # VC: caller does not have permission to modify `B::T` at given address at tests/spec_instrumentation/modifies.move:52:9+28
  13: assert CanModify<0x0::B::T>($t0)
- 14: move_to<0x0::B::T>($t8, $t0) on_abort goto 28 with $t6
+ 14: move_to<0x0::B::T>($t0, $t8) on_abort goto 28 with $t6
  15: $t9 := opaque begin: A::read_at($t1)
  16: assume Identical($t10, Not(exists<0x0::A::S>($t1)))
  17: if ($t10) goto 18 else goto 21

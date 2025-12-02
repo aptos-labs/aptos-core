@@ -8,7 +8,7 @@ fun InvRelevance::inner<#0>($t0|s: &signer, $t1|t: #0) {
   0: $t2 := move($t0)
   1: $t3 := move($t1)
   2: $t4 := pack 0x2::InvRelevance::R<#0>($t3)
-  3: move_to<0x2::InvRelevance::R<#0>>($t4, $t2)
+  3: move_to<0x2::InvRelevance::R<#0>>($t2, $t4)
   4: return ()
 }
 
@@ -51,7 +51,7 @@ public fun InvRelevance::outer_u64($t0|s: &signer, $t1|t: u64) {
 fun InvRelevance::inner<#0>($t0|s: signer, $t1|t: #0) {
      var $t2: 0x2::InvRelevance::R<#0>
   0: $t2 := pack 0x2::InvRelevance::R<#0>($t1)
-  1: move_to<0x2::InvRelevance::R<#0>>($t2, $t0)
+  1: move_to<0x2::InvRelevance::R<#0>>($t0, $t2)
   2: return ()
 }
 

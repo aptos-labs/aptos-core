@@ -80,7 +80,7 @@ module 0x42::M {
         (copy x, x)
     }
     fun f5(s: &signer, x: HasKey<NoAbilities, u64>) {
-        move_to<HasKey<NoAbilities, u64>>(x, s);
+        move_to<HasKey<NoAbilities, u64>>(s, x);
     }
     fun f6(): HasKey<NoAbilities, u64>
         acquires HasKey
