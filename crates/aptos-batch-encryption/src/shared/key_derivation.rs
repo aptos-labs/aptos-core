@@ -171,7 +171,7 @@ impl BIBEDecryptionKey {
         threshold_config: &ShamirThresholdConfig<Fr>,
     ) -> Result<Self> {
         let signature_g1 = G1Affine::reconstruct(
-            &threshold_config,
+            threshold_config,
             &shares
                 .iter()
                 .map(|share| (share.player, share.signature_share_eval))
