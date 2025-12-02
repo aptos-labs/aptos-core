@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     schemes::fptx::FPTX,
-    shared::{
-        key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare},
-    },
+    shared::key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare},
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;

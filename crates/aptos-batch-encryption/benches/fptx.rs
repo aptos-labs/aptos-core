@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use aptos_batch_encryption::{
-    schemes::fptx::FPTX,
-    shared::key_derivation::BIBEDecryptionKeyShare,
+    schemes::fptx::FPTX, shared::key_derivation::BIBEDecryptionKeyShare,
     traits::BatchThresholdEncryption,
 };
 use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;

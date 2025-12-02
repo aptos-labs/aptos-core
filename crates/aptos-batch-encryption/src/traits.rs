@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
-    type ThresholdConfig : aptos_crypto::ThresholdConfig;
+    type ThresholdConfig: aptos_crypto::ThresholdConfig;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
     /// deploy this scheme, the functionality here will have to be implemented in the SDK.
@@ -178,7 +178,6 @@ pub trait AssociatedData:
 
 impl Plaintext for String {}
 impl AssociatedData for String {}
-
 
 pub trait VerificationKey: Serialize + DeserializeOwned {
     fn player(&self) -> Player;

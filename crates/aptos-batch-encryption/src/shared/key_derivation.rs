@@ -1,10 +1,6 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
-use super::{
-    symmetric,
-};
-use aptos_crypto::{arkworks::shamir::{Reconstructable, ShamirGroupShare, ShamirThresholdConfig}, player::Player};
-use ark_ff::UniformRand as _;
+use super::symmetric;
 use crate::{
     errors::{BatchEncryptionError, ReconstructError},
     group::{Fr, G1Affine, G2Affine, PairingSetting},
@@ -12,7 +8,12 @@ use crate::{
     traits::{DecryptionKeyShare, VerificationKey},
 };
 use anyhow::Result;
+use aptos_crypto::{
+    arkworks::shamir::{Reconstructable, ShamirGroupShare, ShamirThresholdConfig},
+    player::Player,
+};
 use ark_ec::{pairing::Pairing as _, AffineRepr};
+use ark_ff::UniformRand as _;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{Deserialize, Serialize};
 
@@ -169,11 +170,13 @@ impl BIBEDecryptionKey {
         shares: &[BIBEDecryptionKeyShare],
         threshold_config: &ShamirThresholdConfig<Fr>,
     ) -> Result<Self> {
-        let signature_g1 = G1Affine::reconstruct(&threshold_config, 
+        let signature_g1 = G1Affine::reconstruct(
+            &threshold_config,
             &shares
                 .iter()
                 .map(|share| (share.player, share.signature_share_eval))
-                .collect::<Vec<ShamirGroupShare<G1Affine>>>())?;
+                .collect::<Vec<ShamirGroupShare<G1Affine>>>(),
+        )?;
 
         let digest_g1 = shares[0].digest_g1;
 
@@ -192,10 +195,7 @@ impl BIBEDecryptionKey {
 #[cfg(test)]
 mod tests {
     use super::{gen_msk_shares, BIBEDecryptionKey, BIBEDecryptionKeyShare};
-    use crate::{
-        group::Fr,
-        shared::digest::Digest,
-    };
+    use crate::{group::Fr, shared::digest::Digest};
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
     use ark_ff::UniformRand as _;
     use ark_std::rand::{seq::SliceRandom, thread_rng};
