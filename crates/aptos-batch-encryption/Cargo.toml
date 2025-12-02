@@ -20,41 +20,39 @@ ark-bls12-381 = { workspace = true }
 ark-bn254 = { workspace = true }
 ark-ec = { workspace = true }
 ark-ff = { workspace = true }
-ark-ff-macros = { workspace = true }
 ark-ff-asm = { workspace = true }
+ark-ff-macros = { workspace = true }
 ark-poly = { workspace = true }
 ark-serialize = { workspace = true }
 ark-std = { workspace = true }
 ed25519-dalek = { version = "2.1.1", features = ["asm", "rand_core", "serde"] }
 sha2 = { version = "0.10.8", features = ["asm", "asm-aarch64", "sha2-asm"] }
 
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+bcs = { workspace = true }
 csv = { workspace = true }
 ff = { workspace = true }
-num-traits = { workspace = true }
-rand_core = { workspace = true }
-serde = { workspace = true }
-rayon = { workspace = true }
-itertools = { workspace = true }
-anyhow = { workspace = true }
-hmac = { workspace = true }
-aes-gcm = { workspace = true }
-bcs = { workspace = true }
-thiserror = { workspace = true }
 generic-array = { workspace = true }
+hmac = { workspace = true }
+itertools = { workspace = true }
 lazy_static = { workspace = true }
+num-traits = { workspace = true }
 rand = { workspace = true }
+rand_core = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
 serde_json = { workspace = true }
-aptos-crypto = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
 itertools = { workspace = true }
 
-
 [[bench]]
 name = "fk_algorithm"
 harness = false
-
 
 [[bench]]
 name = "multi_point_eval"
@@ -63,7 +61,6 @@ harness = false
 [[bench]]
 name = "digest"
 harness = false
-
 
 [[bench]]
 name = "fptx"
