@@ -146,7 +146,6 @@ pub fn setup(c: &mut Criterion) {
                     let setup = DigestKey::new(&mut rng, batch_size, *num_rounds).unwrap();
                     let mut file = File::create("setup.bcs").unwrap();
                     file.write_all(&bcs::to_bytes(&setup).unwrap()).unwrap();
-                    //panic!();
                 });
             },
         );
