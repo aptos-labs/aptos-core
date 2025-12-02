@@ -69,6 +69,7 @@ impl BIBEEncryptionKey for EncryptionKey {
 }
 
 impl BatchThresholdEncryption for FPTX {
+    type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type Ciphertext = Ciphertext<FreeRootId>;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;

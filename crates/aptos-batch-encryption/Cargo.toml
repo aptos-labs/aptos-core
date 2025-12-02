@@ -16,15 +16,15 @@ name = "aptos_batch_encryption"
 doctest = false
 
 [dependencies]
-ark-bls12-381 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = [ "curve"] }
-ark-bn254 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = [ "curve"] }
-ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = ["parallel", "rayon"] }
-ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff", features = ["asm"] }
-ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-ark-poly = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff", features = ["parallel"] }
-ark-serialize = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff" }
-ark-std = { version = "0.5.0", features = ["getrandom"] }
+ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-ff-macros = { workspace = true }
+ark-ff-asm = { workspace = true }
+ark-poly = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
 ed25519-dalek = { version = "2.1.1", features = ["asm", "rand_core", "serde"] }
 sha2 = { version = "0.10.8", features = ["asm", "asm-aarch64", "sha2-asm"] }
 
@@ -44,6 +44,7 @@ generic-array = { workspace = true }
 lazy_static = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
+aptos-crypto.workspace = true
 
 [dev-dependencies]
 criterion = { workspace = true }
