@@ -73,9 +73,9 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
 
             let mut result: Vec<T> = product.into_iter().zip(self).map(|(x, y)| *y - x).collect();
 
-            let mut i = 0;
-            while i < result.len() && result[i] != T::zero() {
-                i += 1;
+            let mut i = result.len();
+            while i > 0 && result[i-1] == T::zero() {
+                i -= 1;
             }
             result.truncate(i);
 
@@ -220,6 +220,7 @@ mod tests {
         assert_eq!(r2, cone.coeffs())
     }
 
+
     #[test]
     fn test_remainder_2() {
         println!(" -1: {}", -Fr::one());
@@ -237,6 +238,20 @@ mod tests {
 
         assert_eq!(r1, &[]);
         assert_eq!(r2, cone.coeffs())
+    }
+
+    #[test]
+    fn test_remainder_3() {
+        println!(" -1: {}", -Fr::one());
+        println!(" -2: {}", -(Fr::one() + Fr::one()));
+
+        let x_squared: DensePolynomial<Fr> = DenseUVPolynomial::from_coefficients_vec(vec![Fr::zero(), Fr::zero(), Fr::one()]);
+        let x_squared_minus_x: DensePolynomial<Fr> = DenseUVPolynomial::from_coefficients_vec(vec![Fr::zero(), -Fr::one(), Fr::one()]);
+
+        let r = x_squared.remainder(&x_squared_minus_x);
+
+
+        assert_eq!(r, &[Fr::zero(), Fr::one()]);
     }
 
     #[test]
