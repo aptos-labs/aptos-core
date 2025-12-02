@@ -4,8 +4,10 @@
 use crate::{
     deployment_information::DeploymentInformation,
     external_resources::{
-        groth16_vk::OnChainGroth16VerificationKey, jwk_fetcher::JWKCache,
-        keyless_config::OnChainKeylessConfiguration, resource_fetcher::CachedResources,
+        groth16_vk::OnChainGroth16VerificationKey,
+        jwk_types::{FederatedJWKs, JWKCache},
+        keyless_config::OnChainKeylessConfiguration,
+        resource_fetcher::CachedResources,
     },
     request_handler::{
         handle_request, ABOUT_PATH, DEFAULT_PEPPER_SERVICE_PORT, DELEGATED_FETCH_PATH, FETCH_PATH,
@@ -598,6 +600,9 @@ async fn send_request_to_path(
     // Get or create a JWK cache
     let jwk_cache = jwk_cache.unwrap_or_else(|| Arc::new(Mutex::new(HashMap::new())));
 
+    // Create the federated JWKs
+    let federated_jwks = FederatedJWKs::new_empty();
+
     // Get or create cached resources
     let cached_resources = cached_resources.unwrap_or(CachedResources::new_for_testing());
 
@@ -615,6 +620,7 @@ async fn send_request_to_path(
         request,
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         account_recovery_managers,
         account_recovery_db,

@@ -6,7 +6,11 @@ use crate::{
         account_managers::AccountRecoveryManagers, account_recovery_db::AccountRecoveryDBInterface,
     },
     error::PepperServiceError,
-    external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    external_resources::{
+        jwk_fetcher,
+        jwk_types::{FederatedJWKIssuer, FederatedJWKs, JWKCache},
+        resource_fetcher::CachedResources,
+    },
     metrics,
     vuf_keypair::VUFKeypair,
 };
@@ -49,6 +53,7 @@ const EMAIL_UID_KEY: &str = "email";
 pub async fn handle_pepper_request(
     vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
+    federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
     cached_resources: CachedResources,
     jwt: String,
     ephemeral_public_key: EphemeralPublicKey,
@@ -80,7 +85,7 @@ pub async fn handle_pepper_request(
     )?;
 
     // Verify the JWT signature
-    verify_jwt_signature(jwk_cache, &jwt, &claims).await?;
+    verify_jwt_signature(jwk_cache, federated_jwks, &jwt, &claims).await?;
 
     // Get the uid key and value
     let (uid_key, uid_val) = get_uid_key_and_value(uid_key, &claims)?;
@@ -345,6 +350,7 @@ fn get_verified_derivation_path(
 /// Verifies the JWT signature using the cached JWKs, or fetches the federated JWK if not found in cache
 async fn verify_jwt_signature(
     jwk_cache: JWKCache,
+    federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
     jwt: &str,
     claims: &TokenData<Claims>,
 ) -> Result<(), PepperServiceError> {
@@ -360,12 +366,14 @@ async fn verify_jwt_signature(
         Ok(rsa_jwk) => rsa_jwk,
         Err(error) => {
             info!("Failed to get cached JWK for issuer {} and key ID {}: {}. Attempting to fetch federated JWK.", &claims.claims.iss, &key_id, error);
-            jwk_fetcher::get_federated_jwk(jwt).await.map_err(|error| {
-                PepperServiceError::BadRequest(format!(
-                    "Failed to fetch federated JWK: {}. JWT: {}",
-                    error, jwt
-                ))
-            })?
+            jwk_fetcher::get_federated_jwk(jwt, federated_jwks)
+                .await
+                .map_err(|error| {
+                    PepperServiceError::BadRequest(format!(
+                        "Failed to fetch federated JWK: {}. JWT: {}",
+                        error, jwt
+                    ))
+                })?
         },
     };
     let jwk_decoding_key =

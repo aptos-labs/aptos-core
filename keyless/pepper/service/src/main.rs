@@ -14,7 +14,7 @@ use aptos_keyless_pepper_service::{
     deployment_information::DeploymentInformation,
     external_resources::{
         jwk_fetcher,
-        jwk_fetcher::{JWKCache, JWKIssuer},
+        jwk_types::{FederatedJWKIssuer, FederatedJWKs, JWKCache, JWKIssuer},
         resource_fetcher,
         resource_fetcher::CachedResources,
     },
@@ -217,13 +217,15 @@ async fn main() {
         };
 
     // Start the JWK fetchers
-    let jwk_cache = jwk_fetcher::start_jwk_fetchers(args.jwk_issuers_override.clone());
+    let (jwk_cache, federated_jwks) =
+        jwk_fetcher::start_jwk_fetchers(args.jwk_issuers_override.clone());
 
     // Start the pepper service
     start_pepper_service(
         args.pepper_service_port,
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         account_recovery_managers,
         account_recovery_db,
@@ -256,6 +258,7 @@ async fn start_pepper_service(
     pepper_service_port: u16,
     vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
+    federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
@@ -271,6 +274,7 @@ async fn start_pepper_service(
         // Clone the required Arcs for the service function
         let vuf_keypair = vuf_keypair.clone();
         let jwk_cache = jwk_cache.clone();
+        let federated_jwks = federated_jwks.clone();
         let cached_resources = cached_resources.clone();
         let account_recovery_managers = account_recovery_managers.clone();
         let account_recovery_db = account_recovery_db.clone();
@@ -289,6 +293,7 @@ async fn start_pepper_service(
                 // Clone the required Arcs for the request handler
                 let vuf_keypair = vuf_keypair.clone();
                 let jwk_cache = jwk_cache.clone();
+                let federated_jwks = federated_jwks.clone();
                 let cached_resources = cached_resources.clone();
                 let account_recovery_managers = account_recovery_managers.clone();
                 let account_recovery_db = account_recovery_db.clone();
@@ -301,6 +306,7 @@ async fn start_pepper_service(
                         request,
                         vuf_keypair.clone(),
                         jwk_cache.clone(),
+                        federated_jwks.clone(),
                         cached_resources.clone(),
                         account_recovery_managers.clone(),
                         account_recovery_db.clone(),

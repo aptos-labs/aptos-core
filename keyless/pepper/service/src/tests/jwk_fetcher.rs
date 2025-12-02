@@ -5,7 +5,8 @@ use crate::{
     error::PepperServiceError,
     external_resources::{
         jwk_fetcher,
-        jwk_fetcher::{JWKCache, JWKIssuerInterface, KeyID, JWK_REFRESH_INTERVAL_SECS},
+        jwk_fetcher::JWK_REFRESH_INTERVAL_SECS,
+        jwk_types::{JWKCache, JWKIssuerInterface, KeyID},
     },
     tests::utils,
 };
