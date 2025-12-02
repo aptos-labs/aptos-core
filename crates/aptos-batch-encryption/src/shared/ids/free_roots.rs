@@ -90,8 +90,7 @@ impl IdSet for FreeRootIdSet<UncomputedCoeffs> {
 
     fn add(&mut self, id: &FreeRootId) {
         if self.poly_roots.len() >= self.capacity {
-            // TODO real error handling
-            panic!("put a real error here.");
+            panic!("Number of ids must be less than capacity");
         }
         self.poly_roots.push(id.root_x);
     }
