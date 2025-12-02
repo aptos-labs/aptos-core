@@ -352,7 +352,7 @@ derive_delegated_resource_account() {
 		exit 1
 	fi
 
-	DELEGATED_RESOURCE_ACCOUNT=$(echo "$output" | jq -r '.Result[0]')
+	DELEGATED_RESOURCE_ACCOUNT=$(echo "$output" | jq -r '.Result')
 
 	if [ -z "$DELEGATED_RESOURCE_ACCOUNT" ]; then
 		echo "Error: Failed to parse delegated resource account from CLI output"
@@ -448,6 +448,9 @@ update_delegated_network_address() {
 }
 
 join_delegated_validator_set() {
+	# Ensure VN endpoint is healthy before we try to join
+	check_vn_endpoint_healthy
+
 	echo "Joining validator set with delegated pool..."
 	$MOVEMENT_CLI node join-validator-set \
 		--pool-address "$DELEGATED_POOL_ADDRESS" \
@@ -457,6 +460,23 @@ join_delegated_validator_set() {
 		echo "Error: Failed to join validator set with delegated pool"
 		exit 1
 	fi
+}
+
+check_vn_endpoint_healthy() {
+	local url="${NETWORK_API_ADDRESS%/}/v1"
+
+	echo "Checking VN endpoint health at: $url ..."
+	# -s: silent, -o /dev/null: discard body, -w: print status code only
+	local http_code
+	http_code=$(curl -s -o /dev/null -w "%{http_code}" "$url" || echo "000")
+
+	if [ "$http_code" != "200" ]; then
+		echo "Error: VN endpoint '$url' is not healthy (HTTP $http_code, expected 200)."
+		echo "Aborting join-validator-set operation."
+		exit 1
+	fi
+
+	echo "VN endpoint is healthy (200)."
 }
 
 setup_delegated_pool_flow() {
