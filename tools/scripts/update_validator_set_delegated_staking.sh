@@ -352,7 +352,7 @@ derive_delegated_resource_account() {
 		exit 1
 	fi
 
-	DELEGATED_RESOURCE_ACCOUNT=$(echo "$output" | jq -r '.Result[0].resource_account // empty' 2>/dev/null)
+	DELEGATED_RESOURCE_ACCOUNT=$(echo "$output" | jq -r '.Result[0]')
 
 	if [ -z "$DELEGATED_RESOURCE_ACCOUNT" ]; then
 		echo "Error: Failed to parse delegated resource account from CLI output"
@@ -377,7 +377,7 @@ get_delegated_pool_address() {
 		exit 1
 	fi
 
-	DELEGATED_POOL_ADDRESS=$(echo "$response" | jq -r '.Result[0].value // .Result[0].data // empty')
+	DELEGATED_POOL_ADDRESS=$(echo "$response" | jq -r '.Result[0]')
 
 	if [ -z "$DELEGATED_POOL_ADDRESS" ] || [ "$DELEGATED_POOL_ADDRESS" = "null" ]; then
 		echo "Error: Unable to parse delegated pool address from response"
