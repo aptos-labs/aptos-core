@@ -2256,14 +2256,12 @@ dependencies = [
  "redis",
  "rstest",
  "serde",
- "serde_json",
  "tikv-jemallocator",
  "tokio",
  "tokio-stream",
  "tonic 0.12.3",
  "tonic-reflection",
  "tracing",
- "uuid 1.11.0",
 ]
 
 [[package]]
@@ -2292,7 +2290,6 @@ dependencies = [
  "tonic 0.12.3",
  "tonic-reflection",
  "tracing",
- "uuid 1.11.0",
  "warp",
 ]
 
@@ -2559,6 +2556,7 @@ dependencies = [
  "tonic 0.12.3",
  "tracing",
  "url",
+ "uuid 1.11.0",
  "warp",
 ]
 
