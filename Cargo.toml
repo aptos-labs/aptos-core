@@ -504,7 +504,7 @@ ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
 ark-bn254 = { version = "0.5.0", features = ["curve"] }
 ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
 ark-ff = { version = "0.5.0", features = ["asm"] }
-ark-ff-asm = { version ="0.5.0", features = ["parallel"] }
+ark-ff-asm = { version ="0.5.0" }
 ark-ff-macros = "0.5.0"
 ark-groth16 = "0.5.0"
 ark-poly = { version = "0.5.0", features = ["parallel"] }
