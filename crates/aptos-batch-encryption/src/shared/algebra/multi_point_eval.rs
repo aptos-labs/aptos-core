@@ -51,7 +51,6 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
             let f_rev_evals = domain.fft(&f_rev);
             let divisor_rev_inv_evals = domain.fft(&divisor_rev_inv);
 
-
             let quotient_rev_evals: Vec<T> = f_rev_evals
                 .into_par_iter()
                 .zip(divisor_rev_inv_evals)
