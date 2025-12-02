@@ -5258,6 +5258,26 @@ dependencies = [
  "zeroize",
 ]
 
+[[package]]
+name = "ark-ec"
+version = "0.5.0"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
+dependencies = [
+ "ahash 0.8.11",
+ "ark-ff 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "educe",
+ "fnv",
+ "hashbrown 0.15.3",
+ "itertools 0.13.0",
+ "num-bigint 0.4.4",
+ "num-integer",
+ "num-traits",
+ "rayon",
+ "zeroize",
+]
 
 [[package]]
 name = "ark-ff"
