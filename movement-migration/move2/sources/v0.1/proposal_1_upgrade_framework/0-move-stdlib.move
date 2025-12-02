@@ -1,6 +1,6 @@
 // Script hash: 0f71ff9a
-// Framework commit hash: 669168bd373895f558a3a89b7aebee845ae9099d
-// Builder commit hash: 669168bd373895f558a3a89b7aebee845ae9099d
+// Framework commit hash: 1ac46621900f5c1d5b966170ac5f45f6fefe592f
+// Builder commit hash: 1ac46621900f5c1d5b966170ac5f45f6fefe592f
 // Upgrade proposal for package `MoveStdlib`
 
 // source digest: F1BA247A15F0995D5D574571CA7D0C40D9C429C5B757F12D6EEB479D700126EB
