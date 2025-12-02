@@ -4,7 +4,7 @@ Aptos Fullnodes VULTR (https://www.vultr.com/) Deployment
 This directory contains Terraform configs to deploy a public fullnode on VULTR.
 
 These instructions assume that you have a functioning VULTR account. 
-The default configuration will create a single node cluster with 4CPU/8GB and a automatically allocate and bind a persistant block storage (SSD) using VULTR-CSI (https://github.com/vultr/vultr-csi)
+The default configuration will create a single node cluster with 4CPU/8GB and a automatically allocate and bind a persistent block storage (SSD) using VULTR-CSI (https://github.com/vultr/vultr-csi)
 
 
 1. Install pre-requisites if needed:

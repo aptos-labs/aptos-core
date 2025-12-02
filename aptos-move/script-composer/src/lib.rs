@@ -28,9 +28,9 @@ pub static APTOS_SCRIPT_COMPOSER_KEY: &[u8] = "aptos::script_composer".as_bytes(
 #[wasm_bindgen]
 #[derive(Clone, Debug, Hash, Eq, PartialEq, Serialize, Deserialize)]
 pub struct PreviousResult {
-    /// Refering to the return value in the `call_idx`th call.
+    /// Referring to the return value in the `call_idx`th call.
     call_idx: u16,
-    /// Refering to the `return_idx`th return value in that call, since move function call can
+    /// Referring to the `return_idx`th return value in that call, since move function call can
     /// return multiple values.
     return_idx: u16,
     /// How this result would be used.
@@ -43,11 +43,11 @@ pub enum CallArgument {
     /// Passing raw bytes to the function. The bytes must follows the existing constraints for
     /// transaction arguments.
     Raw(Vec<u8>),
-    /// Refering to signer of the transaction. If it's a single signer transaction you will only
+    /// Referring to signer of the transaction. If it's a single signer transaction you will only
     /// be able to access `Signer(0)`. You will be able to access other signers if it's a multi
     /// agent transaction.
     Signer(u16),
-    /// The arugment came from the returned value of a previous `MoveFunctionCall`.
+    /// The argument came from the returned value of a previous `MoveFunctionCall`.
     PreviousResult(PreviousResult),
 }
 

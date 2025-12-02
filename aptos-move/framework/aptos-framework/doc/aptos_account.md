@@ -752,7 +752,7 @@ to transfer APT) - if we want to allow APT PFS without account itself
 
     // <b>use</b> <b>internal</b> APIs, <b>as</b> they skip:
     // - owner, frozen and dispatchable checks
-    // <b>as</b> APT cannot be frozen or have dispatch, and PFS cannot be transfered
+    // <b>as</b> APT cannot be frozen or have dispatch, and PFS cannot be transferred
     // (PFS could potentially be burned. regular transfer would permanently unburn the store.
     // Ignoring the check here <b>has</b> the equivalent of unburning, transfers, and then burning again)
     <a href="fungible_asset.md#0x1_fungible_asset_withdraw_permission_check_by_address">fungible_asset::withdraw_permission_check_by_address</a>(
