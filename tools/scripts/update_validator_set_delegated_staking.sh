@@ -324,9 +324,7 @@ execution_summary() {
 	echo ""
 }
 
-###############################################################################
 # Delegated pool logic                                                        #
-###############################################################################
 
 derive_delegated_resource_account() {
 	echo "Deriving delegated pool resource-account address..."
