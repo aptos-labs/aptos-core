@@ -11,7 +11,7 @@ use crate::{
     },
 };
 use anyhow::{bail, Result};
-use aptos_consensus_types::{block::Block, common::Payload};
+use aptos_consensus_types::{block::Block, common::Payload, proof_of_store::BatchInfo};
 use aptos_crypto::HashValue;
 use aptos_types::transaction::{SignedTransaction, Transaction};
 use clap::Parser;
@@ -63,7 +63,7 @@ impl Command {
 
 fn extract_txns_from_quorum_store(
     digests: impl Iterator<Item = HashValue>,
-    all_batches: &HashMap<HashValue, PersistedValue>,
+    all_batches: &HashMap<HashValue, PersistedValue<BatchInfo>>,
 ) -> anyhow::Result<Vec<&SignedTransaction>> {
     let mut block_txns = Vec::new();
     for digest in digests {
@@ -82,7 +82,7 @@ fn extract_txns_from_quorum_store(
 
 pub fn extract_txns_from_block<'a>(
     block: &'a Block,
-    all_batches: &'a HashMap<HashValue, PersistedValue>,
+    all_batches: &'a HashMap<HashValue, PersistedValue<BatchInfo>>,
 ) -> anyhow::Result<Vec<&'a SignedTransaction>> {
     match block.payload().as_ref() {
         Some(payload) => match payload {

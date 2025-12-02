@@ -1003,6 +1003,7 @@ dependencies = [
  "rayon",
  "scopeguard",
  "serde",
+ "serde-name",
  "serde_bytes",
  "serde_json",
  "sha3 0.9.1",
@@ -2255,14 +2256,12 @@ dependencies = [
  "redis",
  "rstest",
  "serde",
- "serde_json",
  "tikv-jemallocator",
  "tokio",
  "tokio-stream",
  "tonic 0.12.3",
  "tonic-reflection",
  "tracing",
- "uuid 1.11.0",
 ]
 
 [[package]]
@@ -2291,7 +2290,6 @@ dependencies = [
  "tonic 0.12.3",
  "tonic-reflection",
  "tracing",
- "uuid 1.11.0",
  "warp",
 ]
 
@@ -2558,6 +2556,7 @@ dependencies = [
  "tonic 0.12.3",
  "tracing",
  "url",
+ "uuid 1.11.0",
  "warp",
 ]
 
@@ -16856,9 +16855,9 @@ dependencies = [
 
 [[package]]
 name = "serde-name"
-version = "0.1.2"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12c47087018ec281d1cdab673d36aea22d816b54d498264029c05d5fa1910da6"
+checksum = "3b5b14ebbcc4e4f2b3642fa99c388649da58d1dc3308c7d109f39f565d1710f0"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
