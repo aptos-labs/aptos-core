@@ -55,23 +55,23 @@ name = "fk_algorithm"
 harness = false
 
 
-#[[bench]]
-#name = "multi_point_eval"
-#harness = false
+[[bench]]
+name = "multi_point_eval"
+harness = false
 
-#[[bench]]
-#name = "digest"
-#harness = false
+[[bench]]
+name = "digest"
+harness = false
 
 
 [[bench]]
 name = "fptx"
 harness = false
 
-#[[bench]]
-#name = "lagrange"
-#harness = false
-#
+[[bench]]
+name = "lagrange"
+harness = false
+
 [[bench]]
 name = "msm"
 harness = false
