@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::metrics::{
-    BYTES_READY_TO_TRANSFER_FROM_SERVER, BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING,
-    CONNECTION_COUNT, ERROR_COUNT, LATEST_PROCESSED_VERSION_PER_PROCESSOR,
-    NUM_TRANSACTIONS_STRIPPED, PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR,
-    PROCESSED_VERSIONS_COUNT_PER_PROCESSOR, SHORT_CONNECTION_COUNT,
+    BYTES_READY_TO_TRANSFER_FROM_SERVER, CONNECTION_COUNT, ERROR_COUNT,
+    LATEST_PROCESSED_VERSION_PER_PROCESSOR, NUM_TRANSACTIONS_STRIPPED,
+    PROCESSED_LATENCY_IN_SECS_PER_PROCESSOR, PROCESSED_VERSIONS_COUNT_PER_PROCESSOR,
+    SHORT_CONNECTION_COUNT,
 };
 use anyhow::{Context, Result};
 use aptos_indexer_grpc_utils::{
@@ -13,12 +13,11 @@ use aptos_indexer_grpc_utils::{
     chunk_transactions,
     compression_util::{CacheEntry, StorageFormat},
     config::IndexerGrpcFileStoreConfig,
-    constants::{
-        IndexerGrpcRequestMetadata, GRPC_AUTH_TOKEN_HEADER, GRPC_REQUEST_NAME_HEADER,
-        MESSAGE_SIZE_LIMIT, REQUEST_HEADER_APTOS_APPLICATION_NAME, REQUEST_HEADER_APTOS_EMAIL,
-        REQUEST_HEADER_APTOS_IDENTIFIER, REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+    constants::{get_request_metadata, IndexerGrpcRequestMetadata, MESSAGE_SIZE_LIMIT},
+    counters::{
+        log_grpc_step, IndexerGrpcStep, BYTES_READY_TO_TRANSFER_FROM_SERVER_AFTER_STRIPPING,
+        NUM_MULTI_FETCH_OVERLAPPED_VERSIONS,
     },
-    counters::{log_grpc_step, IndexerGrpcStep, NUM_MULTI_FETCH_OVERLAPPED_VERSIONS},
     file_store_operator::FileStoreOperator,
     in_memory_cache::InMemoryCache,
     time_diff_since_pb_timestamp_in_secs,
@@ -34,7 +33,6 @@ use futures::Stream;
 use prost::Message;
 use redis::Client;
 use std::{
-    collections::HashMap,
     pin::Pin,
     str::FromStr,
     sync::Arc,
@@ -44,7 +42,6 @@ use tokio::sync::mpsc::{channel, error::SendTimeoutError};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
-use uuid::Uuid;
 
 type ResponseStream = Pin<Box<dyn Stream<Item = Result<TransactionsResponse, Status>> + Send>>;
 
@@ -150,10 +147,7 @@ impl RawData for RawDataServerWrapper {
         req: Request<GetTransactionsRequest>,
     ) -> Result<Response<Self::GetTransactionsStream>, Status> {
         // Get request identity. The request is already authenticated by the interceptor.
-        let request_metadata = match get_request_metadata(&req) {
-            Ok(request_metadata) => request_metadata,
-            _ => return Result::Err(Status::aborted("Invalid request token")),
-        };
+        let request_metadata = get_request_metadata(&req);
         CONNECTION_COUNT
             .with_label_values(&request_metadata.get_label_values())
             .inc();
@@ -846,46 +840,6 @@ async fn data_fetch_error_handling(err: anyhow::Error, current_version: u64, cha
         TRANSIENT_DATA_ERROR_RETRY_SLEEP_DURATION_MS,
     ))
     .await;
-}
-
-/// Gets the request metadata. Useful for logging.
-fn get_request_metadata(
-    req: &Request<GetTransactionsRequest>,
-) -> tonic::Result<IndexerGrpcRequestMetadata> {
-    let request_metadata_pairs = vec![
-        (
-            "request_identifier_type",
-            REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
-        ),
-        ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
-        ("request_email", REQUEST_HEADER_APTOS_EMAIL),
-        (
-            "request_application_name",
-            REQUEST_HEADER_APTOS_APPLICATION_NAME,
-        ),
-        ("request_token", GRPC_AUTH_TOKEN_HEADER),
-        ("processor_name", GRPC_REQUEST_NAME_HEADER),
-    ];
-    let mut request_metadata_map: HashMap<String, String> = request_metadata_pairs
-        .into_iter()
-        .map(|(key, value)| {
-            (
-                key.to_string(),
-                req.metadata()
-                    .get(value)
-                    .map(|value| value.to_str().unwrap_or("unspecified").to_string())
-                    .unwrap_or("unspecified".to_string()),
-            )
-        })
-        .collect();
-    request_metadata_map.insert(
-        "request_connection_id".to_string(),
-        Uuid::new_v4().to_string(),
-    );
-    let request_metadata: IndexerGrpcRequestMetadata =
-        serde_json::from_str(&serde_json::to_string(&request_metadata_map).unwrap()).unwrap();
-    // TODO: update the request name if these are internal requests.
-    Ok(request_metadata)
 }
 
 async fn channel_send_multiple_with_timeout(
