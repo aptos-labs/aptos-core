@@ -17,7 +17,7 @@ pub fn digest(c: &mut Criterion) {
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
         let (ek, dk, _, _, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data: String = String::from("");
@@ -43,7 +43,7 @@ pub fn encrypt(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tc = ThresholdConfig::new(1, 1);
         let (ek, _dk, _, _, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = rng
             .sample_iter(&Alphanumeric)
@@ -69,7 +69,7 @@ pub fn verify_ct(c: &mut Criterion) {
         let mut rng = thread_rng();
         let tc = ThresholdConfig::new(1, 1);
         let (ek, _dk, _, _, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -91,7 +91,7 @@ pub fn eval_proofs_compute_all(c: &mut Criterion) {
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
         let (ek, dk, _, _, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -121,7 +121,7 @@ pub fn eval_proofs_compute_all_2(c: &mut Criterion) {
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
         let (ek, dk, _, _, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -152,7 +152,7 @@ pub fn derive_decryption_key_share(c: &mut Criterion) {
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(n, t);
         let (ek, dk, _, msk_shares, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -183,7 +183,7 @@ pub fn verify_decryption_key_share(c: &mut Criterion) {
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
         let (ek, dk, vks, msk_shares, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -217,7 +217,7 @@ pub fn reconstruct_decryption_key(c: &mut Criterion) {
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(n, t);
         let (ek, dk, _, msk_shares, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
@@ -252,7 +252,7 @@ pub fn decrypt(c: &mut Criterion) {
         let tp = ThreadPoolBuilder::default().build().unwrap();
         let tc = ThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares, _, _) =
-            FPTX::setup_for_testing(rng.gen(), batch_size, 1, &tc, &tc).unwrap();
+            FPTX::setup_for_testing(rng.r#gen(), batch_size, 1, &tc, &tc).unwrap();
 
         let msg: String = String::from("hi");
         let associated_data = String::from("");
