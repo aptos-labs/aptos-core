@@ -421,11 +421,11 @@ impl fmt::Display for FunctionAttribute {
             FunctionAttribute::TestVariant => {
                 write!(f, "test_variant")
             },
-            FunctionAttribute::BorrowFieldImmutable(_) => {
-                write!(f, "borrow")
+            FunctionAttribute::BorrowFieldImmutable(offset) => {
+                write!(f, "borrow={}", offset)
             },
-            FunctionAttribute::BorrowFieldMutable(_) => {
-                write!(f, "borrow_mut")
+            FunctionAttribute::BorrowFieldMutable(offset) => {
+                write!(f, "borrow_mut={}", offset)
             },
         }
     }

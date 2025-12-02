@@ -19,7 +19,10 @@ use move_core_types::{
 };
 use move_ir_types::ast as IR_AST;
 use move_model::{
-    ast::{AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, ResourceSpecifier},
+    ast::{
+        AccessSpecifier, AccessSpecifierKind, AddressSpecifier, Attribute, AttributeValue,
+        ResourceSpecifier, Value,
+    },
     metadata::{
         lang_feature_versions::LANGUAGE_VERSION_FOR_RAC, CompilationMetadata, CompilerVersion,
         LanguageVersion, COMPILATION_METADATA_KEY,
@@ -37,6 +40,7 @@ use move_stackless_bytecode::{
     stackless_bytecode::{Bytecode, Constant, Operation},
 };
 use move_symbol_pool::symbol as IR_SYMBOL;
+use num::ToPrimitive;
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet};
 
 /// Data structure to store indices for struct apis.
@@ -1711,21 +1715,68 @@ impl ModuleContext<'_> {
                             no_args(name.as_str());
                             result.push(FF::FunctionAttribute::ModuleLock)
                         },
+                        well_known::PACK => {
+                            no_args(name.as_str());
+                            result.push(FF::FunctionAttribute::Pack)
+                        },
+                        well_known::UNPACK => {
+                            no_args(name.as_str());
+                            result.push(FF::FunctionAttribute::Unpack)
+                        },
+                        well_known::TEST_VARIANT => {
+                            no_args(name.as_str());
+                            result.push(FF::FunctionAttribute::TestVariant)
+                        },
                         _ => {
                             // skip
                         },
                     }
                 },
-                Attribute::Assign(_, name, _) => {
+                Attribute::Assign(_, name, attribute_value) => {
                     let name = fun_env.symbol_pool().string(*name);
                     if matches!(
                         name.as_str(),
-                        well_known::PERSISTENT_ATTRIBUTE | well_known::MODULE_LOCK_ATTRIBUTE
+                        well_known::PERSISTENT_ATTRIBUTE
+                            | well_known::MODULE_LOCK_ATTRIBUTE
+                            | well_known::PACK
+                            | well_known::UNPACK
+                            | well_known::TEST_VARIANT
                     ) {
                         self.error(
                             fun_env.get_id_loc(),
                             format!("attribute `{}` cannot be assigned to", name),
                         )
+                    }
+                    match name.as_str() {
+                        well_known::BORROW_NAME => {
+                            if let AttributeValue::Value(_, Value::Number(number)) = attribute_value
+                            {
+                                result.push(FF::FunctionAttribute::BorrowFieldImmutable(
+                                    number.to_u8().unwrap(),
+                                ))
+                            } else {
+                                self.error(
+                                    fun_env.get_id_loc(),
+                                    format!("attribute `{}` must have a number value", name),
+                                )
+                            }
+                        },
+                        well_known::BORROW_MUT_NAME => {
+                            if let AttributeValue::Value(_, Value::Number(number)) = attribute_value
+                            {
+                                result.push(FF::FunctionAttribute::BorrowFieldMutable(
+                                    number.to_u8().unwrap(),
+                                ))
+                            } else {
+                                self.error(
+                                    fun_env.get_id_loc(),
+                                    format!("attribute `{}` must have a number value", name),
+                                )
+                            }
+                        },
+                        _ => {
+                            // skip
+                        },
                     }
                 },
             }
