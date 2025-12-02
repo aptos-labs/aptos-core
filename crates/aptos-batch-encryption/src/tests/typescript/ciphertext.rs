@@ -46,7 +46,8 @@ fn test_dummy() {
 fn test_bibe_ct_encrypt_decrypt_ts() {
     let mut rng = thread_rng();
     let tc = ThresholdConfig::new(1, 1);
-    let (ek, dk, _, msk_shares, _, _) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
+    let (ek, dk, _, msk_shares, _, _) =
+        FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
     let mut ids = FreeRootIdSet::with_capacity(dk.capacity()).unwrap();
     let mut counter = Fr::zero();
@@ -140,7 +141,8 @@ fn test_ct_verify_ts() {
 fn test_ct_encrypt_decrypt_ts() {
     let mut rng = thread_rng();
     let tc = ThresholdConfig::new(1, 1);
-    let (ek, dk, _, msk_shares, _, _) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
+    let (ek, dk, _, msk_shares, _, _) =
+        FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
     let plaintext = String::from("hi");
 
