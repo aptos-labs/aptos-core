@@ -3,20 +3,20 @@
 use crate::{
     schemes::fptx::FPTX,
     shared::{
-        algebra::shamir::ThresholdConfig,
         key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare},
     },
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::rand::{seq::SliceRandom, thread_rng, Rng as _};
 use rayon::ThreadPoolBuilder;
 
 #[test]
 fn smoke() {
     let mut rng = thread_rng();
-    let tc_happy = ThresholdConfig::new(8, 5);
-    let tc_slow = ThresholdConfig::new(8, 3);
+    let tc_happy = ShamirThresholdConfig::new(5, 8);
+    let tc_slow = ShamirThresholdConfig::new(3, 8);
     let tp = ThreadPoolBuilder::new().build().unwrap();
 
     let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
@@ -92,8 +92,8 @@ fn smoke() {
 #[test]
 fn fptx_serialize_deserialize_setup() {
     let mut rng = thread_rng();
-    let tc_happy = ThresholdConfig::new(8, 5);
-    let tc_slow = ThresholdConfig::new(8, 3);
+    let tc_happy = ShamirThresholdConfig::new(5, 8);
+    let tc_slow = ShamirThresholdConfig::new(3, 8);
 
     let setup = FPTX::setup_for_testing(rng.r#gen(), 8, 2, &tc_happy, &tc_slow).unwrap();
 

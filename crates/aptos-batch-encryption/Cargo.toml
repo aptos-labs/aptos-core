@@ -70,10 +70,6 @@ name = "fptx"
 harness = false
 
 [[bench]]
-name = "lagrange"
-harness = false
-
-[[bench]]
 name = "msm"
 harness = false
 

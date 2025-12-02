@@ -304,13 +304,13 @@ pub mod tests {
         group::*,
         schemes::fptx::FPTX,
         shared::{
-            algebra::shamir::ThresholdConfig,
             ciphertext::{CTDecrypt, CTEncrypt, Ciphertext},
             ids::{FreeRootId, FreeRootIdSet, IdSet as _},
             key_derivation::BIBEDecryptionKey,
         },
         traits::BatchThresholdEncryption as _,
     };
+    use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
     use ark_std::{
         rand::{thread_rng, Rng},
         One, Zero,
@@ -319,7 +319,7 @@ pub mod tests {
     #[test]
     fn test_bibe_ct_encrypt_decrypt() {
         let mut rng = thread_rng();
-        let tc = ThresholdConfig::new(1, 1);
+        let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
@@ -357,7 +357,7 @@ pub mod tests {
     #[test]
     fn test_ct_encrypt_decrypt() {
         let mut rng = thread_rng();
-        let tc = ThresholdConfig::new(1, 1);
+        let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, dk, _, msk_shares, _, _) =
             FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
@@ -387,7 +387,7 @@ pub mod tests {
     #[test]
     fn test_ct_verify() {
         let mut rng = thread_rng();
-        let tc = ThresholdConfig::new(1, 1);
+        let tc = ShamirThresholdConfig::new(1, 1);
         let (ek, _, _, _, _, _) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
         let plaintext = String::from("hi");

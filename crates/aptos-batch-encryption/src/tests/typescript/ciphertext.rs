@@ -6,13 +6,13 @@ use crate::{
     group::Fr,
     schemes::fptx::{EncryptionKey, FPTX},
     shared::{
-        algebra::shamir::ThresholdConfig,
         ciphertext::{BIBECTDecrypt as _, BIBECTEncrypt, BIBECiphertext, CTDecrypt, Ciphertext},
         ids::{FreeRootId, FreeRootIdSet, IdSet as _},
         key_derivation::BIBEDecryptionKey,
     },
     traits::BatchThresholdEncryption as _,
 };
+use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
 use ark_std::{
     rand::{thread_rng, Rng as _},
     One, Zero,
@@ -45,7 +45,7 @@ fn test_dummy() {
 #[test]
 fn test_bibe_ct_encrypt_decrypt_ts() {
     let mut rng = thread_rng();
-    let tc = ThresholdConfig::new(1, 1);
+    let tc = ShamirThresholdConfig::new(1, 1);
     let (ek, dk, _, msk_shares, _, _) =
         FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
@@ -124,7 +124,7 @@ fn test_ed25519() {
 #[ignore]
 fn test_ct_verify_ts() {
     let mut rng = thread_rng();
-    let tc = ThresholdConfig::new(1, 1);
+    let tc = ShamirThresholdConfig::new(1, 1);
     let (ek, _, _, _, _, _) = FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 
     let associated_data = String::from("associated data");
@@ -140,7 +140,7 @@ fn test_ct_verify_ts() {
 #[ignore]
 fn test_ct_encrypt_decrypt_ts() {
     let mut rng = thread_rng();
-    let tc = ThresholdConfig::new(1, 1);
+    let tc = ShamirThresholdConfig::new(1, 1);
     let (ek, dk, _, msk_shares, _, _) =
         FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc, &tc).unwrap();
 

@@ -3,7 +3,6 @@
 use crate::{
     group::*,
     shared::{
-        algebra::shamir::ThresholdConfig,
         ark_serialize::*,
         ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
@@ -89,8 +88,8 @@ impl BatchThresholdEncryption for FPTX {
         seed: u64,
         max_batch_size: usize,
         number_of_rounds: usize,
-        tc_happypath: &ThresholdConfig,
-        tc_slowpath: &ThresholdConfig,
+        tc_happypath: &Self::ThresholdConfig,
+        tc_slowpath: &Self::ThresholdConfig,
     ) -> Result<(
         Self::EncryptionKey,
         Self::DigestKey,
@@ -189,7 +188,7 @@ impl BatchThresholdEncryption for FPTX {
 
     fn reconstruct_decryption_key(
         shares: &[Self::DecryptionKeyShare],
-        config: &ThresholdConfig,
+        config: &Self::ThresholdConfig,
         pool: &rayon::ThreadPool,
     ) -> anyhow::Result<Self::DecryptionKey> {
         pool.install(|| BIBEDecryptionKey::reconstruct(shares, config))

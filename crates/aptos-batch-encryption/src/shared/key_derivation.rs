@@ -1,14 +1,15 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::{
-    algebra::shamir::{ShamirGroupShare, ThresholdConfig},
     symmetric,
 };
+use aptos_crypto::{arkworks::shamir::{Reconstructable, ShamirGroupShare, ShamirThresholdConfig}, player::Player};
+use ark_ff::UniformRand as _;
 use crate::{
     errors::{BatchEncryptionError, ReconstructError},
     group::{Fr, G1Affine, G2Affine, PairingSetting},
     shared::{ark_serialize::*, digest::Digest},
-    traits::{DecryptionKeyShare, Player, VerificationKey},
+    traits::{DecryptionKeyShare, VerificationKey},
 };
 use anyhow::Result;
 use ark_ec::{pairing::Pairing as _, AffineRepr};
@@ -67,7 +68,7 @@ impl VerificationKey for BIBEVerificationKey {
 pub fn gen_msk_shares<R: RngCore + CryptoRng>(
     msk: Fr,
     rng: &mut R,
-    threshold_config: &ThresholdConfig,
+    threshold_config: &ShamirThresholdConfig<Fr>,
 ) -> (
     BIBEMasterPublicKey,
     Vec<BIBEVerificationKey>,
@@ -75,9 +76,12 @@ pub fn gen_msk_shares<R: RngCore + CryptoRng>(
 ) {
     let mpk = BIBEMasterPublicKey((G2Affine::generator() * msk).into());
 
+    let mut coeffs = vec![msk];
+    coeffs.extend((0..(threshold_config.t - 1)).map(|_| Fr::rand(rng)));
+
     let (msk_shares, vk_shares): (Vec<BIBEMasterSecretKeyShare>, Vec<BIBEVerificationKey>) =
         threshold_config
-            .share(msk, rng)
+            .share(&coeffs)
             .into_iter()
             .map(|(player, shamir_share_eval)| {
                 (
@@ -163,14 +167,13 @@ impl BIBEMasterPublicKey {
 impl BIBEDecryptionKey {
     pub fn reconstruct(
         shares: &[BIBEDecryptionKeyShare],
-        threshold_config: &ThresholdConfig,
+        threshold_config: &ShamirThresholdConfig<Fr>,
     ) -> Result<Self> {
-        let signature_g1 = threshold_config.reconstruct_in_exponent(
+        let signature_g1 = G1Affine::reconstruct(&threshold_config, 
             &shares
                 .iter()
                 .map(|share| (share.player, share.signature_share_eval))
-                .collect::<Vec<ShamirGroupShare>>(),
-        )?;
+                .collect::<Vec<ShamirGroupShare<G1Affine>>>())?;
 
         let digest_g1 = shares[0].digest_g1;
 
@@ -191,8 +194,9 @@ mod tests {
     use super::{gen_msk_shares, BIBEDecryptionKey, BIBEDecryptionKeyShare};
     use crate::{
         group::Fr,
-        shared::{algebra::shamir::ThresholdConfig, digest::Digest},
+        shared::digest::Digest,
     };
+    use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
     use ark_ff::UniformRand as _;
     use ark_std::rand::{seq::SliceRandom, thread_rng};
 
@@ -201,7 +205,7 @@ mod tests {
         let mut rng = thread_rng();
         let n = 8;
         let t = 6;
-        let tc = ThresholdConfig::new(n, t);
+        let tc = ShamirThresholdConfig::new(t, n);
         let msk = Fr::rand(&mut rng);
         let (mpk, vks, msk_shares) = gen_msk_shares(msk, &mut rng, &tc);
         let digest = Digest::new_for_testing(&mut rng);

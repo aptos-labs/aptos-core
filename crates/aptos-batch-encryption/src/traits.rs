@@ -1,9 +1,10 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::Result;
+use aptos_crypto::player::Player;
 use ark_std::rand::{CryptoRng, RngCore};
 use rayon::ThreadPool;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
@@ -178,20 +179,6 @@ pub trait AssociatedData:
 impl Plaintext for String {}
 impl AssociatedData for String {}
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Copy, Clone, Serialize, Deserialize)]
-pub struct Player {
-    id: usize,
-}
-
-impl Player {
-    pub fn new(id: usize) -> Self {
-        Self { id }
-    }
-
-    pub fn id(&self) -> usize {
-        self.id
-    }
-}
 
 pub trait VerificationKey: Serialize + DeserializeOwned {
     fn player(&self) -> Player;
