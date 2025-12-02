@@ -20,7 +20,7 @@ pub fn eval_proofs_at_roots_of_unity(c: &mut Criterion) {
             .tau_powers_g1
             .iter()
             .map(|gs| {
-                gs.into_iter()
+                gs.iter()
                     .map(|g| G1Projective::from(*g))
                     .collect::<Vec<G1Projective>>()
             })
@@ -51,7 +51,7 @@ pub fn eval_proofs_at_x_coords(c: &mut Criterion) {
             .tau_powers_g1
             .iter()
             .map(|gs| {
-                gs.into_iter()
+                gs.iter()
                     .map(|g| G1Projective::from(*g))
                     .collect::<Vec<G1Projective>>()
             })
