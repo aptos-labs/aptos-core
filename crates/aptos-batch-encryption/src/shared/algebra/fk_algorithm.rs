@@ -51,7 +51,6 @@ impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
     }
 }
 
-
 impl<F: FftField> CirculantDomain<F> {
     /// Create a new CirculantDomain of the specified `dimension`, which supports
     /// evaluating circulants of size `dimension x dimension`.

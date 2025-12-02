@@ -10,4 +10,3 @@ use ark_ec::pairing::Pairing;
 pub type G1Prepared = <ark_bn254::Bn254 as Pairing>::G1Prepared;
 pub type G2Prepared = <ark_bn254::Bn254 as Pairing>::G2Prepared;
 pub type PairingOutput = ark_ec::pairing::PairingOutput<ark_bn254::Bn254>;
-
