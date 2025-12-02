@@ -1,7 +1,11 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
+use aptos_protos::indexer::v1::GetTransactionsRequest;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use tonic::Request;
+use uuid::Uuid;
 
 // Maximum number of threads for the file store
 pub const MAXIMUM_NUMBER_FILESTORE_THREADS: usize = 10;
@@ -60,4 +64,41 @@ impl IndexerGrpcRequestMetadata {
             &self.processor_name,
         ]
     }
+}
+
+/// Gets the request metadata from gRPC request headers. Useful for logging and metrics.
+pub fn get_request_metadata(req: &Request<GetTransactionsRequest>) -> IndexerGrpcRequestMetadata {
+    let request_metadata_pairs = vec![
+        (
+            "request_identifier_type",
+            REQUEST_HEADER_APTOS_IDENTIFIER_TYPE,
+        ),
+        ("request_identifier", REQUEST_HEADER_APTOS_IDENTIFIER),
+        ("request_email", REQUEST_HEADER_APTOS_EMAIL),
+        (
+            "request_application_name",
+            REQUEST_HEADER_APTOS_APPLICATION_NAME,
+        ),
+        ("request_token", GRPC_AUTH_TOKEN_HEADER),
+        ("processor_name", GRPC_REQUEST_NAME_HEADER),
+    ];
+    let mut request_metadata_map: HashMap<String, String> = request_metadata_pairs
+        .into_iter()
+        .map(|(key, value)| {
+            (
+                key.to_string(),
+                req.metadata()
+                    .get(value)
+                    .map(|value| value.to_str().unwrap_or("unspecified").to_string())
+                    .unwrap_or("unspecified".to_string()),
+            )
+        })
+        .collect();
+    request_metadata_map.insert(
+        "request_connection_id".to_string(),
+        Uuid::new_v4().to_string(),
+    );
+
+    // TODO: update the request name if these are internal requests.
+    serde_json::from_str(&serde_json::to_string(&request_metadata_map).unwrap()).unwrap()
 }
