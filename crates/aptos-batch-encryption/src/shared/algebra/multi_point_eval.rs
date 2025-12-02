@@ -51,10 +51,6 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
             let f_rev_evals = domain.fft(&f_rev);
             let divisor_rev_inv_evals = domain.fft(&divisor_rev_inv);
 
-            //let (f_rev_evals, divisor_rev_inv_evals) = rayon::join(
-            //    || domain.fft(&f_rev),
-            //    || domain.fft(&divisor_rev_inv),
-            //);
 
             let quotient_rev_evals: Vec<T> = f_rev_evals
                 .into_par_iter()
@@ -68,10 +64,6 @@ impl<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>> Remainder<F> for [T] {
 
             let quotient_evals = domain2.fft(&quotient);
             let divisor_evals = domain2.fft(divisor);
-            //let (quotient_evals, divisor_evals) = rayon::join(
-            //        || domain2.fft(&quotient),
-            //        || domain2.fft(&divisor),
-            //);
 
             let product_evals: Vec<T> = quotient_evals
                 .into_par_iter()
@@ -106,8 +98,6 @@ fn recurse<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     } else {
         assert!(mult_tree[level - 1].len() == mult_tree[level].len() * 2);
         assert!(mult_tree[level - 1].len() > 2 * pos + 1);
-        //            let left = f.remainder(&mult_tree[level-1][2*pos]);
-        //            let right = f.remainder(&mult_tree[level-1][2*pos+1]);
         let (left, right) = rayon::join(
             || f.remainder(&mult_tree[level - 1][2 * pos]),
             || f.remainder(&mult_tree[level - 1][2 * pos + 1]),
@@ -117,10 +107,6 @@ fn recurse<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
             || recurse(&left, mult_tree, level - 1, 2 * pos),
             || recurse(&right, mult_tree, level - 1, 2 * pos + 1),
         );
-        //            let (result_left, result_right) = (
-        //                recurse(&left, mult_tree, level-1, 2*pos),
-        //                recurse(&right, mult_tree, level-1, 2*pos + 1)
-        //                );
         result_left.into_iter().chain(result_right).collect()
     }
 }

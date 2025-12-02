@@ -75,9 +75,4 @@ pub trait OssifiedIdSet {
         id: Self::Id,
         round: usize,
     ) -> G1Affine;
-    //fn compute_single_eval_proof_with_setup(&self, id: Self::Id, setup: &super::digest::DigestKey, round: usize) -> HashMap<Self::Id, G1Affine>;
-    // TODO start here next time. Think about interface here for computing 1) a single proof, 2)
-    // multiple proofs, and 3) all proofs. Also think about how to make FK work well for
-    // not-all-proofs.
-    // Finally, think about changing to new variant w/ randomized setups. DONE
 }

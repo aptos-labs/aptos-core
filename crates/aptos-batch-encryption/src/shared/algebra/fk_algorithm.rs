@@ -51,54 +51,6 @@ impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>
     }
 }
 
-//impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> Serialize for PreparedInput<F, T> {
-//    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//    where S: serde::Serializer {
-//        let mut seq = serializer.serialize_seq(Some(self.y.len()))?;
-//        for elem in &self.y {
-//            let mut bytes = vec![];
-//            elem.serialize_with_mode(&mut bytes, Compress::No).map_err(serde::ser::Error::custom)?;
-//            seq.serialize_element(&bytes)?;
-//        }
-//        seq.end()
-//    }
-//}
-//
-//struct PreparedInputVisitor<F: FftField, T: DomainCoeff<F> + CanonicalDeserialize> {
-//    pd: PhantomData<T>,
-//    pd2: PhantomData<F>,
-//}
-//impl<F: FftField, T: DomainCoeff<F> + CanonicalDeserialize> PreparedInputVisitor<F, T> {
-//    fn new() -> Self { Self { pd: PhantomData, pd2: PhantomData } }
-//}
-//
-//impl<'de, F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> Visitor<'de> for PreparedInputVisitor<F, T> {
-//    type Value = PreparedInput<F, T>;
-//
-//    fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-//        formatter.write_str("a struct of type PreparedInput")
-//    }
-//
-//    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-//    where
-//        A: serde::de::SeqAccess<'de>,
-//    {
-//        let mut y : Vec<T> = vec![];
-//        while let Some(value) = seq.next_element::<Vec<u8>>()? {
-//            let value_t = T::deserialize_with_mode(value.as_slice(), Compress::No, Validate::No)
-//                .map_err(serde::de::Error::custom)?;
-//            y.push(value_t);
-//        }
-//        Ok(PreparedInput::new(y))
-//    }
-//}
-//
-//impl<'de, F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize>  Deserialize<'de> for PreparedInput<F, T> {
-//    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-//    where D: serde::Deserializer<'de> {
-//        deserializer.deserialize_seq(PreparedInputVisitor::new())
-//    }
-//}
 
 impl<F: FftField> CirculantDomain<F> {
     /// Create a new CirculantDomain of the specified `dimension`, which supports
