@@ -105,28 +105,6 @@ pub fn compute_arbitrary_x(c: &mut Criterion) {
         );
     }
 }
-//
-//
-//pub fn compute_all_eval_proofs(c: &mut Criterion) {
-//    let mut group = c.benchmark_group("Digest::compute_all_eval_proofs");
-//
-//    for batch_size in [8, 32, 128, 512 ] {
-//        let mut rng = thread_rng();
-//        let setup = DigestKey::new(&mut rng, batch_size).unwrap();
-//        let mut ids = FFTDomainIdSet::with_capacity(batch_size).unwrap();
-//
-//        // set all possible ids
-//        for x in 0..batch_size {
-//            ids.set(x, Fr::rand(&mut rng));
-//        }
-//
-//        let d = Digest::compute(&setup, ids);
-//        group.bench_with_input(BenchmarkId::from_parameter(batch_size), &d, |b, d| {
-//            b.iter(|| d.compute_all_eval_proofs());
-//        });
-//    }
-//}
-//
 pub fn compute_all_eval_proofs_arbitrary_x(c: &mut Criterion) {
     let mut group = c.benchmark_group("EvalProofs::compute_all/FreeRootId");
 

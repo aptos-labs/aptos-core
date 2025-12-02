@@ -42,10 +42,10 @@ criterion = { workspace = true }
 itertools = { workspace = true }
 
 
-#[[bench]]
-#name = "fk_algorithm"
-#harness = false
-#
+[[bench]]
+name = "fk_algorithm"
+harness = false
+
 
 #[[bench]]
 #name = "multi_point_eval"
@@ -68,9 +68,6 @@ harness = false
 name = "msm"
 harness = false
 
-[[bench]]
-name = "sim_beat_mev"
-harness = false
 
 
 
