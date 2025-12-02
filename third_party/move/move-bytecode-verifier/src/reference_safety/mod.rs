@@ -22,9 +22,9 @@ use move_binary_format::{
     binary_views::{BinaryIndexedView, FunctionView},
     errors::{PartialVMError, PartialVMResult},
     file_format::{
-        Bytecode, CodeOffset, FunctionDefinitionIndex, FunctionHandle, IdentifierIndex,
-        MemberCount, SignatureIndex, SignatureToken, StructDefinition, StructVariantHandle,
-        VariantIndex,
+        Bytecode, CodeOffset, FunctionAttribute, FunctionDefinitionIndex, FunctionHandle,
+        IdentifierIndex, MemberCount, SignatureIndex, SignatureToken, StructDefinition,
+        StructVariantHandle, VariantIndex,
     },
     safe_assert, safe_unwrap,
     views::FieldOrVariantIndex,
@@ -37,6 +37,7 @@ struct ReferenceSafetyAnalysis<'a> {
     function_view: &'a FunctionView<'a>,
     name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
     stack: Vec<AbstractValue>,
+    check_struct_api_attributes: bool,
 }
 
 impl<'a> ReferenceSafetyAnalysis<'a> {
@@ -44,12 +45,14 @@ impl<'a> ReferenceSafetyAnalysis<'a> {
         resolver: &'a BinaryIndexedView<'a>,
         function_view: &'a FunctionView<'a>,
         name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
+        check_struct_api_attributes: bool,
     ) -> Self {
         Self {
             resolver,
             function_view,
             name_def_map,
             stack: vec![],
+            check_struct_api_attributes,
         }
     }
 }
@@ -59,10 +62,15 @@ pub(crate) fn verify<'a>(
     function_view: &FunctionView,
     name_def_map: &'a HashMap<IdentifierIndex, FunctionDefinitionIndex>,
     meter: &mut impl Meter,
+    check_struct_api_attributes: bool,
 ) -> PartialVMResult<()> {
     let initial_state = AbstractState::new(function_view);
-
-    let mut verifier = ReferenceSafetyAnalysis::new(resolver, function_view, name_def_map);
+    let mut verifier = ReferenceSafetyAnalysis::new(
+        resolver,
+        function_view,
+        name_def_map,
+        check_struct_api_attributes,
+    );
     verifier.analyze_function(initial_state, function_view, meter)
 }
 
@@ -443,11 +451,35 @@ fn execute_inner(
 
         Bytecode::Call(idx) => {
             let function_handle = verifier.resolver.function_handle_at(*idx);
+            if verifier.check_struct_api_attributes {
+                for attr in function_handle.attributes.iter() {
+                    // When calling a borrow field mut api, we assume the body only
+                    // borrows the field at field_offset thus call borrow_field
+                    if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
+                        let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+                        let value = state.borrow_field(offset, true, id, *field_offset as u16)?;
+                        verifier.stack.push(value);
+                        return Ok(());
+                    }
+                }
+            }
             call(verifier, state, offset, function_handle, meter)?
         },
         Bytecode::CallGeneric(idx) => {
             let func_inst = verifier.resolver.function_instantiation_at(*idx);
             let function_handle = verifier.resolver.function_handle_at(func_inst.handle);
+            if verifier.check_struct_api_attributes {
+                for attr in function_handle.attributes.iter() {
+                    // When calling a borrow field mut api, we assume the body only
+                    // borrows the field at field_offset thus call borrow_field
+                    if let FunctionAttribute::BorrowFieldMutable(field_offset) = attr {
+                        let id = safe_unwrap!(safe_unwrap!(verifier.stack.pop()).ref_id());
+                        let value = state.borrow_field(offset, true, id, *field_offset as u16)?;
+                        verifier.stack.push(value);
+                        return Ok(());
+                    }
+                }
+            }
             call(verifier, state, offset, function_handle, meter)?
         },
 

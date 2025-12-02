@@ -482,7 +482,7 @@ impl<'a> FunctionGenerator<'a> {
         is_imm: bool,
     ) {
         assert!(struct_env.get_visibility().is_public_or_friend());
-        if struct_env.is_empty_struct() {
+        if struct_env.is_empty_struct().unwrap_or(false) {
             return;
         }
         let para_type_parameters = TypeParameter::vec_to_formals(struct_env.get_type_parameters());
