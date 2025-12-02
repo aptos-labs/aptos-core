@@ -44,7 +44,7 @@ generic-array = { workspace = true }
 lazy_static = { workspace = true }
 rand = { workspace = true }
 serde_json = { workspace = true }
-aptos-crypto.workspace = true
+aptos-crypto = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }
