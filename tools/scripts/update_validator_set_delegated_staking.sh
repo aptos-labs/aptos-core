@@ -326,6 +326,18 @@ execution_summary() {
 
 # Delegated pool logic                                                        #
 
+# Initialize common CLI args (must be called after validate_input sets the variables)
+init_common_cli_args() {
+	COMMON_CLI_ARGS=(
+		--private-key "$VALIDATOR_OWNER_PRIVATE_KEY"
+		--sender-account "$VALIDATOR_OWNER_ACCOUNT"
+		--url "$NETWORK_API_ADDRESS"
+		--gas-unit-price 100
+		--max-gas 20000
+		--assume-yes
+	)
+}
+
 derive_delegated_resource_account() {
 	echo "Deriving delegated pool resource-account address..."
 	local output
@@ -380,12 +392,7 @@ init_delegation_pool() {
 	$MOVEMENT_CLI move run \
 		--function-id 0x1::delegation_pool::initialize_delegation_pool \
 		--args "u64:${DELEGATION_COMMISSION_BPS}" "string:$DELEGATION_SEED" \
-		--private-key "$VALIDATOR_OWNER_PRIVATE_KEY" \
-		--sender-account "$VALIDATOR_OWNER_ACCOUNT" \
-		--url "$NETWORK_API_ADDRESS" \
-		--gas-unit-price 100 \
-		--max-gas 20000 \
-		--assume-yes
+		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to initialize delegation pool"
@@ -398,12 +405,7 @@ add_delegation_stake() {
 	$MOVEMENT_CLI move run \
 		--function-id 0x1::delegation_pool::add_stake \
 		--args "address:$DELEGATED_POOL_ADDRESS" "u64:${INITIAL_DELEGATION_STAKE}" \
-		--private-key "$VALIDATOR_OWNER_PRIVATE_KEY" \
-		--sender-account "$VALIDATOR_OWNER_ACCOUNT" \
-		--url "$NETWORK_API_ADDRESS" \
-		--gas-unit-price 100 \
-		--max-gas 20000 \
-		--assume-yes
+		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to add initial delegated stake"
@@ -422,12 +424,7 @@ update_delegated_consensus_keys() {
 		--pool-address "$DELEGATED_POOL_ADDRESS" \
 		--consensus-public-key "$DELEGATED_CONSENSUS_PUB" \
 		--proof-of-possession "$DELEGATED_CONSENSUS_POP" \
-		--private-key "$VALIDATOR_OWNER_PRIVATE_KEY" \
-		--sender-account "$VALIDATOR_OWNER_ACCOUNT" \
-		--url "$NETWORK_API_ADDRESS" \
-		--gas-unit-price 100 \
-		--max-gas 20000 \
-		--assume-yes
+		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to update delegated pool consensus keys"
@@ -441,12 +438,7 @@ update_delegated_network_address() {
 		--pool-address "$DELEGATED_POOL_ADDRESS" \
 		--validator-host "$VALIDATOR_HOST" \
 		--validator-network-public-key "$NETWORK_PUBLIC_KEY" \
-		--private-key "$VALIDATOR_OWNER_PRIVATE_KEY" \
-		--sender-account "$VALIDATOR_OWNER_ACCOUNT" \
-		--url "$NETWORK_API_ADDRESS" \
-		--gas-unit-price 100 \
-		--max-gas 20000 \
-		--assume-yes
+		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to update delegated pool network address"
@@ -458,12 +450,7 @@ join_delegated_validator_set() {
 	echo "Joining validator set with delegated pool..."
 	$MOVEMENT_CLI node join-validator-set \
 		--pool-address "$DELEGATED_POOL_ADDRESS" \
-		--private-key "$VALIDATOR_OWNER_PRIVATE_KEY" \
-		--sender-account "$VALIDATOR_OWNER_ACCOUNT" \
-		--url "$NETWORK_API_ADDRESS" \
-		--gas-unit-price 100 \
-		--max-gas 20000 \
-		--assume-yes
+		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to join validator set with delegated pool"
@@ -501,6 +488,9 @@ setup_delegated_pool_flow() {
 		echo "  - Start the validator process."
 		return
 	fi
+
+	# Initialize common CLI args before running delegated pool commands
+	init_common_cli_args
 
 	derive_delegated_resource_account
 	get_delegated_pool_address
