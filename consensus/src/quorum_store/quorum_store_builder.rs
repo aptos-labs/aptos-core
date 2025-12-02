@@ -30,7 +30,9 @@ use crate::{
 use aptos_channels::{aptos_channel, message_queues::QueueStyle};
 use aptos_config::config::{BatchTransactionFilterConfig, QuorumStoreConfig};
 use aptos_consensus_types::{
-    common::Author, proof_of_store::ProofCache, request_response::GetPayloadCommand,
+    common::Author,
+    proof_of_store::{BatchInfo, BatchInfoExt, ProofCache},
+    request_response::GetPayloadCommand,
 };
 use aptos_crypto::bls12381::PrivateKey;
 use aptos_logger::prelude::*;
@@ -406,7 +408,10 @@ impl InnerBuilder {
                 let response = if let Ok(value) =
                     batch_store.get_batch_from_local(&rpc_request.req.digest())
                 {
-                    let batch: Batch = value.try_into().unwrap();
+                    let batch: Batch<BatchInfoExt> = value.try_into().unwrap();
+                    let batch: Batch<BatchInfo> = batch
+                        .try_into()
+                        .expect("Batch retieval requests must be for V1 batch");
                     BatchResponse::Batch(batch)
                 } else {
                     match aptos_db_clone.get_latest_ledger_info() {
