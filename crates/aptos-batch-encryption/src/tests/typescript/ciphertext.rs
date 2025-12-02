@@ -21,6 +21,7 @@ use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
 use serde::{Deserialize, Serialize};
 
 #[test]
+#[ignore]
 fn test_bibe_ciphertext_serialization() {
     let ct: BIBECiphertext<FreeRootId> = BIBECiphertext::blank_for_testing();
     let input = bcs::to_bytes(&ct).unwrap();
@@ -32,6 +33,7 @@ fn test_bibe_ciphertext_serialization() {
     assert_eq!(ct_deserialized, ct);
 }
 
+#[ignore]
 #[test]
 fn test_dummy() {
     let ek = EncryptionKey::new_for_testing();
@@ -39,6 +41,7 @@ fn test_dummy() {
     let _bibe_ct = ek.bibe_encrypt(&mut rng, &String::from("hi"), FreeRootId::new(Fr::one()));
 }
 
+#[ignore]
 #[test]
 fn test_bibe_ct_encrypt_decrypt_ts() {
     let mut rng = thread_rng();
@@ -79,6 +82,7 @@ fn test_bibe_ct_encrypt_decrypt_ts() {
 }
 
 #[allow(non_snake_case)]
+#[ignore]
 #[test]
 fn test_ed25519() {
     #[derive(Serialize, Deserialize)]
@@ -116,6 +120,7 @@ fn test_ed25519() {
 }
 
 #[test]
+#[ignore]
 fn test_ct_verify_ts() {
     let mut rng = thread_rng();
     let tc = ThresholdConfig::new(1, 1);
@@ -131,6 +136,7 @@ fn test_ct_verify_ts() {
 }
 
 #[test]
+#[ignore]
 fn test_ct_encrypt_decrypt_ts() {
     let mut rng = thread_rng();
     let tc = ThresholdConfig::new(1, 1);

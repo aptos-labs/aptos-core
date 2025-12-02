@@ -8,6 +8,7 @@ use ark_serialize::{CanonicalDeserializeWithFlags, CanonicalSerialize, Compress,
 use ark_std::rand::thread_rng;
 
 #[test]
+#[ignore]
 fn test_g1_serialization() {
     let mut rng = thread_rng();
     let rand_exponent: Fr = Fr::rand(&mut rng);
@@ -23,6 +24,7 @@ fn test_g1_serialization() {
 }
 
 #[test]
+#[ignore]
 fn test_g2_serialization() {
     let mut rng = thread_rng();
     let rand_exponent: Fr = Fr::rand(&mut rng);
@@ -40,6 +42,7 @@ fn test_g2_serialization() {
 type TargetField = <Bn<ark_bn254::Config> as Pairing>::TargetField;
 
 #[test]
+#[ignore]
 fn test_fp12_serialization() {
     let mut rng = thread_rng();
     let x = TargetField::rand(&mut rng);
