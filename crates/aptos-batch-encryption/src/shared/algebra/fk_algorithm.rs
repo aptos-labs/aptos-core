@@ -508,7 +508,7 @@ impl<'de, F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeseria
         let toeplitz_domain_dimension = toeplitz_domain_dimension
             .ok_or_else(|| de::Error::missing_field("toeplitz_domain_dimension"))?;
         let fft_domain_size =
-            fft_domain_size.ok_or_else(|| de::Error::missing_field("toeplitz_domain_dimension"))?;
+            fft_domain_size.ok_or_else(|| de::Error::missing_field("fft_domain_size"))?;
         let prepared_toeplitz_inputs = prepared_toeplitz_inputs
             .ok_or_else(|| de::Error::missing_field("prepared_toeplitz_inputs"))?;
         Ok(FKDomain {
