@@ -53,7 +53,7 @@ module 0x8675309::M {
         acquires R
     {
         let _ = exists<R>(@0x0);
-        let () = move_to<R>(R{}, a);
+        let () = move_to<R>(a, R{});
         let _ = borrow_global<R>(@0x0);
         let _ = borrow_global_mut<R>(@0x0);
         let R{} = move_from<R>(@0x0);
@@ -62,7 +62,7 @@ module 0x8675309::M {
         acquires R
     {
         let _ = exists<R>(@0x0);
-        let () = move_to<R>(R{}, a);
+        let () = move_to<R>(a, R{});
         let _ = borrow_global<R>(@0x0);
         let _ = borrow_global_mut<R>(@0x0);
         let R{} = move_from<R>(@0x0);

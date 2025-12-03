@@ -34,7 +34,7 @@ fun ReachingDefTest::create_resource($t0|sender: &signer) {
   3: $t1 := $t4
   4: $t5 := move($t0)
   5: $t6 := move($t1)
-  6: move_to<0x42::ReachingDefTest::R>($t6, $t5)
+  6: move_to<0x42::ReachingDefTest::R>($t5, $t6)
   7: return ()
 }
 
@@ -74,6 +74,6 @@ fun ReachingDefTest::create_resource($t0|sender: &signer) {
   3: $t1 := $t4
   4: $t5 := move($t0)
   5: $t6 := move($t4)
-  6: move_to<0x42::ReachingDefTest::R>($t4, $t0)
+  6: move_to<0x42::ReachingDefTest::R>($t0, $t4)
   7: return ()
 }

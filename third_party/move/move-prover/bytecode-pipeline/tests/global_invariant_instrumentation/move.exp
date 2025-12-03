@@ -8,7 +8,7 @@ public fun Test::publish($t0|s: &signer) {
   0: $t1 := move($t0)
   1: $t2 := 1
   2: $t3 := pack 0x42::Test::R($t2)
-  3: move_to<0x42::Test::R>($t3, $t1)
+  3: move_to<0x42::Test::R>($t1, $t3)
   4: return ()
 }
 
@@ -33,7 +33,7 @@ public fun Test::publish($t0|s: signer) {
   0: assume forall a: address: TypeDomain<address>(): Gt(select Test::R.x<0x42::Test::R>(global<0x42::Test::R>(a)), 0)
   1: $t1 := 1
   2: $t2 := pack 0x42::Test::R($t1)
-  3: move_to<0x42::Test::R>($t2, $t0) on_abort goto 7 with $t3
+  3: move_to<0x42::Test::R>($t0, $t2) on_abort goto 7 with $t3
      # global invariant at tests/global_invariant_instrumentation/move.move:7:9+57
      # VC: global memory invariant does not hold at tests/global_invariant_instrumentation/move.move:7:9+57
   4: assert forall a: address: TypeDomain<address>(): Gt(select Test::R.x<0x42::Test::R>(global<0x42::Test::R>(a)), 0)
