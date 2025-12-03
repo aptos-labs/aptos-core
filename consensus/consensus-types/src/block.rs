@@ -6,6 +6,7 @@ use crate::{
     block_data::{BlockData, BlockType},
     common::{Author, Payload, Round},
     opt_block_data::OptBlockData,
+    payload::{OptQuorumStorePayload, TDataInfo},
     quorum_cert::QuorumCert,
 };
 use anyhow::{bail, ensure, format_err, Result};
@@ -143,11 +144,19 @@ impl Block {
                     proof_with_data.num_txns(),
                     proof_with_data.num_bytes(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.proof_with_data().num_proofs(),
-                    opt_quorum_store_payload.proof_with_data().num_txns(),
-                    opt_quorum_store_payload.proof_with_data().num_bytes(),
-                ),
+                Payload::OptQuorumStore(opt_quorum_store_payload) => match opt_quorum_store_payload
+                {
+                    OptQuorumStorePayload::V1(p) => (
+                        p.proof_with_data().num_proofs(),
+                        p.proof_with_data().num_txns(),
+                        p.proof_with_data().num_bytes(),
+                    ),
+                    OptQuorumStorePayload::V2(p) => (
+                        p.proof_with_data().num_proofs(),
+                        p.proof_with_data().num_txns(),
+                        p.proof_with_data().num_bytes(),
+                    ),
+                },
             },
         }
     }
@@ -169,11 +178,19 @@ impl Block {
                         .map(|(b, _)| b.num_bytes() as usize)
                         .sum(),
                 ),
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.inline_batches().num_batches(),
-                    opt_quorum_store_payload.inline_batches().num_txns(),
-                    opt_quorum_store_payload.inline_batches().num_bytes(),
-                ),
+                Payload::OptQuorumStore(opt_quorum_store_payload) => match opt_quorum_store_payload
+                {
+                    OptQuorumStorePayload::V1(p) => (
+                        p.inline_batches().num_batches(),
+                        p.inline_batches().num_txns(),
+                        p.inline_batches().num_bytes(),
+                    ),
+                    OptQuorumStorePayload::V2(p) => (
+                        p.inline_batches().num_batches(),
+                        p.inline_batches().num_txns(),
+                        p.inline_batches().num_bytes(),
+                    ),
+                },
                 _ => (0, 0, 0),
             },
         }
@@ -184,19 +201,19 @@ impl Block {
         match self.block_data.payload() {
             None => (0, 0, 0),
             Some(payload) => match payload {
-                Payload::OptQuorumStore(opt_quorum_store_payload) => (
-                    opt_quorum_store_payload.opt_batches().len(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_txns() as usize)
-                        .sum(),
-                    opt_quorum_store_payload
-                        .opt_batches()
-                        .iter()
-                        .map(|b| b.num_bytes() as usize)
-                        .sum(),
-                ),
+                Payload::OptQuorumStore(opt_quorum_store_payload) => match opt_quorum_store_payload
+                {
+                    OptQuorumStorePayload::V1(p) => (
+                        p.opt_batches().len(),
+                        p.opt_batches().iter().map(|b| b.num_txns() as usize).sum(),
+                        p.opt_batches().iter().map(|b| b.num_bytes() as usize).sum(),
+                    ),
+                    OptQuorumStorePayload::V2(p) => (
+                        p.opt_batches().len(),
+                        p.opt_batches().iter().map(|b| b.num_txns() as usize).sum(),
+                        p.opt_batches().iter().map(|b| b.num_bytes() as usize).sum(),
+                    ),
+                },
                 _ => (0, 0, 0),
             },
         }

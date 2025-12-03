@@ -15,8 +15,8 @@ use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, ProofWithData},
-    payload::{BatchPointer, TDataInfo},
-    proof_of_store::{BatchInfo, BatchInfoExt},
+    payload::{BatchPointer, OptQuorumStorePayload, TDataInfo},
+    proof_of_store::{BatchInfo, BatchInfoExt, TBatchInfo},
 };
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
@@ -199,9 +199,8 @@ impl TPayloadManager for QuorumStorePayloadManager {
                         )
                         .collect::<Vec<_>>()
                 },
-                Payload::OptQuorumStore(opt_quorum_store_payload) => {
-                    opt_quorum_store_payload.into_inner().get_all_batch_infos()
-                },
+                Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => p.get_all_batch_infos(),
+                Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => p.get_all_batch_infos(),
             })
             .collect();
 
@@ -271,16 +270,32 @@ impl TPayloadManager for QuorumStorePayloadManager {
             Payload::DirectMempool(_) => {
                 unreachable!()
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                 prefetch_helper(
-                    opt_qs_payload.opt_batches(),
+                    p.opt_batches(),
                     self.batch_reader.clone(),
                     Some(author),
                     timestamp,
                     &self.ordered_authors,
                 );
                 prefetch_helper(
-                    opt_qs_payload.proof_with_data(),
+                    p.proof_with_data(),
+                    self.batch_reader.clone(),
+                    None,
+                    timestamp,
+                    &self.ordered_authors,
+                )
+            },
+            Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+                prefetch_helper(
+                    p.opt_batches(),
+                    self.batch_reader.clone(),
+                    Some(author),
+                    timestamp,
+                    &self.ordered_authors,
+                );
+                prefetch_helper(
+                    p.proof_with_data(),
                     self.batch_reader.clone(),
                     None,
                     timestamp,
@@ -391,9 +406,26 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 // or inlined transactions.
                 Ok(())
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                 let mut missing_authors = BitVec::with_num_bits(self.ordered_authors.len() as u16);
-                for batch in opt_qs_payload.opt_batches().deref() {
+                for batch in p.opt_batches().deref() {
+                    if self.batch_reader.exists(batch.digest()).is_none() {
+                        let index = *self
+                            .address_to_validator_index
+                            .get(&batch.author())
+                            .expect("Payload author should have been verified");
+                        missing_authors.set(index as u16);
+                    }
+                }
+                if missing_authors.all_zeros() {
+                    Ok(())
+                } else {
+                    Err(missing_authors)
+                }
+            },
+            Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+                let mut missing_authors = BitVec::with_num_bits(self.ordered_authors.len() as u16);
+                for batch in p.opt_batches().deref() {
                     if self.batch_reader.exists(batch.digest()).is_none() {
                         let index = *self
                             .address_to_validator_index
@@ -476,7 +508,7 @@ impl TPayloadManager for QuorumStorePayloadManager {
                 )
                 .await?
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(OptQuorumStorePayload::V1(opt_qs_payload)) => {
                 let opt_batch_txns = process_optqs_payload(
                     opt_qs_payload.opt_batches(),
                     self.batch_reader.clone(),
@@ -555,7 +587,11 @@ fn get_inline_transactions(block: &Block) -> Vec<SignedTransaction> {
                 .flat_map(|(_batch_info, txns)| txns.clone())
                 .collect()
         },
-        Payload::OptQuorumStore(opt_qs_payload) => opt_qs_payload.inline_batches().transactions(),
+        Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => p.inline_batches().transactions(),
+        Payload::OptQuorumStore(OptQuorumStorePayload::V2(_p)) => {
+            error!("OptQSPayload V2 is not expected");
+            Vec::new()
+        },
         _ => {
             vec![] // Other payload types do not have inline transactions
         },

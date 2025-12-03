@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore};
+use crate::proof_of_store::{BatchInfo, BatchInfoExt, ProofOfStore, TBatchInfo};
 use anyhow::ensure;
 use aptos_types::{transaction::SignedTransaction, PeerId};
 use core::fmt;
@@ -11,9 +11,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-pub type OptBatches = BatchPointer<BatchInfo>;
+pub type OptBatches<T> = BatchPointer<T>;
 
-pub type ProofBatches = BatchPointer<ProofOfStore<BatchInfo>>;
+pub type ProofBatches<T> = BatchPointer<ProofOfStore<T>>;
 
 pub trait TDataInfo {
     fn num_txns(&self) -> u64;
@@ -91,6 +91,12 @@ impl<T> Deref for BatchPointer<T> {
 
     fn deref(&self) -> &Self::Target {
         &self.batch_summary
+    }
+}
+
+impl<T> DerefMut for BatchPointer<T> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.batch_summary
     }
 }
 
@@ -188,20 +194,20 @@ impl PayloadExecutionLimit {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct InlineBatch {
-    batch_info: BatchInfo,
+pub struct InlineBatch<T: TBatchInfo> {
+    batch_info: T,
     transactions: Vec<SignedTransaction>,
 }
 
-impl InlineBatch {
-    pub fn new(batch_info: BatchInfo, transactions: Vec<SignedTransaction>) -> Self {
+impl<T: TBatchInfo> InlineBatch<T> {
+    pub fn new(batch_info: T, transactions: Vec<SignedTransaction>) -> Self {
         Self {
             batch_info,
             transactions,
         }
     }
 
-    pub fn info(&self) -> &BatchInfo {
+    pub fn info(&self) -> &T {
         &self.batch_info
     }
 
@@ -211,9 +217,9 @@ impl InlineBatch {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct InlineBatches(Vec<InlineBatch>);
+pub struct InlineBatches<T: TBatchInfo>(Vec<InlineBatch<T>>);
 
-impl InlineBatches {
+impl<T: TBatchInfo> InlineBatches<T> {
     pub fn num_batches(&self) -> usize {
         self.0.len()
     }
@@ -243,7 +249,7 @@ impl InlineBatches {
             .collect()
     }
 
-    pub fn batch_infos(&self) -> Vec<BatchInfo> {
+    pub fn batch_infos(&self) -> Vec<T> {
         self.0
             .iter()
             .map(|inline_batch| inline_batch.batch_info.clone())
@@ -251,14 +257,14 @@ impl InlineBatches {
     }
 }
 
-impl From<Vec<InlineBatch>> for InlineBatches {
-    fn from(value: Vec<InlineBatch>) -> Self {
+impl<T: TBatchInfo> From<Vec<InlineBatch<T>>> for InlineBatches<T> {
+    fn from(value: Vec<InlineBatch<T>>) -> Self {
         Self(value)
     }
 }
 
-impl From<Vec<(BatchInfo, Vec<SignedTransaction>)>> for InlineBatches {
-    fn from(value: Vec<(BatchInfo, Vec<SignedTransaction>)>) -> Self {
+impl<T: TBatchInfo> From<Vec<(T, Vec<SignedTransaction>)>> for InlineBatches<T> {
+    fn from(value: Vec<(T, Vec<SignedTransaction>)>) -> Self {
         value
             .into_iter()
             .map(|(batch_info, transactions)| InlineBatch::new(batch_info, transactions))
@@ -267,29 +273,32 @@ impl From<Vec<(BatchInfo, Vec<SignedTransaction>)>> for InlineBatches {
     }
 }
 
-impl Deref for InlineBatches {
-    type Target = Vec<InlineBatch>;
+impl<T: TBatchInfo> Deref for InlineBatches<T> {
+    type Target = Vec<InlineBatch<T>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl DerefMut for InlineBatches {
+impl<T: TBatchInfo> DerefMut for InlineBatches<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct OptQuorumStorePayloadV1 {
-    inline_batches: InlineBatches,
-    opt_batches: OptBatches,
-    proofs: ProofBatches,
+pub struct OptQuorumStorePayloadV1<T: TBatchInfo> {
+    inline_batches: InlineBatches<T>,
+    opt_batches: OptBatches<T>,
+    proofs: ProofBatches<T>,
     execution_limits: PayloadExecutionLimit,
 }
 
-impl OptQuorumStorePayloadV1 {
+impl<T> OptQuorumStorePayloadV1<T>
+where
+    T: TBatchInfo + Send + Sync + 'static + TDataInfo,
+{
     pub fn get_all_batch_infos(self) -> Vec<BatchInfoExt> {
         let Self {
             inline_batches,
@@ -323,37 +332,40 @@ impl OptQuorumStorePayloadV1 {
             "OptQS InlineBatch epoch doesn't match given epoch"
         );
         ensure!(
-            self.opt_batches.iter().all(|b| b.info().epoch() == epoch),
+            self.opt_batches.iter().all(|b| b.epoch() == epoch),
             "OptQS OptBatch epoch doesn't match given epoch"
         );
 
         ensure!(
-            self.proofs.iter().all(|b| b.info().epoch() == epoch),
+            self.proofs.iter().all(|b| b.epoch() == epoch),
             "OptQS Proof epoch doesn't match given epoch"
         );
 
         Ok(())
     }
-}
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub enum OptQuorumStorePayload {
-    V1(OptQuorumStorePayloadV1),
-}
+    fn extend(mut self, other: Self) -> Self {
+        self.inline_batches.extend(other.inline_batches.0);
+        self.opt_batches.extend(other.opt_batches);
+        self.proofs.extend(other.proofs);
+        self.execution_limits.extend(other.execution_limits);
+        self
+    }
 
-impl OptQuorumStorePayload {
-    pub fn new(
-        inline_batches: InlineBatches,
-        opt_batches: OptBatches,
-        proofs: ProofBatches,
-        execution_limits: PayloadExecutionLimit,
-    ) -> Self {
-        Self::V1(OptQuorumStorePayloadV1 {
-            inline_batches,
-            opt_batches,
-            proofs,
-            execution_limits,
-        })
+    pub fn inline_batches(&self) -> &InlineBatches<T> {
+        &self.inline_batches
+    }
+
+    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore<T>> {
+        &self.proofs
+    }
+
+    pub fn opt_batches(&self) -> &BatchPointer<T> {
+        &self.opt_batches
+    }
+
+    pub fn set_execution_limit(&mut self, execution_limits: PayloadExecutionLimit) {
+        self.execution_limits = execution_limits;
     }
 
     pub(crate) fn num_txns(&self) -> usize {
@@ -364,56 +376,137 @@ impl OptQuorumStorePayload {
         self.opt_batches.is_empty() && self.proofs.is_empty() && self.inline_batches.is_empty()
     }
 
-    pub(crate) fn extend(mut self, other: Self) -> Self {
-        let other: OptQuorumStorePayloadV1 = other.into_inner();
-        self.inline_batches.extend(other.inline_batches.0);
-        self.opt_batches.extend(other.opt_batches);
-        self.proofs.extend(other.proofs);
-        self.execution_limits.extend(other.execution_limits);
-        self
-    }
-
     pub(crate) fn num_bytes(&self) -> usize {
         self.opt_batches.num_bytes() + self.proofs.num_bytes() + self.inline_batches.num_bytes()
     }
+}
 
-    pub fn into_inner(self) -> OptQuorumStorePayloadV1 {
-        match self {
-            OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
+impl From<OptQuorumStorePayloadV1<BatchInfo>> for OptQuorumStorePayloadV1<BatchInfoExt> {
+    fn from(p: OptQuorumStorePayloadV1<BatchInfo>) -> Self {
+        OptQuorumStorePayloadV1 {
+            inline_batches: p
+                .inline_batches
+                .0
+                .into_iter()
+                .map(|batch| InlineBatch::new(batch.batch_info.into(), batch.transactions))
+                .collect::<Vec<_>>()
+                .into(),
+            opt_batches: p
+                .opt_batches
+                .into_iter()
+                .map(|batch| batch.into())
+                .collect::<Vec<_>>()
+                .into(),
+            proofs: p
+                .proofs
+                .into_iter()
+                .map(|proof| proof.into())
+                .collect::<Vec<_>>()
+                .into(),
+            execution_limits: p.execution_limits,
         }
     }
+}
 
-    pub fn inline_batches(&self) -> &InlineBatches {
-        &self.inline_batches
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum OptQuorumStorePayload {
+    V1(OptQuorumStorePayloadV1<BatchInfo>),
+    V2(OptQuorumStorePayloadV1<BatchInfoExt>),
+}
+
+impl OptQuorumStorePayload {
+    pub fn new(
+        inline_batches: InlineBatches<BatchInfo>,
+        opt_batches: OptBatches<BatchInfo>,
+        proofs: ProofBatches<BatchInfo>,
+        execution_limits: PayloadExecutionLimit,
+    ) -> Self {
+        Self::V1(OptQuorumStorePayloadV1 {
+            inline_batches,
+            opt_batches,
+            proofs,
+            execution_limits,
+        })
     }
 
-    pub fn proof_with_data(&self) -> &BatchPointer<ProofOfStore<BatchInfo>> {
-        &self.proofs
-    }
-
-    pub fn opt_batches(&self) -> &BatchPointer<BatchInfo> {
-        &self.opt_batches
+    pub(crate) fn extend(self, other: Self) -> Self {
+        match (self, other) {
+            (Self::V1(p1), Self::V1(p2)) => Self::V1(p1.extend(p2)),
+            (Self::V2(p1), Self::V2(p2)) => Self::V2(p1.extend(p2)),
+            (Self::V1(p1), Self::V2(p2)) => {
+                Self::V2(OptQuorumStorePayloadV1::<BatchInfoExt>::from(p1).extend(p2))
+            },
+            (Self::V2(p1), Self::V1(p2)) => Self::V2(p1.extend(p2.into())),
+        }
     }
 
     pub fn set_execution_limit(&mut self, execution_limits: PayloadExecutionLimit) {
-        self.execution_limits = execution_limits;
-    }
-}
-
-impl Deref for OptQuorumStorePayload {
-    type Target = OptQuorumStorePayloadV1;
-
-    fn deref(&self) -> &Self::Target {
         match self {
-            OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
+            OptQuorumStorePayload::V1(p) => p.set_execution_limit(execution_limits),
+            OptQuorumStorePayload::V2(p) => p.set_execution_limit(execution_limits),
         }
     }
-}
 
-impl DerefMut for OptQuorumStorePayload {
-    fn deref_mut(&mut self) -> &mut Self::Target {
+    pub(crate) fn num_txns(&self) -> usize {
         match self {
-            OptQuorumStorePayload::V1(opt_qs_payload) => opt_qs_payload,
+            OptQuorumStorePayload::V1(p) => p.num_txns(),
+            OptQuorumStorePayload::V2(p) => p.num_txns(),
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.is_empty(),
+            OptQuorumStorePayload::V2(p) => p.is_empty(),
+        }
+    }
+
+    pub(crate) fn num_bytes(&self) -> usize {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.num_bytes(),
+            OptQuorumStorePayload::V2(p) => p.num_bytes(),
+        }
+    }
+
+    pub(crate) fn max_txns_to_execute(&self) -> Option<u64> {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.max_txns_to_execute(),
+            OptQuorumStorePayload::V2(p) => p.max_txns_to_execute(),
+        }
+    }
+
+    pub(crate) fn check_epoch(&self, epoch: u64) -> anyhow::Result<()> {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.check_epoch(epoch),
+            OptQuorumStorePayload::V2(p) => p.check_epoch(epoch),
+        }
+    }
+
+    fn num_inline_txns(&self) -> usize {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.inline_batches().num_txns(),
+            OptQuorumStorePayload::V2(p) => p.inline_batches().num_txns(),
+        }
+    }
+
+    fn num_opt_batch_txns(&self) -> usize {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.opt_batches().num_txns(),
+            OptQuorumStorePayload::V2(p) => p.opt_batches().num_txns(),
+        }
+    }
+
+    fn num_proof_txns(&self) -> usize {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.proof_with_data().num_txns(),
+            OptQuorumStorePayload::V2(p) => p.proof_with_data().num_txns(),
+        }
+    }
+
+    fn execution_limits(&self) -> &PayloadExecutionLimit {
+        match self {
+            OptQuorumStorePayload::V1(p) => &p.execution_limits,
+            OptQuorumStorePayload::V2(p) => &p.execution_limits,
         }
     }
 }
@@ -422,10 +515,11 @@ impl fmt::Display for OptQuorumStorePayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "OptQuorumStorePayload(opt_batches: {}, proofs: {}, limits: {:?})",
-            self.opt_batches.num_txns(),
-            self.proofs.num_txns(),
-            self.execution_limits,
+            "OptQuorumStorePayload(inline: {}, opt: {}, proofs: {}, limits: {:?})",
+            self.num_inline_txns(),
+            self.num_opt_batch_txns(),
+            self.num_proof_txns(),
+            self.execution_limits(),
         )
     }
 }
