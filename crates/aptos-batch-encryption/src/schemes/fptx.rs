@@ -1,8 +1,7 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    group::*,
-    shared::{
+    errors::BatchEncryptionError, group::{self, *}, shared::{
         ark_serialize::*,
         ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
@@ -14,10 +13,11 @@ use crate::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterPublicKey,
             BIBEMasterSecretKeyShare, BIBEVerificationKey,
         },
-    },
-    traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
+    }, traits::{AssociatedData, BatchThresholdEncryption, Plaintext}
 };
 use anyhow::{anyhow, Result};
+use aptos_crypto::SecretSharingConfig as _;
+use aptos_dkg::pvss::{traits::SubTranscript, Player};
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
@@ -68,6 +68,7 @@ impl BIBEEncryptionKey for EncryptionKey {
 }
 
 impl BatchThresholdEncryption for FPTX {
+    type SubTranscript = aptos_dkg::pvss::chunky::SubTranscript<group::Pairing>;
     type Ciphertext = Ciphertext<FreeRootId>;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;
@@ -83,6 +84,71 @@ impl BatchThresholdEncryption for FPTX {
     type Round = u64;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
+
+    fn setup(
+        digest_key: &Self::DigestKey,
+        pvss_public_params: &<Self::SubTranscript as SubTranscript>::PublicParameters,
+        subtranscript_happypath: &Self::SubTranscript,
+        subtranscript_slowpath: &Self::SubTranscript,
+        tc_happypath: &Self::ThresholdConfig,
+        tc_slowpath: &Self::ThresholdConfig,
+        current_player: Player,
+        msk_share_decryption_key: &<Self::SubTranscript as SubTranscript>::DecryptPrivKey,
+    ) -> Result<(
+        Self::EncryptionKey,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+    )> {
+        (subtranscript_happypath.get_dealt_public_key() ==
+            subtranscript_slowpath.get_dealt_public_key())
+            .then_some(())
+            .ok_or(
+                BatchEncryptionError::HappySlowPathMismatchError
+            )?;
+
+        let mpk_g2 : G2Affine = subtranscript_happypath.get_dealt_public_key().into_g2();
+
+        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
+
+        let vks_happypath = tc_happypath
+            .get_players()
+            .into_iter()
+            .map(|p|
+                Self::VerificationKey {
+                    player: p,
+                    mpk_g2,
+                    vk_g2: subtranscript_happypath.get_public_key_share(&tc_happypath, &p).into_g2()
+                }
+            ).collect();
+
+        let vks_slowpath = tc_slowpath
+            .get_players()
+            .into_iter()
+            .map(|p|
+                Self::VerificationKey {
+                    player: p,
+                    mpk_g2,
+                    vk_g2: subtranscript_slowpath.get_public_key_share(&tc_slowpath, &p).into_g2()
+                }
+            ).collect();
+
+        let msk_share_happypath = BIBEMasterSecretKeyShare {
+            mpk_g2,
+            player: current_player,
+            shamir_share_eval: subtranscript_happypath.decrypt_own_share(&tc_happypath, &current_player, &msk_share_decryption_key, &pvss_public_params).0.into_fr(),
+        };
+
+        let msk_share_slowpath = BIBEMasterSecretKeyShare {
+            mpk_g2,
+            player: current_player,
+            shamir_share_eval: subtranscript_slowpath.decrypt_own_share(&tc_slowpath, &current_player, &msk_share_decryption_key, &pvss_public_params).0.into_fr(),
+        };
+
+        Ok((ek, vks_happypath, msk_share_happypath, vks_slowpath, msk_share_slowpath))
+    }
+
 
     fn setup_for_testing(
         seed: u64,

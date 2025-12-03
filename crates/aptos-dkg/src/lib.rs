@@ -97,6 +97,9 @@ impl<E: Pairing> Scalar<E> {
     pub fn vecvecvec_from_inner(vvv: Vec<Vec<Vec<E::ScalarField>>>) -> Vec<Vec<Vec<Self>>> {
         vvv.into_iter().map(Self::vecvec_from_inner).collect()
     }
+    pub fn into_fr(&self) -> E::ScalarField {
+        self.0
+    }
 }
 
 impl<E: Pairing> UniformRand for Scalar<E> {

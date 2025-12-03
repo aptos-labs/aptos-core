@@ -5,9 +5,11 @@ use aptos_crypto::player::Player;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
+use aptos_dkg::pvss::traits::SubTranscript;
 
 pub trait BatchThresholdEncryption {
     type ThresholdConfig: aptos_crypto::ThresholdConfig;
+    type SubTranscript: SubTranscript;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually
     /// deploy this scheme, the functionality here will have to be implemented in the SDK.
@@ -53,6 +55,26 @@ pub trait BatchThresholdEncryption {
     /// A decryption key that has been reconstructed by a threshold of decryption key shares.
     type DecryptionKey;
     type Id: PartialEq + Eq;
+
+    fn setup(
+        digest_key: &Self::DigestKey,
+        pvss_public_params: &<Self::SubTranscript as SubTranscript>::PublicParameters,
+        subtranscript_happypath: &Self::SubTranscript,
+        subtranscript_slowpath: &Self::SubTranscript,
+        tc_happypath: &Self::ThresholdConfig,
+        tc_slowpath: &Self::ThresholdConfig,
+        current_player: Player,
+        sk_share_decryption_key: &<Self::SubTranscript as SubTranscript>::DecryptPrivKey,
+    ) -> Result<(
+        Self::EncryptionKey,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+        Vec<Self::VerificationKey>,
+        Self::MasterSecretKeyShare,
+    )>;
+
+
+
 
     /// Generates an (insecure) setup for the batch threshold encryption scheme. Consists of
     /// a [`PublicKey`] which can be used to encrypt messages and to compute a digest from a list

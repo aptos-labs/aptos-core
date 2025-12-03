@@ -329,6 +329,14 @@ pub trait SecretSharingConfig: Display {
         Player { id: i }
     }
 
+    /// Returns a vec of all player IDs.
+    fn get_players(&self) -> Vec<Player> {
+        (0..self.get_total_num_players())
+            .map(|i| Player { id: i })
+            .collect()
+
+    }
+
     /// Useful during testing.
     fn get_random_player<R>(&self, rng: &mut R) -> Player
     where

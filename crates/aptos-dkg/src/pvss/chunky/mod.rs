@@ -12,3 +12,4 @@ mod weighted_transcript;
 
 pub use transcript::Transcript;
 pub use weighted_transcript::Transcript as WeightedTranscript;
+pub use transcript::SubTranscript;
