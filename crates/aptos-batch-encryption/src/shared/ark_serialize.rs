@@ -19,7 +19,7 @@ where
     D: serde::de::Deserializer<'de>,
 {
     let s: Vec<u8> = serde::de::Deserialize::deserialize(data)?;
-    let a = A::deserialize_with_mode(s.as_slice(), Compress::Yes, Validate::No);
+    let a = A::deserialize_with_mode(s.as_slice(), Compress::Yes, Validate::Yes);
     a.map_err(serde::de::Error::custom)
 }
 

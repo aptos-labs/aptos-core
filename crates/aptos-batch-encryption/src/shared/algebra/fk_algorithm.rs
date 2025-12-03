@@ -335,12 +335,13 @@ impl<
     pub fn eval_proofs_at_roots_of_unity(&self, f: &[F], round: usize) -> Vec<T> {
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
+        assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
+
         let mut f = Vec::from(f);
         f.extend(std::iter::repeat_n(
             F::zero(),
             self.toeplitz_domain.dimension() + 1 - f.len(),
         ));
-        assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
         let h_term_commitments = self.toeplitz_domain.eval_prepared(
             &self.toeplitz_for_poly(&f),

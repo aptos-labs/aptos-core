@@ -114,8 +114,12 @@ pub fn multi_point_eval<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     f: &[T],
     x_coords: &[F],
 ) -> Vec<T> {
-    let mult_tree = compute_mult_tree(x_coords);
-    recurse(f, &mult_tree, mult_tree.len() - 1, 0)
+    if x_coords.len() == 0 {
+        vec![]
+    } else {
+        let mult_tree = compute_mult_tree(x_coords);
+        recurse(f, &mult_tree, mult_tree.len() - 1, 0)
+    }
 }
 
 pub fn multi_point_eval_naive(f: &[G1Affine], x_coords: &[Fr]) -> Vec<G1Affine> {
@@ -336,6 +340,18 @@ mod tests {
             evals[3],
             f[0] + f[1] * four + f[2] * four * four + f[3] * four * four * four
         );
+    }
+
+    #[test]
+    fn test_multi_point_eval_5() {
+        let mut rng = thread_rng();
+
+        let f = [G1Projective::rand(&mut rng); 4];
+        let x_coords : Vec<Fr> = vec![];
+
+        let evals = multi_point_eval(&f, &x_coords);
+
+        assert_eq!(evals.len(), 0);
     }
 
     #[test]

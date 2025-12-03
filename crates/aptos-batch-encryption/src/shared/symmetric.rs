@@ -165,7 +165,7 @@ pub fn hmac_kdf(
 /// probability of failure of this fn is 1/2^256 on a random
 /// input.
 pub fn hash_g2_element(g2_element: G2Affine) -> Result<G1Affine> {
-    for ctr in 0..u8::MAX {
+    for ctr in 0..=u8::MAX {
         let mut hash_source_bytes = Vec::new();
         g2_element
             .serialize_compressed(&mut hash_source_bytes)
