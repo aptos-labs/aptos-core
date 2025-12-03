@@ -67,6 +67,7 @@ fn diff_override_config_yaml(
                 Ok(Some(override_config))
             }
         },
+        (_, serde_yaml::Value::Null) => Ok(Some(override_config)),
         (_, _) => bail!(
             "base does not match override: {:?}, {:?}",
             override_config,
