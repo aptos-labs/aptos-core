@@ -4,7 +4,7 @@
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::{traits::SecretSharingConfig as _, Uniform};
+use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
     pvss::{
@@ -31,7 +31,7 @@ use rand::{rngs::ThreadRng, thread_rng, Rng};
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subscript
     for tc in get_threshold_configs_for_benchmarking() {
-        subaggregatable_pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
+        subaggregatable_pvss_group::<<aptos_dkg::pvss::chunky::Transcript<ark_ec::models::bn::Bn<ark_bn254::Config>> as aptos_dkg::pvss::traits::Transcript>::SecretSharingConfig, pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
     }
 
     // unweighted aggregatable PVSS
@@ -100,7 +100,7 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 
 // TODO: combine with function above, rather than copy-paste
 pub fn subaggregatable_pvss_group<
-    T: HasAggregatableSubtranscript<T::SecretSharingConfig> + MalleableTranscript,
+    C: SecretSharingConfig, T: HasAggregatableSubtranscript<C> + MalleableTranscript<SecretSharingConfig = C>,
 >(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
@@ -114,7 +114,7 @@ pub fn subaggregatable_pvss_group<
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_subaggregate::<T, WallTime>(sc, &mut group);
+    pvss_subaggregate::<C, T, WallTime>(sc, &mut group);
     pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
@@ -211,7 +211,8 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
 }
 
 fn pvss_subaggregate<
-    T: Transcript + HasAggregatableSubtranscript<T::SecretSharingConfig>,
+    C: SecretSharingConfig,
+    T: Transcript<SecretSharingConfig = C> + HasAggregatableSubtranscript<C>,
     M: Measurement,
 >(
     sc: &T::SecretSharingConfig,

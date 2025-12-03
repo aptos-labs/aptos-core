@@ -60,20 +60,7 @@ use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 
-/// A trait for a PVSS protocol. This trait allows both for:
-///
-/// 1. Normal/unweighted $t$-out-of-$n$ PVSS protocols where any $t$ players (or more) can
-///    reconstruct the secret (but no fewer can)
-/// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
-///    reconstruct the secret (but players with combined weight $< w$ cannot)
-pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
-    type SecretSharingConfig: SecretSharingConfig
-        + DeserializeOwned
-        + Serialize
-        + Debug
-        + PartialEq
-        + Eq;
-
+pub trait SubTranscript {
     type PublicParameters: HasEncryptionPublicParams
         + WithMaxNumShares
         + Default
@@ -83,22 +70,15 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Debug
         + PartialEq
         + Eq;
-
-    type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
-    type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
-
-    type DealtSecretKeyShare: PartialEq + Clone;
+    type SecretSharingConfig: SecretSharingConfig
+        + DeserializeOwned
+        + Serialize
+        + Debug
+        + PartialEq
+        + Eq;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
-    type DealtSecretKey: PartialEq
-        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
+    type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKey;
-
-    type InputSecret: Uniform
-        + Zero
-        + for<'a> AddAssign<&'a Self::InputSecret>
-        + Convert<Self::DealtSecretKey, Self::PublicParameters>
-        + Convert<Self::DealtPubKey, Self::PublicParameters>;
-
     type EncryptPubKey: Debug
         + Clone
         + ValidCryptoMaterial
@@ -111,6 +91,79 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
             Self::EncryptPubKey,
             <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
         >;
+
+    /// Returns the dealt pubkey shore of `player`.
+    fn get_public_key_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare;
+
+    /// Given a valid transcript, returns the `DealtPublicKey` of that transcript: i.e., the public
+    /// key associated with the secret key dealt in the transcript.
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey;
+
+    /// Given a valid transcript, returns the decrypted `DealtSecretShare` for the player with ID
+    /// `player_id`.
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
+}
+
+/// A trait for a PVSS protocol transcript. This trait allows both for:
+///
+/// 1. Normal/unweighted $t$-out-of-$n$ PVSS protocols where any $t$ players (or more) can
+///    reconstruct the secret (but no fewer can)
+/// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
+///    reconstruct the secret (but players with combined weight $< w$ cannot)
+pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
+    type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
+    type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
+
+    type DealtSecretKey: PartialEq
+        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
+
+    type InputSecret: Uniform
+        + Zero
+        + for<'a> AddAssign<&'a Self::InputSecret>
+        + Convert<Self::DealtSecretKey, Self::PublicParameters>
+        + Convert<Self::DealtPubKey, Self::PublicParameters>;
+
+    type PublicParameters: HasEncryptionPublicParams
+        + WithMaxNumShares
+        + Default
+        + ValidCryptoMaterial
+        + DeserializeOwned
+        + Serialize
+        + Debug
+        + PartialEq
+        + Eq;
+    type SecretSharingConfig: SecretSharingConfig
+        + DeserializeOwned
+        + Serialize
+        + Debug
+        + PartialEq
+        + Eq;
+    type DealtPubKeyShare: Debug + PartialEq + Clone;
+    type DealtSecretKeyShare: PartialEq + Clone;
+    type DealtPubKey;
+    type EncryptPubKey: Debug
+        + Clone
+        + ValidCryptoMaterial
+        + DeserializeOwned
+        + Serialize
+        + PartialEq
+        + Eq;
+    type DecryptPrivKey: Uniform
+        + Convert<
+            Self::EncryptPubKey,
+            <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
+        >;
+
 
     /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
     fn dst() -> Vec<u8>;
@@ -159,6 +212,16 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     /// other transcripts, in which case the set will be of size `n`.
     fn get_dealers(&self) -> Vec<Player>;
 
+    /// Generates a random looking transcript (but not a valid one).
+    /// Useful for testing and benchmarking.
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng;
+
     /// Returns the dealt pubkey shore of `player`.
     fn get_public_key_share(
         &self,
@@ -179,16 +242,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
-
-    /// Generates a random looking transcript (but not a valid one).
-    /// Useful for testing and benchmarking.
-    fn generate<R>(
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        rng: &mut R,
-    ) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng;
 }
 
 pub trait Aggregatable<C>: Sized {
@@ -227,8 +280,16 @@ impl<T> AggregatableTranscript for T where
 {
 }
 
-pub trait HasAggregatableSubtranscript<C> {
-    type SubTranscript: Aggregatable<C>;
+pub trait HasAggregatableSubtranscript<C> : Transcript {
+    type SubTranscript: Aggregatable<C> + SubTranscript<
+        PublicParameters = Self::PublicParameters,
+        SecretSharingConfig = Self::SecretSharingConfig,
+        DealtPubKeyShare = Self::DealtPubKeyShare,
+        DealtSecretKeyShare = Self::DealtSecretKeyShare,
+        DealtPubKey = Self::DealtPubKey,
+        EncryptPubKey = Self::EncryptPubKey,
+        DecryptPrivKey = Self::DecryptPrivKey,
+    >;
 
     fn get_subtranscript(&self) -> Self::SubTranscript;
 }
