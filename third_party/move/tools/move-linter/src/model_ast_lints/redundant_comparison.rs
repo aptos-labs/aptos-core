@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 //! This module detects redundant, contradictory, and tautological
 //! numerical comparisons over the same variable in boolean expressions
-//! combined with `&&` and `||`.
+//! combined with `&&` and `||`
 
 use move_compiler_v2::external_checks::ExpChecker;
 use move_model::{
