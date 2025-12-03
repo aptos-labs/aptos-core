@@ -68,7 +68,8 @@ impl From<Error> for TaskError {
 pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
-pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
+pub type PrepareResult = (Vec<SignedTransaction>, Option<u64>);
+pub type VerifyTxnsResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
 // First Option is whether randomness is enabled
 // Second Option is whether randomness is skipped
 pub type RandResult = (Option<Option<Randomness>>, bool);
@@ -85,6 +86,7 @@ pub type SecretShareResult = SecretShare;
 #[derive(Clone)]
 pub struct PipelineFutures {
     pub prepare_fut: TaskFuture<PrepareResult>,
+    pub verify_txns_fut: TaskFuture<VerifyTxnsResult>,
     pub rand_check_fut: TaskFuture<RandResult>,
     pub execute_fut: TaskFuture<ExecuteResult>,
     pub ledger_update_fut: TaskFuture<LedgerUpdateResult>,
