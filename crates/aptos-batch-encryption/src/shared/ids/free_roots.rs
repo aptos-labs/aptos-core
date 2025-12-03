@@ -189,8 +189,8 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
             .collect();
 
         HashMap::from_iter(
-            self.as_vec()
-                .into_iter()
+            ids.iter()
+                .cloned()
                 .zip(pfs)
                 .collect::<Vec<(Self::Id, G1Affine)>>(),
         )

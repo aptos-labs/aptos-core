@@ -94,8 +94,8 @@ fn recurse<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     } else if f.len() == 1 {
         vec![f[0]]
     } else {
-        assert!(mult_tree[level - 1].len() == mult_tree[level].len() * 2);
-        assert!(mult_tree[level - 1].len() > 2 * pos + 1);
+        debug_assert!(mult_tree[level - 1].len() == mult_tree[level].len() * 2);
+        debug_assert!(mult_tree[level - 1].len() > 2 * pos + 1);
         let (left, right) = rayon::join(
             || f.remainder(&mult_tree[level - 1][2 * pos]),
             || f.remainder(&mult_tree[level - 1][2 * pos + 1]),
@@ -113,12 +113,11 @@ pub fn multi_point_eval<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     f: &[T],
     x_coords: &[F],
 ) -> Vec<T> {
-    if x_coords.is_empty() {
-        vec![]
-    } else {
-        let mult_tree = compute_mult_tree(x_coords);
-        recurse(f, &mult_tree, mult_tree.len() - 1, 0)
-    }
+    // The way it is written right now, this only supports
+    // evaluating a poly on a number of x coords greater than deg(f) + 1
+    assert!(x_coords.len() >= f.len());
+    let mult_tree = compute_mult_tree(x_coords);
+    recurse(f, &mult_tree, mult_tree.len() - 1, 0)
 }
 
 pub fn multi_point_eval_naive<
@@ -128,6 +127,8 @@ pub fn multi_point_eval_naive<
     f: &[T::MulBase],
     x_coords: &[F],
 ) -> Vec<T> {
+    // Note: unlike the non-naive algorithm, this supports an arbitrary
+    // number of x coords
     let powers = x_coords
         .into_par_iter()
         .map(|x| {
@@ -345,18 +346,6 @@ mod tests {
             evals[3],
             f[0] + f[1] * four + f[2] * four * four + f[3] * four * four * four
         );
-    }
-
-    #[test]
-    fn test_multi_point_eval_5() {
-        let mut rng = thread_rng();
-
-        let f = [G1Projective::rand(&mut rng); 4];
-        let x_coords: Vec<Fr> = vec![];
-
-        let evals = multi_point_eval(&f, &x_coords);
-
-        assert_eq!(evals.len(), 0);
     }
 
     #[test]
