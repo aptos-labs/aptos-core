@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     counters::{self, MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXNS_IN_BLOCK, TXN_SHUFFLE_SECONDS},
