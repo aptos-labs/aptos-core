@@ -332,9 +332,7 @@ impl<
         toeplitz
     }
 
-    /// Compute the evaluation proofs for a KZG commitment of a polynomial `f`, committed to under
-    /// `tau_powers`, on the FFT domain encapsulated by this [`FKDomain`].
-    pub fn eval_proofs_at_roots_of_unity(&self, f: &[F], round: usize) -> Vec<T> {
+    fn compute_h_term_commitments(&self, f: &[F], round: usize) -> Vec<T> {
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
@@ -345,33 +343,23 @@ impl<
             self.toeplitz_domain.dimension() + 1 - f.len(),
         ));
 
-        let h_term_commitments = self.toeplitz_domain.eval_prepared(
+        self.toeplitz_domain.eval_prepared(
             &self.toeplitz_for_poly(&f),
             // The Toeplitz matrix is only evaluated on the powers up to max_poly_degree - 1,
             // since the H_j(X) polynomials have degree at most that
             &self.prepared_toeplitz_inputs[round],
-        );
+        )
+    }
 
+    /// Compute the evaluation proofs for a KZG commitment of a polynomial `f`, committed to under
+    /// `tau_powers`, on the FFT domain encapsulated by this [`FKDomain`].
+    pub fn eval_proofs_at_roots_of_unity(&self, f: &[F], round: usize) -> Vec<T> {
+        let h_term_commitments = self.compute_h_term_commitments(f, round);
         self.fft_domain.fft(&h_term_commitments)
     }
 
     pub fn eval_proofs_at_x_coords(&self, f: &[F], x_coords: &[F], round: usize) -> Vec<T> {
-        // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
-        // dimension.
-        let mut f = Vec::from(f);
-        f.extend(std::iter::repeat_n(
-            F::zero(),
-            self.toeplitz_domain.dimension() + 1 - f.len(),
-        ));
-        assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
-
-        let h_term_commitments = self.toeplitz_domain.eval_prepared(
-            &self.toeplitz_for_poly(&f),
-            // The Toeplitz matrix is only evaluated on the powers up to max_poly_degree - 1,
-            // since the H_j(X) polynomials have degree at most that
-            &self.prepared_toeplitz_inputs[round],
-        );
-
+        let h_term_commitments = self.compute_h_term_commitments(f, round);
         multi_point_eval(&h_term_commitments, x_coords)
     }
 
@@ -381,21 +369,7 @@ impl<
         x_coords: &[F],
         round: usize,
     ) -> Vec<T> {
-        // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
-        // dimension.
-        let mut f = Vec::from(f);
-        f.extend(std::iter::repeat_n(
-            F::zero(),
-            self.toeplitz_domain.dimension() + 1 - f.len(),
-        ));
-        assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
-
-        let h_term_commitments = self.toeplitz_domain.eval_prepared(
-            &self.toeplitz_for_poly(&f),
-            // The Toeplitz matrix is only evaluated on the powers up to max_poly_degree - 1,
-            // since the H_j(X) polynomials have degree at most that
-            &self.prepared_toeplitz_inputs[round],
-        );
+        let h_term_commitments = self.compute_h_term_commitments(f, round);
 
         multi_point_eval_naive(
             &h_term_commitments
