@@ -6,7 +6,7 @@ use crate::{
     ServiceContext,
 };
 use aptos_api::context::Context;
-use aptos_config::config::{get_default_processor_task_count, NodeConfig};
+use aptos_config::config::NodeConfig;
 use aptos_logger::info;
 use aptos_mempool::MempoolClientSender;
 use aptos_protos::{
@@ -51,13 +51,9 @@ pub fn bootstrap(
 
     let address = node_config.indexer_grpc.address;
     let use_data_service_interface = node_config.indexer_grpc.use_data_service_interface;
-    let processor_task_count = node_config
-        .indexer_grpc
-        .processor_task_count
-        .unwrap_or_else(|| get_default_processor_task_count(use_data_service_interface));
+    let processor_task_count = node_config.indexer_grpc.processor_task_count;
     let processor_batch_size = node_config.indexer_grpc.processor_batch_size;
     let output_batch_size = node_config.indexer_grpc.output_batch_size;
-    let transaction_channel_size = node_config.indexer_grpc.transaction_channel_size;
 
     runtime.spawn(async move {
         let context = Arc::new(Context::new(
@@ -72,7 +68,6 @@ pub fn bootstrap(
             processor_task_count,
             processor_batch_size,
             output_batch_size,
-            transaction_channel_size,
         };
         // If we are here, we know indexer grpc is enabled.
         let server = FullnodeDataService {
