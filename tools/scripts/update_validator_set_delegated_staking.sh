@@ -7,11 +7,10 @@
 # Usage:
 #   ./update_validator_set_delegated.sh \
 #       <operator-identity-file> \
+#.      <validator-owner-identity-file> \
 #       <network> \
 #       <stake-amount> \
 #       <validator-host> \
-#       <validator-owner-account> \
-#       <validator-owner-private-key> \
 #       [dry-run]
 #
 # Network options: testnet | mainnet | previewnet | custom:https://your-api-url.com
@@ -31,27 +30,26 @@ MAX_STAKE_RATIO=30 # Maximum stake as percentage of total voting power
 SEED=2563
 DELEGATION_SEED="aptos_framework::delegation_pool${SEED}"
 DELEGATION_COMMISSION_BPS=1000      # 1000 = 10%
-INITIAL_DELEGATION_STAKE=1000000001 # 10.00000001 MOVE (in octas)
 
 # Network presets
 TESTNET_API="https://testnet.movementnetwork.xyz"
 MAINNET_API="https://mainnet.movementnetwork.xyz"
+PREVIEWNET_API="https://previewnet.devnet.movementnetwork.xyz"
 
 # Operator identity
 OPERATOR_IDENTITY_FILE="$1"
-NETWORK_INPUT="$2"
-STAKE_AMOUNT="$3"
-VALIDATOR_HOST="$4"
-VALIDATOR_OWNER_ACCOUNT="$5"
-VALIDATOR_OWNER_PRIVATE_KEY="$6"
-DRY_RUN="${7:-true}"
+VALIDATOR_OWNER_IDENTITY_FILE="$2"
+NETWORK_INPUT="$3"
+STAKE_AMOUNT="$4"
+VALIDATOR_HOST="$5"
+DRY_RUN="${6:-true}"
 
 help_message_and_exit() {
 	echo "Usage: $0 <operator-identity-file> <network> <stake-amount> <validator-host> <validator-owner-account> <validator-owner-private-key> [dry-run]"
 	echo "Network options:"
 	echo "  testnet               - Movement testnet ($TESTNET_API)"
 	echo "  mainnet               - Movement mainnet ($MAINNET_API)"
-	echo "  previewnet            - Movement previewnet (https://previewnet.devnet.movementnetwork.xyz)"
+	echo "  previewnet            - Movement previewnet ($PREVIEWNET_API)"
 	echo "  custom:https://url    - Custom API endpoint"
 	exit 1
 }
@@ -152,6 +150,16 @@ validate_input() {
 		help_message_and_exit
 	fi
 
+	if [ -z "$VALIDATOR_OWNER_IDENTITY_FILE" ]; then
+		echo "Error: Validator owner identity file not provided"
+		help_message_and_exit
+	fi
+
+	if [ ! -f "$VALIDATOR_OWNER_IDENTITY_FILE" ]; then
+		echo "Error: Validator owner identity file not found: $VALIDATOR_OWNER_IDENTITY_FILE"
+		help_message_and_exit
+	fi
+
 	if [ -z "$NETWORK_INPUT" ]; then
 		echo "Error: Network not provided"
 		help_message_and_exit
@@ -186,19 +194,9 @@ validate_input() {
 		echo "Error: Validator host not provided"
 		help_message_and_exit
 	fi
-
-	if [ -z "$VALIDATOR_OWNER_ACCOUNT" ]; then
-		echo "Error: Validator account not provided"
-		help_message_and_exit
-	fi
-
-	if [ -z "$VALIDATOR_OWNER_PRIVATE_KEY" ]; then
-		echo "Error: Validator account private key not provided"
-		help_message_and_exit
-	fi
 }
 
-get_identities() {
+get_operator_identity() {
 	OPERATOR_ACCOUNT=$(grep "account_address:" "$OPERATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
 	OPERATOR_ACCOUNT_PRIVATE_KEY=$(grep "account_private_key:" "$OPERATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
 	CONSENSUS_PRIVATE_KEY=$(grep "consensus_private_key:" "$OPERATOR_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
@@ -212,6 +210,17 @@ get_identities() {
 
 	read CONSENSUS_PUBLIC_KEY CONSENSUS_POP <<<"$(get_consensus_keys "$CONSENSUS_PRIVATE_KEY")"
 	NETWORK_PUBLIC_KEY=$(get_network_pub_key "$NETWORK_PRIVATE_KEY")
+}
+
+get_validator_owner_identity() {
+	VALIDATOR_OWNER_ACCOUNT=$(grep "account_address:" "$VALIDATOR_OWNER_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
+	VALIDATOR_OWNER_PRIVATE_KEY=$(grep "account_private_key:" "$VALIDATOR_OWNER_IDENTITY_FILE" | awk '{print $2}' | tr -d '"')
+
+	if [ -z "$VALIDATOR_OWNER_ACCOUNT" ] || [ -z "$VALIDATOR_OWNER_PRIVATE_KEY" ]; then
+		echo "Error: Missing required fields in validator owner identity file"
+		echo "Required fields: account_address, account_private_key"
+		exit 1
+	fi
 }
 
 get_current_validator_set() {
@@ -239,24 +248,24 @@ get_current_validator_set() {
 }
 
 check_not_in_validator_set() {
-	local normalized_account="0x${OPERATOR_ACCOUNT#0x}"
+	local normalized_account="0x${DELEGATED_RESOURCE_ACCOUNT#0x}"
 
 	if echo "$ACTIVE_VALIDATORS" | grep -q "^${normalized_account}$"; then
-		echo "Error: Account $OPERATOR_ACCOUNT is already an active validator"
+		echo "Error: Account $DELEGATED_RESOURCE_ACCOUNT is already an active validator"
 		exit 1
 	fi
 
 	if [ -n "$PENDING_ACTIVE_VALIDATORS" ] && echo "$PENDING_ACTIVE_VALIDATORS" | grep -q "^${normalized_account}$"; then
-		echo "Error: Account $OPERATOR_ACCOUNT is already pending to become active validator"
+		echo "Error: Account $DELEGATED_RESOURCE_ACCOUNT is already pending to become active validator"
 		exit 1
 	fi
 
 	if [ -n "$PENDING_INACTIVE_VALIDATORS" ] && echo "$PENDING_INACTIVE_VALIDATORS" | grep -q "^${normalized_account}$"; then
-		echo "Error: Account $OPERATOR_ACCOUNT is pending to become inactive validator"
+		echo "Error: Account $DELEGATED_RESOURCE_ACCOUNT is pending to become inactive validator"
 		exit 1
 	fi
 
-	echo "Account $OPERATOR_ACCOUNT is not in current validator set - proceeding"
+	echo "Account $DELEGATED_RESOURCE_ACCOUNT is not in current validator set - proceeding"
 }
 
 check_account_balance() {
@@ -389,10 +398,10 @@ init_delegation_pool() {
 }
 
 add_delegation_stake() {
-	echo "Adding initial delegated stake of $INITIAL_DELEGATION_STAKE octas..."
+	echo "Adding initial delegated stake of $STAKE_AMOUNT octas..."
 	$MOVEMENT_CLI move run \
 		--function-id 0x1::delegation_pool::add_stake \
-		--args "address:$DELEGATED_RESOURCE_ACCOUNT" "u64:${INITIAL_DELEGATION_STAKE}" \
+		--args "address:$DELEGATED_RESOURCE_ACCOUNT" "u64:${STAKE_AMOUNT}" \
 		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
@@ -479,7 +488,6 @@ setup_delegated_pool_flow() {
 		echo "Delegated pool setup skipped: only configured for 'previewnet'. Current network: $NETWORK_INPUT"
 		return
 	fi
-
 	if [ "$DRY_RUN" = "true" ]; then
 		echo "Dry run enabled. Delegated pool actions will NOT be executed."
 		echo "Would run, in order:"
@@ -503,9 +511,8 @@ setup_delegated_pool_flow() {
 	init_common_cli_args
 	init_operator_cli_args
 
-	derive_delegated_resource_account
-	init_delegation_pool
-	set_pool_operator
+	# init_delegation_pool
+	# set_pool_operator
 	add_delegation_stake
 	extract_delegated_consensus_keys
 	update_delegated_consensus_keys
@@ -521,8 +528,10 @@ setup_delegated_pool_flow() {
 
 dependency_check
 validate_input
-get_identities
+get_operator_identity
+get_validator_owner_identity
 get_current_validator_set
+derive_delegated_resource_account
 check_not_in_validator_set
 check_account_balance
 execution_summary
