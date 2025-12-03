@@ -40,7 +40,7 @@ public fun Test::publish<#0>($t0|signer: &signer, $t1|x: 0x123::Test::A<#0, u8>)
      var $t3: 0x123::Test::A<#0, u8>
   0: $t2 := move($t0)
   1: $t3 := move($t1)
-  2: move_to<0x123::Test::A<#0, u8>>($t3, $t2)
+  2: move_to<0x123::Test::A<#0, u8>>($t2, $t3)
   3: return ()
 }
 
@@ -120,7 +120,7 @@ public fun Test::publish<#0>($t0|signer: &signer, $t1|x: 0x123::Test::A<#0, u8>)
      var $t3: 0x123::Test::A<#0, u8>
   0: $t2 := move($t0)
   1: $t3 := move($t1)
-  2: move_to<0x123::Test::A<#0, u8>>($t3, $t2)
+  2: move_to<0x123::Test::A<#0, u8>>($t2, $t3)
   3: return ()
 }
 
