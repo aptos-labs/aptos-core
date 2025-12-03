@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module defines a Poem payload type for BCS. JSON is already natively
 //! supported. This type just helps with representing BCS bytes in the spec.
