@@ -21,7 +21,7 @@ use aptos_consensus_types::{
         CommitLedgerResult, CommitVoteResult, ExecuteResult, LedgerUpdateResult,
         NotifyStateSyncResult, PipelineFutures, PipelineInputRx, PipelineInputTx, PipelinedBlock,
         PostCommitResult, PostLedgerUpdateResult, PreCommitResult, PrepareResult, RandResult,
-        TaskError, TaskFuture, TaskResult,
+        TaskError, TaskFuture, TaskResult, VerifyTxnsResult,
     },
     quorum_cert::QuorumCert,
     wrapped_ledger_info::WrappedLedgerInfo,
@@ -116,10 +116,10 @@ impl PreCommitStatus {
 /// Future returns a TaskResult<T>, which error can be either a user error or task error (e.g. cancellation).
 ///
 /// Currently, the critical path is the following, more details can be found in the comments of each phase.
-/// prepare -> execute -> ledger update -> pre-commit -> commit ledger
-///    rand ->
-///                         order proof ->
-///                                      commit proof ->
+/// prepare -> verify txns -> execute -> ledger update -> pre-commit -> commit ledger
+///                   rand ->
+///                                        order proof ->
+///                                                     commit proof ->
 #[derive(Clone)]
 pub struct PipelineBuilder {
     block_preparer: Arc<BlockPreparer>,
@@ -330,7 +330,8 @@ impl PipelineBuilder {
         compute_result: StateComputeResult,
         commit_proof: LedgerInfoWithSignatures,
     ) -> PipelineFutures {
-        let prepare_fut = spawn_ready_fut((Arc::new(vec![]), None));
+        let prepare_fut = spawn_ready_fut((Vec::new(), None));
+        let verify_txns_fut = spawn_ready_fut((Arc::new(Vec::new()), None));
         let rand_check_fut = spawn_ready_fut((None, false));
         let execute_fut = spawn_ready_fut(Duration::from_millis(0));
         let ledger_update_fut =
@@ -349,6 +350,7 @@ impl PipelineBuilder {
         let post_commit_fut = spawn_ready_fut(());
         PipelineFutures {
             prepare_fut,
+            verify_txns_fut,
             rand_check_fut,
             execute_fut,
             ledger_update_fut,
@@ -438,9 +440,13 @@ impl PipelineBuilder {
             Self::prepare(self.block_preparer.clone(), block.clone(), qc_rx),
             Some(&mut abort_handles),
         );
+        let verify_txns_fut = spawn_shared_fut(
+            Self::verify_txns(prepare_fut.clone(), block.clone()),
+            Some(&mut abort_handles),
+        );
         let rand_check_fut = spawn_shared_fut(
             Self::rand_check(
-                prepare_fut.clone(),
+                verify_txns_fut.clone(),
                 parent.execute_fut.clone(),
                 rand_rx,
                 self.executor.clone(),
@@ -453,7 +459,7 @@ impl PipelineBuilder {
         );
         let execute_fut = spawn_shared_fut(
             Self::execute(
-                prepare_fut.clone(),
+                verify_txns_fut.clone(),
                 parent.execute_fut.clone(),
                 rand_check_fut.clone(),
                 self.executor.clone(),
@@ -522,7 +528,7 @@ impl PipelineBuilder {
 
         let post_ledger_update_fut = spawn_shared_fut(
             Self::post_ledger_update(
-                prepare_fut.clone(),
+                verify_txns_fut.clone(),
                 ledger_update_fut.clone(),
                 self.txn_notifier.clone(),
                 block.clone(),
@@ -554,6 +560,7 @@ impl PipelineBuilder {
         );
         let all_fut = PipelineFutures {
             prepare_fut,
+            verify_txns_fut,
             rand_check_fut,
             execute_fut,
             ledger_update_fut,
@@ -574,7 +581,7 @@ impl PipelineBuilder {
     }
 
     /// Precondition: Block is inserted into block tree (all ancestors are available)
-    /// What it does: Wait for all data becomes available and verify transaction signatures
+    /// What it does: Wait for all data becomes available
     async fn prepare(
         preparer: Arc<BlockPreparer>,
         block: Arc<Block>,
@@ -607,6 +614,20 @@ impl PipelineBuilder {
                 },
             }
         };
+
+        Ok((input_txns, block_gas_limit))
+    }
+
+    /// Precondition: prepare finishes
+    /// What it does: verify transaction signatures
+    async fn verify_txns(
+        prepare_fut: TaskFuture<PrepareResult>,
+        block: Arc<Block>,
+    ) -> TaskResult<VerifyTxnsResult> {
+        let mut tracker = Tracker::start_waiting("verify_txns", &block);
+        let (input_txns, block_gas_limit) = prepare_fut.await?;
+        tracker.start_working();
+
         let sig_verification_start = Instant::now();
         let sig_verified_txns: Vec<SignatureVerifiedTransaction> = SIG_VERIFY_POOL.install(|| {
             let num_txns = input_txns.len();
@@ -624,7 +645,7 @@ impl PipelineBuilder {
     /// Precondition: 1. prepare finishes, 2. parent block's execution phase finishes
     /// What it does: decides if the block requires a randomness seed and return the value
     async fn rand_check(
-        prepare_fut: TaskFuture<PrepareResult>,
+        verify_txns_fut: TaskFuture<VerifyTxnsResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
         rand_rx: oneshot::Receiver<Option<Randomness>>,
         executor: Arc<dyn BlockExecutorTrait>,
@@ -635,7 +656,7 @@ impl PipelineBuilder {
     ) -> TaskResult<RandResult> {
         let mut tracker = Tracker::start_waiting("rand_check", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, _) = prepare_fut.await?;
+        let (user_txns, _) = verify_txns_fut.await?;
 
         tracker.start_working();
         if !is_randomness_enabled {
@@ -723,10 +744,10 @@ impl PipelineBuilder {
         Ok((Some(maybe_rand), has_randomness))
     }
 
-    /// Precondition: 1. prepare finishes, 2. parent block's phase finishes 3. randomness is available
+    /// Precondition: 1. verify txns finishes, 2. parent block's phase finishes 3. randomness is available
     /// What it does: Execute all transactions in block executor
     async fn execute(
-        prepare_fut: TaskFuture<PrepareResult>,
+        verify_txns_fut: TaskFuture<VerifyTxnsResult>,
         parent_block_execute_fut: TaskFuture<ExecuteResult>,
         rand_check: TaskFuture<RandResult>,
         executor: Arc<dyn BlockExecutorTrait>,
@@ -737,7 +758,7 @@ impl PipelineBuilder {
     ) -> TaskResult<ExecuteResult> {
         let mut tracker = Tracker::start_waiting("execute", &block);
         parent_block_execute_fut.await?;
-        let (user_txns, block_gas_limit) = prepare_fut.await?;
+        let (user_txns, block_gas_limit) = verify_txns_fut.await?;
         let onchain_execution_config =
             onchain_execution_config.with_block_gas_limit_override(block_gas_limit);
 
@@ -865,13 +886,13 @@ impl PipelineBuilder {
     /// What it does: For now this is mainly to notify mempool about failed transactions
     /// This is off critical path
     async fn post_ledger_update(
-        prepare_fut: TaskFuture<PrepareResult>,
+        verify_txns_result: TaskFuture<VerifyTxnsResult>,
         ledger_update_fut: TaskFuture<LedgerUpdateResult>,
         mempool_notifier: Arc<dyn TxnNotifier>,
         block: Arc<Block>,
     ) -> TaskResult<PostLedgerUpdateResult> {
         let mut tracker = Tracker::start_waiting("post_ledger_update", &block);
-        let (user_txns, _) = prepare_fut.await?;
+        let (user_txns, _) = verify_txns_result.await?;
         let (compute_result, _, _) = ledger_update_fut.await?;
 
         tracker.start_working();
@@ -1117,6 +1138,7 @@ impl PipelineBuilder {
     async fn monitor(epoch: u64, round: Round, block_id: HashValue, all_futs: PipelineFutures) {
         let PipelineFutures {
             prepare_fut,
+            verify_txns_fut: _,
             rand_check_fut: _,
             execute_fut,
             ledger_update_fut,
