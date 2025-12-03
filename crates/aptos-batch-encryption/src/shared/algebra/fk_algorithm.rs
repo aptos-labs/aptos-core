@@ -66,18 +66,18 @@ impl<F: FftField> CirculantDomain<F> {
     /// `input`.
     ///
     /// A circulant matrix
-    /// ```
-    /// ┌       ┐
-    /// │ a c b │
-    /// │ b a c │
-    /// │ c b a │
-    /// └       ┘
+    /// ```txt
+    /// [       ]
+    /// [ a c b ]
+    /// [ b a c ]
+    /// [ c b a ]
+    /// [       ]
     /// ```
     /// is represented by a vector
-    /// ```
-    /// ┌       ┐
-    /// │ a b c │
-    /// └       ┘
+    /// ```txt
+    /// [       ]
+    /// [ a b c ]
+    /// [       ]
     /// ```
     ///
     /// and the logic for efficient evaluation is explained here:
@@ -158,7 +158,7 @@ impl<F: FftField + Sized> ToeplitzDomain<F> {
     /// `C` such that `Tx = C[x 0^dimension]^T`.
     ///
     /// A Toeplitz matrix
-    /// ```
+    /// ```txt
     /// ┌       ┐
     /// │ c b a │
     /// │ d c b │
@@ -166,14 +166,14 @@ impl<F: FftField + Sized> ToeplitzDomain<F> {
     /// └       ┘
     /// ```
     /// is represented by a vector
-    /// ```
+    /// ```txt
     /// ┌           ┐
     /// │ a b c d e │
     /// └           ┘
     /// ```
     /// and is converted into a circulant matrix of twice
     /// the dimension:
-    /// ```
+    /// ```txt
     /// ┌              ┐
     /// │ c b a  c e d │
     /// │ d c b  a c e │
@@ -185,7 +185,7 @@ impl<F: FftField + Sized> ToeplitzDomain<F> {
     /// └              ┘
     /// ```
     /// which is represented by a vector
-    /// ```
+    /// ```txt
     /// ┌             ┐
     /// │ c d e c a b │
     /// └             ┘
@@ -309,17 +309,17 @@ impl<
     /// Compute the corresponding Toeplitz matrix for a polynomial `f`, as explained here:
     /// [https://alinush.github.io/feist-khovratovich#computing-the-h_j--gh_jtau-commitments](https://alinush.github.io/feist-khovratovich#computing-the-h_j--gh_jtau-commitments)
     /// TODO explain this diagram
-    /// ```
-    /// ┌        ┐     ┌            ┐   ┌  ┐
-    /// │ H (X)  │     │ f   f   f  │   │ 2│
-    /// │  1     │     │  3   2   1 │   │X │
-    /// │        │     │            │   │  │
-    /// │ H (X)  │  =  │ 0   f   f  │ ● │ 1│
-    /// │  2     │     │      3   2 │   │X │
-    /// │        │     │            │   │  │
-    /// │ H (X)  │     │ 0   0   f  │   │ 0│
-    /// │  3     │     │          3 │   │X │
-    /// └        ┘     └            ┘   └  ┘
+    /// ```txt
+    /// [        ]     [            ]   [  ]
+    /// [ H (X)  ]     [ f   f   f  ]   [ 2]
+    /// [  1     ]     [  3   2   1 ]   [X ]
+    /// [        ]     [            ]   [  ]
+    /// [ H (X)  ]  =  [ 0   f   f  ] * [ 1]
+    /// [  2     ]     [      3   2 ]   [X ]
+    /// [        ]     [            ]   [  ]
+    /// [ H (X)  ]     [ 0   0   f  ]   [ 0]
+    /// [  3     ]     [          3 ]   [X ]
+    /// [        ]     [            ]   [  ]
     /// ```
     pub fn toeplitz_for_poly(&self, f: &[F]) -> Vec<F> {
         let toeplitz: Vec<F> = Vec::from(&f[1..])
