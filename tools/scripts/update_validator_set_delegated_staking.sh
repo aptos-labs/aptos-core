@@ -524,6 +524,16 @@ setup_delegated_pool_flow() {
 	echo "  - Wait one epoch."
 	echo "  - Update validator-identity.yaml account_address with: $DELEGATED_RESOURCE_ACCOUNT"
 	echo "  - Start validator with updated identity."
+	echo " VALIDATOR IDENTITY YAML FILE "
+	echo " -------------------------------------------"
+	echo ""
+	echo "---"
+	echo "account_address: \"$DELEGATED_RESOURCE_ACCOUNT\""
+	echo "account_private_key: \"$OPERATOR_ACCOUNT_PRIVATE_KEY\""
+	echo "consensus_private_key: \"$CONSENSUS_PRIVATE_KEY\""
+	echo "network_private_key: \"$NETWORK_PRIVATE_KEY\""
+	echo ""
+	echo " -------------------------------------------"
 }
 
 dependency_check
