@@ -114,7 +114,7 @@ pub fn multi_point_eval<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     f: &[T],
     x_coords: &[F],
 ) -> Vec<T> {
-    if x_coords.len() == 0 {
+    if x_coords.is_empty() {
         vec![]
     } else {
         let mult_tree = compute_mult_tree(x_coords);
@@ -347,7 +347,7 @@ mod tests {
         let mut rng = thread_rng();
 
         let f = [G1Projective::rand(&mut rng); 4];
-        let x_coords : Vec<Fr> = vec![];
+        let x_coords: Vec<Fr> = vec![];
 
         let evals = multi_point_eval(&f, &x_coords);
 
