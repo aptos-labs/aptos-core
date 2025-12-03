@@ -1,7 +1,7 @@
 {
-  "name": "@bgub/ts-base",
-  "version": "1.0.2",
-  "description": "Starter template for TS libraries",
+  "name": "ts-batch-encrypt",
+  "version": "1.0.0",
+  "description": "Typescript encrypt function for batch threshold encryption scheme",
   "keywords": [
     "starter",
     "library",
@@ -39,7 +39,7 @@
   "bugs": {
     "url": "https://github.com/bgub/ts-base/issues"
   },
-  "license": "MIT",
+  "license": "Aptos",
   "engines": {
     "node": ">=20"
   },
