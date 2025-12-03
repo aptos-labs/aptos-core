@@ -4,9 +4,7 @@ use super::{Id, IdSet, OssifiedIdSet};
 use crate::{
     group::{Fr, G1Affine, G1Projective},
     shared::{
-        algebra::{
-            mult_tree::{compute_mult_tree, quotient},
-        },
+        algebra::mult_tree::{compute_mult_tree, quotient},
         ark_serialize::*,
     },
 };
@@ -136,7 +134,11 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
     ) -> HashMap<Self::Id, G1Affine> {
         let pfs: Vec<G1Affine> = setup
             .fk_domain
-            .eval_proofs_at_x_coords_naive_multi_point_eval(&self.poly_coeffs(), &self.poly_roots, round)
+            .eval_proofs_at_x_coords_naive_multi_point_eval(
+                &self.poly_coeffs(),
+                &self.poly_roots,
+                round,
+            )
             .iter()
             .map(|g| G1Affine::from(*g))
             .collect();

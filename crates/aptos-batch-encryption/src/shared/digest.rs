@@ -188,7 +188,10 @@ impl<IS: OssifiedIdSet> EvalProofsPromise<IS> {
         EvalProofs {
             computed_proofs: self
                 .ids
-                .compute_all_eval_proofs_with_setup_vzgg_multi_point_eval(digest_key, self.digest.round),
+                .compute_all_eval_proofs_with_setup_vzgg_multi_point_eval(
+                    digest_key,
+                    self.digest.round,
+                ),
         }
     }
 }

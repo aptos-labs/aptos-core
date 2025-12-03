@@ -121,7 +121,13 @@ pub fn multi_point_eval<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     }
 }
 
-pub fn multi_point_eval_naive<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T> + VariableBaseMSM<ScalarField = F>>(f: &[T::MulBase], x_coords: &[F]) -> Vec<T> {
+pub fn multi_point_eval_naive<
+    F: FftField,
+    T: DomainCoeff<F> + Mul<F, Output = T> + VariableBaseMSM<ScalarField = F>,
+>(
+    f: &[T::MulBase],
+    x_coords: &[F],
+) -> Vec<T> {
     let powers = x_coords
         .into_par_iter()
         .map(|x| {
@@ -137,7 +143,7 @@ pub fn multi_point_eval_naive<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T
 
     powers
         .into_par_iter()
-        .map(|p| T::msm(f, &p).unwrap().into())
+        .map(|p| T::msm(f, &p).unwrap())
         .collect()
 }
 
@@ -167,7 +173,7 @@ mod tests {
         let x_coords = vec![Fr::one() + Fr::one(); poly_size];
 
         let evals1 = multi_point_eval(&poly_proj, &x_coords);
-        let evals2 : Vec<G1Projective> = multi_point_eval_naive(&poly, &x_coords);
+        let evals2: Vec<G1Projective> = multi_point_eval_naive(&poly, &x_coords);
 
         for i in 0..poly_size {
             println!("{}", i);
