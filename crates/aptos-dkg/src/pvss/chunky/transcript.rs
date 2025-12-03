@@ -356,19 +356,17 @@ type SecretSharingConfig<F> = ShamirThresholdConfig<F>;
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type InputSecret = InputSecret<E::ScalarField>;
-    type SigningPubKey = bls12381::PublicKey;
-    type SigningSecretKey = bls12381::PrivateKey;
-
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
+    type DealtSecretKey = keys::DealtSecretKey<E>;
     type DealtSecretKeyShare = keys::DealtSecretKeyShare<E>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
+    type InputSecret = InputSecret<E::ScalarField>;
     type PublicParameters = PublicParameters<E>;
     type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
-
+    type SigningPubKey = bls12381::PublicKey;
+    type SigningSecretKey = bls12381::PrivateKey;
 
     fn scheme_name() -> String {
         "chunky_pvss".to_string()
