@@ -511,8 +511,8 @@ setup_delegated_pool_flow() {
 	init_common_cli_args
 	init_operator_cli_args
 
-	# init_delegation_pool
-	# set_pool_operator
+	init_delegation_pool
+	set_pool_operator
 	add_delegation_stake
 	extract_delegated_consensus_keys
 	update_delegated_consensus_keys
