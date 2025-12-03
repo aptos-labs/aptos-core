@@ -866,6 +866,10 @@ OptQuorumStorePayload:
       V1:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayloadV1
+    1:
+      V2:
+        NEWTYPE:
+          TYPENAME: OptQuorumStorePayloadV1
 OptQuorumStorePayloadV1:
   STRUCT:
     - inline_batches:

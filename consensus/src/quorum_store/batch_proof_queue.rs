@@ -8,7 +8,6 @@ use super::{
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
     common::{Author, TxnSummaryWithExpiration},
-    payload::TDataInfo,
     proof_of_store::{BatchInfoExt, ProofOfStore, TBatchInfo},
     utils::PayloadTxnsSize,
 };
