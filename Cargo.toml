@@ -56,9 +56,9 @@ members = [
     "crates/aptos",
     "crates/aptos-admin-service",
     "crates/aptos-api-tester",
+    "crates/aptos-batch-encryption",
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
-    "crates/aptos-batch-encryption",
     "crates/aptos-build-info",
     "crates/aptos-collections",
     "crates/aptos-compression",
@@ -505,7 +505,7 @@ ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
 ark-bn254 = { version = "0.5.0", features = ["curve"] }
 ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
 ark-ff = { version = "0.5.0", features = ["asm"] }
-ark-ff-asm = { version ="0.5.0" }
+ark-ff-asm = { version = "0.5.0" }
 ark-ff-macros = "0.5.0"
 ark-groth16 = "0.5.0"
 ark-poly = { version = "0.5.0", features = ["parallel"] }
@@ -969,15 +969,14 @@ futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "bac
 futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
-ark-bls12-381 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff"}
+ark-bls12-381 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-bn254 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff"}
-ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff"}
+ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
-ark-poly = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff" }
-ark-serialize = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff" }
-
+ark-poly = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-serialize = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
 
 # There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2,
 # so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
