@@ -15,7 +15,7 @@ use aptos_config::config::BlockTransactionFilterConfig;
 use aptos_consensus_types::{
     block::Block,
     common::{Author, Payload, ProofWithData},
-    payload::{BatchPointer, OptQuorumStorePayload, OptQuorumStorePayloadV1, TDataInfo},
+    payload::{BatchPointer, OptQuorumStorePayload, TDataInfo},
     proof_of_store::{BatchInfo, BatchInfoExt, TBatchInfo},
 };
 use aptos_crypto::HashValue;
@@ -587,8 +587,10 @@ fn get_inline_transactions(block: &Block) -> Vec<SignedTransaction> {
                 .flat_map(|(_batch_info, txns)| txns.clone())
                 .collect()
         },
-        Payload::OptQuorumStore(OptQuorumStorePayload::V1(opt_qs_payload)) => {
-            opt_qs_payload.inline_batches().transactions()
+        Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => p.inline_batches().transactions(),
+        Payload::OptQuorumStore(OptQuorumStorePayload::V2(_p)) => {
+            error!("OptQSPayload V2 is not expected");
+            Vec::new()
         },
         _ => {
             vec![] // Other payload types do not have inline transactions

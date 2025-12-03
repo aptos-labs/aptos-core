@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0
 
 use crate::consensus_observer::common::error::Error;
-use anyhow::bail;
 use aptos_consensus_types::{
     common::{BatchPayload, Payload},
     payload::{InlineBatches, OptQuorumStorePayload},
@@ -707,7 +706,7 @@ impl BlockTransactionPayload {
                 // Verify the transaction limit
                 self.verify_transaction_limit(p.max_txns_to_execute())?;
             },
-            Payload::OptQuorumStore(OptQuorumStorePayload::V2(p)) => {
+            Payload::OptQuorumStore(OptQuorumStorePayload::V2(_p)) => {
                 return Err(Error::InvalidMessageError(
                     "OptQuorumStorePayload V2 is not supproted".into(),
                 ));

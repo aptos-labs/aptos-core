@@ -608,7 +608,9 @@ impl Payload {
                 Ok(())
             },
             (true, Payload::OptQuorumStore(OptQuorumStorePayload::V2(p))) => {
-                bail!("OptQuorumStorePayload::V2 cannot be accepted yet");
+                if true {
+                    bail!("OptQuorumStorePayload::V2 cannot be accepted yet");
+                }
                 #[allow(unreachable_code)]
                 {
                     let proof_with_data = p.proof_with_data();

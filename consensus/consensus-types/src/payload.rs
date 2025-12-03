@@ -11,9 +11,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-pub type OptBatches<T: TBatchInfo> = BatchPointer<T>;
+pub type OptBatches<T> = BatchPointer<T>;
 
-pub type ProofBatches<T: TBatchInfo> = BatchPointer<ProofOfStore<T>>;
+pub type ProofBatches<T> = BatchPointer<ProofOfStore<T>>;
 
 pub trait TDataInfo {
     fn num_txns(&self) -> u64;
@@ -481,16 +481,45 @@ impl OptQuorumStorePayload {
             OptQuorumStorePayload::V2(p) => p.check_epoch(epoch),
         }
     }
+
+    fn num_inline_txns(&self) -> usize {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.inline_batches().num_txns(),
+            OptQuorumStorePayload::V2(p) => p.inline_batches().num_txns(),
+        }
+    }
+
+    fn num_opt_batch_txns(&self) -> usize {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.opt_batches().num_txns(),
+            OptQuorumStorePayload::V2(p) => p.opt_batches().num_txns(),
+        }
+    }
+
+    fn num_proof_txns(&self) -> usize {
+        match self {
+            OptQuorumStorePayload::V1(p) => p.proof_with_data().num_txns(),
+            OptQuorumStorePayload::V2(p) => p.proof_with_data().num_txns(),
+        }
+    }
+
+    fn execution_limits(&self) -> &PayloadExecutionLimit {
+        match self {
+            OptQuorumStorePayload::V1(p) => &p.execution_limits,
+            OptQuorumStorePayload::V2(p) => &p.execution_limits,
+        }
+    }
 }
 
 impl fmt::Display for OptQuorumStorePayload {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "OptQuorumStorePayload(opt_batches: {}, proofs: {}, limits: {:?})",
-            self.num_txns(),
-            self.num_txns(),
-            self.is_empty(),
+            "OptQuorumStorePayload(inline: {}, opt: {}, proofs: {}, limits: {:?})",
+            self.num_inline_txns(),
+            self.num_opt_batch_txns(),
+            self.num_proof_txns(),
+            self.execution_limits(),
         )
     }
 }
