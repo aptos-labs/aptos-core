@@ -130,7 +130,6 @@ impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
     }
 }
 
-
 impl<I: Id> BIBECiphertext<I> {
     pub fn prepare(
         &self,

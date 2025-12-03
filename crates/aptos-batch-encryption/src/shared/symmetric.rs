@@ -42,13 +42,11 @@ pub struct OneTimePad(GenericArray<u8, KeySize>);
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct OneTimePaddedKey(GenericArray<u8, KeySize>);
 
-
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct SymmetricCiphertext {
     nonce: SymmetricNonce,
     ct_body: Vec<u8>,
 }
-
 
 impl OneTimePad {
     /// Take some source bytes that are high-entropy (but not necessarily uniformly-distributed),
