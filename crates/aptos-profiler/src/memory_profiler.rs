@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{utils::convert_svg_to_string, MemProfilerConfig, Profiler};
 #[cfg(unix)]

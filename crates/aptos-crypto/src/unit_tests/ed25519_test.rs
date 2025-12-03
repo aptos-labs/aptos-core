@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations// Copyright (c) Aptos Foundation
+                                   // Copyright (c) Aptos Foundation
+                                   // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate as aptos_crypto;
 use crate::{

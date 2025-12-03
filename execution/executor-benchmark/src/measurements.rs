@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::metrics::TIMER;
 use aptos_block_executor::counters::{

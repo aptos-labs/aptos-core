@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_aggregator::aggregator_v1_extension::{extension_error, AggregatorID};
 use aptos_types::{account_address::AccountAddress, state_store::table::TableHandle};

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! In order to use a type with poem-openapi, it must implement a certain set
 //! of traits, depending on the context in which you want to use the type.

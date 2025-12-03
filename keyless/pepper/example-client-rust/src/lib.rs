@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_crypto::{blstrs::g2_proj_from_bytes, ed25519::Ed25519PrivateKey, PrivateKey, Uniform};
 use aptos_infallible::duration_since_epoch;

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This API is for the in-house TapCaptchaChecker, it doesn't do anything for
 //! the GoogleCaptchaChecker.

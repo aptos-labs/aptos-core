@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_db::AptosDB;

@@ -1,6 +1,7 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use super::transactions::TransactionQuery;
 use crate::{models::transactions::Transaction, schema::events, util::standardize_address};
 use aptos_api_types::Event as APIEvent;

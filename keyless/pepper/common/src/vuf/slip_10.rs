@@ -1,7 +1,8 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(unexpected_cfgs)] // Copyright (c) Aptos Foundation
+                           // Copyright (c) Aptos Foundation
+                           // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(unexpected_cfgs)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 pub extern crate derivation_path;
 pub extern crate ed25519_dalek;

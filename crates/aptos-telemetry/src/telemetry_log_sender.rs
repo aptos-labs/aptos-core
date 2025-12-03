@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{metrics::increment_log_ingest_too_large_by, sender::TelemetrySender};
 use aptos_logger::{prelude::*, telemetry_log_writer::TelemetryLog};

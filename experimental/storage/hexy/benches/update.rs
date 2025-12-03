@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_crypto::HashValue;
 use aptos_experimental_hexy::{

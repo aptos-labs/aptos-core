@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{metrics::OTHER_TIMERS_SECONDS, state_store::hot_state::HotState};
 use aptos_infallible::Mutex;

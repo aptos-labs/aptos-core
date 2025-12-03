@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! Similar to `state_node_index`, this records the same node replacement information except that
 //! the stale nodes here are the latest in at least one epoch.

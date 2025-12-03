@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::transaction_shuffler::use_case_aware::{
     types::{InputIdx, OutputIdx},

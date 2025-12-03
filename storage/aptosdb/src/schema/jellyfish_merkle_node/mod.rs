@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This module defines physical storage schema for nodes in the state Jellyfish Merkle Tree.
 //! Node is identified by [NodeKey](jellyfish-merkle::node_type::NodeKey).

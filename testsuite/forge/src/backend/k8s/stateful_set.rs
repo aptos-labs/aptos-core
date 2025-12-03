@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{create_k8s_client, k8s_wait_nodes_strategy, K8sApi, ReadWrite, Result, KUBECTL_BIN};
 use again::RetryPolicy;

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 /// This file is a copy of the file storage/indexer/src/lib.rs.
 /// At the end of the migration to migrate table info mapping

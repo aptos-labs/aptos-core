@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This module provides an API for the PureEdDSA signature scheme over the Ed25519 twisted
 //! Edwards curve as defined in [RFC8032](https://tools.ietf.org/html/rfc8032).

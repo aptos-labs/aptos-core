@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{common::IP_LOCAL_HOST, no_panic_println};
 use anyhow::{bail, Result};

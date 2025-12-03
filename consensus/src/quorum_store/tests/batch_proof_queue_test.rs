@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::quorum_store::{
     batch_proof_queue::BatchProofQueue, tests::batch_store_test::batch_store_for_test,

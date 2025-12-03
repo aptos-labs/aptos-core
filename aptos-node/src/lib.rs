@@ -1,9 +1,10 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 #![allow(unexpected_cfgs)]
-#![forbid(unsafe_code)]
+#![forbid(unsafe_code)] // Copyright (c) Aptos Foundation
+                        // Copyright (c) Aptos Foundation
+                        // SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 mod consensus;
 mod indexer;

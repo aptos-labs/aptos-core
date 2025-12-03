@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_crypto::arkworks::random::{sample_field_element, scalar_from_uniform_be_bytes};
 use ark_ff::PrimeField;

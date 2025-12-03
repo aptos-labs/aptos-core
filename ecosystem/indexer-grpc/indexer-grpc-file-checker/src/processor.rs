@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use anyhow::{ensure, Context, Result};
 use aptos_indexer_grpc_utils::compression_util::{FileEntry, StorageFormat};

@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::field_reassign_with_default)] // Copyright (c) Aptos Foundation
+                                               // Copyright (c) Aptos Foundation
+                                               // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::field_reassign_with_default)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use anyhow::{bail, format_err, Context, Result};
 use aptos_forge::{config::ForgeConfig, Options, *};

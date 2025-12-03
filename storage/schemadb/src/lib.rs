@@ -1,8 +1,9 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 #![forbid(unsafe_code)]
+// Copyright (c) Aptos Foundation
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This library implements a schematized DB on top of [RocksDB](https://rocksdb.org/). It makes
 //! sure all data passed in and out are structured according to predefined schemas and prevents

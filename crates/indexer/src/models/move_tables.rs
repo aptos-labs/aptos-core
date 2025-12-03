@@ -1,6 +1,7 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use crate::{
     models::transactions::Transaction,
     schema::{current_table_items, table_items, table_metadatas},

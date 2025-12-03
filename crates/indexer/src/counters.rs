@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_metrics_core::{
     register_int_counter, register_int_counter_vec, register_int_gauge_vec, IntCounter,

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 /// Sorta vector of key-value pairs by the keep and then deduplicate items, keeping the last value
 /// for each key.

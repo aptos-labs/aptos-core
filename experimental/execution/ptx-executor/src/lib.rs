@@ -1,7 +1,9 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
 #![forbid(unsafe_code)]
+// Copyright (c) Aptos Foundation
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This crate defines `PtxBlockExecutor` and supporting type that executes purely P-Transactions which
 //! have accurately predicable read/write sets.

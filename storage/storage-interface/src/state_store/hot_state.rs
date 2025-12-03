@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::state_store::state_view::hot_state_view::HotStateView;
 use aptos_experimental_layered_map::LayeredMap;

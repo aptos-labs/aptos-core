@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::unwrap_used)] // Copyright (c) Aptos Foundation
+                               // Copyright (c) Aptos Foundation
+                               // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::unwrap_used)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     consensusdb::ConsensusDB,

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{validator_set::extract_validator_set_updates, DiscoveryError};
 use aptos_config::{config::PeerSet, network_id::NetworkContext};

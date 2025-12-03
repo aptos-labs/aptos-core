@@ -1,3 +1,6 @@
+// Copyright © Aptos Foundation
+// SPDX-License-Identifier: Apache-2.0
+
 // Copyright (c) Aptos Labs
 // Copyright (c) The Diem Core Contributors
 // Copyright (c) The Move Contributors

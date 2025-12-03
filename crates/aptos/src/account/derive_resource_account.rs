@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::common::types::{CliCommand, CliError, CliTypedResult};
 use aptos_sdk::rest_client::aptos_api_types::HexEncodedBytes;

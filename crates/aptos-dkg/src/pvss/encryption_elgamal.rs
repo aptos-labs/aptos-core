@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 /// Implements public parameters $(h, g) \in G$ for an ElGamal encryption scheme where $h$
 /// is the message base and $g$ is the PK base.

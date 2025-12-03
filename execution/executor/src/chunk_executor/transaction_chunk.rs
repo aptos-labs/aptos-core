@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     metrics::{CHUNK_OTHER_TIMERS, VM_EXECUTE_CHUNK},

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_sdk::{crypto::HashValue, types::transaction::SignedTransaction};
 use std::time::{SystemTime, UNIX_EPOCH};

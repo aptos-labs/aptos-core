@@ -1,8 +1,9 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
-
 #![forbid(unsafe_code)]
+// Copyright (c) Aptos Foundation
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This crate provides [`AptosDB`] which represents physical storage of the core Aptos data
 //! structures.

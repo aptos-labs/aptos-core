@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     counters::{self, MAX_TXNS_FROM_BLOCK_TO_EXECUTE, TXNS_IN_BLOCK, TXN_SHUFFLE_SECONDS},

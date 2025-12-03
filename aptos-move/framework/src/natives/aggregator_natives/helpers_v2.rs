@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::natives::aggregator_natives::aggregator_v2::{
     EUNSUPPORTED_AGGREGATOR_SNAPSHOT_TYPE, EUNSUPPORTED_AGGREGATOR_TYPE,

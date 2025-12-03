@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 // TODO: Sometimes build_commit_hash is an empty string (so far I've noticed
 // this happens when targeting a node running from a container). Figure out

@@ -1,6 +1,6 @@
 #![no_main]
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use ethnum::U256 as EthnumU256;
 use libfuzzer_sys::{fuzz_target, Corpus};

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! Implements the Poseidon hash function for BN-254, which hashes $\le$ 16 field elements and
 //! produces a single field element as output.

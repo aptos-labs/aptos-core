@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![forbid(unsafe_code)] // Copyright (c) Aptos Foundation
+                        // Copyright (c) Aptos Foundation
+                        // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![forbid(unsafe_code)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_metrics_core::{exponential_buckets, register_histogram_vec, HistogramVec};
 use once_cell::sync::Lazy;

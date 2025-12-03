@@ -1,7 +1,9 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 #![allow(dead_code)]
-#![allow(unused_variables)]
+#![allow(unused_variables)] // Copyright (c) Aptos Foundation
+                            // Copyright (c) Aptos Foundation
+                            // SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 pub const IMPORTED_MAINNET_TXNS_2386021136_TRADEPORT_V2_FILL_COLLECTION_OFFER: &[u8] = include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/json_transactions/imported_mainnet_txns/2386021136_tradeport_v2_fill_collection_offer.json"));
 

@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations// Copyright (c) Aptos Foundation
+                                   // Copyright (c) Aptos Foundation
+                                   // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::redundant_clone)] // Required to work around prop_assert_eq! limitations
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use super::*;
 use crate::{ledger_db::transaction_db_test::init_db, AptosDB};

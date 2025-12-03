@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{assert_success, tests::common, MoveHarness};
 use aptos_framework::natives::event::ECANNOT_CREATE_EVENT;

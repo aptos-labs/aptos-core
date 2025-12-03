@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{move_utils::as_move_value::AsMoveValue, on_chain_config::OnChainConfig};
 use move_core_types::value::{MoveStruct, MoveValue};

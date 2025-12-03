@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::needless_range_loop)] // Copyright (c) Aptos Foundation
+                                       // Copyright (c) Aptos Foundation
+                                       // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::needless_range_loop)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_dkg::{
     algebra::{

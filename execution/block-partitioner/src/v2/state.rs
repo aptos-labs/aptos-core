@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(unused_variables)] // Copyright (c) Aptos Foundation
+                            // Copyright (c) Aptos Foundation
+                            // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(unused_variables)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     v2::{

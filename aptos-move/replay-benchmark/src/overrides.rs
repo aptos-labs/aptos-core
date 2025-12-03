@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! Defines different overrides for on-chain state used for benchmarking. With overrides, past
 //! transactions can be replayed on top of a modified state, and we can evaluate how it impacts

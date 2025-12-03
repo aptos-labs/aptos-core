@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(dead_code)] // Copyright (c) Aptos Foundation
+                     // Copyright (c) Aptos Foundation
+                     // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(dead_code)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::tdbg;
 use aptos_cached_packages::aptos_stdlib::code_publish_package_txn;

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{execution::execute_workload, state_view::ReadSet, workload::Workload};
 use aptos_vm::{aptos_vm::AptosVMBlockExecutor, VMBlockExecutor};

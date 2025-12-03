@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::metrics::{self, increment_log_ingest_failures_by, increment_log_ingest_successes_by};
 use anyhow::{anyhow, Error, Result};

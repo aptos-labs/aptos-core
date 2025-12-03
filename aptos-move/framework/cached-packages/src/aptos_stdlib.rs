@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(unused_imports)] // Copyright (c) Aptos Foundation
+                          // Copyright (c) Aptos Foundation
+                          // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(unused_imports)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 pub use crate::{
     aptos_framework_sdk_builder::*, aptos_token_objects_sdk_builder as aptos_token_objects_stdlib,

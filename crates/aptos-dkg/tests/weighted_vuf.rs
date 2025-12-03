@@ -1,8 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-
 #![allow(clippy::ptr_arg)]
-#![allow(clippy::needless_borrow)]
+#![allow(clippy::needless_borrow)] // Copyright (c) Aptos Foundation
+                                   // Copyright (c) Aptos Foundation
+                                   // SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_crypto::{blstrs::random_scalar, traits::SecretSharingConfig as _};
 use aptos_dkg::{

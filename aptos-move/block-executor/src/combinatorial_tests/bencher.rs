@@ -1,8 +1,8 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+#![allow(dead_code)] // Copyright (c) Aptos Foundation
+                     // Copyright (c) Aptos Foundation
+                     // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(dead_code)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     code_cache_global_manager::AptosModuleCacheManagerGuard,

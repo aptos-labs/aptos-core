@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 /// Chain ID of the current chain
 pub const X_APTOS_CHAIN_ID: &str = "X-Aptos-Chain-Id";

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This crate is designed to help with tracking events and state that might be speculative in
 //! nature due to speculative execution of transactions (e.g. by BlockSTM parallel executor, but

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::state_store::persisted_state::PersistedState;
 use aptos_block_executor::hot_state_op_accumulator::BlockHotStateOpAccumulator;

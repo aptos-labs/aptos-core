@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This module implements `JellyfishMerkleIterator`. Initialized with a version and a key, the
 //! iterator generates all the key-value pairs in this version of the tree, starting from the

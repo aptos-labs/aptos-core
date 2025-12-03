@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::match_result_ok)] // Copyright (c) Aptos Foundation
+                                   // Copyright (c) Aptos Foundation
+                                   // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::match_result_ok)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     jwks::{rsa::RSA_JWK, unsupported::UnsupportedJWK, KID},

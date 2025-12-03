@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 // TODO[Orderless]: Update the sdk builder to generate transactions with new payload format
 use crate::common;
@@ -124,8 +123,7 @@ where
             writeln!(
                 self.out,
                 r#"
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+
 
 // This file was generated. Do not modify!
 //

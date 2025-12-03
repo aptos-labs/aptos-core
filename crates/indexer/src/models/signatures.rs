@@ -1,6 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-#![allow(clippy::extra_unused_lifetimes)]
+#![allow(clippy::extra_unused_lifetimes)] // Copyright (c) Aptos Foundation
+                                          // Copyright (c) Aptos Foundation
+                                          // SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{models::transactions::Transaction, schema::signatures, util::standardize_address};
 use anyhow::{Context, Result};

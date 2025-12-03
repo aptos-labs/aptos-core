@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! For what it's worth, I don't understand why the `merlin` library wants the user to first define
 //! a trait with their 'append' operations and then implement that trait on `merlin::Transcript`.

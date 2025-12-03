@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::collectors::common::{MeasureLatency, NAMESPACE};
 use aptos_metrics_core::const_metric::ConstMetric;

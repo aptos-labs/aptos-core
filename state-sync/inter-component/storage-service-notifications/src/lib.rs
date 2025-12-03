@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![forbid(unsafe_code)] // Copyright (c) Aptos Foundation
+                        // Copyright (c) Aptos Foundation
+                        // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![forbid(unsafe_code)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_channels::{self, aptos_channel, message_queues::QueueStyle};
 use async_trait::async_trait;

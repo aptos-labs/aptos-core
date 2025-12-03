@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 /// A style for the CLI that closely resembles the Clap v3 color scheme
 pub fn aptos_cli_style() -> clap::builder::Styles {

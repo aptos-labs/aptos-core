@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_crypto::arkworks::random::{
     unsafe_random_point, unsafe_random_point_slow, unsafe_random_points, unsafe_random_points_slow,

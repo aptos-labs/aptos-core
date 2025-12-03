@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 // 64 "0"s
 const ZEROS: &str = "0000000000000000000000000000000000000000000000000000000000000000";

@@ -1,6 +1,7 @@
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use anyhow::bail;
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 use aptos_crypto::ed25519::Ed25519PrivateKey;
 use aptos_sdk::types::{
     AccountKey, EphemeralKeyPair, EphemeralPrivateKey, KeylessAccount, LocalAccount,

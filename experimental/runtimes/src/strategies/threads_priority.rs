@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{common::set_thread_nice_value, thread_manager::ThreadManager};
 use aptos_runtimes::spawn_rayon_thread_pool_with_start_hook;

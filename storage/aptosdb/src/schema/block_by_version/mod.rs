@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This module defines physical storage schema for an index to help us fine out which block a
 //! ledger version is in, by storing a block_start_version <-> block_height pair.

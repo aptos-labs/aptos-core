@@ -1,5 +1,6 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use aptos_secure_net::network_controller::{Message, NetworkController};
 use aptos_types::block_executor::partitioner::{RoundId, ShardId, MAX_ALLOWED_PARTITIONING_ROUNDS};
 use aptos_vm::sharded_block_executor::{

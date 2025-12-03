@@ -1,6 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-#![allow(unused)]
+#![allow(unused)] // Copyright (c) Aptos Foundation
+                  // Copyright (c) Aptos Foundation
+                  // SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 pub use super::prebuilt_packages::PreBuiltPackagesImpl;
 use aptos_framework::natives::code::PackageMetadata;

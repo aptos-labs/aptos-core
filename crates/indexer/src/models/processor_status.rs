@@ -1,6 +1,7 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use crate::{database::PgPoolConnection, schema::processor_status};
 use diesel::{ExpressionMethods, OptionalExtension, QueryDsl, RunQueryDsl};
 

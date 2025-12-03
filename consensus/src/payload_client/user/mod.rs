@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::error::QuorumStoreError;
 use aptos_consensus_types::{common::Payload, payload_pull_params::PayloadPullParameters};

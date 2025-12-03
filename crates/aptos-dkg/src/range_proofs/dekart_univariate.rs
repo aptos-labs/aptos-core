@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     algebra::polynomials, fiat_shamir, pcs::univariate_kzg, range_proofs::traits,

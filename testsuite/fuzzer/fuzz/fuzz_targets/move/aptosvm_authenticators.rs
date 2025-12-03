@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 #![no_main]
 #![allow(unused_imports)]
+
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{

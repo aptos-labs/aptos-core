@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{wait_for_all_nodes_to_catchup_to_version, AptosPublicInfo};
 use anyhow::{bail, Context, Result};

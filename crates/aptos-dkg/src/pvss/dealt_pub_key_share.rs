@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 // NOTE: I don't think we need this DealtPubKey[Share] anymore, since we never implement any traits
 // on it, unlike the DealtSecretKey[Share]. We will keep it in case we want to implement the

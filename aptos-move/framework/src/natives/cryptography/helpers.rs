@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 /// For all $n > 0$, returns $\floor{\log_2{n}}$, contained within a `Some`.
 /// For $n = 0$, returns `None`.

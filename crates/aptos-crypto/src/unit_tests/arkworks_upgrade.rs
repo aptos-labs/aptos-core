@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use ark_bls12_381::{Bls12_381 as Bls12_381New, G1Projective as G1New, G2Projective as G2New};
 use ark_bls12_381_old::{Bls12_381 as Bls12_381Old, G1Projective as G1Old, G2Projective as G2Old};

@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This is a copy of `futures::stream::buffered` from `futures 0.3.6`, except that it uses
 //! `FuturesOrderedX` which provides concurrency control. So we can buffer more results without

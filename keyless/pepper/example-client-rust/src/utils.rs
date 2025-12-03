@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{DEFAULT_CLIENT_TIMEOUT_SECS, DEFAULT_JWT};
 use aptos_types::keyless::Configuration;

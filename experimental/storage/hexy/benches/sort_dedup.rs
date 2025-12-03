@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_experimental_hexy::utils::sort_dedup;
 use criterion::{criterion_group, criterion_main, BatchSize, Criterion};

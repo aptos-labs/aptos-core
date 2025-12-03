@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This module defines physical storage schema for an event index via which a ContractEvent (
 //! represented by a <txn_version, event_idx> tuple so that it can be fetched from `EventSchema`)

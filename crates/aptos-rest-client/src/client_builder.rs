@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     get_version_path_with_base, Client, DEFAULT_VERSION_PATH_BASE, X_APTOS_SDK_HEADER_VALUE,

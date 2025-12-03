@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_block_executor::txn_provider::default::DefaultTxnProvider;
 use aptos_block_partitioner::{v2::config::PartitionerV2Config, PartitionerConfig};

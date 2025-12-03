@@ -1,6 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
-#![allow(dead_code)]
+#![allow(dead_code)] // Copyright (c) Aptos Foundation
+                     // Copyright (c) Aptos Foundation
+                     // SPDX-License-Identifier: Innovation-Enabling Source Code License
+
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 mod adapter;
 mod anchor_election;

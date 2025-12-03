@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! Tests for deeply-nested function values. The Move VM must ensure that it is not possible to
 //! construct values that are too deep, as this can cause stack overflow.

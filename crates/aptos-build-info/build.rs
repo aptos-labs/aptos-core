@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 fn main() -> shadow_rs::SdResult<()> {
     // CARGO_CFG env vars don't make it to the program at runtime, so we

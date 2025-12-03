@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use super::function_info::extract_function_info;
 use aptos_gas_schedule::gas_params::natives::aptos_framework::DISPATCHABLE_AUTHENTICATE_DISPATCH_BASE;

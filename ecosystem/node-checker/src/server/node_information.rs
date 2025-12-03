@@ -1,5 +1,6 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use crate::configuration::NodeAddress;
 use aptos_config::config::RoleType;
 use aptos_sdk::types::chain_id::ChainId;

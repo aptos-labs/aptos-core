@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_metrics_core::{
     exponential_buckets, register_histogram_vec, register_int_counter, register_int_counter_vec,

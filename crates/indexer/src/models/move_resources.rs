@@ -1,6 +1,7 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
 #![allow(clippy::extra_unused_lifetimes)]
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use crate::{models::transactions::Transaction, schema::move_resources, util::standardize_address};
 use anyhow::{Context, Result};
 use aptos_api_types::{DeleteResource, MoveStructTag as APIMoveStructTag, WriteResource};

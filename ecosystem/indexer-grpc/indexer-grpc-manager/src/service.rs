@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{data_manager::DataManager, metadata_manager::MetadataManager, metrics::COUNTER};
 use aptos_protos::indexer::v1::{

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 //! This file contains logic for checking a node, common to both VFNs and PFNs.
 //! At this point, some earlier code has processed the input information, e.g.

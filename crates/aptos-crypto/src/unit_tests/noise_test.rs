@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{
     noise::{handshake_init_msg_len, handshake_resp_msg_len, NoiseConfig, MAX_SIZE_NOISE_MSG},

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::{aptos::move_test_helpers, smoke_test_environment::new_local_swarm_with_aptos};
 use aptos_forge::Swarm;

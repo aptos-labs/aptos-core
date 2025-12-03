@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 pub use move_binary_format::file_format_common::{bcs_size_of_byte_array, size_u32_as_uleb128};
 

@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![forbid(unsafe_code)] // Copyright (c) Aptos Foundation
+                        // Copyright (c) Aptos Foundation
+                        // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![forbid(unsafe_code)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 /// It has to be integration tests because otherwise it forms an indirect dependency circle between
 /// aptos-vm and aptos-language-e2e-tests, which causes static variables to have two instances in

@@ -1,7 +1,8 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::non_canonical_partial_ord_impl)] // Copyright (c) Aptos Foundation
+                                                  // Copyright (c) Aptos Foundation
+                                                  // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::non_canonical_partial_ord_impl)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_crypto::HashValue;
 use aptos_proptest_helpers::ValueGenerator;

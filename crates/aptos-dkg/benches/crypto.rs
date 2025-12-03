@@ -1,7 +1,8 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::useless_conversion)] // Copyright (c) Aptos Foundation
+                                      // Copyright (c) Aptos Foundation
+                                      // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::useless_conversion)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use aptos_crypto::blstrs::{multi_pairing, random_scalar};
 use aptos_dkg::{

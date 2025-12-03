@@ -1,6 +1,6 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
+
 use crate::config::{PeerRole, RoleType};
 use aptos_short_hex_str::AsShortHexStr;
 use aptos_types::PeerId;

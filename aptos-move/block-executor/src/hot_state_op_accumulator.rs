@@ -1,7 +1,8 @@
-// Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+#![allow(clippy::new_without_default)] // Copyright (c) Aptos Foundation
+                                       // Copyright (c) Aptos Foundation
+                                       // SPDX-License-Identifier: Innovation-Enabling Source Code License
 
-#![allow(clippy::new_without_default)]
+// SPDX-License-Identifier: Innovation-Enabling Source Code License
 
 use crate::counters::HOT_STATE_OP_ACCUMULATOR_COUNTER as COUNTER;
 use aptos_metrics_core::IntCounterVecHelper;
