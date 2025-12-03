@@ -28,8 +28,8 @@ MIN_STAKE=0        # Minimum allowed stake (0 for now, will be non-zero later)
 MAX_STAKE_RATIO=30 # Maximum stake as percentage of total voting power
 
 # Delegation / delegated pool configuration (for "Validator 4"-style setup)
-DELEGATION_SEED="aptos_framework::delegation_pool2563"
 SEED=2563
+DELEGATION_SEED="aptos_framework::delegation_pool${SEED}"
 DELEGATION_COMMISSION_BPS=1000      # 1000 = 10%
 INITIAL_DELEGATION_STAKE=1000000001 # 10.00000001 MOVE (in octas)
 
