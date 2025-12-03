@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // Persistent checking is a mechanism to increase tolerancy to eventual consistency issues. In our
 // earlier tests we have observed that parallel runs of the flows returned higher failure rates
