@@ -9,6 +9,7 @@ use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
     pvss::{
         self,
+        chunky::Transcript as ChunkyTranscript,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
             DealingArgs, NoAux, BENCHMARK_CONFIGS,
@@ -20,6 +21,8 @@ use aptos_dkg::{
         LowDegreeTest, WeightedConfigBlstrs,
     },
 };
+use ark_bn254::Config as Bn254Config;
+use ark_ec::models::bn::Bn;
 use criterion::{
     criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
@@ -27,14 +30,14 @@ use criterion::{
 };
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
-use ark_ec::models::bn::Bn;
-use ark_bn254::Config as Bn254Config;
-use aptos_dkg::pvss::chunky::Transcript as ChunkyTranscript;
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subscript
     for tc in get_threshold_configs_for_benchmarking() {
-        subaggregatable_pvss_group::<<ChunkyTranscript<Bn<Bn254Config>> as Transcript>::SecretSharingConfig, pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
+        subaggregatable_pvss_group::<
+            <ChunkyTranscript<Bn<Bn254Config>> as Transcript>::SecretSharingConfig,
+            pvss::chunky::Transcript<ark_bn254::Bn254>,
+        >(&tc, c);
     }
 
     // unweighted aggregatable PVSS
