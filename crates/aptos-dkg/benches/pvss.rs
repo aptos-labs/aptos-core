@@ -100,7 +100,8 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 
 // TODO: combine with function above, rather than copy-paste
 pub fn subaggregatable_pvss_group<
-    C: SecretSharingConfig, T: HasAggregatableSubtranscript<C> + MalleableTranscript<SecretSharingConfig = C>,
+    C: SecretSharingConfig,
+    T: HasAggregatableSubtranscript<C> + MalleableTranscript<SecretSharingConfig = C>,
 >(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,

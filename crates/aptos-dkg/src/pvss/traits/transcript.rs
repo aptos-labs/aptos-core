@@ -164,7 +164,6 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
             <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
         >;
 
-
     /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
     fn dst() -> Vec<u8>;
 
@@ -280,16 +279,17 @@ impl<T> AggregatableTranscript for T where
 {
 }
 
-pub trait HasAggregatableSubtranscript<C> : Transcript {
-    type SubTranscript: Aggregatable<C> + SubTranscript<
-        PublicParameters = Self::PublicParameters,
-        SecretSharingConfig = Self::SecretSharingConfig,
-        DealtPubKeyShare = Self::DealtPubKeyShare,
-        DealtSecretKeyShare = Self::DealtSecretKeyShare,
-        DealtPubKey = Self::DealtPubKey,
-        EncryptPubKey = Self::EncryptPubKey,
-        DecryptPrivKey = Self::DecryptPrivKey,
-    >;
+pub trait HasAggregatableSubtranscript<C>: Transcript {
+    type SubTranscript: Aggregatable<C>
+        + SubTranscript<
+            PublicParameters = Self::PublicParameters,
+            SecretSharingConfig = Self::SecretSharingConfig,
+            DealtPubKeyShare = Self::DealtPubKeyShare,
+            DealtSecretKeyShare = Self::DealtSecretKeyShare,
+            DealtPubKey = Self::DealtPubKey,
+            EncryptPubKey = Self::EncryptPubKey,
+            DecryptPrivKey = Self::DecryptPrivKey,
+        >;
 
     fn get_subtranscript(&self) -> Self::SubTranscript;
 }
