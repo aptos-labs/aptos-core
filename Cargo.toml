@@ -500,12 +500,14 @@ anstyle = "1.0.1"
 arbitrary = { version = "1.4.1", features = ["derive"] }
 arc-swap = "1.6.0"
 arr_macro = "0.2.1"
-ark-bls12-381 = "0.5.0"
-ark-bn254 = "0.5.0"
-ark-ec = "0.5.0"
-ark-ff = "0.5.0"
+ark-bls12-381 = { version = "0.5.0", features = ["curve"] }
+ark-bn254 = { version = "0.5.0", features = ["curve"] }
+ark-ec = { version = "0.5.0", features = ["parallel", "rayon"] }
+ark-ff = { version = "0.5.0", features = ["asm"] }
+ark-ff-asm = { version ="0.5.0" }
+ark-ff-macros = "0.5.0"
 ark-groth16 = "0.5.0"
-ark-poly = "0.5.0"
+ark-poly = { version = "0.5.0", features = ["parallel"] }
 ark-relations = "0.5.0"
 ark-serialize = { version = "0.5.0", features = ["derive"] }
 ark-snark = { version = "0.5.0" }
@@ -965,6 +967,15 @@ futures-sink = { git = "https://github.com/aptos-labs/futures-rs", branch = "bac
 futures-io = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-task = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
 futures-macro = { git = "https://github.com/aptos-labs/futures-rs", branch = "backport" }
+ark-bls12-381 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff"}
+ark-bn254 = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ec = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff"}
+ark-ff = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff"}
+ark-ff-macros = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-ff-asm = { git = "https://github.com/aptos-labs/algebra", branch = "fix-fft-parallelism-cutoff" }
+ark-poly = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff" }
+ark-serialize = { git = "https://github.com/aptos-labs/algebra",  branch = "fix-fft-parallelism-cutoff" }
+
 
 # There is a circular dependency between aptos-core, aptos-indexer-processor-sdk, and aptos-indexer-processors-v2,
 # so we cannot simply change the version and package for `jemalloc-sys` in one repo without running into conflicts.
