@@ -100,3 +100,5 @@ cargo run -p movement move run-script --script-path movement-migration/move2/sou
 cargo run -p movement move run-script --script-path movement-migration/post-move2-upgrade/scripts/force-epoch-change.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
 # initialize the ggp extension this has to be done within the same epoch 
 cargo run -p movement move run-script --script-path movement-migration/post-move2-upgrade/scripts/after-move2-upgrade.move --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes
+# Update staking lock period with the same value as Aptos
+cargo run -p movement move run-script --script-path movement-migration/update_recurring_lockup_duration/scripts/update_recurring_lockup_duration.move --args u64:1209600 --sender-account 0xa550c18 --private-key-file "$PRIVATE_KEY_FILE"  --url "$URL"  --assume-yes

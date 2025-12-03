@@ -1,0 +1,15 @@
+[package]
+name = "update_recurring_lockup_duration"
+version = "1.0.0"
+authors = []
+
+[addresses]
+
+[dev-addresses]
+
+[dependencies.AptosFramework]
+git = "https://github.com/movementlabsxyz/aptos-core.git"
+rev = "l1-migration"
+subdir = "aptos-move/framework/aptos-framework"
+
+[dev-dependencies]
