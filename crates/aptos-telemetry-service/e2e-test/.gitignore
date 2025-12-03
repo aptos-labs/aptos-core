@@ -1,0 +1,8 @@
+# E2E Test Generated Files
+
+# Test data directory (created at runtime)
+test-data/
+
+# Any test keys
+**/*.key
+**/*.pub

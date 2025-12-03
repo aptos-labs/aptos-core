@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub mod humio;
+pub mod loki;
 
 pub mod victoria_metrics_api {
 

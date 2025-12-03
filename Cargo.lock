@@ -4456,9 +4456,11 @@ dependencies = [
  "claims",
  "clap 4.5.21",
  "debug-ignore",
+ "ed25519-dalek 1.0.1",
  "flate2",
  "futures",
  "gcp-bigquery-client",
+ "hex",
  "httpmock",
  "jsonwebtoken 8.3.0",
  "once_cell",
@@ -4475,6 +4477,7 @@ dependencies = [
  "tokio",
  "tracing",
  "url",
+ "urlencoding",
  "uuid 1.11.0",
  "warp",
 ]
@@ -10749,6 +10752,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyper-tls"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70206fc6890eaca9fde8a0bf71caa2ddfc9fe045ac9e5c70df101a7dbde866e0"
+dependencies = [
+ "bytes",
+ "http-body-util",
+ "hyper 1.4.1",
+ "hyper-util",
+ "native-tls",
+ "tokio",
+ "tokio-native-tls",
+ "tower-service",
+]
+
+[[package]]
 name = "hyper-util"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -15981,7 +16000,7 @@ dependencies = [
  "http-body 0.4.6",
  "hyper 0.14.28",
  "hyper-rustls 0.24.2",
- "hyper-tls",
+ "hyper-tls 0.5.0",
  "ipnet",
  "js-sys",
  "log",
@@ -16020,19 +16039,23 @@ dependencies = [
  "async-compression",
  "base64 0.22.1",
  "bytes",
+ "encoding_rs",
  "futures-core",
  "futures-util",
+ "h2 0.4.5",
  "http 1.1.0",
  "http-body 1.0.0",
  "http-body-util",
  "hyper 1.4.1",
  "hyper-rustls 0.27.2",
+ "hyper-tls 0.6.0",
  "hyper-util",
  "ipnet",
  "js-sys",
  "log",
  "mime",
  "mime_guess",
+ "native-tls",
  "once_cell",
  "percent-encoding",
  "pin-project-lite",
@@ -16045,7 +16068,9 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "sync_wrapper 1.0.1",
+ "system-configuration",
  "tokio",
+ "tokio-native-tls",
  "tokio-rustls 0.26.0",
  "tokio-util 0.7.10",
  "tower-service",
@@ -17998,6 +18023,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba323866e5d033818e3240feeb9f7db2c4296674e4d9e16b97b7bf8f490434e8"
 dependencies = [
  "pin-utils",
+]
+
+[[package]]
+name = "telemetry-test-client"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "aptos-crypto",
+ "aptos-telemetry-service",
+ "aptos-types",
+ "chrono",
+ "clap 4.5.21",
+ "ed25519-dalek 2.1.1",
+ "flate2",
+ "getrandom 0.2.11",
+ "hex",
+ "reqwest 0.12.5",
+ "serde",
+ "serde_json",
+ "tokio",
+ "toml 0.8.12",
+ "tracing",
+ "tracing-subscriber 0.3.18",
 ]
 
 [[package]]

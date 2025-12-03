@@ -1,0 +1,27 @@
+# Grafana datasources for E2E testing
+# Auto-configures VictoriaMetrics and Loki datasources
+
+apiVersion: 1
+
+datasources:
+  # VictoriaMetrics (Prometheus-compatible) datasource
+  - name: VictoriaMetrics
+    type: prometheus
+    access: proxy
+    url: http://victoria-metrics:8428
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      timeInterval: 10s
+    editable: true
+
+  # Loki datasource
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      maxLines: 1000
+      timeout: 60
+    editable: true
+
