@@ -136,7 +136,7 @@ export class BIBEEncryptionKey extends Serializable {
     ];
 
 
-    // Note: in contrast to arkworks, the target group operations are multiplications, nod additions.
+    // Note: in contrast to arkworks, the target group operations are multiplications, not additions.
     // The multiplication by `r[1]` is done inside the pairing because I'm not sure what the interface is for scalar multiplication over the target group.
     let otp_source_gt = Gt.inv(bn254.pairing(hashed_encryption_key.multiply(r[1]), this.sig_mpk_g2));
 
