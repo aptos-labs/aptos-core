@@ -132,11 +132,7 @@ pub fn eval_proofs_compute_all_2(c: &mut Criterion) {
             BenchmarkId::from_parameter(batch_size),
             &(pfs, dk),
             |b, input| {
-                b.iter(|| {
-                    FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(
-                        &input.0, &input.1,
-                    )
-                });
+                b.iter(|| FPTX::eval_proofs_compute_all_vzgg_multi_point_eval(&input.0, &input.1));
             },
         );
     }
