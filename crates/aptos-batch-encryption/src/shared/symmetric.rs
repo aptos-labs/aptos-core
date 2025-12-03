@@ -42,13 +42,6 @@ pub struct OneTimePad(GenericArray<u8, KeySize>);
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash, Eq)]
 pub struct OneTimePaddedKey(GenericArray<u8, KeySize>);
 
-impl OneTimePaddedKey {
-    #[cfg(test)]
-    pub(crate) fn blank_for_testing() -> Self {
-        let blank = vec![0; 16];
-        Self(GenericArray::clone_from_slice(blank.as_slice()))
-    }
-}
 
 #[derive(Debug, Clone, Serialize, Deserialize, Hash, PartialEq, Eq)]
 pub struct SymmetricCiphertext {
@@ -56,15 +49,6 @@ pub struct SymmetricCiphertext {
     ct_body: Vec<u8>,
 }
 
-impl SymmetricCiphertext {
-    #[cfg(test)]
-    pub(crate) fn blank_for_testing() -> Self {
-        Self {
-            nonce: SymmetricNonce::default(),
-            ct_body: vec![],
-        }
-    }
-}
 
 impl OneTimePad {
     /// Take some source bytes that are high-entropy (but not necessarily uniformly-distributed),
