@@ -32,15 +32,10 @@ aes-gcm = { workspace = true }
 anyhow = { workspace = true }
 aptos-crypto = { workspace = true }
 bcs = { workspace = true }
-csv = { workspace = true }
-ff = { workspace = true }
 generic-array = { workspace = true }
 hmac = { workspace = true }
-itertools = { workspace = true }
-lazy_static = { workspace = true }
 num-traits = { workspace = true }
 rand = { workspace = true }
-rand_core = { workspace = true }
 rayon = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -49,6 +44,9 @@ thiserror = { workspace = true }
 [dev-dependencies]
 criterion = { workspace = true }
 itertools = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["ark-bls12-381", "ark-ff-asm", "ark-ff-macros"]
 
 [[bench]]
 name = "fk_algorithm"
