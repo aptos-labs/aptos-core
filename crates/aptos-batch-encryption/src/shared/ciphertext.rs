@@ -130,6 +130,27 @@ impl<I: Id, EK: BIBEEncryptionKey> CTEncrypt<I> for EK {
     }
 }
 
+#[cfg(test)]
+use super::ids::FreeRootId;
+
+#[cfg(test)]
+impl BIBECiphertext<FreeRootId> {
+    pub(crate) fn blank_for_testing() -> Self {
+        use ark_std::Zero;
+
+        BIBECiphertext {
+            id: FreeRootId::new(Fr::zero()),
+            ct_g2: [
+                G2Affine::generator(),
+                (G2Affine::generator() * Fr::from(2)).into(),
+                (G2Affine::generator() * Fr::from(3)).into(),
+            ],
+            padded_key: OneTimePaddedKey::blank_for_testing(),
+            symmetric_ciphertext: SymmetricCiphertext::blank_for_testing(),
+        }
+    }
+}
+
 impl<I: Id> BIBECiphertext<I> {
     pub fn prepare(
         &self,
