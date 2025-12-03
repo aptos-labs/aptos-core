@@ -341,7 +341,7 @@ init_common_cli_args() {
 
 init_operator_cli_args() {
 	OPERATOR_CLI_ARGS=(
-		--private-key "$OPERATOR_PRVATE_KEY"
+		--private-key "$OPERATOR_ACCOUNT_PRIVATE_KEY"
 		--sender-account "$OPERATOR_ACCOUNT"
 		--url "$NETWORK_API_ADDRESS"
 		--gas-unit-price 100
