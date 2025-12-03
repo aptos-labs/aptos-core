@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 use super::multi_point_eval::multi_point_eval;
 use crate::{
-    group::{Fr, G1Affine, G1Projective},
     shared::{algebra::multi_point_eval::multi_point_eval_naive, ark_serialize::*},
 };
+use ark_ec::VariableBaseMSM;
 use ark_ff::FftField;
 use ark_poly::{domain::DomainCoeff, EvaluationDomain, Radix2EvaluationDomain};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -275,7 +275,7 @@ pub struct FKDomain<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + Canoni
 
 impl<
         F: FftField,
-        T: DomainCoeff<F> + Mul<F, Output = T> + CanonicalSerialize + CanonicalDeserialize,
+        T: DomainCoeff<F> + Mul<F, Output = T> + VariableBaseMSM<ScalarField = F> + CanonicalSerialize + CanonicalDeserialize,
     > FKDomain<F, T>
 {
     pub fn new(
@@ -353,7 +353,12 @@ impl<
         self.fft_domain.fft(&h_term_commitments)
     }
 
-    pub fn eval_proofs_at_x_coords(&self, f: &[F], x_coords: &[F], round: usize) -> Vec<T> {
+    pub fn eval_proofs_at_x_coords(
+        &self,
+        f: &[F],
+        x_coords: &[F],
+        round: usize
+    ) -> Vec<T> {
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         let mut f = Vec::from(f);
@@ -372,27 +377,18 @@ impl<
 
         multi_point_eval(&h_term_commitments, x_coords)
     }
-}
 
-pub trait EPTest {
-    fn eval_proofs_at_x_coords_alt(&self, f: &[Fr], x_coords: &[Fr], round: usize)
-        -> Vec<G1Affine>;
-}
-
-use ark_std::Zero;
-
-impl EPTest for FKDomain<Fr, G1Projective> {
-    fn eval_proofs_at_x_coords_alt(
+    pub fn eval_proofs_at_x_coords_naive_multi_point_eval(
         &self,
-        f: &[Fr],
-        x_coords: &[Fr],
+        f: &[F],
+        x_coords: &[F],
         round: usize,
-    ) -> Vec<G1Affine> {
+    ) -> Vec<T> {
         // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
         // dimension.
         let mut f = Vec::from(f);
         f.extend(std::iter::repeat_n(
-            Fr::zero(),
+            F::zero(),
             self.toeplitz_domain.dimension() + 1 - f.len(),
         ));
         assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
@@ -407,12 +403,15 @@ impl EPTest for FKDomain<Fr, G1Projective> {
         multi_point_eval_naive(
             &h_term_commitments
                 .into_iter()
-                .map(G1Affine::from)
-                .collect::<Vec<G1Affine>>(),
+                .map(T::MulBase::from)
+                .collect::<Vec<T::MulBase>>(),
             x_coords,
         )
     }
 }
+
+
+
 
 impl<F: FftField, T: DomainCoeff<F> + CanonicalSerialize + CanonicalDeserialize> Serialize
     for FKDomain<F, T>

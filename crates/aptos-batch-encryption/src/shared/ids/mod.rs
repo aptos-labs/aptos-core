@@ -4,10 +4,8 @@ use crate::group::{Fr, G1Affine};
 use ed25519_dalek::VerifyingKey;
 use std::{collections::HashMap, hash::Hash};
 
-pub mod fft_domain;
 pub mod free_roots;
 
-pub use fft_domain::{FFTDomainId, FFTDomainIdSet};
 pub use free_roots::{FreeRootId, FreeRootIdSet};
 use serde::Serialize;
 
@@ -58,7 +56,10 @@ pub trait OssifiedIdSet {
         setup: &super::digest::DigestKey,
         round: usize,
     ) -> HashMap<Self::Id, G1Affine>;
-    fn compute_all_eval_proofs_with_setup_2(
+    /// Given a [`DigestKey`], compute all KZG evaluation proofs for the polynomial that encodes
+    /// this set with respect to this setup. This version uses a different (slower for our
+    /// parameter regime) multi-point-eval algorithm, from von zur Gathen and Gerhardt.
+    fn compute_all_eval_proofs_with_setup_vzgg_multi_point_eval(
         &self,
         setup: &super::digest::DigestKey,
         round: usize,

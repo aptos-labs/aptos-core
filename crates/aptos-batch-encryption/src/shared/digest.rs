@@ -184,11 +184,11 @@ impl<IS: OssifiedIdSet> EvalProofsPromise<IS> {
         }
     }
 
-    pub fn compute_all_2(&self, digest_key: &DigestKey) -> EvalProofs<IS> {
+    pub fn compute_all_vgzz_multi_point_eval(&self, digest_key: &DigestKey) -> EvalProofs<IS> {
         EvalProofs {
             computed_proofs: self
                 .ids
-                .compute_all_eval_proofs_with_setup_2(digest_key, self.digest.round),
+                .compute_all_eval_proofs_with_setup_vzgg_multi_point_eval(digest_key, self.digest.round),
         }
     }
 }

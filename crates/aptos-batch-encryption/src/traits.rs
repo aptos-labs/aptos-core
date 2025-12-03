@@ -109,8 +109,10 @@ pub trait BatchThresholdEncryption {
         pool: &ThreadPool,
     ) -> Self::EvalProofs;
 
-    /// Compute KZG eval proofs. This will be the most expensive operation in the scheme.
-    fn eval_proofs_compute_all_2(
+    /// Compute KZG eval proofs. This will be the most expensive operation in the scheme. This
+    /// version uses a different (slower for our parameter regime) multi-point-eval algorithm,
+    /// from von zur Gathen and Gerhardt. Currently for benchmarking only, not for production use.
+    fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &Self::DigestKey,
         pool: &ThreadPool,

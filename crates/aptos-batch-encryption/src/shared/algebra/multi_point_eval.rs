@@ -1,14 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use super::mult_tree::compute_mult_tree;
-use crate::group::{Fr, G1Affine, G1Projective};
-use ark_ec::VariableBaseMSM as _;
+use ark_ec::VariableBaseMSM;
 use ark_ff::FftField;
 use ark_poly::{
     domain::DomainCoeff, univariate::DensePolynomial, DenseUVPolynomial, EvaluationDomain as _,
     Polynomial as _, Radix2EvaluationDomain,
 };
-use ark_std::{log2, One};
+use ark_std::log2;
 use rayon::iter::{IndexedParallelIterator as _, IntoParallelIterator as _, ParallelIterator as _};
 use std::ops::{Deref, Mul};
 
@@ -122,23 +121,23 @@ pub fn multi_point_eval<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T>>(
     }
 }
 
-pub fn multi_point_eval_naive(f: &[G1Affine], x_coords: &[Fr]) -> Vec<G1Affine> {
+pub fn multi_point_eval_naive<F: FftField, T: DomainCoeff<F> + Mul<F, Output = T> + VariableBaseMSM<ScalarField = F>>(f: &[T::MulBase], x_coords: &[F]) -> Vec<T> {
     let powers = x_coords
         .into_par_iter()
         .map(|x| {
             let mut result = Vec::new();
-            let mut x_power = Fr::one();
+            let mut x_power = F::one();
             for _i in 0..f.len() {
                 result.push(x_power);
                 x_power *= x;
             }
             result
         })
-        .collect::<Vec<Vec<Fr>>>();
+        .collect::<Vec<Vec<F>>>();
 
     powers
         .into_par_iter()
-        .map(|p| G1Projective::msm(f, &p).unwrap().into())
+        .map(|p| T::msm(f, &p).unwrap().into())
         .collect()
 }
 
@@ -168,7 +167,7 @@ mod tests {
         let x_coords = vec![Fr::one() + Fr::one(); poly_size];
 
         let evals1 = multi_point_eval(&poly_proj, &x_coords);
-        let evals2 = multi_point_eval_naive(&poly, &x_coords);
+        let evals2 : Vec<G1Projective> = multi_point_eval_naive(&poly, &x_coords);
 
         for i in 0..poly_size {
             println!("{}", i);

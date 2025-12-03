@@ -5,7 +5,6 @@ use crate::{
     group::{Fr, G1Affine, G1Projective},
     shared::{
         algebra::{
-            fk_algorithm::EPTest as _,
             mult_tree::{compute_mult_tree, quotient},
         },
         ark_serialize::*,
@@ -137,7 +136,7 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
     ) -> HashMap<Self::Id, G1Affine> {
         let pfs: Vec<G1Affine> = setup
             .fk_domain
-            .eval_proofs_at_x_coords_alt(&self.poly_coeffs(), &self.poly_roots, round)
+            .eval_proofs_at_x_coords_naive_multi_point_eval(&self.poly_coeffs(), &self.poly_roots, round)
             .iter()
             .map(|g| G1Affine::from(*g))
             .collect();
@@ -150,7 +149,7 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
         )
     }
 
-    fn compute_all_eval_proofs_with_setup_2(
+    fn compute_all_eval_proofs_with_setup_vzgg_multi_point_eval(
         &self,
         setup: &crate::shared::digest::DigestKey,
         round: usize,
@@ -178,7 +177,7 @@ impl OssifiedIdSet for FreeRootIdSet<ComputedCoeffs> {
     ) -> HashMap<Self::Id, G1Affine> {
         let pfs: Vec<G1Affine> = setup
             .fk_domain
-            .eval_proofs_at_x_coords_alt(
+            .eval_proofs_at_x_coords_naive_multi_point_eval(
                 &self.poly_coeffs(),
                 &ids.iter().map(|id| id.x()).collect::<Vec<Fr>>(),
                 round,

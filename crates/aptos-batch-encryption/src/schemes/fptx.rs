@@ -164,12 +164,12 @@ impl BatchThresholdEncryption for FPTX {
         pool.install(|| proofs.compute_all(digest_key))
     }
 
-    fn eval_proofs_compute_all_2(
+    fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
         pool: &rayon::ThreadPool,
     ) -> Self::EvalProofs {
-        pool.install(|| proofs.compute_all_2(digest_key))
+        pool.install(|| proofs.compute_all_vgzz_multi_point_eval(digest_key))
     }
 
     fn eval_proof_for_ct(
