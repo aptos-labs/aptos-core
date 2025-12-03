@@ -165,6 +165,79 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
             <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
         >;
 
+    /// Returns the dealt pubkey shore of `player`.
+    fn get_public_key_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare;
+
+    /// Given a valid transcript, returns the `DealtPublicKey` of that transcript: i.e., the public
+    /// key associated with the secret key dealt in the transcript.
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey;
+
+    /// Given a valid transcript, returns the decrypted `DealtSecretShare` for the player with ID
+    /// `player_id`.
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare);
+}
+
+/// A trait for a PVSS protocol transcript. This trait allows both for:
+///
+/// 1. Normal/unweighted $t$-out-of-$n$ PVSS protocols where any $t$ players (or more) can
+///    reconstruct the secret (but no fewer can)
+/// 2. Weighted $w$-out-of-$W$ PVSS protocols where any players with combined weight $\ge w$ can
+///    reconstruct the secret (but players with combined weight $< w$ cannot)
+pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
+    type SigningSecretKey: Uniform + SigningKey<VerifyingKeyMaterial = Self::SigningPubKey>;
+    type SigningPubKey: VerifyingKey<SigningKeyMaterial = Self::SigningSecretKey>;
+
+    type DealtSecretKey: PartialEq
+        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
+
+    type InputSecret: Uniform
+        + Zero
+        + for<'a> AddAssign<&'a Self::InputSecret>
+        + Convert<Self::DealtSecretKey, Self::PublicParameters>
+        + Convert<Self::DealtPubKey, Self::PublicParameters>;
+
+    type PublicParameters: HasEncryptionPublicParams
+        + WithMaxNumShares
+        + Default
+        + ValidCryptoMaterial
+        + DeserializeOwned
+        + Serialize
+        + Debug
+        + PartialEq
+        + Eq;
+    type SecretSharingConfig: SecretSharingConfig
+        + DeserializeOwned
+        + Serialize
+        + Debug
+        + PartialEq
+        + Eq;
+    type DealtPubKeyShare: Debug + PartialEq + Clone;
+    type DealtSecretKeyShare: PartialEq + Clone;
+    type DealtPubKey;
+    type EncryptPubKey: Debug
+        + Clone
+        + ValidCryptoMaterial
+        + DeserializeOwned
+        + Serialize
+        + PartialEq
+        + Eq;
+    type DecryptPrivKey: Uniform
+        + Convert<
+            Self::EncryptPubKey,
+            <Self::PublicParameters as HasEncryptionPublicParams>::EncryptionPublicParameters,
+        >;
+
+
     /// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
     fn dst() -> Vec<u8>;
 
