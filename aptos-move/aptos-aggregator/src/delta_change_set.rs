@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Parallel data aggregation uses a `Delta` op. Every delta is is a state key
 //! (for accessing the storage) and an operation: a partial function with a

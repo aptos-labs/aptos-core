@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! Transactional tests for comparison operations, Lt/Le/Ge/Gt, over non-integer types,
 //! introduced in Move language version 2.2 and onwards.

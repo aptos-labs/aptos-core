@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{context::SafeNativeContext, errors::SafeNativeResult};
 use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
