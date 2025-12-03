@@ -1,0 +1,72 @@
+# Docker Compose setup for E2E testing of Aptos Telemetry Service
+# Runs VictoriaMetrics and Loki locally for telemetry data ingestion testing
+version: '3.8'
+
+services:
+  # VictoriaMetrics - Time-series database for metrics
+  victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: telemetry-victoria-metrics
+    ports:
+      - "8428:8428"  # HTTP API for ingestion and queries
+    volumes:
+      - victoria-data:/victoria-metrics-data
+    command:
+      - '--storageDataPath=/victoria-metrics-data'
+      - '--httpListenAddr=:8428'
+      - '--retentionPeriod=30d'  # Keep data for 30 days
+      - '--selfScrapeInterval=10s'  # Self-monitoring interval
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8428/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Loki - Log aggregation system
+  loki:
+    image: grafana/loki:3.0.0
+    container_name: telemetry-loki
+    ports:
+      - "3100:3100"  # HTTP API for ingestion and queries
+    volumes:
+      - ./loki-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Grafana - Visualization (optional, for debugging)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: telemetry-grafana
+    ports:
+      - "3000:3000"  # Web UI
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    environment:
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    restart: unless-stopped
+    depends_on:
+      - victoria-metrics
+      - loki
+
+volumes:
+  victoria-data:
+    driver: local
+  loki-data:
+    driver: local
+  grafana-data:
+    driver: local
+
+networks:
+  default:
+    name: telemetry-network
+
