@@ -339,6 +339,17 @@ init_common_cli_args() {
 	)
 }
 
+init_operator_cli_args() {
+	OPERATOR_CLI_ARGS=(
+		--private-key "$OPERATOR_PRVATE_KEY"
+		--sender-account "$OPERATOR_ACCOUNT"
+		--url "$NETWORK_API_ADDRESS"
+		--gas-unit-price 100
+		--max-gas 20000
+		--assume-yes
+	)
+}
+
 derive_delegated_resource_account() {
 	echo "Deriving delegated pool resource-account address..."
 	local output
@@ -364,36 +375,11 @@ derive_delegated_resource_account() {
 	echo "Derived delegated resource account: $DELEGATED_RESOURCE_ACCOUNT"
 }
 
-get_delegated_pool_address() {
-	echo "Fetching expected delegated pool address..."
-	local response
-	response=$($MOVEMENT_CLI move view \
-		--function-id 0x1::delegation_pool::get_expected_stake_pool_address \
-		--args "address:$VALIDATOR_OWNER_ACCOUNT" "u64:$SEED" \
-		--url "$NETWORK_API_ADDRESS" 2>&1)
-
-	if [ $? -ne 0 ]; then
-		echo "Error: Failed to retrieve delegated pool address via move view"
-		echo "$response"
-		exit 1
-	fi
-
-	DELEGATED_POOL_ADDRESS=$(echo "$response" | jq -r '.Result[0]')
-
-	if [ -z "$DELEGATED_POOL_ADDRESS" ] || [ "$DELEGATED_POOL_ADDRESS" = "null" ]; then
-		echo "Error: Unable to parse delegated pool address from response"
-		echo "$response"
-		exit 1
-	fi
-
-	echo "Delegated pool address: $DELEGATED_POOL_ADDRESS"
-}
-
 init_delegation_pool() {
 	echo "Initializing delegation pool for validator owner account..."
 	$MOVEMENT_CLI move run \
 		--function-id 0x1::delegation_pool::initialize_delegation_pool \
-		--args "u64:${DELEGATION_COMMISSION_BPS}" "string:$DELEGATION_SEED" \
+		--args "u64:${DELEGATION_COMMISSION_BPS}" "string:$SEED" \
 		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
@@ -406,7 +392,7 @@ add_delegation_stake() {
 	echo "Adding initial delegated stake of $INITIAL_DELEGATION_STAKE octas..."
 	$MOVEMENT_CLI move run \
 		--function-id 0x1::delegation_pool::add_stake \
-		--args "address:$DELEGATED_POOL_ADDRESS" "u64:${INITIAL_DELEGATION_STAKE}" \
+		--args "address:$DELEGATED_RESOURCE_ACCOUNT" "u64:${INITIAL_DELEGATION_STAKE}" \
 		"${COMMON_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
@@ -423,10 +409,10 @@ extract_delegated_consensus_keys() {
 update_delegated_consensus_keys() {
 	echo "Updating delegated pool consensus keys..."
 	$MOVEMENT_CLI node update-consensus-key \
-		--pool-address "$DELEGATED_POOL_ADDRESS" \
+		--pool-address "$DELEGATED_RESOURCE_ACCOUNT" \
 		--consensus-public-key "$DELEGATED_CONSENSUS_PUB" \
 		--proof-of-possession "$DELEGATED_CONSENSUS_POP" \
-		"${COMMON_CLI_ARGS[@]}"
+		"${OPERATOR_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to update delegated pool consensus keys"
@@ -437,28 +423,13 @@ update_delegated_consensus_keys() {
 update_delegated_network_address() {
 	echo "Updating delegated pool network address..."
 	$MOVEMENT_CLI node update-validator-network-addresses \
-		--pool-address "$DELEGATED_POOL_ADDRESS" \
+		--pool-address "$DELEGATED_RESOURCE_ACCOUNT" \
 		--validator-host "$VALIDATOR_HOST" \
 		--validator-network-public-key "$NETWORK_PUBLIC_KEY" \
-		"${COMMON_CLI_ARGS[@]}"
+		"${OPERATOR_CLI_ARGS[@]}"
 
 	if [ $? -ne 0 ]; then
 		echo "Error: Failed to update delegated pool network address"
-		exit 1
-	fi
-}
-
-join_delegated_validator_set() {
-	# Ensure VN endpoint is healthy before we try to join
-	check_vn_endpoint_healthy
-
-	echo "Joining validator set with delegated pool..."
-	$MOVEMENT_CLI node join-validator-set \
-		--pool-address "$DELEGATED_POOL_ADDRESS" \
-		"${COMMON_CLI_ARGS[@]}"
-
-	if [ $? -ne 0 ]; then
-		echo "Error: Failed to join validator set with delegated pool"
 		exit 1
 	fi
 }
@@ -478,6 +449,23 @@ check_vn_endpoint_healthy() {
 	fi
 
 	echo "VN endpoint is healthy (200)."
+}
+
+set_pool_operator() {
+	# Assign operator
+	echo "Setting operator of delegation pool..."
+	$MOVEMENT_CLI move run \
+		--function-id 0x1::delegation_pool::set_operator \
+		--args address:${OPERATOR_ACCOUNT} \
+		"${COMMON_CLI_ARGS[@]}"
+
+	if [ $? -ne 0 ]; then
+		echo "Error: Failed to set operator of delegation pool"
+		exit 1
+	fi
+
+	echo "Successfully set operator of delegation pool"
+
 }
 
 setup_delegated_pool_flow() {
@@ -513,25 +501,23 @@ setup_delegated_pool_flow() {
 
 	# Initialize common CLI args before running delegated pool commands
 	init_common_cli_args
+	init_operator_cli_args
 
 	derive_delegated_resource_account
-	get_delegated_pool_address
 	init_delegation_pool
+	set_pool_operator
 	add_delegation_stake
 	extract_delegated_consensus_keys
 	update_delegated_consensus_keys
 	update_delegated_network_address
-	join_delegated_validator_set
 
 	echo ""
 	echo "Delegated pool setup completed."
 	echo "NOTE:"
 	echo "  - Wait one epoch."
-	echo "  - Update validator-identity.yaml account_address with: $DELEGATED_POOL_ADDRESS"
+	echo "  - Update validator-identity.yaml account_address with: $DELEGATED_RESOURCE_ACCOUNT"
 	echo "  - Start validator with updated identity."
 }
-
-# Main execution
 
 dependency_check
 validate_input
