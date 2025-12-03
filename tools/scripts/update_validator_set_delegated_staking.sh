@@ -29,6 +29,7 @@ MAX_STAKE_RATIO=30 # Maximum stake as percentage of total voting power
 
 # Delegation / delegated pool configuration (for "Validator 4"-style setup)
 DELEGATION_SEED="aptos_framework::delegation_pool2563"
+SEED=2563
 DELEGATION_COMMISSION_BPS=1000      # 1000 = 10%
 INITIAL_DELEGATION_STAKE=1000000001 # 10.00000001 MOVE (in octas)
 
@@ -368,7 +369,7 @@ get_delegated_pool_address() {
 	local response
 	response=$($MOVEMENT_CLI move view \
 		--function-id 0x1::delegation_pool::get_expected_stake_pool_address \
-		--args "address:$VALIDATOR_OWNER_ACCOUNT" "string:$DELEGATION_SEED" \
+		--args "address:$VALIDATOR_OWNER_ACCOUNT" "u64:$SEED" \
 		--url "$NETWORK_API_ADDRESS" 2>&1)
 
 	if [ $? -ne 0 ]; then
