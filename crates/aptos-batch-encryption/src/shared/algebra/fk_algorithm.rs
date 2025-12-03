@@ -206,7 +206,7 @@ impl<F: FftField + Sized> ToeplitzDomain<F> {
             .chain(beginning)
             .collect();
 
-        assert_eq!(circulant.len(), self.circulant_domain.dimension());
+        debug_assert_eq!(circulant.len(), self.circulant_domain.dimension());
 
         circulant
     }
@@ -327,21 +327,20 @@ impl<
             .chain(vec![F::zero(); f.len() - 2])
             .collect();
 
-        assert_eq!(toeplitz.len(), self.toeplitz_domain.dimension() * 2 - 1);
+        debug_assert_eq!(toeplitz.len(), self.toeplitz_domain.dimension() * 2 - 1);
 
         toeplitz
     }
 
     fn compute_h_term_commitments(&self, f: &[F], round: usize) -> Vec<T> {
-        // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
-        // dimension.
-        assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
-
         let mut f = Vec::from(f);
         f.extend(std::iter::repeat_n(
             F::zero(),
             self.toeplitz_domain.dimension() + 1 - f.len(),
         ));
+        // f.len() = (degree of f) + 1. Degree of f should be equal to the toeplitz domain
+        // dimension.
+        debug_assert_eq!(self.toeplitz_domain.dimension(), f.len() - 1);
 
         self.toeplitz_domain.eval_prepared(
             &self.toeplitz_for_poly(&f),
