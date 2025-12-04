@@ -520,10 +520,10 @@ setup_delegated_pool_flow() {
 
 	echo ""
 	echo "Delegated pool setup completed."
-	echo "NOTE:"
-	echo "  - Wait one epoch."
-	echo "  - Update validator-identity.yaml account_address with: $DELEGATED_RESOURCE_ACCOUNT"
-	echo "  - Start validator with updated identity."
+	echo "TODOs:"
+	echo "  - Deploy the validator using the identity below."
+	echo "  - Once deployed, run the command below to join the validator set."
+	echo "  - Wait one epoch for the validator to become active."
 	echo " VALIDATOR IDENTITY YAML FILE "
 	echo " -------------------------------------------"
 	echo ""
@@ -534,6 +534,15 @@ setup_delegated_pool_flow() {
 	echo "network_private_key: \"$NETWORK_PRIVATE_KEY\""
 	echo ""
 	echo " -------------------------------------------"
+	echo ""
+	echo ""
+	echo "Command to join validator set after deploying the validator:"
+	echo ""
+	echo "$MOVEMENT_CLI node join-validator-set \\"
+	echo "  --pool-address \"$DELEGATED_RESOURCE_ACCOUNT\" \\"
+	echo "  ${OPERATOR_CLI_ARGS[*]}"
+	echo ""
+
 }
 
 dependency_check
