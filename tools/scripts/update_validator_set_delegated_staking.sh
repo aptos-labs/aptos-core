@@ -89,17 +89,19 @@ get_consensus_keys() {
 	local temp_file
 	temp_file=$(mktemp)
 
-	$MOVEMENT_CLI key extract-public-key \
+	local resp
+	resp=$($MOVEMENT_CLI key extract-public-key \
 		--private-key "$private_key" \
 		--key-type "bls12381" \
 		--encoding hex \
 		--output-file "$temp_file" \
-		--assume-yes >/dev/null 2>&1
+		--assume-yes 2>&1)
 	local exit_code=$?
 
 	if [ $exit_code -ne 0 ]; then
 		rm -f "$temp_file" "${temp_file}.pub" "${temp_file}.pop"
 		echo "Error: Failed to extract consensus keys (exit code: $exit_code)" >&2
+		echo "Details: $resp" >&2
 		exit 1
 	fi
 
