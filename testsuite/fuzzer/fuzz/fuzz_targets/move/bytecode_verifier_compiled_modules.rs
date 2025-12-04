@@ -1,6 +1,6 @@
 // Copyright (c) The Move Contributors
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![no_main]
 use aptos_types::on_chain_config::Features;
