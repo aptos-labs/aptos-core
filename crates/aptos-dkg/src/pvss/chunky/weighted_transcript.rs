@@ -2,33 +2,48 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
-    Scalar, dlog::bsgs, pcs::univariate_hiding_kzg, pvss::{
-        Player, chunky::{
+    dlog::bsgs,
+    pcs::univariate_hiding_kzg,
+    pvss::{
+        chunky::{
             chunked_elgamal::{self, num_chunks_per_scalar},
             chunks,
-            hkzg_chunked_elgamal::{self},
+            hkzg_chunked_elgamal::{self, HkzgWeightedElgamalWitness},
             input_secret::InputSecret,
             keys,
             public_parameters::PublicParameters,
-        }, traits::{
-            self, HasEncryptionPublicParams, transcript::{Aggregatable, MalleableTranscript, NonAggregatableTranscript}
-        }
-    }, range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof}, sigma_protocol::{
+        },
+        traits::{
+            self,
+            transcript::{Aggregatable, MalleableTranscript, NonAggregatableTranscript},
+            HasEncryptionPublicParams,
+        },
+        Player,
+    },
+    range_proofs::{dekart_univariate_v2, traits::BatchedRangeProof},
+    sigma_protocol::{
         self,
-        homomorphism::{Trait as _, tuple::TupleCodomainShape},
+        homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::Trait as _,
-    }, traits::transcript::HasAggregatableSubtranscript
+    },
+    traits::transcript::HasAggregatableSubtranscript,
+    Scalar,
 };
 use anyhow::bail;
 use aptos_crypto::{
-    CryptoMaterialError, SecretSharingConfig as _, Signature, SigningKey, Uniform, ValidCryptoMaterial, arkworks::{
+    arkworks::{
         self,
         random::{
-            UniformRand, sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points
+            sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+            UniformRand,
         },
         scrape::LowDegreeTest,
         serialization::{ark_de, ark_se},
-    }, bls12381::{self}, hash::{CryptoHash, HashValue}, utils, weighted_config::WeightedConfigArkworks
+    },
+    bls12381::{self},
+    utils,
+    weighted_config::WeightedConfigArkworks,
+    CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{
     pairing::{Pairing, PairingOutput},
@@ -39,7 +54,6 @@ use ark_poly::EvaluationDomain;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Sub};
-use crate::pvss::chunky::hkzg_chunked_elgamal::HkzgWeightedElgamalWitness;
 
 /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
 /// transcript operations within the protocol are uniquely namespaced
@@ -55,7 +69,6 @@ pub struct Transcript<E: Pairing> {
     /// Proof (of knowledge) showing that the s_{i,j}'s in C are base-B representations (of the s_i's in V, but this is not part of the proof), and that the r_j's in R are used in C
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub sharing_proof: SharingProof<E>,
-    sig: bls12381::Signature,
 }
 
 #[allow(non_snake_case)]
@@ -95,7 +108,9 @@ impl<E: Pairing> TryFrom<&[u8]> for SubTranscript<E> {
 #[allow(type_alias_bounds)]
 type SecretSharingConfig<E: Pairing> = WeightedConfigArkworks<E::ScalarField>;
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> HasAggregatableSubtranscript<SecretSharingConfig<E>> for Transcript<E> {
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+    HasAggregatableSubtranscript<SecretSharingConfig<E>> for Transcript<E>
+{
     type SubTranscript = SubTranscript<E>;
 
     fn get_subtranscript(&self) -> Self::SubTranscript {
@@ -125,21 +140,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .map(|V_i| {
                 let affine = V_i.into_affine();
 
-                keys::DealtPubKeyShare::<E>::new(
-                    keys::DealtPubKey::new(affine)
-                )
+                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(affine))
             })
             .collect()
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(
-            self
-                .Vs
-                .last()
-                .expect("V is empty somehow")[0]
-                .into_affine(),
-        )
+        Self::DealtPubKey::new(self.Vs.last().expect("V is empty somehow")[0].into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -150,7 +157,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-
         let weight = sc.get_player_weight(player);
 
         let Cs = &self.Cs[player.id];
@@ -161,9 +167,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .Rs
             .iter()
             .take(weight)
-            .map(|R_i_vec| {
-                R_i_vec.iter().map(|R_i| R_i.mul(dk.dk)).collect::<Vec<_>>()
-            })
+            .map(|R_i_vec| R_i_vec.iter().map(|R_i| R_i.mul(dk.dk)).collect::<Vec<_>>())
             .collect();
 
         if let Some(first_key) = ephemeral_keys.first() {
@@ -177,7 +181,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let mut sk_shares: Vec<Scalar<E>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
-        for i in 0..weight { // TODO: should really put this in a separate function
+        for i in 0..weight {
+            // TODO: should really put this in a separate function
             let dealt_encrypted_secret_key_share_chunks: Vec<_> = Cs[i]
                 .iter()
                 .zip(ephemeral_keys[i].iter())
@@ -192,10 +197,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             )
             .expect("BSGS dlog failed");
 
-            let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> = dealt_chunked_secret_key_share
-                .iter()
-                .map(|&x| E::ScalarField::from(x))
-                .collect();
+            let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> =
+                dealt_chunked_secret_key_share
+                    .iter()
+                    .map(|&x| E::ScalarField::from(x))
+                    .collect();
 
             let dealt_secret_key_share =
                 chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
@@ -204,8 +210,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
 
         (
-            sk_shares,
-            pk_shares, // TODO: review this formalism... wh ydo we need this here?
+            sk_shares, pk_shares, // TODO: review this formalism... wh ydo we need this here?
         )
     }
 }
@@ -238,99 +243,6 @@ impl<E: Pairing> Aggregatable<SecretSharingConfig<E>> for SubTranscript<E> {
         Ok(())
     }
 }
-
-// TODO: Could maybe also use the existing `Contribution` struct from `das`, if we're okay with adding player ids etc?
-#[derive(Serialize)]
-pub struct Contribution<E: Pairing> {
-    #[serde(serialize_with = "ark_se")]
-    pub comm: E::G2,
-}
-
-// ================================================================
-//            IMPLEMENTATION OF CONTRIBUTION HASHER
-// ================================================================
-
-/// Cryptographic hasher for a BCS-serializable `Contribution`
-#[derive(Clone)]
-pub struct ContributionHasher(aptos_crypto::hash::DefaultHasher);
-
-impl ContributionHasher {
-    fn new() -> Self {
-        const DOMAIN: &[u8] = b"Contribution";
-
-        ContributionHasher(aptos_crypto::hash::DefaultHasher::new(DOMAIN))
-    }
-}
-
-static CONTRIBUTION_HASHER: aptos_crypto::_once_cell::sync::Lazy<ContributionHasher> =
-    aptos_crypto::_once_cell::sync::Lazy::new(|| ContributionHasher::new());
-
-impl Default for ContributionHasher {
-    fn default() -> Self {
-        CONTRIBUTION_HASHER.clone()
-    }
-}
-
-impl aptos_crypto::hash::CryptoHasher for ContributionHasher {
-    fn seed() -> &'static [u8; 32] {
-        // Directly compute a fixed seed from the domain string.
-        const DOMAIN: &[u8] = b"Contribution";
-
-        // Compute once and leak to get 'static
-        Box::leak(Box::new(aptos_crypto::hash::DefaultHasher::prefixed_hash(
-            DOMAIN,
-        )))
-    }
-
-    fn update(&mut self, bytes: &[u8]) {
-        self.0.update(bytes);
-    }
-
-    fn finish(self) -> aptos_crypto::hash::HashValue {
-        self.0.finish()
-    }
-}
-
-impl std::io::Write for ContributionHasher {
-    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
-        self.0.update(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> std::io::Result<()> {
-        Ok(())
-    }
-}
-
-// ================================================================
-//         END IMPLEMENTATION OF CONTRIBUTION HASHER
-// ================================================================
-
-// ================================================================
-//          IMPLEMENTATION OF CONTRIBUTION BCS HASH
-// ================================================================
-
-/// Manual implementation of `BCSCryptoHash` for `Contribution<E>`
-impl<E: Pairing> CryptoHash for Contribution<E>
-where
-    Contribution<E>: Serialize,
-{
-    type Hasher = ContributionHasher;
-
-    fn hash(&self) -> HashValue {
-        use aptos_crypto::hash::CryptoHasher;
-
-        let mut state = Self::Hasher::default();
-        // If BCS serialization fails, this is a programmer error
-        bcs::serialize_into(&mut state, &self)
-            .expect("BCS serialization of Contribution should not fail");
-        state.finish()
-    }
-}
-
-// ================================================================
-//        END IMPLEMENTATION OF CONTRIBUTION BCS HASH
-// ================================================================
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
@@ -401,7 +313,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     fn deal<A: Serialize + Clone, R: rand_core::RngCore + rand_core::CryptoRng>(
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        ssk: &Self::SigningSecretKey,
+        _ssk: &Self::SigningSecretKey,
         spk: &Self::SigningPubKey,
         eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
@@ -445,13 +357,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
-        // Now sign the contribution
-        let sig = ssk
-            .sign(&Contribution::<E> {
-                comm: *flattened_Vs.last().unwrap(),
-            })
-            .expect("signing of `chunky` PVSS transcript failed");
-
         let mut Vs = unflatten_by_weights(&flattened_Vs, sc);
         Vs.push(vec![*flattened_Vs.last().unwrap()]);
 
@@ -459,7 +364,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             dealer: *dealer,
             subtrs: SubTranscript { Vs, Cs, Rs },
             sharing_proof,
-            sig
         }
     }
 
@@ -478,21 +382,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .map(|V_i| {
                 let affine = V_i.into_affine();
 
-                keys::DealtPubKeyShare::<E>::new(
-                    keys::DealtPubKey::new(affine)
-                )
+                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(affine))
             })
             .collect()
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(
-            self.subtrs
-                .Vs
-                .last()
-                .expect("V is empty somehow")[0]
-                .into_affine(),
-        )
+        Self::DealtPubKey::new(self.subtrs.Vs.last().expect("V is empty somehow")[0].into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -503,7 +399,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         dk: &Self::DecryptPrivKey,
         pp: &Self::PublicParameters,
     ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-
         let weight = sc.get_player_weight(player);
 
         let Cs = &self.subtrs.Cs[player.id];
@@ -515,9 +410,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .Rs
             .iter()
             .take(weight)
-            .map(|R_i_vec| {
-                R_i_vec.iter().map(|R_i| R_i.mul(dk.dk)).collect::<Vec<_>>()
-            })
+            .map(|R_i_vec| R_i_vec.iter().map(|R_i| R_i.mul(dk.dk)).collect::<Vec<_>>())
             .collect();
 
         if let Some(first_key) = ephemeral_keys.first() {
@@ -531,7 +424,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let mut sk_shares: Vec<Scalar<E>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
-        for i in 0..weight { // TODO: should really put this in a separate function
+        for i in 0..weight {
+            // TODO: should really put this in a separate function
             let dealt_encrypted_secret_key_share_chunks: Vec<_> = Cs[i]
                 .iter()
                 .zip(ephemeral_keys[i].iter())
@@ -546,10 +440,11 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             )
             .expect("BSGS dlog failed");
 
-            let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> = dealt_chunked_secret_key_share
-                .iter()
-                .map(|&x| E::ScalarField::from(x))
-                .collect();
+            let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> =
+                dealt_chunked_secret_key_share
+                    .iter()
+                    .map(|&x| E::ScalarField::from(x))
+                    .collect();
 
             let dealt_secret_key_share =
                 chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
@@ -558,8 +453,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
 
         (
-            sk_shares,
-            pk_shares, // TODO: review this formalism... wh ydo we need this here?
+            sk_shares, pk_shares, // TODO: review this formalism... wh ydo we need this here?
         )
     }
 
@@ -570,18 +464,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     {
         let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
 
-        let ssk = bls12381::PrivateKey::generate(rng);
-
-        let sig = ssk
-            .sign(&Contribution::<E> {
-                comm: unsafe_random_point(rng),
-            })
-            .expect("signing of PVSS transcript should have succeeded");
-
         Transcript {
             dealer: sc.get_player(0),
             subtrs: SubTranscript {
-                Vs: unflatten_by_weights(&unsafe_random_points::<E::G2, _>(sc.get_total_weight() + 1, rng), sc),
+                Vs: unflatten_by_weights(
+                    &unsafe_random_points::<E::G2, _>(sc.get_total_weight() + 1, rng),
+                    sc,
+                ),
                 Cs: (0..sc.get_total_num_players())
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
@@ -590,25 +479,24 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
                             .collect() // todo: use vec![vec![]]... like in the generate functions
                     })
                     .collect(),
-                Rs: (0..sc.get_max_weight()).map(|_| unsafe_random_points(num_chunks_per_share, rng)).collect(),
+                Rs: (0..sc.get_max_weight())
+                    .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                    .collect(),
             },
             sharing_proof: SharingProof {
                 range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
                     unsafe_random_point(rng),
                 ),
-                SoK: hkzg_chunked_elgamal::WeightedProof::generate(
-                    sc,
-                    num_chunks_per_share,
-                    rng,
-                ),
+                SoK: hkzg_chunked_elgamal::WeightedProof::generate(sc, num_chunks_per_share, rng),
                 range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
             },
-            sig,
         }
     }
 }
 
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggregatableTranscript for Transcript<E> {
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggregatableTranscript
+    for Transcript<E>
+{
     #[allow(non_snake_case)]
     fn verify<A: Serialize + Clone>(
         &self,
@@ -619,9 +507,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
         sid: &A,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.get_total_num_players() {
-            bail!("Expected {} encryption keys, but got {}", sc.get_total_num_players(), eks.len());
+            bail!(
+                "Expected {} encryption keys, but got {}",
+                sc.get_total_num_players(),
+                eks.len()
+            );
         }
-        if self.subtrs.Cs.len() != sc.get_total_num_players() { // probably incorrect because weighting
+        if self.subtrs.Cs.len() != sc.get_total_num_players() {
             bail!(
                 "Expected {} arrays of chunked ciphertexts, but got {}",
                 sc.get_total_num_players(),
@@ -643,14 +535,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
             self.dealer.id,
             DST.to_vec(),
         ); // As above, this is a bit hacky... though we have access to `self` now
-
-        // Verify the transcript signature
-        self.sig.verify(
-            &Contribution::<E> {
-                comm: self.subtrs.Vs.last().unwrap()[0],
-            },
-            &spks[self.dealer.id],
-        )?;
 
         {
             // Verify the PoK
@@ -689,7 +573,13 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
         let mut rng = rand::thread_rng(); // TODO: make `rng` a parameter of fn verify()?
 
         // Do the SCRAPE LDT
-        let ldt = LowDegreeTest::random(&mut rng, sc.get_threshold_weight(), sc.get_total_weight() + 1, true, &sc.get_threshold_config().domain); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
+        let ldt = LowDegreeTest::random(
+            &mut rng,
+            sc.get_threshold_weight(),
+            sc.get_total_weight() + 1,
+            true,
+            &sc.get_threshold_config().domain,
+        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
         let Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
         // could add an assert_eq here with sc.get_total_weight()
         ldt.low_degree_test_group(&Vs_flat)?;
@@ -702,8 +592,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
         let powers_of_beta = utils::powers(beta, sc.get_total_weight() + 1);
 
         let Cs_flat: Vec<_> = self.subtrs.Cs.iter().flatten().cloned().collect();
-        assert_eq!(Cs_flat.len(), sc.get_total_weight(), "Number of ciphertexts does not equal number of weights"); // TODO what if zero weight?
-        // could add an assert_eq here with sc.get_total_weight()
+        assert_eq!(
+            Cs_flat.len(),
+            sc.get_total_weight(),
+            "Number of ciphertexts does not equal number of weights"
+        ); // TODO what if zero weight?
+           // could add an assert_eq here with sc.get_total_weight()
 
         for i in 0..Cs_flat.len() {
             for j in 0..Cs_flat[i].len() {
@@ -713,11 +607,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
                 exp_vec.push(exp);
             }
         }
-
-//        eprintln!("yessssieeeeeeeeeeeeeeeeeeeeeeee!!!!!!!!!!!!!!!!!!!!!!!! {:?}", base_vec.len());
-//        eprintln!("yessssieeeeeeeeeeeeeeeeeeeeeeee2!!!!!!!!!!!!!!!!!!!!!!!! {:?}", exp_vec.len());
-//        eprintln!("yessss!!!!!!!!!!!!!!!!!!!!!!!! {:?}", base_vec);
-//        eprintln!("yessss2!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! {:?}", exp_vec);
 
         let weighted_Cs = E::G1::msm(&E::G1::normalize_batch(&base_vec), &exp_vec)
             .expect("Failed to compute MSM of Cs in chunky");
@@ -763,14 +652,15 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let hkzg_randomness = univariate_hiding_kzg::CommitmentRandomness::rand(rng);
         let elgamal_randomness = Scalar::vecvec_from_inner(
             (0..sc.get_max_weight())
-            .map(|_| {
-                chunked_elgamal::correlated_randomness(
-                    rng,
-                    1 << pp.ell as u64,
-                    num_chunks_per_scalar::<E::ScalarField>(pp.ell),
-                )
-            })
-            .collect());
+                .map(|_| {
+                    chunked_elgamal::correlated_randomness(
+                        rng,
+                        1 << pp.ell as u64,
+                        num_chunks_per_scalar::<E::ScalarField>(pp.ell),
+                    )
+                })
+                .collect(),
+        );
 
         // Chunk and flatten the shares
         let f_evals_chunked: Vec<Vec<E::ScalarField>> = f_evals

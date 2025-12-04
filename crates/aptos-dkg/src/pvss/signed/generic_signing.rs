@@ -1,28 +1,23 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-use crate::pvss::traits::transcript::NonAggregatableTranscript;
-use crate::traits::Transcript;
-use aptos_crypto::bls12381;
-use serde::Serialize;
-use rand_core::CryptoRng;
-use rand_core::RngCore;
-use aptos_crypto::player::Player;
-use aptos_crypto::SigningKey;
-use serde::Deserialize;
-use aptos_crypto_derive::CryptoHasher;
-use aptos_crypto_derive::BCSCryptoHash;
-use aptos_crypto::ValidCryptoMaterial;
-use aptos_crypto::CryptoMaterialError;
-use aptos_crypto::Uniform;
-use crate::pvss::test_utils::NoAux;
-use aptos_crypto::Signature;
+use crate::{
+    pvss::{test_utils::NoAux, traits::transcript::NonAggregatableTranscript},
+    traits::Transcript,
+};
+use aptos_crypto::{
+    bls12381, player::Player, CryptoMaterialError, Signature, SigningKey, Uniform,
+    ValidCryptoMaterial,
+};
+use aptos_crypto_derive::{BCSCryptoHash, CryptoHasher};
+use rand_core::{CryptoRng, RngCore};
+use serde::{Deserialize, Serialize};
 
 /// A generic transformation from a non-malleable PVSS to a signed and non-malleable PVSS.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 pub struct GenericSigning<T> {
     trs: T,
-    sig: bls12381::Signature
+    sig: bls12381::Signature,
 }
 
 impl<T: Transcript> ValidCryptoMaterial for GenericSigning<T> {
@@ -43,16 +38,18 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericSigning<T> {
     }
 }
 
+// TODO: currently signs the entire transcript, only need to sign contribution
 #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
-pub struct Contribution<T, S> {
-    pub trs: T,
-    pub sid: S, // the session id
+pub struct SessionContribution<C, S> {
+    pub contrib: C, // the transcript's contribution, to be signed
+    pub sid: S,     // the session id
 }
 
-/// Currently has requirements on the `SigningPubKey` and `SigningSecretKey`, in order 
+/// Currently has requirements on the `SigningPubKey` and `SigningSecretKey`, in order
 /// to get a signature of type `bls12381::Signature`; this can be relaxed
-impl<T: Transcript<SigningPubKey = bls12381::PublicKey, SigningSecretKey = bls12381::PrivateKey>> Transcript
-    for GenericSigning<T>
+impl<
+        T: Transcript<SigningPubKey = bls12381::PublicKey, SigningSecretKey = bls12381::PrivateKey>,
+    > Transcript for GenericSigning<T>
 {
     type DealtPubKey = T::DealtPubKey;
     type DealtPubKeyShare = T::DealtPubKeyShare;
@@ -87,30 +84,17 @@ impl<T: Transcript<SigningPubKey = bls12381::PublicKey, SigningSecretKey = bls12
         dealer: &Player,
         rng: &mut R,
     ) -> Self {
-
-        let trs = T::deal(
-                sc,
-                pp,
-                ssk,
-                spk,
-                eks,
-                s,
-                sid,
-                dealer,
-                rng,
-            );
+        let trs = T::deal(sc, pp, ssk, spk, eks, s, sid, dealer, rng);
 
         // Sign the contribution
         let sig = ssk
-            .sign(&Contribution {
-                trs: trs.clone(), sid
+            .sign(&SessionContribution {
+                contrib: trs.get_dealt_public_key(),
+                sid,
             })
             .expect("signing of `chunky` PVSS transcript failed");
 
-        GenericSigning {
-            trs,
-            sig
-        }
+        GenericSigning { trs, sig }
     }
 
     fn get_dealers(&self) -> Vec<Player> {
@@ -148,18 +132,23 @@ impl<T: Transcript<SigningPubKey = bls12381::PublicKey, SigningSecretKey = bls12
         let ssk = bls12381::PrivateKey::generate(rng);
 
         let sig = ssk
-            .sign(&Contribution {
-                trs: trs.clone(), sid: NoAux,
+            .sign(&SessionContribution {
+                contrib: trs.get_dealt_public_key(),
+                sid: NoAux,
             })
             .expect("signing of PVSS transcript should have succeeded");
 
-        GenericSigning {
-            trs, sig,
-        }
+        GenericSigning { trs, sig }
     }
 }
 
-impl<T: NonAggregatableTranscript<SigningPubKey = bls12381::PublicKey, SigningSecretKey = bls12381::PrivateKey>> NonAggregatableTranscript for GenericSigning<T> {
+impl<
+        T: NonAggregatableTranscript<
+            SigningPubKey = bls12381::PublicKey,
+            SigningSecretKey = bls12381::PrivateKey,
+        >,
+    > NonAggregatableTranscript for GenericSigning<T>
+{
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
@@ -168,21 +157,14 @@ impl<T: NonAggregatableTranscript<SigningPubKey = bls12381::PublicKey, SigningSe
         eks: &[Self::EncryptPubKey],
         sid: &A,
     ) -> anyhow::Result<()> {
-
         self.sig.verify(
-            &Contribution {
-                trs: self.trs.clone(), sid,
+            &SessionContribution {
+                contrib: self.trs.get_dealt_public_key(),
+                sid,
             },
             &spks[self.get_dealers()[0].id],
         )?;
 
-        T::verify(
-            &self.trs,
-            sc,
-            pp,
-            spks,
-            eks,
-            sid,
-        )
+        T::verify(&self.trs, sc, pp, spks, eks, sid)
     }
 }

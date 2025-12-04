@@ -9,14 +9,16 @@ use crate::pvss::{
     Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
 use aptos_crypto::{
-    SigningKey, Uniform, arkworks::shamir::Reconstructable, traits::{self, SecretSharingConfig as _, ThresholdConfig as _}, weighted_config::WeightedConfigArkworks
+    arkworks::shamir::Reconstructable,
+    traits::{self, SecretSharingConfig as _, ThresholdConfig as _},
+    weighted_config::{WeightedConfig, WeightedConfigArkworks},
+    SigningKey, Uniform,
 };
 use ark_ff::FftField;
 use num_traits::Zero;
 use rand::{prelude::ThreadRng, thread_rng};
 use serde::Serialize;
 use std::ops::AddAssign;
-use aptos_crypto::weighted_config::WeightedConfig;
 
 /// Type used to indicate that dealears are not including any auxiliary data in their PVSS transcript
 /// signatures.
@@ -74,7 +76,11 @@ pub fn setup_dealing<T: Transcript, R: rand_core::RngCore + rand_core::CryptoRng
 }
 
 // TODO: Possible way to merge this would be to make `SecretSharingConfig`s implement `WeightedConfig` with all weights set to 1
-pub fn setup_dealing_weighted<F: FftField, T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>, R: rand_core::RngCore + rand_core::CryptoRng>(
+pub fn setup_dealing_weighted<
+    F: FftField,
+    T: Transcript<SecretSharingConfig = WeightedConfigArkworks<F>>,
+    R: rand_core::RngCore + rand_core::CryptoRng,
+>(
     sc: &T::SecretSharingConfig,
     mut rng: &mut R,
 ) -> DealingArgs<T> {
@@ -119,7 +125,10 @@ pub fn generate_keys_and_secrets<T: Transcript, R: rand_core::RngCore + rand_cor
     let ssks = (0..sc.get_total_num_players())
         .map(|_| T::SigningSecretKey::generate(rng))
         .collect::<Vec<_>>();
-    let spks = ssks.iter().map(|ssk| ssk.verifying_key()).collect::<Vec<_>>();
+    let spks = ssks
+        .iter()
+        .map(|ssk| ssk.verifying_key())
+        .collect::<Vec<_>>();
 
     let dks = (0..sc.get_total_num_players())
         .map(|_| T::DecryptPrivKey::generate(rng))
@@ -341,10 +350,9 @@ where
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
-//    eprint!("!!!!!!!!!!! {:?}", players_and_shares.len());
-//    eprint!("!!!!!!!!!!! {:?}", players_and_shares[0].1.len());
-//   eprint!("!!!!!!!!!!! {:?}", players_and_shares[1].1.len());
-
+    //    eprint!("!!!!!!!!!!! {:?}", players_and_shares.len());
+    //    eprint!("!!!!!!!!!!! {:?}", players_and_shares[0].1.len());
+    //   eprint!("!!!!!!!!!!! {:?}", players_and_shares[1].1.len());
 
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

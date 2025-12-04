@@ -79,7 +79,7 @@ pub trait SubTranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Eq;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKeyShare: PartialEq + Clone;
-    type DealtPubKey;
+    type DealtPubKey: Serialize;
     type EncryptPubKey: Debug
         + Clone
         + ValidCryptoMaterial
@@ -151,7 +151,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Eq;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKeyShare: PartialEq + Clone;
-    type DealtPubKey;
+    type DealtPubKey: Serialize;
     type EncryptPubKey: Debug
         + Clone
         + ValidCryptoMaterial
@@ -291,7 +291,7 @@ pub trait NonAggregatableTranscript: Transcript {
         pp: &Self::PublicParameters,
         spks: &[Self::SigningPubKey],
         eks: &[Self::EncryptPubKey],
-        sid: &A, // Note the different signature heres
+        sid: &A, // Note the different function signature heres
     ) -> anyhow::Result<()>;
 }
 

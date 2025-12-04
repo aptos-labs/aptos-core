@@ -72,9 +72,10 @@ impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParame
 }
 
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DealtPubKey<E: Pairing> {
     /// A group element $G$ \in G_2$
+    #[serde(serialize_with = "ark_se")]
     G: E::G2Affine,
 }
 

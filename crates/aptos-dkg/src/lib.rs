@@ -18,9 +18,12 @@
 #![allow(clippy::borrow_interior_mutable_const)]
 
 use crate::pvss::{traits, Player};
-use aptos_crypto::arkworks::{
-    random::{sample_field_element, UniformRand},
-    shamir::{Reconstructable, ShamirThresholdConfig},
+use aptos_crypto::{
+    arkworks::{
+        random::{sample_field_element, UniformRand},
+        shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
+    },
+    weighted_config::WeightedConfigArkworks,
 };
 pub use aptos_crypto::{
     blstrs as algebra,
@@ -31,9 +34,6 @@ use ark_ff::{Fp, FpConfig};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use more_asserts::{assert_ge, assert_le};
 use rand::Rng;
-use aptos_crypto::arkworks::shamir::ShamirShare;
-use aptos_crypto::weighted_config::WeightedConfigArkworks;
-
 pub use utils::random::DST_RAND_CORE_HELL;
 
 pub mod dlog;
@@ -44,7 +44,6 @@ pub mod range_proofs;
 pub mod sigma_protocol;
 pub mod utils;
 pub mod weighted_vuf;
-
 
 /// A wrapper around `E::ScalarField` to prevent overlapping trait implementations.
 ///

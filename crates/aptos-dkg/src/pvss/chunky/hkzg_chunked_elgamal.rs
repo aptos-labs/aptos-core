@@ -14,12 +14,17 @@ use crate::{
     },
     Scalar,
 };
-use aptos_crypto::{arkworks::random::{UniformRand, sample_field_element, sample_field_elements, unsafe_random_point}, weighted_config::WeightedConfigArkworks};
+use aptos_crypto::{
+    arkworks::random::{
+        sample_field_element, sample_field_elements, unsafe_random_point, unsafe_random_points,
+        UniformRand,
+    },
+    weighted_config::WeightedConfigArkworks,
+    SecretSharingConfig,
+};
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use aptos_crypto::arkworks::random::unsafe_random_points;
-use aptos_crypto::SecretSharingConfig;
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -41,7 +46,7 @@ use aptos_crypto::SecretSharingConfig;
 pub struct HkzgElgamalWitness<E: Pairing> {
     pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<E>,
     pub chunked_plaintexts: Vec<Vec<Scalar<E>>>, // For each plaintext z_i, a chunk z_{i,j}
-    pub elgamal_randomness: Vec<Scalar<E>>, // For each chunk, a blinding factor
+    pub elgamal_randomness: Vec<Scalar<E>>,      // For each chunk, a blinding factor
 }
 
 #[derive(
@@ -69,8 +74,10 @@ type LiftedHkzg<'a, E> =
 type LiftedChunkedElgamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
 
-type LiftedHkzgWeighted<'a, E> =
-    LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgWeightedElgamalWitness<E>>;
+type LiftedHkzgWeighted<'a, E> = LiftHomomorphism<
+    univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
+    HkzgWeightedElgamalWitness<E>,
+>;
 type LiftedWeightedChunkedElgamal<'a, E> =
     LiftHomomorphism<chunked_elgamal::WeightedHomomorphism<'a, E>, HkzgWeightedElgamalWitness<E>>;
 
@@ -125,7 +132,8 @@ type LiftedWeightedChunkedElgamal<'a, E> =
 // it would make more sense to say this is a tuple homomorphism consisting of (lifts of) the
 // DeKARTv2::commitment_homomorphism together with the chunked_elgamal::homomorphism.
 pub type Homomorphism<'a, E> = TupleHomomorphism<LiftedHkzg<'a, E>, LiftedChunkedElgamal<'a, E>>;
-pub type WeightedHomomorphism<'a, E> = TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, E>>;
+pub type WeightedHomomorphism<'a, E> =
+    TupleHomomorphism<LiftedHkzgWeighted<'a, E>, LiftedWeightedChunkedElgamal<'a, E>>;
 
 pub type Proof<'a, E> = sigma_protocol::Proof<E, Homomorphism<'a, E>>;
 pub type WeightedProof<'a, E> = sigma_protocol::Proof<E, WeightedHomomorphism<'a, E>>;
@@ -173,14 +181,17 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
                 TrivialShape(unsafe_random_point(rng)), // because TrivialShape is the codomain of univariate_hiding_kzg::CommitmentHomomorphism. TODO: develop generate() methods there? Maybe make it part of sigma_protocol::Trait ?
                 chunked_elgamal::WeightedCodomainShape {
                     chunks: (0..sc.get_total_num_players())
-                    .map(|i| {
-                        let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
-                        (0..w)
-                            .map(|_| unsafe_random_points(number_of_chunks, rng))
-                            .collect()
-                    })
-                    .collect(),
-                    randomness: vec![unsafe_random_points(number_of_chunks, rng); sc.get_max_weight()],
+                        .map(|i| {
+                            let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
+                            (0..w)
+                                .map(|_| unsafe_random_points(number_of_chunks, rng))
+                                .collect()
+                        })
+                        .collect(),
+                    randomness: vec![
+                        unsafe_random_points(number_of_chunks, rng);
+                        sc.get_max_weight()
+                    ],
                 },
             )),
             z: HkzgWeightedElgamalWitness {
@@ -189,11 +200,16 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
                         (0..w)
-                            .map(|_| Scalar::vec_from_inner(sample_field_elements(number_of_chunks, rng)))
+                            .map(|_| {
+                                Scalar::vec_from_inner(sample_field_elements(number_of_chunks, rng))
+                            })
                             .collect()
                     })
                     .collect(),
-                elgamal_randomness: vec![vec![Scalar(sample_field_element(rng)); number_of_chunks]; sc.get_max_weight()],
+                elgamal_randomness: vec![
+                    vec![Scalar(sample_field_element(rng)); number_of_chunks];
+                    sc.get_max_weight()
+                ],
             },
         }
     }

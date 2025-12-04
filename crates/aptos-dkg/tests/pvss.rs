@@ -6,17 +6,17 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
-use aptos_crypto::weighted_config::WeightedConfigArkworks;
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
     traits::SecretSharingConfig as _,
+    weighted_config::WeightedConfigArkworks,
 };
 #[cfg(test)]
 use aptos_dkg::pvss::traits::AggregatableTranscript;
 use aptos_dkg::pvss::{
     chunky, das,
     das::unweighted_protocol,
-    insecure_field, test_utils,
+    insecure_field, signed, test_utils,
     test_utils::{
         get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
         reconstruct_dealt_secret_key_randomly, NoAux,
@@ -102,10 +102,15 @@ fn test_pvss_all_weighted() {
             println!("\nTesting {wc} PVSS");
             let seed = random_scalar(&mut rng);
 
-            pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<ark_bn254::Bn254, chunky::WeightedTranscript<ark_bn254::Bn254>>(
-                &wc,
-                seed.to_bytes_le(),
-            );
+            pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+                ark_bn254::Bn254,
+                signed::GenericSigning<chunky::WeightedTranscript<ark_bn254::Bn254>>,
+            >(&wc, seed.to_bytes_le());
+
+            pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+                ark_bn254::Bn254,
+                chunky::WeightedTranscript<ark_bn254::Bn254>,
+            >(&wc, seed.to_bytes_le());
         }
     }
 }
@@ -249,7 +254,10 @@ fn pvss_nonaggregate_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(
 use ark_ec::pairing::Pairing;
 // TODO: merge this stuff
 #[cfg(test)]
-fn pvss_nonaggregate_weighted_deal_verify_and_reconstruct<E: Pairing, T: NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>>(
+fn pvss_nonaggregate_weighted_deal_verify_and_reconstruct<
+    E: Pairing,
+    T: NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+>(
     sc: &WeightedConfigArkworks<E::ScalarField>,
     seed_bytes: [u8; 32],
 ) {

@@ -231,10 +231,11 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq> Entrywis
             })
             .collect();
 
-        let randomness = self.randomness
-    .into_iter()
-    .map(|inner_vec| inner_vec.into_iter().map(&f).collect::<Vec<_>>())
-    .collect();
+        let randomness = self
+            .randomness
+            .into_iter()
+            .map(|inner_vec| inner_vec.into_iter().map(&f).collect::<Vec<_>>())
+            .collect();
 
         WeightedCodomainShape { chunks, randomness }
     }
@@ -252,7 +253,9 @@ impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for Codo
     }
 }
 
-impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator for WeightedCodomainShape<T> {
+impl<T: CanonicalSerialize + CanonicalDeserialize + Clone> IntoIterator
+    for WeightedCodomainShape<T>
+{
     type IntoIter = std::vec::IntoIter<T>;
     type Item = T;
 
@@ -278,16 +281,13 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
         let Cs = input
             .plaintext_chunks
-        .iter()
-        .enumerate()
-        .map(|(i, z_i)| { // here i is the player's id
-            chunks_msm_terms(self.pp,
-                self.eks[i],
-                z_i,
-                &input.plaintext_randomness,
-            )
-        })
-        .collect();
+            .iter()
+            .enumerate()
+            .map(|(i, z_i)| {
+                // here i is the player's id
+                chunks_msm_terms(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
+            })
+            .collect();
 
         // R_j = r_j * H_1
         let Rs = input
@@ -318,7 +318,8 @@ fn chunks_msm_terms<E: Pairing>(
     chunks: &[Scalar<E>],
     correlated_randomness: &[Scalar<E>],
 ) -> Vec<fixed_base_msms::MsmInput<E::G1Affine, E::ScalarField>> {
-    chunks.iter()
+    chunks
+        .iter()
         .zip(correlated_randomness.iter())
         .map(|(&z_ij, &r_j)| fixed_base_msms::MsmInput {
             bases: vec![pp.G, ek],
@@ -359,20 +360,16 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
         // C_{i,j} = z_{i,j} * G_1 + r_j * ek[i]
         let Cs = input
             .plaintext_chunks
-        .iter()
-        .enumerate()
-        .map(|(i, z_i)| { // here `i` is the player's id
-            chunks_vec_msm_terms(
-                self.pp,
-                self.eks[i],
-                z_i,
-                &input.plaintext_randomness,
-            )
-        })
-        .collect();
+            .iter()
+            .enumerate()
+            .map(|(i, z_i)| {
+                // here `i` is the player's id
+                chunks_vec_msm_terms(self.pp, self.eks[i], z_i, &input.plaintext_randomness)
+            })
+            .collect();
 
         // R_j = r_j * H_1
-        let Rs= input
+        let Rs = input
             .plaintext_randomness
             .iter()
             .map(|inner_vec| {
