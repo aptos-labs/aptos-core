@@ -83,7 +83,7 @@ impl traits::Transcript for Transcript {
         pp: &Self::PublicParameters,
         _ssk: &Self::SigningSecretKey,
         _spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         _aux: &A,
         dealer: &Player,
@@ -114,9 +114,9 @@ impl traits::Transcript for Transcript {
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        _spks: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        _aux: &Vec<A>,
+        _spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        _aux: &[A],
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());

@@ -48,7 +48,7 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericWeighting<T> {
 impl<T: Transcript> GenericWeighting<T> {
     fn to_weighted_encryption_keys(
         sc: &WeightedConfigBlstrs,
-        eks: &Vec<T::EncryptPubKey>,
+        eks: &[T::EncryptPubKey],
     ) -> Vec<T::EncryptPubKey> {
         // Re-organize the encryption key vector so that we deal multiple shares to each player,
         // proportional to their weight.
@@ -99,7 +99,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         aux: &A,
         dealer: &Player,
@@ -127,9 +127,9 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        spk: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>,
+        spk: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        aux: &[A],
     ) -> anyhow::Result<()> {
         let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
 

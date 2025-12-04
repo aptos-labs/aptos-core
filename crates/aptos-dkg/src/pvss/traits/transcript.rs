@@ -182,9 +182,9 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
-        session_id: &A,
+        sid: &A,
         dealer: &Player,
         rng: &mut R,
     ) -> Self;
@@ -200,9 +200,9 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        spks: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        session_ids: &Vec<A>,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        sids: &[A],
     ) -> anyhow::Result<()>;
 
     /// Returns the set of player IDs who have contributed to this transcript.

@@ -8,7 +8,7 @@ use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
     pvss::{
-        self,
+        das,
         chunky::Transcript as ChunkyTranscript,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
@@ -21,8 +21,7 @@ use aptos_dkg::{
         LowDegreeTest, WeightedConfigBlstrs,
     },
 };
-use ark_bn254::Config as Bn254Config;
-use ark_ec::models::bn::Bn;
+use ark_bn254::Bn254;
 use criterion::{
     criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
@@ -35,19 +34,19 @@ pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subscript
     for tc in get_threshold_configs_for_benchmarking() {
         subaggregatable_pvss_group::<
-            <ChunkyTranscript<Bn<Bn254Config>> as Transcript>::SecretSharingConfig,
-            pvss::chunky::Transcript<ark_bn254::Bn254>,
+            <ChunkyTranscript<Bn254> as Transcript>::SecretSharingConfig,
+            ChunkyTranscript<Bn254>,
         >(&tc, c);
     }
 
     // unweighted aggregatable PVSS
     for tc in get_threshold_configs_for_benchmarking() {
-        aggregatable_pvss_group::<pvss::das::Transcript>(&tc, c);
+        aggregatable_pvss_group::<das::Transcript>(&tc, c);
     }
 
     // weighted PVSS
     for wc in get_weighted_configs_for_benchmarking() {
-        let d = aggregatable_pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
+        let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
         weighted_pvss_group(&wc, d, c);
 
         // Note: Insecure, so not interested in benchmarks.

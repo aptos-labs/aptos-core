@@ -113,7 +113,7 @@ impl traits::Transcript for Transcript {
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         _spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         aux: &A,
         dealer: &Player,
@@ -189,9 +189,9 @@ impl traits::Transcript for Transcript {
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        spks: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        auxs: &Vec<A>,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        auxs: &[A],
     ) -> anyhow::Result<()> {
         self.check_sizes(sc)?;
         let n = sc.get_total_num_players();

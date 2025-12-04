@@ -357,7 +357,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         session_id: &A,
         dealer: &Player,
@@ -419,9 +419,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        spks: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        session_ids: &Vec<A>,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        session_ids: &[A],
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
