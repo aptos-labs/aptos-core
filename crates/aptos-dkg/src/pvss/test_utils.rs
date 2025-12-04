@@ -323,21 +323,6 @@ where
     R: rand_core::RngCore,
 {
     // Test reconstruction from t random shares
-
-    // let players = sc
-    //     .get_random_eligible_subset_of_players(rng);
-    // eprintln!("!!!!!!!!!!!!!! players lijst {:?}", players);
-    // let players_and_shares = players
-    //     .into_iter()
-    //     .map(|p| {
-    //         let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()], pp);
-
-    //         assert_eq!(pk, trx.get_public_key_share(sc, &p));
-
-    //         (p, sk)
-    //     })
-    //     .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
-
     let players_and_shares = sc
         .get_random_eligible_subset_of_players(rng)
         .into_iter()
@@ -349,10 +334,6 @@ where
             (p, sk)
         })
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
-
-    //    eprint!("!!!!!!!!!!! {:?}", players_and_shares.len());
-    //    eprint!("!!!!!!!!!!! {:?}", players_and_shares[0].1.len());
-    //   eprint!("!!!!!!!!!!! {:?}", players_and_shares[1].1.len());
 
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }

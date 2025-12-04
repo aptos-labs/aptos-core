@@ -273,6 +273,7 @@ pub trait Aggregatable<C>: Sized {
 pub trait AggregatableTranscript:
     Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>
 {
+    // The signature here is slightly different from `NonAggregatableTranscript`, because our aggregatable PVSSs needs all of the session ids
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,

@@ -38,7 +38,6 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericSigning<T> {
     }
 }
 
-// TODO: currently signs the entire transcript, only need to sign contribution
 #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct SessionContribution<C, S> {
     pub contrib: C, // the transcript's contribution, to be signed
@@ -142,6 +141,7 @@ impl<
     }
 }
 
+// Following the requirements of `Transcript` here
 impl<
         T: NonAggregatableTranscript<
             SigningPubKey = bls12381::PublicKey,
