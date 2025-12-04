@@ -593,6 +593,16 @@ module aptos_framework::stake {
         }
     }
 
+    public fun set_transaction_fee_limit_per_epoch_per_pool(framework: &signer, limit_octa: u64) {
+        system_addresses::assert_aptos_framework(framework);
+
+        let config = TransactionFeeConfig::V0 {
+            max_fee_octa_allowed_per_epoch_per_pool: limit_octa,
+        };
+
+        set_transaction_fee_config(framework, config);
+    }
+
     public fun set_transaction_fee_config(framework: &signer, config: TransactionFeeConfig) acquires TransactionFeeConfig {
         system_addresses::assert_aptos_framework(framework);
 
