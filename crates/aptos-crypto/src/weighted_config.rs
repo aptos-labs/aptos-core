@@ -49,6 +49,30 @@ pub type WeightedConfigBlstrs = WeightedConfig<ThresholdConfigBlstrs>;
 #[allow(type_alias_bounds)]
 pub type WeightedConfigArkworks<F: FftField> = WeightedConfig<ShamirThresholdConfig<F>>;
 
+/// Splits a flattened list into sublists for each player based on their weights.
+///
+/// # Parameters
+/// - `flattened`: A slice containing the flattened list of items to split.
+/// - `sc`: A `WeightedConfig` that provides the weight for each player.
+///
+/// # Returns
+/// A vector of vectors, where each inner vector contains the items assigned to a single player.
+pub fn unflatten_by_weights<T, TC>(flattened: &[T], sc: &WeightedConfig<TC>) -> Vec<Vec<T>>
+where
+    T: Clone,
+    TC: ThresholdConfig,
+{
+    let mut start = 0;
+    (0..sc.get_total_num_players())
+        .map(|i| {
+            let weight = sc.get_player_weight(&sc.get_player(i));
+            let slice = &flattened[start..start + weight];
+            start += weight;
+            slice.to_vec()
+        })
+        .collect()
+}
+
 impl<TC: ThresholdConfig> WeightedConfig<TC> {
     #[allow(non_snake_case)]
     /// Initializes a weighted secret sharing configuration with threshold weight `threshold_weight`

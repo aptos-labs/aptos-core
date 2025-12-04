@@ -7,7 +7,10 @@ use crate::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
         das, encryption_dlog, schnorr,
-        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
+        traits::{
+            self, transcript::MalleableTranscript, AggregatableTranscript,
+            HasEncryptionPublicParams,
+        },
         LowDegreeTest, Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
     },
     traits::transcript::Aggregatable,
@@ -113,7 +116,7 @@ impl traits::Transcript for Transcript {
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         _spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         aux: &A,
         dealer: &Player,
@@ -182,106 +185,6 @@ impl traits::Transcript for Transcript {
         };
         debug_assert!(t.check_sizes(sc).is_ok());
         t
-    }
-
-    #[allow(non_snake_case)]
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spks: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        auxs: &Vec<A>,
-    ) -> anyhow::Result<()> {
-        self.check_sizes(sc)?;
-        let n = sc.get_total_num_players();
-        if eks.len() != n {
-            bail!("Expected {} encryption keys, but got {}", n, eks.len());
-        }
-        let W = sc.get_total_weight();
-
-        // Deriving challenges by flipping coins: less complex to implement & less likely to get wrong. Creates bad RNG risks but we deem that acceptable.
-        let mut rng = rand::thread_rng();
-        let extra = random_scalars(2 + W * 3, &mut rng);
-
-        let sok_vrfy_challenge = &extra[W * 3 + 1];
-        let g_2 = pp.get_commitment_base();
-        let g_1 = pp.get_encryption_public_params().pubkey_base();
-        batch_verify_soks::<G1Projective, A>(
-            self.soks.as_slice(),
-            g_1,
-            &self.V[W],
-            spks,
-            auxs,
-            sok_vrfy_challenge,
-        )?;
-
-        let ldt = LowDegreeTest::random(
-            &mut rng,
-            sc.get_threshold_weight(),
-            W + 1,
-            true,
-            sc.get_batch_evaluation_domain(),
-        );
-        ldt.low_degree_test_on_g1(&self.V)?;
-
-        //
-        // Correctness of encryptions check
-        //
-
-        let alphas_betas_and_gammas = &extra[0..W * 3 + 1];
-        let (alphas_and_betas, gammas) = alphas_betas_and_gammas.split_at(2 * W + 1);
-        let (alphas, betas) = alphas_and_betas.split_at(W + 1);
-        assert_eq!(alphas.len(), W + 1);
-        assert_eq!(betas.len(), W);
-        assert_eq!(gammas.len(), W);
-
-        let lc_VR_hat = G2Projective::multi_exp_iter(
-            self.V_hat.iter().chain(self.R_hat.iter()),
-            alphas_and_betas.iter(),
-        );
-        let lc_VRC = G1Projective::multi_exp_iter(
-            self.V.iter().chain(self.R.iter()).chain(self.C.iter()),
-            alphas_betas_and_gammas.iter(),
-        );
-        let lc_V_hat = G2Projective::multi_exp_iter(self.V_hat.iter().take(W), gammas.iter());
-        let mut lc_R_hat = Vec::with_capacity(n);
-
-        for i in 0..n {
-            let p = sc.get_player(i);
-            let weight = sc.get_player_weight(&p);
-            let s_i = sc.get_player_starting_index(&p);
-
-            lc_R_hat.push(g2_multi_exp(
-                &self.R_hat[s_i..s_i + weight],
-                &gammas[s_i..s_i + weight],
-            ));
-        }
-
-        let h = pp.get_encryption_public_params().message_base();
-        let g_2_neg = g_2.neg();
-        let eks = eks
-            .iter()
-            .map(Into::<G1Projective>::into)
-            .collect::<Vec<G1Projective>>();
-        // The vector of left-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
-        let lhs = [g_1, &lc_VRC, h].into_iter().chain(&eks);
-        // The vector of right-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
-        let rhs = [&lc_VR_hat, &g_2_neg, &lc_V_hat]
-            .into_iter()
-            .chain(&lc_R_hat);
-
-        let res = multi_pairing(lhs, rhs);
-        if res != Gt::identity() {
-            bail!(
-                "Expected zero during multi-pairing check for {} {}, but got {}",
-                sc,
-                Self::scheme_name(),
-                res
-            );
-        }
-
-        return Ok(());
     }
 
     fn get_dealers(&self) -> Vec<Player> {
@@ -369,6 +272,108 @@ impl traits::Transcript for Transcript {
             V_hat: insecure_random_g2_points(W + 1, rng),
             C: insecure_random_g1_points(W, rng),
         }
+    }
+}
+
+impl AggregatableTranscript for Transcript {
+    #[allow(non_snake_case)]
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        auxs: &[A],
+    ) -> anyhow::Result<()> {
+        self.check_sizes(sc)?;
+        let n = sc.get_total_num_players();
+        if eks.len() != n {
+            bail!("Expected {} encryption keys, but got {}", n, eks.len());
+        }
+        let W = sc.get_total_weight();
+
+        // Deriving challenges by flipping coins: less complex to implement & less likely to get wrong. Creates bad RNG risks but we deem that acceptable.
+        let mut rng = rand::thread_rng();
+        let extra = random_scalars(2 + W * 3, &mut rng);
+
+        let sok_vrfy_challenge = &extra[W * 3 + 1];
+        let g_2 = pp.get_commitment_base();
+        let g_1 = pp.get_encryption_public_params().pubkey_base();
+        batch_verify_soks::<G1Projective, A>(
+            self.soks.as_slice(),
+            g_1,
+            &self.V[W],
+            spks,
+            auxs,
+            sok_vrfy_challenge,
+        )?;
+
+        let ldt = LowDegreeTest::random(
+            &mut rng,
+            sc.get_threshold_weight(),
+            W + 1,
+            true,
+            sc.get_batch_evaluation_domain(),
+        );
+        ldt.low_degree_test_on_g1(&self.V)?;
+
+        //
+        // Correctness of encryptions check
+        //
+
+        let alphas_betas_and_gammas = &extra[0..W * 3 + 1];
+        let (alphas_and_betas, gammas) = alphas_betas_and_gammas.split_at(2 * W + 1);
+        let (alphas, betas) = alphas_and_betas.split_at(W + 1);
+        assert_eq!(alphas.len(), W + 1);
+        assert_eq!(betas.len(), W);
+        assert_eq!(gammas.len(), W);
+
+        let lc_VR_hat = G2Projective::multi_exp_iter(
+            self.V_hat.iter().chain(self.R_hat.iter()),
+            alphas_and_betas.iter(),
+        );
+        let lc_VRC = G1Projective::multi_exp_iter(
+            self.V.iter().chain(self.R.iter()).chain(self.C.iter()),
+            alphas_betas_and_gammas.iter(),
+        );
+        let lc_V_hat = G2Projective::multi_exp_iter(self.V_hat.iter().take(W), gammas.iter());
+        let mut lc_R_hat = Vec::with_capacity(n);
+
+        for i in 0..n {
+            let p = sc.get_player(i);
+            let weight = sc.get_player_weight(&p);
+            let s_i = sc.get_player_starting_index(&p);
+
+            lc_R_hat.push(g2_multi_exp(
+                &self.R_hat[s_i..s_i + weight],
+                &gammas[s_i..s_i + weight],
+            ));
+        }
+
+        let h = pp.get_encryption_public_params().message_base();
+        let g_2_neg = g_2.neg();
+        let eks = eks
+            .iter()
+            .map(Into::<G1Projective>::into)
+            .collect::<Vec<G1Projective>>();
+        // The vector of left-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
+        let lhs = [g_1, &lc_VRC, h].into_iter().chain(&eks);
+        // The vector of right-hand-side ($\mathbb{G}_2$) inputs to each pairing in the multi-pairing.
+        let rhs = [&lc_VR_hat, &g_2_neg, &lc_V_hat]
+            .into_iter()
+            .chain(&lc_R_hat);
+
+        let res = multi_pairing(lhs, rhs);
+        if res != Gt::identity() {
+            bail!(
+                "Expected zero during multi-pairing check for {} {}, but got {}",
+                sc,
+                <Self as traits::Transcript>::scheme_name(),
+                res
+            );
+        }
+
+        return Ok(());
     }
 }
 
