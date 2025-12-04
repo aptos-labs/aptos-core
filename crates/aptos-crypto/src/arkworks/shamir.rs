@@ -33,7 +33,7 @@ pub trait Reconstructable<SSC: traits::SecretSharingConfig>: Sized {
     /// itself corresponds more closely to the definition of a share
     type ShareValue: Clone;
 
-    /// The reconstruct function.
+    /// The reconstruct function: given some shares, it attempts to reconstructs the underlying secret.
     fn reconstruct(sc: &SSC, shares: &[ShamirShare<Self::ShareValue>]) -> Result<Self>;
 }
 

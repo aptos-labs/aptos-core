@@ -79,7 +79,7 @@ pub trait SubTranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Eq;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKeyShare: PartialEq + Clone;
-    type DealtPubKey: Serialize;
+    type DealtPubKey: Serialize; // So it can get signed
     type EncryptPubKey: Debug
         + Clone
         + ValidCryptoMaterial
@@ -151,7 +151,7 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Eq;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKeyShare: PartialEq + Clone;
-    type DealtPubKey: Serialize;
+    type DealtPubKey: Serialize; // So it can get signed
     type EncryptPubKey: Debug
         + Clone
         + ValidCryptoMaterial
