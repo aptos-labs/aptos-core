@@ -55,8 +55,9 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use serde::{Deserialize, Serialize};
 use std::ops::{Mul, Sub};
 
-/// Domain-separator tag (DST) for the Fiat-Shamir hashing used to derive randomness from the transcript.
-pub const DST: &[u8; 32] = b"APTOS_CHUNK_EG_FIELD_PVSS_FS_DST";
+/// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+/// transcript operations within the protocol are uniquely namespaced
+pub const DST: &[u8; 30] = b"APTOS_CHUNKY_FIELD_PVSS_FS_DST";
 
 #[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
@@ -447,7 +448,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     where
         R: rand_core::RngCore + rand_core::CryptoRng,
     {
-        let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
+        let num_chunks_per_share = num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize;
         let utrs = UnsignedTranscript {
             dealer: sc.get_player(0),
             subtranscript: SubTranscript {
@@ -579,7 +580,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
             // Verify the range proof
             if let Err(err) = self.utrs.sharing_proof.range_proof.verify(
                 &pp.pk_range_proof.vk,
-                sc.n * num_chunks_per_scalar::<E>(pp.ell) as usize,
+                sc.n * num_chunks_per_scalar::<E::ScalarField>(pp.ell) as usize,
                 pp.ell as usize,
                 &self.utrs.sharing_proof.range_proof_commitment,
             ) {
@@ -659,7 +660,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let elgamal_randomness = Scalar::vec_from_inner(chunked_elgamal::correlated_randomness(
             rng,
             1 << pp.ell as u64,
-            num_chunks_per_scalar::<E>(pp.ell),
+            num_chunks_per_scalar::<E::ScalarField>(pp.ell),
         ));
 
         // Chunk and flatten the shares

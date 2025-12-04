@@ -29,6 +29,7 @@ use criterion::{
 };
 use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
+use aptos_dkg::pvss::traits::transcript::NonAggregatableTranscript;
 
 pub fn all_groups(c: &mut Criterion) {
     // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
@@ -284,8 +285,6 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
         )
     });
 }
-
-use aptos_dkg::pvss::traits::transcript::NonAggregatableTranscript;
 
 fn pvss_nonaggregate_verify<T: NonAggregatableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
