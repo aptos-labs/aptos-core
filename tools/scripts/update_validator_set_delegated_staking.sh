@@ -29,7 +29,7 @@ MAX_STAKE_RATIO=30 # Maximum stake as percentage of total voting power
 # Delegation / delegated pool configuration (for "Validator 4"-style setup)
 SEED=2563
 DELEGATION_SEED="aptos_framework::delegation_pool${SEED}"
-DELEGATION_COMMISSION_BPS=1000      # 1000 = 10%
+DELEGATION_COMMISSION_BPS=1000 # 1000 = 10%
 
 # Network presets
 TESTNET_API="https://testnet.movementnetwork.xyz"
@@ -516,7 +516,7 @@ setup_delegated_pool_flow() {
 	init_common_cli_args
 	init_operator_cli_args
 
-	init_delegation_pool
+	#init_delegation_pool
 	set_pool_operator
 	add_delegation_stake
 	extract_delegated_consensus_keys
