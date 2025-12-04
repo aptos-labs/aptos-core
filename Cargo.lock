@@ -2661,7 +2661,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-stream",
- "toml 0.7.8",
  "tonic 0.12.3",
  "url",
 ]
