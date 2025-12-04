@@ -71,7 +71,7 @@ fn weighted_pvss<T: AggregatableTranscript<SecretSharingConfig = WeightedConfigB
     );
 
     // Make sure the PVSS dealt correctly
-    trx.verify(&wc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &vec![NoAux])
+    trx.verify(&wc, &d.pp, &[d.spks[0].clone()], &d.eks, &[NoAux])
         .expect("PVSS transcript failed verification");
 
     (wc, d, trx)
@@ -95,7 +95,7 @@ fn wvuf_randomly_aggregate_verify_and_derive_eval<
     wc: &WeightedConfigBlstrs,
     sk: &T::DealtSecretKey,
     pk: &T::DealtPubKey,
-    dks: &Vec<T::DecryptPrivKey>,
+    dks: &[T::DecryptPrivKey],
     pvss_pp: &T::PublicParameters,
     trx: &T,
     rng: &mut R,
