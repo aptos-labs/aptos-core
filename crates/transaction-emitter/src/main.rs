@@ -74,6 +74,7 @@ struct Diag {
 #[tokio::main]
 pub async fn main() -> Result<()> {
     Logger::builder().level(Level::Info).build();
+    env_logger::init();
 
     let args = Args::parse();
 

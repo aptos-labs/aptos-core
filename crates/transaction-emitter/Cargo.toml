@@ -20,6 +20,7 @@ aptos-sdk = { workspace = true }
 aptos-transaction-emitter-lib = { workspace = true }
 aptos-transaction-workloads-lib = { workspace = true }
 clap = { workspace = true }
+env_logger = { workspace = true }
 futures = { workspace = true }
 rand = { workspace = true }
 tokio = { workspace = true }
