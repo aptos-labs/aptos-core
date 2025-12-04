@@ -25,7 +25,9 @@ use crate::{
     transaction_generator::{create_block_metadata_transaction, TransactionGenerator},
 };
 use aptos_api::context::Context;
-use aptos_config::config::{NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG};
+use aptos_config::config::{
+    get_default_processor_task_count, NodeConfig, PrunerConfig, NO_OP_STORAGE_PRUNER_CONFIG,
+};
 use aptos_db::AptosDB;
 use aptos_db_indexer::{db_ops::open_db, db_v2::IndexerAsyncV2, indexer_reader::IndexerReaders};
 use aptos_executor::block_executor::BlockExecutor;
@@ -157,9 +159,12 @@ fn init_indexer_wrapper(
     ));
     let service_context = ServiceContext {
         context: context.clone(),
-        processor_task_count: config.indexer_grpc.processor_task_count,
+        processor_task_count: config.indexer_grpc.processor_task_count.unwrap_or_else(|| {
+            get_default_processor_task_count(config.indexer_grpc.use_data_service_interface)
+        }),
         processor_batch_size: config.indexer_grpc.processor_batch_size,
         output_batch_size: config.indexer_grpc.output_batch_size,
+        transaction_channel_size: config.indexer_grpc.transaction_channel_size,
     };
 
     // Spawn table_info_service in tokio runtime
