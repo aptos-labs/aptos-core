@@ -162,9 +162,9 @@ pub fn weighted_pvss_group<
 fn pvss_deal<T: Transcript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
-    spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -252,9 +252,9 @@ fn pvss_subaggregate<
 fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
-    spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -278,7 +278,7 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
                 )
             },
             |trx| {
-                trx.verify(&sc, &pp, &vec![spks[0].clone()], &eks, &vec![NoAux])
+                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &[NoAux])
                     .expect("PVSS transcript verification should succeed");
             },
         )
@@ -288,9 +288,9 @@ fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
 fn pvss_nonaggregate_verify<T: NonAggregatableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
-    spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -314,7 +314,7 @@ fn pvss_nonaggregate_verify<T: NonAggregatableTranscript, M: Measurement>(
                 )
             },
             |trx| {
-                trx.verify(&sc, &pp, &vec![spks[0].clone()], &eks, &NoAux)
+                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux)
                     .expect("PVSS transcript verification should succeed");
             },
         )
@@ -324,9 +324,9 @@ fn pvss_nonaggregate_verify<T: NonAggregatableTranscript, M: Measurement>(
 fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
+    ssks: &[T::SigningSecretKey],
     spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    eks: &[T::EncryptPubKey],
     iss: &T::InputSecret,
     num_aggr: usize,
     g: &mut BenchmarkGroup<M>,
@@ -383,10 +383,10 @@ fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Mea
 fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
-    spks: &Vec<T::SigningPubKey>,
-    dks: &Vec<T::DecryptPrivKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    dks: &[T::DecryptPrivKey],
+    eks: &[T::EncryptPubKey],
     s: &T::InputSecret,
     g: &mut BenchmarkGroup<M>,
 ) {
