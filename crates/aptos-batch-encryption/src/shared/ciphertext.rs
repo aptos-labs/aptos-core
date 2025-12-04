@@ -290,6 +290,7 @@ pub mod tests {
         traits::BatchThresholdEncryption as _,
     };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+    use aptos_dkg::pvss::traits::Reconstructable as _;
     use ark_std::{
         rand::{thread_rng, Rng},
         One, Zero,
@@ -321,8 +322,8 @@ pub mod tests {
         let ct = ek.bibe_encrypt(&mut rng, &plaintext, id).unwrap();
 
         let dk = BIBEDecryptionKey::reconstruct(
-            &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
             &tc,
+            &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
         )
         .unwrap();
 
@@ -353,8 +354,8 @@ pub mod tests {
         let pfs = pfs.compute_all(&dk);
 
         let dk = BIBEDecryptionKey::reconstruct(
-            &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
             &tc,
+            &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
         )
         .unwrap();
 
