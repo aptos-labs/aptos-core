@@ -45,12 +45,15 @@ VALIDATOR_HOST="$5"
 DRY_RUN="${6:-true}"
 
 help_message_and_exit() {
-	echo "Usage: $0 <operator-identity-file> <network> <stake-amount> <validator-host> <validator-owner-account> <validator-owner-private-key> [dry-run]"
+	echo "Usage: $0 <operator-identity-file> <validator-owner-identity-file> <network> <stake-amount> <validator-host> [dry-run]"
 	echo "Network options:"
 	echo "  testnet               - Movement testnet ($TESTNET_API)"
 	echo "  mainnet               - Movement mainnet ($MAINNET_API)"
 	echo "  previewnet            - Movement previewnet ($PREVIEWNET_API)"
 	echo "  custom:https://url    - Custom API endpoint"
+	echo "Example:"
+	echo "  $0 operator-identity.yaml owner-identity.yaml testnet 1000000 validator.example.com:6180 true"
+	echo "  $0 operator-identity.yaml owner-identity.yaml custom:https://my-node.com 5000000 validator.example.com:6180 false"
 	exit 1
 }
 
