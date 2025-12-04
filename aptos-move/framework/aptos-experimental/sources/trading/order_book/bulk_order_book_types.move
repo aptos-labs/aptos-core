@@ -40,12 +40,14 @@ module aptos_experimental::bulk_order_book_types {
     friend aptos_experimental::bulk_order_book;
     friend aptos_experimental::order_placement;
     friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::dead_mans_switch_operations;
     #[test_only]
     friend aptos_experimental::bulk_order_book_tests;
 
     use std::option;
     use std::option::Option;
     use std::vector;
+    use aptos_std::timestamp;
     use aptos_experimental::order_book_types::{OrderIdType, UniqueIdxType, OrderMatchDetails, OrderMatch,
         new_bulk_order_match_details, new_order_match
     };
@@ -116,6 +118,7 @@ module aptos_experimental::bulk_order_book_types {
             account: address,
             unique_priority_idx: UniqueIdxType,
             order_sequence_number: u64, // sequence number for order validation
+            creation_time_micros: u64,
             bid_prices: vector<u64>, // prices for each levels of the order
             bid_sizes: vector<u64>, // sizes for each levels of the order
             ask_prices: vector<u64>, // prices for each levels of the order
@@ -148,6 +151,7 @@ module aptos_experimental::bulk_order_book_types {
         best_ask_price: Option<u64>,
     ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>) {
         let BulkOrderRequest::V1 { account, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, metadata } = order_req;
+        let creation_time_micros = timestamp::now_microseconds();
         let bid_price_crossing_idx = discard_price_crossing_levels(&bid_prices, best_ask_price, true);
         let ask_price_crossing_idx = discard_price_crossing_levels(&ask_prices, best_bid_price, false);
 
@@ -171,6 +175,7 @@ module aptos_experimental::bulk_order_book_types {
             account,
             unique_priority_idx,
             order_sequence_number,
+            creation_time_micros,
             bid_prices: post_only_bid_prices,
             bid_sizes: post_only_bid_sizes,
             ask_prices: post_only_ask_prices,
@@ -386,6 +391,7 @@ module aptos_experimental::bulk_order_book_types {
                 remaining_size,
                 is_bid,
                 order.order_sequence_number,
+                order.creation_time_micros,
                 order.metadata,
             ),
             matched_size
@@ -446,6 +452,12 @@ module aptos_experimental::bulk_order_book_types {
         self: &BulkOrder<M>,
     ): u64 {
         self.order_sequence_number
+    }
+
+    public(friend) fun get_creation_time_micros<M: store + copy + drop>(
+        self: &BulkOrder<M>,
+    ): u64 {
+        self.creation_time_micros
     }
 
     /// Gets the active price for a specific side of a bulk order.
@@ -610,6 +622,7 @@ module aptos_experimental::bulk_order_book_types {
         address,
         UniqueIdxType,
         u64,
+        u64,
         vector<u64>,
         vector<u64>,
         vector<u64>,
@@ -621,6 +634,7 @@ module aptos_experimental::bulk_order_book_types {
             account,
             unique_priority_idx,
             order_sequence_number,
+            creation_time_micros,
             bid_prices,
             bid_sizes,
             ask_prices,
@@ -632,6 +646,7 @@ module aptos_experimental::bulk_order_book_types {
             account,
             unique_priority_idx,
             order_sequence_number,
+            creation_time_micros,
             bid_prices,
             bid_sizes,
             ask_prices,
