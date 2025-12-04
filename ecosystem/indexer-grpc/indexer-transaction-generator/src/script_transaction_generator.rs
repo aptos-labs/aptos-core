@@ -94,33 +94,16 @@ impl ScriptTransactions {
         // Compile the setup script.
         let script_current_dir = std::env::current_dir().unwrap();
         let cmd = create_compile_script_cmd(script_current_dir.clone());
-        let _ = cmd.execute().await.context(format!(
+        let compile_output = cmd.execute().await.context(format!(
             "Failed to compile the script: {:?}",
             &script_current_dir
         ))?;
 
-        // Read the content of the TOML file. This is to get the package name.
-        let content = std::fs::read_to_string(script_current_dir.join("Move.toml"))
-            .expect("Failed to read TOML file");
-        let value = content
-            .parse::<toml::Value>()
-            .expect("Failed to parse TOML");
-        let package_name = value
-            .get("package")
-            .context("Malformed Move.toml file: No package.")?
-            .get("name")
-            .context("Malformed Move.toml file: No package name.")?
-            .as_str()
-            .context("Malformed package name.")?;
+        // Use the script location from CompileScript output (script.mv in package root).
+        // This is more reliable than the build directory path which may not always exist.
+        let compiled_script_path = compile_output.script_location;
 
-        // Run the compiled script.
-        let compiled_build_path = script_current_dir
-            .join("build")
-            .join(package_name)
-            .join("bytecode_scripts")
-            .join("main_0.mv");
-
-        let cmd = create_run_script_cmd(compiled_build_path);
+        let cmd = create_run_script_cmd(compiled_script_path);
         let transaction_summary = cmd.execute().await.context(format!(
             "Failed to run the script: {:?}",
             &script_current_dir

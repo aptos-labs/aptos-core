@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     accounts::{
@@ -7,7 +7,11 @@ use crate::{
     },
     dedicated_handlers::pepper_request::handle_pepper_request,
     error::PepperServiceError,
-    external_resources::{jwk_fetcher, jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    external_resources::{
+        jwk_fetcher,
+        jwk_types::{FederatedJWKIssuer, FederatedJWKs, JWKCache},
+        resource_fetcher::CachedResources,
+    },
     vuf_keypair::VUFKeypair,
 };
 use aptos_crypto::ed25519::Ed25519PublicKey;
@@ -43,6 +47,7 @@ pub trait HandlerTrait<TRequest, TResponse>: Send + Sync {
         &self,
         vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
+        federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
         cached_resources: CachedResources,
         request: TRequest,
         account_recovery_managers: Arc<AccountRecoveryManagers>,
@@ -59,6 +64,7 @@ impl HandlerTrait<PepperRequestV2, PepperResponse> for V0DelegatedFetchHandler {
         &self,
         vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
+        federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
         cached_resources: CachedResources,
         request: PepperRequestV2,
         account_recovery_managers: Arc<AccountRecoveryManagers>,
@@ -82,6 +88,7 @@ impl HandlerTrait<PepperRequestV2, PepperResponse> for V0DelegatedFetchHandler {
         let (_pepper_base, pepper, address) = handle_pepper_request(
             vuf_keypair,
             jwk_cache,
+            federated_jwks,
             cached_resources,
             jwt,
             epk,
@@ -112,6 +119,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         &self,
         vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
+        federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
         cached_resources: CachedResources,
         request: PepperRequest,
         account_recovery_managers: Arc<AccountRecoveryManagers>,
@@ -131,6 +139,7 @@ impl HandlerTrait<PepperRequest, PepperResponse> for V0FetchHandler {
         let (_pepper_base, pepper, address) = handle_pepper_request(
             vuf_keypair,
             jwk_cache,
+            federated_jwks,
             cached_resources,
             jwt,
             epk,
@@ -161,6 +170,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         &self,
         vuf_keypair: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
+        federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
         cached_resources: CachedResources,
         request: PepperRequest,
         account_recovery_managers: Arc<AccountRecoveryManagers>,
@@ -180,6 +190,7 @@ impl HandlerTrait<PepperRequest, SignatureResponse> for V0SignatureHandler {
         let (pepper_base, _pepper, _address) = handle_pepper_request(
             vuf_keypair,
             jwk_cache,
+            federated_jwks,
             cached_resources,
             jwt,
             epk,
@@ -210,6 +221,7 @@ impl HandlerTrait<VerifyRequest, VerifyResponse> for V0VerifyHandler {
         &self,
         _: Arc<VUFKeypair>,
         jwk_cache: JWKCache,
+        _federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
         cached_resources: CachedResources,
         request: VerifyRequest,
         _account_recovery_managers: Arc<AccountRecoveryManagers>,

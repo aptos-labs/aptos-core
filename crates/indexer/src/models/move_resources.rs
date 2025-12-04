@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 #![allow(clippy::extra_unused_lifetimes)]
 use crate::{models::transactions::Transaction, schema::move_resources, util::standardize_address};
 use anyhow::{Context, Result};

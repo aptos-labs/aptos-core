@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use anyhow::{anyhow, bail};
 use aptos_framework::{natives::code::PackageMetadata, BuildOptions, BuiltPackage};
@@ -125,8 +125,8 @@ pub fn create_prebuilt_packages_bundle(
 
     // Step 2: generate implementation to access prebuilt packages.
     let code = r#"
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 // This file was generated. Do not modify!
 //
