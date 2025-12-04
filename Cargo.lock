@@ -4564,6 +4564,7 @@ dependencies = [
  "aptos-transaction-emitter-lib",
  "aptos-transaction-workloads-lib",
  "clap 4.5.21",
+ "env_logger",
  "futures",
  "rand 0.7.3",
  "tokio",
