@@ -1,5 +1,6 @@
-// Copyright (c) Aptos Foundation
-// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
+// Copyright © Aptos Foundation
+// Parts of the project are originally copyright © Meta Platforms, Inc.
+// SPDX-License-Identifier: Apache-2.0
 
 //! Implements a live-variable analysis processor, annotating lifetime information about locals.
 //! See also <https://en.wikipedia.org/wiki/Live-variable_analysis>
