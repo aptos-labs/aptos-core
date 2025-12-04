@@ -49,6 +49,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     friend aptos_experimental::order_placement;
     friend aptos_experimental::order_operations;
     friend aptos_experimental::market_types;
+    friend aptos_experimental::dead_mans_switch_operations;
     use aptos_std::big_ordered_map;
     use aptos_std::big_ordered_map::BigOrderedMap;
     use aptos_framework::event;
@@ -269,7 +270,7 @@ module aptos_experimental::dead_mans_switch_tracker {
     /// // Disable dead man's switch
     /// update_keep_alive_state(&mut tracker, trader_addr, 0);
     /// ```
-    public(friend) fun update_keep_alive_state(
+    public(friend) fun keep_alive(
         tracker: &mut DeadMansSwitchTracker,
         account: address,
         timeout_seconds: u64,
@@ -341,7 +342,7 @@ module aptos_experimental::dead_mans_switch_tracker {
         account: address,
         timeout_seconds: u64,
     ) {
-        update_keep_alive_state(tracker, account, timeout_seconds)
+        keep_alive(tracker, account, timeout_seconds)
     }
 
     #[test_only]

@@ -4,7 +4,7 @@ module aptos_experimental::dead_mans_switch_operations {
     use std::string;
     use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
     use aptos_experimental::order_book_types::OrderIdType;
-    use aptos_experimental::dead_mans_switch_tracker::is_order_valid;
+    use aptos_experimental::dead_mans_switch_tracker::{Self, is_order_valid};
     use aptos_experimental::order_operations;
     use aptos_experimental::single_order_types::get_creation_time_micros;
     use aptos_experimental::bulk_order_book_types::get_creation_time_micros as get_bulk_order_creation_time_micros;
@@ -117,5 +117,34 @@ module aptos_experimental::dead_mans_switch_operations {
                 callbacks
             );
         }
+    }
+
+    /// Updates the keep-alive state for a trader in the dead man's switch.
+    /// This function should be called periodically by traders to keep their orders active.
+    ///
+    /// Behavior:
+    /// - First update: Creates a new session starting at time 0 (all existing orders remain valid)
+    /// - Subsequent updates before expiration: Extends the current session
+    /// - Update after expiration: Starts a new session (invalidates all orders placed before now)
+    ///
+    /// Parameters:
+    /// - market: The market instance
+    /// - account: The trader's address
+    /// - timeout_seconds: Duration in seconds until the session expires.
+    ///   Must be >= min_keep_alive_time_secs or 0 to disable.
+    ///   Pass 0 to disable the dead man's switch for this account.
+    ///
+    /// Aborts:
+    /// - E_DEAD_MANS_SWITCH_NOT_ENABLED: If dead man's switch is not enabled for this market
+    /// - E_KEEP_ALIVE_TIMEOUT_TOO_SHORT: If timeout is less than minimum and not zero
+    ///
+    /// ```
+    public fun keep_alive<M: store + copy + drop>(
+        market: &mut Market<M>,
+        account: address,
+        timeout_seconds: u64
+    ) {
+        let tracker = market_types::get_dead_mans_switch_tracker_mut(market);
+        dead_mans_switch_tracker::keep_alive(tracker, account, timeout_seconds);
     }
 }

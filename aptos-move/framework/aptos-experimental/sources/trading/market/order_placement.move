@@ -1196,26 +1196,6 @@ module aptos_experimental::order_placement {
         }
     }
 
-    /// Updates the keep-alive state for a user in the dead man's switch tracker.
-    /// This function should be called periodically by users to keep their orders active.
-    ///
-    /// Parameters:
-    /// - market: The market instance
-    /// - user: The signer of the user
-    /// - timeout_seconds: The timeout in seconds for the keep-alive state
-    public fun update_keep_alive_state<M: store + copy + drop>(
-        market: &mut Market<M>,
-        user: &signer,
-        timeout_seconds: u64
-    ) {
-        let tracker = market_types::get_dead_mans_switch_tracker_mut(market);
-        aptos_experimental::dead_mans_switch_tracker::update_keep_alive_state(
-            tracker,
-            signer::address_of(user),
-            timeout_seconds
-        );
-    }
-
     // ============================= test_only APIs ====================================
     #[test_only]
     public fun is_clearinghouse_settle_violation(

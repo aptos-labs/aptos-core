@@ -72,9 +72,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Update keep-alive state for trader with 5 minute timeout
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -132,9 +132,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -147,9 +147,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
         timestamp::fast_forward_seconds(100); // Only 100 seconds, still valid
 
         // Renew keep-alive
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -213,9 +213,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -270,9 +270,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -299,9 +299,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
         timestamp::fast_forward_seconds(100);
 
         // Renew keep-alive
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -331,9 +331,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Step 1: Update keep-alive state for trader
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -354,9 +354,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
         timestamp::fast_forward_seconds(KEEP_ALIVE_TIMEOUT_SECS + 10);
 
         // Step 4: Start a new session with keep-alive update
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &trader,
+            trader_addr,
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -412,9 +412,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Maker updates keep-alive state and places a bid order
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &maker,
+            signer::address_of(&maker),
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -485,9 +485,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Taker updates keep-alive state
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &taker,
+            signer::address_of(&taker),
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -537,9 +537,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Maker updates keep-alive state and places order
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &maker,
+            signer::address_of(&maker),
             KEEP_ALIVE_TIMEOUT_SECS
         );
 
@@ -548,9 +548,9 @@ module aptos_experimental::dead_mans_switch_operations_test {
 
         // Taker updates keep-alive state
         timestamp::fast_forward_seconds(10);
-        order_placement::update_keep_alive_state(
+        dead_mans_switch_operations::keep_alive(
             &mut market,
-            &taker,
+            signer::address_of(&taker),
             KEEP_ALIVE_TIMEOUT_SECS
         );
 

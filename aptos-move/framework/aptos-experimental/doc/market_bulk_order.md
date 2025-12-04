@@ -108,7 +108,7 @@ Returns:
     );
     <b>let</b> response = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_place_bulk_order">place_bulk_order</a>(request);
     <b>let</b> (bulk_order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num_option) = destroy_bulk_order_place_response(response);
-    <b>let</b> (order_id, _, _, order_sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
+    <b>let</b> (order_id, _, _, order_sequence_number, _, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = bulk_order.destroy_bulk_order(); // We don't need <b>to</b> keep the bulk order <b>struct</b> after placement
     <b>assert</b>!(sequence_number == order_sequence_number, <a href="market_bulk_order.md#0x7_market_bulk_order_E_SEQUENCE_NUMBER_MISMATCH">E_SEQUENCE_NUMBER_MISMATCH</a>);
     // Extract previous_seq_num from <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/option.md#0x1_option">option</a>, defaulting <b>to</b> 0 <b>if</b> none
     <b>let</b> previous_seq_num = previous_seq_num_option.destroy_with_default(0);
@@ -146,10 +146,11 @@ for the specified user account.
 Parameters:
 - market: The market instance
 - user: The signer of the user whose bulk orders should be cancelled
+- cancellation_reason: The reason for cancelling the bulk order
 - callbacks: The market clearinghouse callbacks for cleanup operations
 
 
-<pre><code><b>public</b> <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>public</b> <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -161,10 +162,11 @@ Parameters:
 <pre><code><b>public</b> <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     market: &<b>mut</b> Market&lt;M&gt;,
     user: &<a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
+    cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> <a href="../../aptos-framework/doc/account.md#0x1_account">account</a> = <a href="../../aptos-framework/../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer_address_of">signer::address_of</a>(user);
-    <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>(market, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, callbacks);
+    <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>(market, <a href="../../aptos-framework/doc/account.md#0x1_account">account</a>, cancellation_reason, callbacks);
 }
 </code></pre>
 
@@ -178,7 +180,7 @@ Parameters:
 
 
 
-<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
+<pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>&lt;M: <b>copy</b>, drop, store, R: <b>copy</b>, drop, store&gt;(market: &<b>mut</b> <a href="market_types.md#0x7_market_types_Market">market_types::Market</a>&lt;M&gt;, user: <b>address</b>, cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>, callbacks: &<a href="market_types.md#0x7_market_types_MarketClearinghouseCallbacks">market_types::MarketClearinghouseCallbacks</a>&lt;M, R&gt;)
 </code></pre>
 
 
@@ -190,10 +192,11 @@ Parameters:
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order_internal">cancel_bulk_order_internal</a>&lt;M: store + <b>copy</b> + drop, R: store + <b>copy</b> + drop&gt;(
     market: &<b>mut</b> Market&lt;M&gt;,
     user: <b>address</b>,
+    cancellation_reason: <a href="market_types.md#0x7_market_types_OrderCancellationReason">market_types::OrderCancellationReason</a>,
     callbacks: &MarketClearinghouseCallbacks&lt;M, R&gt;
 ) {
     <b>let</b> cancelled_bulk_order = market.get_order_book_mut().<a href="market_bulk_order.md#0x7_market_bulk_order_cancel_bulk_order">cancel_bulk_order</a>(user);
-    <b>let</b> (order_id, _, _, sequence_number, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = cancelled_bulk_order.destroy_bulk_order();
+    <b>let</b> (order_id, _, _, sequence_number, _, bid_prices, bid_sizes, ask_prices, ask_sizes, _ ) = cancelled_bulk_order.destroy_bulk_order();
     <b>let</b> i = 0;
     <b>while</b> (i &lt; bid_sizes.length()) {
         callbacks.cleanup_bulk_order_at_price(user, order_id, <b>true</b>, bid_prices[i], bid_sizes[i]);
@@ -211,7 +214,8 @@ Parameters:
         bid_prices,
         bid_sizes,
         ask_prices,
-        ask_sizes
+        ask_sizes,
+        std::option::some(cancellation_reason)
     );
 }
 </code></pre>
