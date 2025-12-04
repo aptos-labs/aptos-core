@@ -119,7 +119,7 @@ impl BatchThresholdEncryption for FPTX {
                 Self::VerificationKey {
                     player: p,
                     mpk_g2,
-                    vk_g2: subtranscript_happypath.get_public_key_share(&tc_happypath, &p).as_g2()
+                    vk_g2: subtranscript_happypath.get_public_key_share(tc_happypath, &p).as_g2()
                 }
             ).collect();
 
@@ -130,20 +130,20 @@ impl BatchThresholdEncryption for FPTX {
                 Self::VerificationKey {
                     player: p,
                     mpk_g2,
-                    vk_g2: subtranscript_slowpath.get_public_key_share(&tc_slowpath, &p).as_g2()
+                    vk_g2: subtranscript_slowpath.get_public_key_share(tc_slowpath, &p).as_g2()
                 }
             ).collect();
 
         let msk_share_happypath = BIBEMasterSecretKeyShare {
             mpk_g2,
             player: current_player,
-            shamir_share_eval: subtranscript_happypath.decrypt_own_share(&tc_happypath, &current_player, &msk_share_decryption_key, &pvss_public_params).0.into_fr(),
+            shamir_share_eval: subtranscript_happypath.decrypt_own_share(tc_happypath, &current_player, msk_share_decryption_key, pvss_public_params).0.into_fr(),
         };
 
         let msk_share_slowpath = BIBEMasterSecretKeyShare {
             mpk_g2,
             player: current_player,
-            shamir_share_eval: subtranscript_slowpath.decrypt_own_share(&tc_slowpath, &current_player, &msk_share_decryption_key, &pvss_public_params).0.into_fr(),
+            shamir_share_eval: subtranscript_slowpath.decrypt_own_share(tc_slowpath, &current_player, msk_share_decryption_key, pvss_public_params).0.into_fr(),
         };
 
         Ok((ek, vks_happypath, msk_share_happypath, vks_slowpath, msk_share_slowpath))

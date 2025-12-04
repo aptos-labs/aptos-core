@@ -99,7 +99,7 @@ fn smoke_with_setup_for_testing() {
 }
 
 type T = aptos_dkg::pvss::chunky::Transcript<crate::group::Pairing>;
-use aptos_dkg::{pvss::{test_utils::NoAux, traits::{transcript::HasAggregatableSubtranscript, Transcript}, Player}, Scalar};
+use aptos_dkg::pvss::{test_utils::NoAux, traits::{transcript::HasAggregatableSubtranscript, Transcript}};
 use aptos_dkg::pvss::traits::{HasEncryptionPublicParams, Convert};
 use aptos_crypto::{SigningKey, Uniform};
 
@@ -129,7 +129,7 @@ fn smoke_with_pvss() {
         .collect::<Vec<<T as Transcript>::DecryptPrivKey>>();
     let eks = dks
         .iter()
-        .map(|dk| dk.to(&pp.get_encryption_public_params()))
+        .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();
 
     let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos_crypto);
@@ -176,7 +176,7 @@ fn smoke_with_pvss() {
     let (msk_shares_happy, msk_shares_slow) : (Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>, Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>) = tc_happy.get_players()
         .into_iter()
     .map(|p| {
-            let (__, _, msk_share_happypath, _, msk_share_slowpath) = FPTX::setup(
+            let (_, _, msk_share_happypath, _, msk_share_slowpath) = FPTX::setup(
                 &dk,
                 &pp,
                 &subtrx_happypath,
