@@ -189,27 +189,7 @@ module aptos_experimental::dead_mans_switch_tracker {
         state.expiration_time_secs > current_time
     }
 
-    /// Disables the dead man's switch for a trader
-    ///
-    /// Removes all keep-alive state for the account, effectively opting them out of
-    /// the dead man's switch mechanism. After calling this, all their orders will be
-    /// considered valid regardless of age.
-    ///
-    /// # Parameters
-    /// - `tracker`: Mutable reference to the dead man's switch tracker
-    /// - `account`: The trader's address
-    ///
-    /// # Effects
-    /// - Removes the trader's keep-alive state from the tracker
-    /// - Emits a `KeepAliveDisabledEvent`
-    /// - All future orders will not be subject to dead man's switch validation
-    ///
-    /// # Example
-    /// ```move
-    /// disable_keep_alive(&mut tracker, trader_addr);
-    /// // Trader's orders will now never expire
-    /// ```
-    public(friend) fun disable_keep_alive(
+    fun disable_keep_alive(
         tracker: &mut DeadMansSwitchTracker,
         account: address,
     ) {
@@ -291,11 +271,8 @@ module aptos_experimental::dead_mans_switch_tracker {
             if (state.expiration_time_secs < current_time) {
                 // Start a new session - this means any order placed before this time is invalidated
                 state.session_start_time_secs = current_time;
-                state.expiration_time_secs = expiration_time;
-            } else {
-                // Update existing session
-                state.expiration_time_secs = expiration_time;
             };
+            // Update existing session
             state.expiration_time_secs = expiration_time;
             event::emit(
                 KeepAliveUpdateEvent::V1 {

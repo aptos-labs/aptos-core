@@ -103,7 +103,6 @@ module aptos_experimental::dead_mans_switch_operations_test {
         let order_ids = vector[order_id_1, order_id_2, order_id_3];
         dead_mans_switch_operations::cleanup_expired_orders(
             &mut market,
-            trader_addr,
             order_ids,
             &clearinghouse_test::test_market_callbacks()
         );
@@ -157,7 +156,6 @@ module aptos_experimental::dead_mans_switch_operations_test {
         let order_ids = vector[order_id_1, order_id_2];
         dead_mans_switch_operations::cleanup_expired_orders(
             &mut market,
-            trader_addr,
             order_ids,
             &clearinghouse_test::test_market_callbacks()
         );
@@ -193,7 +191,6 @@ module aptos_experimental::dead_mans_switch_operations_test {
         let order_ids = vector[new_order_id_type(1)];
         dead_mans_switch_operations::cleanup_expired_orders(
             &mut market,
-            trader_addr,
             order_ids,
             &clearinghouse_test::test_market_callbacks()
         );
@@ -377,7 +374,6 @@ module aptos_experimental::dead_mans_switch_operations_test {
         let all_order_ids = vector[old_order_id_1, old_order_id_2, new_order_id_1, new_order_id_2];
         dead_mans_switch_operations::cleanup_expired_orders(
             &mut market,
-            trader_addr,
             all_order_ids,
             &clearinghouse_test::test_market_callbacks()
         );

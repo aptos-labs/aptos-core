@@ -6,7 +6,7 @@ module aptos_experimental::dead_mans_switch_operations {
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::dead_mans_switch_tracker::{Self, is_order_valid};
     use aptos_experimental::order_operations;
-    use aptos_experimental::single_order_types::get_creation_time_micros;
+    use aptos_experimental::single_order_types::{Self, get_creation_time_micros};
     use aptos_experimental::bulk_order_book_types::get_creation_time_micros as get_bulk_order_creation_time_micros;
     use aptos_experimental::market_bulk_order;
 
@@ -15,7 +15,7 @@ module aptos_experimental::dead_mans_switch_operations {
 
     const MICROS_PER_SECOND: u64 = 1000000;
 
-    /// Cleans up expired orders for a given account based on dead man's switch rules.
+    /// Cleans up expired orders based on dead man's switch rules.
     ///
     /// This function validates that each order's creation timestamp is valid according to
     /// the dead man's switch tracker. If an order was created before the current keep-alive
@@ -23,7 +23,6 @@ module aptos_experimental::dead_mans_switch_operations {
     ///
     /// Parameters:
     /// - market: The market instance
-    /// - account: The account whose orders should be checked and cleaned up
     /// - order_ids: Vector of order IDs to check and potentially cancel
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
     ///
@@ -31,7 +30,6 @@ module aptos_experimental::dead_mans_switch_operations {
     /// - E_DEAD_MANS_SWITCH_NOT_ENABLED: If dead man's switch is not enabled for this market
     public fun cleanup_expired_orders<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
-        account: address,
         order_ids: vector<OrderIdType>,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
@@ -48,10 +46,18 @@ module aptos_experimental::dead_mans_switch_operations {
 
             if (order_opt.is_some()) {
                 let order_with_state = order_opt.destroy_some();
-                let (order, _is_active) = order_with_state.destroy_order_from_state();
+                let (order, is_active) = order_with_state.destroy_order_from_state();
+
+                if (!is_active) {
+                    // Order is already inactive, skip
+                    i += 1;
+                    continue;
+                };
+                // Get account from the order
+                let account = order.get_account();
 
                 // Get creation timestamp in microseconds and convert to seconds
-                let creation_time_micros = get_creation_time_micros(&order);
+                let creation_time_micros = order.get_creation_time_micros();
                 let creation_time_secs = creation_time_micros / MICROS_PER_SECOND;
 
                 // Check if order is valid according to dead man's switch
@@ -101,7 +107,7 @@ module aptos_experimental::dead_mans_switch_operations {
         let bulk_order = market.get_order_book().get_bulk_order(account);
 
         // Get creation timestamp in microseconds and convert to seconds
-        let creation_time_micros = get_bulk_order_creation_time_micros(&bulk_order);
+        let creation_time_micros = bulk_order.get_bulk_order_creation_time_micros();
         let creation_time_secs = creation_time_micros / MICROS_PER_SECOND;
 
         // Check if order is valid according to dead man's switch
