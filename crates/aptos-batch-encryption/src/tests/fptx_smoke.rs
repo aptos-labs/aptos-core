@@ -110,7 +110,11 @@ fn smoke_with_pvss() {
 
     let tc_happy = ShamirThresholdConfig::new(5, 8);
     let tc_slow = ShamirThresholdConfig::new(3, 8);
-    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(tc_happy.get_total_num_players(), DEFAULT_ELL_FOR_TESTING, G2Affine::generator(), &mut rng_aptos_crypto);
+    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
+        tc_happy.get_total_num_players(),
+        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        G2Affine::generator(),
+        &mut rng_aptos_crypto);
 
     let ssks = (0..tc_happy.get_total_num_players())
         .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos_crypto))

@@ -108,7 +108,7 @@ impl BatchThresholdEncryption for FPTX {
                 BatchEncryptionError::HappySlowPathMismatchError
             )?;
 
-        let mpk_g2 : G2Affine = subtranscript_happypath.get_dealt_public_key().into_g2();
+        let mpk_g2 : G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
 
         let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
 
@@ -119,7 +119,7 @@ impl BatchThresholdEncryption for FPTX {
                 Self::VerificationKey {
                     player: p,
                     mpk_g2,
-                    vk_g2: subtranscript_happypath.get_public_key_share(&tc_happypath, &p).into_g2()
+                    vk_g2: subtranscript_happypath.get_public_key_share(&tc_happypath, &p).as_g2()
                 }
             ).collect();
 
@@ -130,7 +130,7 @@ impl BatchThresholdEncryption for FPTX {
                 Self::VerificationKey {
                     player: p,
                     mpk_g2,
-                    vk_g2: subtranscript_slowpath.get_public_key_share(&tc_slowpath, &p).into_g2()
+                    vk_g2: subtranscript_slowpath.get_public_key_share(&tc_slowpath, &p).as_g2()
                 }
             ).collect();
 

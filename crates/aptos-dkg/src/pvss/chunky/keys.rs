@@ -85,7 +85,7 @@ impl<E: Pairing> DealtPubKey<E> {
         Self { G }
     }
 
-    pub fn into_g2(&self) -> E::G2Affine {
+    pub fn as_g2(&self) -> E::G2Affine {
         self.G
     }
 }
@@ -100,8 +100,8 @@ impl<E: Pairing> DealtPubKeyShare<E> {
         DealtPubKeyShare(dealt_pk)
     }
 
-    pub fn into_g2(&self) -> E::G2Affine {
-        self.0.into_g2()
+    pub fn as_g2(&self) -> E::G2Affine {
+        self.0.as_g2()
     }
 }
 

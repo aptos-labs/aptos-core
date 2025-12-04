@@ -183,7 +183,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
-const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
+pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 
 impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking
