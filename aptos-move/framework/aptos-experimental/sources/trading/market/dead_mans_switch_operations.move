@@ -6,8 +6,8 @@ module aptos_experimental::dead_mans_switch_operations {
     use aptos_experimental::order_book_types::OrderIdType;
     use aptos_experimental::dead_mans_switch_tracker::{Self, is_order_valid};
     use aptos_experimental::order_operations;
-    use aptos_experimental::single_order_types::{Self, get_creation_time_micros};
-    use aptos_experimental::bulk_order_book_types::get_creation_time_micros as get_bulk_order_creation_time_micros;
+    use aptos_experimental::single_order_types;
+    use aptos_experimental::bulk_order_book_types;
     use aptos_experimental::market_bulk_order;
 
     // Error codes
@@ -54,10 +54,10 @@ module aptos_experimental::dead_mans_switch_operations {
                     continue;
                 };
                 // Get account from the order
-                let account = order.get_account();
+                let account = single_order_types::get_account(&order);
 
                 // Get creation timestamp in microseconds and convert to seconds
-                let creation_time_micros = order.get_creation_time_micros();
+                let creation_time_micros = single_order_types::get_creation_time_micros(&order);
                 let creation_time_secs = creation_time_micros / MICROS_PER_SECOND;
 
                 // Check if order is valid according to dead man's switch
@@ -107,7 +107,7 @@ module aptos_experimental::dead_mans_switch_operations {
         let bulk_order = market.get_order_book().get_bulk_order(account);
 
         // Get creation timestamp in microseconds and convert to seconds
-        let creation_time_micros = bulk_order.get_bulk_order_creation_time_micros();
+        let creation_time_micros = bulk_order_book_types::get_creation_time_micros(&bulk_order);
         let creation_time_secs = creation_time_micros / MICROS_PER_SECOND;
 
         // Check if order is valid according to dead man's switch
@@ -150,6 +150,9 @@ module aptos_experimental::dead_mans_switch_operations {
         account: address,
         timeout_seconds: u64
     ) {
+        // Check if dead man's switch is enabled
+        assert!(market.is_dead_mans_switch_enabled(), E_DEAD_MANS_SWITCH_NOT_ENABLED);
+
         let tracker = market_types::get_dead_mans_switch_tracker_mut(market);
         dead_mans_switch_tracker::keep_alive(tracker, account, timeout_seconds);
     }

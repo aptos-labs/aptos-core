@@ -581,4 +581,31 @@ module aptos_experimental::dead_mans_switch_operations_test {
         // Cleanup
         market.destroy_market();
     }
+
+    #[test]
+    #[expected_failure(abort_code = 0, location = aptos_experimental::dead_mans_switch_operations)]
+    fun test_keep_alive_fails_when_dms_not_enabled() {
+        // Setup market WITHOUT dead man's switch
+        let admin = account::create_signer_for_test(@0x1);
+        let market_signer = account::create_signer_for_test(@0x2);
+        let trader = account::create_signer_for_test(@0x100);
+        let trader_addr = signer::address_of(&trader);
+
+        timestamp::set_time_has_started_for_testing(&admin);
+        let market: Market<clearinghouse_test::TestOrderMetadata> = new_market(
+            &admin,
+            &mut market_signer,
+            new_market_config(false, true, 1, false, 0) // DMS disabled
+        );
+        clearinghouse_test::initialize(&admin);
+
+        // Try to update keep-alive - should abort with E_DEAD_MANS_SWITCH_NOT_ENABLED
+        dead_mans_switch_operations::keep_alive(
+            &mut market,
+            trader_addr,
+            KEEP_ALIVE_TIMEOUT_SECS
+        );
+
+        market.destroy_market();
+    }
 }
