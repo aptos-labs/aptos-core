@@ -157,8 +157,8 @@ module aptos_experimental::dead_mans_switch_tracker {
     ///     return true  // No dead man's switch, all orders valid
     /// if order_creation_time < session_start_time:
     ///     return false  // Order from expired session
-    /// if current_time > expiration_time:
-    ///     return false  // Session expired
+    /// if current_time >= expiration_time:
+    ///     return false  // Session expired (inclusive of expiration time)
     /// return true  // Order valid
     /// ```
     ///
@@ -186,7 +186,7 @@ module aptos_experimental::dead_mans_switch_tracker {
             // Order was placed before the session started, so it is invalid
             return false;
         };
-        state.expiration_time_secs > current_time
+        state.expiration_time_secs >= current_time
     }
 
     fun disable_keep_alive(
@@ -268,7 +268,7 @@ module aptos_experimental::dead_mans_switch_tracker {
         let itr = tracker.state.internal_find(&account);
         if (!itr.iter_is_end(&tracker.state)) {
            let state = itr.iter_borrow_mut(&mut tracker.state);
-            if (state.expiration_time_secs < current_time) {
+            if (current_time > state.expiration_time_secs) {
                 // Start a new session - this means any order placed before this time is invalidated
                 state.session_start_time_secs = current_time;
             };

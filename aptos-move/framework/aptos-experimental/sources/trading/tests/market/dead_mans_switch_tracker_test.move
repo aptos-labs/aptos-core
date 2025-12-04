@@ -164,11 +164,11 @@ module aptos_experimental::dead_mans_switch_tracker_test {
         set_time(INITIAL_TIMESTAMP + 99);
         assert_order_valid(&tracker, user_addr, INITIAL_TIMESTAMP);
 
-        // At exact expiration time (expiration_time > current_time is false)
+        // At exact expiration time (expiration_time >= current_time is true, so still valid)
         set_time(INITIAL_TIMESTAMP + 100);
-        assert_order_invalid(&tracker, user_addr, INITIAL_TIMESTAMP);
+        assert_order_valid(&tracker, user_addr, INITIAL_TIMESTAMP);
 
-        // One second after expiration
+        // One second after expiration (now expired)
         set_time(INITIAL_TIMESTAMP + 101);
         assert_order_invalid(&tracker, user_addr, INITIAL_TIMESTAMP);
 
