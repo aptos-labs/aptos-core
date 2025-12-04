@@ -1,0 +1,64 @@
+[package]
+name = "aptos-batch-encryption"
+version = "0.1.0"
+
+# Workspace inherited keys
+authors = { workspace = true }
+edition = { workspace = true }
+homepage = { workspace = true }
+license = { workspace = true }
+publish = { workspace = true }
+repository = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+name = "aptos_batch_encryption"
+doctest = false
+
+[dependencies]
+aes-gcm = { workspace = true }
+anyhow = { workspace = true }
+aptos-crypto = { workspace = true }
+ark-bls12-381 = { workspace = true }
+ark-bn254 = { workspace = true }
+ark-ec = { workspace = true }
+ark-ff = { workspace = true }
+ark-ff-asm = { workspace = true }
+ark-ff-macros = { workspace = true }
+ark-poly = { workspace = true }
+ark-serialize = { workspace = true }
+ark-std = { workspace = true }
+bcs = { workspace = true }
+ed25519-dalek = { version = "2.1.1", features = ["asm", "rand_core", "serde"] }
+generic-array = { workspace = true }
+hmac = { workspace = true }
+num-traits = { workspace = true }
+rand = { workspace = true }
+rayon = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { version = "0.10.8", features = ["asm", "asm-aarch64", "sha2-asm"] }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+itertools = { workspace = true }
+
+[package.metadata.cargo-machete]
+ignored = ["ark-bls12-381", "ark-ff-asm", "ark-ff-macros"]
+
+[[bench]]
+name = "fk_algorithm"
+harness = false
+
+[[bench]]
+name = "multi_point_eval"
+harness = false
+
+[[bench]]
+name = "fptx"
+harness = false
+
+[[bench]]
+name = "msm"
+harness = false
