@@ -200,7 +200,7 @@ fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &vec![NoAux])
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &[NoAux])
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
@@ -237,7 +237,7 @@ fn pvss_nonaggregate_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &NoAux)
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux)
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
@@ -279,7 +279,7 @@ fn pvss_nonaggregate_weighted_deal_verify_and_reconstruct<
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &NoAux)
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux)
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
