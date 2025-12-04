@@ -89,8 +89,78 @@ pub struct SubTranscript<E: Pairing> {
     pub Rs: Vec<E::G1>,
 }
 
-impl<E: Pairing> HasAggregatableSubtranscript<SecretSharingConfig<E::ScalarField>>
-    for Transcript<E>
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::SubTranscript
+    for SubTranscript<E>
+{
+    type DealtPubKey = keys::DealtPubKey<E>;
+    type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
+    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E>;
+    type DecryptPrivKey = keys::DecryptPrivKey<E>;
+    type EncryptPubKey = keys::EncryptPubKey<E>;
+    type PublicParameters = PublicParameters<E>;
+    type SecretSharingConfig = SecretSharingConfig<E::ScalarField>;
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.Vs[player.id].into_affine()))
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(self.Vs.last().expect("V is empty somehow").into_affine())
+    }
+
+    #[allow(non_snake_case)]
+    fn decrypt_own_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        let C_i = &self.Cs[player.id]; // where in notation `C_i`, `i` denotes `player.id`
+
+        let ephemeral_keys: Vec<_> = self.Rs.iter().map(|R_i| R_i.mul(dk.dk)).collect();
+        assert_eq!(
+            ephemeral_keys.len(),
+            C_i.len(),
+            "Number of ephemeral keys does not match the number of ciphertext chunks"
+        );
+        let dealt_encrypted_secret_key_share_chunks: Vec<_> = C_i
+            .iter()
+            .zip(ephemeral_keys.iter())
+            .map(|(C_ij, ephemeral_key)| C_ij.sub(ephemeral_key))
+            .collect();
+
+        let dealt_chunked_secret_key_share = bsgs::dlog_vec(
+            pp.pp_elgamal.G.into_group(),
+            &dealt_encrypted_secret_key_share_chunks,
+            &pp.table,
+            1 << pp.ell as u32,
+        )
+        .expect("BSGS dlog failed");
+
+        let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> = dealt_chunked_secret_key_share
+            .iter()
+            .map(|&x| E::ScalarField::from(x))
+            .collect();
+
+        let dealt_secret_key_share =
+            chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
+
+        let dealt_pub_key_share = self.Vs[player.id].into_affine(); // G_2^{f(\omega^i})
+
+        (
+            Scalar(dealt_secret_key_share),
+            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)), // TODO: review this formalism
+        )
+    }
+}
+
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+    HasAggregatableSubtranscript<SecretSharingConfig<E::ScalarField>> for Transcript<E>
 {
     type SubTranscript = SubTranscript<E>;
 
@@ -469,79 +539,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         vec![self.utrs.dealer]
     }
 
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(
-            self.utrs.subtranscript.Vs[player.id].into_affine(),
-        ))
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(
-            self.utrs
-                .subtranscript
-                .Vs
-                .last()
-                .expect("V is empty somehow")
-                .into_affine(),
-        )
-    }
-
-    #[allow(non_snake_case)]
-    fn decrypt_own_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let C_i = &self.utrs.subtranscript.Cs[player.id]; // where in notation `C_i`, `i` denotes `player.id`
-
-        let ephemeral_keys: Vec<_> = self
-            .utrs
-            .subtranscript
-            .Rs
-            .iter()
-            .map(|R_i| R_i.mul(dk.dk))
-            .collect();
-        assert_eq!(
-            ephemeral_keys.len(),
-            C_i.len(),
-            "Number of ephemeral keys does not match the number of ciphertext chunks"
-        );
-        let dealt_encrypted_secret_key_share_chunks: Vec<_> = C_i
-            .iter()
-            .zip(ephemeral_keys.iter())
-            .map(|(C_ij, ephemeral_key)| C_ij.sub(ephemeral_key))
-            .collect();
-
-        let dealt_chunked_secret_key_share = bsgs::dlog_vec(
-            pp.pp_elgamal.G.into_group(),
-            &dealt_encrypted_secret_key_share_chunks,
-            &pp.table,
-            1 << pp.ell as u32,
-        )
-        .expect("BSGS dlog failed");
-
-        let dealt_chunked_secret_key_share_fr: Vec<E::ScalarField> = dealt_chunked_secret_key_share
-            .iter()
-            .map(|&x| E::ScalarField::from(x))
-            .collect();
-
-        let dealt_secret_key_share =
-            chunks::le_chunks_to_scalar(pp.ell, &dealt_chunked_secret_key_share_fr);
-
-        let dealt_pub_key_share = self.utrs.subtranscript.Vs[player.id].into_affine(); // G_2^{f(\omega^i})
-
-        (
-            Scalar(dealt_secret_key_share),
-            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)), // TODO: review this formalism
-        )
-    }
-
     #[allow(non_snake_case)]
     fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
     where
@@ -577,6 +574,37 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             .expect("signing of PVSS transcript should have succeeded");
 
         Transcript { utrs, sgn }
+    }
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::SubTranscript;
+        self.utrs.subtranscript.get_public_key_share(_sc, &player)
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::SubTranscript;
+        self.utrs.subtranscript.get_dealt_public_key()
+    }
+
+    #[allow(non_snake_case)]
+    fn decrypt_own_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::SubTranscript;
+        self.utrs
+            .subtranscript
+            .decrypt_own_share(_sc, player, dk, pp)
     }
 }
 
