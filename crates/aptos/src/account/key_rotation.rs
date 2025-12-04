@@ -1,11 +1,15 @@
 // Copyright © Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 
-use crate::common::types::{
-    account_address_from_auth_key, account_address_from_public_key, AuthenticationKeyInputOptions,
-    CliCommand, CliConfig, CliError, CliTypedResult, ConfigSearchMode, EncodingOptions,
-    ExtractEd25519PublicKey, HardwareWalletOptions, ParseEd25519PrivateKey, ProfileConfig,
-    ProfileOptions, PublicKeyInputOptions, RestOptions, TransactionOptions, TransactionSummary,
+use crate::common::{
+    init::lookup_address,
+    types::{
+        account_address_from_auth_key, account_address_from_public_key,
+        AuthenticationKeyInputOptions, CliCommand, CliConfig, CliError, CliTypedResult,
+        ConfigSearchMode, EncodingOptions, ExtractEd25519PublicKey, HardwareWalletOptions,
+        ParseEd25519PrivateKey, ProfileConfig, ProfileOptions, PublicKeyInputOptions, RestOptions,
+        TransactionOptions, TransactionSummary,
+    },
 };
 use aptos_cached_packages::aptos_stdlib;
 use aptos_crypto::{
@@ -14,7 +18,7 @@ use aptos_crypto::{
     PrivateKey, SigningKey,
 };
 use aptos_ledger;
-use aptos_rest_client::{error::RestError, Client};
+use aptos_rest_client::Client;
 use aptos_types::{
     account_address::AccountAddress,
     account_config::{RotationProofChallenge, CORE_CODE_ADDRESS},
@@ -380,15 +384,4 @@ impl CliCommand<AccountAddress> for LookupAddress {
         };
         Ok(lookup_address(&rest_client, address, true).await?)
     }
-}
-
-pub async fn lookup_address(
-    rest_client: &Client,
-    address_key: AccountAddress,
-    must_exist: bool,
-) -> Result<AccountAddress, RestError> {
-    Ok(rest_client
-        .lookup_address(address_key, must_exist)
-        .await?
-        .into_inner())
 }
