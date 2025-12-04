@@ -1,13 +1,18 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    group::{G2Affine}, schemes::fptx::{FPTX}, shared::{digest::DigestKey, key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare}}, traits::BatchThresholdEncryption
+    group::G2Affine,
+    schemes::fptx::FPTX,
+    shared::{
+        digest::DigestKey,
+        key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare},
+    },
+    traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig,  SecretSharingConfig as _};
+use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, SecretSharingConfig as _};
 use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
-
 
 fn smoke_with_setup<R: RngCore + CryptoRng>(
     rng: &mut R,
@@ -95,13 +100,27 @@ fn smoke_with_setup_for_testing() {
     let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
         FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
 
-    smoke_with_setup(&mut rng, tc_happy, tc_slow, ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow);
+    smoke_with_setup(
+        &mut rng,
+        tc_happy,
+        tc_slow,
+        ek,
+        dk,
+        vks_happy,
+        msk_shares_happy,
+        vks_slow,
+        msk_shares_slow,
+    );
 }
 
 type T = aptos_dkg::pvss::chunky::Transcript<crate::group::Pairing>;
-use aptos_dkg::pvss::{test_utils::NoAux, traits::{transcript::HasAggregatableSubtranscript, Transcript}};
-use aptos_dkg::pvss::traits::{HasEncryptionPublicParams, Convert};
 use aptos_crypto::{SigningKey, Uniform};
+use aptos_dkg::pvss::{
+    test_utils::NoAux,
+    traits::{
+        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
+    },
+};
 
 #[test]
 fn smoke_with_pvss() {
@@ -114,7 +133,8 @@ fn smoke_with_pvss() {
         tc_happy.get_total_num_players(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
         G2Affine::generator(),
-        &mut rng_aptos_crypto);
+        &mut rng_aptos_crypto,
+    );
 
     let ssks = (0..tc_happy.get_total_num_players())
         .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos_crypto))
@@ -134,7 +154,6 @@ fn smoke_with_pvss() {
 
     let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos_crypto);
 
-
     // Test dealing
     let subtrx_happypath = T::deal(
         &tc_happy,
@@ -146,7 +165,8 @@ fn smoke_with_pvss() {
         &NoAux,
         &tc_happy.get_player(0),
         &mut rng_aptos_crypto,
-    ).get_subtranscript();
+    )
+    .get_subtranscript();
 
     let subtrx_slowpath = T::deal(
         &tc_slow,
@@ -158,7 +178,8 @@ fn smoke_with_pvss() {
         &NoAux,
         &tc_slow.get_player(0),
         &mut rng_aptos_crypto,
-    ).get_subtranscript();
+    )
+    .get_subtranscript();
 
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 
@@ -170,12 +191,17 @@ fn smoke_with_pvss() {
         &tc_happy,
         &tc_slow,
         tc_happy.get_player(0),
-        &dks[0]
-    ).unwrap();
+        &dks[0],
+    )
+    .unwrap();
 
-    let (msk_shares_happy, msk_shares_slow) : (Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>, Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>) = tc_happy.get_players()
+    let (msk_shares_happy, msk_shares_slow): (
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+    ) = tc_happy
+        .get_players()
         .into_iter()
-    .map(|p| {
+        .map(|p| {
             let (_, _, msk_share_happypath, _, msk_share_slowpath) = FPTX::setup(
                 &dk,
                 &pp,
@@ -184,11 +210,12 @@ fn smoke_with_pvss() {
                 &tc_happy,
                 &tc_slow,
                 p,
-                &dks[p.get_id()]).unwrap();
+                &dks[p.get_id()],
+            )
+            .unwrap();
             (msk_share_happypath, msk_share_slowpath)
-        }).collect();
-
-
+        })
+        .collect();
 
     smoke_with_setup(
         &mut rng,
@@ -199,7 +226,7 @@ fn smoke_with_pvss() {
         vks_happy,
         msk_shares_happy,
         vks_slow,
-        msk_shares_slow
+        msk_shares_slow,
     );
 }
 

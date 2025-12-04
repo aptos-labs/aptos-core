@@ -90,8 +90,6 @@ impl<E: Pairing> DealtPubKey<E> {
     }
 }
 
-
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>); // TODO: Copied from `das`, but should review this at some point!!
 

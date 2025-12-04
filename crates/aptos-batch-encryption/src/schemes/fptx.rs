@@ -1,7 +1,9 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    errors::BatchEncryptionError, group::{self, *}, shared::{
+    errors::BatchEncryptionError,
+    group::{self, *},
+    shared::{
         ark_serialize::*,
         ciphertext::{BIBEEncryptionKey, CTDecrypt, CTEncrypt, Ciphertext, PreparedCiphertext},
         digest::{Digest, DigestKey, EvalProofs, EvalProofsPromise},
@@ -13,7 +15,8 @@ use crate::{
             self, BIBEDecryptionKey, BIBEDecryptionKeyShare, BIBEMasterPublicKey,
             BIBEMasterSecretKeyShare, BIBEVerificationKey,
         },
-    }, traits::{AssociatedData, BatchThresholdEncryption, Plaintext}
+    },
+    traits::{AssociatedData, BatchThresholdEncryption, Plaintext},
 };
 use anyhow::{anyhow, Result};
 use aptos_crypto::SecretSharingConfig as _;
@@ -68,7 +71,6 @@ impl BIBEEncryptionKey for EncryptionKey {
 }
 
 impl BatchThresholdEncryption for FPTX {
-    type SubTranscript = aptos_dkg::pvss::chunky::SubTranscript<group::Pairing>;
     type Ciphertext = Ciphertext<FreeRootId>;
     type DecryptionKey = BIBEDecryptionKey;
     type DecryptionKeyShare = BIBEDecryptionKeyShare;
@@ -82,6 +84,7 @@ impl BatchThresholdEncryption for FPTX {
     type MasterSecretKeyShare = BIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
+    type SubTranscript = aptos_dkg::pvss::chunky::SubTranscript<group::Pairing>;
     type ThresholdConfig = aptos_crypto::arkworks::shamir::ShamirThresholdConfig<Fr>;
     type VerificationKey = BIBEVerificationKey;
 
@@ -101,54 +104,75 @@ impl BatchThresholdEncryption for FPTX {
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
-        (subtranscript_happypath.get_dealt_public_key() ==
-            subtranscript_slowpath.get_dealt_public_key())
-            .then_some(())
-            .ok_or(
-                BatchEncryptionError::HappySlowPathMismatchError
-            )?;
+        (subtranscript_happypath.get_dealt_public_key()
+            == subtranscript_slowpath.get_dealt_public_key())
+        .then_some(())
+        .ok_or(BatchEncryptionError::HappySlowPathMismatchError)?;
 
-        let mpk_g2 : G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
+        let mpk_g2: G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
 
         let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
 
         let vks_happypath = tc_happypath
             .get_players()
             .into_iter()
-            .map(|p|
-                Self::VerificationKey {
-                    player: p,
-                    mpk_g2,
-                    vk_g2: subtranscript_happypath.get_public_key_share(tc_happypath, &p).as_g2()
-                }
-            ).collect();
+            .map(|p| Self::VerificationKey {
+                player: p,
+                mpk_g2,
+                vk_g2: subtranscript_happypath
+                    .get_public_key_share(tc_happypath, &p)
+                    .as_g2(),
+            })
+            .collect();
 
         let vks_slowpath = tc_slowpath
             .get_players()
             .into_iter()
-            .map(|p|
-                Self::VerificationKey {
-                    player: p,
-                    mpk_g2,
-                    vk_g2: subtranscript_slowpath.get_public_key_share(tc_slowpath, &p).as_g2()
-                }
-            ).collect();
+            .map(|p| Self::VerificationKey {
+                player: p,
+                mpk_g2,
+                vk_g2: subtranscript_slowpath
+                    .get_public_key_share(tc_slowpath, &p)
+                    .as_g2(),
+            })
+            .collect();
 
         let msk_share_happypath = BIBEMasterSecretKeyShare {
             mpk_g2,
             player: current_player,
-            shamir_share_eval: subtranscript_happypath.decrypt_own_share(tc_happypath, &current_player, msk_share_decryption_key, pvss_public_params).0.into_fr(),
+            shamir_share_eval: subtranscript_happypath
+                .decrypt_own_share(
+                    tc_happypath,
+                    &current_player,
+                    msk_share_decryption_key,
+                    pvss_public_params,
+                )
+                .0
+                .into_fr(),
         };
 
         let msk_share_slowpath = BIBEMasterSecretKeyShare {
             mpk_g2,
             player: current_player,
-            shamir_share_eval: subtranscript_slowpath.decrypt_own_share(tc_slowpath, &current_player, msk_share_decryption_key, pvss_public_params).0.into_fr(),
+            shamir_share_eval: subtranscript_slowpath
+                .decrypt_own_share(
+                    tc_slowpath,
+                    &current_player,
+                    msk_share_decryption_key,
+                    pvss_public_params,
+                )
+                .0
+                .into_fr(),
         };
 
-        Ok((ek, vks_happypath, msk_share_happypath, vks_slowpath, msk_share_slowpath))
+        Ok((
+            ek,
+            vks_happypath,
+            msk_share_happypath,
+            vks_slowpath,
+            msk_share_slowpath,
+        ))
     }
-
 
     fn setup_for_testing(
         seed: u64,

@@ -117,8 +117,6 @@ impl BIBEMasterSecretKeyShare {
     }
 }
 
-
-
 fn verify_bls(
     verification_key_g2: G2Affine,
     digest: &Digest,

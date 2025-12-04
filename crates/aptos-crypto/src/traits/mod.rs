@@ -334,7 +334,6 @@ pub trait SecretSharingConfig: Display {
         (0..self.get_total_num_players())
             .map(|i| Player { id: i })
             .collect()
-
     }
 
     /// Useful during testing.

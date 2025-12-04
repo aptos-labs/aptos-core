@@ -6,6 +6,7 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
+use aptos_crypto::blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES};
 #[cfg(test)]
 use aptos_crypto::SecretSharingConfig;
 use aptos_crypto::{
@@ -64,16 +65,12 @@ fn test_pvss_all_unweighted() {
         type ChunkyTranscript = chunky::Transcript<ark_bn254::Bn254>;
 
         // Chunky
-        pvss_deal_verify_and_reconstruct::<ChunkyTranscript>(
-            &tc,
-            seed.to_bytes_le(),
-        );
+        pvss_deal_verify_and_reconstruct::<ChunkyTranscript>(&tc, seed.to_bytes_le());
 
-
-        pvss_deal_verify_and_reconstruct_from_subtranscript::<<ChunkyTranscript as Transcript>::SecretSharingConfig, ChunkyTranscript>(
-            &tc,
-            seed.to_bytes_le(),
-        );
+        pvss_deal_verify_and_reconstruct_from_subtranscript::<
+            <ChunkyTranscript as Transcript>::SecretSharingConfig,
+            ChunkyTranscript,
+        >(&tc, seed.to_bytes_le());
     }
 }
 
@@ -305,7 +302,10 @@ fn pvss_nonaggregate_weighted_deal_verify_and_reconstruct<
 }
 
 #[cfg(test)]
-fn pvss_deal_verify_and_reconstruct_from_subtranscript<C: SecretSharingConfig, T: Transcript<SecretSharingConfig = C> + HasAggregatableSubtranscript<C>>(
+fn pvss_deal_verify_and_reconstruct_from_subtranscript<
+    C: SecretSharingConfig,
+    T: Transcript<SecretSharingConfig = C> + HasAggregatableSubtranscript<C>,
+>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -334,7 +334,10 @@ fn pvss_deal_verify_and_reconstruct_from_subtranscript<C: SecretSharingConfig, T
 
     let trx = trx.get_subtranscript();
 
-    if d.dsk != reconstruct_dealt_secret_key_randomly_subtranscript::<StdRng, T::SubTranscript>(sc, &mut rng, &d.dks, trx, &d.pp)
+    if d.dsk
+        != reconstruct_dealt_secret_key_randomly_subtranscript::<StdRng, T::SubTranscript>(
+            sc, &mut rng, &d.dks, trx, &d.pp,
+        )
     {
         panic!("Reconstructed SK did not match");
     }

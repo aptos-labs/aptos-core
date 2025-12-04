@@ -5,7 +5,8 @@ use crate::pvss::{
     traits::{
         transcript::{Transcript, WithMaxNumShares},
         Convert, HasEncryptionPublicParams, SubTranscript,
-    }, Player, ThresholdConfigBlstrs, WeightedConfigBlstrs
+    },
+    Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
 };
 use aptos_crypto::{
     arkworks::shamir::Reconstructable,

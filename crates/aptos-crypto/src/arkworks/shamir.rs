@@ -82,7 +82,6 @@ impl<F: FftField> traits::SecretSharingConfig for ShamirThresholdConfig<F> {
     fn get_total_num_shares(&self) -> usize {
         self.n
     }
-
 }
 
 impl<F: FftField> traits::ThresholdConfig for ShamirThresholdConfig<F> {

@@ -168,7 +168,12 @@ impl<E: Pairing> PublicParameters<E> {
     }
 
     /// Creates public parameters with a specified commitment base.
-    pub fn new_with_commitment_base<R: RngCore + CryptoRng>(n: usize, ell: u8, commitment_base: E::G2Affine, rng: &mut R) -> Self {
+    pub fn new_with_commitment_base<R: RngCore + CryptoRng>(
+        n: usize,
+        ell: u8,
+        commitment_base: E::G2Affine,
+        rng: &mut R,
+    ) -> Self {
         let mut pp = Self::new(n, ell, rng);
         pp.G_2 = commitment_base;
         pp

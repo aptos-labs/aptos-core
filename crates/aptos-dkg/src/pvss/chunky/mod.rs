@@ -14,3 +14,4 @@ pub use transcript::Transcript;
 pub use weighted_transcript::Transcript as WeightedTranscript;
 pub use transcript::SubTranscript;
 pub use public_parameters::DEFAULT_ELL_FOR_TESTING;
+pub use transcript::{SubTranscript, Transcript};

@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: Apache-2.0
 use anyhow::Result;
 use aptos_crypto::player::Player;
+use aptos_dkg::pvss::traits::SubTranscript;
 use ark_std::rand::{CryptoRng, RngCore};
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
-use aptos_dkg::pvss::traits::SubTranscript;
 
 pub trait BatchThresholdEncryption {
     type ThresholdConfig: aptos_crypto::ThresholdConfig;
@@ -72,9 +72,6 @@ pub trait BatchThresholdEncryption {
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )>;
-
-
-
 
     /// Generates an (insecure) setup for the batch threshold encryption scheme. Consists of
     /// a [`PublicKey`] which can be used to encrypt messages and to compute a digest from a list
