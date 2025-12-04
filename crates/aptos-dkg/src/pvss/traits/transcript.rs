@@ -77,6 +77,8 @@ pub trait SubTranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
         + Debug
         + PartialEq
         + Eq;
+    type DealtSecretKey: PartialEq
+        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKey: Serialize; // So it can get signed
@@ -377,6 +379,7 @@ pub trait HasAggregatableSubtranscript<C>: Transcript {
             DealtPubKeyShare = Self::DealtPubKeyShare,
             DealtSecretKeyShare = Self::DealtSecretKeyShare,
             DealtPubKey = Self::DealtPubKey,
+            DealtSecretKey = Self::DealtSecretKey,
             EncryptPubKey = Self::EncryptPubKey,
             DecryptPrivKey = Self::DecryptPrivKey,
         >;

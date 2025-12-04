@@ -1,13 +1,13 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    schemes::fptx::FPTX,
-    shared::{digest::DigestKey, key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare}},
-    traits::BatchThresholdEncryption,
+    group::{G2Affine}, schemes::fptx::{FPTX}, shared::{digest::DigestKey, key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare}}, traits::BatchThresholdEncryption
 };
 use anyhow::Result;
 use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig,  SecretSharingConfig as _};
+use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
+
 
 fn smoke_with_setup<R: RngCore + CryptoRng>(
     rng: &mut R,
@@ -99,9 +99,8 @@ fn smoke_with_setup_for_testing() {
 }
 
 type T = aptos_dkg::pvss::chunky::Transcript<crate::group::Pairing>;
-use aptos_dkg::pvss::{test_utils::NoAux, traits::{transcript::HasAggregatableSubtranscript, Transcript}};
+use aptos_dkg::{pvss::{test_utils::NoAux, traits::{transcript::HasAggregatableSubtranscript, Transcript}, Player}, Scalar};
 use aptos_dkg::pvss::traits::{HasEncryptionPublicParams, Convert};
-use aptos_dkg::pvss::traits::transcript::WithMaxNumShares;
 use aptos_crypto::{SigningKey, Uniform};
 
 #[test]
@@ -111,7 +110,7 @@ fn smoke_with_pvss() {
 
     let tc_happy = ShamirThresholdConfig::new(5, 8);
     let tc_slow = ShamirThresholdConfig::new(3, 8);
-    let pp = <T as Transcript>::PublicParameters::with_max_num_shares(tc_happy.get_total_num_players());
+    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(tc_happy.get_total_num_players(), DEFAULT_ELL_FOR_TESTING, G2Affine::generator(), &mut rng_aptos_crypto);
 
     let ssks = (0..tc_happy.get_total_num_players())
         .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos_crypto))
@@ -133,7 +132,7 @@ fn smoke_with_pvss() {
 
 
     // Test dealing
-    let trx_happypath = T::deal(
+    let subtrx_happypath = T::deal(
         &tc_happy,
         &pp,
         &ssks[0],
@@ -143,8 +142,9 @@ fn smoke_with_pvss() {
         &NoAux,
         &tc_happy.get_player(0),
         &mut rng_aptos_crypto,
-    );
-    let trx_slowpath = T::deal(
+    ).get_subtranscript();
+
+    let subtrx_slowpath = T::deal(
         &tc_slow,
         &pp,
         &ssks[0],
@@ -154,33 +154,37 @@ fn smoke_with_pvss() {
         &NoAux,
         &tc_slow.get_player(0),
         &mut rng_aptos_crypto,
-    );
+    ).get_subtranscript();
 
     let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
 
     let (ek, vks_happy, _, vks_slow, _) = FPTX::setup(
         &dk,
         &pp,
-        &trx_happypath.get_subtranscript(),
-        &trx_slowpath.get_subtranscript(),
+        &subtrx_happypath,
+        &subtrx_slowpath,
         &tc_happy,
         &tc_slow,
         tc_happy.get_player(0),
-        &dks[0]).unwrap();
+        &dks[0]
+    ).unwrap();
 
-    let (msk_shares_happy, msk_shares_slow) : (Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>, Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>) = (0..tc_happy.get_total_num_players())
-    .map(|i| {
+    let (msk_shares_happy, msk_shares_slow) : (Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>, Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>) = tc_happy.get_players()
+        .into_iter()
+    .map(|p| {
             let (__, _, msk_share_happypath, _, msk_share_slowpath) = FPTX::setup(
                 &dk,
                 &pp,
-                &trx_happypath.get_subtranscript(),
-                &trx_slowpath.get_subtranscript(),
+                &subtrx_happypath,
+                &subtrx_slowpath,
                 &tc_happy,
                 &tc_slow,
-                tc_happy.get_player(i),
-                &dks[i]).unwrap();
+                p,
+                &dks[p.get_id()]).unwrap();
             (msk_share_happypath, msk_share_slowpath)
         }).collect();
+
+
 
     smoke_with_setup(
         &mut rng,
@@ -191,7 +195,8 @@ fn smoke_with_pvss() {
         vks_happy,
         msk_shares_happy,
         vks_slow,
-        msk_shares_slow);
+        msk_shares_slow
+    );
 }
 
 #[test]

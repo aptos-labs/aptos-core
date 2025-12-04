@@ -4,9 +4,8 @@
 use crate::pvss::{
     traits::{
         transcript::{Transcript, WithMaxNumShares},
-        Convert, HasEncryptionPublicParams,
-    },
-    Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
+        Convert, HasEncryptionPublicParams, SubTranscript,
+    }, Player, ThresholdConfigBlstrs, WeightedConfigBlstrs
 };
 use aptos_crypto::{
     arkworks::shamir::Reconstructable,
@@ -336,4 +335,30 @@ where
         .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
 
     T::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
+}
+
+pub fn reconstruct_dealt_secret_key_randomly_subtranscript<R, T: SubTranscript>(
+    sc: &<T as SubTranscript>::SecretSharingConfig,
+    rng: &mut R,
+    dks: &Vec<<T as SubTranscript>::DecryptPrivKey>,
+    trx: T,
+    pp: &<T as SubTranscript>::PublicParameters,
+) -> <T as SubTranscript>::DealtSecretKey
+where
+    R: rand_core::RngCore,
+{
+    // Test reconstruction from t random shares
+    let players_and_shares = sc
+        .get_random_eligible_subset_of_players(rng)
+        .into_iter()
+        .map(|p| {
+            let (sk, pk) = trx.decrypt_own_share(sc, &p, &dks[p.get_id()], pp);
+
+            assert_eq!(pk, trx.get_public_key_share(sc, &p));
+
+            (p, sk)
+        })
+        .collect::<Vec<(Player, T::DealtSecretKeyShare)>>();
+
+    <T as SubTranscript>::DealtSecretKey::reconstruct(sc, &players_and_shares).unwrap()
 }
