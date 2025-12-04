@@ -101,7 +101,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         spk: &Self::SigningPubKey,
         eks: &Vec<Self::EncryptPubKey>,
         s: &Self::InputSecret,
-        aux: &A,
+        aux: &A, // Weird that this compiles even though aux has been renamed??
         dealer: &Player,
         rng: &mut R,
     ) -> Self {
