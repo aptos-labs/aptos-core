@@ -5,7 +5,7 @@ use crate::{
     algebra::polynomials::shamir_secret_share,
     pvss::{
         self, das, encryption_dlog,
-        traits::{self, transcript::MalleableTranscript, Convert},
+        traits::{self, transcript::MalleableTranscript, AggregatableTranscript, Convert},
         Player, ThresholdConfigBlstrs,
     },
     traits::transcript::Aggregatable,
@@ -110,6 +110,50 @@ impl traits::Transcript for Transcript {
         }
     }
 
+    fn get_dealers(&self) -> Vec<Player> {
+        self.dealers.clone()
+    }
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.V.last().unwrap())
+    }
+
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        _dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        (self.C[player.id], self.get_public_key_share(sc, player))
+    }
+
+    #[allow(non_snake_case)]
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
+        Transcript {
+            dealers: vec![sc.get_player(0)],
+            V: insecure_random_g2_points(sc.n + 1, rng),
+            C: random_scalars(sc.n, rng),
+        }
+    }
+}
+
+impl AggregatableTranscript for Transcript {
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
@@ -151,48 +195,6 @@ impl traits::Transcript for Transcript {
         }
 
         return Ok(());
-    }
-
-    fn get_dealers(&self) -> Vec<Player> {
-        self.dealers.clone()
-    }
-
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(*self.V.last().unwrap())
-    }
-
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        _dk: &Self::DecryptPrivKey,
-        _pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        (self.C[player.id], self.get_public_key_share(sc, player))
-    }
-
-    #[allow(non_snake_case)]
-    fn generate<R>(
-        sc: &Self::SecretSharingConfig,
-        _pp: &Self::PublicParameters,
-        rng: &mut R,
-    ) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
-        Transcript {
-            dealers: vec![sc.get_player(0)],
-            V: insecure_random_g2_points(sc.n + 1, rng),
-            C: random_scalars(sc.n, rng),
-        }
     }
 }
 

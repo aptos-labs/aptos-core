@@ -26,7 +26,7 @@ use crate::{
         homomorphism::{tuple::TupleCodomainShape, Trait as _},
         traits::Trait as _,
     },
-    traits::transcript::HasAggregatableSubtranscript,
+    traits::transcript::{HasAggregatableSubtranscript, NonAggregatableTranscript},
     Scalar,
 };
 use anyhow::bail;
@@ -80,15 +80,39 @@ pub struct UnsignedTranscript<E: Pairing> {
 }
 
 #[allow(non_snake_case)]
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq)]
+#[derive(
+    CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
+)]
 pub struct SubTranscript<E: Pairing> {
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Vs: Vec<E::G2>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Cs: Vec<Vec<E::G1>>, // TODO: maybe make this and the other fields affine? The verifier will have to do it anyway... and we are trying to speed that up
     /// Second chunked ElGamal component: R[j] = r_j * H
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Rs: Vec<E::G1>,
 }
 
+impl<E: Pairing> ValidCryptoMaterial for SubTranscript<E> {
+    const AIP_80_PREFIX: &'static str = "";
+
+    fn to_bytes(&self) -> Vec<u8> {
+        // TODO: using `Result<Vec<u8>>` and `.map_err(|_| CryptoMaterialError::DeserializationError)` would be more consistent here?
+        bcs::to_bytes(&self).expect("Unexpected error during PVSS transcript serialization")
+    }
+}
+
+impl<E: Pairing> TryFrom<&[u8]> for SubTranscript<E> {
+    type Error = CryptoMaterialError;
+
+    fn try_from(bytes: &[u8]) -> Result<Self, Self::Error> {
+        bcs::from_bytes::<SubTranscript<E>>(bytes)
+            .map_err(|_| CryptoMaterialError::DeserializationError)
+    }
+}
+
+// TODO: Copy-paste ewww
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::SubTranscript
     for SubTranscript<E>
 {
@@ -414,14 +438,90 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         Transcript { utrs, sgn }
     }
 
+    fn get_dealers(&self) -> Vec<Player> {
+        vec![self.utrs.dealer]
+    }
+
+    #[allow(non_snake_case)]
+    fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
+        let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
+        let utrs = UnsignedTranscript {
+            dealer: sc.get_player(0),
+            subtranscript: SubTranscript {
+                Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
+                Cs: (0..sc.n)
+                    .map(|_| unsafe_random_points(num_chunks_per_share, rng))
+                    .collect::<Vec<_>>(), // TODO: would this become faster if generated in one batch and flattened?
+                Rs: unsafe_random_points(num_chunks_per_share, rng),
+            },
+            sharing_proof: SharingProof {
+                range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
+                    unsafe_random_point(rng),
+                ),
+                PoK: hkzg_chunked_elgamal::Proof::generate(
+                    (sc.n - 1).next_power_of_two() - 1,
+                    num_chunks_per_share,
+                    rng,
+                ),
+                range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
+            },
+        };
+
+        let ssk = PrivateKey::generate(rng);
+
+        let sgn = ssk
+            .sign(&utrs)
+            .expect("signing of PVSS transcript should have succeeded");
+
+        Transcript { utrs, sgn }
+    }
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::SubTranscript;
+        self.utrs.subtranscript.get_public_key_share(_sc, &player)
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::SubTranscript;
+        self.utrs.subtranscript.get_dealt_public_key()
+    }
+
+    #[allow(non_snake_case)]
+    fn decrypt_own_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        // local use here since we have a `SubTranscript` struct in this file
+        use traits::SubTranscript;
+        self.utrs
+            .subtranscript
+            .decrypt_own_share(_sc, player, dk, pp)
+    }
+}
+
+impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggregatableTranscript
+    for Transcript<E>
+{
     #[allow(non_snake_case)]
     fn verify<A: Serialize + Clone>(
         &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spks: &[Self::SigningPubKey],
-        eks: &[Self::EncryptPubKey],
-        session_ids: &[A],
+        sc: &<Self as traits::Transcript>::SecretSharingConfig,
+        pp: &<Self as traits::Transcript>::PublicParameters,
+        spks: &[<Self as traits::Transcript>::SigningPubKey],
+        eks: &[<Self as traits::Transcript>::EncryptPubKey],
+        sid: &A,
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
@@ -445,7 +545,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let sok_ctxt = (
             *sc,
             &spks[self.utrs.dealer.id],
-            session_ids[self.utrs.dealer.id].clone(),
+            sid,
             self.utrs.dealer.id,
             DST.to_vec(),
         ); // This is a bit hacky; also get rid of DST here and use self.dst?
@@ -533,78 +633,6 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
 
         Ok(())
-    }
-
-    fn get_dealers(&self) -> Vec<Player> {
-        vec![self.utrs.dealer]
-    }
-
-    #[allow(non_snake_case)]
-    fn generate<R>(sc: &Self::SecretSharingConfig, pp: &Self::PublicParameters, rng: &mut R) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
-        let num_chunks_per_share = num_chunks_per_scalar::<E>(pp.ell) as usize;
-        let utrs = UnsignedTranscript {
-            dealer: sc.get_player(0),
-            subtranscript: SubTranscript {
-                Vs: unsafe_random_points::<E::G2, _>(sc.n + 1, rng),
-                Cs: (0..sc.n)
-                    .map(|_| unsafe_random_points(num_chunks_per_share, rng))
-                    .collect::<Vec<_>>(), // TODO: would this become faster if generated in one batch and flattened?
-                Rs: unsafe_random_points(num_chunks_per_share, rng),
-            },
-            sharing_proof: SharingProof {
-                range_proof_commitment: sigma_protocol::homomorphism::TrivialShape(
-                    unsafe_random_point(rng),
-                ),
-                PoK: hkzg_chunked_elgamal::Proof::generate(
-                    (sc.n - 1).next_power_of_two() - 1,
-                    num_chunks_per_share,
-                    rng,
-                ),
-                range_proof: dekart_univariate_v2::Proof::generate(pp.ell, rng),
-            },
-        };
-
-        let ssk = PrivateKey::generate(rng);
-
-        let sgn = ssk
-            .sign(&utrs)
-            .expect("signing of PVSS transcript should have succeeded");
-
-        Transcript { utrs, sgn }
-    }
-
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
-        self.utrs.subtranscript.get_public_key_share(_sc, &player)
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
-        self.utrs.subtranscript.get_dealt_public_key()
-    }
-
-    #[allow(non_snake_case)]
-    fn decrypt_own_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        // local use here since we have a `SubTranscript` struct in this file
-        use traits::SubTranscript;
-        self.utrs
-            .subtranscript
-            .decrypt_own_share(_sc, player, dk, pp)
     }
 }
 

@@ -16,7 +16,9 @@ use aptos_crypto::{bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
-        traits::{transcript::Aggregatable, Convert, Reconstructable, Transcript},
+        traits::{
+            transcript::Aggregatable, AggregatableTranscript, Convert, Reconstructable, Transcript,
+        },
         Player,
     },
 };

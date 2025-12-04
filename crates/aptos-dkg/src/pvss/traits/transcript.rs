@@ -60,7 +60,8 @@ use num_traits::Zero;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{fmt::Debug, ops::AddAssign};
 
-pub trait SubTranscript {
+// TODO: get rid of all the copy-paste here
+pub trait SubTranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type PublicParameters: HasEncryptionPublicParams
         + WithMaxNumShares
         + Default
@@ -196,14 +197,14 @@ pub trait Transcript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     /// Additionally, verifies that the transcript was indeed aggregated from a set of players
     /// identified by the public keys in `spks`, by verifying each player $i$'s signature on the
     /// transcript and on `aux[i]`.
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spks: &[Self::SigningPubKey],
-        eks: &[Self::EncryptPubKey],
-        sids: &[A],
-    ) -> anyhow::Result<()>;
+    // fn verify<A: Serialize + Clone>(
+    //     &self,
+    //     sc: &Self::SecretSharingConfig,
+    //     pp: &Self::PublicParameters,
+    //     spks: &[Self::SigningPubKey],
+    //     eks: &[Self::EncryptPubKey],
+    //     sids: &[A],
+    // ) -> anyhow::Result<()>;
 
     /// Returns the set of player IDs who have contributed to this transcript.
     /// In other words, the transcript could have been dealt by one player, in which case
@@ -269,14 +270,29 @@ pub trait Aggregatable<C>: Sized {
     }
 }
 
-/// Workaround for the trait alias `AggregatableTranscript = Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>`
 pub trait AggregatableTranscript:
     Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>
 {
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        sids: &[A],
+    ) -> anyhow::Result<()>;
 }
-impl<T> AggregatableTranscript for T where
-    T: Transcript + Aggregatable<<Self as Transcript>::SecretSharingConfig>
-{
+
+// TODO: add HasAggregatableSubtranscript ?
+pub trait NonAggregatableTranscript: Transcript {
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        sid: &A, // Note the different signature heres
+    ) -> anyhow::Result<()>;
 }
 
 pub trait HasAggregatableSubtranscript<C>: Transcript {

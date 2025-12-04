@@ -7,7 +7,10 @@ use crate::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
         das, encryption_dlog, schnorr,
-        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
+        traits::{
+            self, transcript::MalleableTranscript, AggregatableTranscript,
+            HasEncryptionPublicParams,
+        },
         LowDegreeTest, Player, ThresholdConfigBlstrs, WeightedConfigBlstrs,
     },
     traits::transcript::Aggregatable,
@@ -184,6 +187,95 @@ impl traits::Transcript for Transcript {
         t
     }
 
+    fn get_dealers(&self) -> Vec<Player> {
+        self.soks
+            .iter()
+            .map(|(p, _, _, _)| *p)
+            .collect::<Vec<Player>>()
+    }
+
+    fn get_public_key_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        let weight = sc.get_player_weight(player);
+        let mut pk_shares = Vec::with_capacity(weight);
+
+        for j in 0..weight {
+            let k = sc.get_share_index(player.id, j).unwrap();
+            pk_shares.push(pvss::dealt_pub_key_share::g2::DealtPubKeyShare::new(
+                Self::DealtPubKey::new(self.V_hat[k]),
+            ));
+        }
+
+        pk_shares
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.V_hat.last().unwrap())
+    }
+
+    #[allow(non_snake_case)]
+    fn decrypt_own_share(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        let weight = sc.get_player_weight(player);
+        let mut sk_shares = Vec::with_capacity(weight);
+        let pk_shares = self.get_public_key_share(sc, player);
+
+        for j in 0..weight {
+            let k = sc.get_share_index(player.id, j).unwrap();
+
+            let ctxt = self.C[k]; // h_1^{f(s_i + j - 1)} \ek_i^{r_{s_i + j}}
+            let ephemeral_key = self.R[k].mul(dk.dk); // (g_1^{r_{s_i + j}})
+            let dealt_secret_key_share = ctxt.sub(ephemeral_key);
+
+            sk_shares.push(pvss::dealt_secret_key_share::g1::DealtSecretKeyShare::new(
+                Self::DealtSecretKey::new(dealt_secret_key_share),
+            ));
+        }
+
+        (sk_shares, pk_shares)
+    }
+
+    #[allow(non_snake_case)]
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
+        let W = sc.get_total_weight();
+        let sk = bls12381::PrivateKey::genesis();
+        Transcript {
+            soks: vec![(
+                sc.get_player(0),
+                random_g1_point(rng),
+                sk.sign(&Contribution::<G1Projective, usize> {
+                    comm: random_g1_point(rng),
+                    player: sc.get_player(0),
+                    aux: 0,
+                })
+                .unwrap(),
+                (random_g1_point(rng), random_scalar(rng)),
+            )],
+            R: insecure_random_g1_points(W, rng),
+            R_hat: insecure_random_g2_points(W, rng),
+            V: insecure_random_g1_points(W + 1, rng),
+            V_hat: insecure_random_g2_points(W + 1, rng),
+            C: insecure_random_g1_points(W, rng),
+        }
+    }
+}
+
+impl AggregatableTranscript for Transcript {
     #[allow(non_snake_case)]
     fn verify<A: Serialize + Clone>(
         &self,
@@ -276,99 +368,12 @@ impl traits::Transcript for Transcript {
             bail!(
                 "Expected zero during multi-pairing check for {} {}, but got {}",
                 sc,
-                Self::scheme_name(),
+                <Self as traits::Transcript>::scheme_name(),
                 res
             );
         }
 
         return Ok(());
-    }
-
-    fn get_dealers(&self) -> Vec<Player> {
-        self.soks
-            .iter()
-            .map(|(p, _, _, _)| *p)
-            .collect::<Vec<Player>>()
-    }
-
-    fn get_public_key_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        let weight = sc.get_player_weight(player);
-        let mut pk_shares = Vec::with_capacity(weight);
-
-        for j in 0..weight {
-            let k = sc.get_share_index(player.id, j).unwrap();
-            pk_shares.push(pvss::dealt_pub_key_share::g2::DealtPubKeyShare::new(
-                Self::DealtPubKey::new(self.V_hat[k]),
-            ));
-        }
-
-        pk_shares
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(*self.V_hat.last().unwrap())
-    }
-
-    #[allow(non_snake_case)]
-    fn decrypt_own_share(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        _pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let weight = sc.get_player_weight(player);
-        let mut sk_shares = Vec::with_capacity(weight);
-        let pk_shares = self.get_public_key_share(sc, player);
-
-        for j in 0..weight {
-            let k = sc.get_share_index(player.id, j).unwrap();
-
-            let ctxt = self.C[k]; // h_1^{f(s_i + j - 1)} \ek_i^{r_{s_i + j}}
-            let ephemeral_key = self.R[k].mul(dk.dk); // (g_1^{r_{s_i + j}})
-            let dealt_secret_key_share = ctxt.sub(ephemeral_key);
-
-            sk_shares.push(pvss::dealt_secret_key_share::g1::DealtSecretKeyShare::new(
-                Self::DealtSecretKey::new(dealt_secret_key_share),
-            ));
-        }
-
-        (sk_shares, pk_shares)
-    }
-
-    #[allow(non_snake_case)]
-    fn generate<R>(
-        sc: &Self::SecretSharingConfig,
-        _pp: &Self::PublicParameters,
-        rng: &mut R,
-    ) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
-        let W = sc.get_total_weight();
-        let sk = bls12381::PrivateKey::genesis();
-        Transcript {
-            soks: vec![(
-                sc.get_player(0),
-                random_g1_point(rng),
-                sk.sign(&Contribution::<G1Projective, usize> {
-                    comm: random_g1_point(rng),
-                    player: sc.get_player(0),
-                    aux: 0,
-                })
-                .unwrap(),
-                (random_g1_point(rng), random_scalar(rng)),
-            )],
-            R: insecure_random_g1_points(W, rng),
-            R_hat: insecure_random_g2_points(W, rng),
-            V: insecure_random_g1_points(W + 1, rng),
-            V_hat: insecure_random_g2_points(W + 1, rng),
-            C: insecure_random_g1_points(W, rng),
-        }
     }
 }
 

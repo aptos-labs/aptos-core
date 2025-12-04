@@ -6,11 +6,10 @@
 
 use aptos_crypto::{blstrs::random_scalar, traits::SecretSharingConfig as _};
 use aptos_dkg::{
-    pvss,
     pvss::{
-        test_utils,
-        test_utils::{DealingArgs, NoAux},
-        traits::Transcript,
+        self,
+        test_utils::{self, DealingArgs, NoAux},
+        traits::{AggregatableTranscript, Transcript},
         Player, WeightedConfigBlstrs,
     },
     weighted_vuf::{pinkas::PinkasWUF, traits::WeightedVUF},
@@ -26,7 +25,7 @@ fn test_wvuf_basic_viability() {
 }
 
 fn weighted_wvuf_bvt<
-    T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>,
+    T: AggregatableTranscript<SecretSharingConfig = WeightedConfigBlstrs>,
     WVUF: WeightedVUF<
         SecretKey = T::DealtSecretKey,
         PubKey = T::DealtPubKey,
@@ -52,7 +51,7 @@ where
     );
 }
 
-fn weighted_pvss<T: Transcript<SecretSharingConfig = WeightedConfigBlstrs>>(
+fn weighted_pvss<T: AggregatableTranscript<SecretSharingConfig = WeightedConfigBlstrs>>(
     rng: &mut StdRng,
 ) -> (WeightedConfigBlstrs, DealingArgs<T>, T) {
     let wc = WeightedConfigBlstrs::new(10, vec![3, 5, 3, 4, 2, 1, 1, 7]).unwrap();
