@@ -126,13 +126,12 @@ impl BatchThresholdEncryption for FPTX {
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
         round: Self::Round,
-        pool: &rayon::ThreadPool,
     ) -> anyhow::Result<(Self::Digest, Self::EvalProofsPromise)> {
         let mut ids: FreeRootIdSet<UncomputedCoeffs> =
             FreeRootIdSet::from_slice(&cts.iter().map(|ct| ct.id()).collect::<Vec<FreeRootId>>())
                 .ok_or(anyhow!(""))?;
 
-        pool.install(|| digest_key.digest(&mut ids, round))
+        digest_key.digest(&mut ids, round)
     }
 
     fn verify_ct(
@@ -149,17 +148,15 @@ impl BatchThresholdEncryption for FPTX {
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
-        pool: &rayon::ThreadPool,
     ) -> Self::EvalProofs {
-        pool.install(|| proofs.compute_all(digest_key))
+        proofs.compute_all(digest_key)
     }
 
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &DigestKey,
-        pool: &rayon::ThreadPool,
     ) -> Self::EvalProofs {
-        pool.install(|| proofs.compute_all_vgzz_multi_point_eval(digest_key))
+        proofs.compute_all_vgzz_multi_point_eval(digest_key)
     }
 
     fn eval_proof_for_ct(
@@ -179,37 +176,30 @@ impl BatchThresholdEncryption for FPTX {
     fn reconstruct_decryption_key(
         shares: &[Self::DecryptionKeyShare],
         config: &Self::ThresholdConfig,
-        pool: &rayon::ThreadPool,
     ) -> anyhow::Result<Self::DecryptionKey> {
-        pool.install(|| BIBEDecryptionKey::reconstruct(shares, config))
+        BIBEDecryptionKey::reconstruct(shares, config)
     }
 
     fn prepare_cts(
         cts: &[Self::Ciphertext],
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-        pool: &rayon::ThreadPool,
     ) -> Result<Vec<Self::PreparedCiphertext>> {
-        pool.install(|| {
-            cts.into_par_iter()
-                .map(|ct| ct.prepare(digest, eval_proofs))
-                .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
-        })
+        cts.into_par_iter()
+            .map(|ct| ct.prepare(digest, eval_proofs))
+            .collect::<anyhow::Result<Vec<Self::PreparedCiphertext>>>()
     }
 
     fn decrypt<'a, P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         cts: &[Self::PreparedCiphertext],
-        pool: &rayon::ThreadPool,
     ) -> anyhow::Result<Vec<P>> {
-        pool.install(|| {
-            cts.into_par_iter()
-                .map(|ct| {
-                    let plaintext: Result<P> = decryption_key.decrypt(ct);
-                    plaintext
-                })
-                .collect::<anyhow::Result<Vec<P>>>()
-        })
+        cts.into_par_iter()
+            .map(|ct| {
+                let plaintext: Result<P> = decryption_key.decrypt(ct);
+                plaintext
+            })
+            .collect::<anyhow::Result<Vec<P>>>()
     }
 
     fn verify_decryption_key_share(

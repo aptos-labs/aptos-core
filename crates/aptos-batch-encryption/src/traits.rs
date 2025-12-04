@@ -3,7 +3,6 @@
 use anyhow::Result;
 use aptos_crypto::player::Player;
 use ark_std::rand::{CryptoRng, RngCore};
-use rayon::ThreadPool;
 use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
@@ -90,7 +89,6 @@ pub trait BatchThresholdEncryption {
         digest_key: &Self::DigestKey,
         cts: &[Self::Ciphertext],
         round: Self::Round,
-        pool: &ThreadPool,
     ) -> Result<(Self::Digest, Self::EvalProofsPromise)>;
 
     /// Validators *must* verify each ciphertext before approving it to be decrypted, in order to
@@ -106,7 +104,6 @@ pub trait BatchThresholdEncryption {
     fn eval_proofs_compute_all(
         proofs: &Self::EvalProofsPromise,
         digest_key: &Self::DigestKey,
-        pool: &ThreadPool,
     ) -> Self::EvalProofs;
 
     /// Compute KZG eval proofs. This will be the most expensive operation in the scheme. This
@@ -115,7 +112,6 @@ pub trait BatchThresholdEncryption {
     fn eval_proofs_compute_all_vzgg_multi_point_eval(
         proofs: &Self::EvalProofsPromise,
         digest_key: &Self::DigestKey,
-        pool: &ThreadPool,
     ) -> Self::EvalProofs;
 
     fn eval_proof_for_ct(
@@ -142,7 +138,6 @@ pub trait BatchThresholdEncryption {
     fn reconstruct_decryption_key(
         shares: &[Self::DecryptionKeyShare],
         config: &Self::ThresholdConfig,
-        pool: &ThreadPool,
     ) -> Result<Self::DecryptionKey>;
 
     // TODO: verify decryption key?
@@ -151,14 +146,12 @@ pub trait BatchThresholdEncryption {
         cts: &[Self::Ciphertext],
         digest: &Self::Digest,
         eval_proofs: &Self::EvalProofs,
-        pool: &ThreadPool,
     ) -> Result<Vec<Self::PreparedCiphertext>>;
 
     /// Decrypt a set of ciphertext using a decryption key and advice.
     fn decrypt<P: Plaintext>(
         decryption_key: &Self::DecryptionKey,
         cts: &[Self::PreparedCiphertext],
-        pool: &ThreadPool,
     ) -> Result<Vec<P>>;
 
     fn decrypt_individual<P: Plaintext>(
