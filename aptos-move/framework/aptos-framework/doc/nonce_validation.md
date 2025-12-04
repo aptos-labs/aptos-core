@@ -202,7 +202,7 @@
 
 
 
-<pre><code><b>const</b> <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a>: u64 = 65;
+<pre><code><b>const</b> <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a>: u64 = 100;
 </code></pre>
 
 

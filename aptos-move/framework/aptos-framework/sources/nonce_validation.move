@@ -16,7 +16,7 @@ module aptos_framework::nonce_validation {
     // We maintain an invariant that two transactions with the same (address, nonce) pair cannot be stored
     // in the nonce hsitory if their transanction expiration times are less than
     // `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` seconds apart.
-    const NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS: u64 = 65;
+    const NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS: u64 = 100;
 
 
     // Each time we check if an (address, nonce) pair can be inserted into nonce history,
@@ -246,22 +246,22 @@ module aptos_framework::nonce_validation {
         assert!(!check_and_insert_nonce(@0x5, 1234, begin_time + 85));
         assert!(check_and_insert_nonce(@0x5, 1235, begin_time + 85));
 
-        timestamp::fast_forward_seconds(85);
+        timestamp::fast_forward_seconds(120);
         // Nonce (0x5, 1234) expires at `begin_time + 50`.
         // Nonce (0x5, 1234) will be garbage collected after
         // `begin_time + 50 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` seconds.
         assert!(!check_if_nonce_exists_in_history(@0x5, 1234));
         timestamp::fast_forward_seconds(1);
         assert!(check_if_nonce_exists_in_history(@0x5, 1234));
-        assert!(check_and_insert_nonce(@0x5, 1234, begin_time + 150));
+        assert!(check_and_insert_nonce(@0x5, 1234, begin_time + 185));
 
         // Nonce (0x5, 1235) expired at `begin_time + 85` seconds.
-        // We are currently at `begin_time + 116` seconds.
+        // We are currently at `begin_time + 151` seconds.
         // The nonce is still stored in nonce history.
         // But another nonce with expiry time higher than
         // `begin_time + 85 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` can still be inserted.
         assert!(!check_if_nonce_exists_in_history(@0x5, 1235));
-        assert!(!check_and_insert_nonce(@0x5, 1235, begin_time + 150));
-        assert!(check_and_insert_nonce(@0x5, 1235, begin_time + 151));
+        assert!(!check_and_insert_nonce(@0x5, 1235, begin_time + 185));
+        assert!(check_and_insert_nonce(@0x5, 1235, begin_time + 186));
     }
 }

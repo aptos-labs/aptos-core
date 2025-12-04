@@ -22,8 +22,9 @@ module aptos_framework::transaction_validation {
     friend aptos_framework::genesis;
 
     // We will advertise to the community that max expiration time for orderless txns is 60 seconds.
-    // Adding a 5 second slack here as the client's time and the blockchain's time may drift.
-    const MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS: u64 = 65;
+    // Adding a 40 second slack here as the client's time and the blockchain's time may drift,
+    // and to account for any fallen behind fullnodes that are performing simulation on old blockchain state.
+    const MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS: u64 = 100;
 
     // We need to ensure that a transaction can't be replayed.
     // There are two ways to prevent replay attacks:

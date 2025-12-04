@@ -259,7 +259,7 @@ Transaction exceeded its allocated max gas
 
 
 
-<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS">MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS</a>: u64 = 65;
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS">MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS</a>: u64 = 100;
 </code></pre>
 
 
