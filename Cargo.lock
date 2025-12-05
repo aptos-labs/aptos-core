@@ -4530,6 +4530,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-trading-natives"
+version = "0.1.0"
+dependencies = [
+ "aptos-gas-schedule",
+ "aptos-native-interface",
+ "aptos-types",
+ "better_any",
+ "bytes",
+ "move-binary-format",
+ "move-core-types",
+ "move-table-extension",
+ "move-vm-runtime",
+ "move-vm-types",
+ "once_cell",
+ "sha3 0.9.1",
+ "smallvec",
+ "triomphe",
+]
+
+[[package]]
 name = "aptos-transaction-benchmarks"
 version = "0.1.0"
 dependencies = [
@@ -4920,6 +4940,7 @@ dependencies = [
  "aptos-mvhashmap",
  "aptos-native-interface",
  "aptos-table-natives",
+ "aptos-trading-natives",
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm-environment",
@@ -4978,6 +4999,7 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-native-interface",
  "aptos-table-natives",
+ "aptos-trading-natives",
  "aptos-types",
  "aptos-vm-types",
  "ark-bn254",
@@ -5045,6 +5067,7 @@ dependencies = [
  "aptos-move-stdlib",
  "aptos-native-interface",
  "aptos-table-natives",
+ "aptos-trading-natives",
  "aptos-transaction-simulation",
  "aptos-types",
  "aptos-vm",

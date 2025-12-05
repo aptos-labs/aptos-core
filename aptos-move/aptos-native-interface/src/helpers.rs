@@ -53,6 +53,29 @@ macro_rules! safely_get_struct_field_as {
     }};
 }
 
+/// Returns a field value of the specified type from a struct at a given index.
+/// If the field access is out of bounds, or type is incorrect, a
+/// `SafeNativeError::InvariantViolation` is returned.
+#[macro_export]
+macro_rules! safely_get_struct_variant_field_as {
+    ($value:expr, $allowed:expr, $idx:expr, $variant_name:expr, $t:ty) => {{
+        // Note: we remap errors to safe errors in order to avoid implicit
+        //       conversions via `Into`.
+        $value
+            .borrow_variant_field(
+                $allowed,
+                $idx,
+                &|_v| ($variant_name).to_string())
+            .map_err($crate::SafeNativeError::InvariantViolation)?
+            .value_as::<Reference>()
+            .map_err($crate::SafeNativeError::InvariantViolation)?
+            .read_ref()
+            .map_err($crate::SafeNativeError::InvariantViolation)?
+            .value_as::<$t>()
+            .map_err($crate::SafeNativeError::InvariantViolation)?
+    }};
+}
+
 /// Like `assert_eq!` but for safe natives that return `SafeNativeResult<T>`. Instead of panicking,
 /// will return a `SafeNativeError::InvariantViolation(UNKNOWN_INVARIANT_VIOLATION_ERROR)`.
 #[macro_export]

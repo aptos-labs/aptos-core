@@ -27,6 +27,7 @@ This is the reference documentation of the Aptos experimental framework.
 -  [`0x7::order_book_types`](order_book_types.md#0x7_order_book_types)
 -  [`0x7::order_operations`](order_operations.md#0x7_order_operations)
 -  [`0x7::order_placement`](order_placement.md#0x7_order_placement)
+-  [`0x7::orders_index`](orders_index.md#0x7_orders_index)
 -  [`0x7::pending_order_book_index`](pending_order_book_index.md#0x7_pending_order_book_index)
 -  [`0x7::pre_cancellation_tracker`](pre_cancellation_tracker.md#0x7_pre_cancellation_tracker)
 -  [`0x7::price_time_index`](price_time_index.md#0x7_price_time_index)

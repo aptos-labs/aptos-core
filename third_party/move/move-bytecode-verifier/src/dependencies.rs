@@ -224,6 +224,7 @@ fn verify_imported_modules(context: &Context) -> PartialVMResult<()> {
         if Some(ModuleHandleIndex(idx as u16)) != self_module
             && !context.dependency_map.contains_key(&module_id)
         {
+            panic!("Couldn't find {} in dependency map", module_id);
             return Err(verification_error(
                 StatusCode::MISSING_DEPENDENCY,
                 IndexKind::ModuleHandle,
@@ -248,7 +249,7 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
         let struct_name = context.resolver.identifier_at(struct_handle.name);
         match context
             .struct_id_to_handle_map
-            .get(&(owner_module_id, struct_name.to_owned()))
+            .get(&(owner_module_id.clone(), struct_name.to_owned()))
         {
             Some(def_idx) => {
                 let def_handle = owner_module.struct_handle_at(*def_idx);
@@ -267,6 +268,7 @@ fn verify_imported_structs(context: &Context) -> PartialVMResult<()> {
                 }
             },
             None => {
+                panic!("Couldn't find {} {}", owner_module_id, struct_name);
                 return Err(verification_error(
                     StatusCode::LOOKUP_FAILED,
                     IndexKind::StructHandle,
@@ -312,6 +314,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                 let def_params = match context.dependency_map.get(&owner_module_id) {
                     Some(module) => module.signature_at(def_handle.parameters),
                     None => {
+                        panic!("Couldn't find {} in dependency map", owner_module_id);
                         return Err(verification_error(
                             StatusCode::LOOKUP_FAILED,
                             IndexKind::FunctionHandle,
@@ -333,6 +336,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                 let def_return = match context.dependency_map.get(&owner_module_id) {
                     Some(module) => module.signature_at(def_handle.return_),
                     None => {
+                        panic!("Couldn't find {} in dependency map", owner_module_id);
                         return Err(verification_error(
                             StatusCode::LOOKUP_FAILED,
                             IndexKind::FunctionHandle,
@@ -376,6 +380,7 @@ fn verify_imported_functions(context: &Context) -> PartialVMResult<()> {
                 }
             },
             None => {
+                panic!("Couldn't find {} {} in func_id_to_index_map", owner_module_id.clone(), function_name.to_owned());
                 return Err(verification_error(
                     StatusCode::LOOKUP_FAILED,
                     IndexKind::FunctionHandle,

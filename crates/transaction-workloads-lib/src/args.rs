@@ -86,21 +86,29 @@ pub enum TransactionTypeArg {
     /// and there are no matches.
     OrderBookNoMatches1Market,
     OrderBookNoMatches50Markets,
+    OrderIndexNoMatches1Market,
+    OrderIndexNoMatches50Markets,
     /// Basic market where sell and buy prices are in distinct ranges,
     /// and there are no matches.
     /// Basic market, 25% of orders are in the "overlap" interval.
     /// Half of the orders are buys, half sells, and both have same size ranges.
     OrderBookBalancedMatches25Pct1Market,
     OrderBookBalancedMatches25Pct50Markets,
+    OrderIndexBalancedMatches25Pct1Market,
+    OrderIndexBalancedMatches25Pct50Markets,
     /// Basic market, 80% of orders are in the "overlap" interval.
     /// Half of the orders are buys, half sells, and both have same size ranges.
     OrderBookBalancedMatches80Pct1Market,
     OrderBookBalancedMatches80Pct50Markets,
+    OrderIndexBalancedMatches80Pct1Market,
+    OrderIndexBalancedMatches80Pct50Markets,
     /// Basic market, 80% of orders are in the "overlap" interval.
     /// Sells are 99 times smaller, but are 99 times more frequent than buys.
     /// That means we will match rarely, but single match will be creating ~100 positions
     OrderBookBalancedSizeSkewed80Pct1Market,
     OrderBookBalancedSizeSkewed80Pct50Markets,
+    OrderIndexBalancedSizeSkewed80Pct1Market,
+    OrderIndexBalancedSizeSkewed80Pct50Markets,
     // Monotonic counter throughput tests
     MonotonicCounterSingle,
     MonotonicCounterMultiple10,
@@ -407,10 +415,12 @@ impl TransactionTypeArg {
                 call_custom_module(EntryPoints::APTTransferWithMasterSigner)
             },
             TransactionTypeArg::OrderBookNoMatches1Market
-            | TransactionTypeArg::OrderBookNoMatches50Markets => {
+            | TransactionTypeArg::OrderBookNoMatches50Markets
+            | TransactionTypeArg::OrderIndexNoMatches1Market
+            | TransactionTypeArg::OrderIndexNoMatches50Markets => {
                 call_custom_module(EntryPoints::OrderBook {
                     state: OrderBookState::new(),
-                    num_markets: if let TransactionTypeArg::OrderBookNoMatches50Markets = self {
+                    num_markets: if matches!(self, TransactionTypeArg::OrderBookNoMatches50Markets | TransactionTypeArg::OrderIndexNoMatches50Markets) {
                         50
                     } else {
                         1
@@ -419,15 +429,16 @@ impl TransactionTypeArg {
                     buy_frequency: 0.5,
                     max_sell_size: 1,
                     max_buy_size: 1,
+                    use_order_index: matches!(self, TransactionTypeArg::OrderIndexNoMatches1Market | TransactionTypeArg::OrderIndexNoMatches50Markets),
                 })
             },
             TransactionTypeArg::OrderBookBalancedMatches25Pct1Market
-            | TransactionTypeArg::OrderBookBalancedMatches25Pct50Markets => {
+            | TransactionTypeArg::OrderBookBalancedMatches25Pct50Markets
+            | TransactionTypeArg::OrderIndexBalancedMatches25Pct1Market
+            | TransactionTypeArg::OrderIndexBalancedMatches25Pct50Markets => {
                 call_custom_module(EntryPoints::OrderBook {
                     state: OrderBookState::new(),
-                    num_markets: if let TransactionTypeArg::OrderBookBalancedMatches25Pct50Markets =
-                        self
-                    {
+                    num_markets: if matches!(self, TransactionTypeArg::OrderBookBalancedMatches25Pct50Markets | TransactionTypeArg::OrderIndexBalancedMatches25Pct50Markets) {
                         50
                     } else {
                         1
@@ -436,15 +447,16 @@ impl TransactionTypeArg {
                     buy_frequency: 0.5,
                     max_sell_size: 1,
                     max_buy_size: 1,
+                    use_order_index: matches!(self, TransactionTypeArg::OrderIndexBalancedMatches25Pct1Market | TransactionTypeArg::OrderIndexBalancedMatches25Pct50Markets),
                 })
             },
             TransactionTypeArg::OrderBookBalancedMatches80Pct1Market
-            | TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets => {
+            | TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets
+            | TransactionTypeArg::OrderIndexBalancedMatches80Pct1Market
+            | TransactionTypeArg::OrderIndexBalancedMatches80Pct50Markets => {
                 call_custom_module(EntryPoints::OrderBook {
                     state: OrderBookState::new(),
-                    num_markets: if let TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets =
-                        self
-                    {
+                    num_markets: if matches!(self, TransactionTypeArg::OrderBookBalancedMatches80Pct50Markets | TransactionTypeArg::OrderIndexBalancedMatches80Pct50Markets) {
                         50
                     } else {
                         1
@@ -453,15 +465,17 @@ impl TransactionTypeArg {
                     buy_frequency: 0.5,
                     max_sell_size: 1,
                     max_buy_size: 1,
+                    use_order_index: matches!(self, TransactionTypeArg::OrderIndexBalancedMatches80Pct1Market | TransactionTypeArg::OrderIndexBalancedMatches80Pct50Markets),
                 })
             },
             TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct1Market
-            | TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct50Markets => {
+            | TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct50Markets
+            | TransactionTypeArg::OrderIndexBalancedSizeSkewed80Pct1Market
+            | TransactionTypeArg::OrderIndexBalancedSizeSkewed80Pct50Markets => {
                 call_custom_module(EntryPoints::OrderBook {
                     state: OrderBookState::new(),
                     num_markets:
-                        if let TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct50Markets = self
-                        {
+                        if matches!(self, TransactionTypeArg::OrderBookBalancedSizeSkewed80Pct50Markets | TransactionTypeArg::OrderIndexBalancedSizeSkewed80Pct50Markets) {
                             50
                         } else {
                             1
@@ -470,6 +484,7 @@ impl TransactionTypeArg {
                     buy_frequency: 0.01,
                     max_sell_size: 50,
                     max_buy_size: 950,
+                    use_order_index: matches!(self, TransactionTypeArg::OrderIndexBalancedSizeSkewed80Pct1Market | TransactionTypeArg::OrderIndexBalancedSizeSkewed80Pct50Markets),
                 })
             },
             TransactionTypeArg::MonotonicCounterSingle => {

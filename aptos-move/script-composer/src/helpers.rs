@@ -110,6 +110,10 @@ pub(crate) fn find_struct<'a>(
                 return Ok((module, StructHandleIndex::new(idx as TableIndex)));
             }
         }
+        panic!(
+            "Struct {}::{} doesn't yet exist in the cache",
+            module_id, struct_name
+        );
         return Err(
             PartialVMError::new(StatusCode::LOOKUP_FAILED).with_message(format!(
                 "Struct {}::{} doesn't yet exist in the cache",
@@ -117,6 +121,10 @@ pub(crate) fn find_struct<'a>(
             )),
         );
     }
+    panic!(
+        "Module {} doesn't yet exist in the cache",
+        module_id
+    );
     Err(
         PartialVMError::new(StatusCode::LOOKUP_FAILED).with_message(format!(
             "Module {} doesn't yet exist in the cache",

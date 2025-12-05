@@ -2,6 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_native_interface::SafeNativeBuilder;
+use aptos_types::account_config::EXPERIMENTAL_CODE_ADDRESS;
 use move_core_types::language_storage::CORE_CODE_ADDRESS;
 use move_vm_runtime::native_functions::NativeFunctionTable;
 use std::collections::HashSet;
@@ -40,6 +41,10 @@ pub fn aptos_natives_with_builder(
         ))
         .chain(aptos_table_natives::table_natives(
             CORE_CODE_ADDRESS,
+            builder,
+        ))
+        .chain(aptos_trading_natives::all_natives(
+            EXPERIMENTAL_CODE_ADDRESS,
             builder,
         ))
         .collect()

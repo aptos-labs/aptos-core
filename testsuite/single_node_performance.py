@@ -265,14 +265,24 @@ TESTS = [
     RunGroupConfig(key=RunGroupKey("vector-remove-insert-len3000-size1"), included_in=Flow.CONTINUOUS),
 
     # waived because of missing monotonic counter native.
-    RunGroupConfig(key=RunGroupKey("order-book-no-matches1-market"), included_in=Flow.ORDER_BOOK, waived=True),
-    RunGroupConfig(key=RunGroupKey("order-book-balanced-matches25-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
-    RunGroupConfig(key=RunGroupKey("order-book-balanced-matches80-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
-    RunGroupConfig(key=RunGroupKey("order-book-balanced-size-skewed80-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
-    RunGroupConfig(key=RunGroupKey("order-book-no-matches50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
-    RunGroupConfig(key=RunGroupKey("order-book-balanced-matches25-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
-    RunGroupConfig(key=RunGroupKey("order-book-balanced-matches80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
-    RunGroupConfig(key=RunGroupKey("order-book-balanced-size-skewed80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-no-matches1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-balanced-matches25-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-balanced-matches80-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-balanced-size-skewed80-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-no-matches50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-balanced-matches25-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-balanced-matches80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-index-balanced-size-skewed80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-no-matches1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-balanced-matches25-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-balanced-matches80-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-balanced-size-skewed80-pct1-market"), included_in=Flow.ORDER_BOOK, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-no-matches50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-balanced-matches25-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-balanced-matches80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+    RunGroupConfig(expected_tps=1000, key=RunGroupKey("order-book-balanced-size-skewed80-pct50-markets"), included_in=Flow.ORDER_BOOK | Flow.CONTINUOUS, waived=True),
+
     RunGroupConfig(key=RunGroupKey("monotonic-counter-single"), included_in=Flow.CONTINUOUS, waived=True),
 
     RunGroupConfig(key=RunGroupKey("fibonacci-recursive20"), included_in=Flow.CONTINUOUS, waived=True),

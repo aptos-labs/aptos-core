@@ -29,6 +29,7 @@ aptos-metrics-core = { workspace = true }
 aptos-mvhashmap = { workspace = true }
 aptos-native-interface = { workspace = true }
 aptos-table-natives = { workspace = true }
+aptos-trading-natives = { workspace = true }
 aptos-types = { workspace = true }
 aptos-vm-environment = { workspace = true }
 aptos-vm-logging = { workspace = true }

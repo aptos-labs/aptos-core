@@ -296,6 +296,7 @@ pub enum EntryPoints {
         max_sell_size: u64,
         /// Buy size is picked randomly from [1, max_buy_size] range
         max_buy_size: u64,
+        use_order_index: bool,
     },
 
     /// Test monotonically increasing counter native function throughput
@@ -450,7 +451,7 @@ impl EntryPointTrait for EntryPoints {
             EntryPoints::APTTransferWithPermissionedSigner
             | EntryPoints::APTTransferWithMasterSigner => "permissioned_transfer",
             EntryPoints::MonotonicCounter { .. } => "transaction_context_example",
-            EntryPoints::OrderBook { .. } => "order_book_example",
+            EntryPoints::OrderBook { use_order_index, .. } => if *use_order_index { "order_index_example" } else { "order_book_example" },
             EntryPoints::MoveVmMicroBenchmark(entrypoint) => match entrypoint {
                 MoveVmMicroBenchmark::Locals | MoveVmMicroBenchmark::LocalsGeneric => "locals",
             },
@@ -916,6 +917,7 @@ impl EntryPointTrait for EntryPoints {
                 buy_frequency,
                 max_buy_size,
                 max_sell_size,
+                ..
             } => {
                 let rng: &mut StdRng = rng.expect("Must provide RNG");
 

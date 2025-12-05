@@ -323,6 +323,11 @@ impl CompiledScriptBuilder {
                 return self.import_function_by_handle(module, def.function);
             }
         }
+        panic!(
+            "Function {}::{} couldn't be found",
+            module.self_id(),
+            name
+        );
         Err(PartialVMError::new(StatusCode::LOOKUP_FAILED))
     }
 
