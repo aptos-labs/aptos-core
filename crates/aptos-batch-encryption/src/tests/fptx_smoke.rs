@@ -116,10 +116,9 @@ fn smoke_with_setup_for_testing() {
 type T = aptos_dkg::pvss::chunky::Transcript<crate::group::Pairing>;
 use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
-    test_utils::NoAux,
-    traits::{
+    test_utils::NoAux, traits::{
         transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
-    },
+    }
 };
 
 #[test]
@@ -144,10 +143,10 @@ fn smoke_with_pvss() {
         .map(|ssk| ssk.verifying_key())
         .collect::<Vec<<T as Transcript>::SigningPubKey>>();
 
-    let dks = (0..tc_happy.get_total_num_players())
+    let dks : Vec<<T as Transcript>::DecryptPrivKey> = (0..tc_happy.get_total_num_players())
         .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos_crypto))
-        .collect::<Vec<<T as Transcript>::DecryptPrivKey>>();
-    let eks = dks
+        .collect();
+    let eks : Vec<<T as Transcript>::EncryptPubKey> = dks
         .iter()
         .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();

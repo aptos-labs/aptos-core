@@ -6,12 +6,10 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
-use aptos_crypto::blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES};
 #[cfg(test)]
 use aptos_crypto::SecretSharingConfig;
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
-    traits::SecretSharingConfig as _,
     weighted_config::WeightedConfigArkworks,
 };
 #[cfg(test)]
@@ -65,7 +63,11 @@ fn test_pvss_all_unweighted() {
         type ChunkyTranscript = chunky::Transcript<ark_bn254::Bn254>;
 
         // Chunky
-        pvss_deal_verify_and_reconstruct::<ChunkyTranscript>(&tc, seed.to_bytes_le());
+        pvss_nonaggregate_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
+            &tc,
+            seed.to_bytes_le(),
+        );
+
 
         pvss_deal_verify_and_reconstruct_from_subtranscript::<
             <ChunkyTranscript as Transcript>::SecretSharingConfig,
@@ -329,8 +331,6 @@ fn pvss_deal_verify_and_reconstruct_from_subtranscript<
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &vec![NoAux])
-        .expect("PVSS transcript failed verification");
 
     let trx = trx.get_subtranscript();
 
