@@ -206,9 +206,8 @@ pub fn aptos_prod_vm_config(
     // Some feature gating was missed, so for native dynamic dispatch the feature is always on for
     // testnet after 1.38 release.
     let enable_function_caches = features.is_call_tree_and_instruction_vm_cache_enabled();
-    let enable_function_caches_for_native_dynamic_dispatch = features
-        .is_call_tree_and_instruction_vm_cache_enabled()
-        || (chain_id.is_testnet() && gas_feature_version >= RELEASE_V1_38);
+    let enable_function_caches_for_native_dynamic_dispatch =
+        enable_function_caches || (chain_id.is_testnet() && gas_feature_version >= RELEASE_V1_38);
 
     let config = VMConfig {
         verifier_config,
