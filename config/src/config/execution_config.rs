@@ -89,8 +89,8 @@ impl Default for ExecutionConfig {
             processed_transactions_detailed_counters: false,
             genesis_waypoint: None,
             blockstm_v2_enabled: false,
+            layout_caches_enabled: true,
             // TODO: consider setting to be true by default.
-            layout_caches_enabled: false,
             async_runtime_checks: false,
         }
     }
