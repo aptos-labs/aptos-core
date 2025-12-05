@@ -4888,6 +4888,7 @@ Committed gas-limit is updated by reducing it with the max-gas-amount of the can
     <b>assert</b>!(automation_task_metadata.state != <a href="automation_registry.md#0x1_automation_registry_CANCELLED">CANCELLED</a>, <a href="automation_registry.md#0x1_automation_registry_EALREADY_CANCELLED">EALREADY_CANCELLED</a>);
     <b>if</b> (automation_task_metadata.state == <a href="automation_registry.md#0x1_automation_registry_PENDING">PENDING</a>) {
         <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.main.tasks, task_index);
+        <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_remove_value">vector::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.system_tasks_state.task_ids, &task_index);
     } <b>else</b> { // it is safe not <b>to</b> check the state <b>as</b> above, the cancelled tasks are already rejected.
         <b>let</b> automation_task_metadata_mut = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_get_value_mut">enumerable_map::get_value_mut</a>(
             &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.main.tasks,
@@ -5654,6 +5655,7 @@ In case if end is identified the registry state is update to CYCLE_READY and cor
     <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_for_each">vector::for_each</a>(task_indexes, |task_index| {
         <b>if</b> (<a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_contains">enumerable_map::contains</a>(&<a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.main.tasks, task_index)) {
             <b>let</b> task = <a href="../../supra-stdlib/doc/enumerable_map.md#0x1_enumerable_map_remove_value">enumerable_map::remove_value</a>(&<b>mut</b> <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>.main.tasks, task_index);
+            <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(&<b>mut</b> removed_tasks, task_index);
             <a href="automation_registry.md#0x1_automation_registry_mark_task_processed">mark_task_processed</a>(transition_state, task_index);
             // Nothing <b>to</b> refund for <a href="automation_registry.md#0x1_automation_registry_GST">GST</a> tasks
             <b>if</b> (<a href="automation_registry.md#0x1_automation_registry_is_of_type">is_of_type</a>(&task, <a href="automation_registry.md#0x1_automation_registry_UST">UST</a>)) {
@@ -5666,9 +5668,8 @@ In case if end is identified the registry state is update to CYCLE_READY and cor
                     &resource_signer,
                     epoch_locked_fees,
                     current_time,
-                    &<b>mut</b> removed_tasks
                 )
-            };
+            }
         }
     });
 
@@ -5902,7 +5903,7 @@ Removes system task from registry state.
 Refunds the deposit fee and any autoamtion fees of the task.
 
 
-<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_refund_task_fees">refund_task_fees</a>(task: <a href="automation_registry.md#0x1_automation_registry_AutomationTaskMetaData">automation_registry::AutomationTaskMetaData</a>, <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">automation_registry::AutomationRefundBookkeeping</a>, arc: &<a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfigV2">automation_registry::ActiveAutomationRegistryConfigV2</a>, transition_state: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_TransitionState">automation_registry::TransitionState</a>, resource_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch_locked_fees: u64, current_time: u64, removed_tasks: &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;): u64
+<pre><code><b>fun</b> <a href="automation_registry.md#0x1_automation_registry_refund_task_fees">refund_task_fees</a>(task: <a href="automation_registry.md#0x1_automation_registry_AutomationTaskMetaData">automation_registry::AutomationTaskMetaData</a>, <a href="automation_registry.md#0x1_automation_registry">automation_registry</a>: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRegistry">automation_registry::AutomationRegistry</a>, refund_bookkeeping: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_AutomationRefundBookkeeping">automation_registry::AutomationRefundBookkeeping</a>, arc: &<a href="automation_registry.md#0x1_automation_registry_ActiveAutomationRegistryConfigV2">automation_registry::ActiveAutomationRegistryConfigV2</a>, transition_state: &<b>mut</b> <a href="automation_registry.md#0x1_automation_registry_TransitionState">automation_registry::TransitionState</a>, resource_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>, epoch_locked_fees: u64, current_time: u64): u64
 </code></pre>
 
 
@@ -5920,7 +5921,6 @@ Refunds the deposit fee and any autoamtion fees of the task.
     resource_signer: &<a href="../../aptos-stdlib/../move-stdlib/doc/signer.md#0x1_signer">signer</a>,
     epoch_locked_fees: u64,
     current_time: u64,
-    removed_tasks: &<b>mut</b> <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector">vector</a>&lt;u64&gt;
 
 ) : u64 {
     <b>assert</b>!(<a href="automation_registry.md#0x1_automation_registry_is_of_type">is_of_type</a>(&task, <a href="automation_registry.md#0x1_automation_registry_UST">UST</a>), <a href="automation_registry.md#0x1_automation_registry_EREGISTERED_TASK_INVALID_TYPE">EREGISTERED_TASK_INVALID_TYPE</a>);
@@ -5950,7 +5950,6 @@ Refunds the deposit fee and any autoamtion fees of the task.
         task.owner,
         task.locked_fee_for_next_epoch,
         task.locked_fee_for_next_epoch);
-    <a href="../../aptos-stdlib/../move-stdlib/doc/vector.md#0x1_vector_push_back">vector::push_back</a>(removed_tasks, task.task_index);
     epoch_locked_fees
 }
 </code></pre>

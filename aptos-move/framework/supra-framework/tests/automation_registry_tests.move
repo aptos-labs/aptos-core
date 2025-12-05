@@ -4048,58 +4048,78 @@ module std::automation_registry_tests {
         initialize_registry_test(framework, user);
         let (multisig_address, multisig_signer) = setup_multisig_account(framework, user);
         automation_registry::grant_authorization(framework, multisig_address);
+        let max_gas_amount = 10;
 
         let _ = automation_registry::register_system_task_with_state(
             &multisig_signer,
-            10,
+            max_gas_amount,
             86400,
             ACTIVE
         );
         let _ = automation_registry::register_system_task_with_state(
             &multisig_signer,
-            10,
+            max_gas_amount,
             86400,
             ACTIVE
         );
-        // check account balances after registration
+        // check account balances after registration, no charges are expected
         let registry_fee_address = automation_registry::get_registry_fee_address();
         let user_address = address_of(user);
         check_account_balance(user_address, ACCOUNT_BALANCE);
         check_account_balance(multisig_address, ACCOUNT_BALANCE);
         check_account_balance(registry_fee_address, REGISTRY_DEFAULT_BALANCE);
 
-        assert!(20 == automation_registry::get_system_gas_committed_for_next_cycle(), 1);
+        assert!((2 * max_gas_amount) == automation_registry::get_system_gas_committed_for_next_cycle(), 1);
         let active_task_ids = automation_registry::get_active_task_ids();
         let expected_ids = vector<u64>[0, 1];
         vector::for_each(expected_ids, |task_index| {
             assert!(vector::contains(&active_task_ids, &task_index), 1);
         });
 
-        // Cancel task 2. The committed gas for the next epoch will be updated,
+        let system_task_ids = automation_registry::get_system_task_indexes();
+        vector::for_each(expected_ids, |task_index| {
+            assert!(vector::contains(&system_task_ids, &task_index), 1);
+        });
+        // Cancel second registered task . The committed gas for the next cycle by system tasks will be updated,
         // but when requested active task it will be still available in the list
         automation_registry::cancel_system_task(&multisig_signer, 1);
         // Task will be still available in the registry but with cancelled state
         automation_registry::check_task_state(1, true, CANCELLED);
 
-        assert!(10 == automation_registry::get_system_gas_committed_for_next_cycle(), 1);
+        assert!(max_gas_amount == automation_registry::get_system_gas_committed_for_next_cycle(), 1);
         let active_task_ids = automation_registry::get_active_task_ids();
         vector::for_each(expected_ids, |task_index| {
             assert!(vector::contains(&active_task_ids, &task_index), 1);
+       });
+        let system_task_ids = automation_registry::get_system_task_indexes();
+        vector::for_each(expected_ids, |task_index| {
+            assert!(vector::contains(&system_task_ids, &task_index), 1);
         });
 
-        // Add and cancel the task in the same epoch. Task index will be 4
+        // Add and cancel the task in the same cycle. Task index will be 2
         assert!(automation_registry::get_next_task_index() == 2, 1);
         automation_registry::register_system_task_with_state(&multisig_signer,
             10,
             86400,
             PENDING,
         );
+        let expected_system_ids = vector<u64>[0, 1, 2];
+        let system_task_ids = automation_registry::get_system_task_indexes();
+        vector::for_each(expected_ids, |task_index| {
+            assert!(vector::contains(&system_task_ids, &task_index), 1);
+        });
         automation_registry::cancel_system_task(&multisig_signer, 2);
-        assert!(10 == automation_registry::get_system_gas_committed_for_next_cycle(), 1);
+        assert!(max_gas_amount == automation_registry::get_system_gas_committed_for_next_cycle(), 1);
         let active_task_ids = automation_registry::get_active_task_ids();
         vector::for_each(expected_ids, |task_index| {
             assert!(vector::contains(&active_task_ids, &task_index), 1);
         });
+        let expected_system_ids = vector<u64>[0, 1];
+        let system_task_ids = automation_registry::get_system_task_indexes();
+        vector::for_each(expected_ids, |task_index| {
+            assert!(vector::contains(&system_task_ids, &task_index), 1);
+        });
+
         // there is no task with index 2 and the next task index will be 3.
         assert!(!automation_registry::has_task_with_id(2), 1);
         assert!(automation_registry::get_next_task_index() == 3, 1);
@@ -4202,7 +4222,7 @@ module std::automation_registry_tests {
     }
 
     #[test(framework = @supra_framework, user = @0x1caff)]
-    fun check_system_task_successful_stopped(
+    fun check_system_task_successfully_stopped(
         framework: &signer,
         user: &signer
     ) {
@@ -4259,7 +4279,12 @@ module std::automation_registry_tests {
             assert!(vector::contains(&active_task_ids, &task_index), 2);
         });
 
-        // 0.002 (*4) - automation_epoch_fee_per_second, 7200 epoch duration
+        let system_task_ids = automation_registry::get_system_task_indexes();
+        vector::for_each(expected_ids, |task_index| {
+            assert!(vector::contains(&active_task_ids, &task_index), 2);
+        });
+
+        // No fees are charged
         check_account_balance( multisig_address, ACCOUNT_BALANCE );
         check_account_balance(user_account, ACCOUNT_BALANCE );
         check_account_balance( registry_fee_address, REGISTRY_DEFAULT_BALANCE );
@@ -4311,7 +4336,7 @@ module std::automation_registry_tests {
         assert!(automation_registry::get_next_task_index() == 5, 1);
         assert!(3 * max_gas_amount == automation_registry::get_system_gas_committed_for_next_cycle(), 1);
 
-        // Check balances after test execution
+        // Check balances after test execution, no fees are charged or refunded.
         check_account_balance(multisig_address, ACCOUNT_BALANCE);
         check_account_balance(user_account, ACCOUNT_BALANCE);
         check_account_balance(registry_fee_address, REGISTRY_DEFAULT_BALANCE);

@@ -1471,6 +1471,7 @@ module supra_framework::automation_registry {
         assert!(automation_task_metadata.state != CANCELLED, EALREADY_CANCELLED);
         if (automation_task_metadata.state == PENDING) {
             enumerable_map::remove_value(&mut automation_registry.main.tasks, task_index);
+            vector::remove_value(&mut automation_registry.system_tasks_state.task_ids, &task_index);
         } else { // it is safe not to check the state as above, the cancelled tasks are already rejected.
             let automation_task_metadata_mut = enumerable_map::get_value_mut(
                 &mut automation_registry.main.tasks,
@@ -2047,6 +2048,7 @@ module supra_framework::automation_registry {
         vector::for_each(task_indexes, |task_index| {
             if (enumerable_map::contains(&automation_registry.main.tasks, task_index)) {
                 let task = enumerable_map::remove_value(&mut automation_registry.main.tasks, task_index);
+                vector::push_back(&mut removed_tasks, task_index);
                 mark_task_processed(transition_state, task_index);
                 // Nothing to refund for GST tasks
                 if (is_of_type(&task, UST)) {
@@ -2059,9 +2061,8 @@ module supra_framework::automation_registry {
                         &resource_signer,
                         epoch_locked_fees,
                         current_time,
-                        &mut removed_tasks
                     )
-                };
+                }
             }
         });
 
@@ -2213,7 +2214,6 @@ module supra_framework::automation_registry {
         resource_signer: &signer,
         epoch_locked_fees: u64,
         current_time: u64,
-        removed_tasks: &mut vector<u64>
 
     ) : u64 {
         assert!(is_of_type(&task, UST), EREGISTERED_TASK_INVALID_TYPE);
@@ -2243,7 +2243,6 @@ module supra_framework::automation_registry {
             task.owner,
             task.locked_fee_for_next_epoch,
             task.locked_fee_for_next_epoch);
-        vector::push_back(removed_tasks, task.task_index);
         epoch_locked_fees
     }
 
