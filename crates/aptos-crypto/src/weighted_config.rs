@@ -4,7 +4,10 @@
 //! Weighted threshold secret sharing configuration for BLSTRS-based PVSS.
 
 use crate::{
-    arkworks::{shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig}, weighted_sum::WeightedSum},
+    arkworks::{
+        shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
+        weighted_sum::WeightedSum,
+    },
     blstrs::{
         evaluation_domain::{BatchEvaluationDomain, EvaluationDomain},
         threshold_config::ThresholdConfigBlstrs,
@@ -124,7 +127,6 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
             min_weight,
         })
     }
-
 
     /// Returns the minimum weight among all players in this weighted secret sharing configuration.
     pub fn get_min_weight(&self) -> usize {
@@ -300,12 +302,13 @@ impl<TC: ThresholdConfig> WeightedConfig<TC> {
     pub fn group_by_player<T: Clone>(&self, items: &[T]) -> Vec<Vec<T>> {
         self.get_players()
             .into_iter()
-            .map(|player|
+            .map(|player| {
                 self.get_all_virtual_players(&player)
                     .into_iter()
                     .map(|virt_player| items[virt_player.get_id()].clone())
                     .collect::<Vec<T>>()
-            ).collect()
+            })
+            .collect()
     }
 }
 

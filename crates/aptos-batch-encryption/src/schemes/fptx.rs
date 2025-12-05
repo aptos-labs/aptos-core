@@ -20,7 +20,10 @@ use crate::{
 };
 use anyhow::{anyhow, Result};
 use aptos_crypto::SecretSharingConfig as _;
-use aptos_dkg::pvss::{traits::{Reconstructable as _, SubTranscript}, Player};
+use aptos_dkg::pvss::{
+    traits::{Reconstructable as _, SubTranscript},
+    Player,
+};
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};

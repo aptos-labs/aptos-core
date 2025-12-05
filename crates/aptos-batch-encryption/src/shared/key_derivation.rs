@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::symmetric;
 use crate::{
-    errors::{BatchEncryptionError},
+    errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, PairingSetting},
     shared::{ark_serialize::*, digest::Digest},
     traits::{DecryptionKeyShare, VerificationKey},
@@ -104,16 +104,11 @@ impl BIBEMasterSecretKeyShare {
     pub fn derive_decryption_key_share(&self, digest: &Digest) -> Result<BIBEDecryptionKeyShare> {
         let hashed_encryption_key: G1Affine = symmetric::hash_g2_element(self.mpk_g2)?;
 
-        Ok(
-            (
-                self.player,
-                BIBEDecryptionKeyShareValue {
-                    signature_share_eval: G1Affine::from(
-                        (digest.as_g1() + hashed_encryption_key) * self.shamir_share_eval,
-                    ),
-                }
-            )
-        )
+        Ok((self.player, BIBEDecryptionKeyShareValue {
+            signature_share_eval: G1Affine::from(
+                (digest.as_g1() + hashed_encryption_key) * self.shamir_share_eval,
+            ),
+        }))
     }
 }
 
@@ -180,11 +175,8 @@ impl Reconstructable<ShamirThresholdConfig<Fr>> for BIBEDecryptionKey {
                 .collect::<Vec<ShamirGroupShare<G1Affine>>>(),
         )?;
 
-
         // sanity check
-        Ok(Self {
-            signature_g1,
-        })
+        Ok(Self { signature_g1 })
     }
 }
 

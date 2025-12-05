@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEDecryptionKeyShare},
-    shared::{
-        key_derivation::{BIBEDecryptionKey},
-    },
+    shared::key_derivation::BIBEDecryptionKey,
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
@@ -37,10 +35,11 @@ fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
     ]
     .into_iter()
     .map(|(tc, vks, msk_shares)| {
-        let dk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::DecryptionKeyShare> = msk_shares
-            .into_iter()
-            .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
-            .collect();
+        let dk_shares: Vec<<FPTXWeighted as BatchThresholdEncryption>::DecryptionKeyShare> =
+            msk_shares
+                .into_iter()
+                .map(|msk_share| msk_share.derive_decryption_key_share(&d).unwrap())
+                .collect();
 
         dk_shares
             .iter()
