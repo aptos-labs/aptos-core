@@ -601,13 +601,29 @@ module aptos_framework::delegation_pool_integration_tests {
         );
     }
 
-    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, validator_2 = @0x234)]
     public entry fun test_active_validator_can_withdraw_all_stake_and_rewards_at_once(
-        aptos_framework: &signer, validator: &signer
+        aptos_framework: &signer, validator: &signer, validator_2: &signer
     ) {
         initialize_for_test(aptos_framework);
-        let (_sk, pk, pop) = generate_identity();
-        initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        initialize_test_validator(
+            &pk_1,
+            &pop_1,
+            validator,
+            100 * ONE_APT,
+            true,
+            false
+        );
+        initialize_test_validator(
+            &pk_2,
+            &pop_2,
+            validator_2,
+            100 * ONE_APT,
+            true,
+            true
+        );
         let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
         assert!(
             stake::get_remaining_lockup_secs(validator_address) == LOCKUP_CYCLE_SECONDS,
@@ -619,7 +635,7 @@ module aptos_framework::delegation_pool_integration_tests {
         assert!(
             stake::get_validator_state(validator_address) == VALIDATOR_STATUS_ACTIVE, 1
         );
-        stake::assert_validator_state(validator_address, 101 * ONE_APT, 0, 0, 0, 0);
+        stake::assert_validator_state(validator_address, 101 * ONE_APT, 0, 0, 0, 1);
 
         // Unlock all coins while still having a lockup.
         assert!(
@@ -628,7 +644,7 @@ module aptos_framework::delegation_pool_integration_tests {
             2
         );
         dp::unlock(validator, validator_address, 101 * ONE_APT);
-        stake::assert_validator_state(validator_address, 0, 0, 0, 101 * ONE_APT, 0);
+        stake::assert_validator_state(validator_address, 0, 0, 0, 101 * ONE_APT, 1);
 
         // One more epoch passes while the current lockup cycle (3600 secs) has not ended.
         timestamp::fast_forward_seconds(1000);
@@ -638,12 +654,12 @@ module aptos_framework::delegation_pool_integration_tests {
         assert!(
             stake::get_validator_state(validator_address) == VALIDATOR_STATUS_ACTIVE, 3
         );
-        stake::assert_validator_state(validator_address, 0, 0, 0, 10201000000, 0);
+        stake::assert_validator_state(validator_address, 0, 0, 0, 10201000000, 1);
 
         // Enough time has passed so the current lockup cycle should have ended. Funds are now fully unlocked.
         timestamp::fast_forward_seconds(LOCKUP_CYCLE_SECONDS);
         end_epoch();
-        stake::assert_validator_state(validator_address, 0, 10303010000, 0, 0, 0);
+        stake::assert_validator_state(validator_address, 0, 10303010000, 0, 0, 1);
         // Validator has been kicked out of the validator set as their stake is 0 now.
         assert!(
             stake::get_validator_state(validator_address) == VALIDATOR_STATUS_INACTIVE,
@@ -741,13 +757,29 @@ module aptos_framework::delegation_pool_integration_tests {
         stake::assert_validator_state(validator_address, 100 * ONE_APT, 0, 0, 0, 0);
     }
 
-    #[test(aptos_framework = @aptos_framework, validator = @0x123)]
+    #[test(aptos_framework = @aptos_framework, validator = @0x123, validator_2 = @0x234)]
     public entry fun test_active_validator_having_insufficient_remaining_stake_after_withdrawal_gets_kicked(
-        aptos_framework: &signer, validator: &signer
+        aptos_framework: &signer, validator: &signer, validator_2: &signer
     ) {
         initialize_for_test(aptos_framework);
-        let (_sk, pk, pop) = generate_identity();
-        initialize_test_validator(&pk, &pop, validator, 100 * ONE_APT, true, true);
+        let (_sk_1, pk_1, pop_1) = generate_identity();
+        let (_sk_2, pk_2, pop_2) = generate_identity();
+        initialize_test_validator(
+            &pk_1,
+            &pop_1,
+            validator,
+            100 * ONE_APT,
+            true,
+            false
+        );
+        initialize_test_validator(
+            &pk_2,
+            &pop_2,
+            validator_2,
+            100 * ONE_APT,
+            true,
+            true
+        );
 
         // Unlock enough coins that the remaining is not enough to meet the min required.
         let validator_address = dp::get_owned_pool_address(signer::address_of(validator));
@@ -762,7 +794,7 @@ module aptos_framework::delegation_pool_integration_tests {
             0,
             0,
             50 * ONE_APT,
-            0
+            1
         );
 
         // Enough time has passed so the current lockup cycle should have ended.
@@ -783,7 +815,7 @@ module aptos_framework::delegation_pool_integration_tests {
             5050000000,
             0,
             0,
-            0
+            1
         );
         // Lockup is no longer renewed since the validator is no longer a part of the validator set.
         assert!(stake::get_remaining_lockup_secs(validator_address) == 0, 3);
