@@ -136,7 +136,7 @@ impl WeightedVUF for PinkasWUF {
             [&pks_combined, &pp.g_hat.neg()].into_iter(),
         ) != Gt::identity()
         {
-            panic!("RPKs were not correctly randomized.");
+            bail!("RPKs were not correctly randomized.");
         }
 
         Ok((delta, pk))
