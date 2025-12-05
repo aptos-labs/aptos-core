@@ -1,0 +1,10 @@
+[package]
+name = "runtime_ref_vector"
+version = "0.0.0"
+
+[addresses]
+runtime_ref_vector = "0x1"
+
+[dependencies]
+AptosFramework = { local = "../../../../../framework/aptos-framework" }
+

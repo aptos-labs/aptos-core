@@ -221,7 +221,7 @@ where
         traversal_context: &mut TraversalContext,
         extensions: &mut NativeContextExtensions,
     ) -> VMResult<Vec<Value>> {
-        let interpreter = InterpreterImpl {
+        let mut interpreter = InterpreterImpl {
             operand_stack: Stack::new(),
             call_stack: CallStack::new(),
             vm_config: loader.runtime_environment().vm_config(),
@@ -233,6 +233,10 @@ where
             layout_converter,
             ref_state: RefCheckState::new(),
         };
+
+        interpreter
+            .ref_state
+            .set_poison_on_native_read(interpreter.vm_config.poison_on_native_read);
 
         let function = Rc::new(function);
         // TODO: remove Self::paranoid_type_checks fully to be replaced
@@ -1000,6 +1004,16 @@ where
             }
         }
 
+        // Paranoid ref checks: set up a callee frame for the native call.
+        RTRCheck::core_call_transition(
+            num_param_tys,
+            function.param_tys().len(),
+            mask,
+            &mut self.ref_state,
+        )?;
+
+        RTRCheck::native_call_effects(function, &mut self.ref_state)?;
+
         let native_function = function.get_native()?;
 
         gas_meter.charge_native_function_before_execution(
@@ -1056,6 +1070,8 @@ where
                         }
                     }
                 }
+
+                RTRCheck::native_return_transition(function, &mut self.ref_state)?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())
@@ -1133,6 +1149,9 @@ where
                     }
                 }
 
+                // Tear down the native ref-check frame before dispatching.
+                RTRCheck::native_return_transition(function, &mut self.ref_state)?;
+
                 let frame_cache = function_caches.get_or_create_frame_cache(&target_func);
                 self.set_new_call_frame::<RTTCheck, RTRCheck>(
                     current_frame,
@@ -1151,6 +1170,8 @@ where
                     traversal_context,
                     &module_name,
                 )?;
+
+                RTRCheck::native_return_transition(function, &mut self.ref_state)?;
 
                 current_frame.pc += 1; // advance past the Call instruction in the caller
                 Ok(())

@@ -27,6 +27,7 @@ mod debug;
 mod access_control;
 mod frame;
 mod frame_type_cache;
+mod native_ref_effects;
 mod reentrancy_checker;
 mod runtime_ref_checks;
 mod runtime_type_checks;

@@ -132,7 +132,7 @@ fn run_case(input: RunnableStateWithOperations) -> Result<(), Corpus> {
     let packages = group_modules_by_address_topo(dep_modules.clone())?;
 
     // Enable runtime reference-safety checks for the Move VM
-    // prod_configs::set_paranoid_ref_checks(true);
+    prod_configs::set_paranoid_ref_checks(true);
 
     let module_cache_manager = AptosModuleCacheManager::new();
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);

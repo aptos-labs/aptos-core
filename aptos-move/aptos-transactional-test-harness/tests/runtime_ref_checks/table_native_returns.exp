@@ -1,0 +1,11 @@
+processed 5 tasks
+task 1 lines 5-65:  publish --private-key Alice [module Alice::table_native_returns {]
+task 2 lines 67-67:  run --signers Alice --args 0 42 -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::table_native_returns::init
+mutable inputs after call: local#0: 0
+return values: 0
+task 3 lines 69-69:  run --signers Alice --args 0 42 -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::table_native_returns::borrow_read_expect
+mutable inputs after call: local#0: 0
+return values: 0
+task 4 lines 71-71:  run --signers Alice --args 0 1 43 -- 0xf75daa73fc071f93593335eb9033da804777eb94491650dd3f095ce6f778acb6::table_native_returns::borrow_mut_update_expect
+mutable inputs after call: local#0: 0
+return values: 0

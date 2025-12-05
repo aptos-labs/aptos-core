@@ -48,7 +48,8 @@ tempfile = { workspace = true }
 
 [dev-dependencies]
 aptos-types = { workspace = true, features = ["fuzzing"] }
-datatest-stable = { workspace = true }
+libtest-mimic = "0.6"
+walkdir = "2"
 
 [[test]]
 name = "tests"

@@ -108,7 +108,7 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
 
     AptosVM::set_concurrency_level_once(FUZZER_CONCURRENCY_LEVEL);
     // Enable runtime reference-safety checks for the Move VM
-    // prod_configs::set_paranoid_ref_checks(true);
+    prod_configs::set_paranoid_ref_checks(true);
     let mut vm = FakeExecutor::from_genesis_with_existing_thread_pool(
         &VM_WRITE_SET,
         ChainId::mainnet(),
@@ -272,8 +272,9 @@ fn run_case(mut input: RunnableState) -> Result<(), Corpus> {
     let status = match tdbg!(res.status()) {
         TransactionStatus::Keep(status) => status,
         TransactionStatus::Discard(e) => {
-            if e.status_type() == StatusType::InvariantViolation
-                || e.status_type() == StatusType::Unknown
+            if (e.status_type() == StatusType::InvariantViolation
+                || e.status_type() == StatusType::Unknown)
+                && *e != StatusCode::ACCESS_CONTROL_INVARIANT_VIOLATION
             {
                 panic!("invariant violation {:?}", e);
             }

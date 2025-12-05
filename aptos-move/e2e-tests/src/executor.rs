@@ -143,6 +143,7 @@ fn empty_in_memory_state_store() -> FakeExecutorStateStore {
 /// In normal runs, this remains `None` and the executor behaves as before.
 enum BlockState {
     None,
+    #[allow(dead_code)]
     Fuzzing(SharedCacheState),
 }
 

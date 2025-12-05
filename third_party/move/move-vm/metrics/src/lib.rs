@@ -3,7 +3,8 @@
 
 use once_cell::sync::Lazy;
 use prometheus::{
-    register_histogram_vec, register_int_gauge, HistogramTimer, HistogramVec, IntGauge,
+    register_histogram_vec, register_int_counter_vec, register_int_gauge, HistogramTimer,
+    HistogramVec, IntCounterVec, IntGauge,
 };
 
 /// Helper trait to encapsulate [HistogramVec] functionality. Users can use this trait to time
@@ -52,6 +53,24 @@ pub static VERIFIED_MODULE_CACHE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     register_int_gauge!(
         "verified_module_cache_size",
         "Number of modules stored in verified module cache"
+    )
+    .expect("Registering the counter should always succeed")
+});
+
+pub static NATIVE_RETURN_FALLBACKS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "vm_native_return_fallback_total",
+        "Count of native return shapes that fell back to the default return index",
+        &["module", "function"]
+    )
+    .expect("Registering the counter should always succeed")
+});
+
+pub static NATIVE_READ_POISONS: Lazy<IntCounterVec> = Lazy::new(|| {
+    register_int_counter_vec!(
+        "vm_native_read_poison_total",
+        "Count of mutable aliases poisoned due to native read effects",
+        &["module", "function"]
     )
     .expect("Registering the counter should always succeed")
 });

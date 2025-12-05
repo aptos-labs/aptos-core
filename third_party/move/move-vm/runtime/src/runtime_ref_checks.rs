@@ -78,7 +78,12 @@
 //! one of the reference parameters. They are also transformed to point to the
 //! corresponding access path tree node in the caller's frame (if it exists).
 
-use crate::{frame::Frame, frame_type_cache::FrameTypeCache, LoadedFunction};
+use crate::{
+    frame::Frame,
+    frame_type_cache::FrameTypeCache,
+    native_ref_effects::{lookup_native_ref_effects, NativeRefEffects, NativeReturnPath},
+    LoadedFunction,
+};
 use fxhash::FxBuildHasher;
 use hashbrown::HashMap;
 use move_binary_format::{
@@ -88,8 +93,10 @@ use move_binary_format::{
 };
 use move_core_types::{
     function::ClosureMask,
+    language_storage::{ModuleId, CORE_CODE_ADDRESS},
     vm_status::{sub_status::unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE, StatusCode},
 };
+use move_vm_metrics::{NATIVE_READ_POISONS, NATIVE_RETURN_FALLBACKS};
 use move_vm_types::loaded_data::runtime_types::Type;
 use std::{collections::BTreeSet, slice};
 
@@ -135,6 +142,13 @@ struct AccessPathTree {
 type NodeID = usize;
 /// Edge label for an edge between two nodes in a given access path tree.
 type EdgeLabel = usize;
+
+// Edge labels used for abstracting access paths that are not tied directly to
+// struct field indices. Keep these small to avoid excessive vector resizing in
+// the access-path tree while still steering clear of actual struct fields.
+const VECTOR_ELEMENTS_EDGE_LABEL: EdgeLabel = 0;
+const SIGNER_ADDRESS_FIELD_INDEX: EdgeLabel = 1;
+const TABLE_ENTRY_EDGE_LABEL: EdgeLabel = 8;
 
 /// A node in the access path tree.
 struct AccessPathTreeNode {
@@ -239,6 +253,9 @@ pub(crate) struct RefCheckState {
 
     /// Stack of per-frame reference states.
     frame_stack: Vec<FrameRefState>,
+
+    /// Whether to treat native reads as immutable accesses (poisoning overlapping &mut).
+    poison_on_native_read: bool,
 }
 
 /// A trait for determining the behavior of the runtime reference checks.
@@ -266,8 +283,22 @@ pub(crate) trait RuntimeRefCheck {
         ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()>;
 
+    /// Applies additional effects for native calls (e.g., poisoning on reads) prior to execution.
+    fn native_call_effects(
+        function: &LoadedFunction,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()>;
+
     /// Initializes the reference check state on the entrypoint function.
     fn init_entry(function: &LoadedFunction, ref_state: &mut RefCheckState) -> PartialVMResult<()>;
+
+    /// Handles native function return: shape the shadow returns and perform return_().
+    /// This allows natives to participate in runtime ref checks without pushing an
+    /// interpreter frame.
+    fn native_return_transition(
+        function: &LoadedFunction,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()>;
 }
 
 /// A no-op implementation of the `RuntimeRefCheck` trait, which does not perform
@@ -305,7 +336,21 @@ impl RuntimeRefCheck for NoRuntimeRefCheck {
         Ok(())
     }
 
+    fn native_call_effects(
+        _function: &LoadedFunction,
+        _ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
     fn init_entry(
+        _function: &LoadedFunction,
+        _ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        Ok(())
+    }
+
+    fn native_return_transition(
         _function: &LoadedFunction,
         _ref_state: &mut RefCheckState,
     ) -> PartialVMResult<()> {
@@ -679,6 +724,50 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
         ref_state.core_call(num_params, num_locals, mask)
     }
 
+    fn native_call_effects(
+        function: &LoadedFunction,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        if !ref_state.poison_on_native_read() {
+            return Ok(());
+        }
+
+        let Some(native_effects) = function
+            .module_id()
+            .and_then(|module_id| lookup_native_ref_effects(module_id, function.name_id()))
+        else {
+            return Ok(());
+        };
+
+        if native_effects.read_param_indexes.is_empty() {
+            return Ok(());
+        }
+
+        let read_nodes = {
+            let callee_frame = ref_state.get_latest_frame_state()?;
+            native_effects
+                .read_param_indexes
+                .iter()
+                .filter_map(|idx| callee_frame.caller_ref_param_map.get(idx).cloned())
+                .collect::<Vec<_>>()
+        };
+
+        if read_nodes.is_empty() {
+            return Ok(());
+        }
+
+        let caller_frame = ref_state.get_mut_callers_frame_state()?;
+        let (module_label, function_label) = metric_labels(function);
+        NATIVE_READ_POISONS
+            .with_label_values(&[module_label.as_str(), function_label.as_str()])
+            .inc_by(read_nodes.len() as u64);
+        for node in read_nodes {
+            caller_frame.immutable_access_via_ref(&node)?;
+        }
+
+        Ok(())
+    }
+
     fn init_entry(function: &LoadedFunction, ref_state: &mut RefCheckState) -> PartialVMResult<()> {
         let num_locals = function.local_tys().len();
         let mut mut_ref_indexes = vec![];
@@ -700,6 +789,15 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
         )?;
 
         Ok(())
+    }
+
+    fn native_return_transition(
+        function: &LoadedFunction,
+        ref_state: &mut RefCheckState,
+    ) -> PartialVMResult<()> {
+        // Materialize returned reference shapes on the callee frame, then return.
+        ref_state.push_native_return_values(function)?;
+        ref_state.return_(function.return_tys().len())
     }
 }
 
@@ -1062,6 +1160,12 @@ impl FrameRefState {
         Ok(())
     }
 
+    fn immutable_access_via_ref(&mut self, node: &QualifiedNodeID) -> PartialVMResult<()> {
+        self.poison_refs_of_node(node, VisitKind::SelfOnly, ReferenceFilter::MutOnly)?;
+        self.poison_refs_of_node(node, VisitKind::StrictDescendants, ReferenceFilter::MutOnly)?;
+        self.poison_refs_of_node(node, VisitKind::StrictAncestors, ReferenceFilter::MutOnly)
+    }
+
     /// Lock the entire subtree rooted at the given `node` with the specified `lock`.
     /// If any node in the subtree is already exclusively locked, it returns an invariant error.
     fn lock_node_subtree(&mut self, node: &QualifiedNodeID, lock: Lock) -> PartialVMResult<()> {
@@ -1121,11 +1225,14 @@ impl FrameRefState {
         safe_assert!(access_path_tree_node.refs.insert(new_ref_id));
 
         // Connect the new reference to the `access_path_tree_node`.
-        self.ref_table.insert(new_ref_id, ReferenceInfo {
-            is_mutable,
-            poisoned: false,
-            access_path_tree_node: qualified_node_id,
-        });
+        self.ref_table.insert(
+            new_ref_id,
+            ReferenceInfo {
+                is_mutable,
+                poisoned: false,
+                access_path_tree_node: qualified_node_id,
+            },
+        );
 
         Ok(new_ref_id)
     }
@@ -1250,7 +1357,107 @@ impl RefCheckState {
         Self {
             shadow_stack: Vec::new(),
             frame_stack: Vec::new(),
+            poison_on_native_read: false,
         }
+    }
+
+    pub fn set_poison_on_native_read(&mut self, enabled: bool) {
+        self.poison_on_native_read = enabled;
+    }
+
+    fn poison_on_native_read(&self) -> bool {
+        self.poison_on_native_read
+    }
+
+    /// Push shadow shapes for native returns onto the shadow stack of the current callee frame.
+    /// Returned references are conservatively derived from reference parameters.
+    pub fn push_native_return_values(&mut self, function: &LoadedFunction) -> PartialVMResult<()> {
+        let native_effects = function
+            .module_id()
+            .and_then(|module_id| lookup_native_ref_effects(module_id, function.name_id()));
+
+        // Determine candidate reference parameter indexes available in this callee frame.
+        // Use the caller_ref_param_map keys of the latest frame to know which params are
+        // actual reference parameters (non-captured) for this native call.
+        let frame_state = self.get_latest_frame_state()?;
+        let mut ref_param_indexes: Vec<usize> =
+            frame_state.caller_ref_param_map.keys().cloned().collect();
+        ref_param_indexes.sort_unstable();
+
+        // Precompute inner types for candidate reference parameters.
+        // Keep only those that are reference-typed.
+        let mut ref_param_info: Vec<(usize, bool, &Type)> = Vec::new();
+        for i in ref_param_indexes {
+            let ty = safe_unwrap!(function.param_tys().get(i));
+            match ty {
+                Type::Reference(inner) => ref_param_info.push((i, false, inner)),
+                Type::MutableReference(inner) => ref_param_info.push((i, true, inner)),
+                _ => {},
+            }
+        }
+
+        // Helper to choose a source parameter index for a returned reference type.
+        let choose_source_param = |ret_inner: &Type| -> Option<(usize, bool)> {
+            // Prefer exact inner-type match
+            for (idx, is_mut, inner) in &ref_param_info {
+                if *inner == ret_inner {
+                    return Some((*idx, *is_mut));
+                }
+            }
+            // Fallback to the first available reference parameter (if any)
+            ref_param_info
+                .first()
+                .map(|(idx, is_mut, _)| (*idx, *is_mut))
+        };
+
+        // For each return type, push the shape onto the shadow stack.
+        for (ret_idx, ret_ty) in function.return_tys().iter().enumerate() {
+            match ret_ty {
+                Type::Reference(inner) => {
+                    let Some((src_idx, _src_is_mut)) = choose_source_param(inner) else {
+                        let msg =
+                            "Native returned reference without any reference parameter".to_string();
+                        return ref_check_failure!(msg);
+                    };
+                    let root = QualifiedNodeID::reference_param_root(src_idx);
+                    let frame_state_mut = self.get_mut_latest_frame_state()?;
+                    let path = resolve_native_return_path(function, native_effects, ret_idx);
+                    let derived_node =
+                        frame_state_mut.get_or_create_descendant_node(&root, &path)?;
+                    let new_ref_id =
+                        frame_state_mut.make_new_ref_to_existing_node(derived_node, false)?;
+                    self.push_ref_to_shadow_stack(new_ref_id);
+                },
+                Type::MutableReference(inner) => {
+                    let Some((src_idx, src_is_mut)) = choose_source_param(inner) else {
+                        let msg =
+                            "Native returned mutable reference without any reference parameter"
+                                .to_string();
+                        return ref_check_failure!(msg);
+                    };
+                    // Ensure the selected parameter was mutable as well (align with verifier rules).
+                    if !src_is_mut {
+                        let msg =
+                            "Returning &mut derived from immutable reference parameter".to_string();
+                        return ref_check_failure!(msg);
+                    }
+                    let root = QualifiedNodeID::reference_param_root(src_idx);
+                    let frame_state_mut = self.get_mut_latest_frame_state()?;
+                    let path = resolve_native_return_path(function, native_effects, ret_idx);
+                    let derived_node =
+                        frame_state_mut.get_or_create_descendant_node(&root, &path)?;
+                    let new_ref_id =
+                        frame_state_mut.make_new_ref_to_existing_node(derived_node, true)?;
+                    self.push_ref_to_shadow_stack(new_ref_id);
+                },
+                _ => {
+                    // Non-reference return
+                    self.push_non_refs_to_shadow_stack(1);
+                },
+            }
+        }
+
+        Ok(())
     }
 
     /// Push `num` non-reference values onto the shadow stack.
@@ -1630,7 +1837,7 @@ impl RefCheckState {
         let parent_node_id = ref_info.access_path_tree_node.clone();
         // Note that we abstract over all indices and use `0` to represent the label.
         // This is stricter than necessary, but it is cheaper than maintaining a per-index access path tree node.
-        let abstracted_label = 0;
+        let abstracted_label = VECTOR_ELEMENTS_EDGE_LABEL;
         let child_node_id = frame_state
             .get_or_create_descendant_node(&parent_node_id, slice::from_ref(&abstracted_label))?;
 
@@ -1876,3 +2083,41 @@ impl RefCheckState {
         Ok(())
     }
 }
+
+fn resolve_native_return_path(
+    function: &LoadedFunction,
+    native_effects: Option<&'static NativeRefEffects>,
+    ret_idx: usize,
+) -> Vec<EdgeLabel> {
+    if let Some(effects) = native_effects {
+        if let Some(effect) = effects
+            .return_effects
+            .iter()
+            .find(|spec| spec.ret_idx == ret_idx)
+        {
+            return match effect.path {
+                NativeReturnPath::RetIndex => vec![ret_idx],
+                NativeReturnPath::Const(const_path) => const_path.to_vec(),
+            };
+        }
+    }
+
+    let (module_label, function_label) = metric_labels(function);
+    NATIVE_RETURN_FALLBACKS
+        .with_label_values(&[module_label.as_str(), function_label.as_str()])
+        .inc();
+
+    vec![ret_idx]
+}
+
+fn metric_labels(function: &LoadedFunction) -> (String, String) {
+    let module_label = function
+        .module_id()
+        .map(|id| id.to_string())
+        .unwrap_or_else(|| "<script>".to_string());
+    let function_label = function.name().to_string();
+    (module_label, function_label)
+}
+
+#[cfg(test)]
+mod tests {}

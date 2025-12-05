@@ -706,11 +706,12 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     warnings_opt
                 }
             },
-            (_, None) => {
-                bail!(
+            (_, None) => match syntax {
+                SyntaxChoice::ASM => warnings_opt,
+                _ => bail!(
                     "Cannot run extended checks, no model:\n\n{}",
                     warnings_opt.unwrap_or_else(|| "No compiler warnings".to_string())
-                );
+                ),
             },
         };
         Ok((data, named_addr_opt, module, warnings_opt))
@@ -747,11 +748,12 @@ impl<'a> MoveTestAdapter<'a> for AptosTestAdapter<'a> {
                     warnings_opt
                 }
             },
-            (_, None) => {
-                bail!(
+            (_, None) => match syntax {
+                SyntaxChoice::ASM => warnings_opt,
+                _ => bail!(
                     "Cannot run extended checks, no model:\n\n{}",
                     warnings_opt.unwrap_or_else(|| "No compiler warnings".to_string())
-                );
+                ),
             },
         };
         Ok((compiled_script, warnings_opt))
@@ -1112,6 +1114,14 @@ pub fn run_aptos_test_with_config(
     config: TestRunConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let suffix = Some(EXP_EXT.to_owned());
+    run_aptos_test_with_config_and_exp_suffix(path, config, &suffix)
+}
+
+pub fn run_aptos_test_with_config_and_exp_suffix(
+    path: &Path,
+    config: TestRunConfig,
+    exp_suffix: &Option<String>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let v2_lib = {
         let language_version = &config.language_version;
         if language_version == &LanguageVersion::latest() {
@@ -1121,5 +1131,5 @@ pub fn run_aptos_test_with_config(
         }
     };
     set_paranoid_type_checks(true);
-    run_test_impl::<AptosTestAdapter>(config, path, v2_lib, &suffix)
+    run_test_impl::<AptosTestAdapter>(config, path, v2_lib, exp_suffix)
 }

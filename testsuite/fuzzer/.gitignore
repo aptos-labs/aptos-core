@@ -3,3 +3,12 @@
 perf.data
 perf.data.old
 test-casr-report/
+*.txt
+*.log
+crash-*
+clusterfuzz-testcase-*
+*.masm
+*.zip
+*.tar
+*.gz
+*.diff

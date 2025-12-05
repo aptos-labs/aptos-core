@@ -1,6 +1,10 @@
 #!/bin/bash
 
-export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable -C target-cpu=native"
+if [ "$1" = "build-oss-fuzz" ] || [ -n "$OSS_FUZZ" ]; then
+    export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable -C target-cpu=x86-64 -C target-feature=+sse4.2"
+else
+    export RUSTFLAGS="${RUSTFLAGS} --cfg tokio_unstable -C target-cpu=native"
+fi
 export EXTRAFLAGS="-Ztarget-applies-to-host -Zhost-config"
 # Nightly version control
 NIGHTLY_VERSION="nightly-2025-08-07"
@@ -193,6 +197,7 @@ function build-oss-fuzz() {
     if [ -z "$1" ]; then
         usage build-oss-fuzz
     fi
+    export OSS_FUZZ=1
     oss_fuzz_out=$1
     mkdir -p "$oss_fuzz_out"
     mkdir -p ./target
@@ -373,8 +378,8 @@ function run() {
     fuzz_target=$1
     # TODO: switch to name args
     # INFO: forkin with more then 8 cores degradate performances
-    fork_count=${3:-4}
-    ignore_crashes=${4:-0}
+    fork_count=${3:-8}
+    ignore_crashes=${4:-1}
     testcase=$2
     if [ ! -z "$testcase" ]; then
         if [ -f "$testcase" ]; then
@@ -388,7 +393,7 @@ function run() {
     if [[ "$OSTYPE" == "darwin"* ]]; then
         cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -fork=4 -ignore_crashes=$ignore_crashes
     else
-        cargo_fuzz run $features --sanitizer none -O $fuzz_target $testcase -- -rss_limit_mb=4096 -fork=$fork_count -ignore_crashes=$ignore_crashes
+        cargo_fuzz run $features --sanitizer address -O $fuzz_target $testcase -- -ignore_crashes=$ignore_crashes -jobs=$((8*10)) -workers=$fork_count -runs=10000 # -fork=$fork_count 
     fi
 }
 

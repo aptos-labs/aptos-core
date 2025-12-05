@@ -211,6 +211,7 @@ pub fn aptos_prod_vm_config(
         enable_layout_caches,
         propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
         enable_framework_for_option,
+        poison_on_native_read: false,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

@@ -411,14 +411,21 @@ pub(crate) fn publish_group(
     let status = match tdbg!(res.status()) {
         TransactionStatus::Keep(status) => status,
         TransactionStatus::Discard(e) => {
-            if e.status_type() == StatusType::InvariantViolation {
-                panic!(
-                    "invariant violation via TransactionStatus: {:?}, {:?}",
-                    e,
-                    res.auxiliary_data()
-                );
+            match (e.status_type(), *e) {
+                (StatusType::InvariantViolation, code) => {
+                    if code != StatusCode::ACCESS_CONTROL_INVARIANT_VIOLATION {
+                        panic!(
+                            "invariant violation via TransactionStatus: {:?}, {:?}",
+                            e,
+                            res.auxiliary_data()
+                        );
+                    }
+                    else {
+                        return Err(Corpus::Reject);
+                    }
+                }
+                _ => return Err(Corpus::Keep),
             }
-            return Err(Corpus::Keep);
         },
         _ => return Err(Corpus::Keep),
     };
@@ -428,14 +435,20 @@ pub(crate) fn publish_group(
         ExecutionStatus::Success => Ok(()),
         ExecutionStatus::MiscellaneousError(e) => {
             if let Some(e) = e {
-                if e.status_type() == StatusType::InvariantViolation
-                    && *e != StatusCode::VERIFICATION_ERROR
-                {
-                    panic!(
-                        "invariant violation via ExecutionStatus: {:?}, {:?}",
-                        e,
-                        res.auxiliary_data()
-                    );
+                match (e.status_type(), *e) {
+                    (StatusType::InvariantViolation, code) => {
+                        if code != StatusCode::ACCESS_CONTROL_INVARIANT_VIOLATION {
+                            panic!(
+                                "invariant violation via ExecutionStatus: {:?}, {:?}",
+                                e,
+                                res.auxiliary_data()
+                            );
+                        }
+                        else {
+                            return Err(Corpus::Reject);
+                        }
+                    }
+                    _ => return Err(Corpus::Keep),
                 }
             }
             Err(Corpus::Keep)

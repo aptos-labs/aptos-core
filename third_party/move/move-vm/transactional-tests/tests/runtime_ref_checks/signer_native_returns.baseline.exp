@@ -1,0 +1,8 @@
+processed 2 tasks
+task 0 lines 1-9:  publish [module 0xcafe::signer_native_returns {]
+task 1 lines 11-11:  run 0xcafe::signer_native_returns::borrow_address_roundtrip --signers 0xcafe
+return values: 000000000000000000000000000000000000000000000000000000000000cafe
+
+
+
+

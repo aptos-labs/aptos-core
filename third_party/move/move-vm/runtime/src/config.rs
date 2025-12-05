@@ -49,6 +49,8 @@ pub struct VMConfig {
     pub enable_layout_caches: bool,
     pub propagate_dependency_limit_error: bool,
     pub enable_framework_for_option: bool,
+    /// If true, treat native function reads as immutable accesses for runtime ref checks.
+    pub poison_on_native_read: bool,
 }
 
 impl Default for VMConfig {
@@ -76,6 +78,7 @@ impl Default for VMConfig {
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
             enable_framework_for_option: false,
+            poison_on_native_read: false,
         }
     }
 }
@@ -85,6 +88,13 @@ impl VMConfig {
     pub fn set_paranoid_ref_checks(self, enable: bool) -> Self {
         Self {
             paranoid_ref_checks: enable,
+            ..self
+        }
+    }
+
+    pub fn set_poison_on_native_read(self, enable: bool) -> Self {
+        Self {
+            poison_on_native_read: enable,
             ..self
         }
     }
