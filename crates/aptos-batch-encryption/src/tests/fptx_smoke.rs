@@ -125,7 +125,7 @@ use aptos_dkg::pvss::{
 #[test]
 fn smoke_with_pvss() {
     let mut rng = thread_rng();
-    let mut rng_aptos_crypto = rand::thread_rng();
+    let mut rng_aptos = rand::thread_rng();
 
     let tc_happy = ShamirThresholdConfig::new(5, 8);
     let tc_slow = ShamirThresholdConfig::new(3, 8);
@@ -133,11 +133,11 @@ fn smoke_with_pvss() {
         tc_happy.get_total_num_players(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
         G2Affine::generator(),
-        &mut rng_aptos_crypto,
+        &mut rng_aptos,
     );
 
     let ssks = (0..tc_happy.get_total_num_players())
-        .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos_crypto))
+        .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos))
         .collect::<Vec<<T as Transcript>::SigningSecretKey>>();
     let spks = ssks
         .iter()
@@ -145,14 +145,14 @@ fn smoke_with_pvss() {
         .collect::<Vec<<T as Transcript>::SigningPubKey>>();
 
     let dks: Vec<<T as Transcript>::DecryptPrivKey> = (0..tc_happy.get_total_num_players())
-        .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos_crypto))
+        .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos))
         .collect();
     let eks: Vec<<T as Transcript>::EncryptPubKey> = dks
         .iter()
         .map(|dk| dk.to(pp.get_encryption_public_params()))
         .collect();
 
-    let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos_crypto);
+    let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos);
 
     // Test dealing
     let subtrx_happypath = T::deal(
@@ -164,7 +164,7 @@ fn smoke_with_pvss() {
         &s,
         &NoAux,
         &tc_happy.get_player(0),
-        &mut rng_aptos_crypto,
+        &mut rng_aptos,
     )
     .get_subtranscript();
 
@@ -177,7 +177,7 @@ fn smoke_with_pvss() {
         &s,
         &NoAux,
         &tc_slow.get_player(0),
-        &mut rng_aptos_crypto,
+        &mut rng_aptos,
     )
     .get_subtranscript();
 

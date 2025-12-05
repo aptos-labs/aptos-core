@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEDecryptionKeyShare},
-    shared::key_derivation::BIBEDecryptionKey,
+    shared::{digest::DigestKey, key_derivation::BIBEDecryptionKey},
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
@@ -95,6 +95,124 @@ fn weighted_smoke_with_setup_for_testing() {
 
     let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
         FPTXWeighted::setup_for_testing(rng.r#gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
+
+    weighted_smoke_with_setup(
+        &mut rng,
+        tc_happy,
+        tc_slow,
+        ek,
+        dk,
+        vks_happy,
+        msk_shares_happy,
+        vks_slow,
+        msk_shares_slow,
+    );
+}
+
+type T = aptos_dkg::pvss::chunky::WeightedTranscript<crate::group::Pairing>;
+use crate::group::G2Affine;
+use aptos_crypto::{SigningKey, Uniform};
+use aptos_dkg::pvss::{
+    test_utils::NoAux,
+    traits::{
+        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
+    },
+};
+
+#[test]
+fn weighted_smoke_with_pvss() {
+    let mut rng = thread_rng();
+    let mut rng_aptos = rand::thread_rng();
+
+    let tc_happy = WeightedConfigArkworks::new(5, vec![1, 2, 5]).unwrap();
+    let tc_slow = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
+    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
+        tc_happy.get_total_num_players(),
+        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        G2Affine::generator(),
+        &mut rng_aptos,
+    );
+
+    let ssks = (0..tc_happy.get_total_num_players())
+        .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos))
+        .collect::<Vec<<T as Transcript>::SigningSecretKey>>();
+    let spks = ssks
+        .iter()
+        .map(|ssk| ssk.verifying_key())
+        .collect::<Vec<<T as Transcript>::SigningPubKey>>();
+
+    let dks: Vec<<T as Transcript>::DecryptPrivKey> = (0..tc_happy.get_total_num_players())
+        .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos))
+        .collect();
+    let eks: Vec<<T as Transcript>::EncryptPubKey> = dks
+        .iter()
+        .map(|dk| dk.to(pp.get_encryption_public_params()))
+        .collect();
+
+    let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos);
+
+    // Test dealing
+    let subtrx_happypath = T::deal(
+        &tc_happy,
+        &pp,
+        &ssks[0],
+        &spks[0],
+        &eks,
+        &s,
+        &NoAux,
+        &tc_happy.get_player(0),
+        &mut rng_aptos,
+    )
+    .get_subtranscript();
+
+    let subtrx_slowpath = T::deal(
+        &tc_slow,
+        &pp,
+        &ssks[0],
+        &spks[0],
+        &eks,
+        &s,
+        &NoAux,
+        &tc_slow.get_player(0),
+        &mut rng_aptos,
+    )
+    .get_subtranscript();
+
+    let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
+
+    let (ek, vks_happy, _, vks_slow, _) = FPTXWeighted::setup(
+        &dk,
+        &pp,
+        &subtrx_happypath,
+        &subtrx_slowpath,
+        &tc_happy,
+        &tc_slow,
+        tc_happy.get_player(0),
+        &dks[0],
+    )
+    .unwrap();
+
+    let (msk_shares_happy, msk_shares_slow): (
+        Vec<<FPTXWeighted as BatchThresholdEncryption>::MasterSecretKeyShare>,
+        Vec<<FPTXWeighted as BatchThresholdEncryption>::MasterSecretKeyShare>,
+    ) = tc_happy
+        .get_players()
+        .into_iter()
+        .map(|p| {
+            let (_, _, msk_share_happypath, _, msk_share_slowpath) = FPTXWeighted::setup(
+                &dk,
+                &pp,
+                &subtrx_happypath,
+                &subtrx_slowpath,
+                &tc_happy,
+                &tc_slow,
+                p,
+                &dks[p.get_id()],
+            )
+            .unwrap();
+            (msk_share_happypath, msk_share_slowpath)
+        })
+        .collect();
 
     weighted_smoke_with_setup(
         &mut rng,
