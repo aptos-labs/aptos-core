@@ -8,7 +8,7 @@ use serde::{de::DeserializeOwned, Serialize};
 use std::hash::Hash;
 
 pub trait BatchThresholdEncryption {
-    type ThresholdConfig: aptos_crypto::ThresholdConfig;
+    type ThresholdConfig: aptos_crypto::SecretSharingConfig;
     type SubTranscript: SubTranscript;
 
     /// An encryption key for the scheme. Allows for generating ciphertexts. If we want to actually

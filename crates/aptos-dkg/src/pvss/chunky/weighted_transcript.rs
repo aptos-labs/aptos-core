@@ -284,8 +284,6 @@ type SokContext<'a, A: Serialize + Clone> = (
     Vec<u8>, // This is for the DST
 );
 
-use aptos_crypto::weighted_config::unflatten_by_weights;
-
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
@@ -358,7 +356,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
-        let mut Vs = unflatten_by_weights(&flattened_Vs, sc);
+        let mut Vs = sc.group_by_player(&flattened_Vs);
         Vs.push(vec![*flattened_Vs.last().unwrap()]);
 
         Transcript {
@@ -468,10 +466,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         Transcript {
             dealer: sc.get_player(0),
             subtrs: SubTranscript {
-                Vs: unflatten_by_weights(
-                    &unsafe_random_points::<E::G2, _>(sc.get_total_weight() + 1, rng),
-                    sc,
-                ),
+                Vs: sc.group_by_player(&unsafe_random_points::<E::G2, _>(
+                    sc.get_total_weight() + 1,
+                    rng,
+                )),
                 Cs: (0..sc.get_total_num_players())
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
@@ -672,7 +670,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let f_evals_chunked_flat: Vec<E::ScalarField> =
             f_evals_chunked.iter().flatten().copied().collect();
         // Separately, gather the chunks by weight
-        let f_evals_weighted = unflatten_by_weights(&f_evals_chunked, sc);
+        let f_evals_weighted = sc.group_by_player(&f_evals_chunked);
 
         // Now generate the encrypted shares and range proof commitment, together with its SoK, so:
         // (1) Set up the witness

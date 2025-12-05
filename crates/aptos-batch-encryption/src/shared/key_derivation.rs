@@ -2,7 +2,7 @@
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::symmetric;
 use crate::{
-    errors::{BatchEncryptionError, ReconstructError},
+    errors::BatchEncryptionError,
     group::{Fr, G1Affine, G2Affine, PairingSetting},
     shared::{ark_serialize::*, digest::Digest},
     traits::{DecryptionKeyShare, VerificationKey},
@@ -27,25 +27,22 @@ pub struct BIBEMasterSecretKeyShare {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
-pub struct BIBEDecryptionKeyShare {
-    player: Player,
+pub struct BIBEDecryptionKeyShareValue {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    signature_share_eval: G1Affine,
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    digest_g1: G1Affine,
+    pub(crate) signature_share_eval: G1Affine,
 }
+
+pub type BIBEDecryptionKeyShare = (Player, BIBEDecryptionKeyShareValue);
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEDecryptionKey {
-    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    pub digest_g1: G1Affine,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub signature_g1: G1Affine,
 }
 
 impl DecryptionKeyShare for BIBEDecryptionKeyShare {
     fn player(&self) -> Player {
-        self.player
+        self.0
     }
 }
 
@@ -107,13 +104,11 @@ impl BIBEMasterSecretKeyShare {
     pub fn derive_decryption_key_share(&self, digest: &Digest) -> Result<BIBEDecryptionKeyShare> {
         let hashed_encryption_key: G1Affine = symmetric::hash_g2_element(self.mpk_g2)?;
 
-        Ok(BIBEDecryptionKeyShare {
-            player: self.player,
+        Ok((self.player, BIBEDecryptionKeyShareValue {
             signature_share_eval: G1Affine::from(
                 (digest.as_g1() + hashed_encryption_key) * self.shamir_share_eval,
             ),
-            digest_g1: digest.as_g1(),
-        })
+        }))
     }
 }
 
@@ -144,7 +139,7 @@ impl BIBEVerificationKey {
             self.vk_g2,
             digest,
             self.mpk_g2,
-            decryption_key_share.signature_share_eval,
+            decryption_key_share.1.signature_share_eval,
         )
         .map_err(|_| BatchEncryptionError::DecryptionKeyShareVerifyError)?;
 
@@ -165,30 +160,23 @@ impl BIBEMasterPublicKey {
     }
 }
 
-impl BIBEDecryptionKey {
-    pub fn reconstruct(
-        shares: &[BIBEDecryptionKeyShare],
+impl Reconstructable<ShamirThresholdConfig<Fr>> for BIBEDecryptionKey {
+    type ShareValue = BIBEDecryptionKeyShareValue;
+
+    fn reconstruct(
         threshold_config: &ShamirThresholdConfig<Fr>,
+        shares: &[BIBEDecryptionKeyShare],
     ) -> Result<Self> {
         let signature_g1 = G1Affine::reconstruct(
             threshold_config,
             &shares
                 .iter()
-                .map(|share| (share.player, share.signature_share_eval))
+                .map(|share| (share.0, share.1.signature_share_eval))
                 .collect::<Vec<ShamirGroupShare<G1Affine>>>(),
         )?;
 
-        let digest_g1 = shares[0].digest_g1;
-
         // sanity check
-        if !shares.iter().all(|share| share.digest_g1 == digest_g1) {
-            Err(ReconstructError::ReconstructDigestsDontMatch)?
-        } else {
-            Ok(Self {
-                digest_g1,
-                signature_g1,
-            })
-        }
+        Ok(Self { signature_g1 })
     }
 }
 
@@ -197,6 +185,7 @@ mod tests {
     use super::{gen_msk_shares, BIBEDecryptionKey, BIBEDecryptionKeyShare};
     use crate::{group::Fr, shared::digest::Digest};
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+    use aptos_dkg::pvss::traits::Reconstructable as _;
     use ark_ff::UniformRand as _;
     use ark_std::rand::{seq::SliceRandom, thread_rng};
 
@@ -221,7 +210,7 @@ mod tests {
 
         let shares_threshold: Vec<BIBEDecryptionKeyShare> =
             dk_shares.choose_multiple(&mut rng, 6).cloned().collect();
-        let dk = BIBEDecryptionKey::reconstruct(&shares_threshold, &tc).unwrap();
+        let dk = BIBEDecryptionKey::reconstruct(&tc, &shares_threshold).unwrap();
 
         mpk.verify_decryption_key(&digest, &dk)
             .expect("Decryption key should verify");
