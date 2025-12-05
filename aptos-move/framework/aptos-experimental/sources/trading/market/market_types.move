@@ -337,85 +337,93 @@ module aptos_experimental::market_types {
     }
 
     #[event]
-    struct OrderEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        client_order_id: Option<String>,
-        user: address,
-        /// Original size of the order
-        orig_size: u64,
-        /// Remaining size of the order in the order book
-        remaining_size: u64,
-        // TODO(bl): Brian and Sean will revisit to see if we should have split
-        // into multiple events for OrderEvent
-        /// OPEN - size_delta will be amount of size added
-        /// CANCELLED - size_delta will be amount of size removed
-        /// FILLED - size_delta will be amount of size filled
-        /// REJECTED - size_delta will always be 0
-        size_delta: u64,
-        price: u64,
-        is_bid: bool,
-        /// Whether the order crosses the orderbook.
-        is_taker: bool,
-        status: OrderStatus,
-        details: std::string::String,
-        metadata_bytes: vector<u8>,
-        time_in_force: TimeInForce,
-        trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
+    enum OrderEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            client_order_id: Option<String>,
+            user: address,
+            /// Original size of the order
+            orig_size: u64,
+            /// Remaining size of the order in the order book
+            remaining_size: u64,
+            // TODO(bl): Brian and Sean will revisit to see if we should have split
+            // into multiple events for OrderEvent
+            /// OPEN - size_delta will be amount of size added
+            /// CANCELLED - size_delta will be amount of size removed
+            /// FILLED - size_delta will be amount of size filled
+            /// REJECTED - size_delta will always be 0
+            size_delta: u64,
+            price: u64,
+            is_bid: bool,
+            /// Whether the order crosses the orderbook.
+            is_taker: bool,
+            status: OrderStatus,
+            details: std::string::String,
+            metadata_bytes: vector<u8>,
+            time_in_force: TimeInForce,
+            trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
+        }
     }
 
     #[event]
-    struct BulkOrderPlacedEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        sequence_number: u64,
-        user: address,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-        cancelled_bid_prices: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
-        cancelled_ask_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
-        previous_seq_num: u64,
+    enum BulkOrderPlacedEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            sequence_number: u64,
+            user: address,
+            bid_prices: vector<u64>,
+            bid_sizes: vector<u64>,
+            ask_prices: vector<u64>,
+            ask_sizes: vector<u64>,
+            cancelled_bid_prices: vector<u64>,
+            cancelled_bid_sizes: vector<u64>,
+            cancelled_ask_prices: vector<u64>,
+            cancelled_ask_sizes: vector<u64>,
+            previous_seq_num: u64,
+        }
     }
 
 
     #[event]
     // This event is emitted when a bulk order is modified - especially when some levels of the bulk orders
     // are cancelled.
-    struct BulkOrderModifiedEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        sequence_number: u64,
-        user: address,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-        cancelled_bid_prices: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
-        cancelled_ask_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
-        previous_seq_num: u64,
+    enum BulkOrderModifiedEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            sequence_number: u64,
+            user: address,
+            bid_prices: vector<u64>,
+            bid_sizes: vector<u64>,
+            ask_prices: vector<u64>,
+            ask_sizes: vector<u64>,
+            cancelled_bid_prices: vector<u64>,
+            cancelled_bid_sizes: vector<u64>,
+            cancelled_ask_prices: vector<u64>,
+            cancelled_ask_sizes: vector<u64>,
+            previous_seq_num: u64,
+        }
     }
 
     #[event]
-    struct BulkOrderFilledEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        sequence_number: u64,
-        user: address,
-        filled_size: u64,
-        price: u64,
-        orig_price: u64,
-        is_bid: bool,
-        fill_id: u128,
+    enum BulkOrderFilledEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            sequence_number: u64,
+            user: address,
+            filled_size: u64,
+            price: u64,
+            orig_price: u64,
+            is_bid: bool,
+            fill_id: u128,
+        }
     }
 
 
@@ -565,7 +573,7 @@ module aptos_experimental::market_types {
             let metadata_bytes =
                 callbacks.get_order_metadata_bytes(&metadata);
             event::emit(
-                OrderEvent {
+                OrderEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -605,7 +613,7 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderPlacedEvent {
+                BulkOrderPlacedEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -638,7 +646,7 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderModifiedEvent {
+                BulkOrderModifiedEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -672,7 +680,7 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderFilledEvent {
+                BulkOrderFilledEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -705,7 +713,7 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderModifiedEvent {
+                BulkOrderModifiedEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
