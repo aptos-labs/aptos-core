@@ -28,6 +28,7 @@ use rand::{rngs::StdRng, thread_rng};
 use rand_core::SeedableRng;
 
 // TODO: Add a test for public parameters serialization roundtrip?
+// TODO: and add a test for aggregate!!!!
 
 #[test]
 fn test_pvss_all_unweighted() {
@@ -95,23 +96,23 @@ fn test_pvss_all_weighted() {
 
         // Provably-secure Das PVSS
         pvss_deal_verify_and_reconstruct::<das::WeightedTranscript>(&wc, seed.to_bytes_le());
+    }
 
-        // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead
-        let wcs = test_utils::get_weighted_configs_for_testing();
-        for wc in wcs {
-            println!("\nTesting {wc} PVSS");
-            let seed = random_scalar(&mut rng);
+    // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead
+    let wcs = test_utils::get_weighted_configs_for_testing();
+    for wc in wcs.iter() {
+        println!("\nTesting {wc} PVSS");
+        let seed = random_scalar(&mut rng);
 
-            pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
-                ark_bn254::Bn254,
-                signed::GenericSigning<chunky::WeightedTranscript<ark_bn254::Bn254>>,
-            >(&wc, seed.to_bytes_le());
+        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+            ark_bn254::Bn254,
+            signed::GenericSigning<chunky::WeightedTranscript<ark_bn254::Bn254>>,
+        >(&wc, seed.to_bytes_le());
 
-            pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
-                ark_bn254::Bn254,
-                chunky::WeightedTranscript<ark_bn254::Bn254>,
-            >(&wc, seed.to_bytes_le());
-        }
+        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+            ark_bn254::Bn254,
+            chunky::WeightedTranscript<ark_bn254::Bn254>,
+        >(&wc, seed.to_bytes_le());
     }
 }
 
