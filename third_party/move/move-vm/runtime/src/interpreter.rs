@@ -1152,7 +1152,14 @@ where
                     }
                 }
 
-                let frame_cache = function_caches.get_or_create_frame_cache(&target_func);
+                let frame_cache = if self
+                    .vm_config
+                    .enable_function_caches_for_native_dynamic_dispatch
+                {
+                    function_caches.get_or_create_frame_cache(&target_func)
+                } else {
+                    FrameTypeCache::make_rc()
+                };
                 self.set_new_call_frame::<RTTCheck, RTRCheck>(
                     current_frame,
                     gas_meter,
