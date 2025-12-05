@@ -1,19 +1,15 @@
 // Copyright (c) Aptos Foundation
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
-    group::G2Affine,
     schemes::fptx_weighted::{FPTXWeighted, WeightedBIBEDecryptionKeyShare},
     shared::{
-        digest::DigestKey,
-        key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare},
+        key_derivation::{BIBEDecryptionKey},
     },
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
-use ark_ec::AffineRepr as _;
+use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
-use rand::distributions::weighted::alias_method::Weight;
 
 fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
     rng: &mut R,

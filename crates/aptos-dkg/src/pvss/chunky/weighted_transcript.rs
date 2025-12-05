@@ -125,6 +125,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
     type DealtSecretKey = keys::DealtSecretKey<E>;
     type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type PublicParameters = PublicParameters<E>;
