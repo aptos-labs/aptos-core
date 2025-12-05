@@ -83,8 +83,9 @@ where
     }
 }
 
-/// A global module cache for verified code that is read-only and concurrently accessed during the
-/// block execution. Modified safely only at block boundaries.
+/// A global cache for verified code and derived information (such as layouts) that is concurrently
+/// accessed during the block execution. Module cache is read-only, and modified safely only at
+/// block boundaries. Layout cache can be modified during execution of the block.
 pub struct GlobalModuleCache<K, D, V, E> {
     /// Module cache containing the verified code.
     module_cache: HashMap<K, Entry<D, V, E>>,

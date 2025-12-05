@@ -1,0 +1,33 @@
+//# publish --verbose
+module 0x66::a
+public fun take_fn<T>(a: T): T
+    local x: T
+    move_loc a
+    st_loc x
+    move_loc x
+    ret
+
+public fun action(x: u8): u8
+    ld_u8 0
+    ret
+
+public fun foo()
+    local fd: |u8|u8 has drop
+    local f: |u8|u8
+    pack_closure action, 0
+    st_loc f
+    ld_u8 1
+    move_loc f
+    call take_fn<|u8|u8>
+    call_closure<|u8|u8>
+    pop
+    pack_closure action, 0
+    st_loc fd
+    ld_u8 1
+    move_loc fd
+    call take_fn<|u8|u8 has drop>
+    call_closure<|u8|u8 has drop>
+    pop
+    ret
+
+//# run 0x66::a::foo --verbose
