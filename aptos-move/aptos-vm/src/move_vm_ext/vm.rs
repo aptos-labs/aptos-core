@@ -33,6 +33,7 @@ impl GenesisRuntimeBuilder {
         let timed_features = TimedFeaturesBuilder::enable_all().build();
 
         let vm_config = aptos_prod_vm_config(
+            chain_id,
             LATEST_GAS_FEATURE_VERSION,
             &features,
             &timed_features,
