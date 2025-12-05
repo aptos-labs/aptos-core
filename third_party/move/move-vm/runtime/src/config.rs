@@ -79,12 +79,8 @@ impl Default for VMConfig {
             enable_enum_option: true,
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
-<<<<<<< HEAD
             enable_framework_for_option: false,
-=======
-            enable_framework_for_option: true,
             enable_function_caches_for_native_dynamic_dispatch: true,
->>>>>>> 9131ffe635 ([vm] Small fixes to interpreter caches (#18233))
         }
     }
 }
