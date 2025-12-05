@@ -24,7 +24,7 @@ module aptos_framework::transaction_validation {
     // We will advertise to the community that max expiration time for orderless txns is 60 seconds.
     // Adding a 40 second slack here as the client's time and the blockchain's time may drift,
     // and to account for any fallen behind fullnodes that are performing simulation on old blockchain state.
-    const MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS: u64 = 100;
+    const MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS: u64 = 100;
 
     // We need to ensure that a transaction can't be replayed.
     // There are two ways to prevent replay attacks:
@@ -256,7 +256,7 @@ module aptos_framework::transaction_validation {
     ) {
         // prologue_common already checks that the current_time > txn_expiration_time
         assert!(
-            txn_expiration_time <= timestamp::now_seconds() + MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS,
+            txn_expiration_time <= timestamp::now_seconds() + MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS,
             error::invalid_argument(PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE),
         );
         assert!(nonce_validation::check_and_insert_nonce(sender, nonce, txn_expiration_time), error::invalid_argument(PROLOGUE_ENONCE_ALREADY_USED));

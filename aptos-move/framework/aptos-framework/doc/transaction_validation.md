@@ -255,11 +255,11 @@ Transaction exceeded its allocated max gas
 
 
 
-<a id="0x1_transaction_validation_MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS"></a>
+<a id="0x1_transaction_validation_MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS"></a>
 
 
 
-<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS">MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS</a>: u64 = 100;
+<pre><code><b>const</b> <a href="transaction_validation.md#0x1_transaction_validation_MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS">MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS</a>: u64 = 100;
 </code></pre>
 
 
@@ -701,7 +701,7 @@ Only called during genesis to initialize system resources for this module.
 ) {
     // prologue_common already checks that the current_time &gt; txn_expiration_time
     <b>assert</b>!(
-        txn_expiration_time &lt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + <a href="transaction_validation.md#0x1_transaction_validation_MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS">MAX_EXPIRATION_TIME_SECONDS_FOR_ORDERLESS_TXNS</a>,
+        txn_expiration_time &lt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + <a href="transaction_validation.md#0x1_transaction_validation_MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS">MAX_EXP_TIME_SECONDS_FOR_ORDERLESS_TXNS</a>,
         <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE">PROLOGUE_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE</a>),
     );
     <b>assert</b>!(<a href="nonce_validation.md#0x1_nonce_validation_check_and_insert_nonce">nonce_validation::check_and_insert_nonce</a>(sender, nonce, txn_expiration_time), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="transaction_validation.md#0x1_transaction_validation_PROLOGUE_ENONCE_ALREADY_USED">PROLOGUE_ENONCE_ALREADY_USED</a>));

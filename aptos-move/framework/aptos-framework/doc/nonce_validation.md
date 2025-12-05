@@ -198,11 +198,11 @@
 
 
 
-<a id="0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS"></a>
+<a id="0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS"></a>
 
 
 
-<pre><code><b>const</b> <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a>: u64 = 100;
+<pre><code><b>const</b> <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS</a>: u64 = 100;
 </code></pre>
 
 
@@ -367,7 +367,7 @@
 ): bool <b>acquires</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a> {
     <b>assert</b>!(<b>exists</b>&lt;<a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>&gt;(@aptos_framework), <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_state">error::invalid_state</a>(<a href="nonce_validation.md#0x1_nonce_validation_E_NONCE_HISTORY_DOES_NOT_EXIST">E_NONCE_HISTORY_DOES_NOT_EXIST</a>));
     // Check <b>if</b> the transaction expiration time is too far in the future.
-    <b>assert</b>!(txn_expiration_time &lt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="nonce_validation.md#0x1_nonce_validation_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE">ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE</a>));
+    <b>assert</b>!(txn_expiration_time &lt;= <a href="timestamp.md#0x1_timestamp_now_seconds">timestamp::now_seconds</a>() + <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS</a>, <a href="../../aptos-stdlib/../move-stdlib/doc/error.md#0x1_error_invalid_argument">error::invalid_argument</a>(<a href="nonce_validation.md#0x1_nonce_validation_ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE">ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE</a>));
     <b>let</b> nonce_history = &<b>mut</b> <a href="nonce_validation.md#0x1_nonce_validation_NonceHistory">NonceHistory</a>[@aptos_framework];
     <b>let</b> nonce_key = <a href="nonce_validation.md#0x1_nonce_validation_NonceKey">NonceKey</a> {
         sender_address,
@@ -393,9 +393,9 @@
         };
 
         // We maintain an <b>invariant</b> that two transaction <b>with</b> the same (<b>address</b>, nonce) pair cannot be stored
-        // in the nonce history <b>if</b> their transaction expiration times are less than `<a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a>`
+        // in the nonce history <b>if</b> their transaction expiration times are less than `<a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS</a>`
         // seconds apart.
-        <b>if</b> (txn_expiration_time &lt;= existing_exp_time + <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a>) {
+        <b>if</b> (txn_expiration_time &lt;= existing_exp_time + <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS</a>) {
             <b>return</b> <b>false</b>;
         };
 
@@ -412,9 +412,9 @@
     <b>let</b> i = 0;
     <b>while</b> (i &lt; <a href="nonce_validation.md#0x1_nonce_validation_MAX_ENTRIES_GARBAGE_COLLECTED_PER_CALL">MAX_ENTRIES_GARBAGE_COLLECTED_PER_CALL</a> && !bucket.nonces_ordered_by_exp_time.is_empty()) {
         <b>let</b> (front_k, _) = bucket.nonces_ordered_by_exp_time.borrow_front();
-        // We garbage collect a nonce after it <b>has</b> expired and the <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a>
+        // We garbage collect a nonce after it <b>has</b> expired and the <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS</a>
         // seconds have passed.
-        <b>if</b> (front_k.txn_expiration_time + <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS</a> &lt; current_time) {
+        <b>if</b> (front_k.txn_expiration_time + <a href="nonce_validation.md#0x1_nonce_validation_NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS">NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS</a> &lt; current_time) {
             bucket.nonces_ordered_by_exp_time.pop_front();
             bucket.nonce_to_exp_time_map.remove(&<a href="nonce_validation.md#0x1_nonce_validation_NonceKey">NonceKey</a> {
                 sender_address: front_k.sender_address,
