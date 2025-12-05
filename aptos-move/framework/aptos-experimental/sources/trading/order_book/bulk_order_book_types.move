@@ -259,17 +259,21 @@ module aptos_experimental::bulk_order_book_types {
     }
 
 
-    struct BulkOrderPlaceResponse<M: store + copy + drop> has copy, drop {
-        order: BulkOrder<M>,
-        cancelled_bid_prices: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
-        cancelled_ask_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
-        previous_seq_num: option::Option<u64>,
+    enum BulkOrderPlaceResponse<M: store + copy + drop> has copy, drop {
+        V1 {
+            order: BulkOrder<M>,
+            cancelled_bid_prices: vector<u64>,
+            cancelled_bid_sizes: vector<u64>,
+            cancelled_ask_prices: vector<u64>,
+            cancelled_ask_sizes: vector<u64>,
+            previous_seq_num: option::Option<u64>,
+        }
     }
 
-    struct BulkOrderRequestResponse<M: store + copy + drop> has copy, drop {
-        request: BulkOrderRequest<M>,
+    enum BulkOrderRequestResponse<M: store + copy + drop> has copy, drop {
+        V1 {
+           request: BulkOrderRequest<M>,
+        }
     }
 
     public(friend) fun new_bulk_order_place_response<M: store + copy + drop>(
@@ -280,7 +284,7 @@ module aptos_experimental::bulk_order_book_types {
         cancelled_ask_sizes: vector<u64>,
         previous_seq_num: option::Option<u64>
     ): BulkOrderPlaceResponse<M> {
-        BulkOrderPlaceResponse {
+        BulkOrderPlaceResponse::V1 {
             order,
             cancelled_bid_prices,
             cancelled_bid_sizes,
@@ -293,7 +297,7 @@ module aptos_experimental::bulk_order_book_types {
     public(friend) fun destroy_bulk_order_place_response<M: store + copy + drop>(
         response: BulkOrderPlaceResponse<M>
     ): (BulkOrder<M>, vector<u64>, vector<u64>, vector<u64>, vector<u64>, option::Option<u64>) {
-        let BulkOrderPlaceResponse { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
+        let BulkOrderPlaceResponse::V1 { order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num } = response;
         (order, cancelled_bid_prices, cancelled_bid_sizes, cancelled_ask_prices, cancelled_ask_sizes, previous_seq_num)
     }
 
