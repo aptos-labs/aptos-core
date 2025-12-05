@@ -106,6 +106,11 @@ impl FullnodeData for FullnodeDataService {
                 processor_batch_size,
                 output_batch_size,
                 tx.clone(),
+                // For now the request for this interface doesn't include a txn filter
+                // because it is only used for the txn stream filestore worker, which
+                // needs every transaction. Later we may add support for txn filtering
+                // to this interface too.
+                None,
                 Some(abort_handle.clone()),
             );
             // Sends init message (one time per request) to the client in the with chain id and starting version. Basically a handshake

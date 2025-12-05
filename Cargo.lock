@@ -2413,6 +2413,7 @@ dependencies = [
  "aptos-secure-storage",
  "aptos-storage-interface",
  "aptos-temppath",
+ "aptos-transaction-filter 0.1.0",
  "aptos-types",
  "aptos-vm",
  "aptos-vm-validator",
