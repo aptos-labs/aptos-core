@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_api::context::Context;
 use std::sync::Arc;
@@ -17,6 +17,7 @@ pub struct ServiceContext {
     pub processor_task_count: u16,
     pub processor_batch_size: u16,
     pub output_batch_size: u16,
+    pub transaction_channel_size: usize,
 }
 
 #[cfg(test)]

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 /// Maximum retry time for exponential backoff (2 sec = 3-4 retries)
 pub const MAX_RETRY_TIME_SECONDS: u64 = 2;

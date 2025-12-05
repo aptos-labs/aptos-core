@@ -7,7 +7,10 @@ use crate::{
         self,
         contribution::{batch_verify_soks, Contribution, SoK},
         das, encryption_dlog, schnorr,
-        traits::{self, transcript::MalleableTranscript, HasEncryptionPublicParams},
+        traits::{
+            self, transcript::MalleableTranscript, AggregatableTranscript,
+            HasEncryptionPublicParams,
+        },
         LowDegreeTest, Player, ThresholdConfigBlstrs,
     },
     traits::transcript::Aggregatable,
@@ -104,7 +107,7 @@ impl traits::Transcript for Transcript {
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         _spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         aux: &A,
         dealer: &Player,
@@ -152,13 +155,81 @@ impl traits::Transcript for Transcript {
         }
     }
 
+    fn get_dealers(&self) -> Vec<Player> {
+        self.soks
+            .iter()
+            .map(|(p, _, _, _)| *p)
+            .collect::<Vec<Player>>()
+    }
+
+    fn get_public_key_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+    ) -> Self::DealtPubKeyShare {
+        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
+    }
+
+    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
+        Self::DealtPubKey::new(*self.V.last().unwrap())
+    }
+
+    fn decrypt_own_share(
+        &self,
+        _sc: &Self::SecretSharingConfig,
+        player: &Player,
+        dk: &Self::DecryptPrivKey,
+        _pp: &Self::PublicParameters,
+    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
+        let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
+        let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
+        let dealt_secret_key_share = ctxt.sub(ephemeral_key);
+        let dealt_pub_key_share = self.V[player.id]; // g_2^{f(\omega^i})
+
+        (
+            Self::DealtSecretKeyShare::new(Self::DealtSecretKey::new(dealt_secret_key_share)),
+            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)),
+        )
+    }
+
+    #[allow(non_snake_case)]
+    fn generate<R>(
+        sc: &Self::SecretSharingConfig,
+        _pp: &Self::PublicParameters,
+        rng: &mut R,
+    ) -> Self
+    where
+        R: rand_core::RngCore + rand_core::CryptoRng,
+    {
+        let sk = bls12381::PrivateKey::genesis();
+        Transcript {
+            soks: vec![(
+                sc.get_player(0),
+                random_g2_point(rng),
+                sk.sign(&Contribution::<G2Projective, usize> {
+                    comm: random_g2_point(rng),
+                    player: sc.get_player(0),
+                    aux: 0,
+                })
+                .unwrap(),
+                (random_g2_point(rng), random_scalar(rng)),
+            )],
+            hat_w: random_g2_point(rng),
+            V: insecure_random_g2_points(sc.n + 1, rng),
+            C: insecure_random_g1_points(sc.n, rng),
+            C_0: random_g1_point(rng),
+        }
+    }
+}
+
+impl AggregatableTranscript for Transcript {
     fn verify<A: Serialize + Clone>(
         &self,
         sc: &Self::SecretSharingConfig,
         pp: &Self::PublicParameters,
-        spks: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        auxs: &Vec<A>,
+        spks: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        auxs: &[A],
     ) -> anyhow::Result<()> {
         if eks.len() != sc.n {
             bail!("Expected {} encryption keys, but got {}", sc.n, eks.len());
@@ -239,72 +310,6 @@ impl traits::Transcript for Transcript {
         }
 
         return Ok(());
-    }
-
-    fn get_dealers(&self) -> Vec<Player> {
-        self.soks
-            .iter()
-            .map(|(p, _, _, _)| *p)
-            .collect::<Vec<Player>>()
-    }
-
-    fn get_public_key_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-    ) -> Self::DealtPubKeyShare {
-        Self::DealtPubKeyShare::new(Self::DealtPubKey::new(self.V[player.id]))
-    }
-
-    fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(*self.V.last().unwrap())
-    }
-
-    fn decrypt_own_share(
-        &self,
-        _sc: &Self::SecretSharingConfig,
-        player: &Player,
-        dk: &Self::DecryptPrivKey,
-        _pp: &Self::PublicParameters,
-    ) -> (Self::DealtSecretKeyShare, Self::DealtPubKeyShare) {
-        let ctxt = self.C[player.id]; // C_i = h_1^m \ek_i^r = h_1^m g_1^{r sk_i}
-        let ephemeral_key = self.C_0.mul(dk.dk); // (g_1^r)^{sk_i} = ek_i^r
-        let dealt_secret_key_share = ctxt.sub(ephemeral_key);
-        let dealt_pub_key_share = self.V[player.id]; // g_2^{f(\omega^i})
-
-        (
-            Self::DealtSecretKeyShare::new(Self::DealtSecretKey::new(dealt_secret_key_share)),
-            Self::DealtPubKeyShare::new(Self::DealtPubKey::new(dealt_pub_key_share)),
-        )
-    }
-
-    #[allow(non_snake_case)]
-    fn generate<R>(
-        sc: &Self::SecretSharingConfig,
-        _pp: &Self::PublicParameters,
-        rng: &mut R,
-    ) -> Self
-    where
-        R: rand_core::RngCore + rand_core::CryptoRng,
-    {
-        let sk = bls12381::PrivateKey::genesis();
-        Transcript {
-            soks: vec![(
-                sc.get_player(0),
-                random_g2_point(rng),
-                sk.sign(&Contribution::<G2Projective, usize> {
-                    comm: random_g2_point(rng),
-                    player: sc.get_player(0),
-                    aux: 0,
-                })
-                .unwrap(),
-                (random_g2_point(rng), random_scalar(rng)),
-            )],
-            hat_w: random_g2_point(rng),
-            V: insecure_random_g2_points(sc.n + 1, rng),
-            C: insecure_random_g1_points(sc.n, rng),
-            C_0: random_g1_point(rng),
-        }
     }
 }
 

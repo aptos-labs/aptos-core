@@ -34,7 +34,7 @@ const DST: &[u8] = b"APTOS_CHUNKED_ELGAMAL_FIELD_PVSS_DST"; // This DST will be 
 fn compute_powers_of_radix<E: Pairing>(ell: u8) -> Vec<E::ScalarField> {
     utils::powers(
         E::ScalarField::from(1u64 << ell),
-        num_chunks_per_scalar::<E>(ell) as usize,
+        num_chunks_per_scalar::<E::ScalarField>(ell) as usize,
     )
 }
 
@@ -142,7 +142,8 @@ impl<E: Pairing> PublicParameters<E> {
     /// Verifiably creates Aptos-specific public parameters.
     pub fn new<R: RngCore + CryptoRng>(max_num_shares: usize, ell: u8, rng: &mut R) -> Self {
         let max_num_chunks_padded =
-            ((max_num_shares * num_chunks_per_scalar::<E>(ell) as usize) + 1).next_power_of_two()
+            ((max_num_shares * num_chunks_per_scalar::<E::ScalarField>(ell) as usize) + 1)
+                .next_power_of_two()
                 - 1;
 
         let group_generators = GroupGenerators::default(); // TODO: At least one of these should come from a powers of tau ceremony?
@@ -165,6 +166,18 @@ impl<E: Pairing> PublicParameters<E> {
 
         pp
     }
+
+    /// Creates public parameters with a specified commitment base.
+    pub fn new_with_commitment_base<R: RngCore + CryptoRng>(
+        n: usize,
+        ell: u8,
+        commitment_base: E::G2Affine,
+        rng: &mut R,
+    ) -> Self {
+        let mut pp = Self::new(n, ell, rng);
+        pp.G_2 = commitment_base;
+        pp
+    }
 }
 
 impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
@@ -175,7 +188,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
-const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
+pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 
 impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking

@@ -689,6 +689,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-batch-encryption"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "aptos-crypto",
+ "aptos-dkg",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-ff-asm 0.5.0",
+ "ark-ff-macros 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "bcs 0.1.4",
+ "criterion",
+ "ed25519-dalek 2.1.1",
+ "generic-array",
+ "hmac 0.12.1",
+ "itertools 0.13.0",
+ "num-traits",
+ "rand 0.7.3",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "aptos-bcs-utils"
 version = "0.1.0"
 dependencies = [
@@ -2661,7 +2693,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-stream",
- "toml 0.7.8",
  "tonic 0.12.3",
  "url",
 ]
@@ -4534,6 +4565,7 @@ dependencies = [
  "aptos-transaction-emitter-lib",
  "aptos-transaction-workloads-lib",
  "clap 4.5.21",
+ "env_logger",
  "futures",
  "rand 0.7.3",
  "tokio",
@@ -8510,6 +8542,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
  "pkcs8 0.10.2",
+ "serde",
  "signature 2.2.0",
 ]
 
@@ -8522,6 +8555,7 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "ed25519 1.5.3",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde",
  "serde_bytes",
  "sha2 0.9.9",
@@ -8536,6 +8570,7 @@ checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
 dependencies = [
  "curve25519-dalek 4.1.2",
  "ed25519 2.2.3",
+ "rand_core 0.6.4",
  "serde",
  "sha2 0.10.8",
  "signature 2.2.0",
@@ -9752,6 +9787,7 @@ version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
+ "serde",
  "typenum",
  "version_check",
  "zeroize",
@@ -17112,6 +17148,7 @@ dependencies = [
  "cpufeatures",
  "digest 0.9.0",
  "opaque-debug",
+ "sha2-asm",
 ]
 
 [[package]]
@@ -17123,6 +17160,16 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest 0.10.7",
+ "sha2-asm",
+]
+
+[[package]]
+name = "sha2-asm"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab"
+dependencies = [
+ "cc",
 ]
 
 [[package]]
@@ -20293,13 +20340,3 @@ checksum = "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02"
 dependencies = [
  "simd-adler32",
 ]
-
-[[patch.unused]]
-name = "ark-bls12-381"
-version = "0.5.0-alpha.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-
-[[patch.unused]]
-name = "ark-bn254"
-version = "0.5.0-alpha.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"

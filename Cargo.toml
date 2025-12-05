@@ -56,6 +56,7 @@ members = [
     "crates/aptos",
     "crates/aptos-admin-service",
     "crates/aptos-api-tester",
+    "crates/aptos-batch-encryption",
     "crates/aptos-bcs-utils",
     "crates/aptos-bitvec",
     "crates/aptos-build-info",
@@ -600,7 +601,7 @@ dirs = "5.0.1"
 dirs-next = "2.0.0"
 dudect-bencher = "0.6"
 dunce = "1.0.4"
-ed25519-dalek = { version = "1.0.1", features = ["std", "serde"] }
+ed25519-dalek = { version = "1.0.1", features = ["asm", "rand_core", "std", "serde"] }
 ed25519-dalek-bip32 = "0.2.0"
 either = "1.6.1"
 enum_dispatch = "0.3.12"
@@ -628,6 +629,7 @@ fxhash = "0.2.1"
 fs2 = "0.4.3"
 getrandom = "0.2.2"
 gcp-bigquery-client = "0.16.8"
+generic-array = { version = "0.14.7", features = ["serde"] }
 get_if_addrs = "0.5.3"
 get-size = { version = "0.1.4", features = ["derive"] }
 git2 = "0.16.1"

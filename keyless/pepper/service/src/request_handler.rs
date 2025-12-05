@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     accounts::{
@@ -10,7 +10,10 @@ use crate::{
     },
     deployment_information::DeploymentInformation,
     error::PepperServiceError,
-    external_resources::{jwk_fetcher::JWKCache, resource_fetcher::CachedResources},
+    external_resources::{
+        jwk_types::{FederatedJWKIssuer, FederatedJWKs, JWKCache},
+        resource_fetcher::CachedResources,
+    },
     utils,
     vuf_keypair::VUFKeypair,
 };
@@ -70,6 +73,7 @@ async fn call_dedicated_request_handler<TRequest, TResponse, TRequestHandler>(
     request: Request<Body>,
     vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
+    federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
     cached_resources: CachedResources,
     request_handler: &TRequestHandler,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
@@ -105,6 +109,7 @@ where
         .handle_request(
             vuf_keypair,
             jwk_cache,
+            federated_jwks,
             cached_resources,
             pepper_request,
             account_recovery_managers,
@@ -311,6 +316,7 @@ pub async fn handle_request(
     request: Request<Body>,
     vuf_keypair: Arc<VUFKeypair>,
     jwk_cache: JWKCache,
+    federated_jwks: FederatedJWKs<FederatedJWKIssuer>,
     cached_resources: CachedResources,
     account_recovery_managers: Arc<AccountRecoveryManagers>,
     account_recovery_db: Arc<dyn AccountRecoveryDBInterface + Send + Sync>,
@@ -371,6 +377,7 @@ pub async fn handle_request(
                     request,
                     vuf_keypair.clone(),
                     jwk_cache,
+                    federated_jwks,
                     cached_resources,
                     &V0DelegatedFetchHandler,
                     account_recovery_managers,
@@ -384,6 +391,7 @@ pub async fn handle_request(
                     request,
                     vuf_keypair.clone(),
                     jwk_cache,
+                    federated_jwks,
                     cached_resources,
                     &V0FetchHandler,
                     account_recovery_managers,
@@ -397,6 +405,7 @@ pub async fn handle_request(
                     request,
                     vuf_keypair.clone(),
                     jwk_cache,
+                    federated_jwks,
                     cached_resources,
                     &V0SignatureHandler,
                     account_recovery_managers,
@@ -410,6 +419,7 @@ pub async fn handle_request(
                     request,
                     vuf_keypair.clone(),
                     jwk_cache,
+                    federated_jwks,
                     cached_resources,
                     &V0VerifyHandler,
                     account_recovery_managers,

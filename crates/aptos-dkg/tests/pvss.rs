@@ -6,19 +6,25 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
+#[cfg(test)]
+use aptos_crypto::SecretSharingConfig;
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
-    traits::SecretSharingConfig as _,
+    weighted_config::WeightedConfigArkworks,
 };
+#[cfg(test)]
+use aptos_dkg::pvss::traits::AggregatableTranscript;
 use aptos_dkg::pvss::{
     chunky, das,
     das::unweighted_protocol,
-    insecure_field, test_utils,
+    insecure_field, signed, test_utils,
     test_utils::{
         get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    traits::transcript::{Transcript, WithMaxNumShares},
+    traits::transcript::{
+        HasAggregatableSubtranscript, NonAggregatableTranscript, Transcript, WithMaxNumShares,
+    },
     GenericWeighting, ThresholdConfigBlstrs,
 };
 use rand::{rngs::StdRng, thread_rng};
@@ -33,6 +39,7 @@ fn test_pvss_all_unweighted() {
     //
     // Unweighted PVSS tests
     //
+    // TODO: might be better to grab (t,n) pairs, then intialise them for each PVSS using `new()` ? and consider renaming that `new_from_threshold()` ?
     let tcs = test_utils::get_threshold_configs_for_testing();
     for tc in tcs {
         println!("\nTesting {tc} PVSS");
@@ -54,11 +61,18 @@ fn test_pvss_all_unweighted() {
 
         let seed = random_scalar(&mut rng);
 
+        type ChunkyTranscript = chunky::Transcript<ark_bn254::Bn254>;
+
         // Chunky
-        pvss_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
+        pvss_nonaggregate_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
             &tc,
             seed.to_bytes_le(),
         );
+
+        pvss_deal_verify_and_reconstruct_from_subtranscript::<
+            <ChunkyTranscript as Transcript>::SecretSharingConfig,
+            ChunkyTranscript,
+        >(&tc, seed.to_bytes_le());
     }
 }
 
@@ -91,6 +105,23 @@ fn test_pvss_all_weighted() {
 
         // Provably-secure Das PVSS
         pvss_deal_verify_and_reconstruct::<das::WeightedTranscript>(&wc, seed.to_bytes_le());
+    }
+
+    // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead
+    let wcs = test_utils::get_weighted_configs_for_testing();
+    for wc in wcs {
+        println!("\nTesting {wc} PVSS");
+        let seed = random_scalar(&mut rng);
+
+        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+            ark_bn254::Bn254,
+            signed::GenericSigning<chunky::WeightedTranscript<ark_bn254::Bn254>>,
+        >(&wc, seed.to_bytes_le());
+
+        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+            ark_bn254::Bn254,
+            chunky::WeightedTranscript<ark_bn254::Bn254>,
+        >(&wc, seed.to_bytes_le());
     }
 }
 
@@ -157,7 +188,7 @@ fn print_transcript_size<T: Transcript>(size_type: &str, sc: &T::SecretSharingCo
 ///  2. Verifies the transcript.
 ///  3. Ensures the a sufficiently-large random subset of the players can recover the dealt secret
 #[cfg(test)]
-fn pvss_deal_verify_and_reconstruct<T: Transcript>(
+fn pvss_deal_verify_and_reconstruct<T: AggregatableTranscript>(
     sc: &T::SecretSharingConfig,
     seed_bytes: [u8; 32],
 ) {
@@ -179,7 +210,7 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript>(
         &sc.get_player(0),
         &mut rng,
     );
-    trx.verify(&sc, &d.pp, &vec![d.spks[0].clone()], &d.eks, &vec![NoAux])
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &[NoAux])
         .expect("PVSS transcript failed verification");
 
     // Test transcript (de)serialization
@@ -188,6 +219,125 @@ fn pvss_deal_verify_and_reconstruct<T: Transcript>(
 
     assert_eq!(trx, trx_deserialized);
     if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
+        panic!("Reconstructed SK did not match");
+    }
+}
+
+#[cfg(test)]
+fn pvss_nonaggregate_deal_verify_and_reconstruct<T: NonAggregatableTranscript>(
+    sc: &T::SecretSharingConfig,
+    seed_bytes: [u8; 32],
+) {
+    // println!();
+    // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
+    let mut rng = StdRng::from_seed(seed_bytes);
+
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+
+    // Test dealing
+    let trx = T::deal(
+        &sc,
+        &d.pp,
+        &d.ssks[0],
+        &d.spks[0],
+        &d.eks,
+        &d.s,
+        &NoAux,
+        &sc.get_player(0),
+        &mut rng,
+    );
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux)
+        .expect("PVSS transcript failed verification");
+
+    // Test transcript (de)serialization
+    let trx_deserialized = T::try_from(trx.to_bytes().as_slice())
+        .expect("serialized transcript should deserialize correctly");
+
+    assert_eq!(trx, trx_deserialized);
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
+        panic!("Reconstructed SK did not match");
+    }
+}
+
+use ark_ec::pairing::Pairing;
+// TODO: merge this stuff
+#[cfg(test)]
+fn pvss_nonaggregate_weighted_deal_verify_and_reconstruct<
+    E: Pairing,
+    T: NonAggregatableTranscript<SecretSharingConfig = WeightedConfigArkworks<E::ScalarField>>,
+>(
+    sc: &WeightedConfigArkworks<E::ScalarField>,
+    seed_bytes: [u8; 32],
+) {
+    // println!();
+    // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
+    let mut rng = StdRng::from_seed(seed_bytes);
+
+    let d = test_utils::setup_dealing_weighted::<E::ScalarField, T, StdRng>(sc, &mut rng);
+
+    // Test dealing
+    let trx = T::deal(
+        &sc,
+        &d.pp,
+        &d.ssks[0],
+        &d.spks[0],
+        &d.eks,
+        &d.s,
+        &NoAux,
+        &sc.get_player(0),
+        &mut rng,
+    );
+    trx.verify(&sc, &d.pp, &[d.spks[0].clone()], &d.eks, &NoAux)
+        .expect("PVSS transcript failed verification");
+
+    // Test transcript (de)serialization
+    let trx_deserialized = T::try_from(trx.to_bytes().as_slice())
+        .expect("serialized transcript should deserialize correctly");
+
+    assert_eq!(trx, trx_deserialized);
+    if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
+        panic!("Reconstructed SK did not match");
+    }
+}
+
+#[cfg(test)]
+fn pvss_deal_verify_and_reconstruct_from_subtranscript<
+    C: SecretSharingConfig,
+    T: Transcript<SecretSharingConfig = C> + HasAggregatableSubtranscript<C>,
+>(
+    sc: &T::SecretSharingConfig,
+    seed_bytes: [u8; 32],
+) {
+    // println!();
+    // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
+
+    use aptos_dkg::pvss::test_utils::reconstruct_dealt_secret_key_randomly_subtranscript;
+    let mut rng = StdRng::from_seed(seed_bytes);
+
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+
+    // Test dealing
+    let trx = T::deal(
+        &sc,
+        &d.pp,
+        &d.ssks[0],
+        &d.spks[0],
+        &d.eks,
+        &d.s,
+        &NoAux,
+        &sc.get_player(0),
+        &mut rng,
+    );
+
+    let trx = trx.get_subtranscript();
+
+    if d.dsk
+        != reconstruct_dealt_secret_key_randomly_subtranscript::<StdRng, T::SubTranscript>(
+            sc, &mut rng, &d.dks, trx, &d.pp,
+        )
     {
         panic!("Reconstructed SK did not match");
     }

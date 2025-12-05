@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! The purpose of this crate is to offer a single source of truth for the definitions of shared
 //! constants within the codebase. This is useful because many different components within

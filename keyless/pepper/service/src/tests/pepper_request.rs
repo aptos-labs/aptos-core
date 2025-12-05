@@ -1,11 +1,12 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     dedicated_handlers::pepper_request::handle_pepper_request,
     error::PepperServiceError,
     external_resources::{
-        jwk_fetcher, keyless_config::OnChainKeylessConfiguration, resource_fetcher::CachedResources,
+        jwk_fetcher, jwk_types::FederatedJWKs, keyless_config::OnChainKeylessConfiguration,
+        resource_fetcher::CachedResources,
     },
     tests::utils,
 };
@@ -34,8 +35,9 @@ async fn request_ephemeral_public_key_expired() {
     // Generate a VUF keypair
     let vuf_keypair = utils::create_vuf_keypair(None);
 
-    // Create a JWK cache and resource cache
+    // Create a JWK cache, federated JWKs, and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
+    let federated_jwks = FederatedJWKs::new_empty();
     let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
@@ -55,6 +57,7 @@ async fn request_ephemeral_public_key_expired() {
     let pepper_result = handle_pepper_request(
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         jwt,
         generate_ephemeral_public_key(),
@@ -80,8 +83,9 @@ async fn request_ephemeral_public_key_expiry_too_large() {
     // Generate a VUF keypair
     let vuf_keypair = utils::create_vuf_keypair(None);
 
-    // Create a JWK cache and resource cache
+    // Create a JWK cache, federated JWKs, and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
+    let federated_jwks = FederatedJWKs::new_empty();
     let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
@@ -101,6 +105,7 @@ async fn request_ephemeral_public_key_expiry_too_large() {
     let pepper_result = handle_pepper_request(
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         jwt,
         generate_ephemeral_public_key(),
@@ -126,8 +131,9 @@ async fn request_invalid_oath_nonce() {
     // Generate a VUF keypair
     let vuf_keypair = utils::create_vuf_keypair(None);
 
-    // Create a JWK cache and resource cache
+    // Create a JWK cache, federated JWKs, and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
+    let federated_jwks = FederatedJWKs::new_empty();
     let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
@@ -147,6 +153,7 @@ async fn request_invalid_oath_nonce() {
     let pepper_result = handle_pepper_request(
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         jwt,
         generate_ephemeral_public_key(),
@@ -172,8 +179,9 @@ async fn request_invalid_jwt() {
     // Generate a VUF keypair
     let vuf_keypair = utils::create_vuf_keypair(None);
 
-    // Create a JWK cache and resource cache
+    // Create a JWK cache, federated JWKs, and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
+    let federated_jwks = FederatedJWKs::new_empty();
     let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
@@ -183,6 +191,7 @@ async fn request_invalid_jwt() {
     let pepper_result = handle_pepper_request(
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         "invalid jwt string".into(),
         generate_ephemeral_public_key(),
@@ -207,6 +216,7 @@ async fn request_invalid_jwt_signature() {
 
     // Create a JWK cache and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
+    let federated_jwks = FederatedJWKs::new_empty();
     let cached_resources = CachedResources::new_for_testing();
 
     // Update the JWK cache
@@ -244,6 +254,7 @@ async fn request_invalid_jwt_signature() {
     let pepper_result = handle_pepper_request(
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         jwt,
         ephemeral_public_key,
@@ -266,8 +277,9 @@ async fn request_max_exp_data_secs_overflowed() {
     // Generate a VUF keypair
     let vuf_keypair = utils::create_vuf_keypair(None);
 
-    // Create a JWK cache and resource cache
+    // Create a JWK cache, federated JWKs, and resource cache
     let jwk_cache = Arc::new(Mutex::new(HashMap::new()));
+    let federated_jwks = FederatedJWKs::new_empty();
     let cached_resources = CachedResources::new_for_testing();
 
     // Update the keyless config cached resource
@@ -287,6 +299,7 @@ async fn request_max_exp_data_secs_overflowed() {
     let pepper_result = handle_pepper_request(
         vuf_keypair,
         jwk_cache,
+        federated_jwks,
         cached_resources,
         jwt,
         generate_ephemeral_public_key(),
