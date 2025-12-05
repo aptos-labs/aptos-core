@@ -221,19 +221,19 @@ impl BatchThresholdEncryption for FPTXWeighted {
     type MasterSecretKeyShare = WeightedBIBEMasterSecretKeyShare;
     type PreparedCiphertext = PreparedCiphertext;
     type Round = u64;
-    type SubTranscript = aptos_dkg::pvss::chunky::SubTranscript<group::Pairing>;
+    type SubTranscript = aptos_dkg::pvss::chunky::WeightedSubTranscript<Pairing>;
     type ThresholdConfig = aptos_crypto::weighted_config::WeightedConfigArkworks<Fr>;
     type VerificationKey = WeightedBIBEVerificationKey;
 
     fn setup(
-        _digest_key: &Self::DigestKey,
-        _pvss_public_params: &<Self::SubTranscript as SubTranscript>::PublicParameters,
-        _subtranscript_happypath: &Self::SubTranscript,
-        _subtranscript_slowpath: &Self::SubTranscript,
-        _tc_happypath: &Self::ThresholdConfig,
-        _tc_slowpath: &Self::ThresholdConfig,
-        _current_player: Player,
-        _msk_share_decryption_key: &<Self::SubTranscript as SubTranscript>::DecryptPrivKey,
+        digest_key: &Self::DigestKey,
+        pvss_public_params: &<Self::SubTranscript as SubTranscript>::PublicParameters,
+        subtranscript_happypath: &Self::SubTranscript,
+        subtranscript_slowpath: &Self::SubTranscript,
+        tc_happypath: &Self::ThresholdConfig,
+        tc_slowpath: &Self::ThresholdConfig,
+        current_player: Player,
+        msk_share_decryption_key: &<Self::SubTranscript as SubTranscript>::DecryptPrivKey,
     ) -> Result<(
         Self::EncryptionKey,
         Vec<Self::VerificationKey>,
@@ -241,7 +241,78 @@ impl BatchThresholdEncryption for FPTXWeighted {
         Vec<Self::VerificationKey>,
         Self::MasterSecretKeyShare,
     )> {
-        panic!("Will implement this once weighted PVSS is done")
+        (subtranscript_happypath.get_dealt_public_key()
+            == subtranscript_slowpath.get_dealt_public_key())
+        .then_some(())
+        .ok_or(BatchEncryptionError::HappySlowPathMismatchError)?;
+
+        let mpk_g2: G2Affine = subtranscript_happypath.get_dealt_public_key().as_g2();
+
+        let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
+
+        let vks_happypath = tc_happypath
+            .get_players()
+            .into_iter()
+            .map(|p| Self::VerificationKey {
+                weighted_player: p,
+                mpk_g2,
+                vks_g2: subtranscript_happypath
+                    .get_public_key_share(tc_happypath, &p)
+                    .into_iter().map(|s| s.as_g2())
+                    .collect(),
+            })
+            .collect();
+
+        let vks_slowpath = tc_slowpath
+            .get_players()
+            .into_iter()
+            .map(|p| Self::VerificationKey {
+                weighted_player: p,
+                mpk_g2,
+                vks_g2: subtranscript_happypath
+                    .get_public_key_share(tc_happypath, &p)
+                    .into_iter().map(|s| s.as_g2())
+                    .collect(),
+            })
+            .collect();
+
+        let msk_share_happypath = Self::MasterSecretKeyShare {
+            mpk_g2,
+            weighted_player: current_player,
+            shamir_share_evals: subtranscript_happypath
+                .decrypt_own_share(
+                    tc_happypath,
+                    &current_player,
+                    msk_share_decryption_key,
+                    pvss_public_params,
+                )
+                .0
+                .into_iter().map(|s| s.into_fr())
+                .collect(),
+        };
+
+        let msk_share_slowpath = Self::MasterSecretKeyShare {
+            mpk_g2,
+            weighted_player: current_player,
+            shamir_share_evals: subtranscript_slowpath
+                .decrypt_own_share(
+                    tc_slowpath,
+                    &current_player,
+                    msk_share_decryption_key,
+                    pvss_public_params,
+                )
+                .0
+                .into_iter().map(|s| s.into_fr())
+                .collect(),
+        };
+
+        Ok((
+            ek,
+            vks_happypath,
+            msk_share_happypath,
+            vks_slowpath,
+            msk_share_slowpath,
+        ))
     }
 
     fn setup_for_testing(
