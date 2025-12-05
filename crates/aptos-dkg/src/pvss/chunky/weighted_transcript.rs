@@ -284,7 +284,6 @@ type SokContext<'a, A: Serialize + Clone> = (
     Vec<u8>, // This is for the DST
 );
 
-
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
 {
@@ -467,9 +466,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         Transcript {
             dealer: sc.get_player(0),
             subtrs: SubTranscript {
-                Vs: sc.group_by_player(
-                    &unsafe_random_points::<E::G2, _>(sc.get_total_weight() + 1, rng)
-                ),
+                Vs: sc.group_by_player(&unsafe_random_points::<E::G2, _>(
+                    sc.get_total_weight() + 1,
+                    rng,
+                )),
                 Cs: (0..sc.get_total_num_players())
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...

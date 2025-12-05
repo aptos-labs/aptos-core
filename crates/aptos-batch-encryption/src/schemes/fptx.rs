@@ -107,7 +107,7 @@ impl BatchThresholdEncryption for FPTX {
 
         let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
 
-        let vks_happypath : Vec<Self::VerificationKey> = tc_happypath
+        let vks_happypath: Vec<Self::VerificationKey> = tc_happypath
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
@@ -119,7 +119,7 @@ impl BatchThresholdEncryption for FPTX {
             })
             .collect();
 
-        let vks_slowpath : Vec<Self::VerificationKey> = tc_slowpath
+        let vks_slowpath: Vec<Self::VerificationKey> = tc_slowpath
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
@@ -159,10 +159,14 @@ impl BatchThresholdEncryption for FPTX {
                 .into_fr(),
         };
 
-
-
-        for (vks, msk_share) in [(&vks_happypath, &msk_share_happypath), (&vks_slowpath, &msk_share_slowpath)] {
-            (vks[msk_share.player.get_id()].vk_g2 == G2Affine::generator() * msk_share.shamir_share_eval).then_some(()).ok_or(BatchEncryptionError::VKMSKMismatchError)?;
+        for (vks, msk_share) in [
+            (&vks_happypath, &msk_share_happypath),
+            (&vks_slowpath, &msk_share_slowpath),
+        ] {
+            (vks[msk_share.player.get_id()].vk_g2
+                == G2Affine::generator() * msk_share.shamir_share_eval)
+                .then_some(())
+                .ok_or(BatchEncryptionError::VKMSKMismatchError)?;
         }
 
         Ok((

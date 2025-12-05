@@ -60,7 +60,6 @@ pub type WeightedConfigBlstrs = WeightedConfig<ThresholdConfigBlstrs>;
 #[allow(type_alias_bounds)]
 pub type WeightedConfigArkworks<F: FftField> = WeightedConfig<ShamirThresholdConfig<F>>;
 
-
 impl<TC: ThresholdConfig> WeightedConfig<TC> {
     #[allow(non_snake_case)]
     /// Initializes a weighted secret sharing configuration with threshold weight `threshold_weight`

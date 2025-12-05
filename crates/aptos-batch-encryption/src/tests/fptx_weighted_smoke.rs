@@ -116,7 +116,7 @@ use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript
+        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
     },
 };
 
