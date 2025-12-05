@@ -51,7 +51,7 @@ impl WeightedBIBEMasterSecretKeyShare {
             mpk_g2: virtualized_msk_shares[0].mpk_g2,
             weighted_player,
             shamir_share_evals: virtualized_msk_shares
-                .into_iter()
+                .iter()
                 .map(|share| share.shamir_share_eval)
                 .collect()
         }
@@ -108,7 +108,7 @@ impl WeightedBIBEVerificationKey {
             mpk_g2: virtualized_vks[0].mpk_g2,
             weighted_player,
             vks_g2: virtualized_vks
-                .into_iter()
+                .iter()
                 .map(|share| share.vk_g2)
                 .collect()
         }
@@ -137,8 +137,7 @@ impl WeightedBIBEVerificationKey {
             vk_g2: *vk_g2,
             player: self.weighted_player, // arbitrary
         }).zip(&dk_share.1)
-            .map(|(vk, dk_share)| vk.verify_decryption_key_share(digest, &(self.weighted_player, dk_share.clone())))
-            .collect::<Result<()>>()
+            .try_for_each(|(vk, dk_share)| vk.verify_decryption_key_share(digest, &(self.weighted_player, dk_share.clone())))
     }
 }
 
