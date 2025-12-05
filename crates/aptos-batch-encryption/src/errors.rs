@@ -6,6 +6,8 @@ use thiserror::Error;
 pub enum BatchEncryptionError {
     #[error("Tried to setup w/ happy path MPK that doesn't match slow path MPK")]
     HappySlowPathMismatchError,
+    #[error("Tried to setup w/ VK that does not match MSK share")]
+    VKMSKMismatchError,
     #[error("Serialization error")]
     SerializationError,
     #[error("Deserialization error")]

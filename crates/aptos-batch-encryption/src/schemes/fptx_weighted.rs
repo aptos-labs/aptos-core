@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 use crate::{
     errors::BatchEncryptionError,
-    group::{self, *},
+    group::*,
     schemes::fptx::{self, EncryptionKey},
     shared::{
         ark_serialize::*,
@@ -27,6 +27,7 @@ use aptos_dkg::pvss::{
     traits::{Reconstructable as _, SubTranscript},
     Player,
 };
+use ark_ec::AffineRepr;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
@@ -250,7 +251,7 @@ impl BatchThresholdEncryption for FPTXWeighted {
 
         let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
 
-        let vks_happypath = tc_happypath
+        let vks_happypath : Vec<Self::VerificationKey> = tc_happypath
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
@@ -263,14 +264,14 @@ impl BatchThresholdEncryption for FPTXWeighted {
             })
             .collect();
 
-        let vks_slowpath = tc_slowpath
+        let vks_slowpath : Vec<Self::VerificationKey> = tc_slowpath
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
                 weighted_player: p,
                 mpk_g2,
-                vks_g2: subtranscript_happypath
-                    .get_public_key_share(tc_happypath, &p)
+                vks_g2: subtranscript_slowpath
+                    .get_public_key_share(tc_slowpath, &p)
                     .into_iter().map(|s| s.as_g2())
                     .collect(),
             })
@@ -305,6 +306,11 @@ impl BatchThresholdEncryption for FPTXWeighted {
                 .into_iter().map(|s| s.into_fr())
                 .collect(),
         };
+
+        for (vks, msk_share) in [(&vks_happypath, &msk_share_happypath), (&vks_slowpath, &msk_share_slowpath)] {
+            vks[msk_share.weighted_player.get_id()].vks_g2.iter().zip(msk_share.shamir_share_evals.clone())
+            .try_for_each(|(vk_raw, msk_share_raw)| (G2Projective::from(*vk_raw) == G2Affine::generator() * msk_share_raw).then_some(()).ok_or(BatchEncryptionError::VKMSKMismatchError))?;
+        }
 
         Ok((
             ek,

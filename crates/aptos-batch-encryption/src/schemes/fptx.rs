@@ -24,6 +24,7 @@ use aptos_dkg::pvss::{
     traits::{Reconstructable as _, SubTranscript},
     Player,
 };
+use ark_ec::AffineRepr as _;
 use ark_ff::UniformRand as _;
 use ark_std::rand::{rngs::StdRng, CryptoRng, RngCore, SeedableRng};
 use rayon::iter::{IntoParallelIterator, ParallelIterator as _};
@@ -106,7 +107,7 @@ impl BatchThresholdEncryption for FPTX {
 
         let ek = EncryptionKey::new(mpk_g2, digest_key.tau_g2);
 
-        let vks_happypath = tc_happypath
+        let vks_happypath : Vec<Self::VerificationKey> = tc_happypath
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
@@ -118,7 +119,7 @@ impl BatchThresholdEncryption for FPTX {
             })
             .collect();
 
-        let vks_slowpath = tc_slowpath
+        let vks_slowpath : Vec<Self::VerificationKey> = tc_slowpath
             .get_players()
             .into_iter()
             .map(|p| Self::VerificationKey {
@@ -130,7 +131,7 @@ impl BatchThresholdEncryption for FPTX {
             })
             .collect();
 
-        let msk_share_happypath = BIBEMasterSecretKeyShare {
+        let msk_share_happypath = Self::MasterSecretKeyShare {
             mpk_g2,
             player: current_player,
             shamir_share_eval: subtranscript_happypath
@@ -144,7 +145,7 @@ impl BatchThresholdEncryption for FPTX {
                 .into_fr(),
         };
 
-        let msk_share_slowpath = BIBEMasterSecretKeyShare {
+        let msk_share_slowpath = Self::MasterSecretKeyShare {
             mpk_g2,
             player: current_player,
             shamir_share_eval: subtranscript_slowpath
@@ -157,6 +158,12 @@ impl BatchThresholdEncryption for FPTX {
                 .0
                 .into_fr(),
         };
+
+
+
+        for (vks, msk_share) in [(&vks_happypath, &msk_share_happypath), (&vks_slowpath, &msk_share_slowpath)] {
+            (vks[msk_share.player.get_id()].vk_g2 == G2Affine::generator() * msk_share.shamir_share_eval).then_some(()).ok_or(BatchEncryptionError::VKMSKMismatchError)?;
+        }
 
         Ok((
             ek,

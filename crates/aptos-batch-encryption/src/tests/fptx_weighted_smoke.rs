@@ -7,6 +7,7 @@ use crate::{
 };
 use anyhow::Result;
 use aptos_crypto::{weighted_config::WeightedConfigArkworks, SecretSharingConfig as _};
+use ark_ec::AffineRepr as _;
 use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
 fn weighted_smoke_with_setup<R: RngCore + CryptoRng>(
@@ -115,7 +116,7 @@ use aptos_crypto::{SigningKey, Uniform};
 use aptos_dkg::pvss::{
     test_utils::NoAux,
     traits::{
-        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
+        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript
     },
 };
 
@@ -127,7 +128,7 @@ fn weighted_smoke_with_pvss() {
     let tc_happy = WeightedConfigArkworks::new(5, vec![1, 2, 5]).unwrap();
     let tc_slow = WeightedConfigArkworks::new(3, vec![1, 2, 5]).unwrap();
     let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
-        tc_happy.get_total_num_players(),
+        tc_happy.get_total_weight(),
         aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
         G2Affine::generator(),
         &mut rng_aptos,
