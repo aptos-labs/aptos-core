@@ -936,6 +936,12 @@ module aptos_framework::staking_contract {
         distribute_events: &mut EventHandle<DistributeEvent>
     ) acquires BeneficiaryForOperator {
         let pool_address = staking_contract.pool_address;
+        // Create the Staker resource if it doesn't exist to backfill the Staker resource for each pool.
+        if (!exists<Staker>(pool_address)) {
+            let pool_signer =
+                &account::create_signer_with_capability(&staking_contract.signer_cap);
+            move_to(pool_signer, Staker { staker });
+        };
         let (_, inactive, _, pending_inactive) = stake::get_stake(pool_address);
         let total_potential_withdrawable = inactive + pending_inactive;
         let coins =
