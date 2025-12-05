@@ -18,12 +18,9 @@
 #![allow(clippy::borrow_interior_mutable_const)]
 
 use crate::pvss::{traits, Player};
-use aptos_crypto::{
-    arkworks::{
-        random::{sample_field_element, UniformRand},
-        shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
-    },
-    weighted_config::WeightedConfigArkworks,
+use aptos_crypto::arkworks::{
+    random::{sample_field_element, UniformRand},
+    shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
 };
 pub use aptos_crypto::{
     blstrs as algebra,
@@ -97,6 +94,10 @@ impl<E: Pairing> Scalar<E> {
     pub fn vecvecvec_from_inner(vvv: Vec<Vec<Vec<E::ScalarField>>>) -> Vec<Vec<Vec<Self>>> {
         vvv.into_iter().map(Self::vecvec_from_inner).collect()
     }
+
+    pub fn into_fr(&self) -> E::ScalarField {
+        self.0
+    }
 }
 
 impl<E: Pairing> UniformRand for Scalar<E> {
@@ -125,7 +126,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             .collect();
 
         Ok(Scalar(E::ScalarField::reconstruct(
-            &sc,
+            sc,
             &shares_destructured,
         )?))
     }
@@ -133,39 +134,39 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
 
 // TODO: make this stuff more generic, like blstrs....
 // TODO: can make stuff more generic... what if we make a thresholdconfig a weightedconfig with weights 1?
-impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
-    Reconstructable<WeightedConfigArkworks<E::ScalarField>> for Scalar<E>
-{
-    type ShareValue = Vec<Scalar<E>>;
-
-    fn reconstruct(
-        sc: &WeightedConfigArkworks<E::ScalarField>,
-        shares: &[ShamirShare<Self::ShareValue>],
-    ) -> anyhow::Result<Self> {
-        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
-
-        // println!();
-        for (player, sub_shares) in shares {
-            // println!(
-            //     "Flattening {} share(s) for player {player}",
-            //     sub_shares.len()
-            // );
-            for (pos, share) in sub_shares.iter().enumerate() {
-                let virtual_player = sc.get_virtual_player(player, pos);
-
-                // println!(
-                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
-                //     share
-                // );
-                // TODO(Performance): Avoiding the cloning here might be nice
-                let tuple = (virtual_player, share.clone());
-                flattened_shares.push(tuple);
-            }
-        }
-
-        assert_ge!(flattened_shares.len(), sc.get_threshold_weight());
-        assert_le!(flattened_shares.len(), sc.get_total_weight());
-
-        Scalar::<E>::reconstruct(sc.get_threshold_config(), &flattened_shares)
-    }
-}
+//impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
+//    Reconstructable<WeightedConfigArkworks<E::ScalarField>> for Scalar<E>
+//{
+//    type ShareValue = Vec<Scalar<E>>;
+//
+//    fn reconstruct(
+//        sc: &WeightedConfigArkworks<E::ScalarField>,
+//        shares: &[ShamirShare<Self::ShareValue>],
+//    ) -> anyhow::Result<Self> {
+//        let mut flattened_shares = Vec::with_capacity(sc.get_total_weight());
+//
+//        // println!();
+//        for (player, sub_shares) in shares {
+//            // println!(
+//            //     "Flattening {} share(s) for player {player}",
+//            //     sub_shares.len()
+//            // );
+//            for (pos, share) in sub_shares.iter().enumerate() {
+//                let virtual_player = sc.get_virtual_player(player, pos);
+//
+//                // println!(
+//                //     " + Adding share {pos} as virtual player {virtual_player}: {:?}",
+//                //     share
+//                // );
+//                // TODO(Performance): Avoiding the cloning here might be nice
+//                let tuple = (virtual_player, share.clone());
+//                flattened_shares.push(tuple);
+//            }
+//        }
+//
+//        assert_ge!(flattened_shares.len(), sc.get_threshold_weight());
+//        assert_le!(flattened_shares.len(), sc.get_total_weight());
+//
+//        Scalar::<E>::reconstruct(sc.get_threshold_config(), &flattened_shares)
+//    }
+//}

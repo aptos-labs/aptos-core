@@ -20,10 +20,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEMasterSecretKeyShare {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    mpk_g2: G2Affine,
-    player: Player,
+    pub(crate) mpk_g2: G2Affine,
+    pub(crate) player: Player,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    shamir_share_eval: Fr,
+    pub(crate) shamir_share_eval: Fr,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -54,10 +54,10 @@ pub struct BIBEMasterPublicKey(pub(crate) G2Affine);
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct BIBEVerificationKey {
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    mpk_g2: G2Affine,
+    pub(crate) mpk_g2: G2Affine,
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
-    vk_g2: G2Affine,
-    player: Player,
+    pub(crate) vk_g2: G2Affine,
+    pub(crate) player: Player,
 }
 
 impl VerificationKey for BIBEVerificationKey {

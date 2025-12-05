@@ -10,5 +10,6 @@ mod public_parameters;
 mod transcript;
 mod weighted_transcript;
 
-pub use transcript::Transcript;
+pub use public_parameters::DEFAULT_ELL_FOR_TESTING;
+pub use transcript::{SubTranscript, Transcript};
 pub use weighted_transcript::Transcript as WeightedTranscript;

@@ -166,6 +166,18 @@ impl<E: Pairing> PublicParameters<E> {
 
         pp
     }
+
+    /// Creates public parameters with a specified commitment base.
+    pub fn new_with_commitment_base<R: RngCore + CryptoRng>(
+        n: usize,
+        ell: u8,
+        commitment_base: E::G2Affine,
+        rng: &mut R,
+    ) -> Self {
+        let mut pp = Self::new(n, ell, rng);
+        pp.G_2 = commitment_base;
+        pp
+    }
 }
 
 impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
@@ -176,7 +188,7 @@ impl<E: Pairing> ValidCryptoMaterial for PublicParameters<E> {
     }
 }
 
-const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
+pub const DEFAULT_ELL_FOR_TESTING: u8 = 16; // TODO: made this a const to emphasize that the parameter is completely fixed wherever this value used (namely below), might not be ideal
 
 impl<E: Pairing> Default for PublicParameters<E> {
     // This is only used for testing and benchmarking
