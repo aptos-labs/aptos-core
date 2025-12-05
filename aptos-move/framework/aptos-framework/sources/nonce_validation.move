@@ -222,8 +222,8 @@ module aptos_framework::nonce_validation {
             let existing_exp_time = bucket.nonce_to_exp_time_map.get(&nonce_key);
             if (existing_exp_time.is_some()) {
                 let existing_exp_time = existing_exp_time.extract();
-                // We store the nonce in nonce history for `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` seconds after it expires.
-                if (timestamp::now_seconds() <= existing_exp_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS) {
+                // We store the nonce in nonce history for `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS` seconds after it expires.
+                if (timestamp::now_seconds() <= existing_exp_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS) {
                     return false;
                 };
             };
@@ -249,7 +249,7 @@ module aptos_framework::nonce_validation {
         timestamp::fast_forward_seconds(120);
         // Nonce (0x5, 1234) expires at `begin_time + 50`.
         // Nonce (0x5, 1234) will be garbage collected after
-        // `begin_time + 50 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` seconds.
+        // `begin_time + 50 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS` seconds.
         assert!(!check_if_nonce_exists_in_history(@0x5, 1234));
         timestamp::fast_forward_seconds(1);
         assert!(check_if_nonce_exists_in_history(@0x5, 1234));
@@ -259,7 +259,7 @@ module aptos_framework::nonce_validation {
         // We are currently at `begin_time + 151` seconds.
         // The nonce is still stored in nonce history.
         // But another nonce with expiry time higher than
-        // `begin_time + 85 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` can still be inserted.
+        // `begin_time + 85 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS` can still be inserted.
         assert!(!check_if_nonce_exists_in_history(@0x5, 1235));
         assert!(!check_and_insert_nonce(@0x5, 1235, begin_time + 185));
         assert!(check_and_insert_nonce(@0x5, 1235, begin_time + 186));
