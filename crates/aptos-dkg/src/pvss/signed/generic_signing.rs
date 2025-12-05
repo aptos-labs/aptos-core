@@ -15,6 +15,9 @@ use serde::{Deserialize, Serialize};
 
 /// A generic transformation from a non-malleable PVSS to a signed and non-malleable PVSS.
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
+
+/// The transcript after applying this transform, will consist of the original transcript plus a BLS12-381 signature
+/// of its dealt pub key and session id
 pub struct GenericSigning<T> {
     trs: T,
     sig: bls12381::Signature,
@@ -40,7 +43,7 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericSigning<T> {
 
 #[derive(Serialize, Deserialize, CryptoHasher, BCSCryptoHash)]
 pub struct SessionContribution<C, S> {
-    pub contrib: C, // the transcript's contribution, to be signed
+    pub contrib: C, // the transcript's contribution (the dealt pub key), to be signed
     pub sid: S,     // the session id
 }
 

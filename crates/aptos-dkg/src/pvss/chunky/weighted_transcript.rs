@@ -42,7 +42,7 @@ use aptos_crypto::{
     },
     bls12381::{self},
     utils,
-    weighted_config::WeightedConfigArkworks,
+    weighted_config::{unflatten_by_weights, WeightedConfigArkworks},
     CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{
@@ -76,6 +76,10 @@ pub struct Transcript<E: Pairing> {
     CanonicalSerialize, CanonicalDeserialize, Serialize, Deserialize, Clone, Debug, PartialEq, Eq,
 )]
 pub struct SubTranscript<E: Pairing> {
+    // The dealt public key
+    #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
+    pub V0: E::G2,
+    // The dealt public key shares
     #[serde(serialize_with = "ark_se", deserialize_with = "ark_de")]
     pub Vs: Vec<Vec<E::G2>>,
     /// First chunked ElGamal component: C[i][j] = s_{i,j} * G + r_j * ek_i. Here s_i = \sum_j s_{i,j} * B^j // TODO: change notation because B is not a group element?
@@ -137,16 +141,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     ) -> Self::DealtPubKeyShare {
         self.Vs[player.id]
             .iter()
-            .map(|V_i| {
-                let affine = V_i.into_affine();
-
-                keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(affine))
-            })
+            .map(|&V_i| keys::DealtPubKeyShare::<E>::new(keys::DealtPubKey::new(V_i.into_affine())))
             .collect()
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.Vs.last().expect("V is empty somehow")[0].into_affine())
+        Self::DealtPubKey::new(self.V0.into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -210,7 +210,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         }
 
         (
-            sk_shares, pk_shares, // TODO: review this formalism... wh ydo we need this here?
+            sk_shares, pk_shares, // TODO: review this formalism... why do we need this here?
         )
     }
 }
@@ -232,7 +232,7 @@ impl<E: Pairing> Aggregatable<SecretSharingConfig<E>> for SubTranscript<E> {
             }
         }
 
-        self.Vs[sc.get_total_num_players()][0] += other.Vs[sc.get_total_num_players()][0];
+        self.V0 += other.V0;
 
         for i in 0..self.Rs.len() {
             for (r_self, r_other) in self.Rs[i].iter_mut().zip(&other.Rs[i]) {
@@ -282,8 +282,6 @@ type SokContext<'a, A: Serialize + Clone> = (
     usize,   // This is for the player id
     Vec<u8>, // This is for the DST
 );
-
-use aptos_crypto::weighted_config::unflatten_by_weights;
 
 impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits::Transcript
     for Transcript<E>
@@ -357,12 +355,12 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
-        let mut Vs = unflatten_by_weights(&flattened_Vs, sc);
-        Vs.push(vec![*flattened_Vs.last().unwrap()]);
+        let Vs = unflatten_by_weights(&flattened_Vs, sc); // This won't use the last item in `flattened_Vs` because of `sc`
+        let V0 = *flattened_Vs.last().unwrap();
 
         Transcript {
             dealer: *dealer,
-            subtrs: SubTranscript { Vs, Cs, Rs },
+            subtrs: SubTranscript { V0, Vs, Cs, Rs },
             sharing_proof,
         }
     }
@@ -388,7 +386,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
     }
 
     fn get_dealt_public_key(&self) -> Self::DealtPubKey {
-        Self::DealtPubKey::new(self.subtrs.Vs.last().expect("V is empty somehow")[0].into_affine())
+        Self::DealtPubKey::new(self.subtrs.V0.into_affine())
     }
 
     #[allow(non_snake_case)]
@@ -467,8 +465,9 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         Transcript {
             dealer: sc.get_player(0),
             subtrs: SubTranscript {
+                V0: unsafe_random_point::<E::G2, _>(rng),
                 Vs: unflatten_by_weights(
-                    &unsafe_random_points::<E::G2, _>(sc.get_total_weight() + 1, rng),
+                    &unsafe_random_points::<E::G2, _>(sc.get_total_weight(), rng),
                     sc,
                 ),
                 Cs: (0..sc.get_total_num_players())
@@ -520,7 +519,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
                 self.subtrs.Cs.len()
             );
         }
-        if self.subtrs.Vs.len() != sc.get_total_num_players() + 1 {
+        if self.subtrs.Vs.len() != sc.get_total_num_players() {
             bail!(
                 "Expected {} commitment elements, but got {}",
                 sc.get_total_num_players() + 1,
@@ -580,7 +579,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
             true,
             &sc.get_threshold_config().domain,
         ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
-        let Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
+        let mut Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
+        Vs_flat.push(self.subtrs.V0);
         // could add an assert_eq here with sc.get_total_weight()
         ldt.low_degree_test_group(&Vs_flat)?;
 
@@ -612,7 +612,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
             .expect("Failed to compute MSM of Cs in chunky");
 
         let weighted_Vs = E::G2::msm(
-            &E::G2::normalize_batch(&Vs_flat[..sc.get_total_weight()]),
+            &E::G2::normalize_batch(&Vs_flat[..sc.get_total_weight()]), // Don't use the last entry of `Vs_flat`
             &powers_of_beta[..sc.get_total_weight()],
         )
         .expect("Failed to compute MSM of Vs in chunky");
