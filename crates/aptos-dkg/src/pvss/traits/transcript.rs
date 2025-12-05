@@ -80,7 +80,8 @@ pub trait SubTranscript: Debug + ValidCryptoMaterial + Clone + PartialEq + Eq {
     type DealtPubKeyShare: Debug + PartialEq + Clone;
     type DealtSecretKeyShare: PartialEq + Clone;
     type DealtPubKey: Serialize; // So it can get signed
-    type DealtSecretKey: PartialEq + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
+    type DealtSecretKey: PartialEq
+        + Reconstructable<Self::SecretSharingConfig, ShareValue = Self::DealtSecretKeyShare>;
     type EncryptPubKey: Debug
         + Clone
         + ValidCryptoMaterial

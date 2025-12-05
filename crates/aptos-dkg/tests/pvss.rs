@@ -14,7 +14,6 @@ use aptos_crypto::{
 };
 #[cfg(test)]
 use aptos_dkg::pvss::traits::AggregatableTranscript;
-use aptos_dkg::pvss::traits::transcript::HasAggregatableSubtranscript;
 use aptos_dkg::pvss::{
     chunky, das,
     das::unweighted_protocol,
@@ -23,7 +22,9 @@ use aptos_dkg::pvss::{
         get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    traits::transcript::{NonAggregatableTranscript, Transcript, WithMaxNumShares},
+    traits::transcript::{
+        HasAggregatableSubtranscript, NonAggregatableTranscript, Transcript, WithMaxNumShares,
+    },
     GenericWeighting, ThresholdConfigBlstrs,
 };
 use rand::{rngs::StdRng, thread_rng};
@@ -68,7 +69,6 @@ fn test_pvss_all_unweighted() {
             seed.to_bytes_le(),
         );
 
-
         pvss_deal_verify_and_reconstruct_from_subtranscript::<
             <ChunkyTranscript as Transcript>::SecretSharingConfig,
             ChunkyTranscript,
@@ -105,23 +105,23 @@ fn test_pvss_all_weighted() {
 
         // Provably-secure Das PVSS
         pvss_deal_verify_and_reconstruct::<das::WeightedTranscript>(&wc, seed.to_bytes_le());
+    }
 
-        // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead
-        let wcs = test_utils::get_weighted_configs_for_testing();
-        for wc in wcs {
-            println!("\nTesting {wc} PVSS");
-            let seed = random_scalar(&mut rng);
+    // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead
+    let wcs = test_utils::get_weighted_configs_for_testing();
+    for wc in wcs {
+        println!("\nTesting {wc} PVSS");
+        let seed = random_scalar(&mut rng);
 
-            pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
-                ark_bn254::Bn254,
-                signed::GenericSigning<chunky::WeightedTranscript<ark_bn254::Bn254>>,
-            >(&wc, seed.to_bytes_le());
+        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+            ark_bn254::Bn254,
+            signed::GenericSigning<chunky::WeightedTranscript<ark_bn254::Bn254>>,
+        >(&wc, seed.to_bytes_le());
 
-            pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
-                ark_bn254::Bn254,
-                chunky::WeightedTranscript<ark_bn254::Bn254>,
-            >(&wc, seed.to_bytes_le());
-        }
+        pvss_nonaggregate_weighted_deal_verify_and_reconstruct::<
+            ark_bn254::Bn254,
+            chunky::WeightedTranscript<ark_bn254::Bn254>,
+        >(&wc, seed.to_bytes_le());
     }
 }
 

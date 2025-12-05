@@ -18,11 +18,9 @@
 #![allow(clippy::borrow_interior_mutable_const)]
 
 use crate::pvss::{traits, Player};
-use aptos_crypto::{
-    arkworks::{
-        random::{sample_field_element, UniformRand},
-        shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
-    },
+use aptos_crypto::arkworks::{
+    random::{sample_field_element, UniformRand},
+    shamir::{Reconstructable, ShamirShare, ShamirThresholdConfig},
 };
 pub use aptos_crypto::{
     blstrs as algebra,
@@ -96,6 +94,7 @@ impl<E: Pairing> Scalar<E> {
     pub fn vecvecvec_from_inner(vvv: Vec<Vec<Vec<E::ScalarField>>>) -> Vec<Vec<Vec<Self>>> {
         vvv.into_iter().map(Self::vecvec_from_inner).collect()
     }
+
     pub fn into_fr(&self) -> E::ScalarField {
         self.0
     }
@@ -127,7 +126,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>>
             .collect();
 
         Ok(Scalar(E::ScalarField::reconstruct(
-            &sc,
+            sc,
             &shares_destructured,
         )?))
     }
