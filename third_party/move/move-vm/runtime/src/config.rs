@@ -51,6 +51,8 @@ pub struct VMConfig {
     pub enable_layout_caches: bool,
     pub propagate_dependency_limit_error: bool,
     pub enable_framework_for_option: bool,
+    /// Same as enable_function_caches, but gates missed gating for native dynamic dispatch.
+    pub enable_function_caches_for_native_dynamic_dispatch: bool,
 }
 
 impl Default for VMConfig {
@@ -78,6 +80,7 @@ impl Default for VMConfig {
             enable_layout_caches: true,
             propagate_dependency_limit_error: true,
             enable_framework_for_option: true,
+            enable_function_caches_for_native_dynamic_dispatch: true,
         }
     }
 }
