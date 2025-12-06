@@ -16,7 +16,7 @@ Order book type definitions
     -  [Fields:](#@Fields:_0)
 -  [Enum `OrderMatch`](#0x7_order_book_types_OrderMatch)
     -  [Fields:](#@Fields:_1)
--  [Struct `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
+-  [Enum `ActiveMatchedOrder`](#0x7_order_book_types_ActiveMatchedOrder)
 -  [Constants](#@Constants_2)
 -  [Function `single_order_type`](#0x7_order_book_types_single_order_type)
 -  [Function `bulk_order_type`](#0x7_order_book_types_bulk_order_type)
@@ -572,13 +572,21 @@ particular match operation.
 
 <a id="0x7_order_book_types_ActiveMatchedOrder"></a>
 
-## Struct `ActiveMatchedOrder`
+## Enum `ActiveMatchedOrder`
 
 
 
-<pre><code><b>struct</b> <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> <b>has</b> <b>copy</b>, drop
+<pre><code>enum <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> <b>has</b> <b>copy</b>, drop
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -612,6 +620,10 @@ particular match operation.
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -1904,7 +1916,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_new_active_matched_order">new_active_matched_order</a>(
     order_id: <a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, matched_size: u64, remaining_size: u64, order_book_type: <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a>
 ): <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> {
-    <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> { order_id, matched_size, remaining_size, order_book_type }
+    ActiveMatchedOrder::V1 { order_id, matched_size, remaining_size, order_book_type }
 }
 </code></pre>
 
@@ -1930,7 +1942,7 @@ This should only be called on bulk orders, aborts if called for non-bulk order.
 <pre><code><b>public</b>(<b>friend</b>) <b>fun</b> <a href="order_book_types.md#0x7_order_book_types_destroy_active_matched_order">destroy_active_matched_order</a>(
     self: <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a>
 ): (<a href="order_book_types.md#0x7_order_book_types_OrderIdType">OrderIdType</a>, u64, u64, <a href="order_book_types.md#0x7_order_book_types_OrderType">OrderType</a>) {
-    <b>let</b> <a href="order_book_types.md#0x7_order_book_types_ActiveMatchedOrder">ActiveMatchedOrder</a> { order_id, matched_size, remaining_size, order_book_type } = self;
+    <b>let</b> ActiveMatchedOrder::V1 { order_id, matched_size, remaining_size, order_book_type } = self;
     (order_id, matched_size, remaining_size, order_book_type)
 }
 </code></pre>

@@ -13,10 +13,10 @@
 -  [Enum `MarketClearinghouseCallbacks`](#0x7_market_types_MarketClearinghouseCallbacks)
 -  [Enum `Market`](#0x7_market_types_Market)
 -  [Enum `MarketConfig`](#0x7_market_types_MarketConfig)
--  [Struct `OrderEvent`](#0x7_market_types_OrderEvent)
--  [Struct `BulkOrderPlacedEvent`](#0x7_market_types_BulkOrderPlacedEvent)
--  [Struct `BulkOrderModifiedEvent`](#0x7_market_types_BulkOrderModifiedEvent)
--  [Struct `BulkOrderFilledEvent`](#0x7_market_types_BulkOrderFilledEvent)
+-  [Enum `OrderEvent`](#0x7_market_types_OrderEvent)
+-  [Enum `BulkOrderPlacedEvent`](#0x7_market_types_BulkOrderPlacedEvent)
+-  [Enum `BulkOrderModifiedEvent`](#0x7_market_types_BulkOrderModifiedEvent)
+-  [Enum `BulkOrderFilledEvent`](#0x7_market_types_BulkOrderFilledEvent)
 -  [Constants](#@Constants_0)
 -  [Function `order_status_open`](#0x7_market_types_order_status_open)
 -  [Function `order_status_filled`](#0x7_market_types_order_status_filled)
@@ -619,14 +619,22 @@
 
 <a id="0x7_market_types_OrderEvent"></a>
 
-## Struct `OrderEvent`
+## Enum `OrderEvent`
 
 
 
 <pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="market_types.md#0x7_market_types_OrderEvent">OrderEvent</a> <b>has</b> <b>copy</b>, drop, store
+enum <a href="market_types.md#0x7_market_types_OrderEvent">OrderEvent</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -738,16 +746,28 @@
 
 </details>
 
+</details>
+
+</details>
+
 <a id="0x7_market_types_BulkOrderPlacedEvent"></a>
 
-## Struct `BulkOrderPlacedEvent`
+## Enum `BulkOrderPlacedEvent`
 
 
 
 <pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="market_types.md#0x7_market_types_BulkOrderPlacedEvent">BulkOrderPlacedEvent</a> <b>has</b> <b>copy</b>, drop, store
+enum <a href="market_types.md#0x7_market_types_BulkOrderPlacedEvent">BulkOrderPlacedEvent</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -841,19 +861,31 @@
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
 <a id="0x7_market_types_BulkOrderModifiedEvent"></a>
 
-## Struct `BulkOrderModifiedEvent`
+## Enum `BulkOrderModifiedEvent`
 
 
 
 <pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="market_types.md#0x7_market_types_BulkOrderModifiedEvent">BulkOrderModifiedEvent</a> <b>has</b> <b>copy</b>, drop, store
+enum <a href="market_types.md#0x7_market_types_BulkOrderModifiedEvent">BulkOrderModifiedEvent</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -950,16 +982,28 @@
 
 </details>
 
+</details>
+
+</details>
+
 <a id="0x7_market_types_BulkOrderFilledEvent"></a>
 
-## Struct `BulkOrderFilledEvent`
+## Enum `BulkOrderFilledEvent`
 
 
 
 <pre><code>#[<a href="../../aptos-framework/doc/event.md#0x1_event">event</a>]
-<b>struct</b> <a href="market_types.md#0x7_market_types_BulkOrderFilledEvent">BulkOrderFilledEvent</a> <b>has</b> <b>copy</b>, drop, store
+enum <a href="market_types.md#0x7_market_types_BulkOrderFilledEvent">BulkOrderFilledEvent</a> <b>has</b> <b>copy</b>, drop, store
 </code></pre>
 
+
+
+<details>
+<summary>Variants</summary>
+
+
+<details>
+<summary>V1</summary>
 
 
 <details>
@@ -1029,6 +1073,10 @@
 </dd>
 </dl>
 
+
+</details>
+
+</details>
 
 </details>
 
@@ -2388,7 +2436,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
         <b>let</b> metadata_bytes =
             callbacks.<a href="market_types.md#0x7_market_types_get_order_metadata_bytes">get_order_metadata_bytes</a>(&metadata);
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market_types.md#0x7_market_types_OrderEvent">OrderEvent</a> {
+            OrderEvent::V1 {
                 parent: self.parent,
                 market: self.market,
                 order_id: order_id.get_order_id_value(),
@@ -2448,7 +2496,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market_types.md#0x7_market_types_BulkOrderPlacedEvent">BulkOrderPlacedEvent</a> {
+            BulkOrderPlacedEvent::V1 {
                 parent: self.parent,
                 market: self.market,
                 order_id: order_id.get_order_id_value(),
@@ -2501,7 +2549,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market_types.md#0x7_market_types_BulkOrderModifiedEvent">BulkOrderModifiedEvent</a> {
+            BulkOrderModifiedEvent::V1 {
                 parent: self.parent,
                 market: self.market,
                 order_id: order_id.get_order_id_value(),
@@ -2555,7 +2603,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market_types.md#0x7_market_types_BulkOrderFilledEvent">BulkOrderFilledEvent</a> {
+            BulkOrderFilledEvent::V1 {
                 parent: self.parent,
                 market: self.market,
                 order_id: order_id.get_order_id_value(),
@@ -2608,7 +2656,7 @@ call the <code>place_order_with_order_id</code> API to place the order with the 
     // Final check whether <a href="../../aptos-framework/doc/event.md#0x1_event">event</a> sending is enabled
     <b>if</b> (self.config.allow_events_emission) {
         <a href="../../aptos-framework/doc/event.md#0x1_event_emit">event::emit</a>(
-            <a href="market_types.md#0x7_market_types_BulkOrderModifiedEvent">BulkOrderModifiedEvent</a> {
+            BulkOrderModifiedEvent::V1 {
                 parent: self.parent,
                 market: self.market,
                 order_id: order_id.get_order_id_value(),
