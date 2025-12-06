@@ -944,6 +944,20 @@ impl TransactionPayload {
     pub fn is_encrypted_variant(&self) -> bool {
         matches!(self, Self::EncryptedPayload(_))
     }
+
+    pub fn as_encrypted_payload(&self) -> Option<&EncryptedPayload> {
+        match self {
+            Self::EncryptedPayload(payload) => Some(payload),
+            _ => None,
+        }
+    }
+
+    pub fn as_encrypted_payload_mut(&mut self) -> Option<&mut EncryptedPayload> {
+        match self {
+            Self::EncryptedPayload(payload) => Some(payload),
+            _ => None,
+        }
+    }
 }
 
 impl TransactionExtraConfig {
@@ -1303,6 +1317,10 @@ impl SignedTransaction {
 
     pub fn is_encrypted_txn(&self) -> bool {
         self.payload().is_encrypted_variant()
+    }
+
+    pub fn payload_mut(&mut self) -> &mut TransactionPayload {
+        &mut self.raw_txn.payload
     }
 }
 
