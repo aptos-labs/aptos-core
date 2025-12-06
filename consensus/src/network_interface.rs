@@ -7,7 +7,10 @@ use crate::{
     dag::DAGNetworkMessage,
     pipeline,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::network_messages::RandGenMessage,
+    rand::{
+        rand_gen::network_messages::RandGenMessage,
+        secret_sharing::network_messages::SecretShareNetworkMessage,
+    },
 };
 use aptos_config::network_id::{NetworkId, PeerNetworkId};
 use aptos_consensus_types::{
@@ -97,6 +100,8 @@ pub enum ConsensusMsg {
     SignedBatchInfoMsgV2(Box<SignedBatchInfoMsg<BatchInfoExt>>),
     /// Quorum Store: Broadcast a certified proof of store (a digest that received 2f+1 votes) with BatchInfoExt.
     ProofOfStoreMsgV2(Box<ProofOfStoreMsg<BatchInfoExt>>),
+    /// Secret share message: Used to share secrets per consensus round
+    SecretShareMsg(SecretShareNetworkMessage),
 }
 
 /// Network type for consensus
@@ -130,6 +135,7 @@ impl ConsensusMsg {
             ConsensusMsg::BatchMsgV2(_) => "BatchMsgV2",
             ConsensusMsg::SignedBatchInfoMsgV2(_) => "SignedBatchInfoMsgV2",
             ConsensusMsg::ProofOfStoreMsgV2(_) => "ProofOfStoreMsgV2",
+            ConsensusMsg::SecretShareMsg(_) => "SecretShareMsg",
         }
     }
 }

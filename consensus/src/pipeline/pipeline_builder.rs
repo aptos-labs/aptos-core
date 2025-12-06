@@ -314,6 +314,7 @@ impl PipelineBuilder {
                 order_vote_tx: Some(order_vote_tx),
                 order_proof_tx: Some(order_proof_tx),
                 commit_proof_tx: Some(commit_proof_tx),
+                secret_sharing_key_tx: None,
             },
             PipelineInputRx {
                 qc_rx,
@@ -347,6 +348,7 @@ impl PipelineBuilder {
         let post_ledger_update_fut = spawn_ready_fut(());
         let notify_state_sync_fut = spawn_ready_fut(());
         let post_commit_fut = spawn_ready_fut(());
+        let secret_sharing_derive_self_fut = spawn_ready_fut(None);
         PipelineFutures {
             prepare_fut,
             rand_check_fut,
@@ -358,6 +360,7 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
+            secret_sharing_derive_self_fut,
         }
     }
 
@@ -552,6 +555,8 @@ impl PipelineBuilder {
             ),
             None,
         );
+        let secret_sharing_derive_self_fut = spawn_ready_fut(None);
+
         let all_fut = PipelineFutures {
             prepare_fut,
             rand_check_fut,
@@ -563,6 +568,7 @@ impl PipelineBuilder {
             notify_state_sync_fut,
             commit_ledger_fut,
             post_commit_fut,
+            secret_sharing_derive_self_fut,
         };
         tokio::spawn(Self::monitor(
             block.epoch(),
@@ -1126,6 +1132,7 @@ impl PipelineBuilder {
             notify_state_sync_fut: _,
             commit_ledger_fut,
             post_commit_fut: _,
+            secret_sharing_derive_self_fut: _,
         } = all_futs;
         wait_and_log_error(prepare_fut, format!("{epoch} {round} {block_id} prepare")).await;
         wait_and_log_error(execute_fut, format!("{epoch} {round} {block_id} execute")).await;
