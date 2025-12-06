@@ -3,6 +3,7 @@
 
 use crate::types::humio::UnstructuredLog;
 use anyhow::anyhow;
+use debug_ignore::DebugIgnore;
 use flate2::{write::GzEncoder, Compression};
 use reqwest::{Client as ReqwestClient, Url};
 use reqwest_middleware::{ClientBuilder, ClientWithMiddleware};
@@ -14,9 +15,9 @@ pub const PEER_ROLE_TAG_NAME: &str = "peer_role";
 pub const CHAIN_ID_TAG_NAME: &str = "chain_id";
 pub const RUN_UUID_TAG_NAME: &str = "run_uuid";
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct IngestClient {
-    inner: ClientWithMiddleware,
+    inner: DebugIgnore<ClientWithMiddleware>,
     base_url: Url,
     auth_token: String,
 }
@@ -28,7 +29,7 @@ impl IngestClient {
             .with(RetryTransientMiddleware::new_with_policy(retry_policy))
             .build();
         Self {
-            inner,
+            inner: DebugIgnore(inner),
             base_url,
             auth_token,
         }
@@ -44,6 +45,7 @@ impl IngestClient {
         let compressed_bytes = gzip_encoder.finish()?;
 
         self.inner
+            .0
             .post(self.base_url.join("api/v1/ingest/humio-unstructured")?)
             .bearer_auth(self.auth_token.clone())
             .header("Content-Encoding", "gzip")

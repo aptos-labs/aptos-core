@@ -133,6 +133,8 @@ pub(crate) enum ServiceErrorCode {
     LogIngestError(#[from] LogIngestError),
     #[error("metrics ingest error: {0}")]
     MetricsIngestError(#[from] MetricsIngestError),
+    #[error("storage provider authentication error: {0}")]
+    CustomContractAuthError(String, ChainId),
 }
 
 #[derive(Debug)]

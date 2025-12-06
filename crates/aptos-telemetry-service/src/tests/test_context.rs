@@ -18,8 +18,27 @@ use warp::{
 };
 
 pub async fn new_test_context() -> TestContext {
+    new_test_context_with_auth(None).await
+}
+
+pub async fn new_test_context_with_auth(
+    on_chain_auth_config: Option<crate::OnChainAuthConfig>,
+) -> TestContext {
     let mut rng = ::rand::rngs::StdRng::from_seed([0u8; 32]);
     let server_private_key = x25519::PrivateKey::generate(&mut rng);
+
+    // Convert the single auth config into the new multi-contract format for testing
+    let custom_contract_configs = if let Some(auth_config) = on_chain_auth_config {
+        vec![crate::CustomContractConfig {
+            name: "test_contract".to_string(),
+            on_chain_auth: auth_config,
+            metrics_sinks: None,
+            logs_sink: None,
+            events_sink: None,
+        }]
+    } else {
+        Vec::new()
+    };
 
     let config = TelemetryServiceConfig {
         address: format!("{}:{}", "127.0.0.1", 80).parse().unwrap(),
@@ -37,21 +56,48 @@ pub async fn new_test_context() -> TestContext {
         peer_identities: HashMap::new(),
         metrics_endpoints_config: MetricsEndpointsConfig::default_for_test(),
         humio_ingest_config: LogIngestConfig::default_for_test(),
+        custom_contract_configs,
+        allowlist_cache_ttl_secs: 10, // Short TTL for testing
     };
 
     let peers = PeerStoreTuple::default();
     let jwt_service = JsonWebTokenService::from_base64_secret(&base64::encode("jwt_secret_key"));
 
+    // Build custom contract clients if configured
+    let custom_contract_clients = if !config.custom_contract_configs.is_empty() {
+        let mut instances = HashMap::new();
+        for cc_config in &config.custom_contract_configs {
+            instances.insert(
+                cc_config.name.clone(),
+                crate::context::CustomContractInstance {
+                    config: cc_config.on_chain_auth.clone(),
+                    metrics_clients: HashMap::new(),
+                    logs_client: None,
+                    bigquery_client: None,
+                },
+            );
+        }
+        Some(crate::context::CustomContractClients { instances })
+    } else {
+        None
+    };
+
     TestContext::new(
-        config,
+        config.clone(),
         Context::new(
             server_private_key,
             peers,
-            ClientTuple::new(None, Some(GroupedMetricsClients::new_empty()), None),
+            ClientTuple::new(
+                None,
+                Some(GroupedMetricsClients::new_empty()),
+                None,
+                custom_contract_clients,
+            ),
             jwt_service,
             HashMap::new(),
             HashMap::new(),
             Arc::new(RwLock::new(HashMap::new())),
+            config.allowlist_cache_ttl_secs,
         ),
     )
 }

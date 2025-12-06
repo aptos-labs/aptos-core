@@ -1,0 +1,42 @@
+[package]
+name = "telemetry-test-client"
+version = "0.1.0"
+edition = "2021"
+description = "Test client for Aptos Telemetry Service custom contract endpoints"
+license = "Apache-2.0"
+publish = false
+
+[[bin]]
+name = "telemetry-test-client"
+path = "src/main.rs"
+
+[dependencies]
+
+# Utils
+anyhow = "1.0"
+# Aptos dependencies (use workspace)
+aptos-crypto = { workspace = true }
+aptos-telemetry-service = { workspace = true }
+aptos-types = { workspace = true }
+chrono = "0.4"
+
+# CLI and config
+clap = { version = "4.5", features = ["derive", "env"] }
+ed25519-dalek = "2.1"
+flate2 = "1.0"
+getrandom = "0.2"
+hex = "0.4"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json", "gzip"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+toml = "0.8"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
