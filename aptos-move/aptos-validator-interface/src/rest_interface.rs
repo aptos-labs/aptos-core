@@ -22,7 +22,10 @@ use aptos_types::{
 };
 use async_recursion::async_recursion;
 use move_core_types::language_storage::ModuleId;
+use rand::Rng;
 use std::collections::HashMap;
+
+const SAMPLING_BOUND: u32 = 10;
 
 pub struct RestDebuggerInterface(Client);
 
@@ -251,7 +254,15 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             .0
             .get_persisted_auxiliary_infos(start, limit)
             .await
-            .map_err(|e| anyhow!("Failed to get auxiliary info: {}", e))?;
+            .unwrap_or_else(|_e| {
+                // Instead of returning an error, return a Vec filled with PersistedAuxiliaryInfo::None
+                (0..limit).map(|_| PersistedAuxiliaryInfo::None).collect()
+            });
+        // let auxiliary_infos = self
+        //     .0
+        //     .get_persisted_auxiliary_infos(start, limit)
+        //     .await
+        //     .map_err(|e| anyhow!("Failed to get auxiliary info: {}", e))?;
 
         Ok((txns, txn_infos, auxiliary_infos))
     }
@@ -269,6 +280,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                 HashMap<(AccountAddress, String), PackageMetadata>,
             ),
         >,
+        sampling: u32,
     ) -> Result<
         Vec<(
             u64,
@@ -280,6 +292,7 @@ impl AptosValidatorInterface for RestDebuggerInterface {
             )>,
         )>,
     > {
+        let sampling = sampling % (SAMPLING_BOUND + 1);
         let mut txns = Vec::with_capacity(limit as usize);
         let (tns, infos, _auxiliary_infos) = self.get_committed_transactions(start, limit).await?;
         let temp_txns = tns
@@ -320,6 +333,13 @@ impl AptosValidatorInterface for RestDebuggerInterface {
                         // For publish txn, we remove all items in the package_cache where module_id.address is the sender of this txn
                         // to update the new package in the cache.
                         package_cache.retain(|k, _| k.address != signed_trans.sender());
+                    }
+                    // sampling when txns to obtain is more than 1
+                    if limit > 1 {
+                        let num = rand::thread_rng().gen_range(0, SAMPLING_BOUND);
+                        if num >= sampling {
+                            continue;
+                        }
                     }
                     if !filter_condition.check_source_code {
                         txns.push((version, txn.clone(), None));

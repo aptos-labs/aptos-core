@@ -94,6 +94,7 @@ impl AptosValidatorInterface for DBDebuggerInterface {
                 HashMap<(AccountAddress, String), PackageMetadata>,
             ),
         >,
+        _sampling: u32,
     ) -> Result<
         Vec<(
             u64,
