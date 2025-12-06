@@ -17,6 +17,8 @@ pub const GRPC_REQUEST_NAME_HEADER: &str = "x-aptos-request-name";
 pub const GRPC_API_GATEWAY_API_KEY_HEADER: &str = "authorization";
 // Limit the message size to 15MB. By default the downstream can receive up to 15MB.
 pub const MESSAGE_SIZE_LIMIT: usize = 1024 * 1024 * 15;
+// Default maximum size in bytes for transaction filters.
+pub const DEFAULT_MAX_TRANSACTION_FILTER_SIZE_BYTES: usize = 10_000;
 
 // These come from API Gateway, see here:
 // https://github.com/aptos-labs/api-gateway/blob/0aae1c17fbd0f5e9b50bdb416f62b48d3d1d5e6b/src/common.rs
