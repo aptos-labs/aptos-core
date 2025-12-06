@@ -1,0 +1,37 @@
+
+Diagnostics:
+warning: [lint] local `recipient` may be zero address when calling 0x42::zero_address_checks::transfer
+  ┌─ tests/stackless_bytecode_lints/zero_address.move:6:9
+  │
+6 │         transfer(recipient);
+  │         ^^^^^^^^^^^^^^^^^^^
+  │
+  = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(zero_address)]`.
+  = For more information, see https://aptos.dev/en/build/smart-contracts/linter#zero_address.
+
+warning: [lint] local `recipient` may be zero address when calling 0x42::zero_address_checks::transfer
+   ┌─ tests/stackless_bytecode_lints/zero_address.move:35:9
+   │
+35 │         transfer(recipient);
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(zero_address)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#zero_address.
+
+warning: [lint] local `recipient` may be zero address when calling 0x42::zero_address_checks::transfer
+   ┌─ tests/stackless_bytecode_lints/zero_address.move:41:9
+   │
+41 │         transfer(recipient_copy);
+   │         ^^^^^^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(zero_address)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#zero_address.
+
+warning: [lint] local `recipient` may be zero address when calling 0x42::zero_address_checks::transfer
+   ┌─ tests/stackless_bytecode_lints/zero_address.move:61:9
+   │
+61 │         transfer(recipient);
+   │         ^^^^^^^^^^^^^^^^^^^
+   │
+   = To suppress this warning, annotate the function/module with the attribute `#[lint::skip(zero_address)]`.
+   = For more information, see https://aptos.dev/en/build/smart-contracts/linter#zero_address.
