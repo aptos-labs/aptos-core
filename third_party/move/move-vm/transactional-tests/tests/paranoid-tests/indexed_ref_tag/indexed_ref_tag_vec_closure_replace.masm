@@ -1,0 +1,64 @@
+// Purpose: closure payload borrow becomes stale after replacing element with new variant.
+// Flow:
+//   (1) build data = [Foo::A(zero), Foo::B(one)]
+//   (2) borrow closure_ref = &data[0].A::c (closure indexed ref)
+//   (3) replace data[0] with Foo::B(one) via vec_mut_borrow/write_ref
+//   (4) read_ref/call_closure on closure_ref -> aborts (tag changed to B)
+// Diagram (step 2)                    Diagram (step 3)
+//   data[0] ──▶ Foo::A { c: zero } ◀── closure_ref   data[0] ──▶ Foo::B { c: one }
+//   data[1] ──▶ Foo::B { c: one }                   closure_ref ──▶ stale expectation (tag A)
+
+//# publish
+module 0xc0ffe6::vector_closure_confusion
+
+
+enum Foo has drop
+  A
+    c: ||u64 has copy+drop+store
+  B
+    c: ||u64 has copy+drop+store
+
+#[persistent] fun zero(): u64
+    ld_u64 0
+    ret
+
+#[persistent] fun one(): u64
+    ld_u64 1
+    ret
+
+public fun stale_vec_closure_replace()
+    local data: vector<Foo>
+    local closure_ref: &||u64 has copy+drop+store
+
+    // Build vector [Foo::A {zero}, Foo::B {one}]
+    pack_closure zero, 0
+    pack_variant Foo, A
+    pack_closure one, 0
+    pack_variant Foo, B
+    vec_pack<Foo> 2
+    st_loc data
+
+    // Borrow closure from element 0
+    borrow_loc data
+    ld_u64 0
+    vec_borrow<Foo>
+    borrow_variant_field Foo, A::c
+    st_loc closure_ref
+
+    // Replace element 0 with Foo::B {one} while stale ref exists
+    pack_closure one, 0
+    pack_variant Foo, B
+    mut_borrow_loc data
+    ld_u64 0
+    vec_mut_borrow<Foo>
+    write_ref
+
+    // Attempt to call stale closure (should fail before call)
+    move_loc closure_ref
+    read_ref
+    call_closure<||u64>
+    pop
+    ret
+
+//# run 0xc0ffe6::vector_closure_confusion::stale_vec_closure_replace --verbose
+

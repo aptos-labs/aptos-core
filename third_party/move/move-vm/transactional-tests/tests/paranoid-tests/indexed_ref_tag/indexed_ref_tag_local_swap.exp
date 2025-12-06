@@ -1,0 +1,3 @@
+processed 2 tasks
+task 0 lines 14-54:  publish [module 0xc0ffe4::local_swap]
+task 1 lines 56-56:  run 0xc0ffe4::local_swap::stale_mem_swap --verbose

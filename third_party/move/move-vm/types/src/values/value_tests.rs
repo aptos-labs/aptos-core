@@ -267,15 +267,16 @@ fn test_vector_unchecked() {
 mod indexed_ref_tests {
     use crate::{
         delayed_values::delayed_field_id::DelayedFieldID,
-        values::{AbstractFunction, Locals, Struct, StructRef, Value, VectorRef},
+        values::{AbstractFunction, Locals, Reference, Struct, StructRef, Value, VectorRef},
     };
     use better_any::{Tid, TidAble};
     use claims::{assert_matches, assert_ok};
-    use move_binary_format::errors::PartialVMResult;
+    use move_binary_format::{errors::PartialVMResult, file_format::VariantIndex};
     use move_core_types::{
         account_address::AccountAddress,
         function::ClosureMask,
         int256::{I256, U256},
+        vm_status::StatusCode,
     };
     use std::cmp::Ordering;
 
@@ -423,6 +424,112 @@ mod indexed_ref_tests {
                 assert_matches!(elem, Value::ContainerRef(_));
             }
         }
+    }
+
+    fn variant_to_str(idx: VariantIndex) -> String {
+        format!("variant {idx}")
+    }
+
+    #[test]
+    fn enum_indexed_ref_tag_propagates() -> PartialVMResult<()> {
+        // Variant borrow should succeed when the variant tag matches one of the allowed tags.
+        let allowed = [0u16];
+        let mut locals = Locals::new(1);
+        // Store a single-variant enum with tag 0 into locals.
+        locals.store_loc(
+            0,
+            Value::struct_(Struct::pack_variant(allowed[0], vec![Value::u64(10)])),
+        )?;
+        let struct_ref: StructRef = locals.borrow_loc(0)?.value_as()?;
+
+        // Reading through the borrowed variant field should succeed and surface the payload.
+        let read_ref: Reference = struct_ref
+            .borrow_variant_field(&allowed, 0, &variant_to_str)?
+            .value_as()?;
+        assert!(read_ref.read_ref()?.equals(&Value::u64(10))?);
+
+        // Writing through the same borrowed reference should also succeed.
+        let write_ref: Reference = struct_ref
+            .borrow_variant_field(&allowed, 0, &variant_to_str)?
+            .value_as()?;
+        assert_ok!(write_ref.write_ref(Value::u64(11)));
+
+        // Equality checks between fresh borrows should pass when tags align.
+        let eq_left = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+        let eq_right = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+        assert!(eq_left.equals(&eq_right)?);
+
+        // Comparison checks should similarly respect matching tags.
+        let cmp_left = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+        let cmp_right = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+        assert_eq!(Ordering::Equal, cmp_left.compare(&cmp_right)?);
+
+        Ok(())
+    }
+
+    #[test]
+    fn enum_indexed_ref_tag_mismatch_rejected() -> PartialVMResult<()> {
+        let allowed = [0u16];
+        let mut locals = Locals::new(1);
+        locals.store_loc(
+            0,
+            Value::struct_(Struct::pack_variant(allowed[0], vec![Value::u64(10)])),
+        )?;
+        let struct_ref: StructRef = locals.borrow_loc(0)?.value_as()?;
+
+        let stale_read: Reference = struct_ref
+            .borrow_variant_field(&allowed, 0, &variant_to_str)?
+            .value_as()?;
+        let stale_write: Reference = struct_ref
+            .borrow_variant_field(&allowed, 0, &variant_to_str)?
+            .value_as()?;
+        let stale_eq_left = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+        let stale_eq_right = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+        let stale_cmp_left = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+        let stale_cmp_right = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str)?;
+
+        let tag_ref: Reference = struct_ref.borrow_field(0)?.value_as()?;
+        assert_ok!(tag_ref.write_ref(Value::u16(1)));
+
+        let err = stale_read
+            .read_ref()
+            .expect_err("tag check must fail on read");
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
+
+        let err = stale_write
+            .write_ref(Value::u64(99))
+            .expect_err("tag check must fail on write");
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
+
+        let err = stale_eq_left
+            .equals(&stale_eq_right)
+            .expect_err("tag check must fail on equals");
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
+
+        let err = stale_cmp_left
+            .compare(&stale_cmp_right)
+            .expect_err("tag check must fail on compare");
+        assert!(err
+            .message()
+            .map(|m| m.starts_with("invalid enum tag"))
+            .unwrap_or(false));
+
+        if let Err(err) = struct_ref.borrow_variant_field(&allowed, 0, &variant_to_str) {
+            assert_eq!(StatusCode::STRUCT_VARIANT_MISMATCH, err.major_status());
+        } else {
+            panic!("variant borrow should fail when tag is changed");
+        }
+
+        Ok(())
     }
 }
 
