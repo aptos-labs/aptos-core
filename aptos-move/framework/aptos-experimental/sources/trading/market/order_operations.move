@@ -2,12 +2,11 @@
 /// It includes functions for canceling orders by order ID, canceling orders by client order ID,
 /// and reducing the size of existing orders.
 module aptos_experimental::order_operations {
+    friend aptos_experimental::dead_mans_switch_operations;
+
     use std::option;
     use std::string::String;
-    use aptos_experimental::market_types::{
-        MarketClearinghouseCallbacks,
-        Market,
-    };
+    use aptos_experimental::market_types::{Self, MarketClearinghouseCallbacks, Market};
     use aptos_experimental::order_book_types::{
         OrderIdType,
         single_order_type
@@ -33,11 +32,14 @@ module aptos_experimental::order_operations {
     ///   It it the caller's responsibility to ensure that the account is authorized to cancel the order.
     /// - user: The signer of the user whose order should be cancelled
     /// - client_order_id: The client order ID of the order to cancel
+    /// - cancellation_reason: The reason for cancellation
+    /// - cancel_reason: String description of the cancellation
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
     public fun cancel_order_with_client_id<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         user: address,
         client_order_id: String,
+        cancellation_reason: market_types::OrderCancellationReason,
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
@@ -47,7 +49,7 @@ module aptos_experimental::order_operations {
             );
         if (order.is_some()) {
             // Order is already placed in the order book, so we can cancel it
-            return cancel_single_order_helper(market, order.destroy_some(), true, cancel_reason, callbacks);
+            return cancel_single_order_helper(market, order.destroy_some(), true, cancellation_reason, cancel_reason, callbacks);
         };
         pre_cancel_order_for_tracker(
             market.get_pre_cancellation_tracker_mut(),
@@ -65,17 +67,20 @@ module aptos_experimental::order_operations {
     ///   It it the caller's responsibility to ensure that the account is authorized to cancel the order.
     /// - user: The signer of the user whose order should be cancelled
     /// - order_id: The order ID of the order to cancel
+    /// - cancellation_reason: The reason for cancellation
+    /// - cancel_details: String description of the cancellation
     /// - callbacks: The market clearinghouse callbacks for cleanup operations
     public fun cancel_order<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         account: address,
         order_id: OrderIdType,
         emit_event: bool,
-        cancel_reason: String,
+        cancellation_reason: market_types::OrderCancellationReason,
+        cancel_details: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): SingleOrder<M> {
         let order = market.get_order_book_mut().cancel_order(account, order_id);
-        cancel_single_order_helper(market, order, emit_event, cancel_reason, callbacks);
+        cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_details, callbacks);
         order
     }
 
@@ -87,13 +92,14 @@ module aptos_experimental::order_operations {
         account: address,
         order_id: OrderIdType,
         emit_event: bool,
+        cancellation_reason: market_types::OrderCancellationReason,
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): option::Option<SingleOrder<M>> {
         let maybe_order = market.get_order_book_mut().try_cancel_order(account, order_id);
         if (maybe_order.is_some()) {
             let order = maybe_order.destroy_some();
-            cancel_single_order_helper(market, order, emit_event, cancel_reason, callbacks);
+            cancel_single_order_helper(market, order, emit_event, cancellation_reason, cancel_reason, callbacks);
             option::some(order)
         } else {
             option::none()
@@ -134,7 +140,8 @@ module aptos_experimental::order_operations {
             is_bid,
             trigger_condition,
             time_in_force,
-            metadata
+            metadata,
+            _creation_time_secs
         ) = order.destroy_single_order();
         callbacks.decrease_order_size(
             new_clearinghouse_order_info(
@@ -166,6 +173,7 @@ module aptos_experimental::order_operations {
             metadata,
             option::none(),
             time_in_force,
+            option::none(),
             callbacks
         );
     }
@@ -177,11 +185,14 @@ module aptos_experimental::order_operations {
     // Parameters:
     // - market: The market instance
     // - order: The order to cancel
+    // - cancellation_reason: The reason for cancellation
+    // - cancel_reason: String description of the cancellation
     // - callbacks: The market clearinghouse callbacks for cleanup operations
-    fun cancel_single_order_helper<M: store + copy + drop, R: store + copy + drop>(
+    public(friend) fun cancel_single_order_helper<M: store + copy + drop, R: store + copy + drop>(
         market: &mut Market<M>,
         order: SingleOrder<M>,
         emit_event: bool,
+        cancellation_reason: market_types::OrderCancellationReason,
         cancel_reason: String,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
@@ -196,7 +207,8 @@ module aptos_experimental::order_operations {
             is_bid,
             trigger_condition,
             time_in_force,
-            metadata
+            metadata,
+            _creation_time_secs
         ) = order.destroy_single_order();
         cleanup_order_internal(
             account, order_id, client_order_id, single_order_type(), is_bid, time_in_force, remaining_size, price, trigger_condition, metadata, callbacks, false
@@ -217,6 +229,7 @@ module aptos_experimental::order_operations {
                 metadata,
                 option::none(), // trigger_condition
                 time_in_force,
+                option::some(cancellation_reason),
                 callbacks
             );
         }

@@ -3,6 +3,7 @@ module aptos_experimental::order_book {
     friend aptos_experimental::order_operations;
     friend aptos_experimental::market_types;
     friend aptos_experimental::market_bulk_order;
+    friend aptos_experimental::dead_mans_switch_operations;
     #[test_only] friend aptos_experimental::order_book_client_order_id;
 
     use std::option::Option;
@@ -261,6 +262,7 @@ module aptos_experimental::order_book {
 
     #[test_only]
     public fun set_up_test_with_id(): OrderBook<u64> {
+        aptos_framework::timestamp::set_time_has_started_for_testing(&aptos_framework::account::create_signer_for_test(@0x1));
         new_order_book()
     }
 }

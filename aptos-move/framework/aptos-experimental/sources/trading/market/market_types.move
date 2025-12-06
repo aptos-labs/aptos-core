@@ -2,6 +2,7 @@ module aptos_experimental::market_types {
     friend aptos_experimental::order_placement;
     friend aptos_experimental::market_bulk_order;
     friend aptos_experimental::order_operations;
+    friend aptos_experimental::dead_mans_switch_operations;
 
     use std::option;
     use std::option::Option;
@@ -10,6 +11,7 @@ module aptos_experimental::market_types {
     use aptos_std::table;
     use aptos_std::table::Table;
     use aptos_framework::event;
+    use aptos_experimental::dead_mans_switch_tracker::{DeadMansSwitchTracker, new_dead_mans_switch_tracker};
     use aptos_experimental::market_clearinghouse_order_info::MarketClearinghouseOrderInfo;
     use aptos_experimental::single_order_types::SingleOrder;
     use aptos_experimental::order_book_types::OrderIdType;
@@ -17,6 +19,8 @@ module aptos_experimental::market_types {
     use aptos_experimental::order_book_types::TriggerCondition;
     use aptos_experimental::order_book::{OrderBook, new_order_book};
     use aptos_experimental::pre_cancellation_tracker::{PreCancellationTracker, new_pre_cancellation_tracker};
+    #[test_only]
+    use aptos_experimental::dead_mans_switch_tracker;
 
     #[test_only]
     use aptos_experimental::pre_cancellation_tracker::destroy_tracker;
@@ -29,6 +33,69 @@ module aptos_experimental::market_types {
     const EORDER_DOES_NOT_EXIST: u64 = 6;
 
     const PRE_CANCELLATION_TRACKER_KEY: u8 = 0;
+    const DEAD_MANS_SWITCH_TRACKER_KEY: u8 = 1;
+
+    /// Reasons why an order was cancelled
+    enum OrderCancellationReason has drop, copy, store {
+        PostOnlyViolation,
+        IOCViolation,
+        PositionUpdateViolation,
+        ReduceOnlyViolation,
+        ClearinghouseSettleViolation,
+        MaxFillLimitViolation,
+        DuplicateClientOrderIdViolation,
+        OrderPreCancelled,
+        PlaceMakerOrderViolation,
+        DeadMansSwitchExpired,
+        DisallowedSelfTrading,
+        OrderCancelledByUser,
+        OrderCancelledBySystem,
+        OrderCancelledBySystemDueToError,
+    }
+
+    public fun order_cancellation_reason_post_only_violation(): OrderCancellationReason {
+        OrderCancellationReason::PostOnlyViolation
+    }
+
+    public fun order_cancellation_reason_ioc_violation(): OrderCancellationReason {
+        OrderCancellationReason::IOCViolation
+    }
+
+    public fun order_cancellation_reason_position_update_violation(): OrderCancellationReason {
+        OrderCancellationReason::PositionUpdateViolation
+    }
+
+    public fun order_cancellation_reason_clearinghouse_settle_violation(): OrderCancellationReason {
+        OrderCancellationReason::ClearinghouseSettleViolation
+    }
+
+    public fun order_cancellation_reason_max_fill_limit_violation(): OrderCancellationReason {
+        OrderCancellationReason::MaxFillLimitViolation
+    }
+
+    public fun order_cancellation_reason_duplicate_client_order_id(): OrderCancellationReason {
+        OrderCancellationReason::DuplicateClientOrderIdViolation
+    }
+
+    public fun order_cancellation_reason_order_pre_cancelled(): OrderCancellationReason {
+        OrderCancellationReason::OrderPreCancelled
+    }
+
+    public fun order_cancellation_reason_place_maker_order_violation(): OrderCancellationReason {
+        OrderCancellationReason::PlaceMakerOrderViolation
+    }
+
+    public fun order_cancellation_reason_dead_mans_switch_expired(): OrderCancellationReason {
+        OrderCancellationReason::DeadMansSwitchExpired
+    }
+
+    public fun order_cancellation_reason_disallowed_self_trading(): OrderCancellationReason {
+        OrderCancellationReason::DisallowedSelfTrading
+    }
+
+    public fun order_cancellation_reason_cancelled_by_user(): OrderCancellationReason {
+        OrderCancellationReason::OrderCancelledByUser
+    }
 
     enum OrderStatus has drop, copy, store {
         /// Order has been accepted by the engine.
@@ -322,6 +389,7 @@ module aptos_experimental::market_types {
             /// as otherwise any insertion/deletion from the tracker would cause conflict
             /// with the order book.
             pre_cancellation_tracker: Table<u8, PreCancellationTracker>,
+            dead_mans_switch_tracker: Table<u8, DeadMansSwitchTracker>,
         }
     }
 
@@ -332,101 +400,120 @@ module aptos_experimental::market_types {
             /// Whether to allow sending all events for the markett
             allow_events_emission: bool,
             /// Pre cancellation window in seconds
-            pre_cancellation_window_secs: u64
+            pre_cancellation_window_secs: u64,
+            /// Enable dead man's switch functionality
+            enable_dead_mans_switch: bool,
+            min_keep_alive_time_secs: u64,
         }
     }
 
     #[event]
-    struct OrderEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        client_order_id: Option<String>,
-        user: address,
-        /// Original size of the order
-        orig_size: u64,
-        /// Remaining size of the order in the order book
-        remaining_size: u64,
-        // TODO(bl): Brian and Sean will revisit to see if we should have split
-        // into multiple events for OrderEvent
-        /// OPEN - size_delta will be amount of size added
-        /// CANCELLED - size_delta will be amount of size removed
-        /// FILLED - size_delta will be amount of size filled
-        /// REJECTED - size_delta will always be 0
-        size_delta: u64,
-        price: u64,
-        is_bid: bool,
-        /// Whether the order crosses the orderbook.
-        is_taker: bool,
-        status: OrderStatus,
-        details: std::string::String,
-        metadata_bytes: vector<u8>,
-        time_in_force: TimeInForce,
-        trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
+    enum OrderEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            client_order_id: Option<String>,
+            user: address,
+            /// Original size of the order
+            orig_size: u64,
+            /// Remaining size of the order in the order book
+            remaining_size: u64,
+            // TODO(bl): Brian and Sean will revisit to see if we should have split
+            // into multiple events for OrderEvent
+            /// OPEN - size_delta will be amount of size added
+            /// CANCELLED - size_delta will be amount of size removed
+            /// FILLED - size_delta will be amount of size filled
+            /// REJECTED - size_delta will always be 0
+            size_delta: u64,
+            price: u64,
+            is_bid: bool,
+            /// Whether the order crosses the orderbook.
+            is_taker: bool,
+            status: OrderStatus,
+            details: std::string::String,
+            metadata_bytes: vector<u8>,
+            time_in_force: TimeInForce,
+            trigger_condition: Option<TriggerCondition>, // Only emitted with order placement events
+            cancellation_reason: Option<OrderCancellationReason>, // Populated when status is CANCELLED
+        }
     }
 
     #[event]
-    struct BulkOrderPlacedEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        sequence_number: u64,
-        user: address,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-        cancelled_bid_prices: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
-        cancelled_ask_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
-        previous_seq_num: u64,
+    enum BulkOrderPlacedEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            sequence_number: u64,
+            user: address,
+            bid_prices: vector<u64>,
+            bid_sizes: vector<u64>,
+            ask_prices: vector<u64>,
+            ask_sizes: vector<u64>,
+            cancelled_bid_prices: vector<u64>,
+            cancelled_bid_sizes: vector<u64>,
+            cancelled_ask_prices: vector<u64>,
+            cancelled_ask_sizes: vector<u64>,
+            previous_seq_num: u64,
+        }
     }
 
 
     #[event]
     // This event is emitted when a bulk order is modified - especially when some levels of the bulk orders
     // are cancelled.
-    struct BulkOrderModifiedEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        sequence_number: u64,
-        user: address,
-        bid_prices: vector<u64>,
-        bid_sizes: vector<u64>,
-        ask_prices: vector<u64>,
-        ask_sizes: vector<u64>,
-        cancelled_bid_prices: vector<u64>,
-        cancelled_bid_sizes: vector<u64>,
-        cancelled_ask_prices: vector<u64>,
-        cancelled_ask_sizes: vector<u64>,
-        previous_seq_num: u64,
+    enum BulkOrderModifiedEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            sequence_number: u64,
+            user: address,
+            bid_prices: vector<u64>,
+            bid_sizes: vector<u64>,
+            ask_prices: vector<u64>,
+            ask_sizes: vector<u64>,
+            cancelled_bid_prices: vector<u64>,
+            cancelled_bid_sizes: vector<u64>,
+            cancelled_ask_prices: vector<u64>,
+            cancelled_ask_sizes: vector<u64>,
+            previous_seq_num: u64,
+            cancellation_reason: Option<OrderCancellationReason>, // Populated when orders are cancelled
+        }
     }
 
     #[event]
-    struct BulkOrderFilledEvent has drop, copy, store {
-        parent: address,
-        market: address,
-        order_id: u128,
-        sequence_number: u64,
-        user: address,
-        filled_size: u64,
-        price: u64,
-        orig_price: u64,
-        is_bid: bool,
-        fill_id: u128,
+    enum BulkOrderFilledEvent has drop, copy, store {
+        V1 {
+            parent: address,
+            market: address,
+            order_id: u128,
+            sequence_number: u64,
+            user: address,
+            filled_size: u64,
+            price: u64,
+            orig_price: u64,
+            is_bid: bool,
+            fill_id: u128,
+        }
     }
 
 
     // ============================= Public APIs ====================================
     public fun new_market_config(
-        allow_self_matching: bool, allow_events_emission: bool, pre_cancellation_window_secs: u64
+        allow_self_matching: bool,
+        allow_events_emission: bool,
+        pre_cancellation_window_secs: u64,
+        enable_dead_mans_switch: bool,
+        min_keep_alive_time_secs: u64,
     ): MarketConfig {
         MarketConfig::V1 {
             allow_self_trade: allow_self_matching,
             allow_events_emission,
             pre_cancellation_window_secs,
+            enable_dead_mans_switch,
+            min_keep_alive_time_secs,
         }
     }
 
@@ -441,12 +528,18 @@ module aptos_experimental::market_types {
             PRE_CANCELLATION_TRACKER_KEY,
             new_pre_cancellation_tracker(pre_cancellation_window)
         );
+        let dead_mans_switch_tracker = table::new();
+        dead_mans_switch_tracker.add(
+            DEAD_MANS_SWITCH_TRACKER_KEY,
+            new_dead_mans_switch_tracker(config.min_keep_alive_time_secs)
+        );
         Market::V1 {
             parent: signer::address_of(parent),
             market: signer::address_of(market),
             config,
             order_book: new_order_book(),
             pre_cancellation_tracker,
+            dead_mans_switch_tracker,
         }
     }
 
@@ -558,6 +651,7 @@ module aptos_experimental::market_types {
         metadata: M,
         trigger_condition: Option<TriggerCondition>,
         time_in_force: TimeInForce,
+        cancellation_reason: Option<OrderCancellationReason>,
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ) {
         // Final check whether event sending is enabled
@@ -565,7 +659,7 @@ module aptos_experimental::market_types {
             let metadata_bytes =
                 callbacks.get_order_metadata_bytes(&metadata);
             event::emit(
-                OrderEvent {
+                OrderEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -581,7 +675,8 @@ module aptos_experimental::market_types {
                     details,
                     metadata_bytes,
                     time_in_force,
-                    trigger_condition
+                    trigger_condition,
+                    cancellation_reason
                 }
             );
         };
@@ -605,7 +700,7 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderPlacedEvent {
+                BulkOrderPlacedEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -634,11 +729,12 @@ module aptos_experimental::market_types {
         cancelled_bid_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
         cancelled_ask_sizes: vector<u64>,
+        cancellation_reason: Option<OrderCancellationReason>,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderModifiedEvent {
+                BulkOrderModifiedEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -653,6 +749,7 @@ module aptos_experimental::market_types {
                     cancelled_ask_prices,
                     cancelled_ask_sizes,
                     previous_seq_num: sequence_number,
+                    cancellation_reason,
                 }
             )
         };
@@ -672,7 +769,7 @@ module aptos_experimental::market_types {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderFilledEvent {
+                BulkOrderFilledEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -701,11 +798,12 @@ module aptos_experimental::market_types {
         cancelled_bid_prices: vector<u64>,
         cancelled_ask_sizes: vector<u64>,
         cancelled_ask_prices: vector<u64>,
+        cancellation_reason: Option<OrderCancellationReason>,
     ) {
         // Final check whether event sending is enabled
         if (self.config.allow_events_emission) {
             event::emit(
-                BulkOrderModifiedEvent {
+                BulkOrderModifiedEvent::V1 {
                     parent: self.parent,
                     market: self.market,
                     order_id: order_id.get_order_id_value(),
@@ -720,6 +818,7 @@ module aptos_experimental::market_types {
                     cancelled_ask_prices,
                     cancelled_ask_sizes,
                     previous_seq_num: sequence_number,
+                    cancellation_reason,
                 }
             );
         };
@@ -737,6 +836,24 @@ module aptos_experimental::market_types {
         self.pre_cancellation_tracker.borrow_mut(PRE_CANCELLATION_TRACKER_KEY)
     }
 
+    public(friend) fun get_dead_mans_switch_tracker<M: store + copy + drop>(
+        self: &Market<M>
+    ): &DeadMansSwitchTracker {
+        self.dead_mans_switch_tracker.borrow(DEAD_MANS_SWITCH_TRACKER_KEY)
+    }
+
+    public(friend) fun get_dead_mans_switch_tracker_mut<M: store + copy + drop>(
+        self: &mut Market<M>
+    ): &mut DeadMansSwitchTracker {
+        self.dead_mans_switch_tracker.borrow_mut(DEAD_MANS_SWITCH_TRACKER_KEY)
+    }
+
+    public(friend) fun is_dead_mans_switch_enabled<M: store + copy + drop>(
+        self: &Market<M>
+    ): bool {
+        self.config.enable_dead_mans_switch
+    }
+
     // ============================= test_only APIs ====================================
     #[test_only]
     public fun destroy_market<M: store + copy + drop>(self: Market<M>) {
@@ -746,10 +863,13 @@ module aptos_experimental::market_types {
             config,
             order_book,
             pre_cancellation_tracker,
+            dead_mans_switch_tracker,
         } = self;
-        let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_secs: _ } = config;
+        let MarketConfig::V1 { allow_self_trade: _, allow_events_emission: _, pre_cancellation_window_secs: _, enable_dead_mans_switch: _, min_keep_alive_time_secs: _ } = config;
         destroy_tracker(pre_cancellation_tracker.remove(PRE_CANCELLATION_TRACKER_KEY));
+        dead_mans_switch_tracker::destroy_tracker(dead_mans_switch_tracker.remove(DEAD_MANS_SWITCH_TRACKER_KEY));
         pre_cancellation_tracker.drop_unchecked();
+        dead_mans_switch_tracker.drop_unchecked();
         order_book.destroy_order_book()
     }
 

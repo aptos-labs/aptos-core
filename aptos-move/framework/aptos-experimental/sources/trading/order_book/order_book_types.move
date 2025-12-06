@@ -205,6 +205,7 @@ module aptos_experimental::order_book_types {
             remaining_size: u64,
             is_bid: bool,
             time_in_force: TimeInForce,
+            creation_time_micros: u64,
             metadata: M,
         },
         BulkOrder {
@@ -215,6 +216,7 @@ module aptos_experimental::order_book_types {
             remaining_size: u64,
             is_bid: bool,
             sequence_number: u64,
+            creation_time_micros: u64,
             metadata: M,
         }
     }
@@ -243,7 +245,7 @@ module aptos_experimental::order_book_types {
 
     public(friend) fun destroy_single_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, Option<String>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, M) {
+    ): (OrderIdType, address, Option<String>, UniqueIdxType, u64, u64, u64, bool, TimeInForce, u64, M) {
         let OrderMatchDetails::SingleOrder {
             order_id,
             account,
@@ -254,14 +256,15 @@ module aptos_experimental::order_book_types {
             remaining_size,
             is_bid,
             time_in_force,
+            creation_time_micros,
             metadata,
         } = self;
-        (order_id, account, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, metadata)
+        (order_id, account, client_order_id, unique_priority_idx, price, orig_size, remaining_size, is_bid, time_in_force, creation_time_micros, metadata)
     }
 
     public(friend) fun destroy_bulk_order_match_details<M: store + copy + drop>(
         self: OrderMatchDetails<M>,
-    ): (OrderIdType, address, UniqueIdxType, u64, u64, bool, u64, M) {
+    ): (OrderIdType, address, UniqueIdxType, u64, u64, bool, u64, u64, M) {
         let OrderMatchDetails::BulkOrder {
             order_id,
             account,
@@ -270,9 +273,10 @@ module aptos_experimental::order_book_types {
             remaining_size,
             is_bid,
             sequence_number,
+            creation_time_micros,
             metadata,
         } = self;
-        (order_id, account, unique_priority_idx, price, remaining_size, is_bid, sequence_number, metadata)
+        (order_id, account, unique_priority_idx, price, remaining_size, is_bid, sequence_number, creation_time_micros, metadata)
     }
 
     public fun get_matched_size<M: store + copy + drop>(
@@ -381,6 +385,12 @@ module aptos_experimental::order_book_types {
         self.sequence_number
     }
 
+    public(friend) fun get_creation_time_micros_from_match_details<M: store + copy + drop>(
+        self: &OrderMatchDetails<M>,
+    ): u64 {
+        self.creation_time_micros
+    }
+
     public(friend) fun new_single_order_match_details<M: store + copy + drop>(
         order_id: OrderIdType,
         account: address,
@@ -391,6 +401,7 @@ module aptos_experimental::order_book_types {
         remaining_size: u64,
         is_bid: bool,
         time_in_force: TimeInForce,
+        creation_time_micros: u64,
         metadata: M
     ): OrderMatchDetails<M> {
         OrderMatchDetails::SingleOrder {
@@ -403,6 +414,7 @@ module aptos_experimental::order_book_types {
             remaining_size,
             is_bid,
             time_in_force,
+            creation_time_micros,
             metadata,
         }
     }
@@ -415,6 +427,7 @@ module aptos_experimental::order_book_types {
         remaining_size: u64,
         is_bid: bool,
         sequence_number: u64,
+        creation_time_micros: u64,
         metadata: M
     ): OrderMatchDetails<M> {
         OrderMatchDetails::BulkOrder {
@@ -425,6 +438,7 @@ module aptos_experimental::order_book_types {
             remaining_size,
             is_bid,
             sequence_number,
+            creation_time_micros,
             metadata,
         }
     }
