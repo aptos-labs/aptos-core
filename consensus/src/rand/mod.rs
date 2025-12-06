@@ -5,3 +5,4 @@
 
 pub mod dkg;
 pub mod rand_gen;
+pub mod secret_sharing;

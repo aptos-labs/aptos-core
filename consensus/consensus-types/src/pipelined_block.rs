@@ -22,6 +22,7 @@ use aptos_types::{
     contract_event::ContractEvent,
     ledger_info::LedgerInfoWithSignatures,
     randomness::Randomness,
+    secret_sharing::{SecretShare, SecretShareKey},
     transaction::{
         signature_verified_transaction::SignatureVerifiedTransaction, SignedTransaction,
         TransactionStatus,
@@ -67,7 +68,8 @@ impl From<Error> for TaskError {
 pub type TaskResult<T> = Result<T, TaskError>;
 pub type TaskFuture<T> = Shared<BoxFuture<'static, TaskResult<T>>>;
 
-pub type PrepareResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
+pub type PrepareResult = (Vec<SignedTransaction>, Option<u64>);
+pub type VerifyTxnsResult = (Arc<Vec<SignatureVerifiedTransaction>>, Option<u64>);
 // First Option is whether randomness is enabled
 // Second Option is whether randomness is skipped
 pub type RandResult = (Option<Option<Randomness>>, bool);
@@ -83,6 +85,7 @@ pub type PostCommitResult = ();
 #[derive(Clone)]
 pub struct PipelineFutures {
     pub prepare_fut: TaskFuture<PrepareResult>,
+    pub verify_txns_fut: TaskFuture<VerifyTxnsResult>,
     pub rand_check_fut: TaskFuture<RandResult>,
     pub execute_fut: TaskFuture<ExecuteResult>,
     pub ledger_update_fut: TaskFuture<LedgerUpdateResult>,
@@ -92,6 +95,7 @@ pub struct PipelineFutures {
     pub notify_state_sync_fut: TaskFuture<NotifyStateSyncResult>,
     pub commit_ledger_fut: TaskFuture<CommitLedgerResult>,
     pub post_commit_fut: TaskFuture<PostCommitResult>,
+    pub compute_decryption_share_fut: TaskFuture<SecretShare>,
 }
 
 impl PipelineFutures {
@@ -114,6 +118,7 @@ pub struct PipelineInputTx {
     pub order_vote_tx: Option<oneshot::Sender<()>>,
     pub order_proof_tx: Option<oneshot::Sender<WrappedLedgerInfo>>,
     pub commit_proof_tx: Option<oneshot::Sender<LedgerInfoWithSignatures>>,
+    pub secret_shared_key_tx: Option<oneshot::Sender<Option<SecretShareKey>>>,
 }
 
 pub struct PipelineInputRx {
@@ -122,6 +127,7 @@ pub struct PipelineInputRx {
     pub order_vote_rx: oneshot::Receiver<()>,
     pub order_proof_fut: TaskFuture<WrappedLedgerInfo>,
     pub commit_proof_fut: TaskFuture<LedgerInfoWithSignatures>,
+    pub secret_share_key_rx: oneshot::Receiver<SecretShareKey>,
 }
 
 /// A window of blocks that are needed for execution with the execution pool, EXCLUDING the current block
