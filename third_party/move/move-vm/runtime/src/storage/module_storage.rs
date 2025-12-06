@@ -250,7 +250,7 @@ where
 
         let _timer =
             VM_TIMER.timer_with_label("unmetered_get_eagerly_verified_module [cache miss]");
-        let mut visited = HashSet::new();
+        let mut visited = HashSet::with_capacity(64);
         visited.insert(id.clone());
         Ok(Some(visit_dependencies_and_verify(
             id,
@@ -382,7 +382,7 @@ where
 
     // Step 2: Traverse and collect all verified immediate dependencies so that we can verify
     // non-local properties of the module.
-    let mut verified_dependencies = vec![];
+    let mut verified_dependencies = Vec::with_capacity(8);
     for (addr, name) in locally_verified_code.immediate_dependencies_iter() {
         let dependency_id = ModuleId::new(*addr, name.to_owned());
 
@@ -396,23 +396,23 @@ where
             continue;
         }
 
-        if visited.insert(dependency_id.clone()) {
-            // Dependency is not verified, and we have not visited it yet.
-            let verified_dependency = visit_dependencies_and_verify(
-                dependency_id.clone(),
-                dependency,
-                dependency_version,
-                visited,
-                module_cache_with_context,
-            )?;
-            verified_dependencies.push(verified_dependency);
-        } else {
+        if !visited.insert(dependency_id.clone()) {
             // We must have found a cycle otherwise.
             return Err(module_cyclic_dependency_error!(
                 dependency_id.address(),
                 dependency_id.name()
             ));
         }
+
+        // Dependency is not verified, and we have not visited it yet.
+        let verified_dependency = visit_dependencies_and_verify(
+            dependency_id,
+            dependency,
+            dependency_version,
+            visited,
+            module_cache_with_context,
+        )?;
+        verified_dependencies.push(verified_dependency);
     }
 
     let verified_code = runtime_environment
