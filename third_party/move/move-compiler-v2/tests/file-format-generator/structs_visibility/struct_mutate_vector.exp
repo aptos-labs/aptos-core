@@ -1,0 +1,65 @@
+
+============ disassembled file-format ==================
+// Bytecode version v9
+module 0x42::m
+struct Scalar has copy + drop + store
+  data: vector<u8>
+
+// Function definition at index 0
+public fun pack$Scalar(l0: vector<u8>): Scalar
+    local l1: vector<u8>
+    move_loc l0
+    pack Scalar
+    ret
+
+// Function definition at index 1
+public fun unpack$Scalar(l0: Scalar): vector<u8>
+    local l1: Scalar
+    move_loc l0
+    unpack Scalar
+    ret
+
+// Function definition at index 2
+public fun borrow$Scalar$0(l0: &Scalar): &vector<u8>
+    local l1: &Scalar
+    move_loc l0
+    borrow_field Scalar, data
+    ret
+
+// Function definition at index 3
+public fun borrow_mut$Scalar$0(l0: &mut Scalar): &mut vector<u8>
+    local l1: &mut Scalar
+    move_loc l0
+    mut_borrow_field Scalar, data
+    ret
+
+// Bytecode version v9
+module 0x42::test_m
+use 0x42::m
+// Function definition at index 0
+#[persistent] public fun new_scalar_from_u8(l0: u8): m::Scalar
+    local l1: m::Scalar
+    local l2: &mut u8
+    call scalar_zero
+    st_loc l1
+    mut_borrow_loc l1
+    call m::borrow_mut$Scalar$0
+    ld_u64 0
+    // @5
+    vec_mut_borrow <u8>
+    st_loc l2
+    move_loc l0
+    move_loc l2
+    write_ref
+    // @10
+    move_loc l1
+    ret
+
+// Function definition at index 1
+#[persistent] public fun scalar_zero(): m::Scalar
+    ld_const<vector<u8>> [0]
+    call m::pack$Scalar
+    ret
+
+
+============ bytecode verification succeeded ========
