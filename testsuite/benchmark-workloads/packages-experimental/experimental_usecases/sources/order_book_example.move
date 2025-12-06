@@ -65,7 +65,7 @@ module 0xABCD::order_book_example {
 
     public entry fun cancel_order(market_id: u32, order_id: u64) acquires Dex {
         let order_book = borrow_order_book_mut(market_id);
-        order_book.cancel_order(@publisher_address, aptos_experimental::order_book_types::new_order_id_type(order_id as u128));
+        order_book.cancel_single_order(@publisher_address, aptos_experimental::order_book_types::new_order_id_type(order_id as u128));
     }
 
     // Copied from order_book, as it's test_only and not part of public API there.

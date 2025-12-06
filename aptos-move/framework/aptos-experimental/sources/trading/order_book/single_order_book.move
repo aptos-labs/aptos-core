@@ -154,10 +154,6 @@ module aptos_experimental::single_order_book {
         }
     }
 
-    public(friend) fun new_price_time_index(): PriceTimeIndex {
-        new_price_time_idx()
-    }
-
     /// Cancels an order from the order book. If the order is active, it is removed from the active order book else
     /// it is removed from the pending order book.
     /// If order doesn't exist, it aborts with EORDER_NOT_FOUND.
@@ -177,7 +173,7 @@ module aptos_experimental::single_order_book {
                 _order_id,
                 client_order_id,
                 unique_priority_idx,
-                bid_price,
+                price,
                 _orig_size,
                 _size,
                 is_bid,
@@ -186,7 +182,7 @@ module aptos_experimental::single_order_book {
                 _,
                 _
             ) = order.destroy_single_order();
-            price_time_idx.cancel_active_order(bid_price, unique_priority_idx, is_bid);
+            price_time_idx.cancel_active_order(price, unique_priority_idx, is_bid);
             if (client_order_id.is_some()) {
                 self.client_order_ids.remove(
                     &new_account_client_order_id(account, client_order_id.destroy_some())
@@ -264,7 +260,7 @@ module aptos_experimental::single_order_book {
         let ascending_idx =
             new_unique_idx_type(transaction_context::monotonically_increasing_counter());
         if (order_req.trigger_condition.is_some()) {
-            return self.place_pending_order_internal(order_req);
+            return self.place_pending_order_internal(order_req, ascending_idx);
         };
         self.place_ready_maker_order_with_unique_idx(price_time_idx, order_req, ascending_idx);
     }
@@ -343,11 +339,11 @@ module aptos_experimental::single_order_book {
     }
 
     fun place_pending_order_internal<M: store + copy + drop>(
-        self: &mut SingleOrderBook<M>, order_req: SingleOrderRequest<M>
+        self: &mut SingleOrderBook<M>,
+        order_req: SingleOrderRequest<M>,
+        ascending_idx: UniqueIdxType
     ) {
         let order_id = order_req.order_id;
-        let ascending_idx =
-            new_unique_idx_type(transaction_context::monotonically_increasing_counter());
         let order =
             new_single_order(
                 order_id,
@@ -541,7 +537,7 @@ module aptos_experimental::single_order_book {
         self: &mut SingleOrderBook<M>, order_limit: u64
     ): vector<SingleOrder<M>> {
         let self_orders = &mut self.orders;
-        let order_ids = self.pending_orders.take_time_time_based_orders(order_limit);
+        let order_ids = self.pending_orders.take_ready_time_based_orders(order_limit);
         let orders = vector::empty();
 
         order_ids.for_each(|order_id| {
@@ -703,6 +699,7 @@ module aptos_experimental::single_order_book {
         total_matched_size
     }
 
+    #[test_only]
     struct TestMetadata has store, copy, drop {}
 
     #[test_only]
