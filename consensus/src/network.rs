@@ -13,9 +13,12 @@ use crate::{
     network_interface::{ConsensusMsg, ConsensusNetworkClient, RPC},
     pipeline::commit_reliable_broadcast::CommitMessage,
     quorum_store::types::{Batch, BatchMsg, BatchRequest, BatchResponse},
-    rand::rand_gen::{
-        network_messages::{RandGenMessage, RandMessage},
-        types::{AugmentedData, FastShare, Share},
+    rand::{
+        rand_gen::{
+            network_messages::{RandGenMessage, RandMessage},
+            types::{AugmentedData, FastShare, Share},
+        },
+        secret_sharing::network_messages::SecretShareNetworkMessage,
     },
 };
 use anyhow::{anyhow, bail, ensure};
@@ -149,6 +152,14 @@ pub struct IncomingRandGenRequest {
 }
 
 #[derive(Debug)]
+pub struct IncomingSecretShareRequest {
+    pub req: SecretShareNetworkMessage,
+    pub sender: Author,
+    pub protocol: ProtocolId,
+    pub response_sender: oneshot::Sender<Result<Bytes, RpcError>>,
+}
+
+#[derive(Debug)]
 pub enum IncomingRpcRequest {
     /// NOTE: This is being phased out in two releases to accommodate `IncomingBlockRetrievalRequestV2`
     /// TODO @bchocho @hariria can remove after all nodes upgrade to release with enum BlockRetrievalRequest (not struct)
@@ -158,6 +169,7 @@ pub enum IncomingRpcRequest {
     CommitRequest(IncomingCommitRequest),
     RandGenRequest(IncomingRandGenRequest),
     BlockRetrieval(IncomingBlockRetrievalRequest),
+    SecretShareRequest(IncomingSecretShareRequest),
 }
 
 impl IncomingRpcRequest {
@@ -170,6 +182,7 @@ impl IncomingRpcRequest {
             IncomingRpcRequest::CommitRequest(req) => req.req.epoch(),
             IncomingRpcRequest::DeprecatedBlockRetrieval(_) => None,
             IncomingRpcRequest::BlockRetrieval(_) => None,
+            IncomingRpcRequest::SecretShareRequest(req) => Some(req.req.epoch()),
         }
     }
 }
