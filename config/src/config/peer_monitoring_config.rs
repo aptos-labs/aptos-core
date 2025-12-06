@@ -16,6 +16,8 @@ pub struct PeerMonitoringServiceConfig {
     pub network_monitoring: NetworkMonitoringConfig,
     pub node_monitoring: NodeMonitoringConfig,
     pub peer_monitor_interval_usec: u64, // The interval (usec) between peer monitor executions
+    pub transaction_monitoring: TransactionMonitoringConfig,
+    pub transaction_tracing_update_interval_ms: u64, // The interval (ms) between trace collector updates
 }
 
 impl Default for PeerMonitoringServiceConfig {
@@ -25,13 +27,23 @@ impl Default for PeerMonitoringServiceConfig {
             latency_monitoring: LatencyMonitoringConfig::default(),
             max_concurrent_requests: 1000,
             max_network_channel_size: 1000,
-            max_num_response_bytes: 100 * 1024, // 100 KB
-            max_request_jitter_ms: 1000,        // Monitoring requests are very infrequent
-            metadata_update_interval_ms: 5000,  // 5 seconds
+            max_num_response_bytes: 10 * 1024 * 1024, // 10 MB
+            max_request_jitter_ms: 1000,              // Monitoring requests are very infrequent
+            metadata_update_interval_ms: 5000,        // 5 seconds
             network_monitoring: NetworkMonitoringConfig::default(),
             node_monitoring: NodeMonitoringConfig::default(),
             peer_monitor_interval_usec: 1_000_000, // 1 second
+            transaction_monitoring: TransactionMonitoringConfig::default(),
+            transaction_tracing_update_interval_ms: 5000, // 5 seconds
         }
+    }
+}
+
+impl PeerMonitoringServiceConfig {
+    /// Returns true iff transaction info monitoring is enabled
+    pub fn transaction_info_monitoring_enabled(&self) -> bool {
+        self.transaction_monitoring
+            .enable_transaction_info_monitoring
     }
 }
 
@@ -83,6 +95,24 @@ impl Default for NodeMonitoringConfig {
         Self {
             node_info_request_interval_ms: 15_000, // 15 seconds
             node_info_request_timeout_ms: 10_000,  // 10 seconds
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(default, deny_unknown_fields)]
+pub struct TransactionMonitoringConfig {
+    pub enable_transaction_info_monitoring: bool, // Whether to enable transaction info monitoring
+    pub transaction_info_request_interval_ms: u64, // The interval (ms) between transaction info requests
+    pub transaction_info_request_timeout_ms: u64, // The timeout (ms) for each transaction info request
+}
+
+impl Default for TransactionMonitoringConfig {
+    fn default() -> Self {
+        Self {
+            enable_transaction_info_monitoring: true,
+            transaction_info_request_interval_ms: 5_000, // 5 seconds
+            transaction_info_request_timeout_ms: 10_000, // 10 seconds
         }
     }
 }
