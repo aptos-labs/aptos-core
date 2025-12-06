@@ -18,6 +18,7 @@ pub type Id = <FPTX as BatchThresholdEncryption>::Id;
 pub type Round = <FPTX as BatchThresholdEncryption>::Round;
 pub type Digest = <FPTX as BatchThresholdEncryption>::Digest;
 pub type EvalProofsPromise = <FPTX as BatchThresholdEncryption>::EvalProofsPromise;
+pub type EvalProof = <FPTX as BatchThresholdEncryption>::EvalProof;
 pub type EvalProofs = <FPTX as BatchThresholdEncryption>::EvalProofs;
 pub type MasterSecretKeyShare = <FPTX as BatchThresholdEncryption>::MasterSecretKeyShare;
 pub type VerificationKey = <FPTX as BatchThresholdEncryption>::VerificationKey;

@@ -70,7 +70,7 @@ impl QueueItem {
             );
             let block = &self.blocks_mut()[offset];
             if let Some(tx) = block.pipeline_tx().lock().as_mut() {
-                tx.secret_sharing_key_tx.take().map(|tx| tx.send(Some(key)));
+                tx.secret_shared_key_tx.take().map(|tx| tx.send(Some(key)));
             }
             self.pending_secret_key_rounds.remove(&round);
         }
