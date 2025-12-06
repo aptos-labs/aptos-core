@@ -88,7 +88,10 @@ use move_core_types::{
     move_resource::{MoveResource, MoveStructType},
     value::MoveValue,
 };
-use move_vm_runtime::module_traversal::{TraversalContext, TraversalStorage};
+use move_vm_runtime::{
+    module_traversal::{TraversalContext, TraversalStorage},
+    InterpreterFunctionCaches,
+};
 use move_vm_types::gas::UnmeteredGasMeter;
 use serde::Serialize;
 use std::{
@@ -1394,6 +1397,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     regular.as_mut().unwrap(),
                     &mut TraversalContext::new(&traversal_storage),
                     &module_storage,
+                    &mut InterpreterFunctionCaches::new(),
                 ),
                 GasMeterType::UnmeteredGasMeter => session.execute_function_bypass_visibility(
                     module,
@@ -1403,6 +1407,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     unmetered.as_mut().unwrap(),
                     &mut TraversalContext::new(&traversal_storage),
                     &module_storage,
+                    &mut InterpreterFunctionCaches::new(),
                 ),
             };
             let elapsed = start.elapsed();
@@ -1499,6 +1504,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 }),
                 &mut traversal_context,
                 &module_storage,
+                &mut InterpreterFunctionCaches::new(),
             );
             if let Err(err) = result {
                 if !should_error {
@@ -1551,6 +1557,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                     &mut UnmeteredGasMeter,
                     &mut traversal_context,
                     &module_storage,
+                    &mut InterpreterFunctionCaches::new(),
                 )
                 .unwrap_or_else(|e| {
                     panic!(
@@ -1595,6 +1602,7 @@ impl<O: OutputLogger> FakeExecutorImpl<O> {
                 &mut UnmeteredGasMeter,
                 &mut TraversalContext::new(&traversal_storage),
                 &module_storage,
+                &mut InterpreterFunctionCaches::new(),
             )
             .map_err(|e| e.into_vm_status())?;
         Ok(finish_session_assert_no_modules(
