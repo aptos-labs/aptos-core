@@ -1415,6 +1415,14 @@ pub static RAND_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
     .unwrap()
 });
 
+pub static DEC_QUEUE_SIZE: Lazy<IntGauge> = Lazy::new(|| {
+    register_int_gauge!(
+        "aptos_consensus_dec_queue_size",
+        "Number of decryption-pending blocks."
+    )
+    .unwrap()
+});
+
 pub static CONSENSUS_PROPOSAL_PAYLOAD_AVAILABILITY: Lazy<IntCounterVec> = Lazy::new(|| {
     register_int_counter_vec!(
         "aptos_consensus_proposal_payload_availability_count",
