@@ -98,11 +98,10 @@ pub const fn is_valid(s: &str) -> bool {
 //       They should be removed once CompiledScript goes away.
 #[cfg(any(test, feature = "fuzzing"))]
 #[allow(dead_code)]
-pub(crate) static ALLOWED_IDENTIFIERS: &str =
-    r"(?:[a-zA-Z][a-zA-Z0-9_$]*)|(?:_[a-zA-Z0-9_$]+)|(?:<SELF>)|(?:<SELF>_[0-9]+)";
+pub(crate) static ALLOWED_IDENTIFIERS: &str = r"(?:[a-zA-Z][a-zA-Z0-9_$]*)|(?:_[a-zA-Z0-9_$]+)|(?:\$[a-zA-Z0-9_$]+)|(?:<SELF>)|(?:<SELF>_[0-9]+)";
 #[cfg(any(test, feature = "fuzzing"))]
 pub(crate) static ALLOWED_NO_SELF_IDENTIFIERS: &str =
-    r"(?:[a-zA-Z][a-zA-Z0-9_$]*)|(?:_[a-zA-Z0-9_$]+)";
+    r"(?:[a-zA-Z][a-zA-Z0-9_$]*)|(?:_[a-zA-Z0-9_$]+)|(?:\$[a-zA-Z0-9_$]+)";
 
 /// An owned identifier.
 ///
