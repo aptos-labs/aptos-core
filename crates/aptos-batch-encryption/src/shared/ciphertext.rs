@@ -161,6 +161,18 @@ impl<I: Id> BIBECiphertext<I> {
 }
 
 impl<I: Id> Ciphertext<I> {
+    pub fn random() -> Self {
+        use crate::schemes::fptx::EncryptionKey;
+        use ark_std::rand::thread_rng;
+
+        let mut rng = thread_rng();
+        let enc_key = EncryptionKey::new(G2Affine::generator(), G2Affine::generator());
+
+        enc_key
+            .encrypt(&mut rng, &String::from("random"), &String::from("data"))
+            .unwrap()
+    }
+
     pub fn verify(&self, associated_data: &impl AssociatedData) -> Result<()> {
         let hashed_id = I::from_verifying_key(&self.vk);
 

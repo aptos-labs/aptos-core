@@ -29,19 +29,17 @@ use aptos_time_service::TimeService;
 use aptos_types::{
     epoch_state::EpochState,
     secret_sharing::{SecretShareConfig, SecretShareMetadata, SecretSharedKey},
-    validator_signer::ValidatorSigner,
 };
 use bytes::Bytes;
 use futures::{
     future::{AbortHandle, Abortable},
-    stream::FuturesUnordered,
     FutureExt, StreamExt,
 };
 use futures_channel::{
     mpsc::{unbounded, UnboundedReceiver, UnboundedSender},
     oneshot,
 };
-use std::{collections::HashSet, pin::Pin, sync::Arc, time::Duration};
+use std::{collections::HashSet, sync::Arc, time::Duration};
 use tokio_retry::strategy::ExponentialBackoff;
 
 pub type Sender<T> = UnboundedSender<T>;
@@ -62,14 +60,12 @@ pub struct SecretShareManager {
     // local state
     secret_share_store: Arc<Mutex<SecretShareStore>>,
     block_queue: BlockQueue,
-    aggregator: FuturesUnordered<Pin<Box<dyn Future<Output = anyhow::Result<()>> + Send>>>,
 }
 
 impl SecretShareManager {
     pub fn new(
         author: Author,
         epoch_state: Arc<EpochState>,
-        _signer: Arc<ValidatorSigner>,
         config: SecretShareConfig,
         outgoing_blocks: Sender<OrderedBlocks>,
         network_sender: Arc<NetworkSender>,
@@ -110,7 +106,6 @@ impl SecretShareManager {
 
             secret_share_store: dec_store,
             block_queue: BlockQueue::new(),
-            aggregator: FuturesUnordered::new(),
         }
     }
 

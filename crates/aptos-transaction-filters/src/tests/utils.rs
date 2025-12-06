@@ -10,6 +10,7 @@ use aptos_types::{
     chain_id::ChainId,
     move_utils::MemberId,
     quorum_store::BatchId,
+    secret_sharing::{Ciphertext, EvalProof},
     transaction::{
         authenticator::{AccountAuthenticator, AnyPublicKey, TransactionAuthenticator},
         encrypted_payload::EncryptedPayload,
@@ -51,7 +52,7 @@ pub fn create_encrypted_and_plaintext_transactions() -> Vec<SignedTransaction> {
 /// Creates and returns an encrypted transaction
 pub fn create_encrypted_transaction() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::Encrypted {
-        ciphertext: vec![],
+        ciphertext: Ciphertext::random(),
         extra_config: TransactionExtraConfig::V1 {
             multisig_address: None,
             replay_protection_nonce: None,
@@ -66,13 +67,13 @@ pub fn create_encrypted_transaction() -> SignedTransaction {
 /// Creates and returns an encrypted transaction in a failed decryption state
 pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::FailedDecryption {
-        ciphertext: vec![],
+        ciphertext: Ciphertext::random(),
         extra_config: TransactionExtraConfig::V1 {
             multisig_address: None,
             replay_protection_nonce: None,
         },
         payload_hash: HashValue::random(),
-        eval_proof: vec![],
+        eval_proof: EvalProof::random(),
     };
 
     let transaction_payload = TransactionPayload::EncryptedPayload(encrypted_payload);
@@ -82,13 +83,13 @@ pub fn create_encrypted_transaction_failed_state() -> SignedTransaction {
 /// Creates and returns an encrypted transaction in a plaintext state
 pub fn create_encrypted_transaction_plaintext_state() -> SignedTransaction {
     let encrypted_payload = EncryptedPayload::Decrypted {
-        ciphertext: vec![],
+        ciphertext: Ciphertext::random(),
         extra_config: TransactionExtraConfig::V1 {
             multisig_address: None,
             replay_protection_nonce: None,
         },
         payload_hash: HashValue::random(),
-        eval_proof: vec![],
+        eval_proof: EvalProof::random(),
         executable: TransactionExecutable::Empty,
         decryption_nonce: 0,
     };
