@@ -11,6 +11,7 @@ use async_trait::async_trait;
 use clap::Parser;
 use move_compiler_v2::Experiment;
 use move_linter::MoveLintChecks;
+use aptos_move_linter::SecurityChecks;
 use move_model::metadata::{CompilerVersion, LanguageVersion, LATEST_STABLE_LANGUAGE_VERSION};
 use move_package::source_package::std_lib::StdVersion;
 use std::{collections::BTreeMap, path::PathBuf, str::FromStr};
@@ -184,13 +185,15 @@ impl CliCommand<&'static str> for LintPackage {
         let build_config = BuiltPackage::create_build_config(&build_options)?;
         let resolved_graph =
             BuiltPackage::prepare_resolution_graph(package_path, build_config.clone())?;
+        let config = self.checks.unwrap_or_default().to_config();
         BuiltPackage::build_with_external_checks(
             resolved_graph,
             build_options,
             build_config,
-            vec![MoveLintChecks::make(
-                self.checks.unwrap_or_default().to_config(),
-            )],
+            vec![
+                MoveLintChecks::make(config.clone()),
+                SecurityChecks::make(config),
+            ],
         )?;
 
         Ok("succeeded")
