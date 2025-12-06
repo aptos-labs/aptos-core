@@ -13,7 +13,7 @@ use crate::{
 use aptos_crypto::{hash::CryptoHash, HashValue};
 use move_core_types::{account_address::AccountAddress, language_storage::StructTag};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::{fmt::Debug, str::FromStr};
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub enum SignatureVerifiedTransaction {
@@ -123,6 +123,29 @@ impl BlockExecutableTransaction for SignatureVerifiedTransaction {
         fee_distribution: FeeDistribution,
     ) -> Self {
         Transaction::block_epilogue_v1(block_id, block_end_info, fee_distribution).into()
+    }
+
+    fn pre_write_values(&self) -> Vec<(Self::Key, Self::Value)> {
+        if let Some(timestamp) = match self {
+            SignatureVerifiedTransaction::Valid(Transaction::BlockMetadataExt(metadata_txn)) => {
+                Some(metadata_txn.timestamp_usecs())
+            },
+            SignatureVerifiedTransaction::Valid(Transaction::BlockMetadata(metadata_txn)) => {
+                Some(metadata_txn.timestamp_usecs())
+            },
+            _ => None,
+        } {
+            vec![(
+                StateKey::resource(
+                    &AccountAddress::ONE,
+                    &StructTag::from_str("0x1::timestamp::CurrentTimeMicroseconds").unwrap(),
+                )
+                .unwrap(),
+                WriteOp::legacy_modification(bcs::to_bytes(&timestamp).unwrap().into()),
+            )]
+        } else {
+            vec![]
+        }
     }
 }
 
