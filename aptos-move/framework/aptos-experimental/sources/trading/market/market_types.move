@@ -393,7 +393,7 @@ module aptos_experimental::market_types {
         }
     }
 
-    enum MarketConfig has store {
+    enum MarketConfig has store, drop {
         V1 {
             /// Weather to allow self matching orders
             allow_self_trade: bool,
@@ -543,6 +543,13 @@ module aptos_experimental::market_types {
         }
     }
 
+    public fun update_market_config<M: store + copy + drop>(
+        self: &mut Market<M>,
+        new_config: MarketConfig
+    ) {
+        self.config = new_config;
+    }
+
     public fun get_order_book<M: store + copy + drop>(self: &Market<M>): &OrderBook<M> {
         &self.order_book
     }
@@ -576,7 +583,7 @@ module aptos_experimental::market_types {
     public fun get_remaining_size<M: store + copy + drop>(
         self: &Market<M>, order_id: OrderIdType
     ): u64 {
-        self.order_book.get_remaining_size(order_id)
+        self.order_book.get_single_remaining_size(order_id)
     }
 
     public fun get_bulk_order_remaining_size<M: store + copy + drop>(
@@ -588,7 +595,7 @@ module aptos_experimental::market_types {
     public fun get_order_metadata<M: store + copy + drop>(
         self: &Market<M>, order_id: OrderIdType
     ): Option<M> {
-        self.order_book.get_order_metadata(order_id)
+        self.order_book.get_single_order_metadata(order_id)
     }
 
     /// Returns the order metadata for an order by order id.
@@ -596,7 +603,7 @@ module aptos_experimental::market_types {
     public fun set_order_metadata<M: store + copy + drop>(
         self: &mut Market<M>, order_id: OrderIdType, metadata: M
     ) {
-        self.order_book.set_order_metadata(order_id, metadata);
+        self.order_book.set_single_order_metadata(order_id, metadata);
     }
 
     public fun get_order_metadata_by_client_id<M: store + copy + drop>(

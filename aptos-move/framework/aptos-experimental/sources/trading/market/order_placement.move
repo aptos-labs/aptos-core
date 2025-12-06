@@ -82,7 +82,11 @@ module aptos_experimental::order_placement {
 
     // Error codes
     const EINVALID_ORDER: u64 = 1;
+    const ECLEARINGHOUSE_SETTLEMENT_VIOLATION: u64 = 2;
+    const ECLIENT_ORDER_ID_LENGTH_EXCEEDED: u64 = 3;
+
     const U64_MAX: u64 = 0xffffffffffffffff;
+    const MAX_CLIENT_ORDER_ID_LENGTH: u64 = 32;
 
     struct OrderMatchResult<R: store + copy + drop> has drop {
         order_id: OrderIdType,
@@ -474,7 +478,7 @@ module aptos_experimental::order_placement {
         );
         // If the maker is invalid cancel the maker order and continue to the next maker order
         if (maker_order.get_remaining_size_from_match_details() != 0) {
-            market.get_order_book_mut().cancel_order(maker_address, order_id);
+            market.get_order_book_mut().cancel_single_order(maker_address, order_id);
         };
         cleanup_order_internal(
             maker_address,
@@ -783,9 +787,16 @@ module aptos_experimental::order_placement {
             };
         };
 
-        let maker_cancellation_reason = settle_result.get_maker_cancellation_reason();
-        let taker_cancellation_reason = settle_result.get_taker_cancellation_reason();
-        if (taker_cancellation_reason.is_some()) {
+        let maker_cancellation_reason_str = settle_result.get_maker_cancellation_reason();
+        let taker_cancellation_reason_str = settle_result.get_taker_cancellation_reason();
+        if (settled_size < maker_matched_size ) {
+            // If the order is partially settled, the expectation is that the clearinghouse
+            // provides cancellation reason for at least one of the orders.
+            assert!(maker_cancellation_reason_str.is_some() || taker_cancellation_reason_str.is_some(),
+               ECLEARINGHOUSE_SETTLEMENT_VIOLATION
+            );
+        };
+        let taker_cancellation_reason = if (taker_cancellation_reason_str.is_some()) {
             cancel_single_order_internal(
                 market,
                 user_addr,
@@ -799,7 +810,7 @@ module aptos_experimental::order_placement {
                 is_bid,
                 true, // is_taker
                 market_types::order_cancellation_reason_clearinghouse_settle_violation(),
-                taker_cancellation_reason.destroy_some(),
+                taker_cancellation_reason_str.destroy_some(),
                 option::none(), // trigger_condition
                 metadata,
                 time_in_force,
@@ -807,18 +818,11 @@ module aptos_experimental::order_placement {
                 callbacks,
                 vector[]
             );
-            if (maker_cancellation_reason.is_none() && unsettled_maker_size > 0) {
-                // If the taker is cancelled but the maker is not cancelled, then we need to re-insert
-                // the maker order back into the order book
-                let reinsertion_request = maker_order.new_order_match_details_with_modified_size(unsettled_maker_size);
-                market.get_order_book_mut().reinsert_order(
-                    reinsertion_request,
-                    &maker_order
-                );
-            };
-            return (option::some(market_types::order_cancellation_reason_clearinghouse_settle_violation()), *settle_result.get_callback_result());
+            option::some(market_types::order_cancellation_reason_clearinghouse_settle_violation())
+        } else {
+            option::none()
         };
-        if (maker_cancellation_reason.is_some()) {
+        if (maker_cancellation_reason_str.is_some()) {
             cancel_maker_order_internal(
                 market,
                 &maker_order,
@@ -826,29 +830,38 @@ module aptos_experimental::order_placement {
                 maker_order.get_account_from_match_details(),
                 maker_order.get_order_id_from_match_details(),
                 market_types::order_cancellation_reason_clearinghouse_settle_violation(),
-                maker_cancellation_reason.destroy_some(),
+                maker_cancellation_reason_str.destroy_some(),
                 unsettled_maker_size,
                 maker_order.get_metadata_from_match_details(),
                 maker_order.get_time_in_force_from_match_details(),
                 callbacks
             );
-        } else if (maker_order.get_remaining_size_from_match_details() == 0) {
-            cleanup_order_internal(
-                maker_order.get_account_from_match_details(),
-                maker_order.get_order_id_from_match_details(),
-                maker_order.get_client_order_id_from_match_details(),
-                maker_order.get_book_type_from_match_details(),
-                !is_bid, // is_bid is inverted for maker orders
-                maker_order.get_time_in_force_from_match_details(),
-                0, // 0 because the order is fully filled
-                maker_order.get_price_from_match_details(),
-                option::none(), // trigger_condition
-                maker_order.get_metadata_from_match_details(),
-                callbacks,
-                false // is_taker is false for maker orders
-            );
+        } else {
+            if (unsettled_maker_size > 0) {
+                //  we need to re-insert the maker order back into the order book
+                let reinsertion_request = maker_order.new_order_match_details_with_modified_size(unsettled_maker_size);
+                market.get_order_book_mut().reinsert_order(
+                    reinsertion_request,
+                    &maker_order
+                );
+            } else if (maker_order.get_remaining_size_from_match_details() == 0) {
+                cleanup_order_internal(
+                    maker_order.get_account_from_match_details(),
+                    maker_order.get_order_id_from_match_details(),
+                    maker_order.get_client_order_id_from_match_details(),
+                    maker_order.get_book_type_from_match_details(),
+                    !is_bid, // is_bid is inverted for maker orders
+                    maker_order.get_time_in_force_from_match_details(),
+                    0, // 0 because the order is fully filled
+                    maker_order.get_price_from_match_details(),
+                    option::none(), // trigger_condition
+                    maker_order.get_metadata_from_match_details(),
+                    callbacks,
+                    false // is_taker is false for maker orders
+                );
+            }
         };
-        (option::none(), *settle_result.get_callback_result())
+        (taker_cancellation_reason, *settle_result.get_callback_result())
     }
 
     /// Core function to place an order with a given order id. If the order id is not provided, a new order id is generated.
@@ -872,11 +885,14 @@ module aptos_experimental::order_placement {
         callbacks: &MarketClearinghouseCallbacks<M, R>
     ): OrderMatchResult<R> {
         assert!(
-            orig_size > 0 && remaining_size > 0,
+            orig_size > 0 && remaining_size > 0 && orig_size >= remaining_size,
             EINVALID_ORDER
         );
         assert!(max_match_limit > 0, EINVALID_ORDER);
         assert!(limit_price > 0, EINVALID_ORDER);
+        if (client_order_id.is_some()) {
+            assert!(client_order_id.borrow().length() <= MAX_CLIENT_ORDER_ID_LENGTH, ECLIENT_ORDER_ID_LENGTH_EXCEEDED);
+        };
         if (order_id.is_none()) {
             // If order id is not provided, generate a new order id
             order_id = option::some(next_order_id());
