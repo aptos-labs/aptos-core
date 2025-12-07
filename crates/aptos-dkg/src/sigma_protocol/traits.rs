@@ -68,6 +68,82 @@ pub trait Trait<E: Pairing>:
             &self.dst(),
         )
     }
+
+    #[allow(non_snake_case)]
+    fn verify_msm_terms<C: Serialize, H>(
+        &self,
+        public_statement: &Self::Codomain,
+        proof: &Proof<E, H>, // Would like to set &Proof<E, Self>, but that ties the lifetime of H to that of Self, but we'd like it to be eg static
+        ctxt: &C,
+    ) -> (Vec<Self::Base>, Vec<Self::Scalar>, Vec<Self::Scalar>)
+    where
+        H: homomorphism::Trait<Domain = Self::Domain, Codomain = Self::Codomain>,
+        {
+            let prover_first_message = match &proof.first_proof_item {
+                FirstProofItem::Commitment(A) => A,
+                FirstProofItem::Challenge(_) => {
+                    panic!("Missing implementation - expected commitment, not challenge")
+                },
+            };
+            let c = fiat_shamir_challenge_for_sigma_protocol::<_, E, _>(
+                ctxt,
+                self,
+                public_statement,
+                &prover_first_message,
+                &self.dst(),
+            );
+
+            // Step 2: Compute verifier-specific challenge (used for weighted MSM)
+            // While this could be derived deterministically via Fiat–Shamir, doing so would require
+            // integrating it into the prover as well for composability; we no longer follow this approach.
+            // Instead, we follow the simple approach:
+            let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
+            let beta = E::ScalarField::rand(&mut rng);
+
+            let msm_terms = self.msm_terms(&proof.z);
+            // let powers_of_beta = utils::powers(beta, statement.clone().into_iter().count()); // TODO: Maybe get rid of clone? Is .count() an efficient way to get the length?
+
+            // let terms_iter = msm_terms.clone().into_iter(); // TODO: get rid of these clones?
+            // let prover_iter = prover_first_message.clone().into_iter();
+            // let statement_iter = statement.clone().into_iter();
+
+            // let mut final_bases = Vec::new();
+            // let mut final_scalars = Vec::new();
+
+            // for (((term, A), P), beta_power) in terms_iter
+            //     .zip(prover_iter)
+            //     .zip(statement_iter)
+            //     .zip(powers_of_beta)
+            // {
+            //     // Destructure term and create a new MsmInput
+            //     let mut bases = term.bases().to_vec();
+            //     let mut scalars = term.scalars().to_vec();
+
+            //     for scalar in scalars.iter_mut() {
+            //         *scalar *= beta_power;
+            //     }
+
+            //     // Append bases/scalars from prover and statement
+            //     bases.push(A.clone().into_affine()); // TODO: do a batch into affine
+            //     bases.push(P.clone().into_affine()); // TODO: do a batch into affine
+
+            //     scalars.push(-beta_power);
+            //     scalars.push(-c * beta_power);
+
+            //     final_bases.extend(bases);
+            //     final_scalars.extend(scalars);
+            // }
+
+            combine_msm_terms::<E, Self, <Self as fixed_base_msms::Trait>::MsmInput>(
+                msm_terms.into_iter().collect(),
+                prover_first_message,
+                public_statement,
+                beta,
+                c,
+                0
+            )
+        }
+        
 }
 
 pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {
@@ -288,7 +364,7 @@ where
 /// the image under consideration are included in the transcript.
 ///
 /// # Arguments
-/// - `ctxt`: Extra "context" material that needs to be hashed for the challenge.
+/// - `cntxt`: Extra "context" material that needs to be hashed for the challenge.
 /// - `hom`: The homomorphism structure carrying its public data (e.g., MSM bases).
 /// - `statement`: The public statement, i.e. the image of a witness under the homomorphism.
 /// - `prover_first_message`: the first message in the Σ-protocol (the prover's commitment)
@@ -302,7 +378,7 @@ pub fn fiat_shamir_challenge_for_sigma_protocol<
     E: Pairing,
     H: homomorphism::Trait + CanonicalSerialize,
 >(
-    ctxt: &C,
+    cntxt: &C,
     hom: &H,
     statement: &H::Codomain,
     prover_first_message: &H::Codomain,
@@ -317,7 +393,7 @@ where
 
     // Append the "context" to the transcript
     <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_ctxt(
-        &mut fs_t, ctxt,
+        &mut fs_t, cntxt,
     );
 
     // Append the MSM bases to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
@@ -465,6 +541,7 @@ pub fn verify_msm_hom<C: Serialize, E: Pairing, H>(
     dst: &[u8],
 ) -> anyhow::Result<()>
 where
+//     H: fixed_base_msms::Trait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1, MsmInput = MsmInput<E::G1Affine, E::ScalarField>>
     H: fixed_base_msms::Trait<Scalar = E::ScalarField, Base = E::G1Affine, MsmOutput = E::G1>
         + CanonicalSerialize,
     H::Domain: Witness<E>,
@@ -479,58 +556,115 @@ where
     );
 
     // Step 2: Compute verifier-specific challenge (used for weighted MSM)
-
     // While this could be derived deterministically via Fiat–Shamir, doing so would require
-    // integrating it into the prover as well for composability. For simplicity, we follow
-    // the standard approach instead.
-
-    // let beta = fiat_shamir_challenge_for_msm_verifier::<E, H>(
-    //     fs_transcript,
-    //     public_statement,
-    //     prover_last_message,
-    //     dst_verifier,
-    // );
-    let mut rng = ark_std::rand::thread_rng();
+    // integrating it into the prover as well for composability; we no longer follow this approach.
+    // Instead, we follow the simple approach:
+    let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
     let beta = E::ScalarField::rand(&mut rng);
 
     let msm_terms = homomorphism.msm_terms(prover_last_message);
-    let powers_of_beta = utils::powers(beta, statement.clone().into_iter().count()); // TODO: Maybe get rid of clone? Is .count() an efficient way to get the length?
+    // let powers_of_beta = utils::powers(beta, statement.clone().into_iter().count()); // TODO: Maybe get rid of clone? Is .count() an efficient way to get the length?
 
-    let terms_iter = msm_terms.clone().into_iter(); // TODO: get rid of these clones?
-    let prover_iter = prover_first_message.clone().into_iter();
-    let statement_iter = statement.clone().into_iter();
+    // let terms_iter = msm_terms.clone().into_iter(); // TODO: get rid of these clones?
+    // let prover_iter = prover_first_message.clone().into_iter();
+    // let statement_iter = statement.clone().into_iter();
+
+    // let mut final_bases = Vec::new();
+    // let mut final_scalars = Vec::new();
+
+    // for (((term, A), P), beta_power) in terms_iter
+    //     .zip(prover_iter)
+    //     .zip(statement_iter)
+    //     .zip(powers_of_beta)
+    // {
+    //     // Destructure term and create a new MsmInput
+    //     let mut bases = term.bases().to_vec();
+    //     let mut scalars = term.scalars().to_vec();
+
+    //     for scalar in scalars.iter_mut() {
+    //         *scalar *= beta_power;
+    //     }
+
+    //     // Append bases/scalars from prover and statement
+    //     bases.push(A.clone().into_affine()); // TODO: do a batch into affine
+    //     bases.push(P.clone().into_affine()); // TODO: do a batch into affine
+
+    //     scalars.push(-beta_power);
+    //     scalars.push(-c * beta_power);
+
+    //     final_bases.extend(bases);
+    //     final_scalars.extend(scalars);
+    // }
+
+    let (final_bases, final_scalars, _) = combine_msm_terms::<E, H, <H as fixed_base_msms::Trait>::MsmInput>(
+        msm_terms.into_iter().collect(),
+        prover_first_message,
+        statement,
+        beta,
+        c,
+        0
+    );
+
+    // Step 7: Perform the final MSM check. TODO: Could use msm_eval here?
+    let msm_result =
+        E::G1::msm(&final_bases, &final_scalars).expect("Could not compute MSM for verifier");
+    ensure!(msm_result == E::G1::ZERO);
+
+    Ok(())
+}
+
+/// The MSM terms of the sigma protocol. Useful for combining with the MSM terms of other protocols,
+/// but note that beta powers are already being added here because it's convenient (and slightly faster)
+/// to do that when the c factor is being added
+#[allow(non_snake_case)]
+fn combine_msm_terms<E, H, M: IsMsmInput<E::G1Affine, E::ScalarField>>(
+    msm_terms: Vec<M>,
+    prover_first_message: &H::Codomain,
+    statement: &H::Codomain,
+    beta: E::ScalarField,
+    c: E::ScalarField,
+    excess_betas: usize,
+) -> (Vec<E::G1Affine>, Vec<E::ScalarField>, Vec<E::ScalarField>)
+where
+    E: Pairing,
+    H: fixed_base_msms::Trait<
+        Scalar = E::ScalarField,
+        Base = E::G1Affine,
+        MsmOutput = E::G1,
+    >,
+    H::Codomain: Clone + IntoIterator,
+{
+    let len = statement.clone().into_iter().count() + excess_betas;
+    let powers_of_betas = utils::powers(beta, len);
+    let (needed_betas, excess_betas) = powers_of_betas.split_at(excess_betas);
 
     let mut final_basis = Vec::new();
     let mut final_scalars = Vec::new();
 
-    for (((term, A), P), beta_power) in terms_iter
-        .zip(prover_iter)
-        .zip(statement_iter)
-        .zip(powers_of_beta)
+    for (((term, A), P), &beta_power) in msm_terms
+        .into_iter()
+        .zip(prover_first_message.clone().into_iter())
+        .zip(statement.clone().into_iter())
+        .zip(needed_betas)
     {
-        // Destructure term and create a new MsmInput
         let mut bases = term.bases().to_vec();
         let mut scalars = term.scalars().to_vec();
 
+        // multiply scalars by βᶦ
         for scalar in scalars.iter_mut() {
             *scalar *= beta_power;
         }
 
-        // Append bases/scalars from prover and statement
-        bases.push(A.clone().into_affine()); // TODO: do a batch into affine
-        bases.push(P.clone().into_affine()); // TODO: do a batch into affine
+        // add prover + statement contributions
+        bases.push(A.into_affine()); // TODO: batch affine conversion
+        bases.push(P.into_affine()); // TODO: batch affine conversion
 
-        scalars.push(-H::Scalar::from(1u8) * beta_power);
+        scalars.push(-beta_power);
         scalars.push(-c * beta_power);
 
         final_basis.extend(bases);
         final_scalars.extend(scalars);
     }
 
-    // Step 7: Perform the final MSM check. TODO: Could use msm_eval here?
-    let msm_result =
-        E::G1::msm(&final_basis, &final_scalars).expect("Could not compute MSM for verifier");
-    ensure!(msm_result == E::G1::ZERO);
-
-    Ok(())
+    (final_basis, final_scalars, excess_betas.to_vec())
 }

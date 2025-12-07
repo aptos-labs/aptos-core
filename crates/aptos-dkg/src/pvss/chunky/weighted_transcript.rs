@@ -579,11 +579,33 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> NonAggr
             sc.get_total_weight() + 1,
             true,
             &sc.get_threshold_config().domain,
-        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]
+        ); // includes_zero is true here means it includes a commitment to f(0), which is in V[n]  
         let mut Vs_flat: Vec<_> = self.subtrs.Vs.iter().flatten().cloned().collect();
         Vs_flat.push(self.subtrs.V0);
         // could add an assert_eq here with sc.get_total_weight()
         ldt.low_degree_test_group(&Vs_flat)?;
+
+        // let eks_inner: Vec<_> = eks.iter().map(|ek| ek.ek).collect();
+        // let hom = hkzg_chunked_elgamal::WeightedHomomorphism::new(
+        //     &pp.pk_range_proof.ck_S.lagr_g1,
+        //     pp.pk_range_proof.ck_S.xi_1,
+        //     &pp.pp_elgamal,
+        //     &eks_inner,
+        // );
+        // let (sigma_bases, sigma_scalars, beta_powers) = hom.verify_msm_terms(
+        //         &TupleCodomainShape(
+        //             self.sharing_proof.range_proof_commitment.clone(),
+        //             chunked_elgamal::WeightedCodomainShape {
+        //                 chunks: self.subtrs.Cs.clone(),
+        //                 randomness: self.subtrs.Rs.clone(),
+        //             },
+        //         ),
+        //         &self.sharing_proof.SoK,
+        //         &sok_cntxt,
+        //     );
+        // let ldt_msm_terms = ldt.ldt_msm_input(&Vs_flat)?;
+        // use aptos_crypto::arkworks::msm::verify_msm_terms_with_start;
+        // verify_msm_terms_with_start(ldt_msm_terms, sigma_bases, sigma_scalars, beta_powers);
 
         // Now compute the final MSM // TODO: merge this multi_exp with the PoK verification, as in YOLO YOSO? // TODO2: and use the iterate stuff you developed? it's being forgotten here
         let mut base_vec = Vec::new();

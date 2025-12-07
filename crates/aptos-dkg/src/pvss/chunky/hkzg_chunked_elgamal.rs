@@ -95,7 +95,7 @@ type LiftedWeightedChunkedElgamal<'a, E> =
 //              │                         ║        ╫        ║ ElGamal hom       │
 //              ▼                         ║        ╫        ║                   ▼
 //  ┌───────────────────────────────────┐ ║        ╫        ║  ┌──────────────────────────────┐
-//  │ univariate_hiding_kzg::Witness<E> │ ║        ╫        ║  │ chunked_elgamal:: Witness<E> │
+//  │ univariate_hiding_kzg::Witness<E> │ ║        ╫        ║  │ chunked_elgamal::Witness<E>  │
 //  │-----------------------------------│ ║        ╫        ║  │------------------------------│
 //  │ hkzg_randomness                   │ ║        ╫        ║  │ chunked_plaintexts           │
 //  │ flattened_chunked_plaintexts      │ ║        ╫        ║  │ elgamal_randomness           │

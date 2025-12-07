@@ -5,7 +5,7 @@ use crate::{
     sigma_protocol,
     sigma_protocol::{
         homomorphism,
-        homomorphism::{fixed_base_msms::Trait, EntrywiseMap},
+        homomorphism::{fixed_base_msms, EntrywiseMap},
     },
 };
 use ark_ec::pairing::Pairing;
@@ -143,6 +143,7 @@ where
     }
 }
 
+// TODO: Maak een DifferingTupleHomomorphism ???
 /// Implementation of `FixedBaseMsms` for a tuple of two homomorphisms.
 ///
 /// This allows combining two homomorphisms that share the same `Domain`.
@@ -152,10 +153,10 @@ where
 /// not necessary through enums.
 ///
 /// The codomain shapes of the two homomorphisms are combined using `TupleCodomainShape`.
-impl<H1, H2> Trait for TupleHomomorphism<H1, H2>
+impl<H1, H2> fixed_base_msms::Trait for TupleHomomorphism<H1, H2>
 where
-    H1: Trait,
-    H2: Trait<
+    H1: fixed_base_msms::Trait,
+    H2: fixed_base_msms::Trait<
         Domain = H1::Domain,
         Scalar = H1::Scalar,
         Base = H1::Base,
@@ -188,7 +189,7 @@ impl<E: Pairing, H1, H2> sigma_protocol::Trait<E> for TupleHomomorphism<H1, H2>
 where
     H1: sigma_protocol::Trait<E>,
     H2: sigma_protocol::Trait<E>,
-    H2: Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
+    H2: fixed_base_msms::Trait<Domain = H1::Domain, MsmInput = H1::MsmInput>,
 {
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();
