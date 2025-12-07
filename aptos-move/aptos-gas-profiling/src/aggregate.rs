@@ -90,6 +90,7 @@ impl ExecutionAndIOCosts {
                     fn_name,
                     ty_args,
                     cost,
+                    ..
                 } => insert_or_add(
                     &mut ops,
                     format!(
