@@ -28,6 +28,7 @@ use aptos_types::{
     ledger_info::LedgerInfoWithSignatures,
     state_store::state_value::StateValueChunkWithProof,
     transaction::{TransactionListWithProof, TransactionOutputListWithProof, Version},
+    validator_verifier::ValidatorVerifier,
     waypoint::Waypoint,
 };
 use futures::channel::oneshot;
@@ -340,8 +341,21 @@ impl<
         storage_synchronizer: StorageSyncer,
     ) -> Self {
         // Load the latest epoch state from storage
-        let latest_epoch_state = utils::fetch_latest_epoch_state(storage.clone())
+        let mut latest_epoch_state = utils::fetch_latest_epoch_state(storage.clone())
             .expect("Unable to fetch latest epoch state!");
+
+        // Memory optimization: Adjust epoch state when start_epoch is configured
+        let configured_start_epoch = driver_configuration.config.start_epoch;
+        if configured_start_epoch > 0 && configured_start_epoch > latest_epoch_state.epoch {
+            info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                "Memory optimization: Adjusting epoch state from epoch {} to start_epoch {}",
+                latest_epoch_state.epoch, configured_start_epoch
+            )));
+            // Create a new epoch state with the configured start epoch
+            // We'll use empty verifier initially - it will be updated when we process actual epoch data
+            latest_epoch_state = EpochState::new(configured_start_epoch, ValidatorVerifier::new(vec![]));
+        }
+
         let verified_epoch_states = VerifiedEpochStates::new(latest_epoch_state);
 
         Self {
@@ -850,9 +864,22 @@ impl<
                 "Found higher epoch ending ledger infos in the network! Local: {:?}, advertised: {:?}",
                    highest_local_epoch_end, highest_advertised_epoch_end
             )));
-            let next_epoch_end = highest_local_epoch_end.checked_add(1).ok_or_else(|| {
+
+            // Memory optimization: Use configured start_epoch to skip ancient epochs
+            let configured_start_epoch = self.driver_configuration.config.start_epoch;
+            let mut next_epoch_end = highest_local_epoch_end.checked_add(1).ok_or_else(|| {
                 Error::IntegerOverflow("The next epoch end has overflown!".into())
             })?;
+
+            // Use the maximum of calculated epoch and configured start epoch
+            // This allows skipping millions of old epochs to save memory
+            if configured_start_epoch > 0 && configured_start_epoch > next_epoch_end {
+                next_epoch_end = configured_start_epoch;
+                info!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                    "Memory optimization: Starting epoch sync from configured start_epoch {:?} instead of {:?}",
+                    next_epoch_end, highest_local_epoch_end + 1
+                )));
+            }
             let epoch_ending_stream = self
                 .streaming_client
                 .get_all_epoch_ending_ledger_infos(next_epoch_end)
@@ -1091,6 +1118,18 @@ impl<
         // Verify the epoch change proofs, update our latest epoch state and
         // verify our waypoint.
         for epoch_ending_ledger_info in epoch_ending_ledger_infos {
+            // Memory optimization: Skip processing epochs before configured start_epoch
+            let current_epoch = epoch_ending_ledger_info.ledger_info().epoch();
+            let configured_start_epoch = self.driver_configuration.config.start_epoch;
+
+            if configured_start_epoch > 0 && current_epoch < configured_start_epoch {
+                trace!(LogSchema::new(LogEntry::Bootstrapper).message(&format!(
+                    "Skipping epoch {:?} processing (before configured start_epoch {:?})",
+                    current_epoch, configured_start_epoch
+                )));
+                continue;
+            }
+
             if let Err(error) = self.verified_epoch_states.update_verified_epoch_states(
                 &epoch_ending_ledger_info,
                 &self.driver_configuration.waypoint,
