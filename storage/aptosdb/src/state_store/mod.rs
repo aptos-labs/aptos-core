@@ -531,18 +531,32 @@ impl StateStore {
             latest_snapshot_version = latest_snapshot_version,
             "Initializing BufferedState."
         );
-        let latest_snapshot_root_hash = if let Some(version) = latest_snapshot_version {
-            state_db
-                .state_merkle_db
-                .get_root_hash(version)
-                .expect("Failed to query latest checkpoint root hash on initialization.")
-        } else {
-            *SPARSE_MERKLE_PLACEHOLDER_HASH
-        };
+        let (latest_snapshot_root_hash, latest_snapshot_hot_root_hash) =
+            if let Some(version) = latest_snapshot_version {
+                info!("version: {}", version);
+                let root_hash = state_db
+                    .state_merkle_db
+                    .get_root_hash(version)
+                    .expect("Failed to query latest checkpoint root hash on initialization.");
+                let hot_root_hash = state_db
+                    .state_merkle_db
+                    .get_hot_root_hash(version)
+                    .expect("Failed");
+                (root_hash, hot_root_hash)
+            } else {
+                (
+                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                    *SPARSE_MERKLE_PLACEHOLDER_HASH,
+                )
+            };
+        info!(
+            "Got root hash from DB: {}, hot root hash: {}",
+            latest_snapshot_root_hash, latest_snapshot_hot_root_hash
+        );
         let usage = state_db.get_state_storage_usage(latest_snapshot_version)?;
         let state = StateWithSummary::new_at_version(
             latest_snapshot_version,
-            *SPARSE_MERKLE_PLACEHOLDER_HASH, // TODO(HotState): for now hot state always starts from empty upon restart.
+            latest_snapshot_hot_root_hash,
             latest_snapshot_root_hash,
             usage,
             HotStateConfig::default(),

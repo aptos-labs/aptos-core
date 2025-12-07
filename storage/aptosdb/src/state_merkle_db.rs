@@ -7,6 +7,7 @@ use crate::{
     metrics::{NODE_CACHE_SECONDS, OTHER_TIMERS_SECONDS},
     schema::{
         db_metadata::{DbMetadataKey, DbMetadataSchema, DbMetadataValue},
+        hot_jellyfish_merkle_node::HotJellyfishMerkleNodeSchema,
         jellyfish_merkle_node::JellyfishMerkleNodeSchema,
         stale_node_index::StaleNodeIndexSchema,
         stale_node_index_cross_epoch::StaleNodeIndexCrossEpochSchema,
@@ -68,6 +69,11 @@ pub struct StateMerkleDb {
     version_caches: HashMap<Option<usize>, VersionedNodeCache>,
     // `None` means the cache is not enabled.
     lru_cache: Option<LruNodeCache>,
+}
+
+struct HotDBWrapper {
+    metadata_db: Arc<DB>,
+    shards: [Arc<DB>; NUM_STATE_SHARDS],
 }
 
 impl StateMerkleDb {
@@ -252,6 +258,14 @@ impl StateMerkleDb {
 
     pub fn get_root_hash(&self, version: Version) -> Result<HashValue> {
         JellyfishMerkleTree::new(self).get_root_hash(version)
+    }
+
+    pub fn get_hot_root_hash(&self, version: Version) -> Result<HashValue> {
+        let wrapper = HotDBWrapper {
+            metadata_db: self.hot_state_merkle_metadata_db.clone(),
+            shards: self.hot_state_merkle_db_shards.clone(),
+        };
+        JellyfishMerkleTree::new(&wrapper).get_root_hash(version)
     }
 
     pub fn get_leaf_count(&self, version: Version) -> Result<usize> {
@@ -820,6 +834,22 @@ impl StateMerkleDb {
             }
         }
         Ok(ret)
+    }
+}
+
+impl TreeReader<StateKey> for HotDBWrapper {
+    fn get_node_option(&self, node_key: &NodeKey, _tag: &str) -> Result<Option<Node>> {
+        let db = if let Some(shard_id) = node_key.get_shard_id() {
+            &self.shards[shard_id]
+        } else {
+            &self.metadata_db
+        };
+        let node_opt = db.get::<HotJellyfishMerkleNodeSchema>(node_key)?;
+        Ok(node_opt)
+    }
+
+    fn get_rightmost_leaf(&self, _version: Version) -> Result<Option<(NodeKey, LeafNode)>> {
+        unimplemented!()
     }
 }
 
