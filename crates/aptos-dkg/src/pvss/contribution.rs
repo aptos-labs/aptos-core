@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     pvss::{schnorr, Player},
@@ -29,8 +29,8 @@ pub fn batch_verify_soks<Gr, A>(
     soks: &[SoK<Gr>],
     pk_base: &Gr,
     pk: &Gr,
-    spks: &Vec<bls12381::PublicKey>,
-    aux: &Vec<A>,
+    spks: &[bls12381::PublicKey],
+    aux: &[A],
     tau: &Scalar,
 ) -> anyhow::Result<()>
 where

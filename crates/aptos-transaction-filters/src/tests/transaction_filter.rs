@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     tests::utils,
@@ -138,6 +138,28 @@ fn test_all_filter() {
         let filtered_transactions = filter.filter_transactions(transactions.clone());
         assert!(filtered_transactions.is_empty());
     }
+}
+
+#[test]
+fn test_encrypted_transaction_filter() {
+    // Create a filter that only allows encrypted transactions
+    let transactions = utils::create_encrypted_and_plaintext_transactions();
+    let filter = TransactionFilter::empty()
+        .add_encrypted_transaction_filter(true)
+        .add_all_filter(false);
+
+    // Verify that the filter returns only encrypted transactions (txn 0, 1 and 2)
+    let filtered_transactions = filter.filter_transactions(transactions.clone());
+    assert_eq!(filtered_transactions, transactions[0..3].to_vec());
+
+    // Create a filter that denies encrypted transactions
+    let filter = TransactionFilter::empty()
+        .add_encrypted_transaction_filter(false)
+        .add_all_filter(true);
+
+    // Verify that the filter returns only plaintext transactions (txn 3 onwards)
+    let filtered_transactions = filter.filter_transactions(transactions.clone());
+    assert_eq!(filtered_transactions, transactions[3..].to_vec());
 }
 
 #[test]

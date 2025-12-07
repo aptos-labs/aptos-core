@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
     monitor,
     network::{NetworkSender, QuorumStoreSender},
@@ -14,7 +14,7 @@ use crate::{
 use aptos_config::config::QuorumStoreConfig;
 use aptos_consensus_types::{
     common::{TransactionInProgress, TransactionSummary},
-    proof_of_store::{BatchInfoExt, TBatchInfo},
+    proof_of_store::{BatchInfoExt, BatchKind, TBatchInfo},
 };
 use aptos_experimental_runtimes::thread_manager::optimal_min_len;
 use aptos_logger::prelude::*;
@@ -33,7 +33,7 @@ use tokio::time::Interval;
 pub enum BatchGeneratorCommand {
     CommitNotification(u64, Vec<BatchInfoExt>),
     ProofExpiration(Vec<BatchId>),
-    RemoteBatch(Batch),
+    RemoteBatch(Batch<BatchInfoExt>),
     Shutdown(tokio::sync::oneshot::Sender<()>),
 }
 
@@ -175,7 +175,7 @@ impl BatchGenerator {
         txns: Vec<SignedTransaction>,
         expiry_time: u64,
         bucket_start: u64,
-    ) -> Batch {
+    ) -> Batch<BatchInfoExt> {
         let batch_id = self.batch_id;
         self.batch_id.increment();
         self.db
@@ -187,21 +187,35 @@ impl BatchGenerator {
         counters::CREATED_BATCHES_COUNT.inc();
         counters::num_txn_per_batch(bucket_start.to_string().as_str(), txns.len());
 
-        Batch::new(
-            batch_id,
-            txns,
-            self.epoch,
-            expiry_time,
-            self.my_peer_id,
-            bucket_start,
-        )
+        if self.config.enable_batch_v2 {
+            // TODO(ibalajiarun): Specify accurate batch kind
+            let batch_kind = BatchKind::Normal;
+            Batch::new_v2(
+                batch_id,
+                txns,
+                self.epoch,
+                expiry_time,
+                self.my_peer_id,
+                bucket_start,
+                batch_kind,
+            )
+        } else {
+            Batch::new_v1(
+                batch_id,
+                txns,
+                self.epoch,
+                expiry_time,
+                self.my_peer_id,
+                bucket_start,
+            )
+        }
     }
 
     /// Push num_txns from txns into batches. If num_txns is larger than max size, then multiple
     /// batches are pushed.
     fn push_bucket_to_batches(
         &mut self,
-        batches: &mut Vec<Batch>,
+        batches: &mut Vec<Batch<BatchInfoExt>>,
         txns: &mut Vec<SignedTransaction>,
         num_txns_in_bucket: usize,
         expiry_time: u64,
@@ -242,7 +256,7 @@ impl BatchGenerator {
         &mut self,
         pulled_txns: &mut Vec<SignedTransaction>,
         expiry_time: u64,
-    ) -> Vec<Batch> {
+    ) -> Vec<Batch<BatchInfoExt>> {
         // Sort by gas, in descending order. This is a stable sort on existing mempool ordering,
         // so will not reorder accounts or their sequence numbers as long as they have the same gas.
         pulled_txns.sort_by_key(|txn| u64::MAX - txn.gas_unit_price());
@@ -325,7 +339,10 @@ impl BatchGenerator {
         self.txns_in_progress_sorted.len()
     }
 
-    pub(crate) async fn handle_scheduled_pull(&mut self, max_count: u64) -> Vec<Batch> {
+    pub(crate) async fn handle_scheduled_pull(
+        &mut self,
+        max_count: u64,
+    ) -> Vec<Batch<BatchInfoExt>> {
         counters::BATCH_PULL_EXCLUDED_TXNS.observe(self.txns_in_progress_sorted.len() as f64);
         trace!(
             "QS: excluding txs len: {:?}",
@@ -474,7 +491,14 @@ impl BatchGenerator {
                             self.batch_writer.persist(persist_requests);
                             counters::BATCH_CREATION_PERSIST_LATENCY.observe_duration(persist_start.elapsed());
 
-                            network_sender.broadcast_batch_msg(batches).await;
+                            if self.config.enable_batch_v2 {
+                                network_sender.broadcast_batch_msg_v2(batches).await;
+                            } else {
+                                let batches = batches.into_iter().map(|batch| {
+                                    batch.try_into().expect("Cannot send V2 batch with flag disabled")
+                                }).collect();
+                                network_sender.broadcast_batch_msg(batches).await;
+                            }
                         } else if tick_start.elapsed() > interval.period().checked_div(2).unwrap_or(Duration::ZERO) {
                             // If the pull takes too long, it's also accounted as a non-empty pull to avoid pulling too often.
                             last_non_empty_pull = tick_start;

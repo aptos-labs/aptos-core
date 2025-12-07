@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use aptos_crypto::{
     bls12381,
@@ -116,13 +115,16 @@ pub fn get_registry() -> Result<Registry> {
     tracer.trace_type::<PersistedStateValueMetadata>(&samples)?;
 
     tracer.trace_type::<StateKey>(&samples)?;
-    tracer.trace_type::<aptos_consensus::quorum_store::types::BatchResponse>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proof_of_store::BatchInfoExt>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::round_timeout::RoundTimeoutReason>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::proof_of_store::BatchKind>(&samples)?;
+    tracer.trace_type::<aptos_consensus::quorum_store::types::BatchResponse>(&samples)?;
     tracer.trace_type::<aptos_consensus::network_interface::ConsensusMsg>(&samples)?;
     tracer.trace_type::<aptos_consensus::network_interface::CommitMessage>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_data::BlockType>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalStatus>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::payload::PayloadExecutionLimit>(&samples)?;
+    tracer.trace_type::<aptos_consensus_types::payload::OptQuorumStorePayload>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::common::Payload>(&samples)?;
     tracer.trace_type::<aptos_consensus_types::block_retrieval::BlockRetrievalRequest>(&samples)?;
 

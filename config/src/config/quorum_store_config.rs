@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::config::{
     config_sanitizer::ConfigSanitizer, node_config_loader::NodeType, Error, NodeConfig,
@@ -99,6 +99,7 @@ pub struct QuorumStoreConfig {
     pub enable_opt_quorum_store: bool,
     pub opt_qs_minimum_batch_age_usecs: u64,
     pub enable_payload_v2: bool,
+    pub enable_batch_v2: bool,
 }
 
 impl Default for QuorumStoreConfig {
@@ -140,6 +141,7 @@ impl Default for QuorumStoreConfig {
             enable_opt_quorum_store: true,
             opt_qs_minimum_batch_age_usecs: Duration::from_millis(50).as_micros() as u64,
             enable_payload_v2: false,
+            enable_batch_v2: false,
         }
     }
 }

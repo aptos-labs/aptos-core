@@ -98,7 +98,7 @@ module 0x42::valid_ref_resource {
     }
     fun test_move_to(account: &signer, addr: address) {
         let s1 = S1{x: 1, y: -1i64, z: -2i128};
-        if (!exists<S1>(addr)) move_to<S1>(s1, account)
+        if (!exists<S1>(addr)) move_to<S1>(account, s1)
     }
 }
 

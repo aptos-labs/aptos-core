@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module defines representation of Aptos core data structures at physical level via schemas
 //! that implement [`aptos_schemadb::schema::Schema`].
@@ -12,6 +12,7 @@ pub(crate) mod db_metadata;
 pub(crate) mod epoch_by_version;
 pub(crate) mod event;
 pub(crate) mod event_accumulator;
+pub(crate) mod hot_jellyfish_merkle_node;
 pub(crate) mod hot_state_value_by_key_hash;
 pub(crate) mod jellyfish_merkle_node;
 pub(crate) mod ledger_info;
@@ -43,6 +44,7 @@ pub const EVENT_ACCUMULATOR_CF_NAME: ColumnFamilyName = "event_accumulator";
 pub const EVENT_BY_KEY_CF_NAME: ColumnFamilyName = "event_by_key";
 pub const EVENT_BY_VERSION_CF_NAME: ColumnFamilyName = "event_by_version";
 pub const EVENT_CF_NAME: ColumnFamilyName = "event";
+pub const HOT_JELLYFISH_MERKLE_NODE_CF_NAME: ColumnFamilyName = "hot_jellyfish_merkle_node";
 pub const HOT_STATE_VALUE_BY_KEY_HASH_CF_NAME: ColumnFamilyName = "hot_state_value_by_key_hash";
 pub const JELLYFISH_MERKLE_NODE_CF_NAME: ColumnFamilyName = "jellyfish_merkle_node";
 pub const LEDGER_INFO_CF_NAME: ColumnFamilyName = "ledger_info";

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     dkg::{
@@ -16,7 +16,9 @@ use aptos_crypto::{bls12381, bls12381::PrivateKey};
 use aptos_dkg::{
     pvss,
     pvss::{
-        traits::{transcript::Aggregatable, Convert, Reconstructable, Transcript},
+        traits::{
+            transcript::Aggregatable, AggregatableTranscript, Convert, Reconstructable, Transcript,
+        },
         Player,
     },
 };

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     monitor,
@@ -9,6 +9,7 @@ use crate::{
         types::{BatchRequest, BatchResponse, PersistedValue},
     },
 };
+use aptos_consensus_types::proof_of_store::BatchInfoExt;
 use aptos_crypto::HashValue;
 use aptos_executor_types::*;
 use aptos_infallible::Mutex;
@@ -102,7 +103,7 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
         digest: HashValue,
         expiration: u64,
         responders: Arc<Mutex<BTreeSet<PeerId>>>,
-        mut subscriber_rx: oneshot::Receiver<PersistedValue>,
+        mut subscriber_rx: oneshot::Receiver<PersistedValue<BatchInfoExt>>,
     ) -> ExecutorResult<Vec<SignedTransaction>> {
         let validator_verifier = self.validator_verifier.clone();
         let mut request_state = BatchRequesterState::new(responders, self.retry_limit);
@@ -148,6 +149,9 @@ impl<T: QuorumStoreSender + Sync + 'static> BatchRequester<T> {
                                     debug!("QS: batch request expired, digest:{}", digest);
                                     return Err(ExecutorError::CouldNotGetData);
                                 }
+                            }
+                            Ok(BatchResponse::BatchV2(_)) => {
+                                error!("Batch V2 response is not supported");
                             }
                             Err(e) => {
                                 counters::RECEIVED_BATCH_RESPONSE_ERROR_COUNT.inc();

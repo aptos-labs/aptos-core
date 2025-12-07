@@ -21,13 +21,7 @@ repos:
         files: ^(?!third_party/).*\.rs$
         args:
           - --license-filepath
-          - devtools/assets/license_header.txt
-          - --license-filepath
-          - devtools/assets/shared_license_header.txt
-          - --license-filepath
-          - devtools/assets/license_header_utf8.txt
-          - --license-filepath
-          - devtools/assets/shared_license_header_utf8.txt
+          - devtools/assets/innovation_license_header.txt
           - --comment-style
           - //
       - id: insert-license

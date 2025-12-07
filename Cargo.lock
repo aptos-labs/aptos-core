@@ -689,6 +689,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "aptos-batch-encryption"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm",
+ "anyhow",
+ "aptos-crypto",
+ "aptos-dkg",
+ "ark-bls12-381 0.5.0",
+ "ark-bn254",
+ "ark-ec 0.5.0",
+ "ark-ff 0.5.0",
+ "ark-ff-asm 0.5.0",
+ "ark-ff-macros 0.5.0",
+ "ark-poly 0.5.0",
+ "ark-serialize 0.5.0",
+ "ark-std 0.5.0",
+ "bcs 0.1.4",
+ "criterion",
+ "ed25519-dalek 2.1.1",
+ "generic-array",
+ "hmac 0.12.1",
+ "itertools 0.13.0",
+ "num-traits",
+ "rand 0.7.3",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "aptos-bcs-utils"
 version = "0.1.0"
 dependencies = [
@@ -1003,6 +1035,7 @@ dependencies = [
  "rayon",
  "scopeguard",
  "serde",
+ "serde-name",
  "serde_bytes",
  "serde_json",
  "sha3 0.9.1",
@@ -2255,14 +2288,12 @@ dependencies = [
  "redis",
  "rstest",
  "serde",
- "serde_json",
  "tikv-jemallocator",
  "tokio",
  "tokio-stream",
  "tonic 0.12.3",
  "tonic-reflection",
  "tracing",
- "uuid 1.11.0",
 ]
 
 [[package]]
@@ -2291,7 +2322,6 @@ dependencies = [
  "tonic 0.12.3",
  "tonic-reflection",
  "tracing",
- "uuid 1.11.0",
  "warp",
 ]
 
@@ -2558,6 +2588,7 @@ dependencies = [
  "tonic 0.12.3",
  "tracing",
  "url",
+ "uuid 1.11.0",
  "warp",
 ]
 
@@ -2662,7 +2693,6 @@ dependencies = [
  "tempfile",
  "tokio",
  "tokio-stream",
- "toml 0.7.8",
  "tonic 0.12.3",
  "url",
 ]
@@ -4535,6 +4565,7 @@ dependencies = [
  "aptos-transaction-emitter-lib",
  "aptos-transaction-workloads-lib",
  "clap 4.5.21",
+ "env_logger",
  "futures",
  "rand 0.7.3",
  "tokio",
@@ -5227,8 +5258,7 @@ dependencies = [
 [[package]]
 name = "ark-ec"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43d68f2d516162846c1238e755a7c4d131b892b70cc70c471a8e3ca3ed818fce"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "ahash 0.8.11",
  "ark-ff 0.5.0",
@@ -5269,8 +5299,7 @@ dependencies = [
 [[package]]
 name = "ark-ff"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a177aba0ed1e0fbb62aa9f6d0502e9b46dad8c2eab04c14258a1212d2557ea70"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "ark-ff-asm 0.5.0",
  "ark-ff-macros 0.5.0",
@@ -5300,8 +5329,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-asm"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62945a2f7e6de02a31fe400aa489f0e0f5b2502e69f95f853adb82a96c7a6b60"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "quote",
  "syn 2.0.87",
@@ -5323,8 +5351,7 @@ dependencies = [
 [[package]]
 name = "ark-ff-macros"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09be120733ee33f7693ceaa202ca41accd5653b779563608f1234f78ae07c4b3"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "num-bigint 0.4.4",
  "num-traits",
@@ -5365,8 +5392,7 @@ dependencies = [
 [[package]]
 name = "ark-poly"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "579305839da207f02b89cd1679e50e67b4331e2f9294a57693e5051b7703fe27"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "ahash 0.8.11",
  "ark-ff 0.5.0",
@@ -5405,8 +5431,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f4d068aaf107ebcd7dfb52bc748f8030e0fc930ac8e360146ca54c1203088f7"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "ark-serialize-derive 0.5.0",
  "ark-std 0.5.0",
@@ -5430,8 +5455,7 @@ dependencies = [
 [[package]]
 name = "ark-serialize-derive"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "213888f660fddcca0d257e88e54ac05bca01885f258ccdf695bafd77031bb69d"
+source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -8518,6 +8542,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "115531babc129696a58c64a4fef0a8bf9e9698629fb97e9e40767d235cfbcd53"
 dependencies = [
  "pkcs8 0.10.2",
+ "serde",
  "signature 2.2.0",
 ]
 
@@ -8530,6 +8555,7 @@ dependencies = [
  "curve25519-dalek 3.2.0",
  "ed25519 1.5.3",
  "rand 0.7.3",
+ "rand_core 0.5.1",
  "serde",
  "serde_bytes",
  "sha2 0.9.9",
@@ -8544,6 +8570,7 @@ checksum = "4a3daa8e81a3963a60642bcc1f90a670680bd4a77535faa384e9d1c79d620871"
 dependencies = [
  "curve25519-dalek 4.1.2",
  "ed25519 2.2.3",
+ "rand_core 0.6.4",
  "serde",
  "sha2 0.10.8",
  "signature 2.2.0",
@@ -9760,6 +9787,7 @@ version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
 dependencies = [
+ "serde",
  "typenum",
  "version_check",
  "zeroize",
@@ -16863,9 +16891,9 @@ dependencies = [
 
 [[package]]
 name = "serde-name"
-version = "0.1.2"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12c47087018ec281d1cdab673d36aea22d816b54d498264029c05d5fa1910da6"
+checksum = "3b5b14ebbcc4e4f2b3642fa99c388649da58d1dc3308c7d109f39f565d1710f0"
 dependencies = [
  "serde",
  "thiserror 1.0.69",
@@ -17120,6 +17148,7 @@ dependencies = [
  "cpufeatures",
  "digest 0.9.0",
  "opaque-debug",
+ "sha2-asm",
 ]
 
 [[package]]
@@ -17131,6 +17160,16 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest 0.10.7",
+ "sha2-asm",
+]
+
+[[package]]
+name = "sha2-asm"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b845214d6175804686b2bd482bcffe96651bb2d1200742b712003504a2dac1ab"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     quorum_store::{
@@ -8,6 +8,7 @@ use crate::{
     },
     test_utils::create_vec_signed_transactions,
 };
+use aptos_consensus_types::proof_of_store::BatchInfo;
 use aptos_temppath::TempPath;
 use aptos_types::{account_address::AccountAddress, quorum_store::BatchId};
 use claims::assert_ok;
@@ -19,7 +20,7 @@ fn test_db_for_data() {
 
     let source = AccountAddress::random();
     let signed_txns = create_vec_signed_transactions(100);
-    let persist_request_1: PersistedValue =
+    let persist_request_1: PersistedValue<BatchInfo> =
         Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source, 0).into();
     let clone_1 = persist_request_1.clone();
     assert!(db.save_batch(clone_1).is_ok());
@@ -32,13 +33,13 @@ fn test_db_for_data() {
     );
 
     let signed_txns = create_vec_signed_transactions(200);
-    let persist_request_2: PersistedValue =
+    let persist_request_2: PersistedValue<BatchInfo> =
         Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source, 0).into();
     let clone_2 = persist_request_2.clone();
     assert_ok!(db.save_batch(clone_2));
 
     let signed_txns = create_vec_signed_transactions(300);
-    let persist_request_3: PersistedValue =
+    let persist_request_3: PersistedValue<BatchInfo> =
         Batch::new(BatchId::new_for_test(1), signed_txns, 1, 20, source, 0).into();
     let clone_3 = persist_request_3.clone();
     assert_ok!(db.save_batch(clone_3));

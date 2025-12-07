@@ -1,12 +1,12 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::quorum_store::{
     batch_store::{BatchStore, BatchWriter, QuotaManager},
     quorum_store_db::QuorumStoreDB,
     types::{PersistedValue, StorageMode},
 };
-use aptos_consensus_types::proof_of_store::BatchInfo;
+use aptos_consensus_types::proof_of_store::{BatchInfo, BatchInfoExt};
 use aptos_crypto::HashValue;
 use aptos_temppath::TempPath;
 use aptos_types::{
@@ -46,7 +46,7 @@ fn request_for_test(
     round: u64,
     num_bytes: u64,
     maybe_payload: Option<Vec<SignedTransaction>>,
-) -> PersistedValue {
+) -> PersistedValue<BatchInfoExt> {
     PersistedValue::new(
         BatchInfo::new(
             *TEST_REQUEST_ACCOUNT, // make sure all request come from the same account
@@ -60,6 +60,7 @@ fn request_for_test(
         ),
         maybe_payload,
     )
+    .into()
 }
 
 #[tokio::test]
@@ -96,7 +97,7 @@ async fn test_extend_expiration_vs_save() {
     let batch_store_clone2 = batch_store.clone();
 
     let digests: Vec<HashValue> = (0..num_experiments).map(|_| HashValue::random()).collect();
-    let later_exp_values: Vec<PersistedValue> = (0..num_experiments)
+    let later_exp_values: Vec<PersistedValue<BatchInfoExt>> = (0..num_experiments)
         .map(|i| {
             // Pre-insert some of them.
             if i % 2 == 0 {

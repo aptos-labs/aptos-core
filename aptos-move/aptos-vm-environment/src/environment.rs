@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     gas::get_gas_parameters,
@@ -273,8 +273,13 @@ impl Environment {
             gas_hook,
         );
         let natives = aptos_natives_with_builder(&mut builder, inject_create_signer_for_gov_sim);
-        let vm_config =
-            aptos_prod_vm_config(gas_feature_version, &features, &timed_features, ty_builder);
+        let vm_config = aptos_prod_vm_config(
+            chain_id,
+            gas_feature_version,
+            &features,
+            &timed_features,
+            ty_builder,
+        );
         let verifier_bytes =
             bcs::to_bytes(&vm_config.verifier_config).expect("Verifier config is serializable");
         let runtime_environment = RuntimeEnvironment::new_with_config(natives, vm_config);

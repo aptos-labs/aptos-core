@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     fiat_shamir,
@@ -29,6 +29,8 @@ pub trait Trait<E: Pairing>:
     > + Sized
     + CanonicalSerialize
 {
+    /// Domain-separation tag (DST) used to ensure that all cryptographic hashes and
+    /// transcript operations within the protocol are uniquely namespaced
     fn dst(&self) -> Vec<u8>;
 
     fn prove<C: Serialize, R: rand_core::RngCore + rand_core::CryptoRng>(

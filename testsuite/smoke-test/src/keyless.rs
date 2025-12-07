@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{smoke_test_environment::SwarmBuilder, utils::get_keyless_on_chain_resource};
 use aptos::{common::types::GasOptions, test::CliTestFramework};

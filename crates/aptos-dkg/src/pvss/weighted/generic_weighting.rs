@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 /// A generic transformation from an unweighted PVSS to a weighted PVSS.
 ///
@@ -48,7 +48,7 @@ impl<T: Transcript> TryFrom<&[u8]> for GenericWeighting<T> {
 impl<T: Transcript> GenericWeighting<T> {
     fn to_weighted_encryption_keys(
         sc: &WeightedConfigBlstrs,
-        eks: &Vec<T::EncryptPubKey>,
+        eks: &[T::EncryptPubKey],
     ) -> Vec<T::EncryptPubKey> {
         // Re-organize the encryption key vector so that we deal multiple shares to each player,
         // proportional to their weight.
@@ -99,7 +99,7 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         pp: &Self::PublicParameters,
         ssk: &Self::SigningSecretKey,
         spk: &Self::SigningPubKey,
-        eks: &Vec<Self::EncryptPubKey>,
+        eks: &[Self::EncryptPubKey],
         s: &Self::InputSecret,
         aux: &A,
         dealer: &Player,
@@ -121,26 +121,6 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
                 rng,
             ),
         }
-    }
-
-    fn verify<A: Serialize + Clone>(
-        &self,
-        sc: &Self::SecretSharingConfig,
-        pp: &Self::PublicParameters,
-        spk: &Vec<Self::SigningPubKey>,
-        eks: &Vec<Self::EncryptPubKey>,
-        aux: &Vec<A>,
-    ) -> anyhow::Result<()> {
-        let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
-
-        T::verify(
-            &self.trx,
-            sc.get_threshold_config(),
-            pp,
-            spk,
-            &duplicated_eks,
-            aux,
-        )
     }
 
     fn get_dealers(&self) -> Vec<Player> {
@@ -209,6 +189,30 @@ impl<T: Transcript<SecretSharingConfig = ThresholdConfigBlstrs>> Transcript
         GenericWeighting {
             trx: T::generate(sc.get_threshold_config(), pp, rng),
         }
+    }
+}
+
+impl<T: AggregatableTranscript<SecretSharingConfig = ThresholdConfigBlstrs>> AggregatableTranscript
+    for GenericWeighting<T>
+{
+    fn verify<A: Serialize + Clone>(
+        &self,
+        sc: &Self::SecretSharingConfig,
+        pp: &Self::PublicParameters,
+        spk: &[Self::SigningPubKey],
+        eks: &[Self::EncryptPubKey],
+        aux: &[A],
+    ) -> anyhow::Result<()> {
+        let duplicated_eks = GenericWeighting::<T>::to_weighted_encryption_keys(sc, eks);
+
+        T::verify(
+            &self.trx,
+            sc.get_threshold_config(),
+            pp,
+            spk,
+            &duplicated_eks,
+            aux,
+        )
     }
 }
 

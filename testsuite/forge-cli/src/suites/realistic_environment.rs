@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::ungrouped::{
     background_traffic_for_sweep, background_traffic_for_sweep_with_latency,
@@ -331,7 +330,6 @@ pub(crate) fn realistic_env_graceful_overload(duration: Duration) -> ForgeConfig
         .with_validator_override_node_config_fn(Arc::new(|config, _| {
             config.execution.processed_transactions_detailed_counters = true;
             // TODO(georgemitenkov): remove once features are added to default config.
-            config.execution.layout_caches_enabled = true;
             config.execution.async_runtime_checks = true;
         }))
         .with_genesis_helm_config_fn(Arc::new(|helm_values| {
@@ -467,7 +465,6 @@ pub(crate) fn realistic_env_max_load_test(
                 .consensus_observer
                 .observer_fallback_sync_lag_threshold_ms = 45_000; // 45 seconds
                                                                    // TODO(georgemitenkov): remove once features are added to default config.
-            config.execution.layout_caches_enabled = true;
             config.execution.async_runtime_checks = true;
         }))
         // First start higher gas-fee traffic, to not cause issues with TxnEmitter setup - account creation
@@ -526,7 +523,6 @@ pub(crate) fn realistic_network_tuned_for_throughput_test() -> ForgeConfig {
                 }
 
                 // TODO(georgemitenkov): remove once features are added to default config.
-                config.execution.layout_caches_enabled = true;
                 config.execution.async_runtime_checks = true;
             }))
             .with_genesis_helm_config_fn(Arc::new(move |helm_values| {

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use super::{
     batch_store::BatchStore,
@@ -8,7 +8,6 @@ use super::{
 use crate::quorum_store::counters;
 use aptos_consensus_types::{
     common::{Author, TxnSummaryWithExpiration},
-    payload::TDataInfo,
     proof_of_store::{BatchInfoExt, ProofOfStore, TBatchInfo},
     utils::PayloadTxnsSize,
 };

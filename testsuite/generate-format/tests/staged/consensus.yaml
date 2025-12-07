@@ -136,12 +136,6 @@ AssertionSignature:
         STRUCT:
           - signature:
               TYPENAME: Secp256r1EcdsaSignature
-Batch:
-  STRUCT:
-    - batch_info:
-        TYPENAME: BatchInfo
-    - payload:
-        TYPENAME: BatchPayload
 BatchId:
   STRUCT:
     - id: U64
@@ -159,11 +153,31 @@ BatchInfo:
     - num_txns: U64
     - num_bytes: U64
     - gas_bucket_start: U64
+BatchInfoExt:
+  ENUM:
+    0:
+      V1:
+        STRUCT:
+          - info:
+              TYPENAME: BatchInfo
+    1:
+      V2:
+        STRUCT:
+          - info:
+              TYPENAME: BatchInfo
+          - extra:
+              TYPENAME: ExtraBatchInfo
+BatchKind:
+  ENUM:
+    0:
+      Normal: UNIT
+    1:
+      Encrypted: UNIT
 BatchMsg:
   STRUCT:
     - batches:
         SEQ:
-          TYPENAME: Batch
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>"
 BatchPayload:
   STRUCT:
     - author:
@@ -188,11 +202,15 @@ BatchResponse:
     0:
       Batch:
         NEWTYPE:
-          TYPENAME: Batch
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>"
     1:
       NotFound:
         NEWTYPE:
           TYPENAME: LedgerInfoWithSignatures
+    2:
+      BatchV2:
+        NEWTYPE:
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfoExt>"
 BitVec:
   STRUCT:
     - inner: BYTES
@@ -447,7 +465,7 @@ ConsensusMsg:
     11:
       BatchResponse:
         NEWTYPE:
-          TYPENAME: Batch
+          TYPENAME: "aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>"
     12:
       SignedBatchInfo:
         NEWTYPE:
@@ -488,6 +506,18 @@ ConsensusMsg:
       OptProposalMsg:
         NEWTYPE:
           TYPENAME: OptProposalMsg
+    22:
+      BatchMsgV2:
+        NEWTYPE:
+          TYPENAME: BatchMsg
+    23:
+      SignedBatchInfoMsgV2:
+        NEWTYPE:
+          TYPENAME: SignedBatchInfoMsg
+    24:
+      ProofOfStoreMsgV2:
+        NEWTYPE:
+          TYPENAME: ProofOfStoreMsg
 ContractEvent:
   ENUM:
     0:
@@ -628,6 +658,10 @@ EventKey:
     - creation_number: U64
     - account_address:
         TYPENAME: AccountAddress
+ExtraBatchInfo:
+  STRUCT:
+    - batch_kind:
+        TYPENAME: BatchKind
 FederatedKeylessPublicKey:
   STRUCT:
     - jwk_addr:
@@ -830,6 +864,10 @@ OptQuorumStorePayload:
   ENUM:
     0:
       V1:
+        NEWTYPE:
+          TYPENAME: OptQuorumStorePayloadV1
+    1:
+      V2:
         NEWTYPE:
           TYPENAME: OptQuorumStorePayloadV1
 OptQuorumStorePayloadV1:
@@ -1522,3 +1560,15 @@ ZeroKnowledgeSig:
     - training_wheels_signature:
         OPTION:
           TYPENAME: EphemeralSignature
+"aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfo>":
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfo
+    - payload:
+        TYPENAME: BatchPayload
+"aptos_consensus::quorum_store::types::Batch<aptos_consensus_types::proof_of_store::BatchInfoExt>":
+  STRUCT:
+    - batch_info:
+        TYPENAME: BatchInfoExt
+    - payload:
+        TYPENAME: BatchPayload

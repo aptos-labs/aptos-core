@@ -1,25 +1,27 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::ptr_arg)]
 #![allow(clippy::needless_borrow)]
 
-use aptos_crypto::{traits::SecretSharingConfig as _, Uniform};
+use aptos_crypto::{SecretSharingConfig, Uniform};
 use aptos_dkg::{
     algebra::evaluation_domain::BatchEvaluationDomain,
     pvss::{
-        self,
+        chunky::Transcript as ChunkyTranscript,
+        das,
         test_utils::{
             self, get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
             DealingArgs, NoAux, BENCHMARK_CONFIGS,
         },
         traits::transcript::{
             Aggregatable, AggregatableTranscript, HasAggregatableSubtranscript,
-            MalleableTranscript, Transcript, WithMaxNumShares,
+            MalleableTranscript, NonAggregatableTranscript, Transcript, WithMaxNumShares,
         },
         LowDegreeTest, WeightedConfigBlstrs,
     },
 };
+use ark_bn254::Bn254;
 use criterion::{
     criterion_group, criterion_main,
     measurement::{Measurement, WallTime},
@@ -29,19 +31,22 @@ use more_asserts::assert_le;
 use rand::{rngs::ThreadRng, thread_rng, Rng};
 
 pub fn all_groups(c: &mut Criterion) {
-    // unweighted BN254 PVSS with aggregatable subscript
-    for tc in get_threshold_configs_for_benchmarking() {
-        subaggregatable_pvss_group::<pvss::chunky::Transcript<ark_bn254::Bn254>>(&tc, c);
+    // unweighted BN254 PVSS with aggregatable subtranscript; only doing 2 because large configs are a bit slow and not relevant anyway
+    for tc in get_threshold_configs_for_benchmarking().into_iter().take(2) {
+        subaggregatable_pvss_group::<
+            <ChunkyTranscript<Bn254> as Transcript>::SecretSharingConfig,
+            ChunkyTranscript<Bn254>,
+        >(&tc, c);
     }
 
     // unweighted aggregatable PVSS
     for tc in get_threshold_configs_for_benchmarking() {
-        aggregatable_pvss_group::<pvss::das::Transcript>(&tc, c);
+        aggregatable_pvss_group::<das::Transcript>(&tc, c);
     }
 
     // weighted PVSS
     for wc in get_weighted_configs_for_benchmarking() {
-        let d = aggregatable_pvss_group::<pvss::das::WeightedTranscript>(&wc, c);
+        let d = aggregatable_pvss_group::<das::WeightedTranscript>(&wc, c);
         weighted_pvss_group(&wc, d, c);
 
         // Note: Insecure, so not interested in benchmarks.
@@ -100,7 +105,10 @@ pub fn aggregatable_pvss_group<T: AggregatableTranscript + MalleableTranscript>(
 
 // TODO: combine with function above, rather than copy-paste
 pub fn subaggregatable_pvss_group<
-    T: HasAggregatableSubtranscript<T::SecretSharingConfig> + MalleableTranscript,
+    C: SecretSharingConfig,
+    T: NonAggregatableTranscript
+        + HasAggregatableSubtranscript<C>
+        + MalleableTranscript<SecretSharingConfig = C>,
 >(
     sc: &T::SecretSharingConfig,
     c: &mut Criterion,
@@ -114,8 +122,8 @@ pub fn subaggregatable_pvss_group<
 
     // pvss_transcript_random::<T, WallTime>(sc, &mut group);
     pvss_deal::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
-    pvss_subaggregate::<T, WallTime>(sc, &mut group);
-    pvss_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
+    pvss_subaggregate::<C, T, WallTime>(sc, &mut group);
+    pvss_nonaggregate_verify::<T, WallTime>(sc, &d.pp, &d.ssks, &d.spks, &d.eks, &mut group);
     pvss_decrypt_own_share::<T, WallTime>(
         sc, &d.pp, &d.ssks, &d.spks, &d.dks, &d.eks, &d.s, &mut group,
     );
@@ -154,9 +162,9 @@ pub fn weighted_pvss_group<
 fn pvss_deal<T: Transcript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
-    spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -211,7 +219,8 @@ fn pvss_aggregate<T: AggregatableTranscript, M: Measurement>(
 }
 
 fn pvss_subaggregate<
-    T: Transcript + HasAggregatableSubtranscript<T::SecretSharingConfig>,
+    C: SecretSharingConfig,
+    T: Transcript<SecretSharingConfig = C> + HasAggregatableSubtranscript<C>,
     M: Measurement,
 >(
     sc: &T::SecretSharingConfig,
@@ -240,12 +249,12 @@ fn pvss_subaggregate<
     });
 }
 
-fn pvss_verify<T: Transcript, M: Measurement>(
+fn pvss_verify<T: AggregatableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
-    spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
     g: &mut BenchmarkGroup<M>,
 ) {
     g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
@@ -269,7 +278,43 @@ fn pvss_verify<T: Transcript, M: Measurement>(
                 )
             },
             |trx| {
-                trx.verify(&sc, &pp, &vec![spks[0].clone()], &eks, &vec![NoAux])
+                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &[NoAux])
+                    .expect("PVSS transcript verification should succeed");
+            },
+        )
+    });
+}
+
+fn pvss_nonaggregate_verify<T: NonAggregatableTranscript, M: Measurement>(
+    sc: &T::SecretSharingConfig,
+    pp: &T::PublicParameters,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    eks: &[T::EncryptPubKey],
+    g: &mut BenchmarkGroup<M>,
+) {
+    g.throughput(Throughput::Elements(sc.get_total_num_shares() as u64));
+
+    let mut rng = thread_rng();
+
+    g.bench_function(format!("verify/{}", sc), move |b| {
+        b.iter_with_setup(
+            || {
+                let s = T::InputSecret::generate(&mut rng);
+                T::deal(
+                    &sc,
+                    &pp,
+                    &ssks[0],
+                    &spks[0],
+                    &eks,
+                    &s,
+                    &NoAux,
+                    &sc.get_player(0),
+                    &mut rng,
+                )
+            },
+            |trx| {
+                trx.verify(&sc, &pp, &[spks[0].clone()], &eks, &NoAux)
                     .expect("PVSS transcript verification should succeed");
             },
         )
@@ -279,9 +324,9 @@ fn pvss_verify<T: Transcript, M: Measurement>(
 fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
+    ssks: &[T::SigningSecretKey],
     spks: &Vec<T::SigningPubKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    eks: &[T::EncryptPubKey],
     iss: &T::InputSecret,
     num_aggr: usize,
     g: &mut BenchmarkGroup<M>,
@@ -338,10 +383,10 @@ fn pvss_aggregate_verify<T: AggregatableTranscript + MalleableTranscript, M: Mea
 fn pvss_decrypt_own_share<T: Transcript, M: Measurement>(
     sc: &T::SecretSharingConfig,
     pp: &T::PublicParameters,
-    ssks: &Vec<T::SigningSecretKey>,
-    spks: &Vec<T::SigningPubKey>,
-    dks: &Vec<T::DecryptPrivKey>,
-    eks: &Vec<T::EncryptPubKey>,
+    ssks: &[T::SigningSecretKey],
+    spks: &[T::SigningPubKey],
+    dks: &[T::DecryptPrivKey],
+    eks: &[T::EncryptPubKey],
     s: &T::InputSecret,
     g: &mut BenchmarkGroup<M>,
 ) {

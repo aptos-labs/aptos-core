@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 #![allow(clippy::arc_with_non_send_sync)]
 
@@ -1300,6 +1299,10 @@ impl SignedTransaction {
 
     pub fn replay_protector(&self) -> ReplayProtector {
         self.raw_txn.replay_protector()
+    }
+
+    pub fn is_encrypted_txn(&self) -> bool {
+        self.payload().is_encrypted_variant()
     }
 }
 

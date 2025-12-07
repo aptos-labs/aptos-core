@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{pvss::chunky::chunked_elgamal, traits, Scalar};
 use aptos_crypto::{
@@ -72,9 +72,10 @@ impl<E: Pairing> traits::Convert<EncryptPubKey<E>, chunked_elgamal::PublicParame
 }
 
 #[allow(non_snake_case)]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq)]
 pub struct DealtPubKey<E: Pairing> {
     /// A group element $G$ \in G_2$
+    #[serde(serialize_with = "ark_se")]
     G: E::G2Affine,
 }
 
@@ -82,6 +83,10 @@ pub struct DealtPubKey<E: Pairing> {
 impl<E: Pairing> DealtPubKey<E> {
     pub fn new(G: E::G2Affine) -> Self {
         Self { G }
+    }
+
+    pub fn as_g2(&self) -> E::G2Affine {
+        self.G
     }
 }
 
@@ -91,6 +96,10 @@ pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>); // TODO: Cop
 impl<E: Pairing> DealtPubKeyShare<E> {
     pub fn new(dealt_pk: DealtPubKey<E>) -> Self {
         DealtPubKeyShare(dealt_pk)
+    }
+
+    pub fn as_g2(&self) -> E::G2Affine {
+        self.0.as_g2()
     }
 }
 

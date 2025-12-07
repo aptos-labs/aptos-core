@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 pub mod chunky;
 mod contribution;
@@ -13,6 +13,7 @@ pub(crate) mod encryption_elgamal;
 pub mod insecure_field;
 mod low_degree_test;
 mod schnorr;
+pub mod signed;
 pub mod test_utils;
 pub mod traits;
 pub mod weighted;

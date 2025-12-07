@@ -1,10 +1,10 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::consensus_observer::common::error::Error;
 use aptos_consensus_types::{
     common::{BatchPayload, Payload},
-    payload::InlineBatches,
+    payload::{InlineBatches, OptQuorumStorePayload},
     pipelined_block::PipelinedBlock,
     proof_of_store::{BatchInfo, ProofCache, ProofOfStore},
 };
@@ -696,18 +696,20 @@ impl BlockTransactionPayload {
 
                 // TODO: verify the block gas limit?
             },
-            Payload::OptQuorumStore(opt_qs_payload) => {
+            Payload::OptQuorumStore(OptQuorumStorePayload::V1(p)) => {
                 // Verify the batches in the requested block
-                self.verify_batches(opt_qs_payload.proof_with_data())?;
+                self.verify_batches(p.proof_with_data())?;
 
                 // Verify optQS and inline batches
-                self.verify_optqs_and_inline_batches(
-                    opt_qs_payload.opt_batches(),
-                    opt_qs_payload.inline_batches(),
-                )?;
+                self.verify_optqs_and_inline_batches(p.opt_batches(), p.inline_batches())?;
 
                 // Verify the transaction limit
-                self.verify_transaction_limit(opt_qs_payload.max_txns_to_execute())?;
+                self.verify_transaction_limit(p.max_txns_to_execute())?;
+            },
+            Payload::OptQuorumStore(OptQuorumStorePayload::V2(_p)) => {
+                return Err(Error::InvalidMessageError(
+                    "OptQuorumStorePayload V2 is not supproted".into(),
+                ));
             },
         }
 
@@ -772,7 +774,7 @@ impl BlockTransactionPayload {
     fn verify_optqs_and_inline_batches(
         &self,
         expected_opt_batches: &Vec<BatchInfo>,
-        expected_inline_batches: &InlineBatches,
+        expected_inline_batches: &InlineBatches<BatchInfo>,
     ) -> Result<(), Error> {
         let optqs_and_inline_batches: &Vec<BatchInfo> = match self {
             BlockTransactionPayload::OptQuorumStore(_, optqs_and_inline_batches) => {
@@ -1247,10 +1249,10 @@ mod test {
         );
 
         // Create a quorum store payload with a single proof
-        let inline_batches = InlineBatches::from(Vec::<InlineBatch>::new());
+        let inline_batches = InlineBatches::from(Vec::<InlineBatch<BatchInfo>>::new());
         let opt_batches: BatchPointer<BatchInfo> = Vec::new().into();
         let batch_info = create_batch_info();
-        let proof_with_data: ProofBatches =
+        let proof_with_data: ProofBatches<BatchInfo> =
             vec![ProofOfStore::new(batch_info, AggregateSignature::empty())].into();
         let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
             inline_batches.clone(),
@@ -1266,7 +1268,7 @@ mod test {
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a quorum store payload with no transaction limit
-        let proof_with_data: ProofBatches = Vec::new().into();
+        let proof_with_data: ProofBatches<BatchInfo> = Vec::new().into();
         let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
             inline_batches,
             opt_batches,
@@ -1281,7 +1283,7 @@ mod test {
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a quorum store payload with a single inline batch
-        let proof_with_data: ProofBatches = Vec::new().into();
+        let proof_with_data: ProofBatches<BatchInfo> = Vec::new().into();
         let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
             vec![(create_batch_info(), vec![])].into(),
             Vec::new().into(),
@@ -1296,9 +1298,9 @@ mod test {
         assert_matches!(error, Error::InvalidMessageError(_));
 
         // Create a quorum store payload with a single opt batch
-        let proof_with_data: ProofBatches = Vec::new().into();
+        let proof_with_data: ProofBatches<BatchInfo> = Vec::new().into();
         let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
-            Vec::<InlineBatch>::new().into(),
+            Vec::<InlineBatch<BatchInfo>>::new().into(),
             vec![create_batch_info()].into(),
             proof_with_data,
             PayloadExecutionLimit::None,
@@ -1313,7 +1315,7 @@ mod test {
         // Create an empty opt quorum store payload
         let proof_with_data = Vec::new().into();
         let ordered_payload = Payload::OptQuorumStore(OptQuorumStorePayload::new(
-            Vec::<InlineBatch>::new().into(),
+            Vec::<InlineBatch<BatchInfo>>::new().into(),
             Vec::new().into(),
             proof_with_data,
             PayloadExecutionLimit::MaxTransactionsToExecute(100),
@@ -1329,8 +1331,8 @@ mod test {
             create_batch_info(),
             AggregateSignature::empty(),
         )];
-        let inline_batches: InlineBatches = vec![(create_batch_info(), vec![])].into();
-        let opt_batches: OptBatches = vec![create_batch_info()].into();
+        let inline_batches: InlineBatches<BatchInfo> = vec![(create_batch_info(), vec![])].into();
+        let opt_batches: OptBatches<BatchInfo> = vec![create_batch_info()].into();
         let opt_and_inline_batches =
             [opt_batches.deref().clone(), inline_batches.batch_infos()].concat();
 

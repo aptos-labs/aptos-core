@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{tests::utils, transaction_filter::TransactionFilter};
 
@@ -117,4 +117,29 @@ fn test_transaction_filter_config_multiple_matchers() {
         let filtered_transactions = transaction_filter.filter_transactions(transactions.clone());
         assert_eq!(filtered_transactions, transactions[4..].to_vec());
     }
+}
+
+#[test]
+fn test_transaction_filter_config_multiple_matchers_encrypted() {
+    // Create a set of transactions (encrypted and plaintext)
+    let transactions = utils::create_encrypted_and_plaintext_transactions();
+
+    // Create a filter that denies encrypted transactions from the first transaction sender only
+    let transaction_filter_string = format!(
+        r#"
+            transaction_rules:
+                - Deny:
+                    - EncryptedTransaction
+                    - Sender: "{}"
+                - Allow:
+                    - All
+          "#,
+        transactions[0].sender().to_standard_string()
+    );
+    let transaction_filter =
+        serde_yaml::from_str::<TransactionFilter>(&transaction_filter_string).unwrap();
+
+    // Verify that the first transaction is denied
+    let filtered_transactions = transaction_filter.filter_transactions(transactions.clone());
+    assert_eq!(filtered_transactions, transactions[1..].to_vec());
 }

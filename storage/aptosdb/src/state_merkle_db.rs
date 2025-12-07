@@ -1,5 +1,5 @@
-// Copyright © Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::{
     db_options::gen_state_merkle_cfds,
@@ -49,6 +49,7 @@ use std::{
 pub const STATE_MERKLE_DB_FOLDER_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_DB_NAME: &str = "state_merkle_db";
 pub const STATE_MERKLE_METADATA_DB_NAME: &str = "state_merkle_metadata_db";
+pub const HOT_STATE_MERKLE_METADATA_DB_NAME: &str = "state_merkle_metadata_db";
 
 pub(crate) type LeafNode = aptos_jellyfish_merkle::node_type::LeafNode<StateKey>;
 pub(crate) type Node = aptos_jellyfish_merkle::node_type::Node<StateKey>;
@@ -58,8 +59,10 @@ type NodeBatch = aptos_jellyfish_merkle::NodeBatch<StateKey>;
 pub struct StateMerkleDb {
     // Stores metadata and top levels (non-sharded part) of tree nodes.
     state_merkle_metadata_db: Arc<DB>,
+    hot_state_merkle_metadata_db: Arc<DB>,
     // Stores sharded part of tree nodes.
     state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
+    hot_state_merkle_db_shards: [Arc<DB>; NUM_STATE_SHARDS],
     enable_sharding: bool,
     // shard_id -> cache.
     version_caches: HashMap<Option<usize>, VersionedNodeCache>,
@@ -89,23 +92,7 @@ impl StateMerkleDb {
         let lru_cache = NonZeroUsize::new(max_nodes_per_lru_cache_shard).map(LruNodeCache::new);
 
         if !sharding {
-            info!("Sharded state merkle DB is not enabled!");
-            let state_merkle_db_path = db_paths.default_root_path().join(STATE_MERKLE_DB_NAME);
-            let db = Arc::new(Self::open_db(
-                state_merkle_db_path,
-                STATE_MERKLE_DB_NAME,
-                &state_merkle_db_config,
-                env,
-                block_cache,
-                readonly,
-            )?);
-            return Ok(Self {
-                state_merkle_metadata_db: Arc::clone(&db),
-                state_merkle_db_shards: arr![Arc::clone(&db); 16],
-                enable_sharding: false,
-                version_caches,
-                lru_cache,
-            });
+            panic!("Sharded state merkle DB is not enabled!");
         }
 
         Self::open(
@@ -199,7 +186,11 @@ impl StateMerkleDb {
             for shard_id in 0..NUM_STATE_SHARDS {
                 state_merkle_db
                     .db_shard(shard_id)
-                    .create_checkpoint(Self::db_shard_path(cp_root_path.as_ref(), shard_id))?;
+                    .create_checkpoint(Self::db_shard_path(
+                        cp_root_path.as_ref(),
+                        shard_id,
+                        /* is_hot = */ false,
+                    ))?;
             }
         }
 
@@ -581,6 +572,17 @@ impl StateMerkleDb {
             readonly,
         )?);
 
+        let mut hot_state_merkle_metadata_db_path = state_merkle_metadata_db_path.clone();
+        hot_state_merkle_metadata_db_path.set_file_name("hot_metadata");
+        let hot_state_merkle_metadata_db = Arc::new(Self::open_db(
+            hot_state_merkle_metadata_db_path,
+            HOT_STATE_MERKLE_METADATA_DB_NAME,
+            &state_merkle_db_config,
+            env,
+            block_cache,
+            readonly,
+        )?);
+
         info!(
             state_merkle_metadata_db_path = state_merkle_metadata_db_path,
             "Opened state merkle metadata db!"
@@ -597,6 +599,29 @@ impl StateMerkleDb {
                     env,
                     block_cache,
                     readonly,
+                    /* is_hot = */ false,
+                )
+                .unwrap_or_else(|e| {
+                    panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
+                });
+                Arc::new(db)
+            })
+            .collect::<Vec<_>>()
+            .try_into()
+            .unwrap();
+
+        let hot_state_merkle_db_shards = (0..NUM_STATE_SHARDS)
+            .into_par_iter()
+            .map(|shard_id| {
+                let shard_root_path = db_paths.state_merkle_db_shard_root_path(shard_id);
+                let db = Self::open_shard(
+                    shard_root_path,
+                    shard_id,
+                    &state_merkle_db_config,
+                    env,
+                    block_cache,
+                    readonly,
+                    /* is_hot = */ true,
                 )
                 .unwrap_or_else(|e| {
                     panic!("Failed to open state merkle db shard {shard_id}: {e:?}.")
@@ -609,7 +634,9 @@ impl StateMerkleDb {
 
         let state_merkle_db = Self {
             state_merkle_metadata_db,
+            hot_state_merkle_metadata_db,
             state_merkle_db_shards,
+            hot_state_merkle_db_shards,
             enable_sharding: true,
             version_caches,
             lru_cache,
@@ -636,10 +663,15 @@ impl StateMerkleDb {
         env: Option<&Env>,
         block_cache: Option<&Cache>,
         readonly: bool,
+        is_hot: bool,
     ) -> Result<DB> {
-        let db_name = format!("state_merkle_db_shard_{}", shard_id);
+        let db_name = if is_hot {
+            format!("hot_state_merkle_db_shard_{}", shard_id)
+        } else {
+            format!("state_merkle_db_shard_{}", shard_id)
+        };
         Self::open_db(
-            Self::db_shard_path(db_root_path, shard_id),
+            Self::db_shard_path(db_root_path, shard_id, is_hot),
             &db_name,
             state_merkle_db_config,
             env,
@@ -673,8 +705,12 @@ impl StateMerkleDb {
         })
     }
 
-    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize) -> PathBuf {
-        let shard_sub_path = format!("shard_{}", shard_id);
+    fn db_shard_path<P: AsRef<Path>>(db_root_path: P, shard_id: usize, is_hot: bool) -> PathBuf {
+        let shard_sub_path = format!(
+            "{}_{}",
+            if is_hot { "hot_shard" } else { "shard" },
+            shard_id
+        );
         db_root_path
             .as_ref()
             .join(STATE_MERKLE_DB_FOLDER_NAME)

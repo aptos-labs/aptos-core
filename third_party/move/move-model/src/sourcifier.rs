@@ -1034,13 +1034,6 @@ impl<'a> ExpSourcifier<'a> {
         })
     }
 
-    fn print_rev_exp_list(&self, open: &str, close: &str, exps: &[Exp]) {
-        self.parent
-            .print_list(open, ", ", close, exps.iter().rev(), |e| {
-                self.print_exp(Prio::General, false, e)
-            })
-    }
-
     fn print_call(&self, context_prio: Priority, id: NodeId, oper: &Operation, args: &[Exp]) {
         match oper {
             Operation::MoveFunction(mid, fid) => {
@@ -1247,7 +1240,7 @@ impl<'a> ExpSourcifier<'a> {
             Operation::MoveTo => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "move_to");
                 self.print_node_inst(id);
-                self.print_rev_exp_list("(", ")", args)
+                self.print_exp_list("(", ")", args)
             }),
             Operation::MoveFrom => self.parenthesize(context_prio, Prio::Postfix, || {
                 emit!(self.wr(), "move_from");
