@@ -21,9 +21,8 @@ module alice::entry_points_safety {
     // Ok: public entry function
     public entry fun public_entry() {
     }
-    
+
     // Ok: non-entry public(friend) function
     public(friend) fun friend_non_entry() {
     }
 }
-
