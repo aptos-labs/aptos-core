@@ -1,27 +1,34 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use crate::{
+    group::G2Affine,
     schemes::fptx::FPTX,
-    shared::key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare},
+    shared::{
+        digest::DigestKey,
+        key_derivation::{BIBEDecryptionKey, BIBEDecryptionKeyShare},
+    },
     traits::BatchThresholdEncryption,
 };
 use anyhow::Result;
-use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
-use ark_std::rand::{seq::SliceRandom, thread_rng, Rng as _};
+use aptos_crypto::{arkworks::shamir::ShamirThresholdConfig, SecretSharingConfig as _};
+use ark_ec::AffineRepr as _;
+use ark_std::rand::{seq::SliceRandom, thread_rng, CryptoRng, Rng as _, RngCore};
 
-#[test]
-fn smoke() {
-    let mut rng = thread_rng();
-    let tc_happy = ShamirThresholdConfig::new(5, 8);
-    let tc_slow = ShamirThresholdConfig::new(3, 8);
-
-    let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
-        FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
-
+fn smoke_with_setup<R: RngCore + CryptoRng>(
+    rng: &mut R,
+    tc_happy: <FPTX as BatchThresholdEncryption>::ThresholdConfig,
+    tc_slow: <FPTX as BatchThresholdEncryption>::ThresholdConfig,
+    ek: <FPTX as BatchThresholdEncryption>::EncryptionKey,
+    dk: <FPTX as BatchThresholdEncryption>::DigestKey,
+    vks_happy: Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+    msk_shares_happy: Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+    vks_slow: Vec<<FPTX as BatchThresholdEncryption>::VerificationKey>,
+    msk_shares_slow: Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+) {
     let plaintext: String = String::from("hi");
     let associated_data: String = String::from("hi");
 
-    let ct = FPTX::encrypt(&ek, &mut rng, &plaintext, &associated_data).unwrap();
+    let ct = FPTX::encrypt(&ek, rng, &plaintext, &associated_data).unwrap();
     FPTX::verify_ct(&ct, &associated_data).unwrap();
 
     let (d, pfs_promise) = FPTX::digest(&dk, &vec![ct.clone()], 0).unwrap();
@@ -47,7 +54,7 @@ fn smoke() {
 
         let dk = FPTX::reconstruct_decryption_key(
             &dk_shares
-                .choose_multiple(&mut rng, tc.t)
+                .choose_multiple(rng, tc.t)
                 .cloned()
                 .collect::<Vec<BIBEDecryptionKeyShare>>(),
             &tc,
@@ -82,6 +89,145 @@ fn smoke() {
     let individual_decrypted_plaintext: String =
         FPTX::decrypt_individual(&dk_slow, &ct, &d, &eval_proof).unwrap();
     assert_eq!(individual_decrypted_plaintext, plaintext);
+}
+
+#[test]
+fn smoke_with_setup_for_testing() {
+    let mut rng = thread_rng();
+    let tc_happy = ShamirThresholdConfig::new(5, 8);
+    let tc_slow = ShamirThresholdConfig::new(3, 8);
+
+    let (ek, dk, vks_happy, msk_shares_happy, vks_slow, msk_shares_slow) =
+        FPTX::setup_for_testing(rng.r#gen(), 8, 1, &tc_happy, &tc_slow).unwrap();
+
+    smoke_with_setup(
+        &mut rng,
+        tc_happy,
+        tc_slow,
+        ek,
+        dk,
+        vks_happy,
+        msk_shares_happy,
+        vks_slow,
+        msk_shares_slow,
+    );
+}
+
+type T = aptos_dkg::pvss::chunky::Transcript<crate::group::Pairing>;
+use aptos_crypto::{SigningKey, Uniform};
+use aptos_dkg::pvss::{
+    test_utils::NoAux,
+    traits::{
+        transcript::HasAggregatableSubtranscript, Convert, HasEncryptionPublicParams, Transcript,
+    },
+};
+
+#[test]
+fn smoke_with_pvss() {
+    let mut rng = thread_rng();
+    let mut rng_aptos = rand::thread_rng();
+
+    let tc_happy = ShamirThresholdConfig::new(5, 8);
+    let tc_slow = ShamirThresholdConfig::new(3, 8);
+    let pp = <T as Transcript>::PublicParameters::new_with_commitment_base(
+        tc_happy.get_total_num_players(),
+        aptos_dkg::pvss::chunky::DEFAULT_ELL_FOR_TESTING,
+        G2Affine::generator(),
+        &mut rng_aptos,
+    );
+
+    let ssks = (0..tc_happy.get_total_num_players())
+        .map(|_| <T as Transcript>::SigningSecretKey::generate(&mut rng_aptos))
+        .collect::<Vec<<T as Transcript>::SigningSecretKey>>();
+    let spks = ssks
+        .iter()
+        .map(|ssk| ssk.verifying_key())
+        .collect::<Vec<<T as Transcript>::SigningPubKey>>();
+
+    let dks: Vec<<T as Transcript>::DecryptPrivKey> = (0..tc_happy.get_total_num_players())
+        .map(|_| <T as Transcript>::DecryptPrivKey::generate(&mut rng_aptos))
+        .collect();
+    let eks: Vec<<T as Transcript>::EncryptPubKey> = dks
+        .iter()
+        .map(|dk| dk.to(pp.get_encryption_public_params()))
+        .collect();
+
+    let s = <T as Transcript>::InputSecret::generate(&mut rng_aptos);
+
+    // Test dealing
+    let subtrx_happypath = T::deal(
+        &tc_happy,
+        &pp,
+        &ssks[0],
+        &spks[0],
+        &eks,
+        &s,
+        &NoAux,
+        &tc_happy.get_player(0),
+        &mut rng_aptos,
+    )
+    .get_subtranscript();
+
+    let subtrx_slowpath = T::deal(
+        &tc_slow,
+        &pp,
+        &ssks[0],
+        &spks[0],
+        &eks,
+        &s,
+        &NoAux,
+        &tc_slow.get_player(0),
+        &mut rng_aptos,
+    )
+    .get_subtranscript();
+
+    let dk = DigestKey::new(&mut rng, 8, 1).unwrap();
+
+    let (ek, vks_happy, _, vks_slow, _) = FPTX::setup(
+        &dk,
+        &pp,
+        &subtrx_happypath,
+        &subtrx_slowpath,
+        &tc_happy,
+        &tc_slow,
+        tc_happy.get_player(0),
+        &dks[0],
+    )
+    .unwrap();
+
+    let (msk_shares_happy, msk_shares_slow): (
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+        Vec<<FPTX as BatchThresholdEncryption>::MasterSecretKeyShare>,
+    ) = tc_happy
+        .get_players()
+        .into_iter()
+        .map(|p| {
+            let (_, _, msk_share_happypath, _, msk_share_slowpath) = FPTX::setup(
+                &dk,
+                &pp,
+                &subtrx_happypath,
+                &subtrx_slowpath,
+                &tc_happy,
+                &tc_slow,
+                p,
+                &dks[p.get_id()],
+            )
+            .unwrap();
+            (msk_share_happypath, msk_share_slowpath)
+        })
+        .collect();
+
+    smoke_with_setup(
+        &mut rng,
+        tc_happy,
+        tc_slow,
+        ek,
+        dk,
+        vks_happy,
+        msk_shares_happy,
+        vks_slow,
+        msk_shares_slow,
+    );
 }
 
 #[test]

@@ -6,9 +6,10 @@
 #![allow(clippy::let_and_return)]
 
 //! PVSS scheme-independent testing
+#[cfg(test)]
+use aptos_crypto::SecretSharingConfig;
 use aptos_crypto::{
     blstrs::{random_scalar, G1_PROJ_NUM_BYTES, G2_PROJ_NUM_BYTES},
-    traits::SecretSharingConfig as _,
     weighted_config::WeightedConfigArkworks,
 };
 #[cfg(test)]
@@ -21,7 +22,9 @@ use aptos_dkg::pvss::{
         get_threshold_configs_for_benchmarking, get_weighted_configs_for_benchmarking,
         reconstruct_dealt_secret_key_randomly, NoAux,
     },
-    traits::transcript::{NonAggregatableTranscript, Transcript, WithMaxNumShares},
+    traits::transcript::{
+        HasAggregatableSubtranscript, NonAggregatableTranscript, Transcript, WithMaxNumShares,
+    },
     GenericWeighting, ThresholdConfigBlstrs,
 };
 use rand::{rngs::StdRng, thread_rng};
@@ -59,11 +62,18 @@ fn test_pvss_all_unweighted() {
 
         let seed = random_scalar(&mut rng);
 
+        type ChunkyTranscript = chunky::Transcript<ark_bn254::Bn254>;
+
         // Chunky
         pvss_nonaggregate_deal_verify_and_reconstruct::<chunky::Transcript<ark_bn254::Bn254>>(
             &tc,
             seed.to_bytes_le(),
         );
+
+        pvss_deal_verify_and_reconstruct_from_subtranscript::<
+            <ChunkyTranscript as Transcript>::SecretSharingConfig,
+            ChunkyTranscript,
+        >(&tc, seed.to_bytes_le());
     }
 }
 
@@ -100,7 +110,7 @@ fn test_pvss_all_weighted() {
 
     // Restarting the loop here because now it'll grab **arkworks** weighted `ThresholdConfig`s over BN254 instead
     let wcs = test_utils::get_weighted_configs_for_testing();
-    for wc in wcs.iter() {
+    for wc in wcs {
         println!("\nTesting {wc} PVSS");
         let seed = random_scalar(&mut rng);
 
@@ -289,6 +299,46 @@ fn pvss_nonaggregate_weighted_deal_verify_and_reconstruct<
 
     assert_eq!(trx, trx_deserialized);
     if d.dsk != reconstruct_dealt_secret_key_randomly::<StdRng, T>(sc, &mut rng, &d.dks, trx, &d.pp)
+    {
+        panic!("Reconstructed SK did not match");
+    }
+}
+
+#[cfg(test)]
+fn pvss_deal_verify_and_reconstruct_from_subtranscript<
+    C: SecretSharingConfig,
+    T: Transcript<SecretSharingConfig = C> + HasAggregatableSubtranscript<C>,
+>(
+    sc: &T::SecretSharingConfig,
+    seed_bytes: [u8; 32],
+) {
+    // println!();
+    // println!("Seed: {}", hex::encode(seed_bytes.as_slice()));
+
+    use aptos_dkg::pvss::test_utils::reconstruct_dealt_secret_key_randomly_subtranscript;
+    let mut rng = StdRng::from_seed(seed_bytes);
+
+    let d = test_utils::setup_dealing::<T, StdRng>(sc, &mut rng);
+
+    // Test dealing
+    let trx = T::deal(
+        &sc,
+        &d.pp,
+        &d.ssks[0],
+        &d.spks[0],
+        &d.eks,
+        &d.s,
+        &NoAux,
+        &sc.get_player(0),
+        &mut rng,
+    );
+
+    let trx = trx.get_subtranscript();
+
+    if d.dsk
+        != reconstruct_dealt_secret_key_randomly_subtranscript::<StdRng, T::SubTranscript>(
+            sc, &mut rng, &d.dks, trx, &d.pp,
+        )
     {
         panic!("Reconstructed SK did not match");
     }

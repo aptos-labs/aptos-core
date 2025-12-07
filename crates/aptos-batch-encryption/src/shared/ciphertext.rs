@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 use super::{
     digest::{Digest, EvalProofs},
     key_derivation::BIBEDecryptionKey,
@@ -290,6 +290,7 @@ pub mod tests {
         traits::BatchThresholdEncryption as _,
     };
     use aptos_crypto::arkworks::shamir::ShamirThresholdConfig;
+    use aptos_dkg::pvss::traits::Reconstructable as _;
     use ark_std::{
         rand::{thread_rng, Rng},
         One, Zero,
@@ -320,10 +321,9 @@ pub mod tests {
 
         let ct = ek.bibe_encrypt(&mut rng, &plaintext, id).unwrap();
 
-        let dk = BIBEDecryptionKey::reconstruct(
-            &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
-            &tc,
-        )
+        let dk = BIBEDecryptionKey::reconstruct(&tc, &[msk_shares[0]
+            .derive_decryption_key_share(&digest)
+            .unwrap()])
         .unwrap();
 
         let decrypted_plaintext: String = dk
@@ -352,10 +352,9 @@ pub mod tests {
         let (digest, pfs) = dk.digest(&mut ids, 0).unwrap();
         let pfs = pfs.compute_all(&dk);
 
-        let dk = BIBEDecryptionKey::reconstruct(
-            &[msk_shares[0].derive_decryption_key_share(&digest).unwrap()],
-            &tc,
-        )
+        let dk = BIBEDecryptionKey::reconstruct(&tc, &[msk_shares[0]
+            .derive_decryption_key_share(&digest)
+            .unwrap()])
         .unwrap();
 
         let decrypted_plaintext: String = dk.decrypt(&ct.prepare(&digest, &pfs).unwrap()).unwrap();

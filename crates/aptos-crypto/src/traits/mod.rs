@@ -1,6 +1,5 @@
-// Copyright © Aptos Foundation
-// Parts of the project are originally copyright © Meta Platforms, Inc.
-// SPDX-License-Identifier: Apache-2.0
+// Copyright (c) Aptos Foundation
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 //! This module provides a generic set of traits for dealing with cryptographic primitives.
 //!
@@ -327,6 +326,13 @@ pub trait SecretSharingConfig: Display {
         assert_lt!(i, n);
 
         Player { id: i }
+    }
+
+    /// Returns a vec of all player IDs.
+    fn get_players(&self) -> Vec<Player> {
+        (0..self.get_total_num_players())
+            .map(|i| Player { id: i })
+            .collect()
     }
 
     /// Useful during testing.

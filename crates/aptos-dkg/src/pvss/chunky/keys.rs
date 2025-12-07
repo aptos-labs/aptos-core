@@ -84,6 +84,10 @@ impl<E: Pairing> DealtPubKey<E> {
     pub fn new(G: E::G2Affine) -> Self {
         Self { G }
     }
+
+    pub fn as_g2(&self) -> E::G2Affine {
+        self.G
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -92,6 +96,10 @@ pub struct DealtPubKeyShare<E: Pairing>(pub(crate) DealtPubKey<E>); // TODO: Cop
 impl<E: Pairing> DealtPubKeyShare<E> {
     pub fn new(dealt_pk: DealtPubKey<E>) -> Self {
         DealtPubKeyShare(dealt_pk)
+    }
+
+    pub fn as_g2(&self) -> E::G2Affine {
+        self.0.as_g2()
     }
 }
 

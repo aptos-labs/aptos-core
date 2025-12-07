@@ -695,6 +695,7 @@ dependencies = [
  "aes-gcm",
  "anyhow",
  "aptos-crypto",
+ "aptos-dkg",
  "ark-bls12-381 0.5.0",
  "ark-bn254",
  "ark-ec 0.5.0",
@@ -20339,13 +20340,3 @@ checksum = "73ab332fe2f6680068f3582b16a24f90ad7096d5d39b974d1c0aff0125116f02"
 dependencies = [
  "simd-adler32",
 ]
-
-[[patch.unused]]
-name = "ark-bls12-381"
-version = "0.5.0-alpha.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"
-
-[[patch.unused]]
-name = "ark-bn254"
-version = "0.5.0-alpha.0"
-source = "git+https://github.com/aptos-labs/algebra?branch=fix-fft-parallelism-cutoff#2cacd5efad67bce331aec780b6fcfa4a45f44306"

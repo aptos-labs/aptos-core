@@ -7,6 +7,7 @@ use aptos_gas_schedule::{
     AptosGasParameters,
 };
 use aptos_types::{
+    chain_id::ChainId,
     on_chain_config::{
         randomness_api_v0_config::{AllowCustomMaxGasFlag, RequiredGasDeposit},
         FeatureFlag, Features, OnChainConfig, TimedFeatureFlag, TimedFeatureOverride,
@@ -171,6 +172,7 @@ pub fn aptos_prod_verifier_config(gas_feature_version: u64, features: &Features)
 /// Returns [VMConfig] used by the Aptos blockchain in production, based on the set of feature
 /// flags.
 pub fn aptos_prod_vm_config(
+    chain_id: ChainId,
     gas_feature_version: u64,
     features: &Features,
     timed_features: &TimedFeatures,
@@ -201,6 +203,12 @@ pub fn aptos_prod_vm_config(
     let enable_capture_option = !timed_features.is_enabled(TimedFeatureFlag::DisabledCaptureOption)
         || features.is_enabled(FeatureFlag::ENABLE_CAPTURE_OPTION);
 
+    // Some feature gating was missed, so for native dynamic dispatch the feature is always on for
+    // testnet after 1.38 release.
+    let enable_function_caches = features.is_call_tree_and_instruction_vm_cache_enabled();
+    let enable_function_caches_for_native_dynamic_dispatch =
+        enable_function_caches || (chain_id.is_testnet() && gas_feature_version >= RELEASE_V1_38);
+
     let config = VMConfig {
         verifier_config,
         deserializer_config,
@@ -218,7 +226,7 @@ pub fn aptos_prod_vm_config(
         // manually where applicable.
         delayed_field_optimization_enabled: false,
         ty_builder,
-        enable_function_caches: features.is_call_tree_and_instruction_vm_cache_enabled(),
+        enable_function_caches,
         enable_lazy_loading: features.is_lazy_loading_enabled(),
         enable_depth_checks,
         optimize_trusted_code: features.is_trusted_code_enabled(),
@@ -228,6 +236,7 @@ pub fn aptos_prod_vm_config(
         enable_layout_caches,
         propagate_dependency_limit_error: gas_feature_version >= RELEASE_V1_38,
         enable_framework_for_option,
+        enable_function_caches_for_native_dynamic_dispatch,
     };
 
     // Note: if max_value_nest_depth changed, make sure the constant is in-sync. Do not remove this

@@ -1,5 +1,5 @@
 // Copyright (c) Aptos Foundation
-// SPDX-License-Identifier: Apache-2.0
+// Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
 use crate::keyless::{Bn254, G1Bytes, G2Bytes, Groth16Proof};
 use ark_ec::{pairing::Pairing, AffineRepr, CurveGroup, PrimeGroup};

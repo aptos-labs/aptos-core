@@ -127,6 +127,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E>;
     type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E>>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
@@ -466,10 +467,10 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             dealer: sc.get_player(0),
             subtrs: SubTranscript {
                 V0: unsafe_random_point::<E::G2, _>(rng),
-                Vs: unflatten_by_weights(
-                    &unsafe_random_points::<E::G2, _>(sc.get_total_weight(), rng),
-                    sc,
-                ),
+                Vs: sc.group_by_player(&unsafe_random_points::<E::G2, _>(
+                    sc.get_total_weight(),
+                    rng,
+                )),
                 Cs: (0..sc.get_total_num_players())
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
@@ -671,7 +672,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> Transcr
         let f_evals_chunked_flat: Vec<E::ScalarField> =
             f_evals_chunked.iter().flatten().copied().collect();
         // Separately, gather the chunks by weight
-        let f_evals_weighted = unflatten_by_weights(&f_evals_chunked, sc);
+        let f_evals_weighted = sc.group_by_player(&f_evals_chunked);
 
         // Now generate the encrypted shares and range proof commitment, together with its SoK, so:
         // (1) Set up the witness
