@@ -5,10 +5,11 @@ use crate::{
     fiat_shamir,
     sigma_protocol::homomorphism::{
         self,
-        fixed_base_msms::{self, IsMsmInput},
+        fixed_base_msms::{self},
     },
     Scalar,
 };
+use aptos_crypto::arkworks::msm::IsMsmInput;
 use anyhow::ensure;
 use aptos_crypto::{arkworks::random::sample_field_element, utils};
 use ark_ec::{pairing::Pairing, CurveGroup, VariableBaseMSM};

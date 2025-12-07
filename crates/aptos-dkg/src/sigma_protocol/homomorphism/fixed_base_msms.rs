@@ -8,6 +8,7 @@ use crate::{
 use ark_ec::pairing::Pairing;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use std::fmt::Debug;
+use aptos_crypto::arkworks::msm::IsMsmInput;
 
 /// A `FixedBaseMsms` instance represents a homomorphism whose outputs can be expressed as
 /// one or more **fixed-base multi-scalar multiplications (MSMs)**, sharing consistent base and scalar types.
@@ -93,41 +94,6 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
         >,
     {
         msms.map(|msm_input| Self::msm_eval(&msm_input.bases(), &msm_input.scalars()))
-    }
-}
-
-/// Workaround (see the main trait below) because stable Rust does not yet support associated type defaults.
-pub trait IsMsmInput<B, S> {
-    /// Returns a reference to the slice of base elements in this MSM input.
-    fn bases(&self) -> &[B];
-
-    /// Returns a reference to the slice of scalar elements in this MSM input.
-    fn scalars(&self) -> &[S];
-}
-
-/// Represents the input to a (not necessarily fixed-base) multi-scalar multiplication (MSM):
-/// a collection of bases and corresponding scalars.
-/// TODO: Might not be the right file for this struct, since not necessarily fixed-base
-#[derive(CanonicalSerialize, CanonicalDeserialize, Clone, PartialEq, Eq, Debug)]
-pub struct MsmInput<
-    B: CanonicalSerialize + CanonicalDeserialize,
-    S: CanonicalSerialize + CanonicalDeserialize,
-> {
-    pub bases: Vec<B>,
-    pub scalars: Vec<S>,
-}
-
-impl<
-        B: CanonicalSerialize + CanonicalDeserialize,
-        S: CanonicalSerialize + CanonicalDeserialize,
-    > IsMsmInput<B, S> for MsmInput<B, S>
-{
-    fn bases(&self) -> &[B] {
-        &self.bases
-    }
-
-    fn scalars(&self) -> &[S] {
-        &self.scalars
     }
 }
 

@@ -42,7 +42,7 @@ use aptos_crypto::{
     },
     bls12381::{self},
     utils,
-    weighted_config::{unflatten_by_weights, WeightedConfigArkworks},
+    weighted_config::{WeightedConfigArkworks},
     CryptoMaterialError, SecretSharingConfig as _, ValidCryptoMaterial,
 };
 use ark_ec::{
@@ -356,7 +356,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
         let flattened_Vs = arkworks::commit_to_scalars(&G_2, &f_evals);
         debug_assert_eq!(flattened_Vs.len(), sc.get_total_weight() + 1);
 
-        let Vs = unflatten_by_weights(&flattened_Vs, sc); // This won't use the last item in `flattened_Vs` because of `sc`
+        let Vs = sc.group_by_player(&flattened_Vs);  // This won't use the last item in `flattened_Vs` because of `sc`
         let V0 = *flattened_Vs.last().unwrap();
 
         Transcript {

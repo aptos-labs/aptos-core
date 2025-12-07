@@ -26,6 +26,7 @@ use ark_serialize::{
 use num_integer::Roots;
 use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, io::Write};
+use aptos_crypto::arkworks::msm::MsmInput;
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
@@ -936,7 +937,7 @@ pub mod two_term_msm {
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Eq + Debug;
-        type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
 
@@ -949,7 +950,7 @@ pub mod two_term_msm {
             bases.push(self.base_1);
             bases.push(self.base_2);
 
-            CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
+            CodomainShape(MsmInput { bases, scalars })
         }
 
         fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {

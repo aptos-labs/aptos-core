@@ -31,6 +31,7 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::{CryptoRng, RngCore};
 use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
+use aptos_crypto::arkworks::msm::MsmInput;
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
@@ -295,7 +296,7 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -315,7 +316,7 @@ impl<E: Pairing> fixed_base_msms::Trait for CommitmentHomomorphism<'_, E> {
         bases.push(self.xi_1);
         bases.extend(&self.lagr_g1[..input.values.len()]);
 
-        CodomainShape(fixed_base_msms::MsmInput { bases, scalars })
+        CodomainShape(MsmInput { bases, scalars })
     }
 
     fn msm_eval(bases: &[Self::Base], scalars: &[Self::Scalar]) -> Self::MsmOutput {

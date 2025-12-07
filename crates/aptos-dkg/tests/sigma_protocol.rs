@@ -15,6 +15,7 @@ use ark_ec::{pairing::Pairing, CurveGroup, PrimeGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use rand::thread_rng;
 use std::fmt::Debug;
+use aptos_crypto::arkworks::msm::MsmInput;
 
 #[cfg(test)]
 pub fn test_sigma_protocol<E, H>(hom: H, witness: H::Domain)
@@ -68,12 +69,12 @@ mod schnorr {
             = CodomainShape<T>
         where
             T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-        type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+        type MsmInput = MsmInput<Self::Base, Self::Scalar>;
         type MsmOutput = E::G1;
         type Scalar = E::ScalarField;
 
         fn msm_terms(&self, input: &Self::Domain) -> Self::CodomainShape<Self::MsmInput> {
-            CodomainShape(fixed_base_msms::MsmInput {
+            CodomainShape(MsmInput {
                 bases: vec![self.G],
                 scalars: vec![input.0],
             })

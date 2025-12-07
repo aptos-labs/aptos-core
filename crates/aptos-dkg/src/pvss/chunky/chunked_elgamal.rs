@@ -14,6 +14,7 @@ use ark_serialize::{
     CanonicalDeserialize, CanonicalSerialize, Compress, SerializationError, Write,
 };
 use ark_std::fmt::Debug;
+use aptos_crypto::arkworks::msm::MsmInput;
 
 pub const DST: &[u8; 35] = b"APTOS_CHUNKED_ELGAMAL_GENERATOR_DST"; // This is used to create public parameters, see `default()` below
 
@@ -273,7 +274,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         = CodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -293,7 +294,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
         let Rs = input
             .plaintext_randomness
             .iter()
-            .map(|&r_j| fixed_base_msms::MsmInput {
+            .map(|&r_j| MsmInput {
                 bases: vec![self.pp.H],
                 scalars: vec![r_j.0],
             })
@@ -317,11 +318,11 @@ fn chunks_msm_terms<E: Pairing>(
     ek: <E as Pairing>::G1Affine,
     chunks: &[Scalar<E>],
     correlated_randomness: &[Scalar<E>],
-) -> Vec<fixed_base_msms::MsmInput<E::G1Affine, E::ScalarField>> {
+) -> Vec<MsmInput<E::G1Affine, E::ScalarField>> {
     chunks
         .iter()
         .zip(correlated_randomness.iter())
-        .map(|(&z_ij, &r_j)| fixed_base_msms::MsmInput {
+        .map(|(&z_ij, &r_j)| MsmInput {
             bases: vec![pp.G, ek],
             scalars: vec![z_ij.0, r_j.0],
         })
@@ -335,7 +336,7 @@ pub fn chunks_vec_msm_terms<E: Pairing>(
     ek: <E as Pairing>::G1Affine,
     chunks_vec: &[Vec<Scalar<E>>],
     correlated_randomness_vec: &[Vec<Scalar<E>>],
-) -> Vec<Vec<fixed_base_msms::MsmInput<E::G1Affine, E::ScalarField>>> {
+) -> Vec<Vec<MsmInput<E::G1Affine, E::ScalarField>>> {
     chunks_vec
         .iter()
         .zip(correlated_randomness_vec.iter())
@@ -352,7 +353,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
         = WeightedCodomainShape<T>
     where
         T: CanonicalSerialize + CanonicalDeserialize + Clone + Debug + Eq;
-    type MsmInput = fixed_base_msms::MsmInput<Self::Base, Self::Scalar>;
+    type MsmInput = MsmInput<Self::Base, Self::Scalar>;
     type MsmOutput = E::G1;
     type Scalar = E::ScalarField;
 
@@ -375,7 +376,7 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for WeightedHomomorphism<'a, E> {
             .map(|inner_vec| {
                 inner_vec
                     .iter()
-                    .map(|&r_j| fixed_base_msms::MsmInput {
+                    .map(|&r_j| MsmInput {
                         bases: vec![self.pp.H],
                         scalars: vec![r_j.0],
                     })
