@@ -3,7 +3,7 @@
 
 //# publish --private-key alice
 module alice::view_function_safety {
-    
+
     struct State has key {
         val: u64,
     }
@@ -45,4 +45,3 @@ module alice::view_function_safety {
         borrow_global<State>(@alice).val
     }
 }
-
