@@ -22,11 +22,13 @@ fun one(): u64
     local l2: u64
     call one
     call one
-    call one
     st_loc l0
-    call consume_2
+    copy_loc l0
+    st_loc l1
     // @5
     move_loc l0
+    call consume_2
+    move_loc l1
     call consume_1
     ret
 

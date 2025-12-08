@@ -209,6 +209,23 @@ impl StacklessControlFlowGraph {
         &self.blocks[&block_id].successors
     }
 
+    /// Returns the set of instruction that are successors of `cur`
+    pub fn successor_insts(&self, cur: CodeOffset) -> BTreeSet<CodeOffset> {
+        let mut succ_insts = BTreeSet::new();
+        let cur_block = self.enclosing_block(cur);
+        let code_range = self.code_range(cur_block);
+        // get successor instructions in the same block
+        if cur + 1 < code_range.end as CodeOffset {
+            succ_insts.extend(cur + 1..code_range.end as CodeOffset);
+        }
+        // get instructions from successor blocks
+        for succ_blk in self.successors(cur_block) {
+            let succ_range = self.code_range(*succ_blk);
+            succ_insts.extend(succ_range.start as CodeOffset..succ_range.end as CodeOffset);
+        }
+        succ_insts
+    }
+
     /// Returns a map from a block to a vector of its successors
     pub fn get_successors_map(&self) -> BTreeMap<BlockId, Vec<BlockId>> {
         self.blocks
@@ -230,6 +247,19 @@ impl StacklessControlFlowGraph {
 
     pub fn blocks(&self) -> Vec<BlockId> {
         self.blocks.keys().cloned().collect()
+    }
+
+    pub fn edges(&self) -> Vec<(BlockId, BlockId)> {
+        self.blocks
+            .iter()
+            .flat_map(|(block_id, block)| {
+                block
+                    .successors
+                    .iter()
+                    .map(|succ_id| (*block_id, *succ_id))
+                    .collect::<Vec<(BlockId, BlockId)>>()
+            })
+            .collect()
     }
 
     pub fn reachable_blocks(

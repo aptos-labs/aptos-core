@@ -25,12 +25,14 @@ use crate::{
     },
     pipeline::{
         ability_processor::AbilityProcessor,
+        common_subexp_elimination::CommonSubexpElimination,
         control_flow_graph_simplifier::ControlFlowGraphSimplifier,
         dead_store_elimination::DeadStoreElimination,
         exit_state_analysis::ExitStateAnalysisProcessor,
         flush_writes_processor::FlushWritesProcessor,
         lint_processor::LintProcessor,
         livevar_analysis_processor::LiveVarAnalysisProcessor,
+        reaching_def_analysis_processor::ReachingDefProcessor,
         reference_safety::{reference_safety_processor_v2, reference_safety_processor_v3},
         split_critical_edges_processor::SplitCriticalEdgesProcessor,
         uninitialized_use_checker::UninitializedUseChecker,
@@ -554,6 +556,26 @@ pub fn stackless_bytecode_optimization_pipeline(options: &Options) -> FunctionTa
     // Preprocessing of the stackless bytecode. Many passes expect the absence of critical edges.
     if options.experiment_on(Experiment::SPLIT_CRITICAL_EDGES) {
         pipeline.add_processor(Box::new(SplitCriticalEdgesProcessor {}));
+    }
+
+    // Common subexpression elimination
+    // Need to run before `ABILITY_CHECK`
+    // Further, all annotations are clearned after this pass
+    if options.experiment_on(Experiment::COMMON_SUBEXP_ELIMINATION) {
+        // analysis dependecy: live_var -> reference_safety -> reaching_def -> common_subexp_elimination
+        pipeline.add_processor(Box::new(LiveVarAnalysisProcessor::new(true)));
+        pipeline.add_processor(Box::new(FlushWritesProcessor {}));
+        if options.experiment_on(Experiment::REFERENCE_SAFETY_V3) {
+            pipeline.add_processor(Box::new(
+                reference_safety_processor_v3::ReferenceSafetyProcessor {},
+            ));
+        } else {
+            pipeline.add_processor(Box::new(
+                reference_safety_processor_v2::ReferenceSafetyProcessor {},
+            ));
+        }
+        pipeline.add_processor(Box::new(ReachingDefProcessor {}));
+        pipeline.add_processor(Box::new(CommonSubexpElimination::new(true)));
     }
 
     // Reference safety checkers need live variable annotation.

@@ -21,31 +21,17 @@ module 0xc0ffee::m
     local l5: u64
     local l6: u64
     call one
-    call one
-    call one
-    call one
-    call one
-    // @5
-    call one
-    call one
     st_loc l0
-    st_loc l1
-    st_loc l2
-    // @10
-    st_loc l3
-    st_loc l4
-    st_loc l5
-    st_loc l6
-    move_loc l5
-    // @15
-    move_loc l4
-    move_loc l3
-    move_loc l2
-    move_loc l1
+    copy_loc l0
+    copy_loc l0
+    copy_loc l0
+    // @5
+    copy_loc l0
+    copy_loc l0
+    copy_loc l0
     move_loc l0
-    // @20
-    move_loc l6
     call consume
+    // @10
     ret
 
 
