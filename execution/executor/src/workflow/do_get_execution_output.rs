@@ -51,7 +51,7 @@ use aptos_types::{
 };
 use aptos_vm::VMBlockExecutor;
 use itertools::Itertools;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 pub struct DoGetExecutionOutput;
 
@@ -437,6 +437,7 @@ impl Parser {
             block_end_info,
             next_epoch_state,
             Planned::place_holder(),
+            std::array::from_fn(|_| HashMap::new()),
         );
         let ret = out.clone();
         ret.subscribable_events
