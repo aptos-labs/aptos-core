@@ -9,7 +9,7 @@ module alice::entry_points_safety {
     }
 
     // Ok: public(package) entry function allowed with attribute
-    #[lint::allow_unsafe_friend_entry]
+    #[lint::allow_unsafe_package_entry]
     public(package) entry fun safe_package_entry() {
     }
 

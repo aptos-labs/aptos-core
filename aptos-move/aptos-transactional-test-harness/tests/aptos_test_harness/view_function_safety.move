@@ -15,28 +15,32 @@ module alice::view_function_safety {
 
     // Error: public view function modifying state via helper
     #[view]
-    public fun unsafe_view_modifies_state() acquires State {
+    public fun unsafe_view_modifies_state(): u64 acquires State {
         modify_state();
+        1
     }
 
     // Error: public view function modifying state directly
     #[view]
-    public fun unsafe_view_direct_borrow() acquires State {
+    public fun unsafe_view_direct_borrow(): u64 acquires State {
         let state = borrow_global_mut<State>(@alice);
         state.val = state.val + 1;
+        1
     }
 
     // Ok: public view function modifying state allowed with attribute
     #[view]
     #[lint::allow_unsafe_mutable_view_function]
-    public fun safe_view_modifies_state() acquires State {
+    public fun safe_view_modifies_state(): u64 acquires State {
         modify_state();
+        1
     }
 
     // Ok: private view function can modify state (though unusual)
     #[view]
-    fun private_view_modifies_state() acquires State {
+    fun private_view_modifies_state(): u64 acquires State {
         modify_state();
+        1
     }
 
     // Ok: public view function reading state
