@@ -29,7 +29,7 @@ MAX_STAKE_RATIO=30 # Maximum stake as percentage of total voting power
 # Delegation / delegated pool configuration (for "Validator 4"-style setup)
 SEED=2563
 DELEGATION_SEED="aptos_framework::delegation_pool${SEED}"
-DELEGATION_COMMISSION_BPS=1000 # 1000 = 10%
+DELEGATION_COMMISSION_BPS=0 # 1000 = 10%
 
 # Network presets
 TESTNET_API="https://testnet.movementnetwork.xyz"
@@ -319,7 +319,7 @@ execution_summary() {
 	echo "Operator Configuration:"
 	echo "  Account Address:         $OPERATOR_ACCOUNT"
 	echo ""
-	echo "Validator Owner Configuration:"
+	echo "Validator Owner Configuratio:"
 	echo "  Account Address:         $VALIDATOR_OWNER_ACCOUNT"
 	echo "  Account Balance:         $BALANCE"
 	echo "  (CLI stake-amount arg):  $STAKE_AMOUNT"
