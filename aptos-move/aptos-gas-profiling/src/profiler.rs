@@ -115,7 +115,12 @@ impl<G> GasProfiler<G> {
             intrinsic_cost: None,
             keyless_cost: None,
             dependencies: vec![],
-            frames: vec![CallFrame::new_function(module_id, func_name, ty_args, vec![])],
+            frames: vec![CallFrame::new_function(
+                module_id,
+                func_name,
+                ty_args,
+                vec![],
+            )],
             transaction_transient: None,
             events_transient: vec![],
             write_set_transient: vec![],
