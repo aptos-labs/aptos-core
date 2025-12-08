@@ -370,8 +370,6 @@ impl ExtendedChecker<'_> {
                 continue;
             }
 
-
-
             let (visibility, expected_attr) = if fun.has_package_visibility() {
                 ("package", ALLOW_UNSAFE_PACKAGE_ENTRY_ATTRIBUTE)
             } else {
@@ -384,7 +382,8 @@ impl ExtendedChecker<'_> {
             );
 
             if !self.has_attribute(fun, expected_attr) {
-                self.env.warning( // TODO: we need to make this an error
+                self.env.warning(
+                    // TODO: we need to make this an error
                     &fun.get_loc(),
                     msg.as_str(),
                 );
@@ -831,12 +830,12 @@ impl ExtendedChecker<'_> {
         let data = StacklessBytecodeGenerator::new(fun).generate_function();
         let target = FunctionTarget::new(fun, &data);
         for bc in target.get_bytecode() {
-            if let Bytecode::Call(_, dests, Operation::BorrowGlobal(..), _, _) = bc {
-                if !dests.is_empty() {
-                    let ty = target.get_local_type(dests[0]);
-                    if let Type::Reference(ReferenceKind::Mutable, _) = ty {
-                        return true;
-                    }
+            if let Bytecode::Call(_, dests, Operation::BorrowGlobal(..), _, _) = bc
+                && !dests.is_empty()
+            {
+                let ty = target.get_local_type(dests[0]);
+                if let Type::Reference(ReferenceKind::Mutable, _) = ty {
+                    return true;
                 }
             }
         }
