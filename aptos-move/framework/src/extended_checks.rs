@@ -35,6 +35,7 @@ use std::{
 };
 
 const ALLOW_UNSAFE_FRIEND_ENTRY_ATTRIBUTE: &str = "lint::allow_unsafe_friend_entry";
+const ALLOW_UNSAFE_PACKAGE_ENTRY_ATTRIBUTE: &str = "lint::allow_unsafe_package_entry";
 const ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE: &str = "lint::allow_unsafe_randomness";
 const ALLOW_UNSAFE_MUTABLE_VIEW_FUNCTIONS_ATTRIBUTE: &str =
     "lint::allow_unsafe_mutable_view_function";
@@ -56,8 +57,9 @@ const RANDOMNESS_MODULE_NAME: &str = "randomness";
 
 // top-level attribute names, only.
 pub fn get_all_attribute_names() -> &'static BTreeSet<String> {
-    const ALL_ATTRIBUTE_NAMES: [&str; 11] = [
+    const ALL_ATTRIBUTE_NAMES: [&str; 12] = [
         ALLOW_UNSAFE_FRIEND_ENTRY_ATTRIBUTE,
+        ALLOW_UNSAFE_PACKAGE_ENTRY_ATTRIBUTE,
         ALLOW_UNSAFE_RANDOMNESS_ATTRIBUTE,
         ALLOW_UNSAFE_MUTABLE_VIEW_FUNCTIONS_ATTRIBUTE,
         FMT_SKIP_ATTRIBUTE,
@@ -298,10 +300,14 @@ impl ExtendedChecker<'_> {
             if fun.is_entry()
                 && fun.visibility() == Visibility::Friend
                 && !self.has_attribute(fun, ALLOW_UNSAFE_FRIEND_ENTRY_ATTRIBUTE)
+                && !self.has_attribute(fun, ALLOW_UNSAFE_PACKAGE_ENTRY_ATTRIBUTE)
             {
                 self.env.warning( // TODO: we need to make this an error
                     &fun.get_loc(),
-                    "public(friend) entry and public(package) entry functions are not private. Anyone can call these functions directly thanks to the 'entry' modifier. Add #[lint::allow_unsafe_friend_entry] to ignore this check.",
+                    match fun.has_package_visibility() {
+                        true => "public(package) entry functions are not private. Anyone can call these functions directly thanks to the 'entry' modifier. Add #[lint::allow_unsafe_package_entry] to ignore this check.",
+                        false => "public(friend) entry functions are not private. Anyone can call these functions directly thanks to the 'entry' modifier. Add #[lint::allow_unsafe_friend_entry] to ignore this check.",
+                    },
                 );
             }
         }
