@@ -108,6 +108,10 @@ struct ExtendedChecker<'a> {
     randomness_caller_cache: BTreeMap<QualifiedId<FunId>, bool>,
     /// A cache for functions which are known to call or not call borrow_global_mut
     borrow_global_mut_caller_cache: BTreeMap<QualifiedId<FunId>, bool>,
+    /// Callers map used to back-propagate borrow_global_mut discovery across cycles
+    borrow_global_mut_callers: BTreeMap<QualifiedId<FunId>, BTreeSet<QualifiedId<FunId>>>,
+    /// Functions currently in the borrow_global_mut DFS to break recursion
+    borrow_global_mut_in_progress: BTreeSet<QualifiedId<FunId>>,
 }
 
 impl<'a> ExtendedChecker<'a> {
@@ -121,6 +125,8 @@ impl<'a> ExtendedChecker<'a> {
             ),
             randomness_caller_cache: BTreeMap::new(),
             borrow_global_mut_caller_cache: BTreeMap::new(),
+            borrow_global_mut_callers: BTreeMap::new(),
+            borrow_global_mut_in_progress: BTreeSet::new(),
         }
     }
 
@@ -297,17 +303,27 @@ impl ExtendedChecker<'_> {
 
     fn check_friend_or_package_entry_functions(&self, module: &ModuleEnv) {
         for ref fun in module.get_functions() {
-            if fun.is_entry()
-                && fun.visibility() == Visibility::Friend
-                && !self.has_attribute(fun, ALLOW_UNSAFE_FRIEND_ENTRY_ATTRIBUTE)
-                && !self.has_attribute(fun, ALLOW_UNSAFE_PACKAGE_ENTRY_ATTRIBUTE)
-            {
+            if !fun.is_entry() || fun.visibility() != Visibility::Friend {
+                continue;
+            }
+
+
+
+            let (visibility, expected_attr) = if fun.has_package_visibility() {
+                ("package", ALLOW_UNSAFE_PACKAGE_ENTRY_ATTRIBUTE)
+            } else {
+                ("friend", ALLOW_UNSAFE_FRIEND_ENTRY_ATTRIBUTE)
+            };
+
+            let msg = format!(
+                "public({}) entry functions are not private. Anyone can call these functions directly thanks to the 'entry' modifier. Add #[lint::allow_unsafe_{}_entry] to ignore this check.",
+                visibility, visibility
+            );
+
+            if !self.has_attribute(fun, expected_attr) {
                 self.env.warning( // TODO: we need to make this an error
                     &fun.get_loc(),
-                    match fun.has_package_visibility() {
-                        true => "public(package) entry functions are not private. Anyone can call these functions directly thanks to the 'entry' modifier. Add #[lint::allow_unsafe_package_entry] to ignore this check.",
-                        false => "public(friend) entry functions are not private. Anyone can call these functions directly thanks to the 'entry' modifier. Add #[lint::allow_unsafe_friend_entry] to ignore this check.",
-                    },
+                    msg.as_str(),
                 );
             }
         }
@@ -715,34 +731,69 @@ impl ExtendedChecker<'_> {
         if let Some(res) = self.borrow_global_mut_caller_cache.get(&fun_id) {
             return *res;
         }
-        // For building a fixpoint on cycles, set the value initially to false
-        self.borrow_global_mut_caller_cache.insert(fun_id, false);
+        if self.borrow_global_mut_in_progress.contains(&fun_id) {
+            return false;
+        }
+        self.borrow_global_mut_in_progress.insert(fun_id);
         let fun = self.env.get_function(fun_id);
         if fun.is_native() {
+            self.borrow_global_mut_in_progress.remove(&fun_id);
+            self.borrow_global_mut_caller_cache.insert(fun_id, false);
             return false;
         }
 
-        let data = StacklessBytecodeGenerator::new(&fun).generate_function();
-        let target = FunctionTarget::new(&fun, &data);
+        let mut borrows = self.borrows_global_mut_directly(&fun);
+
+        for callee in fun.get_called_functions().expect("callees defined") {
+            self.borrow_global_mut_callers
+                .entry(*callee)
+                .or_default()
+                .insert(fun_id);
+            if self.calls_borrow_global_mut(*callee) {
+                borrows = true;
+            }
+        }
+        self.borrow_global_mut_in_progress.remove(&fun_id);
+
+        if borrows {
+            self.propagate_borrow_global_mut_true(fun_id);
+            true
+        } else {
+            self.borrow_global_mut_caller_cache.insert(fun_id, false);
+            false
+        }
+    }
+
+    fn borrows_global_mut_directly(&self, fun: &FunctionEnv) -> bool {
+        let data = StacklessBytecodeGenerator::new(fun).generate_function();
+        let target = FunctionTarget::new(fun, &data);
         for bc in target.get_bytecode() {
             if let Bytecode::Call(_, dests, Operation::BorrowGlobal(..), _, _) = bc {
                 if !dests.is_empty() {
                     let ty = target.get_local_type(dests[0]);
                     if let Type::Reference(ReferenceKind::Mutable, _) = ty {
-                        self.borrow_global_mut_caller_cache.insert(fun_id, true);
                         return true;
                     }
                 }
             }
         }
+        false
+    }
 
-        for callee in fun.get_called_functions().expect("callees defined") {
-            if self.calls_borrow_global_mut(*callee) {
-                self.borrow_global_mut_caller_cache.insert(fun_id, true);
-                return true;
+    fn propagate_borrow_global_mut_true(&mut self, fun_id: QualifiedId<FunId>) {
+        let mut stack = vec![fun_id];
+        while let Some(current) = stack.pop() {
+            if matches!(
+                self.borrow_global_mut_caller_cache.get(&current),
+                Some(true)
+            ) {
+                continue;
+            }
+            self.borrow_global_mut_caller_cache.insert(current, true);
+            if let Some(callers) = self.borrow_global_mut_callers.get(&current) {
+                stack.extend(callers.iter().copied());
             }
         }
-        false
     }
 }
 

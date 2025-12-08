@@ -37,6 +37,7 @@ module alice::randomness_test {
     }
 
     // Error because non-public entry does not have randomness attribute
+    #[lint::allow_unsafe_friend_entry]
     public(friend) entry fun missing_randomness_attribute(_s: &signer) {
         randomness_user::uses_randomness_indirect();
     }
