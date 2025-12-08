@@ -121,9 +121,7 @@ impl Default for QuorumStoreConfig {
             receiver_max_batch_bytes: 1024 * 1024 + BATCH_PADDING_BYTES,
             receiver_max_num_batches: 20,
             receiver_max_total_txns: 2000,
-            receiver_max_total_bytes: 4 * 1024 * 1024
-                + DEFAULT_MAX_NUM_BATCHES
-                + BATCH_PADDING_BYTES,
+            receiver_max_total_bytes: 4 * 1024 * 1024 + DEFAULT_MAX_NUM_BATCHES * BATCH_PADDING_BYTES,
             batch_request_num_peers: 5,
             batch_request_retry_limit: 10,
             batch_request_retry_interval_ms: 500,
