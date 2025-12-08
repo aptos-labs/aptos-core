@@ -49,20 +49,18 @@ fun m::test() {
      var $t0: u64
      var $t1: &u64
      var $t2: &u64
-     var $t3: &u64
+     var $t3: &u64 [unused]
      var $t4: bool
      var $t5: u64
      var $t6: u64
   0: $t0 := 5
   1: $t1 := borrow_local($t0)
   2: $t2 := move($t1)
-  3: drop($t2)
-  4: $t3 := borrow_local($t0)
-  5: $t1 := move($t3)
-  6: $t5 := read_ref($t1)
-  7: $t6 := 5
-  8: $t4 := ==($t5, $t6)
-  9: return ()
+  3: $t1 := move($t2)
+  4: $t5 := read_ref($t1)
+  5: $t6 := move($t0)
+  6: $t4 := ==($t5, $t6)
+  7: return ()
 }
 
 ============ after VariableCoalescingAnnotator: ================
@@ -72,7 +70,7 @@ fun m::test() {
      var $t0: u64
      var $t1: &u64
      var $t2: &u64
-     var $t3: &u64
+     var $t3: &u64 [unused]
      var $t4: bool
      var $t5: u64
      var $t6: u64
@@ -86,24 +84,18 @@ fun m::test() {
   2: $t2 := move($t1)
      # live vars: $t0, $t2
      # events: e:$t2
-  3: drop($t2)
-     # live vars: $t0
-     # events: b:$t3
-  4: $t3 := borrow_local($t0)
-     # live vars: $t3
-     # events: e:$t3
-  5: $t1 := move($t3)
-     # live vars: $t1
+  3: $t1 := move($t2)
+     # live vars: $t0, $t1
      # events: e:$t1, b:$t5
-  6: $t5 := read_ref($t1)
-     # live vars: $t5
+  4: $t5 := read_ref($t1)
+     # live vars: $t0, $t5
      # events: b:$t6
-  7: $t6 := 5
+  5: $t6 := move($t0)
      # live vars: $t5, $t6
      # events: e:$t4, e:$t5, e:$t6, b:$t4
-  8: $t4 := ==($t5, $t6)
+  6: $t4 := ==($t5, $t6)
      # live vars:
-  9: return ()
+  7: return ()
 }
 
 ============ after VariableCoalescingTransformer: ================
@@ -120,13 +112,11 @@ fun m::test() {
   0: $t0 := 5
   1: $t1 := borrow_local($t0)
   2: $t2 := move($t1)
-  3: drop($t2)
-  4: $t2 := borrow_local($t0)
-  5: $t1 := move($t2)
-  6: $t5 := read_ref($t1)
-  7: $t6 := 5
-  8: $t4 := ==($t5, $t6)
-  9: return ()
+  3: $t1 := move($t2)
+  4: $t5 := read_ref($t1)
+  5: $t6 := move($t0)
+  6: $t4 := ==($t5, $t6)
+  7: return ()
 }
 
 ============ after DeadStoreElimination: ================
@@ -143,13 +133,11 @@ fun m::test() {
   0: $t0 := 5
   1: $t1 := borrow_local($t0)
   2: $t2 := move($t1)
-  3: drop($t2)
-  4: $t2 := borrow_local($t0)
-  5: $t1 := move($t2)
-  6: $t5 := read_ref($t1)
-  7: $t6 := 5
-  8: $t4 := ==($t5, $t6)
-  9: return ()
+  3: $t1 := move($t2)
+  4: $t5 := read_ref($t1)
+  5: $t6 := move($t0)
+  6: $t4 := ==($t5, $t6)
+  7: return ()
 }
 
 
@@ -159,15 +147,12 @@ module 0xc0ffee::m
 // Function definition at index 0
 fun test()
     local l0: u64
-    local l1: &u64
     ld_u64 5
     st_loc l0
     borrow_loc l0
-    pop
-    borrow_loc l0
-    // @5
     read_ref
-    ld_u64 5
+    move_loc l0
+    // @5
     eq
     pop
     ret

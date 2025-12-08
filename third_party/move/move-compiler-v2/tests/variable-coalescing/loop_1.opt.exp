@@ -84,7 +84,7 @@ fun m::test($t0: u64): u64 {
      var $t8: u64
      var $t9: u64
   0: $t2 := 0
-  1: $t3 := 0
+  1: $t3 := copy($t2)
   2: label L0
   3: $t5 := copy($t3)
   4: $t6 := 10
@@ -120,7 +120,7 @@ fun m::test($t0: u64): u64 {
   0: $t2 := 0
      # live vars: $t0, $t2
      # events: b:$t3
-  1: $t3 := 0
+  1: $t3 := copy($t2)
      # live vars: $t0, $t2, $t3
   2: label L0
      # live vars: $t0, $t2, $t3
@@ -178,7 +178,7 @@ fun m::test($t0: u64): u64 {
      var $t8: u64 [unused]
      var $t9: u64 [unused]
   0: $t2 := 0
-  1: $t3 := 0
+  1: $t3 := copy($t2)
   2: label L0
   3: $t5 := copy($t3)
   4: $t6 := 10
@@ -210,7 +210,7 @@ fun m::test($t0: u64): u64 {
      var $t8: u64 [unused]
      var $t9: u64 [unused]
   0: $t2 := 0
-  1: $t3 := 0
+  1: $t3 := copy($t2)
   2: label L0
   3: $t5 := copy($t3)
   4: $t6 := 10
@@ -237,7 +237,7 @@ fun test(l0: u64): u64
     local l2: u64
     ld_u64 0
     st_loc l1
-    ld_u64 0
+    copy_loc l1
     st_loc l2
 l1: copy_loc l2
     // @5

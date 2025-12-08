@@ -83,9 +83,9 @@ public fun m::test() {
      # live vars:
   0: $t0 := m::one()
      # live vars: $t0
-  1: $t1 := m::one()
+  1: $t1 := copy($t0)
      # live vars: $t0, $t1
-  2: $t2 := m::one()
+  2: $t2 := copy($t0)
      # live vars: $t0, $t1, $t2
   3: m::consume_1($t0)
      # live vars: $t1, $t2
@@ -120,8 +120,8 @@ fun one(): u64
     local l2: u64
     call one
     st_loc l0
-    call one
-    call one
+    copy_loc l0
+    copy_loc l0
     move_loc l0
     // @5
     call consume_1
