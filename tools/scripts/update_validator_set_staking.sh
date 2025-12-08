@@ -400,10 +400,6 @@ execute() {
 		echo "Updating network address..."
 		update_network_address
 
-		# Join the validator set
-		echo "Joining the validator set..."
-		join_the_network
-
 		echo "Validator set update completed successfully!"
 	fi
 }
