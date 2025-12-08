@@ -1,0 +1,22 @@
+processed 2 tasks
+task 1 lines 4-51:  publish --private-key alice [module alice::view_function_safety {]
+warning: view functions should not modify state, but this function (or one of its callees) calls `borrow_global_mut`. Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
+   ┌─ TEMPFILE:15:5
+   │  
+15 │ ╭     public fun unsafe_view_modifies_state(): u64 acquires State {
+16 │ │         modify_state();
+17 │ │         1
+18 │ │     }
+   │ ╰─────^
+
+warning: view functions should not modify state, but this function (or one of its callees) calls `borrow_global_mut`. Add #[lint::allow_unsafe_mutable_view_function] to ignore this check.
+   ┌─ TEMPFILE:21:5
+   │  
+21 │ ╭     public fun unsafe_view_direct_borrow(): u64 acquires State {
+22 │ │         let state = borrow_global_mut<State>(@alice);
+23 │ │         state.val = state.val + 1;
+24 │ │         1
+25 │ │     }
+   │ ╰─────^
+
+

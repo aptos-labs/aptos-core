@@ -307,8 +307,6 @@ impl ExtendedChecker<'_> {
                 continue;
             }
 
-
-
             let (visibility, expected_attr) = if fun.has_package_visibility() {
                 ("package", ALLOW_UNSAFE_PACKAGE_ENTRY_ATTRIBUTE)
             } else {
@@ -321,7 +319,8 @@ impl ExtendedChecker<'_> {
             );
 
             if !self.has_attribute(fun, expected_attr) {
-                self.env.warning( // TODO: we need to make this an error
+                self.env.warning(
+                    // TODO: we need to make this an error
                     &fun.get_loc(),
                     msg.as_str(),
                 );
