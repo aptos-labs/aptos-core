@@ -29,7 +29,7 @@ MAX_STAKE_RATIO=30 # Maximum stake as percentage of total voting power
 # Delegation / delegated pool configuration (for "Validator 4"-style setup)
 SEED=2563
 DELEGATION_SEED="aptos_framework::delegation_pool${SEED}"
-DELEGATION_COMMISSION_BPS=0 # 1000 = 10%
+DELEGATION_COMMISSION_BPS=1000 # 1000 = 10%
 
 # Network presets
 TESTNET_API="https://testnet.movementnetwork.xyz"
@@ -529,6 +529,8 @@ setup_delegated_pool_flow() {
 	echo "  - Deploy the validator using the identity below."
 	echo "  - Once deployed, run the command below to join the validator set."
 	echo "  - Wait one epoch for the validator to become active."
+	echo " Netowkrt Key: "
+	echo "  /dns/movement-network-previewnet-vn-01.mvmt-previewnet:6180/tcp/6180/noise-ik/$NETWORK_PUBLIC_KEY/handshake/0"
 	echo " VALIDATOR IDENTITY YAML FILE "
 	echo " -------------------------------------------"
 	echo ""
