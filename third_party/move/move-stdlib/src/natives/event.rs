@@ -7,12 +7,10 @@ use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGasPerAbstractMemoryUnit;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
-    views::ValueView,
+    natives::function::NativeResult, ty_interner::TypeId, values::Value, views::ValueView,
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
-
 /***************************************************************************************************
  * [NURSERY-ONLY] native fun write_to_event_store
  *
@@ -28,7 +26,7 @@ pub struct WriteToEventStoreGasParameters {
 fn native_write_to_event_store(
     gas_params: &WriteToEventStoreGasParameters,
     _context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.len() == 1);

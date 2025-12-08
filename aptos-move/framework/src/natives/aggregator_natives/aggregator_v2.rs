@@ -29,7 +29,7 @@ use move_vm_types::{
             bytes_and_width_to_derived_string_struct, string_to_bytes, u128_to_u64,
         },
     },
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Reference, Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -53,10 +53,10 @@ pub const EAGGREGATOR_FUNCTION_NOT_YET_SUPPORTED: u64 = 0x03_0009;
 /// If we want to increase this, we need to modify BITS_FOR_SIZE in types/src/delayed_fields.rs.
 pub const DERIVED_STRING_INPUT_MAX_LENGTH: usize = 1024;
 
-fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeResult<u32> {
+fn get_width_by_type(ty_arg: TypeId, error_code_if_incorrect: u64) -> SafeNativeResult<u32> {
     match ty_arg {
-        Type::U128 => Ok(16),
-        Type::U64 => Ok(8),
+        TypeId::U128 => Ok(16),
+        TypeId::U64 => Ok(8),
         _ => Err(SafeNativeError::Abort {
             abort_code: error_code_if_incorrect,
         }),
@@ -65,13 +65,13 @@ fn get_width_by_type(ty_arg: &Type, error_code_if_incorrect: u64) -> SafeNativeR
 
 /// Given the list of native function arguments and a type, pop the next argument if it is of given type.
 fn pop_value_by_type(
-    ty_arg: &Type,
+    ty_arg: TypeId,
     args: &mut VecDeque<Value>,
     error_code_if_incorrect: u64,
 ) -> SafeNativeResult<u128> {
     match ty_arg {
-        Type::U128 => Ok(safely_pop_arg!(args, u128)),
-        Type::U64 => Ok(safely_pop_arg!(args, u64) as u128),
+        TypeId::U128 => Ok(safely_pop_arg!(args, u128)),
+        TypeId::U64 => Ok(safely_pop_arg!(args, u64) as u128),
         _ => Err(SafeNativeError::Abort {
             abort_code: error_code_if_incorrect,
         }),
@@ -79,13 +79,13 @@ fn pop_value_by_type(
 }
 
 fn create_value_by_type(
-    value_ty: &Type,
+    value_ty: TypeId,
     value: u128,
     error_code_if_incorrect: u64,
 ) -> SafeNativeResult<Value> {
     match value_ty {
-        Type::U128 => Ok(Value::u128(value)),
-        Type::U64 => Ok(Value::u64(u128_to_u64(value)?)),
+        TypeId::U128 => Ok(Value::u128(value)),
+        TypeId::U64 => Ok(Value::u64(u128_to_u64(value)?)),
         _ => Err(SafeNativeError::Abort {
             abort_code: error_code_if_incorrect,
         }),
@@ -112,7 +112,7 @@ fn get_context_data<'t, 'b>(
 
 fn create_aggregator_with_max_value(
     context: &mut SafeNativeContext,
-    aggregator_value_ty: &Type,
+    aggregator_value_ty: TypeId,
     max_value: u128,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     let value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
@@ -137,15 +137,15 @@ fn create_aggregator_with_max_value(
 
 fn native_create_aggregator(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
 
-    let max_value = pop_value_by_type(&ty_args[0], &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
-    create_aggregator_with_max_value(context, &ty_args[0], max_value)
+    let max_value = pop_value_by_type(ty_args[0], &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
+    create_aggregator_with_max_value(context, ty_args[0], max_value)
 }
 
 /***************************************************************************************************
@@ -154,15 +154,15 @@ fn native_create_aggregator(
 
 fn native_create_unbounded_aggregator(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 0);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_AGGREGATOR_BASE)?;
 
-    let max_value = unbounded_aggregator_max_value(&ty_args[0])?;
-    create_aggregator_with_max_value(context, &ty_args[0], max_value)
+    let max_value = unbounded_aggregator_max_value(ty_args[0])?;
+    create_aggregator_with_max_value(context, ty_args[0], max_value)
 }
 
 /***************************************************************************************************
@@ -170,14 +170,14 @@ fn native_create_unbounded_aggregator(
  **************************************************************************************************/
 fn native_try_add(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_TRY_ADD_BASE)?;
 
-    let aggregator_value_ty = &ty_args[0];
+    let aggregator_value_ty = ty_args[0];
     let rhs = pop_value_by_type(aggregator_value_ty, &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
     let aggregator = safely_pop_arg!(args, StructRef);
 
@@ -216,14 +216,14 @@ fn native_try_add(
  **************************************************************************************************/
 fn native_try_sub(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_TRY_SUB_BASE)?;
 
-    let aggregator_value_ty = &ty_args[0];
+    let aggregator_value_ty = ty_args[0];
     let rhs = pop_value_by_type(aggregator_value_ty, &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
     let aggregator = safely_pop_arg!(args, StructRef);
 
@@ -259,14 +259,14 @@ fn native_try_sub(
 
 fn native_is_at_least_impl(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_IS_AT_LEAST_BASE)?;
 
-    let aggregator_value_ty = &ty_args[0];
+    let aggregator_value_ty = ty_args[0];
     let rhs = pop_value_by_type(aggregator_value_ty, &mut args, EUNSUPPORTED_AGGREGATOR_TYPE)?;
     let aggregator = safely_pop_arg!(args, StructRef);
 
@@ -297,14 +297,14 @@ fn native_is_at_least_impl(
 
 fn native_read(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_BASE)?;
 
-    let aggregator_value_ty = &ty_args[0];
+    let aggregator_value_ty = ty_args[0];
     let aggregator = safely_pop_arg!(args, StructRef);
 
     let value = if let Some((resolver, delayed_field_data)) = get_context_data(context) {
@@ -333,14 +333,14 @@ fn native_read(
 
 fn native_snapshot(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
     debug_assert_eq!(ty_args.len(), 1);
     context.charge(AGGREGATOR_V2_SNAPSHOT_BASE)?;
 
-    let aggregator_value_ty = &ty_args[0];
+    let aggregator_value_ty = ty_args[0];
     let aggregator = safely_pop_arg!(args, StructRef);
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
@@ -368,14 +368,14 @@ fn native_snapshot(
 
 fn native_create_snapshot(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_CREATE_SNAPSHOT_BASE)?;
 
-    let snapshot_value_ty = &ty_args[0];
+    let snapshot_value_ty = ty_args[0];
     let value = pop_value_by_type(
         snapshot_value_ty,
         &mut args,
@@ -406,7 +406,7 @@ fn native_create_snapshot(
 
 fn native_copy_snapshot(
     _context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     Err(SafeNativeError::Abort {
@@ -420,14 +420,14 @@ fn native_copy_snapshot(
 
 fn native_read_snapshot(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);
     debug_assert_eq!(args.len(), 1);
     context.charge(AGGREGATOR_V2_READ_SNAPSHOT_BASE)?;
 
-    let snapshot_value_ty = &ty_args[0];
+    let snapshot_value_ty = ty_args[0];
     let snapshot = safely_pop_arg!(args, StructRef);
 
     let result_value = if let Some((resolver, mut delayed_field_data)) = get_context_data(context) {
@@ -449,7 +449,7 @@ fn native_read_snapshot(
  **************************************************************************************************/
 fn native_string_concat(
     _context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // Deprecated function in favor of `derive_string_concat`.
@@ -464,7 +464,7 @@ fn native_string_concat(
 
 fn native_read_derived_string(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 0);
@@ -489,7 +489,7 @@ fn native_read_derived_string(
 
 fn native_create_derived_string(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 0);
@@ -530,7 +530,7 @@ fn native_create_derived_string(
 
 fn native_derive_string_concat(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(ty_args.len(), 1);
@@ -542,7 +542,7 @@ fn native_derive_string_concat(
         .map_err(SafeNativeError::InvariantViolation)?;
     context.charge(AGGREGATOR_V2_STRING_CONCAT_PER_BYTE * NumBytes::new(suffix.len() as u64))?;
 
-    let snapshot_value_ty = &ty_args[0];
+    let snapshot_value_ty = ty_args[0];
     let snapshot = safely_pop_arg!(args, StructRef);
 
     let prefix = string_to_bytes(safely_pop_arg!(args, Struct))

@@ -18,7 +18,7 @@
 use crate::LayoutWithDelayedFields;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::language_storage::ModuleId;
-use move_vm_types::{loaded_data::struct_name_indexing::StructNameIndex, ty_interner::TypeVecId};
+use move_vm_types::ty_interner::TypeId;
 use std::collections::HashSet;
 use triomphe::Arc as TriompheArc;
 
@@ -76,21 +76,15 @@ impl LayoutCacheEntry {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct StructKey {
-    pub idx: StructNameIndex,
-    pub ty_args_id: TypeVecId,
-}
-
 /// Interface for fetching and storing layouts into the cache.
 pub trait LayoutCache {
     /// If layout root is cached, returns the cached entry (with the modules that were used to
     /// construct it). The reader must ensure to read the module-set for gas charging of validation
     /// purposes.
-    fn get_struct_layout(&self, key: &StructKey) -> Option<LayoutCacheEntry>;
+    fn get_struct_layout(&self, key: TypeId) -> Option<LayoutCacheEntry>;
 
     /// Stores layout into cache. If layout already exists (e.g., concurrent insertion) - a no-op.
-    fn store_struct_layout(&self, key: &StructKey, entry: LayoutCacheEntry) -> PartialVMResult<()>;
+    fn store_struct_layout(&self, key: TypeId, entry: LayoutCacheEntry) -> PartialVMResult<()>;
 }
 
 /// Marker for no-op layout caches.
@@ -100,15 +94,11 @@ impl<T> LayoutCache for T
 where
     T: NoOpLayoutCache,
 {
-    fn get_struct_layout(&self, _key: &StructKey) -> Option<LayoutCacheEntry> {
+    fn get_struct_layout(&self, _key: TypeId) -> Option<LayoutCacheEntry> {
         None
     }
 
-    fn store_struct_layout(
-        &self,
-        _key: &StructKey,
-        _entry: LayoutCacheEntry,
-    ) -> PartialVMResult<()> {
+    fn store_struct_layout(&self, _key: TypeId, _entry: LayoutCacheEntry) -> PartialVMResult<()> {
         Ok(())
     }
 }

@@ -3,7 +3,7 @@
 
 use move_binary_format::errors::PartialVMError;
 use move_core_types::{identifier::Identifier, language_storage::ModuleId, vm_status::StatusCode};
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::SmallVec;
 
 /// Wraps [PartialVMError] to ensure it cannot be constructed via public constructor when we create
@@ -81,7 +81,7 @@ pub enum SafeNativeError {
     FunctionDispatch {
         module_name: ModuleId,
         func_name: Identifier,
-        ty_args: Vec<Type>,
+        ty_args: Vec<TypeId>,
         args: SmallVec<[Value; 1]>,
     },
 

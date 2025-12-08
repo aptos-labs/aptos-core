@@ -9,12 +9,9 @@ use move_core_types::{
     gas_algebra::{InternalGas, InternalGasPerArg, NumArgs},
 };
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, pop_arg, values::Value,
-};
+use move_vm_types::{natives::function::NativeResult, pop_arg, ty_interner::TypeId, values::Value};
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
-
 /***************************************************************************************************
  * native fun create_signers_for_testing
  *
@@ -37,7 +34,7 @@ pub struct CreateSignersForTestingGasParameters {
 fn native_create_signers_for_testing(
     gas_params: &CreateSignersForTestingGasParameters,
     _context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.is_empty());

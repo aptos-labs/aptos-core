@@ -12,12 +12,11 @@ use aptos_native_interface::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
-
 /***************************************************************************************************
  * native fun add(aggregator: &mut Aggregator, value: u128);
  *
@@ -26,7 +25,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 fn native_add(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
@@ -55,7 +54,7 @@ fn native_add(
  **************************************************************************************************/
 fn native_read(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);
@@ -84,7 +83,7 @@ fn native_read(
 
 fn native_sub(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);
@@ -113,7 +112,7 @@ fn native_sub(
  **************************************************************************************************/
 fn native_destroy(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 1);

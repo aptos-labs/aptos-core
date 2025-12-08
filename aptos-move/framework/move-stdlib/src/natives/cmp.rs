@@ -16,8 +16,8 @@ use aptos_native_interface::{
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::PartialVMError,
+    ty_interner::TypeId,
     values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -35,7 +35,7 @@ const ORDERING_GREATER_THAN_VARIANT: u16 = 2;
  **************************************************************************************************/
 fn native_compare(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 2);

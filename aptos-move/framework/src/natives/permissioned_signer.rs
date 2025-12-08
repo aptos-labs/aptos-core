@@ -13,7 +13,7 @@ use aptos_native_interface::{
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{SignerRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -30,7 +30,7 @@ const EPERMISSION_SIGNER_DISABLED: u64 = 9;
  **************************************************************************************************/
 fn native_is_permissioned_signer_impl(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(arguments.len() == 1);
@@ -61,7 +61,7 @@ fn native_is_permissioned_signer_impl(
  **************************************************************************************************/
 fn native_permission_address(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(args.len() == 1);
@@ -94,7 +94,7 @@ fn native_permission_address(
  **************************************************************************************************/
 fn native_signer_from_permissioned(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(arguments.len() == 2);
@@ -127,7 +127,7 @@ fn native_signer_from_permissioned(
 #[inline]
 fn native_borrow_address(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());

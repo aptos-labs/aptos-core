@@ -41,8 +41,8 @@ use move_core_types::function::ClosureMask;
 use move_vm_types::{
     gas::UnmeteredGasMeter,
     instr::Instruction,
-    loaded_data::runtime_types::{Type, TypeBuilder},
-    ty_interner::{InternedTypePool, TypeVecId},
+    loaded_data::runtime_types::TypeBuilder,
+    ty_interner::{InternedTypePool, TypeId, TypeVecId},
     values::{Locals, Value},
 };
 use std::{
@@ -79,7 +79,7 @@ pub struct TypeChecker<'a, T> {
     /// Stores type information for type checks.
     type_stack: Stack,
     /// Stores function frames of callers.
-    call_stack: CallStack,
+    call_stack: CallStack<'a>,
     /// Stores frame caches for functions used during replay.
     function_caches: InterpreterFunctionCaches,
     /// Code state on top of which the replay runs.
@@ -89,6 +89,7 @@ pub struct TypeChecker<'a, T> {
     /// Cached VM configuration and feature flags.
     vm_config: &'a VMConfig,
     /// Cached type builder.
+    #[allow(dead_code)]
     ty_builder: &'a TypeBuilder,
 }
 
@@ -218,7 +219,7 @@ where
     fn execute_instructions<RTTCheck>(
         &mut self,
         cursor: &mut TraceCursor,
-        frame: &mut Frame,
+        frame: &mut Frame<'a>,
     ) -> PartialVMResult<ExitCode>
     where
         RTTCheck: RuntimeTypeCheck,
@@ -297,12 +298,7 @@ where
                     let function = self.idx_to_loaded_function(frame, *idx)?;
                     RTTCheck::check_pack_closure_visibility(&frame.function, &function)?;
                     if RTTCheck::should_perform_checks(&frame.function.function) {
-                        verify_pack_closure(
-                            self.ty_builder,
-                            &mut self.type_stack,
-                            &function,
-                            *mask,
-                        )?;
+                        verify_pack_closure(self.ty_pool, &mut self.type_stack, &function, *mask)?;
                     }
                 },
                 // Pack closure generic is not checked in pre- or post-execution type transition.
@@ -310,12 +306,7 @@ where
                     let function = self.instantiation_idx_to_loaded_function(frame, *idx)?;
                     RTTCheck::check_pack_closure_visibility(&frame.function, &function)?;
                     if RTTCheck::should_perform_checks(&frame.function.function) {
-                        verify_pack_closure(
-                            self.ty_builder,
-                            &mut self.type_stack,
-                            &function,
-                            *mask,
-                        )?;
+                        verify_pack_closure(self.ty_pool, &mut self.type_stack, &function, *mask)?;
                     }
                 },
                 Instruction::Pop
@@ -425,7 +416,7 @@ where
     fn execute_regular_call<RTTCheck>(
         &mut self,
         cursor: &mut TraceCursor,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'a>,
         callee: Rc<LoadedFunction>,
         callee_frame_cache: Rc<RefCell<FrameTypeCache>>,
     ) -> VMResult<()>
@@ -446,7 +437,7 @@ where
     fn execute_closure_call<RTTCheck>(
         &mut self,
         cursor: &mut TraceCursor,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'a>,
         callee: Rc<LoadedFunction>,
         callee_frame_cache: Rc<RefCell<FrameTypeCache>>,
         mask: ClosureMask,
@@ -469,7 +460,7 @@ where
     fn execute_call<RTTCheck>(
         &mut self,
         cursor: &mut TraceCursor,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'a>,
         callee: Rc<LoadedFunction>,
         callee_frame_cache: Rc<RefCell<FrameTypeCache>>,
         call_type: CallType,
@@ -503,7 +494,7 @@ where
     fn execute_native_call<RTTCheck>(
         &mut self,
         cursor: &mut TraceCursor,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'a>,
         native: &LoadedFunction,
         mask: ClosureMask,
     ) -> PartialVMResult<()>
@@ -515,26 +506,18 @@ where
         if RTTCheck::should_perform_checks(&current_frame.function.function) {
             let num_params = native.param_tys().len();
             for i in (0..num_params).rev() {
-                let expected_ty = &native.param_tys()[i];
+                let expected_ty = if ty_args.is_empty() {
+                    native.param_ty_ids()[i]
+                } else {
+                    self.ty_pool
+                        .instantiate_and_intern(&native.param_tys()[i], ty_args)
+                };
                 if !mask.is_captured(i) {
                     let ty = self.type_stack.pop_ty()?;
-                    if ty_args.is_empty() {
-                        ty.paranoid_check_assignable(expected_ty)?;
-                    } else {
-                        let expected_ty =
-                            self.ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        ty.paranoid_check_assignable(&expected_ty)?;
-                    }
+                    self.ty_pool.paranoid_check_assignable(ty, expected_ty)?;
                     arg_tys.push_front(ty);
                 } else {
-                    #[allow(clippy::collapsible_else_if)]
-                    if ty_args.is_empty() {
-                        arg_tys.push_front(expected_ty.clone())
-                    } else {
-                        let expected_ty =
-                            self.ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                        arg_tys.push_front(expected_ty)
-                    }
+                    arg_tys.push_front(expected_ty);
                 }
             }
         }
@@ -560,12 +543,12 @@ where
         } else {
             if RTTCheck::should_perform_checks(&current_frame.function.function) {
                 if ty_args.is_empty() {
-                    for ty in native.return_tys() {
-                        self.type_stack.push_ty(ty.clone())?;
+                    for ty in native.return_ty_ids() {
+                        self.type_stack.push_ty(*ty)?;
                     }
                 } else {
                     for ty in native.return_tys() {
-                        let ty = self.ty_builder.create_ty_with_subst(ty, ty_args)?;
+                        let ty = self.ty_pool.instantiate_and_intern(ty, ty_args);
                         self.type_stack.push_ty(ty)?;
                     }
                 }
@@ -577,7 +560,10 @@ where
     }
 
     /// Returns the entry-point frame when replay starts.
-    fn set_entrypoint_frame<RTTCheck>(&mut self, cursor: &mut TraceCursor) -> PartialVMResult<Frame>
+    fn set_entrypoint_frame<RTTCheck>(
+        &mut self,
+        cursor: &mut TraceCursor,
+    ) -> PartialVMResult<Frame<'a>>
     where
         RTTCheck: RuntimeTypeCheck,
     {
@@ -593,6 +579,7 @@ where
             &mut UnmeteredGasMeter,
             CallType::Regular,
             self.vm_config,
+            self.ty_pool,
             function,
             None,
             locals,
@@ -605,7 +592,7 @@ where
     /// type checks types on the stack against the expected local types.
     fn set_new_frame<RTTCheck>(
         &mut self,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'a>,
         callee: Rc<LoadedFunction>,
         callee_frame_cache: Rc<RefCell<FrameTypeCache>>,
         call_type: CallType,
@@ -626,13 +613,14 @@ where
 
             if should_check && !mask.is_captured(i) {
                 let ty = self.type_stack.pop_ty()?;
-                let expected_ty = &callee.local_tys()[i];
-
                 if ty_args.is_empty() {
-                    ty.paranoid_check_assignable(expected_ty)?;
+                    self.ty_pool
+                        .paranoid_check_assignable(ty, callee.local_type_ids()[i])?;
                 } else {
-                    let expected_ty = self.ty_builder.create_ty_with_subst(expected_ty, ty_args)?;
-                    ty.paranoid_check_assignable(&expected_ty)?;
+                    let expected_ty = self
+                        .ty_pool
+                        .instantiate_and_intern(&callee.local_tys()[i], ty_args);
+                    self.ty_pool.paranoid_check_assignable(ty, expected_ty)?;
                 }
             }
         }
@@ -641,6 +629,7 @@ where
             &mut UnmeteredGasMeter,
             call_type,
             self.vm_config,
+            self.ty_pool,
             callee,
             None,
             locals,
@@ -658,7 +647,7 @@ where
     /// For a given function index, loads it and its frame cache.
     fn load_function(
         &mut self,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'a>,
         idx: FunctionHandleIndex,
     ) -> PartialVMResult<(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)> {
         use PerInstructionCache::*;
@@ -692,7 +681,7 @@ where
     /// For a given function instantiation index, loads it instantiation, and its frame cache.
     fn load_function_generic(
         &mut self,
-        current_frame: &mut Frame,
+        current_frame: &mut Frame<'a>,
         idx: FunctionInstantiationIndex,
     ) -> PartialVMResult<(Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)> {
         let pc = current_frame.pc as usize;
@@ -727,7 +716,7 @@ where
     /// Converts handle to a non-generic function into a [LoadedFunction].
     fn idx_to_loaded_function(
         &self,
-        frame: &Frame,
+        frame: &Frame<'a>,
         idx: FunctionHandleIndex,
     ) -> PartialVMResult<Rc<LoadedFunction>> {
         let handle = match frame.function.owner() {
@@ -761,9 +750,9 @@ where
     #[inline(always)]
     fn handle_to_loaded_function(
         &self,
-        frame: &Frame,
+        frame: &Frame<'a>,
         handle: &FunctionHandle,
-        ty_args: Vec<Type>,
+        ty_args: Vec<TypeId>,
         ty_args_id: TypeVecId,
     ) -> PartialVMResult<Rc<LoadedFunction>> {
         let (owner, function) = match handle {

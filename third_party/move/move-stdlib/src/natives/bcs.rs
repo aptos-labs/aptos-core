@@ -10,9 +10,9 @@ use move_core_types::{
 };
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
+    ty_interner::TypeId,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{values_impl::Reference, Value},
 };
@@ -41,7 +41,7 @@ pub struct ToBytesGasParameters {
 fn native_to_bytes(
     gas_params: &ToBytesGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.len() == 1);
@@ -51,7 +51,7 @@ fn native_to_bytes(
 
     // pop type and value
     let ref_to_val = pop_arg!(args, Reference);
-    let arg_type = &ty_args[0];
+    let arg_type = ty_args[0];
 
     // get type layout
     let layout = match context.type_to_type_layout(arg_type) {

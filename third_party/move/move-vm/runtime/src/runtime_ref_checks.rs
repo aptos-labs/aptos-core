@@ -89,7 +89,7 @@ use move_core_types::{
     function::ClosureMask,
     vm_status::{sub_status::unknown_invariant_violation::EREFERENCE_SAFETY_FAILURE, StatusCode},
 };
-use move_vm_types::{instr::Instruction, loaded_data::runtime_types::Type};
+use move_vm_types::{instr::Instruction, loaded_data::runtime_types::Type, ty_interner::TypeId};
 use std::{collections::BTreeSet, slice};
 
 /// A deterministic hash map (used in the Rust compiler), expected to perform well.
@@ -162,7 +162,7 @@ enum AccessPathTreeRoot {
     /// Root representing a local (non-ref) value
     Local { index: usize },
     /// Root representing a global type
-    Global { type_: Type },
+    Global { type_: TypeId },
     /// Special node representing the value behind a reference parameter
     ReferenceParameter { param_index: usize },
 }
@@ -172,7 +172,7 @@ struct AccessPathTreeRootsInfo {
     /// Mapping from local index to the corresponding access path tree
     locals: UnorderedMap<usize, AccessPathTree>,
     /// Mapping from global type to the corresponding access path tree
-    globals: UnorderedMap<Type, AccessPathTree>,
+    globals: UnorderedMap<TypeId, AccessPathTree>,
     /// Mapping from reference parameter index to the corresponding access path tree
     reference_params: UnorderedMap<usize, AccessPathTree>,
 }
@@ -581,7 +581,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             MutBorrowGlobalGeneric(index) => {
                 let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
-                ref_state.borrow_global::<true>(struct_ty.clone())?;
+                ref_state.borrow_global::<true>(struct_ty)?;
             },
             ImmBorrowGlobal(index) => {
                 let struct_ty = frame.get_struct_ty(*index);
@@ -589,7 +589,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             ImmBorrowGlobalGeneric(index) => {
                 let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
-                ref_state.borrow_global::<false>(struct_ty.clone())?;
+                ref_state.borrow_global::<false>(struct_ty)?;
             },
             Add | Sub | Mul | Mod | Div | BitOr | BitAnd | Xor | Or | And | Lt | Gt | Le | Ge
             | Shl | Shr => {
@@ -619,7 +619,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
             },
             MoveFromGeneric(index) => {
                 let struct_ty = ty_cache.get_struct_type(*index, frame)?.0;
-                ref_state.move_from(struct_ty.clone())?;
+                ref_state.move_from(struct_ty)?;
             },
             MoveTo(_) => {
                 ref_state.move_to()?;
@@ -919,7 +919,7 @@ impl QualifiedNodeID {
     }
 
     /// A root node corresponding to a global type.
-    fn global_root(type_: Type) -> Self {
+    fn global_root(type_: TypeId) -> Self {
         Self {
             root: AccessPathTreeRoot::Global { type_ },
             node_id: 0, // root is always at 0
@@ -1138,7 +1138,7 @@ impl FrameRefState {
     }
 
     /// Ensure that the global root exists for the given type.
-    fn ensure_global_root_exists(&mut self, type_: Type) {
+    fn ensure_global_root_exists(&mut self, type_: TypeId) {
         self.access_path_tree_roots
             .globals
             .entry(type_)
@@ -1529,11 +1529,11 @@ impl RefCheckState {
 
     /// Transition for borrow global family of instructions.
     /// We currently abstract over all addresses and only use types.
-    fn borrow_global<const MUTABLE: bool>(&mut self, type_: Type) -> PartialVMResult<()> {
+    fn borrow_global<const MUTABLE: bool>(&mut self, type_: TypeId) -> PartialVMResult<()> {
         let _ = self.pop_from_shadow_stack()?;
 
         let frame_state = self.get_mut_latest_frame_state()?;
-        frame_state.ensure_global_root_exists(type_.clone());
+        frame_state.ensure_global_root_exists(type_);
 
         let node_id = QualifiedNodeID::global_root(type_);
         // Unlike references to locals (where borrowing itself does not lead to violations, but use of
@@ -1555,11 +1555,11 @@ impl RefCheckState {
     }
 
     /// Transition for `MoveFrom` and `MoveFromGeneric` instruction.
-    fn move_from(&mut self, type_: Type) -> PartialVMResult<()> {
+    fn move_from(&mut self, type_: TypeId) -> PartialVMResult<()> {
         let _ = self.pop_from_shadow_stack()?;
 
         let frame_state = self.get_mut_latest_frame_state()?;
-        frame_state.ensure_global_root_exists(type_.clone());
+        frame_state.ensure_global_root_exists(type_);
 
         let node_id = QualifiedNodeID::global_root(type_);
         // Poison all references to the global type's subtree.

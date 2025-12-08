@@ -7,7 +7,7 @@ use aptos_native_interface::{
 };
 use move_core_types::account_address::AccountAddress;
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
@@ -19,7 +19,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 pub(crate) fn native_create_signer(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());

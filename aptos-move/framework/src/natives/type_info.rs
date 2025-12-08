@@ -11,7 +11,7 @@ use move_core_types::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Struct, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -46,7 +46,7 @@ fn type_of_internal(struct_tag: &StructTag) -> Result<SmallVec<[Value; 1]>, std:
  **************************************************************************************************/
 fn native_type_of(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
@@ -54,7 +54,7 @@ fn native_type_of(
 
     context.charge(TYPE_INFO_TYPE_OF_BASE)?;
 
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+    let type_tag = context.type_to_type_tag(ty_args[0])?;
 
     if context.eval_gas(TYPE_INFO_TYPE_OF_PER_BYTE_IN_STR) > 0.into() {
         let type_tag_str = type_tag.to_canonical_string();
@@ -83,7 +83,7 @@ fn native_type_of(
  **************************************************************************************************/
 fn native_type_name(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
@@ -91,7 +91,7 @@ fn native_type_name(
 
     context.charge(TYPE_INFO_TYPE_NAME_BASE)?;
 
-    let type_tag = context.type_to_type_tag(&ty_args[0])?;
+    let type_tag = context.type_to_type_tag(ty_args[0])?;
     let type_name = type_tag.to_canonical_string();
 
     // TODO: Ideally, we would charge *before* the `type_to_type_tag()` and `type_tag.to_string()` calls above.
@@ -112,7 +112,7 @@ fn native_type_name(
  **************************************************************************************************/
 fn native_chain_id(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());

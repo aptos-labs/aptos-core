@@ -17,9 +17,7 @@ use move_core_types::{language_storage::TypeTag, value::MoveTypeLayout, vm_statu
 use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 #[cfg(feature = "testing")]
 use move_vm_types::values::{Reference, Struct, StructRef};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, value_serde::ValueSerDeContext, values::Value,
-};
+use move_vm_types::{ty_interner::TypeId, value_serde::ValueSerDeContext, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
@@ -94,13 +92,13 @@ impl NativeEventContext {
 #[inline]
 fn native_write_to_event_store(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.len() == 3);
 
-    let ty = &ty_args[0];
+    let ty = ty_args[0];
     let msg = arguments.pop_back().unwrap();
     let seq_num = safely_pop_arg!(arguments, u64);
     let guid = safely_pop_arg!(arguments, Vec<u8>);
@@ -146,13 +144,13 @@ fn native_write_to_event_store(
 #[cfg(feature = "testing")]
 fn native_emitted_events_by_handle(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.len() == 1);
 
-    let ty = &ty_args[0];
+    let ty = ty_args[0];
     let mut guid = safely_pop_arg!(arguments, StructRef)
         .borrow_field(1)?
         .value_as::<StructRef>()?
@@ -204,13 +202,13 @@ fn native_emitted_events_by_handle(
 #[cfg(feature = "testing")]
 fn native_emitted_events(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.is_empty());
 
-    let ty = &ty_args[0];
+    let ty = ty_args[0];
 
     let ty_tag = context.type_to_type_tag(ty)?;
     let ty_layout = context.type_to_type_layout_check_no_delayed_fields(ty)?;
@@ -239,13 +237,13 @@ fn native_emitted_events(
 #[inline]
 fn native_write_module_event_to_store(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(arguments.len() == 1);
 
-    let ty = &ty_args[0];
+    let ty = ty_args[0];
     let msg = arguments.pop_back().unwrap();
 
     context.charge(

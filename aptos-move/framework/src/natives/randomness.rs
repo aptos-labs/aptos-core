@@ -10,7 +10,7 @@ use aptos_native_interface::{
 };
 use better_any::{Tid, TidAble};
 use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
 
@@ -71,7 +71,7 @@ impl RandomnessContext {
 
 pub fn fetch_and_increment_txn_counter(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if context.gas_feature_version() >= RELEASE_V1_23 {
@@ -92,7 +92,7 @@ pub fn fetch_and_increment_txn_counter(
 
 pub fn is_unbiasable(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // Because we need to run a special transaction prologue to pre-charge maximum

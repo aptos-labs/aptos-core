@@ -35,7 +35,7 @@ use move_vm_types::{
         runtime_types::{StructIdentifier, Type},
     },
     module_id_interner::InternedModuleId,
-    ty_interner::TypeVecId,
+    ty_interner::{InternedTypePool, TypeId, TypeVecId},
     values::{AbstractFunction, SerializedFunctionData},
 };
 use std::{
@@ -85,6 +85,12 @@ pub struct Function {
     // compatible).
     pub(crate) local_tys: Vec<Type>,
     pub(crate) param_tys: Vec<Type>,
+
+    // Pre-computed TypeIds for non-generic functions, empty for generic functions
+    pub(crate) return_type_ids: Vec<TypeId>,
+    pub(crate) local_type_ids: Vec<TypeId>,
+    pub(crate) param_type_ids: Vec<TypeId>,
+
     pub(crate) access_specifier: AccessSpecifier,
     pub(crate) is_persistent: bool,
     pub(crate) has_module_reentrancy_lock: bool,
@@ -138,7 +144,7 @@ pub struct LoadedFunction {
     pub owner: LoadedFunctionOwner,
     // A set of verified type arguments provided for this definition. If
     // function is not generic, an empty vector.
-    pub ty_args: Vec<Type>,
+    pub ty_args: Vec<TypeId>,
     // Unique identifier for type arguments.
     pub ty_args_id: TypeVecId,
     // Definition of the loaded function.
@@ -267,10 +273,10 @@ impl LazyLoadedFunction {
         mask: ClosureMask,
     ) -> PartialVMResult<Self> {
         let runtime_environment = layout_converter.runtime_environment();
-        let ty_args = fun
-            .ty_args
+        let ty_arg_ids = fun.ty_args();
+        let ty_args = ty_arg_ids
             .iter()
-            .map(|t| runtime_environment.ty_to_ty_tag(t))
+            .map(|t| runtime_environment.ty_to_ty_tag(*t))
             .collect::<PartialVMResult<Vec<_>>>()?;
 
         // When building a closure, if it captures arguments, and it is persistent (i.e., it may
@@ -315,7 +321,7 @@ impl LazyLoadedFunction {
         let ty_args = fun
             .ty_args
             .iter()
-            .map(|t| runtime_environment.ty_to_ty_tag(t))
+            .map(|t| runtime_environment.ty_to_ty_tag(*t))
             .collect::<PartialVMResult<Vec<_>>>()?;
         Ok(Self {
             state: Rc::new(RefCell::new(LazyLoadedFunctionState::Resolved {
@@ -338,37 +344,45 @@ impl LazyLoadedFunction {
         fun: &LoadedFunction,
         mask: ClosureMask,
     ) -> PartialVMResult<Option<Vec<MoveTypeLayout>>> {
-        let ty_builder = &layout_converter
-            .runtime_environment()
-            .vm_config()
-            .ty_builder;
-        mask.extract(fun.param_tys(), true)
-            .into_iter()
-            .map(|ty| {
-                let layout = if fun.ty_args.is_empty() {
-                    layout_converter.type_to_type_layout_with_delayed_fields(
+        let ty_pool = layout_converter.runtime_environment().ty_pool();
+        if fun.ty_args.is_empty() {
+            mask.extract(fun.param_ty_ids(), true)
+                .into_iter()
+                .map(|ty_id| {
+                    let layout = layout_converter.type_to_type_layout_with_delayed_fields(
                         gas_meter,
                         traversal_context,
-                        ty,
+                        *ty_id,
                         true,
-                    )?
-                } else {
-                    let ty = ty_builder.create_ty_with_subst(ty, &fun.ty_args)?;
-                    layout_converter.type_to_type_layout_with_delayed_fields(
-                        gas_meter,
-                        traversal_context,
-                        &ty,
-                        true,
-                    )?
-                };
+                    )?;
 
-                // Do not allow delayed fields to be serialized.
-                // TODO(layouts): consider not cloning layouts for captured arguments.
-                Ok(layout
-                    .into_layout_when_has_no_delayed_fields()
-                    .map(|l| l.as_ref().clone()))
-            })
-            .collect::<PartialVMResult<Option<Vec<_>>>>()
+                    // Do not allow delayed fields to be serialized.
+                    // TODO(layouts): consider not cloning layouts for captured arguments.
+                    Ok(layout
+                        .into_layout_when_has_no_delayed_fields()
+                        .map(|l| l.as_ref().clone()))
+                })
+                .collect::<PartialVMResult<Option<Vec<_>>>>()
+        } else {
+            mask.extract(fun.param_tys(), true)
+                .into_iter()
+                .map(|ty| {
+                    let id = ty_pool.instantiate_and_intern(ty, &fun.ty_args);
+                    let layout = layout_converter.type_to_type_layout_with_delayed_fields(
+                        gas_meter,
+                        traversal_context,
+                        id,
+                        true,
+                    )?;
+
+                    // Do not allow delayed fields to be serialized.
+                    // TODO(layouts): consider not cloning layouts for captured arguments.
+                    Ok(layout
+                        .into_layout_when_has_no_delayed_fields()
+                        .map(|l| l.as_ref().clone()))
+                })
+                .collect::<PartialVMResult<Option<Vec<_>>>>()
+        }
     }
 
     pub(crate) fn expect_this_impl(
@@ -500,7 +514,7 @@ impl AbstractFunction for LazyLoadedFunction {
 
 impl LoadedFunction {
     /// Returns type arguments used to instantiate the loaded function.
-    pub fn ty_args(&self) -> &[Type] {
+    pub fn ty_args(&self) -> &[TypeId] {
         &self.ty_args
     }
 
@@ -510,6 +524,18 @@ impl LoadedFunction {
             LoadedFunctionOwner::Module(m) => Some(Module::self_id(m)),
             LoadedFunctionOwner::Script(_) => None,
         }
+    }
+
+    pub fn param_ty_ids(&self) -> &[TypeId] {
+        &self.function.param_type_ids
+    }
+
+    pub fn return_ty_ids(&self) -> &[TypeId] {
+        &self.function.return_type_ids
+    }
+
+    pub fn local_type_ids(&self) -> &[TypeId] {
+        &self.function.local_type_ids
     }
 
     /// Returns the module id or, if it is a script, the pseudo module id for scripts.
@@ -635,6 +661,7 @@ impl Function {
         module: &CompiledModule,
         signature_table: &[Vec<Type>],
         struct_names: &[StructIdentifier],
+        ty_pool: &InternedTypePool,
     ) -> PartialVMResult<Self> {
         let def = module.function_def_at(index);
         let handle = module.function_handle_at(def.function);
@@ -681,6 +708,27 @@ impl Function {
             &handle.access_specifiers,
         )?;
 
+        // Compute TypeIds for non-generic functions
+        let (return_type_ids, local_type_ids, param_type_ids) = if ty_param_abilities.is_empty() {
+            // Non-generic: compute TypeIds by interning the types
+            let return_type_ids = return_tys
+                .iter()
+                .map(|ty| ty_pool.instantiate_and_intern(ty, &[]))
+                .collect();
+            let local_type_ids = local_tys
+                .iter()
+                .map(|ty| ty_pool.instantiate_and_intern(ty, &[]))
+                .collect();
+            let param_type_ids = param_tys
+                .iter()
+                .map(|ty| ty_pool.instantiate_and_intern(ty, &[]))
+                .collect();
+            (return_type_ids, local_type_ids, param_type_ids)
+        } else {
+            // Generic: leave empty, will be computed at instantiation time
+            (vec![], vec![], vec![])
+        };
+
         Ok(Self {
             file_format_version: module.version(),
             index,
@@ -695,6 +743,9 @@ impl Function {
             local_tys,
             return_tys,
             param_tys,
+            return_type_ids,
+            local_type_ids,
+            param_type_ids,
             access_specifier,
             is_persistent: handle.attributes.contains(&FunctionAttribute::Persistent),
             has_module_reentrancy_lock: handle.attributes.contains(&FunctionAttribute::ModuleLock),

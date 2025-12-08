@@ -9,7 +9,7 @@ use aptos_native_interface::{safely_get_struct_field_as, SafeNativeError, SafeNa
 use move_binary_format::errors::PartialVMError;
 use move_vm_types::{
     delayed_values::{delayed_field_id::DelayedFieldID, derived_string_snapshot::string_to_bytes},
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Reference, Struct, StructRef, Value},
 };
 
@@ -26,10 +26,10 @@ const _DERIVED_STRING_SNAPSHOT_PADDING_FIELD_INDEX: usize = 1;
 
 macro_rules! get_value_impl {
     ($func_name:ident, $idx:expr, $e:expr) => {
-        pub(crate) fn $func_name(struct_ref: &StructRef, ty: &Type) -> SafeNativeResult<u128> {
+        pub(crate) fn $func_name(struct_ref: &StructRef, ty: TypeId) -> SafeNativeResult<u128> {
             Ok(match ty {
-                Type::U128 => safely_get_struct_field_as!(struct_ref, $idx, u128),
-                Type::U64 => safely_get_struct_field_as!(struct_ref, $idx, u64) as u128,
+                TypeId::U128 => safely_get_struct_field_as!(struct_ref, $idx, u128),
+                TypeId::U64 => safely_get_struct_field_as!(struct_ref, $idx, u64) as u128,
                 _ => return Err(SafeNativeError::Abort { abort_code: $e }),
             })
         }
@@ -58,11 +58,11 @@ macro_rules! get_value_as_id_impl {
     ($func_name:ident, $idx:expr, $e:expr) => {
         pub(crate) fn $func_name(
             struct_ref: &StructRef,
-            ty: &Type,
+            ty: TypeId,
             resolver: &dyn DelayedFieldResolver,
         ) -> SafeNativeResult<DelayedFieldID> {
             let id = match ty {
-                Type::U64 | Type::U128 => {
+                TypeId::U64 | TypeId::U128 => {
                     safely_get_struct_field_as!(struct_ref, $idx, DelayedFieldID)
                 },
                 _ => return Err(SafeNativeError::Abort { abort_code: $e }),
@@ -100,10 +100,10 @@ pub(crate) fn set_aggregator_value(aggregator: &StructRef, value: Value) -> Safe
         .map_err(SafeNativeError::InvariantViolation)
 }
 
-pub(crate) fn unbounded_aggregator_max_value(ty: &Type) -> SafeNativeResult<u128> {
+pub(crate) fn unbounded_aggregator_max_value(ty: TypeId) -> SafeNativeResult<u128> {
     Ok(match ty {
-        Type::U128 => u128::MAX,
-        Type::U64 => u64::MAX as u128,
+        TypeId::U128 => u128::MAX,
+        TypeId::U64 => u64::MAX as u128,
         _ => {
             return Err(SafeNativeError::Abort {
                 abort_code: EUNSUPPORTED_AGGREGATOR_TYPE,

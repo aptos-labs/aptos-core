@@ -14,7 +14,7 @@ use move_binary_format::errors::PartialVMError;
 use move_core_types::vm_status::StatusCode;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Struct, StructRef, Value},
 };
 use smallvec::{smallvec, SmallVec};
@@ -28,7 +28,7 @@ use std::collections::VecDeque;
  **************************************************************************************************/
 fn native_new_aggregator(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert_eq!(args.len(), 2);

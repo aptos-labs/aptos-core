@@ -6,16 +6,15 @@ use crate::natives::helpers::make_module_natives;
 use move_binary_format::errors::PartialVMResult;
 use move_core_types::{account_address::AccountAddress, gas_algebra::InternalGas};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
+use move_vm_types::ty_interner::TypeId;
 #[allow(unused_imports)]
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
     values::{Reference, Value},
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
-
 /***************************************************************************************************
  * native fun print
  *
@@ -30,7 +29,7 @@ pub struct PrintGasParameters {
 fn native_print(
     gas_params: &PrintGasParameters,
     _context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
     _move_std_addr: AccountAddress,
 ) -> PartialVMResult<NativeResult> {
@@ -38,7 +37,7 @@ fn native_print(
     debug_assert!(args.len() == 1);
 
     let _val = args.pop_back().unwrap();
-    let _ty = &ty_args[0];
+    let _ty = ty_args[0];
 
     // No-op if the feature flag is not present.
     #[cfg(feature = "testing")]
@@ -93,7 +92,7 @@ pub struct PrintStackTraceGasParameters {
 fn native_print_stack_trace(
     gas_params: &PrintStackTraceGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(ty_args.is_empty());
@@ -151,7 +150,7 @@ mod testing {
         vm_status::StatusCode,
     };
     use move_vm_runtime::native_functions::NativeContext;
-    use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+    use move_vm_types::{ty_interner::TypeId, values::Value};
     use std::{fmt, fmt::Write};
 
     const VECTOR_BEGIN: &str = "[";
@@ -176,7 +175,7 @@ mod testing {
 
     fn get_annotated_struct_layout(
         context: &mut NativeContext,
-        ty: &Type,
+        ty: TypeId,
     ) -> PartialVMResult<MoveStructLayout> {
         let annotated_type_layout = context.type_to_fully_annotated_layout(ty)?;
         if let Some(MoveTypeLayout::Struct(annotated_struct_layout)) =
@@ -191,14 +190,6 @@ mod testing {
                         .to_string(),
                 ),
             )
-        }
-    }
-
-    fn get_vector_inner_type(ty: &Type) -> PartialVMResult<&Type> {
-        match ty {
-            Type::Vector(ty) => Ok(ty),
-            _ => Err(PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR)
-                .with_message("Could not get the inner Type of a vector's Type".to_string())),
         }
     }
 
@@ -255,7 +246,7 @@ mod testing {
         context: &mut NativeContext,
         out: &mut String,
         val: Value,
-        ty: &Type,
+        ty: TypeId,
         move_std_addr: &AccountAddress,
         depth: usize,
         canonicalize: bool,
@@ -272,7 +263,16 @@ mod testing {
             MoveTypeLayout::Vector(_) => {
                 // Get the inner type T of a vector<T>. Again, we should not see any delayed fields
                 // in the debug context.
-                let inner_ty = get_vector_inner_type(ty)?;
+                let inner_ty = context
+                    .module_storage()
+                    .runtime_environment()
+                    .ty_pool()
+                    .get_vec_elem_ty(ty)
+                    .ok_or_else(|| {
+                        PartialVMError::new(StatusCode::INTERNAL_TYPE_ERROR).with_message(
+                            "Could not get the inner Type of a vector's Type".to_string(),
+                        )
+                    })?;
                 let inner_tyl = context.type_to_type_layout_check_no_delayed_fields(inner_ty)?;
 
                 match inner_tyl.as_ref() {

@@ -11,7 +11,7 @@ use move_binary_format::{
     },
 };
 use move_core_types::gas_algebra::NumTypeNodes;
-use move_vm_types::loaded_data::runtime_types::Type;
+use move_vm_types::ty_interner::TypeId;
 use std::{cell::RefCell, collections::BTreeMap, rc::Rc};
 
 /// Variants for each individual instruction cache. Should make sure
@@ -31,21 +31,21 @@ pub(crate) enum PerInstructionCache {
 #[derive(Default)]
 pub(crate) struct FrameTypeCache {
     struct_field_type_instantiation:
-        BTreeMap<StructDefInstantiationIndex, Vec<(Type, NumTypeNodes)>>,
+        BTreeMap<StructDefInstantiationIndex, Vec<(TypeId, NumTypeNodes)>>,
     struct_variant_field_type_instantiation:
-        BTreeMap<StructVariantInstantiationIndex, Vec<(Type, NumTypeNodes)>>,
-    struct_def_instantiation_type: BTreeMap<StructDefInstantiationIndex, (Type, NumTypeNodes)>,
+        BTreeMap<StructVariantInstantiationIndex, Vec<(TypeId, NumTypeNodes)>>,
+    struct_def_instantiation_type: BTreeMap<StructDefInstantiationIndex, (TypeId, NumTypeNodes)>,
     struct_variant_instantiation_type:
-        BTreeMap<StructVariantInstantiationIndex, (Type, NumTypeNodes)>,
+        BTreeMap<StructVariantInstantiationIndex, (TypeId, NumTypeNodes)>,
     /// For a given field instantiation, the:
     ///    ((Type of the field, size of the field type) and (Type of its defining struct,
     ///    size of its defining struct)
     field_instantiation:
-        BTreeMap<FieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
+        BTreeMap<FieldInstantiationIndex, ((TypeId, NumTypeNodes), (TypeId, NumTypeNodes))>,
     /// Same as above, bot for variant field instantiations
     variant_field_instantiation:
-        BTreeMap<VariantFieldInstantiationIndex, ((Type, NumTypeNodes), (Type, NumTypeNodes))>,
-    single_sig_token_type: BTreeMap<SignatureIndex, (Type, NumTypeNodes)>,
+        BTreeMap<VariantFieldInstantiationIndex, ((TypeId, NumTypeNodes), (TypeId, NumTypeNodes))>,
+    single_sig_token_type: BTreeMap<SignatureIndex, (TypeId, NumTypeNodes)>,
     /// Stores a variant for each individual instruction in the
     /// function's bytecode. We keep the size of the variant to be
     /// small. The caches are indexed by the index of the given
@@ -64,7 +64,7 @@ pub(crate) struct FrameTypeCache {
         BTreeMap<FunctionInstantiationIndex, (Rc<LoadedFunction>, Rc<RefCell<FrameTypeCache>>)>,
 
     /// Cached instantiated local types for generic functions.
-    pub(crate) instantiated_local_tys: Option<Rc<[Type]>>,
+    pub(crate) instantiated_local_tys: Option<Rc<[TypeId]>>,
     /// Cached number of type nodes per instantiated local type for gas charging re-use.
     pub(crate) instantiated_local_ty_counts: Option<Rc<[NumTypeNodes]>>,
 }
@@ -87,16 +87,18 @@ impl FrameTypeCache {
         &mut self,
         idx: FieldInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
+    ) -> PartialVMResult<((TypeId, NumTypeNodes), (TypeId, NumTypeNodes))> {
         let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             get_or_insert!(&mut self.field_instantiation, idx, {
                 let struct_type = frame.field_instantiation_to_struct(idx)?;
-                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                // struct_type.num_nodes() as u64
+                let struct_ty_count = NumTypeNodes::new(1);
                 let field_ty = frame.get_generic_field_ty(idx)?;
-                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                // field_ty.num_nodes() as u64
+                let field_ty_count = NumTypeNodes::new(2);
                 ((field_ty, field_ty_count), (struct_type, struct_ty_count))
             });
-        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
+        Ok(((*field_ty, *field_ty_count), (*struct_ty, *struct_ty_count)))
     }
 
     // note(inline): do not inline, increases size a lot, might even decrease the performance
@@ -104,7 +106,7 @@ impl FrameTypeCache {
         &mut self,
         idx: VariantFieldInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<((&Type, NumTypeNodes), (&Type, NumTypeNodes))> {
+    ) -> PartialVMResult<((TypeId, NumTypeNodes), (TypeId, NumTypeNodes))> {
         let ((field_ty, field_ty_count), (struct_ty, struct_ty_count)) =
             get_or_insert!(&mut self.variant_field_instantiation, idx, {
                 let info = frame.variant_field_instantiation_info_at(idx);
@@ -112,13 +114,15 @@ impl FrameTypeCache {
                     &info.definition_struct_type,
                     &info.instantiation,
                 )?;
-                let struct_ty_count = NumTypeNodes::new(struct_type.num_nodes() as u64);
+                // struct_type.num_nodes() as u64
+                let struct_ty_count = NumTypeNodes::new(1);
                 let field_ty =
                     frame.instantiate_ty(&info.uninstantiated_field_ty, &info.instantiation)?;
-                let field_ty_count = NumTypeNodes::new(field_ty.num_nodes() as u64);
+                // field_ty.num_nodes() as u64
+                let field_ty_count = NumTypeNodes::new(2);
                 ((field_ty, field_ty_count), (struct_type, struct_ty_count))
             });
-        Ok(((field_ty, *field_ty_count), (struct_ty, *struct_ty_count)))
+        Ok(((*field_ty, *field_ty_count), (*struct_ty, *struct_ty_count)))
     }
 
     // note(inline): do not inline, increases size a lot, might even decrease the performance
@@ -126,13 +130,14 @@ impl FrameTypeCache {
         &mut self,
         idx: StructDefInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<(&Type, NumTypeNodes)> {
+    ) -> PartialVMResult<(TypeId, NumTypeNodes)> {
         let (ty, ty_count) = get_or_insert!(&mut self.struct_def_instantiation_type, idx, {
             let ty = frame.get_generic_struct_ty(idx)?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            // ty.num_nodes() as u64
+            let ty_count = NumTypeNodes::new(1);
             (ty, ty_count)
         });
-        Ok((ty, *ty_count))
+        Ok((*ty, *ty_count))
     }
 
     // note(inline): do not inline, increases size a lot, might even decrease the performance
@@ -140,17 +145,18 @@ impl FrameTypeCache {
         &mut self,
         idx: StructVariantInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<(&Type, NumTypeNodes)> {
+    ) -> PartialVMResult<(TypeId, NumTypeNodes)> {
         let (ty, ty_count) = get_or_insert!(&mut self.struct_variant_instantiation_type, idx, {
             let info = frame.get_struct_variant_instantiation_at(idx);
             let ty = frame.create_struct_instantiation_ty(
                 &info.definition_struct_type,
                 &info.instantiation,
             )?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            // ty.num_nodes() as u64
+            let ty_count = NumTypeNodes::new(1);
             (ty, ty_count)
         });
-        Ok((ty, *ty_count))
+        Ok((*ty, *ty_count))
     }
 
     // note(inline): do not inline, increases size a lot, might even decrease the performance
@@ -158,7 +164,7 @@ impl FrameTypeCache {
         &mut self,
         idx: StructDefInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<&[(Type, NumTypeNodes)]> {
+    ) -> PartialVMResult<&[(TypeId, NumTypeNodes)]> {
         Ok(get_or_insert!(
             &mut self.struct_field_type_instantiation,
             idx,
@@ -167,7 +173,8 @@ impl FrameTypeCache {
                     .instantiate_generic_struct_fields(idx)?
                     .into_iter()
                     .map(|ty| {
-                        let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
+                        // ty.num_nodes() as u64
+                        let num_nodes = NumTypeNodes::new(1);
                         (ty, num_nodes)
                     })
                     .collect::<Vec<_>>()
@@ -180,7 +187,7 @@ impl FrameTypeCache {
         &mut self,
         idx: StructVariantInstantiationIndex,
         frame: &Frame,
-    ) -> PartialVMResult<&[(Type, NumTypeNodes)]> {
+    ) -> PartialVMResult<&[(TypeId, NumTypeNodes)]> {
         Ok(get_or_insert!(
             &mut self.struct_variant_field_type_instantiation,
             idx,
@@ -189,7 +196,8 @@ impl FrameTypeCache {
                     .instantiate_generic_struct_variant_fields(idx)?
                     .into_iter()
                     .map(|ty| {
-                        let num_nodes = NumTypeNodes::new(ty.num_nodes() as u64);
+                        // ty.num_nodes() as u64
+                        let num_nodes = NumTypeNodes::new(1);
                         (ty, num_nodes)
                     })
                     .collect::<Vec<_>>()
@@ -202,13 +210,14 @@ impl FrameTypeCache {
         &mut self,
         idx: SignatureIndex,
         frame: &Frame,
-    ) -> PartialVMResult<(&Type, NumTypeNodes)> {
+    ) -> PartialVMResult<(TypeId, NumTypeNodes)> {
         let (ty, ty_count) = get_or_insert!(&mut self.single_sig_token_type, idx, {
             let ty = frame.instantiate_single_type(idx)?;
-            let ty_count = NumTypeNodes::new(ty.num_nodes() as u64);
+            // ty.num_nodes() as u64
+            let ty_count = NumTypeNodes::new(1);
             (ty, ty_count)
         });
-        Ok((ty, *ty_count))
+        Ok((*ty, *ty_count))
     }
 
     pub(crate) fn make_rc() -> Rc<RefCell<Self>> {
