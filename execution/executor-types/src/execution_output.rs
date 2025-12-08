@@ -14,13 +14,15 @@ use aptos_storage_interface::state_store::{
 use aptos_types::{
     contract_event::ContractEvent,
     epoch_state::EpochState,
-    state_store::hot_state::HotStateConfig,
+    state_store::{
+        hot_state::HotStateConfig, state_key::StateKey, state_value::StateValue, NUM_STATE_SHARDS,
+    },
     transaction::{
         block_epilogue::BlockEndInfo, ExecutionStatus, Transaction, TransactionStatus, Version,
     },
 };
 use derive_more::Deref;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug, Deref)]
 pub struct ExecutionOutput {
@@ -41,6 +43,7 @@ impl ExecutionOutput {
         block_end_info: Option<BlockEndInfo>,
         next_epoch_state: Option<EpochState>,
         subscribable_events: Planned<Vec<ContractEvent>>,
+        evicted: [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
     ) -> Self {
         let next_version = first_version + to_commit.len() as Version;
         assert_eq!(next_version, result_state.latest().next_version());
@@ -65,6 +68,7 @@ impl ExecutionOutput {
             block_end_info,
             next_epoch_state,
             subscribable_events,
+            evicted,
         })
     }
 
@@ -81,6 +85,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
+            evicted: std::array::from_fn(|_| HashMap::new()),
         })
     }
 
@@ -99,6 +104,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: None,
             subscribable_events: Planned::ready(vec![]),
+            evicted: std::array::from_fn(|_| HashMap::new()),
         })
     }
 
@@ -119,6 +125,7 @@ impl ExecutionOutput {
             block_end_info: None,
             next_epoch_state: self.next_epoch_state.clone(),
             subscribable_events: Planned::ready(vec![]),
+            evicted: std::array::from_fn(|_| HashMap::new()),
         })
     }
 
@@ -166,6 +173,7 @@ pub struct Inner {
     /// state cache.
     pub next_epoch_state: Option<EpochState>,
     pub subscribable_events: Planned<Vec<ContractEvent>>,
+    pub evicted: [HashMap<StateKey, Option<StateValue>>; NUM_STATE_SHARDS],
 }
 
 impl Inner {

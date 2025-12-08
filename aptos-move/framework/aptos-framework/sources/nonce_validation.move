@@ -11,12 +11,12 @@ module aptos_framework::nonce_validation {
 
     const NUM_BUCKETS: u64 = 50000;
 
-    // After a transaction expires, we wait for NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS seconds
+    // After a transaction expires, we wait for NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS seconds
     // before garbage collecting the transaction from the nonce history.
     // We maintain an invariant that two transactions with the same (address, nonce) pair cannot be stored
     // in the nonce hsitory if their transanction expiration times are less than
-    // `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` seconds apart.
-    const NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS: u64 = 65;
+    // `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS` seconds apart.
+    const NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS: u64 = 100;
 
 
     // Each time we check if an (address, nonce) pair can be inserted into nonce history,
@@ -133,7 +133,7 @@ module aptos_framework::nonce_validation {
     ): bool acquires NonceHistory {
         assert!(exists<NonceHistory>(@aptos_framework), error::invalid_state(E_NONCE_HISTORY_DOES_NOT_EXIST));
         // Check if the transaction expiration time is too far in the future.
-        assert!(txn_expiration_time <= timestamp::now_seconds() + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS, error::invalid_argument(ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE));
+        assert!(txn_expiration_time <= timestamp::now_seconds() + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS, error::invalid_argument(ETRANSACTION_EXPIRATION_TOO_FAR_IN_FUTURE));
         let nonce_history = &mut NonceHistory[@aptos_framework];
         let nonce_key = NonceKey {
             sender_address,
@@ -159,9 +159,9 @@ module aptos_framework::nonce_validation {
             };
 
             // We maintain an invariant that two transaction with the same (address, nonce) pair cannot be stored
-            // in the nonce history if their transaction expiration times are less than `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS`
+            // in the nonce history if their transaction expiration times are less than `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS`
             // seconds apart.
-            if (txn_expiration_time <= existing_exp_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS) {
+            if (txn_expiration_time <= existing_exp_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS) {
                 return false;
             };
 
@@ -178,9 +178,9 @@ module aptos_framework::nonce_validation {
         let i = 0;
         while (i < MAX_ENTRIES_GARBAGE_COLLECTED_PER_CALL && !bucket.nonces_ordered_by_exp_time.is_empty()) {
             let (front_k, _) = bucket.nonces_ordered_by_exp_time.borrow_front();
-            // We garbage collect a nonce after it has expired and the NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS
+            // We garbage collect a nonce after it has expired and the NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS
             // seconds have passed.
-            if (front_k.txn_expiration_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS < current_time) {
+            if (front_k.txn_expiration_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS < current_time) {
                 bucket.nonces_ordered_by_exp_time.pop_front();
                 bucket.nonce_to_exp_time_map.remove(&NonceKey {
                     sender_address: front_k.sender_address,
@@ -222,8 +222,8 @@ module aptos_framework::nonce_validation {
             let existing_exp_time = bucket.nonce_to_exp_time_map.get(&nonce_key);
             if (existing_exp_time.is_some()) {
                 let existing_exp_time = existing_exp_time.extract();
-                // We store the nonce in nonce history for `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` seconds after it expires.
-                if (timestamp::now_seconds() <= existing_exp_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS) {
+                // We store the nonce in nonce history for `NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS` seconds after it expires.
+                if (timestamp::now_seconds() <= existing_exp_time + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS) {
                     return false;
                 };
             };
@@ -246,22 +246,22 @@ module aptos_framework::nonce_validation {
         assert!(!check_and_insert_nonce(@0x5, 1234, begin_time + 85));
         assert!(check_and_insert_nonce(@0x5, 1235, begin_time + 85));
 
-        timestamp::fast_forward_seconds(85);
+        timestamp::fast_forward_seconds(120);
         // Nonce (0x5, 1234) expires at `begin_time + 50`.
         // Nonce (0x5, 1234) will be garbage collected after
-        // `begin_time + 50 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` seconds.
+        // `begin_time + 50 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS` seconds.
         assert!(!check_if_nonce_exists_in_history(@0x5, 1234));
         timestamp::fast_forward_seconds(1);
         assert!(check_if_nonce_exists_in_history(@0x5, 1234));
-        assert!(check_and_insert_nonce(@0x5, 1234, begin_time + 150));
+        assert!(check_and_insert_nonce(@0x5, 1234, begin_time + 185));
 
         // Nonce (0x5, 1235) expired at `begin_time + 85` seconds.
-        // We are currently at `begin_time + 116` seconds.
+        // We are currently at `begin_time + 151` seconds.
         // The nonce is still stored in nonce history.
         // But another nonce with expiry time higher than
-        // `begin_time + 85 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECS` can still be inserted.
+        // `begin_time + 85 + NONCE_REPLAY_PROTECTION_OVERLAP_INTERVAL_SECONDS` can still be inserted.
         assert!(!check_if_nonce_exists_in_history(@0x5, 1235));
-        assert!(!check_and_insert_nonce(@0x5, 1235, begin_time + 150));
-        assert!(check_and_insert_nonce(@0x5, 1235, begin_time + 151));
+        assert!(!check_and_insert_nonce(@0x5, 1235, begin_time + 185));
+        assert!(check_and_insert_nonce(@0x5, 1235, begin_time + 186));
     }
 }
