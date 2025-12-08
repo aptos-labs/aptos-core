@@ -1,7 +1,5 @@
 /// The `function_info` module defines the `FunctionInfo` type which simulates a function pointer.
 module aptos_framework::function_info {
-    use std::error;
-    use std::features;
     use std::signer;
     use std::string::{Self, String};
 
@@ -13,8 +11,6 @@ module aptos_framework::function_info {
     const EINVALID_IDENTIFIER: u64 = 1;
     /// Function specified in the FunctionInfo doesn't exist on chain.
     const EINVALID_FUNCTION: u64 = 2;
-    /// Feature hasn't been activated yet.
-    const ENOT_ACTIVATED: u64 = 3;
 
     /// A `String` holds a sequence of bytes which is guaranteed to be in utf8 format.
     struct FunctionInfo has copy, drop, store {
@@ -70,10 +66,6 @@ module aptos_framework::function_info {
         framework_function: &FunctionInfo,
         dispatch_target: &FunctionInfo,
     ): bool {
-        assert!(
-            features::dispatchable_fungible_asset_enabled(),
-            error::aborted(ENOT_ACTIVATED)
-        );
         load_function_impl(dispatch_target);
         check_dispatch_type_compatibility_impl(framework_function, dispatch_target)
     }

@@ -41,15 +41,6 @@ fn native_move_range(
     ty_args: &[Type],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
-    if !context
-        .get_feature_flags()
-        .is_native_memory_operations_enabled()
-    {
-        return Err(SafeNativeError::Abort {
-            abort_code: error::unavailable(EFEATURE_NOT_ENABLED),
-        });
-    }
-
     context.charge(VECTOR_MOVE_RANGE_BASE)?;
 
     let map_err = |_| SafeNativeError::Abort {
