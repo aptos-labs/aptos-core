@@ -306,10 +306,9 @@ Always returns <code><b>false</b></code> if <code>self</code> does not hold a va
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_contains">contains</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, e_ref: &Element): bool {
-    <b>if</b> (self is Option::None&lt;Element&gt;) {
-        <b>false</b>
-    } <b>else</b> {
-        &self.e == e_ref
+    match (self) {
+        Option::None =&gt; <b>false</b>,
+        Option::Some { e } =&gt; e == e_ref,
     }
 }
 </code></pre>
@@ -336,10 +335,11 @@ Aborts if <code>self</code> does not hold a value
 
 
 <pre><code><b>public</b> <b>fun</b> <a href="option.md#0x1_option_borrow">borrow</a>&lt;Element&gt;(self: &<a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;): &Element {
-    <b>if</b> (self is Option::None&lt;Element&gt;) {
-        <b>abort</b> <a href="option.md#0x1_option_EOPTION_NOT_SET">EOPTION_NOT_SET</a>
-    } <b>else</b> {
-        &self.e
+    match (self) {
+        Option::None =&gt; {
+            <b>abort</b> <a href="option.md#0x1_option_EOPTION_NOT_SET">EOPTION_NOT_SET</a>
+        },
+        Option::Some { e } =&gt; e,
     }
 }
 </code></pre>
@@ -1124,7 +1124,7 @@ Utility function to destroy an option that is not droppable.
 
 
 <pre><code><b>fun</b> <a href="option.md#0x1_option_spec_contains">spec_contains</a>&lt;Element&gt;(self: <a href="option.md#0x1_option_Option">Option</a>&lt;Element&gt;, e: Element): bool {
-   (self is Option::Some&lt;Element&gt;) && <a href="option.md#0x1_option_borrow">borrow</a>(self) == e
+   (self is Option::Some&lt;Element&gt;) && <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) == e
 }
 </code></pre>
 
@@ -1177,7 +1177,7 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="option.md#0x1_option_borrow">borrow</a>(self) <b>else</b> default_ref);
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) <b>else</b> default_ref);
 </code></pre>
 
 
@@ -1195,7 +1195,7 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="option.md#0x1_option_borrow">borrow</a>(self) <b>else</b> default);
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) <b>else</b> default);
 </code></pre>
 
 
@@ -1214,7 +1214,7 @@ Utility function to destroy an option that is not droppable.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <a href="option.md#0x1_option_is_some">is_some</a>(self) <b>with</b> <a href="option.md#0x1_option_EOPTION_IS_SET">EOPTION_IS_SET</a>;
 <b>ensures</b> <a href="option.md#0x1_option_is_some">is_some</a>(self);
-<b>ensures</b> <a href="option.md#0x1_option_borrow">borrow</a>(self) == e;
+<b>ensures</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) == e;
 </code></pre>
 
 
@@ -1232,7 +1232,7 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(<b>old</b>(self));
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(<b>old</b>(self));
 <b>ensures</b> <a href="option.md#0x1_option_is_none">is_none</a>(self);
 </code></pre>
 
@@ -1250,7 +1250,7 @@ Utility function to destroy an option that is not droppable.
 
 
 <pre><code><b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(self);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self);
 <b>ensures</b> self == <b>old</b>(self);
 </code></pre>
 
@@ -1269,9 +1269,9 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(<b>old</b>(self));
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(<b>old</b>(self));
 <b>ensures</b> <a href="option.md#0x1_option_is_some">is_some</a>(self);
-<b>ensures</b> <a href="option.md#0x1_option_borrow">borrow</a>(self) == el;
+<b>ensures</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) == el;
 </code></pre>
 
 
@@ -1290,7 +1290,7 @@ Utility function to destroy an option that is not droppable.
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
 <b>ensures</b> result == <b>old</b>(self);
-<b>ensures</b> <a href="option.md#0x1_option_borrow">borrow</a>(self) == e;
+<b>ensures</b> <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) == e;
 </code></pre>
 
 
@@ -1308,7 +1308,7 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="option.md#0x1_option_borrow">borrow</a>(self) <b>else</b> default);
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self) <b>else</b> default);
 </code></pre>
 
 
@@ -1326,7 +1326,7 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>include</b> <a href="option.md#0x1_option_AbortsIfNone">AbortsIfNone</a>&lt;Element&gt;;
-<b>ensures</b> result == <a href="option.md#0x1_option_borrow">borrow</a>(self);
+<b>ensures</b> result == <a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self);
 </code></pre>
 
 
@@ -1361,7 +1361,7 @@ Utility function to destroy an option that is not droppable.
 
 <pre><code><b>pragma</b> opaque;
 <b>aborts_if</b> <b>false</b>;
-<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="vector.md#0x1_vector">vector</a>[<a href="option.md#0x1_option_borrow">borrow</a>(self)] <b>else</b> <a href="vector.md#0x1_vector_empty">vector::empty</a>());
+<b>ensures</b> result == (<b>if</b> (<a href="option.md#0x1_option_is_some">is_some</a>(self)) <a href="vector.md#0x1_vector">vector</a>[<a href="option.md#0x1_option_spec_borrow">spec_borrow</a>(self)] <b>else</b> <a href="vector.md#0x1_vector_empty">vector::empty</a>());
 </code></pre>
 
 

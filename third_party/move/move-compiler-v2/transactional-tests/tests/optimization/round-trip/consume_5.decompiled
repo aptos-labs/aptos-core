@@ -22,20 +22,12 @@ module 0xc0ffee::m {
     public fun test(p0: bool, p1: u32) {
         let _v0 = p1;
         if (p0) consume(_v0) else consume(p1);
-        if (!p0) {
-            consume(p1);
-            return ()
-        };
-        consume(_v0);
+        if (p0) consume(_v0) else consume(p1);
     }
     public fun test_struct(p0: bool, p1: W) {
         let _v0 = p1;
         if (p0) consume_(_v0) else consume_(p1);
-        if (!p0) {
-            consume_(p1);
-            return ()
-        };
-        consume_(_v0);
+        if (p0) consume_(_v0) else consume_(p1);
     }
 }
 

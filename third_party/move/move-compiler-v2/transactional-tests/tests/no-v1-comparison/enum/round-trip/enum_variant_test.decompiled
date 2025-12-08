@@ -17,25 +17,18 @@ module 0x42::m {
         &_v0 is V1
     }
     fun test_v1v3(): bool {
-        let _v0 = Data::V1{x: 43};
-        let _v1 = &_v0;
-        let _v2 = _v1 is V1;
-        if (!_v2) _v2 = _v1 is V3;
-        let _v3 = Data::V3{};
-        if (_v2) {
-            let _v4 = &_v3;
-            let _v5 = _v4 is V1;
-            let _v6 = _v5;
-            loop {
-                if (!_v6) {
-                    _v5 = _v4 is V3;
-                    if (_v5) break
-                };
-                return _v5
-            };
-            return _v5
-        };
-        false
+        let _v0;
+        let _v1 = Data::V1{x: 43};
+        let _v2 = &_v1;
+        let _v3 = _v2 is V1;
+        if (!_v3) _v3 = _v2 is V3;
+        let _v4 = Data::V3{};
+        if (_v3) {
+            let _v5 = &_v4;
+            _v0 = _v5 is V1;
+            if (_v0) () else _v0 = _v5 is V3
+        } else _v0 = false;
+        _v0
     }
 }
 

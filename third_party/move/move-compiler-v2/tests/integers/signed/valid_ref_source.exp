@@ -1004,7 +1004,7 @@ fun valid_ref_resource::test_exist1($t0: address): i64 {
      # live vars: $t0
   0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
      # live vars: $t0, $t2
-  1: if ($t2) goto 2 else goto 7
+  1: if ($t2) goto 2 else goto 8
      # live vars: $t0
   2: label L0
      # live vars: $t0
@@ -1014,13 +1014,15 @@ fun valid_ref_resource::test_exist1($t0: address): i64 {
      # live vars: $t4
   5: $t1 := read_ref($t4)
      # live vars: $t1
-  6: return $t1
-     # live vars: $t0
-  7: label L1
-     # live vars:
-  8: $t1 := 1
+  6: label L2
      # live vars: $t1
-  9: return $t1
+  7: return $t1
+     # live vars: $t0
+  8: label L1
+     # live vars:
+  9: $t1 := 1
+     # live vars: $t1
+ 10: goto 6
 }
 
 
@@ -1033,7 +1035,7 @@ fun valid_ref_resource::test_exist2($t0: address): i128 {
      # live vars: $t0
   0: $t2 := exists<0x42::valid_ref_resource::S1>($t0)
      # live vars: $t0, $t2
-  1: if ($t2) goto 2 else goto 7
+  1: if ($t2) goto 2 else goto 8
      # live vars: $t0
   2: label L0
      # live vars: $t0
@@ -1043,13 +1045,15 @@ fun valid_ref_resource::test_exist2($t0: address): i128 {
      # live vars: $t4
   5: $t1 := read_ref($t4)
      # live vars: $t1
-  6: return $t1
-     # live vars: $t0
-  7: label L1
-     # live vars:
-  8: $t1 := 1
+  6: label L2
      # live vars: $t1
-  9: return $t1
+  7: return $t1
+     # live vars: $t0
+  8: label L1
+     # live vars:
+  9: $t1 := 1
+     # live vars: $t1
+ 10: goto 6
 }
 
 
@@ -1078,7 +1082,7 @@ fun valid_ref_resource::test_move_from($t0: &signer, $t1: address): i64 {
      # live vars: $t0, $t1, $t3
   4: $t7 := exists<0x42::valid_ref_resource::S1>($t1)
      # live vars: $t0, $t3, $t7
-  5: if ($t7) goto 6 else goto 13
+  5: if ($t7) goto 6 else goto 14
      # live vars: $t0, $t3
   6: label L0
      # live vars: $t0
@@ -1092,19 +1096,21 @@ fun valid_ref_resource::test_move_from($t0: &signer, $t1: address): i64 {
      # live vars: $t11
  11: $t5 := read_ref($t11)
      # live vars: $t5
- 12: return $t5
-     # live vars: $t0, $t3
- 13: label L1
-     # live vars: $t0, $t3
- 14: drop($t0)
-     # live vars: $t3
- 15: $t10 := borrow_local($t3)
-     # live vars: $t10
- 16: $t11 := borrow_field<0x42::valid_ref_resource::S1>.y($t10)
-     # live vars: $t11
- 17: $t5 := read_ref($t11)
+ 12: label L2
      # live vars: $t5
- 18: return $t5
+ 13: return $t5
+     # live vars: $t0, $t3
+ 14: label L1
+     # live vars: $t0, $t3
+ 15: drop($t0)
+     # live vars: $t3
+ 16: $t10 := borrow_local($t3)
+     # live vars: $t10
+ 17: $t11 := borrow_field<0x42::valid_ref_resource::S1>.y($t10)
+     # live vars: $t11
+ 18: $t5 := read_ref($t11)
+     # live vars: $t5
+ 19: goto 12
 }
 
 
@@ -1130,7 +1136,7 @@ fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
      # live vars: $t0, $t2, $t7
   5: $t7 := !($t7)
      # live vars: $t0, $t2, $t7
-  6: if ($t7) goto 7 else goto 11
+  6: if ($t7) goto 7 else goto 12
      # live vars: $t0, $t2
   7: label L0
      # live vars: $t0, $t2
@@ -1138,13 +1144,15 @@ fun valid_ref_resource::test_move_to($t0: &signer, $t1: address) {
      # live vars: $t2, $t8
   9: move_to<0x42::valid_ref_resource::S1>($t8, $t2)
      # live vars:
- 10: return ()
-     # live vars: $t0, $t2
- 11: label L1
-     # live vars: $t0
- 12: drop($t0)
+ 10: label L2
      # live vars:
- 13: return ()
+ 11: return ()
+     # live vars: $t0, $t2
+ 12: label L1
+     # live vars: $t0
+ 13: drop($t0)
+     # live vars:
+ 14: goto 10
 }
 
 
@@ -1181,6 +1189,7 @@ fun test_deref2(l0: &i128): i128
 
 // Function definition at index 4
 fun test_exist1(l0: address): i64 acquires S1
+    local l1: i64
     copy_loc l0
     exists S1
     br_false l0
@@ -1189,12 +1198,17 @@ fun test_exist1(l0: address): i64 acquires S1
     // @5
     borrow_field S1, y
     read_ref
+    st_loc l1
+l1: move_loc l1
     ret
+    // @10
 l0: ld_i64 1
-    ret
+    st_loc l1
+    branch l1
 
 // Function definition at index 5
 fun test_exist2(l0: address): i128 acquires S1
+    local l1: i128
     copy_loc l0
     exists S1
     br_false l0
@@ -1203,14 +1217,19 @@ fun test_exist2(l0: address): i128 acquires S1
     // @5
     borrow_field S1, z
     read_ref
+    st_loc l1
+l1: move_loc l1
     ret
+    // @10
 l0: ld_i128 1
-    ret
+    st_loc l1
+    branch l1
 
 // Function definition at index 6
 fun test_move_from(l0: &signer, l1: address): i64 acquires S1
     local l2: S1
     local l3: S1
+    local l4: i64
     ld_u64 1
     ld_i64 -1
     ld_i128 -2
@@ -1229,14 +1248,17 @@ fun test_move_from(l0: &signer, l1: address): i64 acquires S1
     borrow_field S1, y
     read_ref
     // @15
+    st_loc l4
+l1: move_loc l4
     ret
 l0: move_loc l0
     pop
+    // @20
     borrow_loc l2
     borrow_field S1, y
-    // @20
     read_ref
-    ret
+    st_loc l4
+    branch l1
 
 // Function definition at index 7
 fun test_move_to(l0: &signer, l1: address)
@@ -1254,10 +1276,10 @@ fun test_move_to(l0: &signer, l1: address)
     move_loc l2
     // @10
     move_to S1
-    ret
+l1: ret
 l0: move_loc l0
     pop
-    ret
+    branch l1
 
 
 ============ bytecode verification succeeded ========

@@ -4,14 +4,15 @@
 module 0xc0ffee::m {
     public fun test(p0: bool): bool {
         let _v0;
-        if (p0) _v0 = false else {
-            let _v1;
-            if (p0) _v1 = false else _v1 = false;
-            p0 = _v1;
-            _v0 = p0
+        let _v1;
+        if (p0) _v1 = false else {
+            let _v2;
+            if (p0) _v2 = false else _v2 = false;
+            p0 = _v2;
+            _v1 = p0
         };
-        if (_v0) return true;
-        !!p0
+        if (_v1) _v0 = true else _v0 = !!p0;
+        _v0
     }
 }
 

@@ -1,5 +1,5 @@
 processed 1 task
-task 0 lines 3-33:  publish [module 0xcafe::Module0 {]
+task 0 lines 3-30:  publish [module 0xcafe::Module0 {]
 warning: Unused value of parameter `p0`. Consider removing the parameter, or prefixing with an underscore (e.g., `_p0`), or binding to `_`
    ┌─ TEMPFILE:12:26
    │

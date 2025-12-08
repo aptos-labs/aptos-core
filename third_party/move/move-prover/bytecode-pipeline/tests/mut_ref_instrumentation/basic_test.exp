@@ -210,21 +210,23 @@ fun TestEliminateMutRefs::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut 0x42::T
  36: goto 27
  37: label L0
  38: $t25 := move($t0)
- 39: if ($t25) goto 40 else goto 47
+ 39: if ($t25) goto 40 else goto 49
  40: label L7
  41: $t26 := move($t5)
  42: drop($t26)
  43: $t27 := move($t2)
  44: $t28 := 0
  45: TestEliminateMutRefs::test3($t27, $t28)
- 46: return ()
- 47: label L6
- 48: $t29 := move($t2)
- 49: drop($t29)
- 50: $t30 := move($t5)
- 51: $t31 := 0
- 52: TestEliminateMutRefs::test3($t30, $t31)
- 53: return ()
+ 46: goto 47
+ 47: label L8
+ 48: return ()
+ 49: label L6
+ 50: $t29 := move($t2)
+ 51: drop($t29)
+ 52: $t30 := move($t5)
+ 53: $t31 := 0
+ 54: TestEliminateMutRefs::test3($t30, $t31)
+ 55: goto 47
 }
 
 ============ after pipeline `mut_ref_instrumentation` ================
@@ -439,21 +441,21 @@ fun TestEliminateMutRefs::test8($t0|b: bool, $t1|n: u64, $t2|r_ref: &mut 0x42::T
  34: goto 25
  35: label L0
  36: $t25 := move($t0)
- 37: if ($t25) goto 38 else goto 46
+ 37: if ($t25) goto 38 else goto 47
  38: label L7
  39: $t26 := move($t5)
  40: drop($t26)
  41: $t27 := copy($t2)
  42: $t28 := 0
  43: TestEliminateMutRefs::test3($t27, $t28)
- 44: trace_local[r_ref]($t2)
- 45: return ()
- 46: label L6
- 47: $t29 := copy($t2)
- 48: drop($t29)
- 49: $t30 := move($t5)
- 50: $t31 := 0
- 51: TestEliminateMutRefs::test3($t30, $t31)
- 52: trace_local[r_ref]($t2)
- 53: return ()
+ 44: label L8
+ 45: trace_local[r_ref]($t2)
+ 46: return ()
+ 47: label L6
+ 48: $t29 := copy($t2)
+ 49: drop($t29)
+ 50: $t30 := move($t5)
+ 51: $t31 := 0
+ 52: TestEliminateMutRefs::test3($t30, $t31)
+ 53: goto 44
 }

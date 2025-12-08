@@ -73,7 +73,7 @@ spec aptos_framework::coin {
         option::is_some(supply) ==>
             val
                 == optional_aggregator::optional_aggregator_value(
-                    option::borrow(supply)
+                    option::spec_borrow(supply)
                 )
     }
 
@@ -97,9 +97,9 @@ spec aptos_framework::coin {
     ): bool {
         option::is_some(old_supply) ==>
             optional_aggregator::optional_aggregator_value(
-                option::borrow(old_supply)
+                option::spec_borrow(old_supply)
             ) == optional_aggregator::optional_aggregator_value(
-                option::borrow(supply)
+                option::spec_borrow(supply)
             )
     }
 
@@ -195,7 +195,7 @@ spec aptos_framework::coin {
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
         include (option::is_some(
             maybe_supply
-        )) ==> optional_aggregator::SubAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
+        )) ==> optional_aggregator::SubAbortsIf { optional_aggregator: option::spec_borrow(maybe_supply), value: amount };
     }
 
     spec schema CoinAddAbortsIf<CoinType> {
@@ -205,7 +205,7 @@ spec aptos_framework::coin {
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
         include (option::is_some(
             maybe_supply
-        )) ==> optional_aggregator::AddAbortsIf { optional_aggregator: option::borrow(maybe_supply), value: amount };
+        )) ==> optional_aggregator::AddAbortsIf { optional_aggregator: option::spec_borrow(maybe_supply), value: amount };
     }
 
     spec schema AbortsIfNotExistCoinInfo<CoinType> {
@@ -237,7 +237,7 @@ spec aptos_framework::coin {
         /// [high-level-req-7.5]
         aborts_if !exists<CoinInfo<CoinType>>(coin_addr);
         let maybe_supply = global<CoinInfo<CoinType>>(coin_addr).supply;
-        let supply = option::borrow(maybe_supply);
+        let supply = option::spec_borrow(maybe_supply);
         let value = optional_aggregator::optional_aggregator_value(supply);
 
         ensures if (option::is_some(maybe_supply)) {
@@ -283,11 +283,11 @@ spec aptos_framework::coin {
         aborts_if coin_store.coin.value < amount;
 
         let maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        let supply_aggr = option::borrow(maybe_supply);
+        let supply_aggr = option::spec_borrow(maybe_supply);
         let value = optional_aggregator::optional_aggregator_value(supply_aggr);
 
         let post post_maybe_supply = global<CoinInfo<CoinType>>(addr).supply;
-        let post post_supply = option::borrow(post_maybe_supply);
+        let post post_supply = option::spec_borrow(post_maybe_supply);
         let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
 
         aborts_if option::is_some(maybe_supply) && value < amount;
@@ -454,7 +454,7 @@ spec aptos_framework::coin {
         };
         let account_addr = signer::address_of(account);
         let post coin_info = global<CoinInfo<CoinType>>(account_addr);
-        let post supply = option::borrow(coin_info.supply);
+        let post supply = option::spec_borrow(coin_info.supply);
         let post value = optional_aggregator::optional_aggregator_value(supply);
         let post limit = optional_aggregator::optional_aggregator_limit(supply);
         modifies global<CoinInfo<CoinType>>(account_addr);

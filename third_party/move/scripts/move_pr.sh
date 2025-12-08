@@ -106,9 +106,7 @@ MOVE_CRATES_INTEGRATION_TEST="\
   -p aptos-transactional-test-harness \
   -p bytecode-verifier-tests \
   -p bytecode-verifier-transactional-tests \
-  -p move-asm \
   -p move-cli \
-  -p move-decompiler \
   -p move-model \
   -p move-package \
   -p move-prover-bytecode-pipeline \

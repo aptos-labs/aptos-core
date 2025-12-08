@@ -96,11 +96,11 @@ spec aptos_framework::transaction_fee {
         aborts_if coin_store.coin.value < amount;
 
         let maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
-        let supply_aggr = option::borrow(maybe_supply);
+        let supply_aggr = option::spec_borrow(maybe_supply);
         let value = optional_aggregator::optional_aggregator_value(supply_aggr);
 
         let post post_maybe_supply = global<CoinInfo<AptosCoin>>(aptos_addr).supply;
-        let post post_supply = option::borrow(post_maybe_supply);
+        let post post_supply = option::spec_borrow(post_maybe_supply);
         let post post_value = optional_aggregator::optional_aggregator_value(post_supply);
 
         aborts_if option::is_some(maybe_supply) && value < amount;
