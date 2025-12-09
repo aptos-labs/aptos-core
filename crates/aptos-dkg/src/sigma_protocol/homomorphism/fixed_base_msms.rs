@@ -89,16 +89,8 @@ pub trait Trait: homomorphism::Trait<Codomain = Self::CodomainShape<Self::MsmOut
     }
 }
 
-// dude je moet iets algemeners maken... dat alleen msm terms bouwt ofzo... hmmmm
-pub trait TraitTwo: homomorphism::Trait<Codomain = (Self::FirstCodomainShape<Self::FirstMsmOutput>, Self::SecondCodomainShape<Self::SecondMsmOutput>)> {
-    /// The scalar type used in the MSMs.
-    type Scalar: Clone;
-
-    /// The group/base type used in the MSMs. Current instantiations always use E::G1Affine but as explained
-    /// in the TODO of doc comment of `fn verify_msm_hom`, we might want to be working with enums here in the future.
-    type FirstBase: Clone;
-    type SecondBase: Clone;
-
+// Alternate version for tuple MSMs with incompatible types, namely whose output is G1 and G2
+pub trait InhomogeneousTrait: homomorphism::Trait<Codomain = (Self::FirstCodomainShape<Self::FirstMsmOutput>, Self::SecondCodomainShape<Self::SecondMsmOutput>)> {
     /// Type representing a single MSM input (a set of bases and scalars). Normally, this would default
     /// to `MsmInput<Self::Base, Self::Scalar>`, but stable Rust does not yet support associated type defaults,
     /// hence we introduce a trait `IsMsmInput` and struct `MsmInput` below.

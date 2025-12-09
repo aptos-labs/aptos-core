@@ -25,7 +25,7 @@ pub trait Trait<E: Pairing>:
     fixed_base_msms::Trait<
         Domain: Witness<E>,
         MsmOutput = E::G1,
-        MsmInput: IsMsmInput<Base = E::G1Affine, Scalar= E::ScalarField>,
+        MsmInput: IsMsmInput<Base = E::G1Affine, Scalar= E::ScalarField>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
     > + Sized
     + CanonicalSerialize
 {
@@ -91,12 +91,13 @@ pub trait Trait<E: Pairing>:
                 &self.dst(),
             );
 
-            // Step 2: Compute verifier-specific challenge (used for weighted MSM)
+            // **Compute verifier-specific challenge (used for weighted MSM)**
             // While this could be derived deterministically via Fiat–Shamir, doing so would require
             // integrating it into the prover as well for composability; we no longer follow this approach.
             // Instead, we follow the simple approach:
             let mut rng = ark_std::rand::thread_rng(); // TODO: make this part of the function input?
             let beta = E::ScalarField::rand(&mut rng);
+            
             let len = public_statement.clone().into_iter().count(); // hmm maybe pass the into_iter version in combine_msm_terms?
             let powers_of_betas = utils::powers(beta, len);
 
