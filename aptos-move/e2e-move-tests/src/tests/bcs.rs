@@ -53,6 +53,7 @@ fn test_function_value_serialization() {
     let expected_status = ExecutionStatus::MoveAbort {
         location: bcs_location.clone(),
         code: NFE_BCS_SERIALIZATION_FAILURE,
+        message: None,
         info: None,
     };
 

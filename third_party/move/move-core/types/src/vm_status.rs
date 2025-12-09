@@ -65,7 +65,11 @@ pub enum VMStatus {
     },
 
     /// Indicates an `abort` from inside Move code. Contains the location of the abort and the code
-    MoveAbort(AbortLocation, /* code */ u64),
+    MoveAbort {
+        location: AbortLocation,
+        code: u64,
+        message: Option<String>,
+    },
 
     /// Indicates an failure from inside Move code, where the VM could not continue exection, e.g.
     /// dividing by zero or a missing resource
@@ -90,7 +94,11 @@ pub fn err_msg<S: Into<String>>(s: S) -> Option<String> {
 pub enum KeptVMStatus {
     Executed,
     OutOfGas,
-    MoveAbort(AbortLocation, /* code */ u64),
+    MoveAbort {
+        location: AbortLocation,
+        code: u64,
+        message: Option<String>,
+    },
     ExecutionFailure {
         location: AbortLocation,
         function: u16,
@@ -145,7 +153,7 @@ impl VMStatus {
     pub fn status_code(&self) -> StatusCode {
         match self {
             Self::Executed => StatusCode::EXECUTED,
-            Self::MoveAbort(_, _) => StatusCode::ABORTED,
+            Self::MoveAbort { .. } => StatusCode::ABORTED,
             Self::ExecutionFailure { status_code, .. } => *status_code,
             Self::Error {
                 status_code: code, ..
@@ -163,16 +171,16 @@ impl VMStatus {
             Self::Error { sub_status, .. } | Self::ExecutionFailure { sub_status, .. } => {
                 *sub_status
             },
-            Self::Executed | Self::MoveAbort(..) => None,
+            Self::Executed | Self::MoveAbort { .. } => None,
         }
     }
 
     /// Returns the message associated with the `VMStatus`, if any.
     pub fn message(&self) -> Option<&String> {
         match self {
-            Self::Error { message, .. } | Self::ExecutionFailure { message, .. } => {
-                message.as_ref()
-            },
+            Self::Error { message, .. }
+            | Self::MoveAbort { message, .. }
+            | Self::ExecutionFailure { message, .. } => message.as_ref(),
             _ => None,
         }
     }
@@ -180,7 +188,7 @@ impl VMStatus {
     /// Returns the Move abort code if the status is `MoveAbort`, and `None` otherwise
     pub fn move_abort_code(&self) -> Option<u64> {
         match self {
-            Self::MoveAbort(_, code) => Some(*code),
+            Self::MoveAbort { code, .. } => Some(*code),
             Self::Error { .. } | Self::ExecutionFailure { .. } | Self::Executed => None,
         }
     }
@@ -199,7 +207,15 @@ impl VMStatus {
     ) -> Result<KeptVMStatus, DiscardedVMStatus> {
         match self {
             VMStatus::Executed => Ok(KeptVMStatus::Executed),
-            VMStatus::MoveAbort(location, code) => Ok(KeptVMStatus::MoveAbort(location, code)),
+            VMStatus::MoveAbort {
+                location,
+                code,
+                message,
+            } => Ok(KeptVMStatus::MoveAbort {
+                location,
+                code,
+                message,
+            }),
             VMStatus::ExecutionFailure {
                 status_code: StatusCode::OUT_OF_GAS,
                 ..
@@ -315,7 +331,7 @@ impl fmt::Display for VMStatus {
         let status_type = self.status_type();
         let mut status = format!("status {:#?} of type {}", self.status_code(), status_type);
 
-        if let VMStatus::MoveAbort(_, code) = self {
+        if let VMStatus::MoveAbort { code, .. } = self {
             status = format!("{} with sub status {}", status, code);
         }
 
@@ -334,9 +350,9 @@ impl fmt::Display for KeptVMStatus {
             KeptVMStatus::Executed => write!(f, "EXECUTED"),
             KeptVMStatus::OutOfGas => write!(f, "OUT_OF_GAS"),
             KeptVMStatus::MiscellaneousError => write!(f, "MISCELLANEOUS_ERROR"),
-            KeptVMStatus::MoveAbort(location, code) => {
-                write!(f, "ABORTED with code {} in {}", code, location)
-            },
+            KeptVMStatus::MoveAbort { location, code, message } => {
+                write!(f, "ABORTED with code {} and message {:?} in {}", code, message, location)
+            }
             KeptVMStatus::ExecutionFailure {
                 location,
                 function,
@@ -365,9 +381,14 @@ impl fmt::Debug for VMStatus {
                 .field("sub_status", sub_status)
                 .field("message", message)
                 .finish(),
-            VMStatus::MoveAbort(location, code) => f
+            VMStatus::MoveAbort {
+                location,
+                code,
+                message,
+            } => f
                 .debug_struct("ABORTED")
                 .field("code", code)
+                .field("message", message)
                 .field("location", location)
                 .finish(),
             VMStatus::ExecutionFailure {
@@ -395,9 +416,14 @@ impl fmt::Debug for KeptVMStatus {
         match self {
             KeptVMStatus::Executed => write!(f, "EXECUTED"),
             KeptVMStatus::OutOfGas => write!(f, "OUT_OF_GAS"),
-            KeptVMStatus::MoveAbort(location, code) => f
+            KeptVMStatus::MoveAbort {
+                location,
+                code,
+                message,
+            } => f
                 .debug_struct("ABORTED")
                 .field("code", code)
+                .field("message", message)
                 .field("location", location)
                 .finish(),
             KeptVMStatus::ExecutionFailure {

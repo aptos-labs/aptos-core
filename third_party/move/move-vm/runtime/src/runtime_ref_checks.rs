@@ -329,6 +329,11 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 // remove the top value from the shadow stack
                 let _ = ref_state.pop_from_shadow_stack()?;
             },
+            AbortMsg => {
+                // remove the top two values from the shadow stack
+                let _ = ref_state.pop_from_shadow_stack()?;
+                let _ = ref_state.pop_from_shadow_stack()?;
+            },
             Ret => {
                 ref_state.return_(frame.function.return_tys().len())?;
             },
@@ -610,7 +615,7 @@ impl RuntimeRefCheck for FullRuntimeRefCheck {
                 // push a non-ref value onto the shadow stack
                 ref_state.push_non_refs_to_shadow_stack(1);
             },
-            Abort => {
+            Abort | AbortMsg => {
                 // not reachable here, transition handled in `pre_execution_transition`
             },
             MoveFrom(index) => {

@@ -259,7 +259,7 @@ where
                 Instruction::Ret => {
                     return Ok(ExitCode::Return);
                 },
-                Instruction::Abort => {
+                Instruction::Abort | Instruction::AbortMsg => {
                     return Ok(ExitCode::Done);
                 },
                 Instruction::Call(idx) => {

@@ -2700,13 +2700,41 @@ impl Frame {
                             )?;
                             eprintln!("trace abort({}): {}", error_code, str);
                         }
+                        let error =
+                            PartialVMError::new(StatusCode::ABORTED).with_sub_status(error_code);
+
+                        // Before returning an abort error, ensure the instruction is recorded in
+                        // the trace, so the trace is full.
+                        trace_recorder.record_successful_instruction(instruction);
+                        return Err(error);
+                    },
+                    Instruction::AbortMsg => {
+                        gas_meter.charge_simple_instr(S::Abort)?;
+
+                        let vec_ref = interpreter.operand_stack.pop_as::<VectorRef>()?;
+                        let error_message = String::from_utf8(vec_ref.as_bytes_ref().to_owned())
+                            .map_err(|err| {
+                                PartialVMError::new_invariant_violation(format!(
+                                    "Invalid UTF-8 string: {err}",
+                                ))
+                            })?;
+
+                        let error_code = interpreter.operand_stack.pop_as::<u64>()?;
+
+                        if is_tracing_for!(TraceCategory::Abort(error_code)) {
+                            let mut str = String::new();
+                            interpreter.debug_print_stack_trace(
+                                &mut str,
+                                interpreter.loader.runtime_environment(),
+                            )?;
+                            eprintln!(
+                                "trace abort_msg({}, {}): {}",
+                                error_code, error_message, str
+                            );
+                        }
                         let error = PartialVMError::new(StatusCode::ABORTED)
                             .with_sub_status(error_code)
-                            .with_message(format!(
-                                "{} at offset {}",
-                                self.function.name_as_pretty_string(),
-                                self.pc,
-                            ));
+                            .with_message(error_message);
 
                         // Before returning an abort error, ensure the instruction is recorded in
                         // the trace, so the trace is full.

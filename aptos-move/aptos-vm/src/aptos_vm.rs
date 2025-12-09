@@ -640,6 +640,7 @@ impl AptosVM {
         if let ExecutionStatus::MoveAbort {
             location: AbortLocation::Module(module_id),
             code,
+            message,
             ..
         } = status
         {
@@ -660,16 +661,22 @@ impl AptosVM {
                 );
             }
 
-            let info = module_storage
+            let mut info = module_storage
                 .unmetered_get_deserialized_module(module_id.address(), module_id.name())
                 .ok()
                 .flatten()
                 .and_then(|module| get_metadata(&module.metadata))
                 .and_then(|m| m.extract_abort_info(code));
 
+            // If the abort had a message, override the description with the message.
+            if let Some((info, message)) = info.as_mut().zip(message.as_ref()) {
+                info.description = message.clone();
+            }
+
             ExecutionStatus::MoveAbort {
                 location: AbortLocation::Module(module_id),
                 code,
+                message,
                 info,
             }
         } else {
@@ -2671,7 +2678,7 @@ impl AptosVM {
             Err(e) => {
                 let vm_status = e.clone().into_vm_status();
                 match vm_status {
-                    VMStatus::MoveAbort(_, _) => {},
+                    VMStatus::MoveAbort { .. } => {},
                     _ => {
                         let message = e
                             .message()

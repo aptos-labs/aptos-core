@@ -76,7 +76,7 @@ pub fn convert_prologue_error(
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
-        VMStatus::MoveAbort(location, code)
+        VMStatus::MoveAbort { location, code, .. }
             if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) =>
         {
             let new_major_status = match error_split(code) {
@@ -108,7 +108,7 @@ pub fn convert_prologue_error(
             };
             VMStatus::error(new_major_status, None)
         },
-        VMStatus::MoveAbort(location, code) => {
+        VMStatus::MoveAbort { location, code, .. } => {
             let new_major_status = match error_split(code) {
                 // Invalid authentication key
                 (INVALID_ARGUMENT, EBAD_ACCOUNT_AUTHENTICATION_KEY) => StatusCode::INVALID_AUTH_KEY,
@@ -185,7 +185,7 @@ pub fn convert_epilogue_error(
     let status = error.into_vm_status();
     Err(match status {
         VMStatus::Executed => VMStatus::Executed,
-        VMStatus::MoveAbort(location, code)
+        VMStatus::MoveAbort { location, code, .. }
             if !APTOS_TRANSACTION_VALIDATION.is_account_module_abort(&location) =>
         {
             let (category, reason) = error_split(code);
@@ -198,8 +198,16 @@ pub fn convert_epilogue_error(
             )
         },
 
-        VMStatus::MoveAbort(location, code) => match error_split(code) {
-            (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort(location, code),
+        VMStatus::MoveAbort {
+            location,
+            code,
+            message,
+        } => match error_split(code) {
+            (LIMIT_EXCEEDED, ECANT_PAY_GAS_DEPOSIT) => VMStatus::MoveAbort {
+                location,
+                code,
+                message,
+            },
             (category, reason) => {
                 let err_msg = format!("[aptos_vm] Unexpected success epilogue Move abort: {:?}::{:?} (Category: {:?} Reason: {:?})",
 			    location, code, category, reason);

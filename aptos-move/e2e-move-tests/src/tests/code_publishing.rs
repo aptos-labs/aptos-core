@@ -471,6 +471,7 @@ fn test_module_publishing_does_not_fallback() {
                 if let ExecutionStatus::MoveAbort {
                     location,
                     code,
+                    message: _,
                     info: _,
                 } = status
                 {
@@ -585,6 +586,7 @@ fn assert_move_abort(status: TransactionStatus, expected_abort_code: u64) {
     if let ExecutionStatus::MoveAbort {
         location: _,
         code,
+        message: _,
         info: _,
     } = status
     {

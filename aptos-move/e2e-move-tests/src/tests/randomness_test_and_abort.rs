@@ -107,6 +107,7 @@ fn test_unbiasable_annotation() {
     if let ExecutionStatus::MoveAbort {
         location,
         code,
+        message: _,
         info: _,
     } = status
     {

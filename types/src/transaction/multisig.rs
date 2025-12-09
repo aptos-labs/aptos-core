@@ -76,7 +76,11 @@ impl TryFrom<VMStatus> for ExecutionError {
                 abort_location: String::from(""),
                 error_code: error as u64,
             }),
-            VMStatus::MoveAbort(abort_location, error_code) => Ok(ExecutionError {
+            VMStatus::MoveAbort {
+                location: abort_location,
+                code: error_code,
+                ..
+            } => Ok(ExecutionError {
                 error_type: String::from("MoveAbort"),
                 abort_location: format!("{:?}", abort_location),
                 error_code,
