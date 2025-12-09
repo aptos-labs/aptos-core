@@ -48,6 +48,7 @@ pub(crate) enum LocalTys {
     /// Used for non-generic functions to avoid type clones around locals.
     BorrowFromFunction,
     /// Used for generic functions, where types are cached per-instantiation.
+    /// Dummy change :)
     BorrowFromFunctionGeneric(Rc<[Type]>),
 }
 
