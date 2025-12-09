@@ -31,16 +31,16 @@
 
 // Constants are defined directly below, no imports needed here
 
-// SLH-DSA SHA2-128s key and signature lengths
-// These are based on the FIPS-205 specification for SHA2-128s
-/// The length in bytes of the SLH-DSA SHA2-128s PrivateKey (seed)
-pub const PRIVATE_KEY_LENGTH: usize = 32;
-/// The length in bytes of the SLH-DSA SHA2-128s PublicKey
+/// The length in bytes of the SLH-DSA SHA2-128s PrivateKey: the SK seed, PRF seed and PK seed.
+/// The PK seed is actually public, but must be stored in the SK, since it is picked randomly
+/// and independently of all other SK material.
+pub const PRIVATE_KEY_LENGTH: usize = 16 * 3;
+/// The length in bytes of the SLH-DSA SHA2-128s PublicKey: the PK seed and PK root.
 // For SHA2-128s, the public key is 32 bytes
-pub const PUBLIC_KEY_LENGTH: usize = 32;
+pub const PUBLIC_KEY_LENGTH: usize = 16 * 2;
 /// The length in bytes of the SLH-DSA SHA2-128s Signature
-// For SHA2-128s, the signature is 7856 bytes (succinct variant)
-pub const SIGNATURE_LENGTH: usize = 7856;
+// For SHA2-128s, the signature is 7,856 bytes (succinct variant)
+pub const SIGNATURE_LENGTH: usize = 7_856;
 
 pub mod slh_dsa_keys;
 pub mod slh_dsa_sigs;
