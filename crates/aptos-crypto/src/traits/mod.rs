@@ -388,4 +388,8 @@ pub(crate) mod private {
     impl Sealed for crate::secp256k1_ecdsa::PrivateKey {}
     impl Sealed for crate::secp256k1_ecdsa::PublicKey {}
     impl Sealed for crate::secp256k1_ecdsa::Signature {}
+
+    impl Sealed for crate::slh_dsa::PrivateKey {}
+    impl Sealed for crate::slh_dsa::PublicKey {}
+    impl Sealed for crate::slh_dsa::Signature {}
 }
