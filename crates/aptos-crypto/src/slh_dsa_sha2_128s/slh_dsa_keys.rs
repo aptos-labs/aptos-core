@@ -1,7 +1,7 @@
 // Copyright (c) Aptos Foundation
 // Licensed pursuant to the Innovation-Enabling Source Code License, available at https://github.com/aptos-labs/aptos-core/blob/main/LICENSE
 
-//! This file implements traits for SLH-DSA SHA2-128s private keys and public keys.
+//! This file implements traits for SLH-DSA-SHA2-128s private keys and public keys.
 
 #[cfg(any(test, feature = "fuzzing"))]
 use crate::test_utils::{self, KeyPair};
@@ -18,8 +18,8 @@ use serde::Serialize;
 use slh_dsa::{Sha2_128s, SigningKey as SlhDsaSigningKey, VerifyingKey as SlhDsaVerifyingKey};
 use std::fmt;
 
-/// A SLH-DSA SHA2-128s private key (signing key)
-#[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
+/// A SLH-DSA-SHA2-128s private key (signing key)
+#[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay, PartialEq, Eq)]
 #[key_name("SlhDsaSha2_128sPrivateKey")]
 pub struct PrivateKey(pub(crate) SlhDsaSigningKey<Sha2_128s>);
 
@@ -29,13 +29,15 @@ static_assertions::assert_not_impl_any!(PrivateKey: Clone);
 #[cfg(any(test, feature = "cloneable-private-keys"))]
 impl Clone for PrivateKey {
     fn clone(&self) -> Self {
-        let sk_bytes: &[u8] = &(self.to_bytes());
-        PrivateKey::try_from(sk_bytes).unwrap()
+        // More efficient than our deserialization, which would slowly recompute the PK root.
+        let sk_bytes: &[u8] = &(self.0.to_bytes());
+        let signing_key = SlhDsaSigningKey::<Sha2_128s>::try_from(sk_bytes).unwrap();
+        PrivateKey(signing_key)
     }
 }
 
-/// A SLH-DSA SHA2-128s public key (verifying key)
-#[derive(DeserializeKey, Clone, SerializeKey)]
+/// A SLH-DSA-SHA2-128s public key (verifying key)
+#[derive(DeserializeKey, Clone, SerializeKey, PartialEq, Eq)]
 #[key_name("SlhDsaSha2_128sPublicKey")]
 pub struct PublicKey(pub(crate) SlhDsaVerifyingKey<Sha2_128s>);
 
@@ -59,12 +61,11 @@ impl PrivateKey {
         let full_bytes = self.0.to_bytes();
         // Extract only the first PRIVATE_KEY_LENGTH bytes (the three 16-byte seeds)
         // The full serialization includes the PK root, which we exclude
-        full_bytes[..PRIVATE_KEY_LENGTH.min(full_bytes.len())].to_vec()
+        full_bytes[..PRIVATE_KEY_LENGTH].to_vec()
     }
 
-    /// Deserialize a PrivateKey without any validation checks apart from expected key size.
-    /// For SLH-DSA, we use slh_keygen_internal with the seed as sk_seed, sk_prf, and pk_seed.
-    /// The input bytes should be PRIVATE_KEY_LENGTH (48 bytes), which we split into three 16-byte seeds.
+    /// Deserialize a PrivateKey: there are no validation checks beyond length checks.
+    /// The input bytes should be PRIVATE_KEY_LENGTH (48 bytes): three 16-byte seeds.
     pub(crate) fn from_bytes_unchecked(
         bytes: &[u8],
     ) -> std::result::Result<PrivateKey, CryptoMaterialError> {
@@ -85,6 +86,7 @@ impl PrivateKey {
 
         let signing_key =
             SlhDsaSigningKey::<Sha2_128s>::slh_keygen_internal(&sk_seed, &sk_prf, &pk_seed);
+
         Ok(PrivateKey(signing_key))
     }
 
@@ -194,14 +196,6 @@ impl Uniform for PrivateKey {
     }
 }
 
-impl PartialEq<Self> for PrivateKey {
-    fn eq(&self, other: &Self) -> bool {
-        self.to_bytes() == other.to_bytes()
-    }
-}
-
-impl Eq for PrivateKey {}
-
 impl TryFrom<&[u8]> for PrivateKey {
     type Error = CryptoMaterialError;
 
@@ -233,13 +227,7 @@ impl ValidCryptoMaterial for PrivateKey {
 // Implementing From<&PrivateKey<...>> allows to derive a public key in a more elegant fashion
 impl From<&PrivateKey> for PublicKey {
     fn from(private_key: &PrivateKey) -> Self {
-        // SigningKey contains the public key internally
-        // We can get it by signing a dummy message and extracting the public key from the signature context
-        // However, a simpler approach is to use the public key bytes directly from the signing key
-        // The SigningKey structure contains a VerifyingKey that we can access
-        // For SLH-DSA, the public key is stored as part of the signing key structure
-        // We'll extract it by getting the public key bytes
-        // SigningKey implements AsRef<VerifyingKey<P>>, so we can get a reference and clone it
+        // The SigningKey structure contains the public key (i.e., a `VerifyingKey`) that we can access
         let verifying_key = private_key.0.as_ref().clone();
         PublicKey(verifying_key)
     }
@@ -257,17 +245,6 @@ impl std::hash::Hash for PublicKey {
     }
 }
 
-// Those are required by the implementation of hash above
-impl PartialEq for PublicKey {
-    fn eq(&self, other: &PublicKey) -> bool {
-        self.to_bytes() == other.to_bytes()
-    }
-}
-
-impl Eq for PublicKey {}
-
-// We deduce VerifyingKey from pointing to the signature material
-// we get the ability to do `pubkey.validate(msg, signature)`
 impl VerifyingKey for PublicKey {
     type SignatureMaterial = Signature;
     type SigningKeyMaterial = PrivateKey;
@@ -281,7 +258,7 @@ impl fmt::Display for PublicKey {
 
 impl fmt::Debug for PublicKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "slh_dsa::PublicKey({})", self)
+        write!(f, "slh_dsa_sha2_128s::PublicKey({})", self)
     }
 }
 
@@ -312,14 +289,14 @@ impl ValidCryptoMaterial for PublicKey {
 // Fuzzing //
 /////////////
 
-/// Produces a uniformly random SLH-DSA SHA2-128s keypair from a seed
+/// Produces a uniformly random SLH-DSA-SHA2-128s keypair from a seed
 #[cfg(any(test, feature = "fuzzing"))]
 pub fn keypair_strategy(
 ) -> impl proptest::strategy::Strategy<Value = KeyPair<PrivateKey, PublicKey>> {
     test_utils::uniform_keypair_strategy::<PrivateKey, PublicKey>()
 }
 
-/// Produces a uniformly random SLH-DSA SHA2-128s public key
+/// Produces a uniformly random SLH-DSA-SHA2-128s public key
 #[cfg(any(test, feature = "fuzzing"))]
 impl proptest::arbitrary::Arbitrary for PublicKey {
     type Parameters = ();
@@ -336,7 +313,6 @@ impl proptest::arbitrary::Arbitrary for PublicKey {
 mod tests {
     use super::*;
     use crate::traits::{Signature as SignatureTrait, Uniform};
-    use rand::{rngs::StdRng, SeedableRng};
 
     #[test]
     fn test_private_key_serialization_wrong_length() {
@@ -380,7 +356,7 @@ mod tests {
     #[test]
     fn test_private_key_generate_and_use() {
         // Test that generated keys can be used for signing and verification
-        let mut rng = StdRng::from_seed([0u8; 32]);
+        let mut rng = rand::thread_rng();
         let key = PrivateKey::generate(&mut rng);
 
         let pubkey: PublicKey = (&key).into();
@@ -407,10 +383,39 @@ mod tests {
     }
 
     #[test]
+    fn test_private_key_uniform_generation_different() {
+        // Test that two randomly generated private keys via Uniform trait are different
+        let mut rng = rand::thread_rng();
+        let key1 = PrivateKey::generate(&mut rng);
+        let key2 = PrivateKey::generate(&mut rng);
+
+        // Ensure the two keys are different
+        assert_ne!(
+            key1, key2,
+            "Two randomly generated private keys should be different"
+        );
+
+        // Also verify their serialized bytes are different
+        assert_ne!(
+            key1.to_bytes(),
+            key2.to_bytes(),
+            "Serialized bytes of two randomly generated keys should be different"
+        );
+
+        // Verify their public keys are also different
+        let pubkey1: PublicKey = (&key1).into();
+        let pubkey2: PublicKey = (&key2).into();
+        assert_ne!(
+            pubkey1, pubkey2,
+            "Public keys derived from two different private keys should be different"
+        );
+    }
+
+    #[test]
     fn test_private_key_serialization_round_trip() {
         // Create a random key
         // Test that generated keys can be used for signing and verification
-        let mut rng = StdRng::from_seed([0u8; 32]);
+        let mut rng = rand::thread_rng();
         let original_sk = PrivateKey::generate(&mut rng);
 
         // Serialize the key
@@ -446,7 +451,7 @@ mod tests {
     #[test]
     fn test_public_key_serialization_round_trip() {
         // Pick a random SK
-        let mut rng = StdRng::from_seed([0u8; 32]);
+        let mut rng = rand::thread_rng();
         let sk = PrivateKey::generate(&mut rng);
 
         // Get its PK
@@ -475,11 +480,10 @@ mod tests {
     #[test]
     fn test_signature_serialization_round_trip() {
         // Pick a random keypair
-        let mut rng = StdRng::from_seed([0u8; 32]);
+        let mut rng = rand::thread_rng();
         let sk = PrivateKey::generate(&mut rng);
         let pk: PublicKey = (&sk).into();
 
-        // Pick a random message (32 bytes)
         let message = [0x42u8; 32];
 
         // Sign the message and verify the signature
@@ -503,7 +507,7 @@ mod tests {
         let deserialized_sig = Signature::try_from(&sig_bytes[..])
             .expect("Should be able to deserialize signature from bytes");
 
-        // Assert_eq the two signatures
+        // assert_eq the two signatures
         assert_eq!(
             original_sig, deserialized_sig,
             "Deserialized signature should be equal to the original"
@@ -513,6 +517,22 @@ mod tests {
         assert!(
             deserialized_sig.verify_arbitrary_msg(&message, &pk).is_ok(),
             "Deserialized signature should still verify correctly"
+        );
+    }
+
+    #[test]
+    fn test_private_key_clone() {
+        // Generate a random private key
+        let mut rng = rand::thread_rng();
+        let original_key = PrivateKey::generate(&mut rng);
+
+        // Clone the private key
+        let cloned_key = original_key.clone();
+
+        // Assert the cloned key is equal to the original
+        assert_eq!(
+            original_key, cloned_key,
+            "Cloned private key should be equal to the original"
         );
     }
 }
