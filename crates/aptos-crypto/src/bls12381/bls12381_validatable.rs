@@ -77,7 +77,7 @@ impl<'de> Deserialize<'de> for UnvalidatedPublicKey {
         if deserializer.is_human_readable() {
             let encoded_key = <String>::deserialize(deserializer)?;
             let bytes_out = ::hex::decode(&encoded_key[2..]).map_err(D::Error::custom)?;
-            <[u8; PublicKey::LENGTH]>::try_from(bytes_out.as_ref())
+            <[u8; PublicKey::LENGTH]>::try_from(bytes_out.as_ref() as &[u8])
                 .map(UnvalidatedPublicKey)
                 .map_err(D::Error::custom)
         } else {
