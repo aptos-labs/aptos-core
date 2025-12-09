@@ -23,7 +23,7 @@ pub mod noise;
 pub mod player;
 pub mod secp256k1_ecdsa;
 pub mod secp256r1_ecdsa;
-pub mod slh_dsa;
+pub mod slh_dsa_sha2_128s;
 pub mod test_utils;
 pub mod traits;
 pub mod utils;
