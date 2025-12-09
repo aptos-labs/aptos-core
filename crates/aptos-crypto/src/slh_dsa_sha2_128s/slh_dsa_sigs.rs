@@ -6,7 +6,7 @@
 use super::SIGNATURE_LENGTH;
 use crate::{
     hash::CryptoHash,
-    slh_dsa::{PrivateKey, PublicKey},
+    slh_dsa_sha2_128s::{PrivateKey, PublicKey},
     traits::{Signature as SignatureTrait, *},
 };
 use anyhow::{anyhow, Result};

@@ -7,7 +7,7 @@
 use crate::test_utils::{self, KeyPair};
 use crate::{
     hash::CryptoHash,
-    slh_dsa::{Signature, PRIVATE_KEY_LENGTH, PUBLIC_KEY_LENGTH},
+    slh_dsa_sha2_128s::{Signature, PRIVATE_KEY_LENGTH, PUBLIC_KEY_LENGTH},
     traits::{PrivateKey as PrivateKeyTrait, PublicKey as PublicKeyTrait, *},
 };
 use aptos_crypto_derive::{key_name, DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};

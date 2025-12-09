@@ -150,7 +150,7 @@ name = "secp256k1"
 harness = false
 
 [[bench]]
-name = "slh_dsa"
+name = "slh_dsa_sha2_128s"
 harness = false
 
 [[example]]

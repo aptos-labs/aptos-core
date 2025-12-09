@@ -5,7 +5,7 @@
 extern crate criterion;
 
 use aptos_crypto::{
-    slh_dsa::{PrivateKey, PublicKey, Signature},
+    slh_dsa_sha2_128s::{PrivateKey, PublicKey, Signature},
     traits::{Signature as SignatureTrait, SigningKey, Uniform},
     PrivateKey as PrivateKeyTrait,
 };
@@ -24,9 +24,9 @@ impl Message32Bytes {
 }
 
 fn benchmark_groups(c: &mut Criterion) {
-    let mut group = c.benchmark_group("slh_dsa");
+    let mut group = c.benchmark_group("slh_dsa/sha2-128s");
 
-    group.sample_size(100);
+    group.sample_size(10);
 
     sig_deserialize(&mut group);
     pk_deserialize(&mut group);
