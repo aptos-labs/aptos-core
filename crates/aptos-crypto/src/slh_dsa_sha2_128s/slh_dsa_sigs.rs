@@ -18,7 +18,7 @@ use std::fmt;
 
 /// A SLH-DSA SHA2-128s signature.
 /// NOTE: The max size on this struct is enforced in its `TryFrom<u8>` trait implementation.
-#[derive(DeserializeKey, Clone, SerializeKey)]
+#[derive(DeserializeKey, Clone, SerializeKey, PartialEq, Eq)]
 #[key_name("SlhDsaSha2_128sSignature")]
 pub struct Signature(pub(crate) SlhDsaSignature<Sha2_128s>);
 
@@ -48,17 +48,9 @@ impl Signature {
     /// return an all-zero signature (for test only)
     #[cfg(any(test, feature = "fuzzing"))]
     pub fn dummy_signature() -> Self {
-        // Create a dummy signature with zeros - this is only for testing
-        let bytes = vec![0u8; SIGNATURE_LENGTH];
-        // This might fail, but it's only for testing
-        Self::from_bytes_unchecked(&bytes).unwrap_or_else(|_| {
-            // If we can't create from zeros, generate a random one for testing
-            use rand::thread_rng;
-            let mut rng = thread_rng();
-            let kp = crate::test_utils::KeyPair::<PrivateKey, PublicKey>::generate(&mut rng);
-            let msg = b"dummy";
-            kp.private_key.sign_arbitrary_message(msg)
-        })
+        // Create a dummy signature with ones - this is only for testing
+        let bytes = vec![1u8; SIGNATURE_LENGTH];
+        Self::from_bytes_unchecked(&bytes).unwrap()
     }
 }
 
@@ -118,15 +110,6 @@ impl TryFrom<&[u8]> for Signature {
     }
 }
 
-// Those are required by the implementation of hash above
-impl PartialEq for Signature {
-    fn eq(&self, other: &Signature) -> bool {
-        self.to_bytes()[..] == other.to_bytes()[..]
-    }
-}
-
-impl Eq for Signature {}
-
 impl fmt::Display for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", hex::encode(&self.to_bytes()[..]))
@@ -135,6 +118,6 @@ impl fmt::Display for Signature {
 
 impl fmt::Debug for Signature {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "slh_dsa::Signature({})", self)
+        write!(f, "slh_dsa_sha2_128s::Signature({})", self)
     }
 }
