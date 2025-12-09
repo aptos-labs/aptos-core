@@ -121,3 +121,15 @@ impl fmt::Debug for Signature {
         write!(f, "slh_dsa_sha2_128s::Signature({})", self)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dummy_signature_deserializes() {
+        // Create a dummy signature by deserializing some dummy bytes.
+        // This test simply ensures this doesn't panic.
+        let _ = Signature::dummy_signature();
+    }
+}

@@ -94,6 +94,7 @@ impl PrivateKey {
     /// methods of the SigningKey implementation. This should remain private.
     fn sign_arbitrary_message(&self, message: &[u8]) -> Signature {
         use slh_dsa::signature::Signer;
+        // NOTE: To hedge against fault attacks, can use RandomizedSigner::<slh_dsa::Signature<Sha2_128s>>::sign_with_rng().
         let signature = Signer::<slh_dsa::Signature<Sha2_128s>>::sign(&self.0, message);
         Signature(signature)
     }
@@ -533,6 +534,33 @@ mod tests {
         assert_eq!(
             original_key, cloned_key,
             "Cloned private key should be equal to the original"
+        );
+    }
+
+    #[test]
+    fn test_signing_is_deterministic() {
+        // Generate a random private key
+        let mut rng = rand::thread_rng();
+        let key = PrivateKey::generate(&mut rng);
+
+        // Create a test message
+        let message = b"test message for deterministic signing";
+
+        // Sign the same message twice
+        let signature1 = key.sign_arbitrary_message(message);
+        let signature2 = key.sign_arbitrary_message(message);
+
+        // Assert that the two signatures are identical
+        assert_eq!(
+            signature1, signature2,
+            "Signing the same message twice should produce identical signatures"
+        );
+
+        // Also verify the signatures are equal when comparing bytes
+        assert_eq!(
+            signature1.to_bytes(),
+            signature2.to_bytes(),
+            "Signature bytes should be identical for the same message"
         );
     }
 }
