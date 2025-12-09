@@ -126,7 +126,11 @@ impl ReleaseTarget {
                     output_format: None,
                 }),
                 skip_fetch_latest_git_deps: true,
-                experiments: vec!["extended-framework-optimizations=on".to_string()],
+                // enable inline optimization for framework packages
+                experiments: vec![
+                    "optimize-extra=on".to_string(),
+                    "extended-framework-optimizations=on".to_string(),
+                ],
                 ..BuildOptions::default()
             },
             packages: packages
