@@ -109,7 +109,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::INLINING_OPTIMIZATION.to_string(),
             description: "Turns on or off inlining optimizations".to_string(),
-            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
+            default: Inherited(Experiment::OPTIMIZE_EXTRA.to_string()),
         },
         Experiment {
             name: Experiment::ACROSS_PACKAGE_INLINING.to_string(),
@@ -155,7 +155,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         Experiment {
             name: Experiment::OPTIMIZE_EXTRA.to_string(),
             description: "Use extra optimizations".to_string(),
-            default: Inherited(Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string()),
+            default: Given(false),
         },
         Experiment {
             name: Experiment::OPTIMIZE_WAITING_FOR_COMPARE_TESTS.to_string(),
@@ -300,7 +300,7 @@ pub static EXPERIMENTS: Lazy<BTreeMap<String, Experiment>> = Lazy::new(|| {
         },
         Experiment {
             name: Experiment::EXTENDED_FRAMEWORK_OPTIMIZATIONS.to_string(),
-            description: "Turns on or off extended framework optimizations".to_string(),
+            description: "Set of optimizations that are safe to perform on the framework, but are disabled otherwise".to_string(),
             default: Given(false),
         },
     ];
