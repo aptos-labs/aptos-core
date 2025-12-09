@@ -12,11 +12,11 @@ use crate::{
 };
 use aptos_crypto_derive::{key_name, DeserializeKey, SerializeKey, SilentDebug, SilentDisplay};
 use core::convert::TryFrom;
+#[cfg(any(test, feature = "fuzzing"))]
+use proptest::prelude::*;
 use serde::Serialize;
 use slh_dsa::{Sha2_128s, SigningKey as SlhDsaSigningKey, VerifyingKey as SlhDsaVerifyingKey};
 use std::fmt;
-#[cfg(any(test, feature = "fuzzing"))]
-use proptest::prelude::*;
 
 /// A SLH-DSA SHA2-128s private key (signing key)
 #[derive(DeserializeKey, SerializeKey, SilentDebug, SilentDisplay)]
@@ -83,9 +83,8 @@ impl PrivateKey {
             .try_into()
             .map_err(|_| CryptoMaterialError::WrongLengthError)?;
 
-        let signing_key = SlhDsaSigningKey::<Sha2_128s>::slh_keygen_internal(
-            &sk_seed, &sk_prf, &pk_seed,
-        );
+        let signing_key =
+            SlhDsaSigningKey::<Sha2_128s>::slh_keygen_internal(&sk_seed, &sk_prf, &pk_seed);
         Ok(PrivateKey(signing_key))
     }
 
@@ -159,21 +158,35 @@ impl Uniform for PrivateKey {
         // We create an adapter that implements the required traits
         use slh_dsa::signature::rand_core::{CryptoRng as SlhCryptoRng, RngCore as SlhRngCore};
 
-        struct RngAdapter<'a, R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore>(&'a mut R);
+        struct RngAdapter<
+            'a,
+            R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
+        >(&'a mut R);
 
-        impl<'a, R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore> SlhRngCore for RngAdapter<'a, R> {
+        impl<
+                'a,
+                R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
+            > SlhRngCore for RngAdapter<'a, R>
+        {
             fn next_u32(&mut self) -> u32 {
                 self.0.next_u32()
             }
+
             fn next_u64(&mut self) -> u64 {
                 self.0.next_u64()
             }
+
             fn fill_bytes(&mut self, dest: &mut [u8]) {
                 self.0.fill_bytes(dest)
             }
         }
 
-        impl<'a, R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore> SlhCryptoRng for RngAdapter<'a, R> {}
+        impl<
+                'a,
+                R: ::rand::RngCore + ::rand::CryptoRng + ::rand_core::CryptoRng + ::rand_core::RngCore,
+            > SlhCryptoRng for RngAdapter<'a, R>
+        {
+        }
 
         let mut adapter = RngAdapter(rng);
         let signing_key = SlhDsaSigningKey::<Sha2_128s>::new(&mut adapter);
@@ -301,7 +314,8 @@ impl ValidCryptoMaterial for PublicKey {
 
 /// Produces a uniformly random SLH-DSA SHA2-128s keypair from a seed
 #[cfg(any(test, feature = "fuzzing"))]
-pub fn keypair_strategy() -> impl proptest::strategy::Strategy<Value = KeyPair<PrivateKey, PublicKey>> {
+pub fn keypair_strategy(
+) -> impl proptest::strategy::Strategy<Value = KeyPair<PrivateKey, PublicKey>> {
     test_utils::uniform_keypair_strategy::<PrivateKey, PublicKey>()
 }
 
@@ -327,13 +341,13 @@ mod tests {
     #[test]
     fn test_private_key_serialization_wrong_length() {
         // Test that deserializing with wrong length fails
-        let too_short = vec![0u8; PRIVATE_KEY_LENGTH - 1];
+        let too_short = [0u8; PRIVATE_KEY_LENGTH - 1];
         assert!(
             PrivateKey::try_from(&too_short[..]).is_err(),
             "Should reject keys that are too short"
         );
 
-        let too_long = vec![0u8; PRIVATE_KEY_LENGTH + 1];
+        let too_long = [0u8; PRIVATE_KEY_LENGTH + 1];
         assert!(
             PrivateKey::try_from(&too_long[..]).is_err(),
             "Should reject keys that are too long"
@@ -343,13 +357,13 @@ mod tests {
     #[test]
     fn test_private_key_serialization_different_keys() {
         // Test that different bytes produce different keys
-        let sk_bytes_1 = vec![0x01u8; PRIVATE_KEY_LENGTH];
-        let sk_bytes_2 = vec![0x02u8; PRIVATE_KEY_LENGTH];
+        let sk_bytes_1 = [0x01u8; PRIVATE_KEY_LENGTH];
+        let sk_bytes_2 = [0x02u8; PRIVATE_KEY_LENGTH];
 
-        let key1 = PrivateKey::try_from(&sk_bytes_1[..])
-            .expect("Should create key from sk_bytes_1");
-        let key2 = PrivateKey::try_from(&sk_bytes_2[..])
-            .expect("Should create key from sk_bytes_2");
+        let key1 =
+            PrivateKey::try_from(&sk_bytes_1[..]).expect("Should create key from sk_bytes_1");
+        let key2 =
+            PrivateKey::try_from(&sk_bytes_2[..]).expect("Should create key from sk_bytes_2");
 
         // Get public keys
         let pubkey1: PublicKey = (&key1).into();
@@ -377,13 +391,17 @@ mod tests {
 
         // Verify the signature
         assert!(
-            signature.verify_arbitrary_msg(test_message, &pubkey).is_ok(),
+            signature
+                .verify_arbitrary_msg(test_message, &pubkey)
+                .is_ok(),
             "Generated key should produce valid signatures"
         );
 
         // Verify wrong message fails
         assert!(
-            signature.verify_arbitrary_msg(b"wrong message", &pubkey).is_err(),
+            signature
+                .verify_arbitrary_msg(b"wrong message", &pubkey)
+                .is_err(),
             "Signature should not verify for wrong message"
         );
     }

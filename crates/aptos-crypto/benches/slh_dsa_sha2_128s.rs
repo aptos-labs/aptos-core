@@ -62,11 +62,7 @@ fn pk_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>) {
     g.throughput(Throughput::Elements(1_u64));
     g.bench_function("pk_deserialize", move |b| {
         b.iter_with_setup(
-            || {
-                PrivateKey::generate(&mut csprng)
-                    .public_key()
-                    .to_bytes()
-            },
+            || PrivateKey::generate(&mut csprng).public_key().to_bytes(),
             |pk_bytes| PublicKey::try_from(&pk_bytes[..]),
         )
     });
