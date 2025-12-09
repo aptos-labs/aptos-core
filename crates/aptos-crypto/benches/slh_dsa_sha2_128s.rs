@@ -23,6 +23,12 @@ impl Message32Bytes {
     }
 }
 
+fn generate_random_message(csprng: &mut impl RngCore) -> Message32Bytes {
+    let mut msg_bytes = [0u8; 32];
+    csprng.fill_bytes(&mut msg_bytes);
+    Message32Bytes::new(msg_bytes)
+}
+
 fn benchmark_groups(c: &mut Criterion) {
     let mut group = c.benchmark_group("slh_dsa/sha2-128s");
 
@@ -45,9 +51,7 @@ fn sig_deserialize<M: Measurement>(g: &mut BenchmarkGroup<M>) {
         b.iter_with_setup(
             || {
                 let priv_key = PrivateKey::generate(&mut csprng);
-                let mut msg_bytes = [0u8; 32];
-                csprng.fill_bytes(&mut msg_bytes);
-                let msg = Message32Bytes::new(msg_bytes);
+                let msg = generate_random_message(&mut csprng);
                 priv_key.sign(&msg).unwrap().to_bytes()
             },
             |sig_bytes| Signature::try_from(&sig_bytes[..]),
@@ -79,9 +83,7 @@ fn sign_32_bytes<M: Measurement>(g: &mut BenchmarkGroup<M>) {
         b.iter_with_setup(
             || {
                 // Generate a random 32-byte message
-                let mut msg_bytes = [0u8; 32];
-                csprng.fill_bytes(&mut msg_bytes);
-                Message32Bytes::new(msg_bytes)
+                generate_random_message(&mut csprng)
             },
             |msg| priv_key.sign(&msg).unwrap(),
         )
@@ -100,9 +102,7 @@ fn verify_32_bytes<M: Measurement>(g: &mut BenchmarkGroup<M>) {
         b.iter_with_setup(
             || {
                 // Generate a random 32-byte message
-                let mut msg_bytes = [0u8; 32];
-                csprng.fill_bytes(&mut msg_bytes);
-                let msg = Message32Bytes::new(msg_bytes);
+                let msg = generate_random_message(&mut csprng);
                 let sig = priv_key.sign(&msg).unwrap();
                 (sig, msg)
             },
