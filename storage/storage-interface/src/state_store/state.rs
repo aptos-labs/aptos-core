@@ -175,7 +175,10 @@ impl State {
         assert!(self.next_version() >= state_cache.next_version());
 
         let overlay = self.make_delta(persisted);
-        let ((shards, new_metadata), usage_delta_per_shard): ((Vec<_>, Vec<_>), Vec<_>) = (
+        let (((shards, new_metadata), usage_delta_per_shard), all_evicted): (
+            ((Vec<_>, Vec<_>), Vec<_>),
+            Vec<_>,
+        ) = (
             state_cache.shards.as_slice(),
             overlay.shards.as_slice(),
             self.hot_state_metadata.as_slice(),
@@ -194,6 +197,7 @@ impl State {
                         hot_metadata.num_items,
                     );
                     let mut all_updates = per_version.iter();
+                    let mut evicted: Option<HashMap<_, _>> = None;
                     for ckpt_version in all_checkpoint_versions {
                         for (key, update) in
                             all_updates.take_while_ref(|(_k, u)| u.version <= *ckpt_version)
@@ -201,9 +205,20 @@ impl State {
                             Self::apply_one_update(&mut lru, overlay, cache, key, update);
                         }
                         // Only evict at the checkpoints.
-                        lru.maybe_evict();
+                        assert!(evicted.is_none());
+                        let actually_evicted = lru.maybe_evict();
+                        evicted = Some(
+                            actually_evicted
+                                .into_iter()
+                                .map(|(k, slot)| {
+                                    assert!(slot.is_hot());
+                                    (k, slot.into_state_value_opt())
+                                })
+                                .collect(),
+                        );
                     }
                     for (key, update) in all_updates {
+                        panic!("not state-sync right now");
                         Self::apply_one_update(&mut lru, overlay, cache, key, update);
                     }
 
@@ -218,7 +233,7 @@ impl State {
                         num_items: new_num_items,
                     };
                     let new_usage = Self::usage_delta_for_shard(cache, overlay, batched_updates);
-                    ((new_layer, new_metadata), new_usage)
+                    (((new_layer, new_metadata), new_usage), evicted.unwrap())
                 },
             )
             .unzip();
@@ -393,6 +408,7 @@ impl LedgerState {
             &last_checkpoint
         };
         let latest = if let Some(batched) = updates.for_latest_batched() {
+            panic!("not state-sync right now");
             let per_version = updates
                 .for_latest_per_version()
                 .expect("Both per-version and batched updates should exist.");
