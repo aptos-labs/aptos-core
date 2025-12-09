@@ -453,4 +453,48 @@ mod tests {
             "Deserialized public key should be equal to the original"
         );
     }
+
+    #[test]
+    fn test_signature_serialization_round_trip() {
+        // Pick a random keypair
+        let mut rng = StdRng::from_seed([0u8; 32]);
+        let sk = PrivateKey::generate(&mut rng);
+        let pk: PublicKey = (&sk).into();
+
+        // Pick a random message (32 bytes)
+        let message = [0x42u8; 32];
+
+        // Sign the message and verify the signature
+        let original_sig = sk.sign_arbitrary_message(&message);
+        assert!(
+            original_sig.verify_arbitrary_msg(&message, &pk).is_ok(),
+            "Original signature should verify correctly"
+        );
+
+        // Serialize the signature
+        let sig_bytes = original_sig.to_bytes();
+
+        // Verify the sig_bytes length is SIGNATURE_LENGTH
+        assert_eq!(
+            sig_bytes.len(),
+            Signature::LENGTH,
+            "Serialized signature should be exactly SIGNATURE_LENGTH bytes"
+        );
+
+        // Deserialize it back
+        let deserialized_sig = Signature::try_from(&sig_bytes[..])
+            .expect("Should be able to deserialize signature from bytes");
+
+        // Assert_eq the two signatures
+        assert_eq!(
+            original_sig, deserialized_sig,
+            "Deserialized signature should be equal to the original"
+        );
+
+        // Also verify the deserialized signature still verifies
+        assert!(
+            deserialized_sig.verify_arbitrary_msg(&message, &pk).is_ok(),
+            "Deserialized signature should still verify correctly"
+        );
+    }
 }
