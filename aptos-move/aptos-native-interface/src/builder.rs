@@ -9,9 +9,7 @@ use aptos_gas_algebra::DynamicExpression;
 use aptos_gas_schedule::{MiscGasParameters, NativeGasParameters};
 use aptos_types::on_chain_config::{Features, TimedFeatures};
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
-use move_vm_types::{
-    loaded_data::runtime_types::Type, natives::function::NativeResult, values::Value,
-};
+use move_vm_types::{natives::function::NativeResult, ty_interner::TypeId, values::Value};
 use smallvec::SmallVec;
 use std::{collections::VecDeque, sync::Arc};
 
@@ -83,7 +81,7 @@ impl SafeNativeBuilder {
     where
         F: for<'a> Fn(
                 &mut SafeNativeContext,
-                &'a [Type],
+                &'a [TypeId],
                 VecDeque<Value>,
             ) -> SafeNativeResult<SmallVec<[Value; 1]>>
             + Send
@@ -95,7 +93,7 @@ impl SafeNativeBuilder {
 
         let enable_incremental_gas_charging = self.enable_incremental_gas_charging;
 
-        let closure = move |context: &mut NativeContext, ty_args: &[Type], args| {
+        let closure = move |context: &mut NativeContext, ty_args: &[TypeId], args| {
             use SafeNativeError::*;
 
             let mut context = SafeNativeContext {
@@ -177,7 +175,7 @@ impl SafeNativeBuilder {
         'b: 'a,
         F: for<'c> Fn(
                 &mut SafeNativeContext,
-                &'c [Type],
+                &'c [TypeId],
                 VecDeque<Value>,
             ) -> SafeNativeResult<SmallVec<[Value; 1]>>
             + Send

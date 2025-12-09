@@ -20,7 +20,7 @@ use merlin::Transcript;
 use move_core_types::gas_algebra::{NumArgs, NumBytes};
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{StructRef, Value},
 };
 use once_cell::sync::Lazy;
@@ -72,7 +72,7 @@ static BULLETPROOF_GENERATORS: Lazy<BulletproofGens> =
 
 fn native_verify_range_proof(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
@@ -112,7 +112,7 @@ fn native_verify_range_proof(
 
 fn native_verify_batch_range_proof(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
@@ -162,7 +162,7 @@ fn native_verify_batch_range_proof(
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_prove_range(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());
@@ -228,7 +228,7 @@ fn native_test_only_prove_range(
 /// This is a test-only native that charges zero gas. It is only exported in testing mode.
 fn native_test_only_batch_prove_range(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.is_empty());

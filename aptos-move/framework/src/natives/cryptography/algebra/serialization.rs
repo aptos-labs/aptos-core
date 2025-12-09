@@ -21,7 +21,7 @@ use ark_ec::CurveGroup;
 use ark_ff::Field;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Value, VectorRef},
 };
 use num_traits::One;
@@ -124,12 +124,12 @@ macro_rules! serialize_element {
 
 pub fn serialize_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let format_opt = format_from_ty_arg!(context, &ty_args[1]);
+    let structure_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let format_opt = format_from_ty_arg!(context, ty_args[1]);
     abort_unless_serialization_format_enabled!(context, format_opt);
     if let (Some(structure), Some(format)) = (structure_opt, format_opt) {
         serialize_element!(
@@ -335,12 +335,12 @@ macro_rules! ark_ec_point_deserialize_internal {
 
 pub fn deserialize_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let format_opt = format_from_ty_arg!(context, &ty_args[1]);
+    let structure_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let format_opt = format_from_ty_arg!(context, ty_args[1]);
     abort_unless_serialization_format_enabled!(context, format_opt);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();

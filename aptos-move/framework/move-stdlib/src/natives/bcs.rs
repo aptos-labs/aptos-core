@@ -20,8 +20,8 @@ use move_core_types::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::{PartialVMError, PartialVMResult},
+    ty_interner::TypeId,
     value_serde::ValueSerDeContext,
     values::{values_impl::Reference, Struct, Value},
 };
@@ -55,14 +55,14 @@ pub fn create_option_u64(enum_option_enabled: bool, value: Option<u64>) -> Value
 /// Rust implementation of Move's `native public fun to_bytes<T>(&T): vector<u8>`
 fn native_to_bytes(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
     debug_assert!(args.len() == 1);
 
     let ref_to_val = safely_pop_arg!(args, Reference);
-    let arg_type = &ty_args[0];
+    let arg_type = ty_args[0];
 
     let layout = if context.get_feature_flags().is_lazy_loading_enabled() {
         // With lazy loading, propagate the error directly. This is because errors here are likely
@@ -124,7 +124,7 @@ fn native_to_bytes(
  **************************************************************************************************/
 fn native_serialized_size(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
@@ -133,7 +133,7 @@ fn native_serialized_size(
     context.charge(BCS_SERIALIZED_SIZE_BASE)?;
 
     let reference = safely_pop_arg!(args, Reference);
-    let ty = &ty_args[0];
+    let ty = ty_args[0];
 
     let serialized_size = match serialized_size_impl(context, reference, ty) {
         Ok(serialized_size) => serialized_size as u64,
@@ -154,7 +154,7 @@ fn native_serialized_size(
 fn serialized_size_impl(
     context: &mut SafeNativeContext,
     reference: Reference,
-    ty: &Type,
+    ty: TypeId,
 ) -> PartialVMResult<usize> {
     // TODO(#14175): Reading the reference performs a deep copy, and we can
     //               implement it in a more efficient way.
@@ -172,14 +172,14 @@ fn serialized_size_impl(
 
 fn native_constant_serialized_size(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(ty_args.len() == 1);
 
     context.charge(BCS_CONSTANT_SERIALIZED_SIZE_BASE)?;
 
-    let ty = &ty_args[0];
+    let ty = ty_args[0];
     let ty_layout = context.type_to_type_layout(ty)?;
 
     let (visited_count, serialized_size_result) = constant_serialized_size(&ty_layout);

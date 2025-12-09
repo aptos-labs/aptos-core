@@ -6,7 +6,7 @@
 
 use crate::{
     delayed_values::delayed_field_id::{DelayedFieldID, TryFromMoveValue, TryIntoMoveValue},
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     value_serde::ValueSerDeContext,
     values::function_values_impl::{AbstractFunction, Closure, ClosureVisitor},
     views::{ValueView, ValueVisitor},
@@ -3492,61 +3492,41 @@ pub const VEC_UNPACK_PARITY_MISMATCH: u64 = NFE_VECTOR_ERROR_BASE + 3;
 // TODO: this check seems to be obsolete if paranoid mode is on,
 //   and should either be removed or move over to runtime_type_checks?
 #[cfg_attr(feature = "force-inline", inline(always))]
-fn check_elem_layout(ty: &Type, v: &Container) -> PartialVMResult<()> {
+fn check_elem_layout(ty: TypeId, v: &Container) -> PartialVMResult<()> {
     match (ty, v) {
-        (Type::U8, Container::VecU8(_))
-        | (Type::U64, Container::VecU64(_))
-        | (Type::U16, Container::VecU16(_))
-        | (Type::U32, Container::VecU32(_))
-        | (Type::U128, Container::VecU128(_))
-        | (Type::U256, Container::VecU256(_))
-        | (Type::I8, Container::VecI8(_))
-        | (Type::I64, Container::VecI64(_))
-        | (Type::I16, Container::VecI16(_))
-        | (Type::I32, Container::VecI32(_))
-        | (Type::I128, Container::VecI128(_))
-        | (Type::I256, Container::VecI256(_))
-        | (Type::Bool, Container::VecBool(_))
-        | (Type::Address, Container::VecAddress(_))
-        | (Type::Signer, Container::Struct(_)) => Ok(()),
-
-        (Type::Vector(_), Container::Vec(_)) => Ok(()),
-
-        (Type::Struct { .. }, Container::Vec(_))
-        | (Type::Signer, Container::Vec(_))
-        | (Type::StructInstantiation { .. }, Container::Vec(_))
-        | (Type::Function { .. }, Container::Vec(_)) => Ok(()),
-
-        (Type::Reference(_), _) | (Type::MutableReference(_), _) | (Type::TyParam(_), _) => Err(
-            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                .with_message(format!("invalid type param for vector: {:?}", ty)),
+        (TypeId::U8, Container::VecU8(_))
+        | (TypeId::U64, Container::VecU64(_))
+        | (TypeId::U16, Container::VecU16(_))
+        | (TypeId::U32, Container::VecU32(_))
+        | (TypeId::U128, Container::VecU128(_))
+        | (TypeId::U256, Container::VecU256(_))
+        | (TypeId::I8, Container::VecI8(_))
+        | (TypeId::I64, Container::VecI64(_))
+        | (TypeId::I16, Container::VecI16(_))
+        | (TypeId::I32, Container::VecI32(_))
+        | (TypeId::I128, Container::VecI128(_))
+        | (TypeId::I256, Container::VecI256(_))
+        | (TypeId::BOOL, Container::VecBool(_))
+        | (TypeId::ADDRESS, Container::VecAddress(_))
+        | (TypeId::SIGNER, Container::Struct(_)) => Ok(()),
+        (ty, Container::Vec(_)) => {
+            if ty.is_any_ref() {
+                Err(
+                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
+                        .with_message(format!("invalid type param for vector: {:?}", ty)),
+                )
+            } else {
+                Ok(())
+            }
+        },
+        _ => Err(
+            PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR).with_message(
+                format!(
+                    "vector elem layout mismatch, expected {:?}, got {:?}",
+                    ty, v
+                ),
+            ),
         ),
-
-        (Type::U8, _)
-        | (Type::U64, _)
-        | (Type::U16, _)
-        | (Type::U32, _)
-        | (Type::U128, _)
-        | (Type::U256, _)
-        | (Type::I8, _)
-        | (Type::I64, _)
-        | (Type::I16, _)
-        | (Type::I32, _)
-        | (Type::I128, _)
-        | (Type::I256, _)
-        | (Type::Bool, _)
-        | (Type::Address, _)
-        | (Type::Signer, _)
-        | (Type::Vector(_), _)
-        | (Type::Struct { .. }, _)
-        | (Type::StructInstantiation { .. }, _)
-        | (Type::Function { .. }, _) => Err(PartialVMError::new(
-            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
-        )
-        .with_message(format!(
-            "vector elem layout mismatch, expected {:?}, got {:?}",
-            ty, v
-        ))),
     }
 }
 
@@ -3758,7 +3738,7 @@ impl VectorRef {
         length: usize,
         to_self: &Self,
         insert_position: usize,
-        type_param: &Type,
+        type_param: TypeId,
     ) -> PartialVMResult<()> {
         let from_c = from_self.0.container();
         let to_c = to_self.0.container();
@@ -3824,108 +3804,103 @@ impl VectorRef {
 
 impl Vector {
     // note(inline): LLVM won't inline it, even with #[inline(always)], and shouldn't, we don't want to bloat execute_code_impl
-    pub fn pack(type_param: &Type, elements: Vec<Value>) -> PartialVMResult<Value> {
-        let container = match type_param {
-            Type::U8 => Value::vector_u8(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::U16 => Value::vector_u16(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::U32 => Value::vector_u32(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::U64 => Value::vector_u64(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::U128 => Value::vector_u128(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::U256 => Value::vector_u256(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::I8 => Value::vector_i8(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::I16 => Value::vector_i16(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::I32 => Value::vector_i32(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::I64 => Value::vector_i64(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::I128 => Value::vector_i128(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::I256 => Value::vector_i256(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::Bool => Value::vector_bool(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-            Type::Address => Value::vector_address(
-                elements
-                    .into_iter()
-                    .map(|v| v.value_as())
-                    .collect::<PartialVMResult<Vec<_>>>()?,
-            ),
-
-            Type::Signer
-            | Type::Vector(_)
-            | Type::Struct { .. }
-            | Type::StructInstantiation { .. }
-            | Type::Function { .. } => {
-                Value::Container(Container::Vec(Rc::new(RefCell::new(elements))))
-            },
-
-            Type::Reference(_) | Type::MutableReference(_) | Type::TyParam(_) => {
-                return Err(
-                    PartialVMError::new(StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR)
-                        .with_message(format!("invalid type param for vector: {:?}", type_param)),
-                )
-            },
-        };
+    pub fn pack(type_param: TypeId, elements: Vec<Value>) -> PartialVMResult<Value> {
+        let container =
+            match type_param {
+                TypeId::U8 => Value::vector_u8(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::U16 => Value::vector_u16(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::U32 => Value::vector_u32(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::U64 => Value::vector_u64(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::U128 => Value::vector_u128(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::U256 => Value::vector_u256(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::I8 => Value::vector_i8(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::I16 => Value::vector_i16(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::I32 => Value::vector_i32(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::I64 => Value::vector_i64(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::I128 => Value::vector_i128(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::I256 => Value::vector_i256(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::BOOL => Value::vector_bool(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                TypeId::ADDRESS => Value::vector_address(
+                    elements
+                        .into_iter()
+                        .map(|v| v.value_as())
+                        .collect::<PartialVMResult<Vec<_>>>()?,
+                ),
+                ty => {
+                    if ty.is_any_ref() {
+                        return Err(PartialVMError::new(
+                            StatusCode::UNKNOWN_INVARIANT_VIOLATION_ERROR,
+                        )
+                        .with_message(format!("invalid type param for vector: {:?}", type_param)));
+                    }
+                    Value::Container(Container::Vec(Rc::new(RefCell::new(elements))))
+                },
+            };
 
         Ok(container)
     }
@@ -4009,7 +3984,7 @@ impl Vector {
     }
 
     pub fn to_vec_u8(self) -> PartialVMResult<Vec<u8>> {
-        check_elem_layout(&Type::U8, &self.0)?;
+        check_elem_layout(TypeId::U8, &self.0)?;
         if let Container::VecU8(r) = self.0 {
             Ok(take_unique_ownership(r)?.into_iter().collect())
         } else {

@@ -18,7 +18,7 @@ use aptos_native_interface::{
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ec::{pairing::Pairing, CurveGroup};
 use move_core_types::gas_algebra::NumArgs;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, rc::Rc};
 
@@ -127,13 +127,13 @@ macro_rules! multi_pairing_internal {
 }
 pub fn multi_pairing_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(3, ty_args.len());
-    let g1_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
-    let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
+    let g1_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let g2_opt = structure_from_ty_arg!(context, ty_args[1]);
+    let gt_opt = structure_from_ty_arg!(context, ty_args[2]);
     abort_unless_pairing_enabled!(context, g1_opt, g2_opt, gt_opt);
     match (g1_opt, g2_opt, gt_opt) {
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {
@@ -170,13 +170,13 @@ pub fn multi_pairing_internal(
 
 pub fn pairing_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(3, ty_args.len());
-    let g1_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let g2_opt = structure_from_ty_arg!(context, &ty_args[1]);
-    let gt_opt = structure_from_ty_arg!(context, &ty_args[2]);
+    let g1_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let g2_opt = structure_from_ty_arg!(context, ty_args[1]);
+    let gt_opt = structure_from_ty_arg!(context, ty_args[2]);
     abort_unless_pairing_enabled!(context, g1_opt, g2_opt, gt_opt);
     match (g1_opt, g2_opt, gt_opt) {
         (Some(Structure::BLS12381G1), Some(Structure::BLS12381G2), Some(Structure::BLS12381Gt)) => {

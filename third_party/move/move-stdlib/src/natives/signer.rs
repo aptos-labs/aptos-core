@@ -7,14 +7,13 @@ use move_binary_format::errors::PartialVMResult;
 use move_core_types::gas_algebra::InternalGas;
 use move_vm_runtime::native_functions::{NativeContext, NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
+    ty_interner::TypeId,
     values::{values_impl::SignerRef, Value},
 };
 use smallvec::smallvec;
 use std::{collections::VecDeque, sync::Arc};
-
 /***************************************************************************************************
  * native fun borrow_address
  *
@@ -30,7 +29,7 @@ pub struct BorrowAddressGasParameters {
 fn native_borrow_address(
     gas_params: &BorrowAddressGasParameters,
     _context: &mut NativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     debug_assert!(_ty_args.is_empty());

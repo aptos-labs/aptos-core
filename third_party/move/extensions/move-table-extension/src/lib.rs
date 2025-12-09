@@ -24,9 +24,9 @@ use move_vm_runtime::{
     native_functions::{LoaderContext, NativeContext, NativeFunction, NativeFunctionTable},
 };
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::NativeResult,
     pop_arg,
+    ty_interner::TypeId,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{GlobalValue, Reference, StructRef, Value},
 };
@@ -39,7 +39,6 @@ use std::{
     sync::Arc,
 };
 use triomphe::Arc as TriompheArc;
-
 // ===========================================================================================
 // Public Data Structures and Constants
 
@@ -221,8 +220,8 @@ impl TableData {
         &mut self,
         loader_context: &mut LoaderContext,
         handle: TableHandle,
-        key_ty: &Type,
-        value_ty: &Type,
+        key_ty: TypeId,
+        value_ty: TypeId,
     ) -> PartialVMResult<&mut Table> {
         Ok(match self.tables.entry(handle) {
             Entry::Vacant(e) => {
@@ -355,7 +354,7 @@ pub struct NewTableHandleGasParameters {
 fn native_new_table_handle(
     gas_params: &NewTableHandleGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 2);
@@ -374,8 +373,8 @@ fn native_new_table_handle(
     let bytes = digest.finalize().to_vec();
     let handle = AccountAddress::from_bytes(&bytes[0..AccountAddress::LENGTH])
         .map_err(|_| partial_extension_error("Unable to create table handle"))?;
-    let key_type = context.type_to_type_tag(&ty_args[0])?;
-    let value_type = context.type_to_type_tag(&ty_args[1])?;
+    let key_type = context.type_to_type_tag(ty_args[0])?;
+    let value_type = context.type_to_type_tag(ty_args[1])?;
     assert!(table_data
         .new_tables
         .insert(TableHandle(handle), TableInfo::new(key_type, value_type))
@@ -404,7 +403,7 @@ fn native_add_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &AddBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -421,7 +420,7 @@ fn native_add_box(
     let mut cost = gas_params.base;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let function_value_extension = loader_context.function_value_extension();
     let key_bytes = serialize(&function_value_extension, &table.key_layout, &key)?;
@@ -458,7 +457,7 @@ fn native_borrow_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &BorrowBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -472,7 +471,7 @@ fn native_borrow_box(
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let mut cost = gas_params.base;
 
@@ -511,7 +510,7 @@ fn native_contains_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &ContainsBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -525,7 +524,7 @@ fn native_contains_box(
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let mut cost = gas_params.base;
 
@@ -563,7 +562,7 @@ fn native_remove_box(
     common_gas_params: &CommonGasParameters,
     gas_params: &RemoveGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -577,7 +576,7 @@ fn native_remove_box(
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
 
     let table =
-        table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+        table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     let mut cost = gas_params.base;
 
@@ -614,7 +613,7 @@ pub struct DestroyEmptyBoxGasParameters {
 fn native_destroy_empty_box(
     gas_params: &DestroyEmptyBoxGasParameters,
     context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);
@@ -626,7 +625,7 @@ fn native_destroy_empty_box(
 
     let handle = get_table_handle(&pop_arg!(args, StructRef))?;
     // TODO: Can the following line be removed?
-    table_data.get_or_create_table(&mut loader_context, handle, &ty_args[0], &ty_args[2])?;
+    table_data.get_or_create_table(&mut loader_context, handle, ty_args[0], ty_args[2])?;
 
     assert!(table_data.removed_tables.insert(handle));
 
@@ -649,7 +648,7 @@ pub struct DropUncheckedBoxGasParameters {
 fn native_drop_unchecked_box(
     gas_params: &DropUncheckedBoxGasParameters,
     _context: &mut NativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     args: VecDeque<Value>,
 ) -> PartialVMResult<NativeResult> {
     assert_eq!(ty_args.len(), 3);

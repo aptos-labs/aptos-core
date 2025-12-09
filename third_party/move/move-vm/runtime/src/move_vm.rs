@@ -23,7 +23,7 @@ use move_core_types::{value::MoveTypeLayout, vm_status::StatusCode};
 use move_vm_metrics::{Timer, VM_TIMER};
 use move_vm_types::{
     gas::GasMeter,
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     value_serde::{FunctionValueExtension, ValueSerDeContext},
     values::{Locals, Reference, VMValueCast, Value},
 };
@@ -86,23 +86,23 @@ impl MoveVM {
         loader: &impl Loader,
         trace_recorder: &mut impl TraceRecorder,
     ) -> VMResult<SerializedReturnValues> {
-        let vm_config = loader.runtime_environment().vm_config();
-
         let function_value_extension = FunctionValueExtensionAdapter {
             module_storage: loader.unmetered_module_storage(),
         };
         let layout_converter = LayoutConverter::new(loader);
         let ty_depth_checker = TypeDepthChecker::new(loader);
 
-        let create_ty_with_subst = |tys: &[Type]| -> VMResult<Vec<Type>> {
-            let ty_builder = &vm_config.ty_builder;
-            tys.iter()
-                .map(|ty| ty_builder.create_ty_with_subst(ty, function.ty_args()))
-                .collect::<PartialVMResult<Vec<_>>>()
-                .map_err(|err| err.finish(Location::Undefined))
+        let pool = loader.runtime_environment().ty_pool();
+        let param_tys = if function.ty_args.is_empty() {
+            function.param_ty_ids().to_vec()
+        } else {
+            function
+                .param_tys()
+                .iter()
+                .map(|ty| pool.instantiate_and_intern(ty, &function.ty_args))
+                .collect::<Vec<_>>()
         };
 
-        let param_tys = create_ty_with_subst(function.param_tys())?;
         let (mut dummy_locals, deserialized_args) = deserialize_args(
             &function_value_extension,
             &layout_converter,
@@ -113,7 +113,15 @@ impl MoveVM {
         )
         .map_err(|err| err.finish(Location::Undefined))?;
 
-        let return_tys = create_ty_with_subst(function.return_tys())?;
+        let return_tys = if function.ty_args.is_empty() {
+            function.return_ty_ids().to_vec()
+        } else {
+            function
+                .return_tys()
+                .iter()
+                .map(|ty| pool.instantiate_and_intern(ty, &function.ty_args))
+                .collect::<Vec<_>>()
+        };
 
         let return_values = {
             let _timer = VM_TIMER.timer_with_label("Interpreter::entrypoint");
@@ -146,9 +154,9 @@ impl MoveVM {
         let mutable_reference_outputs = param_tys
             .iter()
             .enumerate()
-            .filter_map(|(idx, ty)| match ty {
-                Type::MutableReference(inner_ty) => Some((idx, inner_ty.as_ref())),
-                _ => None,
+            .filter_map(|(idx, ty)| {
+                let inner_ty = ty.is_mut_ref().then_some(ty.payload())?;
+                Some((idx, inner_ty))
             })
             .map(|(idx, ty)| {
                 // serialize return values first in the case that a value points into this local
@@ -181,7 +189,7 @@ fn deserialize_arg(
     layout_converter: &LayoutConverter<impl Loader>,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    ty: &Type,
+    ty: TypeId,
     arg: impl Borrow<[u8]>,
 ) -> PartialVMResult<Value> {
     let deserialization_error = || -> PartialVMError {
@@ -220,7 +228,7 @@ fn deserialize_args(
     layout_converter: &LayoutConverter<impl Loader>,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    param_tys: &[Type],
+    param_tys: &[TypeId],
     serialized_args: Vec<impl Borrow<[u8]>>,
 ) -> PartialVMResult<(Locals, Vec<Value>)> {
     if param_tys.len() != serialized_args.len() {
@@ -242,8 +250,9 @@ fn deserialize_args(
         .iter()
         .zip(serialized_args)
         .enumerate()
-        .map(|(idx, (ty, arg_bytes))| match ty.get_ref_inner_ty() {
-            Some(inner_ty) => {
+        .map(|(idx, (ty, arg_bytes))| {
+            if ty.is_any_ref() {
+                let inner_ty = ty.payload();
                 dummy_locals.store_loc(
                     idx,
                     deserialize_arg(
@@ -256,15 +265,16 @@ fn deserialize_args(
                     )?,
                 )?;
                 dummy_locals.borrow_loc(idx)
-            },
-            None => deserialize_arg(
-                function_value_extension,
-                layout_converter,
-                gas_meter,
-                traversal_context,
-                ty,
-                arg_bytes,
-            ),
+            } else {
+                deserialize_arg(
+                    function_value_extension,
+                    layout_converter,
+                    gas_meter,
+                    traversal_context,
+                    *ty,
+                    arg_bytes,
+                )
+            }
         })
         .collect::<PartialVMResult<Vec<_>>>()?;
     Ok((dummy_locals, deserialized_args))
@@ -275,16 +285,15 @@ fn serialize_return_value(
     layout_converter: &LayoutConverter<impl Loader>,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    ty: &Type,
+    ty: TypeId,
     value: Value,
 ) -> PartialVMResult<(Vec<u8>, MoveTypeLayout)> {
-    let (ty, value) = match ty.get_ref_inner_ty() {
-        Some(inner_ty) => {
-            let ref_value: Reference = value.cast()?;
-            let inner_value = ref_value.read_ref()?;
-            (inner_ty, inner_value)
-        },
-        None => (ty, value),
+    let (ty, value) = if ty.is_any_ref() {
+        let ref_value: Reference = value.cast()?;
+        let inner_value = ref_value.read_ref()?;
+        (ty.payload(), inner_value)
+    } else {
+        (ty, value)
     };
 
     let serialization_error = || -> PartialVMError {
@@ -324,7 +333,7 @@ fn serialize_return_values(
     layout_converter: &LayoutConverter<impl Loader>,
     gas_meter: &mut impl GasMeter,
     traversal_context: &mut TraversalContext,
-    return_tys: &[Type],
+    return_tys: &[TypeId],
     return_values: Vec<Value>,
 ) -> PartialVMResult<Vec<(Vec<u8>, MoveTypeLayout)>> {
     if return_tys.len() != return_values.len() {
@@ -348,7 +357,7 @@ fn serialize_return_values(
                 layout_converter,
                 gas_meter,
                 traversal_context,
-                ty,
+                *ty,
                 value,
             )
         })

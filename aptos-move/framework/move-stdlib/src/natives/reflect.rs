@@ -14,8 +14,8 @@ use move_core_types::{
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
     natives::function::PartialVMError,
+    ty_interner::TypeId,
     values::{Struct, StructRef, Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -25,7 +25,7 @@ const INVALID_IDENTIFIER: u16 = 0;
 
 fn native_resolve(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     // Charge base cost before anything else.
@@ -33,7 +33,7 @@ fn native_resolve(
 
     // Process arguments
     debug_assert!(ty_args.len() == 1);
-    let Some(fun_ty) = ty_args.first() else {
+    let Some(fun_ty) = ty_args.first().copied() else {
         return Err(SafeNativeError::InvariantViolation(
             PartialVMError::new_invariant_violation("wrong number of type arguments"),
         ));

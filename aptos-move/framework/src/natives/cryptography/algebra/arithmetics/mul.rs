@@ -12,17 +12,17 @@ use crate::{
 };
 use aptos_gas_schedule::gas_params::natives::aptos_framework::*;
 use aptos_native_interface::{SafeNativeContext, SafeNativeError, SafeNativeResult};
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use smallvec::{smallvec, SmallVec};
 use std::{collections::VecDeque, ops::Mul, rc::Rc};
 
 pub fn mul_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let structure_opt = structure_from_ty_arg!(context, ty_args[0]);
     abort_unless_arithmetics_enabled_for_structure!(context, structure_opt);
     match structure_opt {
         Some(Structure::BLS12381Fr) => ark_binary_op_internal!(

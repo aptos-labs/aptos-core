@@ -15,7 +15,7 @@ use ark_ff::Field;
 #[cfg(feature = "testing")]
 use ark_std::{test_rng, UniformRand};
 #[cfg(feature = "testing")]
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 #[cfg(feature = "testing")]
 use smallvec::{smallvec, SmallVec};
 #[cfg(feature = "testing")]
@@ -51,11 +51,11 @@ macro_rules! ark_rand_internal {
 #[cfg(feature = "testing")]
 pub fn rand_insecure_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
-    mut _args: VecDeque<Value>,
+    ty_args: &[TypeId],
+    _args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(1, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
+    let structure_opt = structure_from_ty_arg!(context, ty_args[0]);
     match structure_opt {
         Some(Structure::BLS12381Fr) => {
             ark_rand_internal!(context, ark_bls12_381::Fr)

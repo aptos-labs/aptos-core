@@ -15,7 +15,7 @@ use aptos_native_interface::{
 };
 use aptos_types::on_chain_config::FeatureFlag;
 use ark_ff::Field;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use num_traits::One;
 use smallvec::{smallvec, SmallVec};
 use std::collections::VecDeque;
@@ -44,12 +44,12 @@ macro_rules! abort_unless_casting_enabled {
 
 pub fn downcast_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let super_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let sub_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let super_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let sub_opt = structure_from_ty_arg!(context, ty_args[1]);
     abort_unless_casting_enabled!(context, super_opt, sub_opt);
     match (super_opt, sub_opt) {
         (Some(Structure::BLS12381Fq12), Some(Structure::BLS12381Gt)) => {
@@ -80,12 +80,12 @@ pub fn downcast_internal(
 
 pub fn upcast_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let sub_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let super_opt = structure_from_ty_arg!(context, &ty_args[1]);
+    let sub_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let super_opt = structure_from_ty_arg!(context, ty_args[1]);
     abort_unless_casting_enabled!(context, super_opt, sub_opt);
     match (sub_opt, super_opt) {
         (Some(Structure::BLS12381Gt), Some(Structure::BLS12381Fq12)) => {

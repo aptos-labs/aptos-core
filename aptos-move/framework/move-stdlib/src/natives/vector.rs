@@ -18,7 +18,7 @@ use aptos_types::error;
 use move_core_types::gas_algebra::NumArgs;
 use move_vm_runtime::native_functions::NativeFunction;
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -38,7 +38,7 @@ pub const EFEATURE_NOT_ENABLED: u64 = 2;
  **************************************************************************************************/
 fn native_move_range(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     if !context
@@ -98,7 +98,7 @@ fn native_move_range(
         length,
         &to,
         insert_position,
-        &ty_args[0],
+        ty_args[0],
     )?;
 
     Ok(smallvec![])

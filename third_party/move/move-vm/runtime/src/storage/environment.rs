@@ -33,7 +33,7 @@ use move_vm_types::loaded_data::{
 use move_vm_types::{
     loaded_data::{runtime_types::Type, struct_name_indexing::StructNameIndexMap},
     module_id_interner::InternedModuleIdPool,
-    ty_interner::InternedTypePool,
+    ty_interner::{InternedTypePool, TypeId},
 };
 use std::sync::Arc;
 
@@ -316,7 +316,7 @@ impl RuntimeEnvironment {
 
     /// Returns the type tag for the given type. Construction of the tag can fail if it is too
     /// "complex": i.e., too deeply nested, or has large struct identifiers.
-    pub fn ty_to_ty_tag(&self, ty: &Type) -> PartialVMResult<TypeTag> {
+    pub fn ty_to_ty_tag(&self, ty: TypeId) -> PartialVMResult<TypeTag> {
         let ty_tag_builder = TypeTagConverter::new(self);
         ty_tag_builder.ty_to_ty_tag(ty)
     }

@@ -18,7 +18,7 @@ use ark_ec::hashing::HashToCurve;
 use either::Either;
 use move_core_types::gas_algebra::{InternalGas, NumBytes};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Value, VectorRef},
 };
 use smallvec::{smallvec, SmallVec};
@@ -80,12 +80,12 @@ macro_rules! hash_to_bls12381gx_cost {
 
 pub fn hash_to_internal(
     context: &mut SafeNativeContext,
-    ty_args: &[Type],
+    ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     assert_eq!(2, ty_args.len());
-    let structure_opt = structure_from_ty_arg!(context, &ty_args[0]);
-    let suite_opt = suite_from_ty_arg!(context, &ty_args[1]);
+    let structure_opt = structure_from_ty_arg!(context, ty_args[0]);
+    let suite_opt = suite_from_ty_arg!(context, ty_args[1]);
     abort_unless_hash_to_structure_enabled!(context, structure_opt, suite_opt);
     let vector_ref = safely_pop_arg!(args, VectorRef);
     let bytes_ref = vector_ref.as_bytes_ref();

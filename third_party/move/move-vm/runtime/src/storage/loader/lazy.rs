@@ -9,7 +9,7 @@ use crate::{
         StructDefinitionLoader,
     },
     Function, LayoutCacheEntry, LayoutWithDelayedFields, LoadedFunction, Module, ModuleStorage,
-    RuntimeEnvironment, Script, StructKey, WithRuntimeEnvironment,
+    RuntimeEnvironment, Script, WithRuntimeEnvironment,
 };
 use move_binary_format::{
     access::ScriptAccess,
@@ -30,6 +30,7 @@ use move_vm_types::{
         struct_name_indexing::StructNameIndex,
     },
     sha3_256,
+    ty_interner::TypeId,
 };
 use std::sync::Arc;
 
@@ -204,7 +205,7 @@ where
         &self,
         gas_meter: &mut impl DependencyGasMeter,
         traversal_context: &mut TraversalContext,
-        key: &StructKey,
+        key: TypeId,
     ) -> Option<PartialVMResult<LayoutWithDelayedFields>> {
         let entry = self.module_storage.get_struct_layout(key)?;
         let (layout, modules) = entry.unpack();
@@ -220,11 +221,7 @@ where
         Some(Ok(layout))
     }
 
-    fn store_layout_to_cache(
-        &self,
-        key: &StructKey,
-        entry: LayoutCacheEntry,
-    ) -> PartialVMResult<()> {
+    fn store_layout_to_cache(&self, key: TypeId, entry: LayoutCacheEntry) -> PartialVMResult<()> {
         self.module_storage.store_struct_layout(key, entry)
     }
 }

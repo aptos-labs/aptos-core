@@ -11,7 +11,7 @@ use aptos_native_interface::{
 };
 use move_core_types::gas_algebra::NumBytes;
 use move_vm_runtime::native_functions::NativeFunction;
-use move_vm_types::{loaded_data::runtime_types::Type, values::Value};
+use move_vm_types::{ty_interner::TypeId, values::Value};
 use sha2::{Digest, Sha256};
 use sha3::Sha3_256;
 use smallvec::{smallvec, SmallVec};
@@ -26,7 +26,7 @@ use std::collections::VecDeque;
 #[inline]
 fn native_sha2_256(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());
@@ -51,7 +51,7 @@ fn native_sha2_256(
 #[inline]
 fn native_sha3_256(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut arguments: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(_ty_args.is_empty());

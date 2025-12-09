@@ -16,7 +16,7 @@ use move_binary_format::errors::{PartialVMError, PartialVMResult};
 use move_core_types::{account_address::AccountAddress, gas_algebra::NumBytes};
 use move_vm_runtime::{native_extensions::SessionListener, native_functions::NativeFunction};
 use move_vm_types::{
-    loaded_data::runtime_types::Type,
+    ty_interner::TypeId,
     values::{Struct, Value},
 };
 use serde::{Deserialize, Serialize};
@@ -263,7 +263,7 @@ fn unpack_allowed_dep(v: Value) -> PartialVMResult<(AccountAddress, String)> {
  **************************************************************************************************/
 fn native_request_publish(
     context: &mut SafeNativeContext,
-    _ty_args: &[Type],
+    _ty_args: &[TypeId],
     mut args: VecDeque<Value>,
 ) -> SafeNativeResult<SmallVec<[Value; 1]>> {
     debug_assert!(matches!(args.len(), 4 | 5));

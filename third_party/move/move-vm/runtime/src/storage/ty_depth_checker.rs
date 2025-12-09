@@ -70,6 +70,7 @@ where
     /// must be non-generic, i.e., all type substitutions must be performed. If needed, the check
     /// traverses multiple modules where inner structs and their fields are defined.
     #[cfg_attr(feature = "force-inline", inline(always))]
+    #[allow(dead_code)]
     pub(crate) fn check_depth_of_type(
         &self,
         gas_meter: &mut impl DependencyGasMeter,
