@@ -149,6 +149,10 @@ harness = false
 name = "secp256k1"
 harness = false
 
+[[bench]]
+name = "slh_dsa"
+harness = false
+
 [[example]]
 name = "is_blstrs_constant_time"
 
