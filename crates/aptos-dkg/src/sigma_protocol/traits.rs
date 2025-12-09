@@ -20,10 +20,11 @@ use ark_serialize::{
 use ark_std::{io::Read, UniformRand};
 use serde::Serialize;
 use std::{fmt::Debug, io::Write};
+use ark_ff::PrimeField;
 
 pub trait Trait<E: Pairing>:
     fixed_base_msms::Trait<
-        Domain: Witness<E>,
+        Domain: Witness<E::ScalarField>,
         MsmOutput = E::G1,
         MsmInput: IsMsmInput<Base = E::G1Affine, Scalar= E::ScalarField>, // need to be a bit specific because this code multiplies scalars and does into_affine(), etc
     > + Sized
@@ -214,13 +215,12 @@ pub trait Trait<E: Pairing>:
 //         }        
 // }
 
-pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {
-    /// The scalar type associated with the domain.
-    type Scalar: CanonicalSerialize + CanonicalDeserialize + Copy; // Not using this atm...
+use ark_ff::Field;
 
+pub trait Witness<F: Field>: CanonicalSerialize + CanonicalDeserialize + Clone + Eq {
     /// Computes a scaled addition: `self + c * other`. Can take ownership because the
     /// randomness is discarded by the prover afterwards
-    fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self;
+    fn scaled_add(self, other: &Self, c: F) -> Self;
 
     /// Samples a random element in the domain. The prover has a witness `w` and calls `w.rand(rng)` to get
     /// the prover's first nonce (of the same "size" as `w`, hence why this cannot be a static method),
@@ -228,10 +228,23 @@ pub trait Witness<E: Pairing>: CanonicalSerialize + CanonicalDeserialize + Clone
     fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self;
 }
 
-impl<E: Pairing> Witness<E> for Scalar<E> {
-    type Scalar = Scalar<E>;
+// use ark_ff::FpConfig;
+// use ark_ff::Fp;
 
-    fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
+// impl<const N: usize, P: FpConfig<N>> Witness for Fp<P, N> {
+//     type Scalar = Fp<P, N>;
+
+//     fn scaled_add(self, other: &Self, c: Fp<P, N>) -> Self {
+//         Scalar(self.0 + (c) * other.0)
+//     }
+
+//     fn rand<R: rand_core::RngCore + rand_core::CryptoRng>(&self, rng: &mut R) -> Self {
+//         Scalar(sample_field_element(rng))
+//     }
+// }
+
+impl<F: PrimeField> Witness<F> for Scalar<F> {
+    fn scaled_add(self, other: &Self, c: F) -> Self {
         Scalar(self.0 + (c) * other.0)
     }
 
@@ -240,10 +253,8 @@ impl<E: Pairing> Witness<E> for Scalar<E> {
     }
 }
 
-impl<E: Pairing, W: Witness<E>> Witness<E> for Vec<W> {
-    type Scalar = W::Scalar;
-
-    fn scaled_add(self, other: &Self, c: E::ScalarField) -> Self {
+impl<F: PrimeField, W: Witness<F>> Witness<F> for Vec<W> {
+    fn scaled_add(self, other: &Self, c: F) -> Self {
         self.into_iter()
             .zip(other.iter())
             .map(|(a, b)| a.scaled_add(b, c))
@@ -291,7 +302,7 @@ where
 // CanonicalDeserialize needs Valid.
 impl<E: Pairing, H: homomorphism::Trait> Valid for FirstProofItem<E, H>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement + Valid,
     E::ScalarField: Valid,
 {
@@ -305,7 +316,7 @@ where
 
 impl<E: Pairing, H: homomorphism::Trait> CanonicalSerialize for FirstProofItem<E, H>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement + CanonicalSerialize,
     E::ScalarField: CanonicalSerialize,
 {
@@ -336,7 +347,7 @@ where
 
 impl<E: Pairing, H: homomorphism::Trait> CanonicalDeserialize for FirstProofItem<E, H>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement + CanonicalDeserialize + Valid,
     E::ScalarField: CanonicalDeserialize + Valid,
 {
@@ -372,7 +383,7 @@ where
 #[derive(CanonicalSerialize, Debug, CanonicalDeserialize, Clone)]
 pub struct Proof<E: Pairing, H: homomorphism::Trait>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement,
 {
     /// The “first item” recorded in the proof, which can be either:
@@ -385,7 +396,7 @@ where
 
 impl<E: Pairing, H: homomorphism::Trait> Proof<E, H>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement,
 {
     /// No-op (semantically): circumvents the fact that proofs inherit the homomorphism’s lifetime. This method should do nothing at runtime.
@@ -411,7 +422,7 @@ where
 // Workaround would be to make `Proof` generic over `H::Domain` and `H::Codomain` instead of `H`
 impl<E: Pairing, H: homomorphism::Trait> PartialEq for Proof<E, H>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement,
 {
     fn eq(&self, other: &Self) -> bool {
@@ -422,7 +433,7 @@ where
 // Empty because it simply asserts reflexivity
 impl<E: Pairing, H: homomorphism::Trait> Eq for Proof<E, H>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement,
 {
 }
@@ -457,36 +468,36 @@ pub fn fiat_shamir_challenge_for_sigma_protocol<
     dst: &[u8],
 ) -> E::ScalarField
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement,
 {
     // Initialise the transcript
     let mut fs_t = merlin::Transcript::new(dst);
 
     // Append the "context" to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_ctxt(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E::ScalarField, H>>::append_sigma_protocol_ctxt(
         &mut fs_t, cntxt,
     );
 
     // Append the MSM bases to the transcript. (If the same hom is used for many proofs, maybe use a single transcript + a boolean to prevent it from repeating?)
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_msm_bases(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E::ScalarField, H>>::append_sigma_protocol_msm_bases(
         &mut fs_t, hom,
     );
 
     // Append the public statement (the image of the witness) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_public_statement(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E::ScalarField, H>>::append_sigma_protocol_public_statement(
         &mut fs_t,
         statement,
     );
 
     // Add the first prover message (the commitment) to the transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::append_sigma_protocol_first_prover_message(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E::ScalarField, H>>::append_sigma_protocol_first_prover_message(
         &mut fs_t,
         prover_first_message,
     );
 
     // Generate the Fiat-Shamir challenge from the updated transcript
-    <merlin::Transcript as fiat_shamir::SigmaProtocol<E, H>>::challenge_for_sigma_protocol(
+    <merlin::Transcript as fiat_shamir::SigmaProtocol<E::ScalarField, H>>::challenge_for_sigma_protocol(
         &mut fs_t,
     )
 }
@@ -507,7 +518,7 @@ pub fn prove_homomorphism<
     dst: &[u8],
 ) -> Proof<E, H>
 where
-    H::Domain: Witness<E>,
+    H::Domain: Witness<E::ScalarField>,
     H::Codomain: Statement,
     R: rand_core::RngCore + rand_core::CryptoRng,
 {

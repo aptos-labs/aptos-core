@@ -206,7 +206,7 @@ impl<E: Pairing, H, LargerDomain> sigma_protocol::Trait<E>
     for homomorphism::LiftHomomorphism<H, LargerDomain>
 where
     H: sigma_protocol::Trait<E>,
-    LargerDomain: Witness<E>,
+    LargerDomain: Witness<E::ScalarField>,
 {
     fn dst(&self) -> Vec<u8> {
         let mut dst = Vec::new();

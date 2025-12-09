@@ -25,6 +25,7 @@ use aptos_crypto::{
 use aptos_crypto_derive::SigmaProtocolWitness;
 use ark_ec::{pairing::Pairing, AdditiveGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_ff::PrimeField;
 
 /// Witness data for the `chunked_elgamal_field` PVSS protocol.
 ///
@@ -43,19 +44,19 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
-pub struct HkzgElgamalWitness<E: Pairing> {
-    pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<E>,
-    pub chunked_plaintexts: Vec<Vec<Scalar<E>>>, // For each plaintext z_i, a chunk z_{i,j}
-    pub elgamal_randomness: Vec<Scalar<E>>,      // For each chunk, a blinding factor
+pub struct HkzgElgamalWitness<F: PrimeField> {
+    pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
+    pub chunked_plaintexts: Vec<Vec<Scalar<F>>>, // For each plaintext z_i, a chunk z_{i,j}
+    pub elgamal_randomness: Vec<Scalar<F>>,      // For each chunk, a blinding factor
 }
 
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Debug, Clone, PartialEq, Eq,
 )]
-pub struct HkzgWeightedElgamalWitness<E: Pairing> {
-    pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<E>,
-    pub chunked_plaintexts: Vec<Vec<Vec<Scalar<E>>>>, // For each player, plaintexts z_i, which are chunked z_{i,j}
-    pub elgamal_randomness: Vec<Vec<Scalar<E>>>, // For at most max_weight, for each chunk, a blinding factor
+pub struct HkzgWeightedElgamalWitness<F: PrimeField> {
+    pub hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness<F>,
+    pub chunked_plaintexts: Vec<Vec<Vec<Scalar<F>>>>, // For each player, plaintexts z_i, which are chunked z_{i,j}
+    pub elgamal_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, for each chunk, a blinding factor
 }
 
 /// The two components described earlier — (1) generating HKZG randomness for the DeKARTv2 proof
@@ -70,16 +71,15 @@ pub struct HkzgWeightedElgamalWitness<E: Pairing> {
 /// a homomorphism. Thus, the overall homomorphism of the Σ-protocol can be viewed as a tuple of two
 /// *lifted* homomorphisms.
 type LiftedHkzg<'a, E> =
-    LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgElgamalWitness<E>>;
+    LiftHomomorphism<univariate_hiding_kzg::CommitmentHomomorphism<'a, E>, HkzgElgamalWitness<<E as Pairing>::ScalarField>>;
 type LiftedChunkedElgamal<'a, E> =
-    LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<E>>;
+    LiftHomomorphism<chunked_elgamal::Homomorphism<'a, E>, HkzgElgamalWitness<<E as Pairing>::ScalarField>>;
 
 type LiftedHkzgWeighted<'a, E> = LiftHomomorphism<
     univariate_hiding_kzg::CommitmentHomomorphism<'a, E>,
-    HkzgWeightedElgamalWitness<E>,
->;
+    HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>>;
 type LiftedWeightedChunkedElgamal<'a, E> =
-    LiftHomomorphism<chunked_elgamal::WeightedHomomorphism<'a, E>, HkzgWeightedElgamalWitness<E>>;
+    LiftHomomorphism<chunked_elgamal::WeightedHomomorphism<'a, E>, HkzgWeightedElgamalWitness<<E as Pairing>::ScalarField>>;
 
 //                                 ┌───────────────────────────────┐
 //                                 │     HkzgElgamalWitness<E>     │
@@ -156,7 +156,7 @@ impl<'a, E: Pairing> Proof<'a, E> {
                 },
             )),
             z: HkzgElgamalWitness {
-                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E>::rand(rng),
+                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
                 chunked_plaintexts: vec![
                     vec![Scalar(sample_field_element(rng)); number_of_chunks];
                     n
@@ -195,7 +195,7 @@ impl<'a, E: Pairing> WeightedProof<'a, E> {
                 },
             )),
             z: HkzgWeightedElgamalWitness {
-                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E>::rand(rng),
+                hkzg_randomness: univariate_hiding_kzg::CommitmentRandomness::<E::ScalarField>::rand(rng),
                 chunked_plaintexts: (0..sc.get_total_num_players())
                     .map(|i| {
                         let w = sc.get_player_weight(&sc.get_player(i)); // TODO: combine these functions...
@@ -227,17 +227,17 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         let lifted_hkzg = LiftedHkzg::<E> {
             hom: univariate_hiding_kzg::CommitmentHomomorphism { lagr_g1, xi_1 },
             // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunked plaintexts after adding a zero
-            projection: |dom: &HkzgElgamalWitness<E>| {
+            projection: |dom: &HkzgElgamalWitness<E::ScalarField>| {
                 let HkzgElgamalWitness {
                     hkzg_randomness,
                     chunked_plaintexts,
                     ..
                 } = dom;
-                let flattened_chunked_plaintexts: Vec<Scalar<E>> =
+                let flattened_chunked_plaintexts: Vec<Scalar<E::ScalarField>> =
                     std::iter::once(Scalar(E::ScalarField::ZERO))
                         .chain(chunked_plaintexts.iter().flatten().cloned())
                         .collect();
-                univariate_hiding_kzg::Witness::<E> {
+                univariate_hiding_kzg::Witness::<E::ScalarField> {
                     hiding_randomness: hkzg_randomness.clone(),
                     values: flattened_chunked_plaintexts,
                 }
@@ -247,7 +247,7 @@ impl<'a, E: Pairing> Homomorphism<'a, E> {
         let lifted_chunked_elgamal = LiftedChunkedElgamal::<E> {
             hom: chunked_elgamal::Homomorphism { pp, eks },
             // The projection map simply ignores the `hkzg_randomness` component
-            projection: |dom: &HkzgElgamalWitness<E>| {
+            projection: |dom: &HkzgElgamalWitness<E::ScalarField>| {
                 let HkzgElgamalWitness {
                     chunked_plaintexts,
                     elgamal_randomness,
@@ -280,17 +280,17 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
         let lifted_hkzg = LiftedHkzgWeighted::<E> {
             hom: univariate_hiding_kzg::CommitmentHomomorphism { lagr_g1, xi_1 },
             // The projection map ignores the `elgamal_randomness` component, and flattens the vector of chunked plaintexts after adding a zero
-            projection: |dom: &HkzgWeightedElgamalWitness<E>| {
+            projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 let HkzgWeightedElgamalWitness {
                     hkzg_randomness,
                     chunked_plaintexts,
                     ..
                 } = dom;
-                let flattened_chunked_plaintexts: Vec<Scalar<E>> =
+                let flattened_chunked_plaintexts: Vec<Scalar<E::ScalarField>> =
                     std::iter::once(Scalar(E::ScalarField::ZERO))
                         .chain(chunked_plaintexts.iter().flatten().flatten().cloned())
                         .collect();
-                univariate_hiding_kzg::Witness::<E> {
+                univariate_hiding_kzg::Witness::<E::ScalarField> {
                     hiding_randomness: hkzg_randomness.clone(),
                     values: flattened_chunked_plaintexts,
                 }
@@ -300,7 +300,7 @@ impl<'a, E: Pairing> WeightedHomomorphism<'a, E> {
         let lifted_chunked_elgamal = LiftedWeightedChunkedElgamal::<E> {
             hom: chunked_elgamal::WeightedHomomorphism { pp, eks },
             // The projection map simply ignores the `hkzg_randomness` component
-            projection: |dom: &HkzgWeightedElgamalWitness<E>| {
+            projection: |dom: &HkzgWeightedElgamalWitness<E::ScalarField>| {
                 let HkzgWeightedElgamalWitness {
                     chunked_plaintexts,
                     elgamal_randomness,

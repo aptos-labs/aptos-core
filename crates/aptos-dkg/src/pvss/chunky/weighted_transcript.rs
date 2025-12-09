@@ -127,8 +127,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type PublicParameters = PublicParameters<E>;
@@ -179,7 +179,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             );
         }
 
-        let mut sk_shares: Vec<Scalar<E>> = Vec::with_capacity(weight);
+        let mut sk_shares: Vec<Scalar<E::ScalarField>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
         for i in 0..weight {
@@ -289,8 +289,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = Vec<keys::DealtPubKeyShare<E>>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E>>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = Vec<keys::DealtSecretKeyShare<E::ScalarField>>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type InputSecret = InputSecret<E::ScalarField>;
@@ -420,7 +420,7 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
             );
         }
 
-        let mut sk_shares: Vec<Scalar<E>> = Vec::with_capacity(weight);
+        let mut sk_shares: Vec<Scalar<E::ScalarField>> = Vec::with_capacity(weight);
         let pk_shares = self.get_public_key_share(sc, player);
 
         for i in 0..weight {

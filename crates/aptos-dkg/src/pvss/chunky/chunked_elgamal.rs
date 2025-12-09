@@ -154,17 +154,17 @@ pub struct WeightedCodomainShape<T: CanonicalSerialize + CanonicalDeserialize + 
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct Witness<E: Pairing> {
-    pub plaintext_chunks: Vec<Vec<Scalar<E>>>,
-    pub plaintext_randomness: Vec<Scalar<E>>, // PlaintextRandomness<E>,
+pub struct Witness<F: PrimeField> {
+    pub plaintext_chunks: Vec<Vec<Scalar<F>>>,
+    pub plaintext_randomness: Vec<Scalar<F>>, // PlaintextRandomness<E>,
 }
 
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct WeightedWitness<E: Pairing> {
-    pub plaintext_chunks: Vec<Vec<Vec<Scalar<E>>>>,
-    pub plaintext_randomness: Vec<Vec<Scalar<E>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
+pub struct WeightedWitness<F: PrimeField> {
+    pub plaintext_chunks: Vec<Vec<Vec<Scalar<F>>>>,
+    pub plaintext_randomness: Vec<Vec<Scalar<F>>>, // For at most max_weight, there needs to be a vector of randomness to encrypt a vector of chunks
 }
 
 // type PlayerPlaintextChunks<E: Pairing> = Vec<Vec<Scalar<E>>>;
@@ -172,7 +172,7 @@ pub struct WeightedWitness<E: Pairing> {
 
 impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
-    type Domain = Witness<E>;
+    type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
@@ -181,7 +181,7 @@ impl<E: Pairing> homomorphism::Trait for Homomorphism<'_, E> {
 
 impl<E: Pairing> homomorphism::Trait for WeightedHomomorphism<'_, E> {
     type Codomain = WeightedCodomainShape<E::G1>;
-    type Domain = WeightedWitness<E>;
+    type Domain = WeightedWitness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))
@@ -315,8 +315,8 @@ impl<'a, E: Pairing> fixed_base_msms::Trait for Homomorphism<'a, E> {
 fn chunks_msm_terms<E: Pairing>(
     pp: &PublicParameters<E>,
     ek: <E as Pairing>::G1Affine,
-    chunks: &[Scalar<E>],
-    correlated_randomness: &[Scalar<E>],
+    chunks: &[Scalar<E::ScalarField>],
+    correlated_randomness: &[Scalar<E::ScalarField>],
 ) -> Vec<MsmInput<E::G1Affine, E::ScalarField>> {
     chunks
         .iter()
@@ -333,8 +333,8 @@ fn chunks_msm_terms<E: Pairing>(
 pub fn chunks_vec_msm_terms<E: Pairing>(
     pp: &PublicParameters<E>,
     ek: <E as Pairing>::G1Affine,
-    chunks_vec: &[Vec<Scalar<E>>],
-    correlated_randomness_vec: &[Vec<Scalar<E>>],
+    chunks_vec: &[Vec<Scalar<E::ScalarField>>],
+    correlated_randomness_vec: &[Vec<Scalar<E::ScalarField>>],
 ) -> Vec<Vec<MsmInput<E::G1Affine, E::ScalarField>>> {
     chunks_vec
         .iter()
@@ -451,7 +451,7 @@ mod tests {
     fn prepare_chunked_witness<E: Pairing>(
         num_values: usize,
         ell: u8,
-    ) -> (Vec<E::ScalarField>, Witness<E>, u8, u32) {
+    ) -> (Vec<E::ScalarField>, Witness<E::ScalarField>, u8, u32) {
         let mut rng = thread_rng();
 
         // 1. Generate random values
@@ -471,7 +471,7 @@ mod tests {
 
         // 5. Build witness
         let witness = Witness {
-            plaintext_chunks: Scalar::<E>::vecvec_from_inner(chunked_values),
+            plaintext_chunks: Scalar::<E::ScalarField>::vecvec_from_inner(chunked_values),
             plaintext_randomness: Scalar::vec_from_inner(rs),
         };
 
@@ -483,7 +483,7 @@ mod tests {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp = PublicParameters::default();
+        let pp: PublicParameters::<E> = PublicParameters::default();
 
         let hom = Homomorphism {
             pp: &pp,
@@ -517,7 +517,7 @@ mod tests {
         let (zs, witness, radix_exponent, _num_chunks) = prepare_chunked_witness::<E>(2, 16);
 
         // 6. Initialize the homomorphism
-        let pp = PublicParameters::default();
+        let pp: PublicParameters<E> = PublicParameters::default();
         let dks: Vec<E::ScalarField> = sample_field_elements(2, &mut thread_rng());
 
         let hom = Homomorphism {
@@ -526,7 +526,7 @@ mod tests {
         };
 
         // 7. Apply homomorphism to obtain chunked ciphertexts
-        let CodomainShape {
+        let CodomainShape::<E::G1> {
             chunks: Cs,
             randomness: Rs,
         } = hom.apply(&witness);

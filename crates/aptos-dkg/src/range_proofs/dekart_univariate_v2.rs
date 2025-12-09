@@ -27,6 +27,7 @@ use num_integer::Roots;
 use rand::{CryptoRng, RngCore};
 use std::{fmt::Debug, io::Write};
 use aptos_crypto::arkworks::msm::MsmInput;
+use ark_ff::PrimeField;
 
 #[allow(non_snake_case)]
 #[derive(CanonicalSerialize, Debug, PartialEq, Eq, Clone, CanonicalDeserialize)]
@@ -231,7 +232,7 @@ fn compute_h_denom_eval<E: Pairing>(
 impl<E: Pairing> traits::BatchedRangeProof<E> for Proof<E> {
     type Commitment = univariate_hiding_kzg::Commitment<E>;
     type CommitmentKey = univariate_hiding_kzg::CommitmentKey<E>;
-    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E>;
+    type CommitmentRandomness = univariate_hiding_kzg::CommitmentRandomness<E::ScalarField>;
     type Input = E::ScalarField;
     type ProverKey = ProverKey<E>;
     type PublicStatement = PublicStatement<E>;
@@ -913,14 +914,14 @@ pub mod two_term_msm {
     #[derive(
         SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
     )]
-    pub struct Witness<E: Pairing> {
-        pub poly_randomness: Scalar<E>,
-        pub hiding_kzg_randomness: Scalar<E>,
+    pub struct Witness<F: PrimeField> {
+        pub poly_randomness: Scalar<F>,
+        pub hiding_kzg_randomness: Scalar<F>,
     }
 
     impl<E: Pairing> homomorphism::Trait for Homomorphism<E> {
         type Codomain = CodomainShape<E::G1>;
-        type Domain = Witness<E>;
+        type Domain = Witness<E::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             // Not doing `self.apply_msm(self.msm_terms(input))` because E::G1::msm is slower!

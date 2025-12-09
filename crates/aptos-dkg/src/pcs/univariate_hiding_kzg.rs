@@ -33,10 +33,11 @@ use sigma_protocol::homomorphism::TrivialShape as CodomainShape;
 use std::fmt::Debug;
 use aptos_crypto::arkworks::msm::MsmInput;
 use aptos_crypto::arkworks::msm::IsMsmInput;
+use ark_ff::PrimeField;
 
 pub type Commitment<E> = CodomainShape<<E as Pairing>::G1>;
 
-pub type CommitmentRandomness<E> = Scalar<E>;
+pub type CommitmentRandomness<F> = Scalar<F>;
 
 #[derive(CanonicalSerialize, CanonicalDeserialize, Debug, PartialEq, Eq, Clone)]
 pub struct OpeningProof<E: Pairing> {
@@ -155,7 +156,7 @@ pub fn setup<E: Pairing, R: RngCore + CryptoRng>(
 pub fn commit_with_randomness<E: Pairing>(
     ck: &CommitmentKey<E>,
     values: &[E::ScalarField],
-    r: &CommitmentRandomness<E>,
+    r: &CommitmentRandomness<E::ScalarField>,
 ) -> Commitment<E> {
     let commitment_hom: CommitmentHomomorphism<'_, E> = CommitmentHomomorphism {
         lagr_g1: &ck.lagr_g1,
@@ -177,7 +178,7 @@ impl<'a, E: Pairing> CommitmentHomomorphism<'a, E> {
         rho: E::ScalarField,
         x: E::ScalarField,
         y: E::ScalarField,
-        s: &CommitmentRandomness<E>,
+        s: &CommitmentRandomness<E::ScalarField>,
     ) -> OpeningProof<E> {
         if ck.roots_of_unity_in_eval_dom.contains(&x) {
             panic!("x is not allowed to be a root of unity");
@@ -277,14 +278,14 @@ pub struct CommitmentHomomorphism<'a, E: Pairing> {
 #[derive(
     SigmaProtocolWitness, CanonicalSerialize, CanonicalDeserialize, Clone, Debug, PartialEq, Eq,
 )]
-pub struct Witness<E: Pairing> {
-    pub hiding_randomness: CommitmentRandomness<E>,
-    pub values: Vec<Scalar<E>>,
+pub struct Witness<F: PrimeField> {
+    pub hiding_randomness: CommitmentRandomness<F>,
+    pub values: Vec<Scalar<F>>,
 }
 
 impl<E: Pairing> homomorphism::Trait for CommitmentHomomorphism<'_, E> {
     type Codomain = CodomainShape<E::G1>;
-    type Domain = Witness<E>;
+    type Domain = Witness<E::ScalarField>;
 
     fn apply(&self, input: &Self::Domain) -> Self::Codomain {
         self.apply_msm(self.msm_terms(input))

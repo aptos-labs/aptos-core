@@ -119,8 +119,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E::ScalarField>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type PublicParameters = PublicParameters<E>;
@@ -359,8 +359,8 @@ impl<const N: usize, P: FpConfig<N>, E: Pairing<ScalarField = Fp<P, N>>> traits:
 {
     type DealtPubKey = keys::DealtPubKey<E>;
     type DealtPubKeyShare = keys::DealtPubKeyShare<E>;
-    type DealtSecretKey = keys::DealtSecretKey<E>;
-    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E>;
+    type DealtSecretKey = keys::DealtSecretKey<E::ScalarField>;
+    type DealtSecretKeyShare = keys::DealtSecretKeyShare<E::ScalarField>;
     type DecryptPrivKey = keys::DecryptPrivKey<E>;
     type EncryptPubKey = keys::EncryptPubKey<E>;
     type InputSecret = InputSecret<E::ScalarField>;

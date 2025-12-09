@@ -57,7 +57,7 @@ mod schnorr {
 
     impl<E: Pairing> homomorphism::Trait for Schnorr<E> {
         type Codomain = CodomainShape<E::G1>;
-        type Domain = Scalar<E>;
+        type Domain = Scalar<E::ScalarField>;
 
         fn apply(&self, input: &Self::Domain) -> Self::Codomain {
             self.apply_msm(self.msm_terms(input))
